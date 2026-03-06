@@ -1,0 +1,23 @@
+export const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || "http://localhost:5173";
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+export const TOKEN_STORAGE_KEY = "pharmagest_token";
+
+export const QUERY_KEYS = {
+  token: ["token"] as const,
+} as const;
+
+export const ENDPOINTS = {
+  uploads: {
+    achatJson: "/uploads/achat-json",
+    venteJson: "/uploads/vente-json",
+  },
+} as const;
+
+export const ACTIONS = {
+  GET_TOKEN: "GET_TOKEN",
+  CLEAR_TOKEN: "CLEAR_TOKEN",
+  STORE_TOKEN: "STORE_TOKEN",
+  START_AREA_CAPTURE: "START_AREA_CAPTURE",
+  SELECT_AND_CAPTURE: "SELECT_AND_CAPTURE",
+} as const;
