@@ -4,7 +4,9 @@ VENV := $(BACKEND_DIR)/.venv
 PIP := $(VENV)/bin/pip
 UVICORN := $(VENV)/bin/uvicorn
 
-.PHONY: install install-backend install-frontend dev dev-backend dev-frontend env
+SQLITE_WEB := $(VENV)/bin/sqlite_web
+
+.PHONY: install install-backend install-frontend dev dev-backend dev-frontend env db
 
 env:
 	@if [ ! -f $(BACKEND_DIR)/.env ]; then \
@@ -30,3 +32,6 @@ dev-frontend:
 dev:
 	@$(MAKE) dev-backend &
 	@$(MAKE) dev-frontend
+
+db:
+	$(SQLITE_WEB) $(BACKEND_DIR)/pharmagest.db --port 8080 --no-browser

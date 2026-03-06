@@ -234,18 +234,28 @@ body {
   }
 
   .sign-up {
-    @apply flex flex-col items-center justify-center px-6 py-8 min-h-svh;
+    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh;
+    background: radial-gradient(ellipse at top, #0d2a3a 0%, #071b2b 70%);
 
     .logo {
-      @apply flex items-center justify-center;
+      @apply flex flex-col items-center justify-center gap-2;
 
       img {
-        @apply h-12 w-12;
+        @apply h-16 w-16;
+      }
+
+      .brand-name {
+        @apply text-white text-xl font-bold tracking-wide;
+      }
+
+      .brand-sub {
+        @apply text-[#14b8a6] text-xs font-medium tracking-widest uppercase;
       }
     }
 
     .card {
-      @apply w-full max-w-xl p-12 mt-6;
+      @apply w-full max-w-md mt-6 border-0 shadow-2xl;
+      padding: clamp(1.25rem, 5vw, 2.5rem);
     }
 
     .header {
@@ -253,7 +263,7 @@ body {
     }
 
     .title {
-      @apply text-3xl font-semibold;
+      @apply text-2xl sm:text-3xl font-semibold;
     }
 
     .description {
@@ -265,7 +275,7 @@ body {
     }
 
     .form {
-      @apply space-y-6;
+      @apply space-y-5;
 
       [data-slot="label"] {
         @apply text-sm font-medium;
@@ -301,7 +311,7 @@ body {
     }
 
     .submit {
-      @apply w-full mt-2;
+      @apply w-full mt-2 bg-[#14b8a6] hover:bg-[#0d9488] text-white border-0;
     }
 
     .footer {
@@ -312,24 +322,34 @@ body {
       }
 
       a {
-        @apply font-semibold underline;
+        @apply font-semibold text-[#14b8a6] no-underline hover:underline;
       }
     }
   }
 
   .sign-in {
-    @apply flex flex-col items-center justify-center px-6 py-8 min-h-svh;
+    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh;
+    background: radial-gradient(ellipse at top, #0d2a3a 0%, #071b2b 70%);
 
     .logo {
-      @apply flex items-center justify-center;
+      @apply flex flex-col items-center justify-center gap-2;
 
       img {
-        @apply h-12 w-12;
+        @apply h-16 w-16;
+      }
+
+      .brand-name {
+        @apply text-white text-xl font-bold tracking-wide;
+      }
+
+      .brand-sub {
+        @apply text-[#14b8a6] text-xs font-medium tracking-widest uppercase;
       }
     }
 
     .card {
-      @apply w-full max-w-xl p-12 mt-6;
+      @apply w-full max-w-md mt-6 border-0 shadow-2xl;
+      padding: clamp(1.25rem, 5vw, 2.5rem);
     }
 
     .header {
@@ -337,7 +357,7 @@ body {
     }
 
     .title {
-      @apply text-3xl font-semibold;
+      @apply text-2xl sm:text-3xl font-semibold;
     }
 
     .description {
@@ -349,7 +369,7 @@ body {
     }
 
     .form {
-      @apply space-y-6;
+      @apply space-y-5;
 
       [data-slot="label"] {
         @apply text-sm font-medium;
@@ -381,7 +401,7 @@ body {
     }
 
     .submit {
-      @apply w-full mt-6;
+      @apply w-full mt-4 bg-[#14b8a6] hover:bg-[#0d9488] text-white border-0;
     }
 
     .split {
@@ -421,7 +441,7 @@ body {
       }
 
       a {
-        @apply font-semibold underline;
+        @apply font-semibold text-[#14b8a6] no-underline hover:underline;
       }
     }
   }

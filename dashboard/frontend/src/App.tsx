@@ -27,10 +27,10 @@ import { dataProvider } from "./providers/data";
 import { authProvider } from "./providers/auth";
 import { Login } from "./pages/login";
 import { Register } from "./pages/register";
-import AchatList from "./pages/achat/list";
-import VentesList from "./pages/ventes/index";
-import StockList from "./pages/stock/list";
-import ParametresList from "./pages/parametres/list";
+import AchatList from "./pages/achat";
+import VentesList from "./pages/ventes";
+import StockList from "./pages/stock";
+import ParametresList from "./pages/parametres";
 import RapportsPage from "./pages/rapports";
 import ProfileSetup from "./pages/profile/setup";
 import ProfilePage from "./pages/profile/index";
@@ -42,7 +42,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <RefineKbarProvider>
-          <ThemeProvider>
+          <ThemeProvider defaultTheme="light">
             <DevtoolsProvider>
               <Refine
                 dataProvider={dataProvider}

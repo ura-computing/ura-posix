@@ -48,6 +48,8 @@ export const SignInForm = () => {
     <div className="sign-in">
       <div className="logo">
         <img src="/logo.png" alt="PharmaGest" />
+        <span className="brand-name">PharmaGest</span>
+        <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 
       <Card className="card">
@@ -100,7 +102,7 @@ export const SignInForm = () => {
 
         <CardFooter className="footer">
           <span>Pas de compte ?</span>
-          <Link to="/register"> Créer un compte</Link>
+          <Link to="/register">Créer un compte</Link>
         </CardFooter>
       </Card>
     </div>

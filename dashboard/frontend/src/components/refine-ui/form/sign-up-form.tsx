@@ -55,6 +55,8 @@ export const SignUpForm = () => {
     <div className="sign-up">
       <div className="logo">
         <img src="/logo.png" alt="PharmaGest" />
+        <span className="brand-name">PharmaGest</span>
+        <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 
       <Card className="card">
@@ -121,7 +123,7 @@ export const SignUpForm = () => {
 
         <CardFooter className="footer">
           <span>Déjà un compte ?</span>
-          <Link to="/login"> Se connecter</Link>
+          <Link to="/login">Se connecter</Link>
         </CardFooter>
       </Card>
     </div>

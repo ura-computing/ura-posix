@@ -1,65 +1,86 @@
-import { createDataProvider, CreateDataProviderOptions } from "@refinedev/rest";
+import type { DataProvider } from "@refinedev/core";
+import { API_URL, TOKEN_KEY } from "@/constants";
 
-import { CreateResponse, GetOneResponse, ListResponse } from "@/types";
-import { BACKEND_BASE_URL } from "@/constants";
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
 
-const options: CreateDataProviderOptions = {
-  getList: {
-    getEndpoint: ({ resource }) => resource,
+async function apiFetch(path: string, options: RequestInit = {}) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Request failed");
+  }
+  return res.json();
+}
 
-    buildQueryParams: async ({ pagination, filters }) => {
-      const params: Record<string, string | number> = {};
+export const dataProvider: DataProvider = {
+  getList: async ({ resource, pagination, filters }) => {
+    const page =
+      (pagination as { currentPage: number | undefined })?.currentPage ?? 1;
+    const limit = pagination?.pageSize ?? 10;
 
-      if (pagination?.mode !== "off") {
-        const page = pagination?.currentPage ?? 1;
-        const pageSize = pagination?.pageSize ?? 10;
+    const params = new URLSearchParams();
+    params.set("page", String(page));
+    params.set("limit", String(limit));
 
-        params.page = page;
-        params.limit = pageSize;
+    filters?.forEach((filter) => {
+      if ("field" in filter) {
+        if (filter.field === "search" || filter.field === "name") {
+          params.set("search", String(filter.value));
+        } else if (
+          filter.field === "categories" &&
+          Array.isArray(filter.value)
+        ) {
+          (filter.value as string[]).forEach((cat) =>
+            params.append("category", cat),
+          );
+        } else if (filter.field === "date_from" || filter.field === "date_to") {
+          if (filter.value) params.set(filter.field, String(filter.value));
+        }
       }
+    });
 
-      filters?.forEach((filter) => {
-        const field = "field" in filter ? filter.field : "";
-        const value = String(filter.value);
-
-        if (field === "search" || field === "name") params.search = value;
-      });
-
-      return params;
-    },
-
-    mapResponse: async (response) => {
-      const payload: ListResponse = await response.json();
-      return payload.data ?? [];
-    },
-
-    getTotalCount: async (response) => {
-      const payload: ListResponse = await response.json();
-      return payload.pagination?.total ?? payload.data?.length ?? 0;
-    },
+    const payload = await apiFetch(`/${resource}?${params}`);
+    return {
+      data: payload.data ?? [],
+      total: payload.pagination?.total ?? payload.data?.length ?? 0,
+    };
   },
 
-  create: {
-    getEndpoint: ({ resource }) => resource,
-
-    buildBodyParams: async ({ variables }) => variables,
-
-    mapResponse: async (response) => {
-      const json: CreateResponse = await response.json();
-      return json.data ?? {};
-    },
+  create: async ({ resource, variables }) => {
+    const payload = await apiFetch(`/${resource}`, {
+      method: "POST",
+      body: JSON.stringify(variables),
+    });
+    return { data: payload.data ?? payload };
   },
 
-  getOne: {
-    getEndpoint: ({ resource, id }) => `${resource}/${id}`,
-
-    mapResponse: async (response) => {
-      const json: GetOneResponse = await response.json();
-      return json.data ?? {};
-    },
+  getOne: async ({ resource, id }) => {
+    const payload = await apiFetch(`/${resource}/${id}`);
+    return { data: payload.data ?? payload };
   },
+
+  update: async ({ resource, id, variables }) => {
+    const payload = await apiFetch(`/${resource}/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(variables),
+    });
+    return { data: payload.data ?? payload };
+  },
+
+  deleteOne: async ({ resource, id }) => {
+    const payload = await apiFetch(`/${resource}/${id}`, { method: "DELETE" });
+    return { data: payload.data ?? payload };
+  },
+
+  getApiUrl: () => API_URL,
 };
-
-const { dataProvider } = createDataProvider(BACKEND_BASE_URL, options);
-
-export { dataProvider };

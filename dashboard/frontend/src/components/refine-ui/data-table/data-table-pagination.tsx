@@ -40,132 +40,106 @@ export function DataTablePagination({
   const pageSizeOptions = useMemo(() => {
     const baseOptions = [10, 20, 30, 40, 50];
     const optionsSet = new Set(baseOptions);
-
-    if (!optionsSet.has(pageSize)) {
-      optionsSet.add(pageSize);
-    }
-
+    if (!optionsSet.has(pageSize)) optionsSet.add(pageSize);
     return Array.from(optionsSet).sort((a, b) => a - b);
   }, [pageSize]);
 
+  const safePageCount = pageCount > 0 ? pageCount : 1;
+  const isFirst = currentPage <= 1;
+  const isLast = currentPage >= safePageCount;
+
+  const NavButtons = () => (
+    <div className="flex items-center gap-1">
+      <Button
+        variant="outline"
+        size="icon"
+        className="hidden h-8 w-8 lg:flex"
+        onClick={() => setCurrentPage(1)}
+        disabled={isFirst}
+        aria-label="Première page"
+      >
+        <ChevronsLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => setCurrentPage(currentPage - 1)}
+        disabled={isFirst}
+        aria-label="Page précédente"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => setCurrentPage(currentPage + 1)}
+        disabled={isLast}
+        aria-label="Page suivante"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="hidden h-8 w-8 lg:flex"
+        onClick={() => setCurrentPage(safePageCount)}
+        disabled={isLast}
+        aria-label="Dernière page"
+      >
+        <ChevronsRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  if (variant === "simple") {
+    return (
+      <div className="flex items-center gap-2 ml-auto">
+        <NavButtons />
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        "flex",
-        "items-center",
-        "justify-between",
-        "flex-wrap",
-        "px-2",
-        "w-full",
-        "gap-2"
-      )}
-    >
-      {variant === "default" ? (
-        <>
-          <div
-            className={cn(
-              "flex-1",
-              "text-sm",
-              "text-muted-foreground",
-              "whitespace-nowrap"
-            )}
+    <div className="flex items-center justify-between flex-wrap px-2 w-full gap-3">
+      <p className="text-sm text-muted-foreground whitespace-nowrap">
+        {typeof total === "number"
+          ? `${total.toLocaleString("fr-MA")} résultat${total !== 1 ? "s" : ""}`
+          : null}
+      </p>
+
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Lignes par page</span>
+          <Select
+            value={`${pageSize}`}
+            onValueChange={(v) => {
+              setPageSize(Number(v));
+              setCurrentPage(1);
+            }}
           >
-            {typeof total === "number" ? `${total} row(s)` : null}
-          </div>
-          <div className={cn("flex", "items-center", "flex-wrap", "gap-2")}>
-            <div className={cn("flex", "items-center", "gap-2")}>
-              <span className={cn("text-sm", "font-medium")}>Rows per page</span>
-              <Select
-                value={`${pageSize}`}
-                onValueChange={(v) => setPageSize(Number(v))}
-              >
-                <SelectTrigger className={cn("h-8", "w-[70px]")}>
-                  <SelectValue placeholder={pageSize} />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  {pageSizeOptions.map((size) => (
-                    <SelectItem key={size} value={`${size}`}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className={cn("flex", "items-center", "flex-wrap", "gap-2")}>
-              <div
-                className={cn(
-                  "flex",
-                  "items-center",
-                  "justify-center",
-                  "text-sm",
-                  "font-medium"
-                )}
-              >
-                Page {currentPage} of {pageCount}
-              </div>
-              <div className={cn("flex", "items-center", "gap-2")}>
-                <Button
-                  variant="outline"
-                  className={cn("hidden", "h-8", "w-8", "p-0", "lg:flex")}
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  aria-label="Go to first page"
-                >
-                  <ChevronsLeft />
-                </Button>
-                <Button
-                  variant="outline"
-                  className={cn("h-8", "w-8", "p-0")}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  aria-label="Go to previous page"
-                >
-                  <ChevronLeft />
-                </Button>
-                <Button
-                  variant="outline"
-                  className={cn("h-8", "w-8", "p-0")}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === pageCount}
-                  aria-label="Go to next page"
-                >
-                  <ChevronRight />
-                </Button>
-                <Button
-                  variant="outline"
-                  className={cn("hidden", "h-8", "w-8", "p-0", "lg:flex")}
-                  onClick={() => setCurrentPage(pageCount)}
-                  disabled={currentPage === pageCount}
-                  aria-label="Go to last page"
-                >
-                  <ChevronsRight />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className={cn("flex", "items-center", "gap-2", "ml-auto")}>
-          <Button
-            variant="outline"
-            className={cn("h-8", "w-8", "p-0")}
-            onClick={() => setCurrentPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            aria-label="Go to previous page"
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="outline"
-            className={cn("h-8", "w-8", "p-0")}
-            onClick={() => setCurrentPage(currentPage + 1)}
-            disabled={currentPage === pageCount}
-            aria-label="Go to next page"
-          >
-            <ChevronRight />
-          </Button>
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue placeholder={pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top">
+              {pageSizeOptions.map((size) => (
+                <SelectItem key={size} value={`${size}`}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
+
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Page <span className="font-medium text-foreground">{currentPage}</span> sur{" "}
+            <span className="font-medium text-foreground">{safePageCount}</span>
+          </span>
+          <NavButtons />
+        </div>
+      </div>
     </div>
   );
 }

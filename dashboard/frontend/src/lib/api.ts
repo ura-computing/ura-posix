@@ -24,6 +24,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const token = getToken();
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Upload failed");
+  }
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   auth: {
     login: (payload: LoginPayload) =>
@@ -36,6 +52,32 @@ export const api = {
 
     updateMe: (payload: ProfileUpdatePayload) =>
       request<User>("/auth/me", { method: "PUT", body: JSON.stringify(payload) }),
+  },
+
+  uploads: {
+    achat: (file: File) => uploadFile<{ inserted: number }>("/uploads/achat", file),
+    vente: (file: File) => uploadFile<{ inserted: number }>("/uploads/vente", file),
+  },
+
+  tables: {
+    achatCategories: () => request<string[]>("/achat/categories"),
+    venteCategories: () => request<string[]>("/ventes/categories"),
+    exportAchat: (search: string, categories: string[], dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ export: "true" });
+      if (search) p.set("search", search);
+      categories.forEach((cat) => p.append("category", cat));
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<{ data: Record<string, unknown>[] }>(`/achat?${p}`);
+    },
+    exportVente: (search: string, categories: string[], dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams({ export: "true" });
+      if (search) p.set("search", search);
+      categories.forEach((cat) => p.append("category", cat));
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      return request<{ data: Record<string, unknown>[] }>(`/ventes?${p}`);
+    },
   },
 
   storeSession: (data: AuthToken) => {

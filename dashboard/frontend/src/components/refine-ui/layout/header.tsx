@@ -1,4 +1,5 @@
 import { UserAvatar } from "@/components/refine-ui/layout/user-avatar";
+import { ThemeToggle } from "@/components/refine-ui/theme/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +78,7 @@ function DesktopHeader() {
             </span>
           )}
         </button>
+        <ThemeToggle className="border-border text-muted-foreground hover:text-foreground" />
         <UserDropdown />
       </div>
     </header>
@@ -103,6 +105,7 @@ function MobileHeader() {
         })}
       />
       <h1 className="text-base font-bold truncate flex-1 min-w-0">{title}</h1>
+      <ThemeToggle className="border-border text-muted-foreground" />
       <UserDropdown />
     </header>
   );

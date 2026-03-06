@@ -1,3 +1,8 @@
+import { useState } from "react";
+import { format, subDays, startOfMonth } from "date-fns";
+import { fr } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
+
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -9,20 +14,102 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import {
   MOCK_KPIS,
   MOCK_INVOICE_ROWS,
   formatCurrency,
 } from "@/data/mock-dashboard";
-import { Pencil, ShoppingCart, Package, TriangleAlert, TrendingUp, UploadCloud } from "lucide-react";
+import { CalendarIcon, Pencil, ShoppingCart, Package, TriangleAlert, TrendingUp, UploadCloud, X } from "lucide-react";
 import { Link } from "react-router";
+import { cn } from "@/lib/utils";
+
 const Dashboard = () => {
   const kpis = MOCK_KPIS;
   const rows = MOCK_INVOICE_ROWS;
+  const today = new Date();
+
+  const [range, setRange] = useState<DateRange | undefined>();
+  const [calOpen, setCalOpen] = useState(false);
+
+  const applyPreset = (preset: "today" | "7d" | "month") => {
+    if (preset === "today") setRange({ from: today, to: today });
+    else if (preset === "7d") setRange({ from: subDays(today, 6), to: today });
+    else setRange({ from: startOfMonth(today), to: today });
+    setCalOpen(false);
+  };
+
+  const rangeLabel = range?.from
+    ? range.to && range.to.getTime() !== range.from.getTime()
+      ? `${format(range.from, "d MMM", { locale: fr })} – ${format(range.to, "d MMM yyyy", { locale: fr })}`
+      : format(range.from, "d MMMM yyyy", { locale: fr })
+    : "Sélectionner une période";
+
+  const hasRange = !!range?.from;
 
   return (
     <div className="space-y-6">
+      {/* Date range filter */}
+      <div className="flex items-center gap-3 flex-wrap rounded-xl border border-border bg-card px-4 py-3">
+        <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Période :</span>
+
+        <Popover open={calOpen} onOpenChange={setCalOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-9 gap-2 text-sm font-normal min-w-[200px] justify-start",
+                hasRange && "border-primary text-primary"
+              )}
+            >
+              <CalendarIcon className="h-4 w-4 shrink-0 opacity-60" />
+              <span className="truncate">{rangeLabel}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start" sideOffset={6}>
+            <div className="flex items-center gap-1 px-3 py-2 border-b">
+              <Button size="sm" variant="ghost" className="h-7 text-xs rounded-md" onClick={() => applyPreset("today")}>
+                Aujourd'hui
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs rounded-md" onClick={() => applyPreset("7d")}>
+                7 derniers jours
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs rounded-md" onClick={() => applyPreset("month")}>
+                Ce mois
+              </Button>
+            </div>
+            <Calendar
+              mode="range"
+              selected={range}
+              onSelect={(r) => { setRange(r); if (r?.to) setCalOpen(false); }}
+              numberOfMonths={2}
+              locale={fr}
+              disabled={{ after: today }}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+
+        {hasRange && (
+          <>
+            <Separator orientation="vertical" className="h-5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setRange(undefined)}
+            >
+              <X className="h-3.5 w-3.5" />
+              Effacer
+            </Button>
+          </>
+        )}
+      </div>
+
       <section>
         <h2 className="text-lg font-semibold text-foreground">Aperçu Rapide</h2>
         <p className="text-sm text-muted-foreground mb-4">Résumé de l'activité du jour</p>
