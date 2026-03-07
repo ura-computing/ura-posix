@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import {
+  useGetIdentity,
   useLink,
   useMenu,
   type TreeMenuItem,
@@ -29,10 +30,17 @@ import {
 import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
+import type { User } from "@/types";
 
 export function Sidebar() {
   const { open } = useShadcnSidebar();
   const { menuItems, selectedKey } = useMenu();
+  const { data: identity } = useGetIdentity<User>();
+  const isAdmin = identity?.role === "admin";
+
+  const visibleItems = menuItems.filter(
+    (item: TreeMenuItem) => !item.meta?.adminOnly || isAdmin
+  );
 
   return (
     <ShadcnSidebar
@@ -67,7 +75,7 @@ export function Sidebar() {
           }
         )}
       >
-        {menuItems.map((item: TreeMenuItem) => (
+        {visibleItems.map((item: TreeMenuItem) => (
           <SidebarItem
             key={item.key || item.name}
             item={item}

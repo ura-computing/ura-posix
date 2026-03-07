@@ -22,27 +22,35 @@ export default function App() {
   const [tableType, setTableType] = useState<TableType>("achat");
 
   const { data: token, isLoading: authLoading } = useToken();
-  const clearToken = useClearToken();
-  const capture = useCaptureAndUpload();
+  const { mutate: clearToken } = useClearToken();
+  const {
+    mutate: startCapture,
+    isPending: isCapturing,
+    isSuccess: captureSuccess,
+    isError: captureError,
+    error: captureErr,
+    data: captureData,
+    reset: resetCapture,
+  } = useCaptureAndUpload();
 
   const handleLoginRedirect = () => {
     chrome.tabs.create({ url: `${DASHBOARD_URL}/login` });
   };
 
   const handleLogout = () => {
-    clearToken.mutate();
-    capture.reset();
+    clearToken();
+    resetCapture();
   };
 
   const handleCapture = () => {
     if (!token) return;
-    capture.reset();
-    capture.mutate({ tableType, token });
+    resetCapture();
+    startCapture({ tableType, token });
   };
 
   const changeType = (type: TableType) => {
     setTableType(type);
-    capture.reset();
+    resetCapture();
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -66,14 +74,13 @@ export default function App() {
     );
   }
 
-  const isCapturing = capture.isPending;
-  const preview = capture.data?.preview ?? null;
+  const preview = captureData?.preview ?? null;
 
   const sessionExpired =
-    capture.isError && (capture.error as Error).message === "SESSION_EXPIRED";
+    captureError && (captureErr as Error).message === "SESSION_EXPIRED";
 
   const userCancelled =
-    capture.isError && (capture.error as Error).message === "Annulé par l'utilisateur";
+    captureError && (captureErr as Error).message === "Annulé par l'utilisateur";
 
   return (
     <div className="popup">
@@ -152,14 +159,14 @@ export default function App() {
             </button>
 
             {/* Status */}
-            {capture.isSuccess && (
+            {captureSuccess && (
               <div className="status success">
-                {capture.data.inserted} ligne(s) importée(s) dans{" "}
-                <strong>{capture.data.tableType === "achat" ? "les achats" : "les ventes"}</strong>.
+                {captureData.inserted} ligne(s) importée(s) dans{" "}
+                <strong>{captureData.tableType === "achat" ? "les achats" : "les ventes"}</strong>.
               </div>
             )}
-            {capture.isError && !userCancelled && !sessionExpired && (
-              <div className="status error">{(capture.error as Error).message}</div>
+            {captureError && !userCancelled && !sessionExpired && (
+              <div className="status error">{(captureErr as Error).message}</div>
             )}
 
             {/* Preview table */}

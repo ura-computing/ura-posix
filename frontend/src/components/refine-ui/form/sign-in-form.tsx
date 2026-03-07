@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useLink, useLogin } from "@refinedev/core";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { Loader2 } from "lucide-react";
 
 import { InputPassword } from "@/components/refine-ui/form/input-password";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ export const SignInForm = () => {
               />
 
               <Button type="submit" size="lg" className="submit" disabled={isPending}>
+                {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {isPending ? "Connexion..." : "Se connecter"}
               </Button>
             </form>

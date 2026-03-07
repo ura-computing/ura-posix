@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, CalendarIcon, Download, Search, X } from "lucide-react";
+import { CalendarIcon, Download, Loader2, Search, X } from "lucide-react";
 import { format, subDays, startOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
@@ -8,9 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { stripPct } from "@/lib/table-utils";
+import { CategoryMultiSelect } from "@/components/category-multi-select";
 
 type TableToolbarProps = {
   searchQuery: string;
@@ -38,15 +37,7 @@ export function TableToolbar({
   onDateRangeChange,
 }: TableToolbarProps) {
   const today = new Date();
-  const [catOpen, setCatOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-
-  const toggleCat = (cat: string) =>
-    onCatsChange(
-      selectedCats.includes(cat)
-        ? selectedCats.filter((c) => c !== cat)
-        : [...selectedCats, cat],
-    );
 
   const applyDatePreset = (preset: "today" | "7d" | "month") => {
     if (!onDateRangeChange) return;
@@ -62,13 +53,6 @@ export function TableToolbar({
       : format(dateRange.from, "d MMM yyyy", { locale: fr })
     : "Période";
 
-  const catLabel =
-    selectedCats.length === 0
-      ? "Toutes les catégories"
-      : selectedCats.length === 1
-        ? stripPct(selectedCats[0])
-        : `${selectedCats.length} catégories`;
-
   return (
     <div className="actions-row">
       <div className="search-field">
@@ -82,52 +66,12 @@ export function TableToolbar({
         />
       </div>
 
-      <Popover open={catOpen} onOpenChange={setCatOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "h-9 w-full md:w-52 justify-between text-sm font-normal",
-              selectedCats.length > 0 && "border-primary text-primary",
-            )}
-          >
-            <span className="truncate">{catLabel}</span>
-            <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-1" align="start">
-          {selectedCats.length > 0 && (
-            <button
-              className="w-full text-left px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => onCatsChange([])}
-            >
-              Tout désélectionner
-            </button>
-          )}
-          <ScrollArea className="max-h-64">
-            {allCategories.map((cat) => {
-              const checked = selectedCats.includes(cat);
-              return (
-                <div
-                  key={cat}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover:bg-accent"
-                  onClick={() => toggleCat(cat)}
-                >
-                  <div
-                    className={cn(
-                      "h-4 w-4 rounded border flex items-center justify-center shrink-0",
-                      checked ? "bg-primary border-primary" : "border-input",
-                    )}
-                  >
-                    {checked && <Check className="h-3 w-3 text-primary-foreground" />}
-                  </div>
-                  <span className="text-sm truncate">{stripPct(cat)}</span>
-                </div>
-              );
-            })}
-          </ScrollArea>
-        </PopoverContent>
-      </Popover>
+      <CategoryMultiSelect
+        allCategories={allCategories}
+        selected={selectedCats}
+        onChange={onCatsChange}
+        className="h-9 w-full md:w-52"
+      />
 
       {selectedCats.length > 0 && (
         <Button
@@ -206,7 +150,7 @@ export function TableToolbar({
         onClick={onExport}
         disabled={exporting}
       >
-        <Download className="h-4 w-4" />
+        {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
         {exporting ? "Export…" : "Exporter CSV"}
       </Button>
     </div>

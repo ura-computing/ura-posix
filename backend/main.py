@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import engine, Base
-from routers import achat, auth, data, uploads, vente
+from routers import achat, admin, auth, data, uploads, vente
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,6 +23,7 @@ app.include_router(uploads.router)
 app.include_router(achat.router)
 app.include_router(vente.router)
 app.include_router(data.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

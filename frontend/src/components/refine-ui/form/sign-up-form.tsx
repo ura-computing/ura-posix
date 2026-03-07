@@ -2,6 +2,7 @@ import { useRegister, useLink } from "@refinedev/core";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -113,6 +114,7 @@ export const SignUpForm = () => {
               />
 
               <Button type="submit" size="lg" className="submit" disabled={isPending}>
+                {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {isPending ? "Création..." : "Créer mon compte"}
               </Button>
             </form>

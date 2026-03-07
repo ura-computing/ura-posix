@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { useTable } from "@refinedev/react-table";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { Link } from "react-router";
+import { UploadCloud } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/refine-ui/views/list-view";
@@ -10,6 +14,27 @@ import { TableToolbar } from "@/components/table-toolbar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { fmt, downloadCSV } from "@/lib/table-utils";
+
+const VenteEmptyState = () => (
+  <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
+    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#14b8a6]/10">
+      <UploadCloud className="h-7 w-7 text-[#14b8a6]" />
+    </div>
+    <div>
+      <p className="text-base font-semibold text-foreground">Aucune vente importée</p>
+      <p className="text-sm text-muted-foreground mt-1">
+        Importez un fichier CSV Sobrus pour voir vos transactions de vente.
+      </p>
+    </div>
+    <Link
+      to="/dashboard/upload-file"
+      className="inline-flex items-center gap-2 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-medium text-white hover:bg-[#0d9488] transition-colors"
+    >
+      <UploadCloud className="h-4 w-4" />
+      Importer les ventes
+    </Link>
+  </div>
+);
 
 type VenteRow = {
   id: number;
@@ -52,6 +77,7 @@ const VentesList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -61,7 +87,9 @@ const VentesList = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const res = await api.tables.exportVente(searchQuery, selectedCats);
+      const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+      const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+      const res = await api.tables.exportVente(searchQuery, selectedCats, dateFrom, dateTo);
       downloadCSV(res.data, venteRowToCSV, VENTE_CSV_HEADERS, `ventes_export_${Date.now()}.csv`);
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
@@ -195,15 +223,19 @@ const VentesList = () => {
   });
 
   useEffect(() => {
+    const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+    const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
     table.refineCore.setFilters(
       [
         ...(searchQuery ? [{ field: "search", operator: "contains" as const, value: searchQuery }] : []),
         ...(selectedCats.length > 0 ? [{ field: "categories", operator: "in" as const, value: selectedCats }] : []),
+        ...(dateFrom ? [{ field: "date_from", operator: "gte" as const, value: dateFrom }] : []),
+        ...(dateTo ? [{ field: "date_to", operator: "lte" as const, value: dateTo }] : []),
       ],
       "replace",
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedCats]);
+  }, [searchQuery, selectedCats, dateRange]);
 
   return (
     <ListView>
@@ -221,10 +253,12 @@ const VentesList = () => {
           onCatsChange={setSelectedCats}
           onExport={handleExport}
           exporting={exporting}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
         />
       </div>
 
-      <DataTable table={table} />
+      <DataTable table={table} emptyState={<VenteEmptyState />} />
     </ListView>
   );
 };

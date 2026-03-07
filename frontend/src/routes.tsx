@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import {
   BarChart3,
+  Building2,
   LayoutDashboard,
   ShoppingCart,
   ShoppingBasket,
@@ -20,6 +21,7 @@ import ParametresList from "./pages/parametres";
 import RapportsPage from "./pages/rapports";
 import ProfileSetup from "./pages/profile/setup";
 import ProfilePage from "./pages/profile/index";
+import PharmaciesAdminPage from "./pages/admin/pharmacies";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,6 +60,7 @@ export const routes: RouteConfig[] = [
   { path: "/rapports", element: <RapportsPage />, requireAuth: true, layout: "sidebar" },
   { path: "/parametres", element: <ParametresList />, requireAuth: true, layout: "sidebar" },
   { path: "/profile", element: <ProfilePage />, requireAuth: true, layout: "sidebar" },
+  { path: "/admin/pharmacies", element: <PharmaciesAdminPage />, requireAuth: true, layout: "sidebar" },
 ];
 
 // ─── Refine Resources (Sidebar Navigation) ───────────────────────────────────
@@ -92,5 +95,10 @@ export const resources: ResourceConfig[] = [
     name: "parametres",
     list: "/parametres",
     meta: { label: "Paramètres", icon: <Settings /> },
+  },
+  {
+    name: "admin-pharmacies",
+    list: "/admin/pharmacies",
+    meta: { label: "Pharmacies", icon: <Building2 />, adminOnly: true },
   },
 ];

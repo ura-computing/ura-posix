@@ -21,11 +21,13 @@ import { cn } from "@/lib/utils";
 type DataTableProps<TData extends BaseRecord> = {
   table: UseTableReturnType<TData, HttpError>;
   paginationVariant?: "default" | "simple";
+  emptyState?: React.ReactNode;
 };
 
 export function DataTable<TData extends BaseRecord>({
   table,
   paginationVariant = "default",
+  emptyState,
 }: DataTableProps<TData>) {
   const {
     reactTable: { getHeaderGroups, getRowModel, getAllColumns },
@@ -195,21 +197,24 @@ export function DataTable<TData extends BaseRecord>({
               <DataTableNoData
                 isOverflowing={isOverflowing}
                 columnsLength={columns.length}
+                emptyState={emptyState}
               />
             )}
           </TableBody>
         </Table>
       </div>
       {!isLoading && getRowModel().rows?.length > 0 && (
-        <DataTablePagination
-          currentPage={currentPage}
-          pageCount={pageCount}
-          setCurrentPage={setCurrentPage}
-          pageSize={pageSize}
-          setPageSize={setPageSize}
-          total={tableQuery.data?.total}
-          variant={paginationVariant}
-        />
+        <div className="sticky bottom-0 bg-background border-t py-3 -mx-2 px-2 md:-mx-4 md:px-4 lg:-mx-6 lg:px-6">
+          <DataTablePagination
+            currentPage={currentPage}
+            pageCount={pageCount}
+            setCurrentPage={setCurrentPage}
+            pageSize={pageSize}
+            setPageSize={setPageSize}
+            total={tableQuery.data?.total}
+            variant={paginationVariant}
+          />
+        </div>
       )}
     </div>
   );
@@ -218,9 +223,11 @@ export function DataTable<TData extends BaseRecord>({
 function DataTableNoData({
   isOverflowing,
   columnsLength,
+  emptyState,
 }: {
   isOverflowing: { horizontal: boolean; vertical: boolean };
   columnsLength: number;
+  emptyState?: React.ReactNode;
 }) {
   return (
     <TableRow className="hover:bg-transparent">
@@ -249,12 +256,16 @@ function DataTableNoData({
             minWidth: "300px",
           }}
         >
-          <div className={cn("text-lg", "font-semibold", "text-foreground")}>
-            No data to display
-          </div>
-          <div className={cn("text-sm", "text-muted-foreground")}>
-            This table is empty for the time being.
-          </div>
+          {emptyState ?? (
+            <>
+              <div className={cn("text-lg", "font-semibold", "text-foreground")}>
+                Aucune donnée
+              </div>
+              <div className={cn("text-sm", "text-muted-foreground")}>
+                Cette table est vide pour le moment.
+              </div>
+            </>
+          )}
         </div>
       </TableCell>
     </TableRow>
