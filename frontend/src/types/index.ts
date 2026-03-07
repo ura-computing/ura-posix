@@ -1,3 +1,5 @@
+export type UserRole = "admin" | "owner" | "employee";
+
 export type User = {
   id: number;
   email: string;
@@ -6,6 +8,31 @@ export type User = {
   phone?: string;
   pharmacy_name?: string;
   profile_complete: boolean;
+  role: UserRole;
+  pharmacy_id?: number;
+};
+
+export type Pharmacy = {
+  id: number;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  created_at?: string;
+  user_count: number;
+};
+
+export type UserAdmin = {
+  id: number;
+  email: string;
+  name?: string;
+  image_url?: string;
+  phone?: string;
+  pharmacy_name?: string;
+  profile_complete: boolean;
+  role: UserRole;
+  pharmacy_id?: number;
+  created_at?: string;
 };
 
 export type LoginPayload = {

@@ -1,5 +1,5 @@
 import { API_URL, ENDPOINTS, TOKEN_KEY, USER_KEY } from "@/constants";
-import type { AuthToken, LoginPayload, ProfileUpdatePayload, RegisterPayload, User } from "@/types";
+import type { AuthToken, LoginPayload, Pharmacy, ProfileUpdatePayload, RegisterPayload, User, UserAdmin, UserRole } from "@/types";
 
 function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -81,8 +81,40 @@ export const api = {
   },
 
   data: {
-    clearAchats: () => request<{ deleted: number }>(ENDPOINTS.data.achats, { method: "DELETE" }),
-    clearVentes: () => request<{ deleted: number }>(ENDPOINTS.data.ventes, { method: "DELETE" }),
+    clearAchats: (filters?: { categories?: string[]; dateFrom?: string; dateTo?: string }) => {
+      const p = new URLSearchParams();
+      filters?.categories?.forEach((c) => p.append("category", c));
+      if (filters?.dateFrom) p.set("date_from", filters.dateFrom);
+      if (filters?.dateTo) p.set("date_to", filters.dateTo);
+      const qs = p.toString();
+      return request<{ deleted: number }>(`${ENDPOINTS.data.achats}${qs ? `?${qs}` : ""}`, { method: "DELETE" });
+    },
+    clearVentes: (filters?: { categories?: string[]; dateFrom?: string; dateTo?: string }) => {
+      const p = new URLSearchParams();
+      filters?.categories?.forEach((c) => p.append("category", c));
+      if (filters?.dateFrom) p.set("date_from", filters.dateFrom);
+      if (filters?.dateTo) p.set("date_to", filters.dateTo);
+      const qs = p.toString();
+      return request<{ deleted: number }>(`${ENDPOINTS.data.ventes}${qs ? `?${qs}` : ""}`, { method: "DELETE" });
+    },
+  },
+
+  admin: {
+    listPharmacies: () => request<Pharmacy[]>(ENDPOINTS.admin.pharmacies),
+    createPharmacy: (body: { name: string; address?: string; phone?: string; email?: string }) =>
+      request<Pharmacy>(ENDPOINTS.admin.pharmacies, { method: "POST", body: JSON.stringify(body) }),
+    updatePharmacy: (id: number, body: { name?: string; address?: string; phone?: string; email?: string }) =>
+      request<Pharmacy>(`${ENDPOINTS.admin.pharmacies}/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    deletePharmacy: (id: number) =>
+      request<{ deleted: boolean }>(`${ENDPOINTS.admin.pharmacies}/${id}`, { method: "DELETE" }),
+    listUsers: (pharmacyId?: number) => {
+      const qs = pharmacyId !== undefined ? `?pharmacy_id=${pharmacyId}` : "";
+      return request<UserAdmin[]>(`${ENDPOINTS.admin.users}${qs}`);
+    },
+    updateUserRole: (userId: number, role: UserRole) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
+    updateUserPharmacy: (userId: number, pharmacyId: number | null) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/pharmacy`, { method: "PUT", body: JSON.stringify({ pharmacy_id: pharmacyId }) }),
   },
 
   storeSession: (data: AuthToken) => {

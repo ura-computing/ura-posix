@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Camera } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -64,7 +64,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
-        <p className="text-sm text-muted-foreground">Chargement...</p>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -176,7 +176,8 @@ export default function ProfilePage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={isPending} className="min-w-32">
+            <Button type="submit" disabled={isPending} className="min-w-32 gap-2">
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {isPending ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </div>

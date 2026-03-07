@@ -12,6 +12,8 @@ export const QUERY_KEYS = {
   me: ["me"] as const,
   achat: ["achat"] as const,
   ventes: ["ventes"] as const,
+  pharmacies: ["admin", "pharmacies"] as const,
+  adminUsers: ["admin", "users"] as const,
 } as const;
 
 export const ENDPOINTS = {
@@ -37,5 +39,9 @@ export const ENDPOINTS = {
   data: {
     achats: "/data/achats",
     ventes: "/data/ventes",
+  },
+  admin: {
+    pharmacies: "/admin/pharmacies",
+    users: "/admin/users",
   },
 } as const;

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ACTIONS, QUERY_KEYS } from "../constants";
+import { ACTIONS, API_URL, QUERY_KEYS } from "../constants";
 
 function sendMsg<T>(msg: object): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -12,7 +12,23 @@ function sendMsg<T>(msg: object): Promise<T> {
 
 async function fetchToken(): Promise<string | null> {
   const res = await sendMsg<{ token: string | null }>({ action: ACTIONS.GET_TOKEN });
-  return res.token;
+  const token = res.token;
+  if (!token) return null;
+
+  // Validate token against the backend
+  try {
+    const resp = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) {
+      await sendMsg({ action: ACTIONS.CLEAR_TOKEN });
+      return null;
+    }
+  } catch {
+    // Backend unreachable — keep token, let capture fail with a proper error
+  }
+
+  return token;
 }
 
 async function removeToken(): Promise<void> {

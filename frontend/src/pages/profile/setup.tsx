@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -174,10 +174,11 @@ export default function ProfileSetup() {
                   Retour
                 </Button>
                 <Button
-                  className="flex-1"
+                  className="flex-1 gap-2"
                   onClick={handleStep2}
                   disabled={isPending}
                 >
+                  {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                   {isPending ? "Enregistrement..." : "Enregistrer"}
                 </Button>
               </div>

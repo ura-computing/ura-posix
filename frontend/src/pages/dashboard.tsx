@@ -92,10 +92,18 @@ const Dashboard = () => {
         </div>
         <Link
           to="/dashboard/upload-file"
-          className="inline-flex items-center gap-2 mt-4 text-sm font-medium text-primary hover:underline"
+          className="group mt-5 flex items-center gap-4 rounded-2xl border-2 border-dashed border-[#14b8a6]/40 bg-[#14b8a6]/5 px-6 py-5 transition-all hover:border-[#14b8a6] hover:bg-[#14b8a6]/10"
         >
-          <UploadCloud className="h-4 w-4" />
-          Upload your file
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#14b8a6]/15 group-hover:bg-[#14b8a6]/25 transition-colors">
+            <UploadCloud className="h-6 w-6 text-[#14b8a6]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Importer un fichier Sobrus</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Achats (bons de livraison) ou Ventes — format CSV</p>
+          </div>
+          <div className="ml-auto shrink-0 text-[#14b8a6] opacity-60 group-hover:opacity-100 transition-opacity">
+            →
+          </div>
         </Link>
       </section>
 

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useGetIdentity, useLogout } from "@refinedev/core";
-import { Bell, LogOutIcon, Search, UserRound } from "lucide-react";
+import { Bell, LogOutIcon, Search, UploadCloud, UserRound } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import type { User } from "@/types";
 
@@ -138,6 +138,10 @@ const UserDropdown = () => {
         <DropdownMenuItem onClick={() => navigate("/profile")}>
           <UserRound className="h-4 w-4" />
           <span className="ml-2">Mon profil</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/dashboard/upload-file")}>
+          <UploadCloud className="h-4 w-4" />
+          <span className="ml-2">Importer Achats / Ventes</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => logout()}>

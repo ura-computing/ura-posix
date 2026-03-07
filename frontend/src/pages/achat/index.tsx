@@ -3,6 +3,8 @@ import { ColumnDef } from "@tanstack/react-table";
 import { useTable } from "@refinedev/react-table";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import { Link } from "react-router";
+import { UploadCloud } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/refine-ui/views/list-view";
@@ -12,6 +14,27 @@ import { TableToolbar } from "@/components/table-toolbar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { fmt, downloadCSV } from "@/lib/table-utils";
+
+const AchatEmptyState = () => (
+  <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
+    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
+      <UploadCloud className="h-7 w-7 text-violet-500" />
+    </div>
+    <div>
+      <p className="text-base font-semibold text-foreground">Aucun achat importé</p>
+      <p className="text-sm text-muted-foreground mt-1">
+        Importez un fichier CSV Sobrus pour voir vos bons de livraison.
+      </p>
+    </div>
+    <Link
+      to="/dashboard/upload-file"
+      className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 transition-colors"
+    >
+      <UploadCloud className="h-4 w-4" />
+      Importer les achats
+    </Link>
+  </div>
+);
 
 type AchatRow = {
   id: number;
@@ -234,7 +257,7 @@ const AchatList = () => {
         />
       </div>
 
-      <DataTable table={table} />
+      <DataTable table={table} emptyState={<AchatEmptyState />} />
     </ListView>
   );
 };

@@ -4,6 +4,19 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+class Pharmacy(Base):
+    __tablename__ = "pharmacies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    address = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    users = relationship("User", back_populates="pharmacy")
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -16,8 +29,12 @@ class User(Base):
     phone = Column(String, nullable=True)
     pharmacy_name = Column(String, nullable=True)
     profile_complete = Column(Boolean, default=False)
+    role = Column(String, default="owner", nullable=False)  # admin | owner | employee
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    pharmacy = relationship("Pharmacy", back_populates="users")
 
 
 class Medicament(Base):
