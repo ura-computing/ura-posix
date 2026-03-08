@@ -34,6 +34,7 @@ def _base_query(
     categories: List[str],
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    tva: Optional[List[str]] = None,
 ):
     q = (
         db.query(Vente)
@@ -50,6 +51,8 @@ def _base_query(
         )
     if categories:
         q = q.filter(Medicament.category.in_(categories))
+    if tva:
+        q = q.filter(Medicament.tva.in_(tva))
     if date_from:
         q = q.filter(Vente.date >= date_from)
     if date_to:
@@ -73,6 +76,22 @@ def get_vente_categories(
     return [r[0] for r in rows]
 
 
+@router.get("/tva-rates")
+def get_vente_tva_rates(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    rows = (
+        db.query(Medicament.tva)
+        .join(Vente, Vente.medicament_id == Medicament.id)
+        .filter(Medicament.tva.isnot(None))
+        .distinct()
+        .order_by(Medicament.tva)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
 @router.get("")
 def list_ventes(
     page: int = Query(1, ge=1),
@@ -81,11 +100,12 @@ def list_ventes(
     category: List[str] = Query(default=[]),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    tva: List[str] = Query(default=[]),
     export: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    q = _base_query(db, search, category, date_from, date_to)
+    q = _base_query(db, search, category, date_from, date_to, tva)
     total = q.count()
 
     if export:

@@ -43,6 +43,8 @@ export const dataProvider: DataProvider = {
           (filter.value as string[]).forEach((cat) =>
             params.append("category", cat),
           );
+        } else if (filter.field === "tva" && Array.isArray(filter.value)) {
+          (filter.value as string[]).forEach((t) => params.append("tva", t));
         } else if (filter.field === "date_from" || filter.field === "date_to") {
           if (filter.value) params.set(filter.field, String(filter.value));
         }

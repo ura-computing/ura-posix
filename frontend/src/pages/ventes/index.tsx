@@ -77,11 +77,14 @@ const VentesList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [selectedTva, setSelectedTva] = useState<string[]>([]);
+  const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     api.tables.venteCategories().then(setAllCategories).catch(() => {});
+    api.tables.venteTvaRates().then(setAllTvaRates).catch(() => {});
   }, []);
 
   const handleExport = async () => {
@@ -89,7 +92,7 @@ const VentesList = () => {
     try {
       const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
       const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
-      const res = await api.tables.exportVente(searchQuery, selectedCats, dateFrom, dateTo);
+      const res = await api.tables.exportVente(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
       downloadCSV(res.data, venteRowToCSV, VENTE_CSV_HEADERS, `ventes_export_${Date.now()}.csv`);
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
@@ -229,34 +232,36 @@ const VentesList = () => {
       [
         ...(searchQuery ? [{ field: "search", operator: "contains" as const, value: searchQuery }] : []),
         ...(selectedCats.length > 0 ? [{ field: "categories", operator: "in" as const, value: selectedCats }] : []),
+        ...(selectedTva.length > 0 ? [{ field: "tva", operator: "in" as const, value: selectedTva }] : []),
         ...(dateFrom ? [{ field: "date_from", operator: "gte" as const, value: dateFrom }] : []),
         ...(dateTo ? [{ field: "date_to", operator: "lte" as const, value: dateTo }] : []),
       ],
       "replace",
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedCats, dateRange]);
+  }, [searchQuery, selectedCats, selectedTva, dateRange]);
 
   return (
     <ListView>
       <Breadcrumb />
       <h1 className="page-title">Ventes</h1>
 
-      <div className="intro-row">
-        <p className="text-sm text-muted-foreground">Historique des transactions de vente.</p>
-        <TableToolbar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Produit, client, N° transaction…"
-          allCategories={allCategories}
-          selectedCats={selectedCats}
-          onCatsChange={setSelectedCats}
-          onExport={handleExport}
-          exporting={exporting}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-        />
-      </div>
+      <p className="text-sm text-muted-foreground -mt-2">Historique des transactions de vente.</p>
+      <TableToolbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Produit, client, N° transaction…"
+        allCategories={allCategories}
+        selectedCats={selectedCats}
+        onCatsChange={setSelectedCats}
+        onExport={handleExport}
+        exporting={exporting}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        allTvaRates={allTvaRates}
+        selectedTva={selectedTva}
+        onTvaChange={setSelectedTva}
+      />
 
       <DataTable table={table} emptyState={<VenteEmptyState />} />
     </ListView>

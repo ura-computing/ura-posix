@@ -62,20 +62,24 @@ export const api = {
   tables: {
     achatCategories: () => request<string[]>(ENDPOINTS.achat.categories),
     venteCategories: () => request<string[]>(ENDPOINTS.ventes.categories),
-    exportAchat: (search: string, categories: string[], dateFrom?: string, dateTo?: string) => {
+    achatTvaRates: () => request<string[]>(ENDPOINTS.achat.tvaRates),
+    venteTvaRates: () => request<string[]>(ENDPOINTS.ventes.tvaRates),
+    exportAchat: (search: string, categories: string[], dateFrom?: string, dateTo?: string, tva?: string[]) => {
       const p = new URLSearchParams({ export: "true" });
       if (search) p.set("search", search);
       categories.forEach((cat) => p.append("category", cat));
       if (dateFrom) p.set("date_from", dateFrom);
       if (dateTo) p.set("date_to", dateTo);
+      tva?.forEach((t) => p.append("tva", t));
       return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.achat.list}?${p}`);
     },
-    exportVente: (search: string, categories: string[], dateFrom?: string, dateTo?: string) => {
+    exportVente: (search: string, categories: string[], dateFrom?: string, dateTo?: string, tva?: string[]) => {
       const p = new URLSearchParams({ export: "true" });
       if (search) p.set("search", search);
       categories.forEach((cat) => p.append("category", cat));
       if (dateFrom) p.set("date_from", dateFrom);
       if (dateTo) p.set("date_to", dateTo);
+      tva?.forEach((t) => p.append("tva", t));
       return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.ventes.list}?${p}`);
     },
   },

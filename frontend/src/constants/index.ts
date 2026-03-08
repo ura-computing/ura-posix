@@ -31,10 +31,12 @@ export const ENDPOINTS = {
   achat: {
     list: "/achat",
     categories: "/achat/categories",
+    tvaRates: "/achat/tva-rates",
   },
   ventes: {
     list: "/ventes",
     categories: "/ventes/categories",
+    tvaRates: "/ventes/tva-rates",
   },
   data: {
     achats: "/data/achats",
