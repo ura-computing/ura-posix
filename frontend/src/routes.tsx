@@ -1,12 +1,16 @@
 import { ReactNode } from "react";
 import {
   BarChart3,
+  BookOpen,
   Building2,
+  ClipboardCheck,
   LayoutDashboard,
+  PackagePlus,
   ShoppingCart,
   ShoppingBasket,
   TriangleAlert,
   Settings,
+  Users,
 } from "lucide-react";
 
 // Page imports
@@ -21,7 +25,12 @@ import ParametresList from "./pages/parametres";
 import RapportsPage from "./pages/rapports";
 import ProfileSetup from "./pages/profile/setup";
 import ProfilePage from "./pages/profile/index";
+import PendingApproval from "./pages/pending";
 import PharmaciesAdminPage from "./pages/admin/pharmacies";
+import AdminCatalogRequestsPage from "./pages/admin/catalog-requests";
+import AdminCatalogPage from "./pages/admin/catalog";
+import OwnerEmployeesPage from "./pages/owner/employees";
+import CatalogRequestsPage from "./pages/catalog-requests";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +47,8 @@ export type ResourceConfig = {
   meta: {
     label: string;
     icon: ReactNode;
+    adminOnly?: boolean;
+    ownerOnly?: boolean;
   };
 };
 
@@ -48,8 +59,9 @@ export const routes: RouteConfig[] = [
   { path: "/login", element: <Login />, requireAuth: false },
   { path: "/register", element: <Register />, requireAuth: false },
 
-  // Profile setup (auth required, no sidebar)
+  // Auth required, no sidebar
   { path: "/profile/setup", element: <ProfileSetup />, requireAuth: true, layout: "none" },
+  { path: "/pending", element: <PendingApproval />, requireAuth: true, layout: "none" },
 
   // Private routes (auth required, with sidebar)
   { path: "/", element: <Dashboard />, requireAuth: true, layout: "sidebar" },
@@ -61,6 +73,10 @@ export const routes: RouteConfig[] = [
   { path: "/parametres", element: <ParametresList />, requireAuth: true, layout: "sidebar" },
   { path: "/profile", element: <ProfilePage />, requireAuth: true, layout: "sidebar" },
   { path: "/admin/pharmacies", element: <PharmaciesAdminPage />, requireAuth: true, layout: "sidebar" },
+  { path: "/admin/catalog-requests", element: <AdminCatalogRequestsPage />, requireAuth: true, layout: "sidebar" },
+  { path: "/admin/catalog", element: <AdminCatalogPage />, requireAuth: true, layout: "sidebar" },
+  { path: "/owner/employees", element: <OwnerEmployeesPage />, requireAuth: true, layout: "sidebar" },
+  { path: "/catalog-requests", element: <CatalogRequestsPage />, requireAuth: true, layout: "sidebar" },
 ];
 
 // ─── Refine Resources (Sidebar Navigation) ───────────────────────────────────
@@ -100,5 +116,25 @@ export const resources: ResourceConfig[] = [
     name: "admin-pharmacies",
     list: "/admin/pharmacies",
     meta: { label: "Pharmacies", icon: <Building2 />, adminOnly: true },
+  },
+  {
+    name: "admin-catalog-requests",
+    list: "/admin/catalog-requests",
+    meta: { label: "Demandes catalogue", icon: <ClipboardCheck />, adminOnly: true },
+  },
+  {
+    name: "admin-catalog",
+    list: "/admin/catalog",
+    meta: { label: "Catalogue", icon: <BookOpen />, adminOnly: true },
+  },
+  {
+    name: "owner-employees",
+    list: "/owner/employees",
+    meta: { label: "Mes employés", icon: <Users />, ownerOnly: true },
+  },
+  {
+    name: "catalog-requests",
+    list: "/catalog-requests",
+    meta: { label: "Demandes catalogue", icon: <PackagePlus />, ownerOnly: true },
   },
 ];

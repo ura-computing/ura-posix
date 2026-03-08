@@ -11,10 +11,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> User:
+def _get_user_from_token(credentials: HTTPAuthorizationCredentials, db: Session) -> User:
+    """Decode token and return user — does NOT check account status."""
     payload = decode_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -24,14 +22,38 @@ def get_current_user(
     return user
 
 
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+) -> User:
+    user = _get_user_from_token(credentials, db)
+    if user.status != "active":
+        raise HTTPException(status_code=403, detail="account_pending")
+    return user
+
+
+def get_current_user_any_status(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+) -> User:
+    """For endpoints accessible while account is pending (e.g. /auth/me)."""
+    return _get_user_from_token(credentials, db)
+
+
 @router.post("/register", response_model=Token)
 def register(body: UserRegister, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    role = body.role if body.role in ("owner", "employee") else "owner"
     user = User(
         email=body.email,
         name=body.name,
         password_hash=hash_password(body.password),
+        role=role,
+        status="pending",
+        pharmacy_name=body.pharmacy_name if role == "owner" else None,
+        pharmacy_id=body.pharmacy_id if role == "employee" else None,
     )
     db.add(user)
     db.commit()
@@ -48,7 +70,8 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user_any_status)):
+    """Always accessible regardless of account status."""
     return current_user
 
 

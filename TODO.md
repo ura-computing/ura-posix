@@ -5,5 +5,6 @@
     + https://console.apify.com/actors/JJghSZmShuco4j9gJ/input
     + find pages that shared lot of adds (in a region) with specific keywords
 
-+ adming dashboard to give or remove access from user
++ check if there is way to design dataabse to be more dynamic
 
++ admin import the catalog

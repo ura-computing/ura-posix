@@ -13,7 +13,9 @@ import {
   ShieldCheck,
   UserCog,
   UserCheck,
+  UserX,
   X,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -493,6 +495,9 @@ export default function PharmaciesAdminPage() {
         />
       )}
 
+      {/* Pending owners section */}
+      <PendingOwnersSection />
+
       {/* All users section */}
       <AllUsersSection pharmacies={pharmacies} />
 
@@ -525,6 +530,135 @@ export default function PharmaciesAdminPage() {
         </AlertDialogContent>
       </AlertDialog>
     </ListView>
+  );
+}
+
+// ── Pending owners section ────────────────────────────────────────────────────
+
+function PendingOwnersSection() {
+  const queryClient = useQueryClient();
+  const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
+
+  const { data: pendingOwners = [], isLoading } = useQuery({
+    queryKey: ["pendingOwners"],
+    queryFn: api.admin.listPendingOwners,
+  });
+
+  const { mutate: approve, isPending: approving } = useMutation({
+    mutationFn: (userId: number) => api.admin.approveUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
+      toast.success("Propriétaire approuvé — pharmacie créée");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { mutate: reject, isPending: rejecting } = useMutation({
+    mutationFn: (userId: number) => api.admin.rejectUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
+      toast.success("Demande refusée");
+      setRejectTarget(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  if (!isLoading && pendingOwners.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Clock className="h-4 w-4 text-amber-500" />
+        <h2 className="text-base font-semibold">Demandes d'accès propriétaires</h2>
+        {!isLoading && <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">{pendingOwners.length}</Badge>}
+      </div>
+
+      <div className="border rounded-xl overflow-hidden bg-card">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="divide-y">
+            {/* Table header */}
+            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <span>Demandeur</span>
+              <span className="w-40">Pharmacie demandée</span>
+              <span className="w-28 text-center">Date</span>
+              <span className="w-36 text-center">Actions</span>
+            </div>
+            {pendingOwners.map((user: UserAdmin) => (
+              <div key={user.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    {user.image_url && <AvatarImage src={user.image_url} />}
+                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      {initials(user.name, user.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
+                    {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+                  </div>
+                </div>
+
+                <span className="text-sm text-muted-foreground w-40 truncate">
+                  {user.pharmacy_name ?? <span className="italic text-muted-foreground/50">Non renseigné</span>}
+                </span>
+
+                <span className="text-xs text-muted-foreground w-28 text-center">
+                  {user.created_at ? format(new Date(user.created_at), "d MMM yyyy", { locale: fr }) : "—"}
+                </span>
+
+                <div className="flex items-center gap-2 w-36 justify-center">
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    disabled={approving}
+                    onClick={() => approve(user.id)}
+                  >
+                    <UserCheck className="h-3.5 w-3.5" />
+                    Approuver
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={rejecting}
+                    onClick={() => setRejectTarget(user)}
+                  >
+                    <UserX className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AlertDialog open={!!rejectTarget} onOpenChange={(v) => { if (!v) setRejectTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refuser la demande de "{rejectTarget?.name ?? rejectTarget?.email}" ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              L'utilisateur ne pourra pas accéder au tableau de bord. Cette action peut être annulée manuellement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={rejecting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={rejecting}
+              onClick={() => rejectTarget && reject(rejectTarget.id)}
+            >
+              {rejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Refuser
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
 

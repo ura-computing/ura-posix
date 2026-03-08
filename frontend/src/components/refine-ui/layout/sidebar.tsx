@@ -37,10 +37,13 @@ export function Sidebar() {
   const { menuItems, selectedKey } = useMenu();
   const { data: identity } = useGetIdentity<User>();
   const isAdmin = identity?.role === "admin";
+  const isOwner = identity?.role === "owner";
 
-  const visibleItems = menuItems.filter(
-    (item: TreeMenuItem) => !item.meta?.adminOnly || isAdmin
-  );
+  const visibleItems = menuItems.filter((item: TreeMenuItem) => {
+    if (item.meta?.adminOnly && !isAdmin) return false;
+    if (item.meta?.ownerOnly && !isOwner && !isAdmin) return false;
+    return true;
+  });
 
   return (
     <ShadcnSidebar

@@ -79,8 +79,8 @@ def _upsert_medicament(db: Session, pid: str, product: str, tva: str | None,
     return med
 
 
-def _insert_achats(db: Session, rows: list[dict[str, Any]]) -> dict:
-    # Pre-load existing (delivery_ref, medicament_id) pairs to skip duplicates
+def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None) -> dict:
+    # Pre-load existing (delivery_ref, medicament_id) pairs scoped to this pharmacy
     incoming_refs = {
         (row.get("Référence de livraison") or "").strip()
         for row in rows
@@ -88,12 +88,12 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]]) -> dict:
     }
     existing_pairs: set[tuple[str, int]] = set()
     if incoming_refs:
-        existing_pairs = {
-            (a.delivery_ref, a.medicament_id)
-            for a in db.query(Achat.delivery_ref, Achat.medicament_id)
-                       .filter(Achat.delivery_ref.in_(incoming_refs))
-                       .all()
-        }
+        q = db.query(Achat.delivery_ref, Achat.medicament_id).filter(
+            Achat.delivery_ref.in_(incoming_refs)
+        )
+        if pharmacy_id is not None:
+            q = q.filter(Achat.pharmacy_id == pharmacy_id)
+        existing_pairs = {(a.delivery_ref, a.medicament_id) for a in q.all()}
 
     achats = []
     skipped = 0
@@ -116,6 +116,7 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]]) -> dict:
             skipped += 1
             continue
         achats.append(Achat(
+            pharmacy_id=pharmacy_id,
             medicament_id=med.id,
             created_at_source=row.get("Créée le") or None,
             delivery_date=row.get("Date Bon de Livraison") or None,
@@ -133,8 +134,8 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]]) -> dict:
     return {"inserted": len(achats), "skipped": skipped}
 
 
-def _insert_ventes(db: Session, rows: list[dict[str, Any]]) -> dict:
-    # Pre-load existing (transaction_ref, medicament_id) pairs to skip duplicates
+def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None) -> dict:
+    # Pre-load existing (transaction_ref, medicament_id) pairs scoped to this pharmacy
     incoming_refs = {
         (row.get("Numéro de transaction") or "").strip()
         for row in rows
@@ -142,12 +143,12 @@ def _insert_ventes(db: Session, rows: list[dict[str, Any]]) -> dict:
     }
     existing_pairs: set[tuple[str, int]] = set()
     if incoming_refs:
-        existing_pairs = {
-            (v.transaction_ref, v.medicament_id)
-            for v in db.query(Vente.transaction_ref, Vente.medicament_id)
-                       .filter(Vente.transaction_ref.in_(incoming_refs))
-                       .all()
-        }
+        q = db.query(Vente.transaction_ref, Vente.medicament_id).filter(
+            Vente.transaction_ref.in_(incoming_refs)
+        )
+        if pharmacy_id is not None:
+            q = q.filter(Vente.pharmacy_id == pharmacy_id)
+        existing_pairs = {(v.transaction_ref, v.medicament_id) for v in q.all()}
 
     ventes = []
     skipped = 0
@@ -170,6 +171,7 @@ def _insert_ventes(db: Session, rows: list[dict[str, Any]]) -> dict:
             skipped += 1
             continue
         ventes.append(Vente(
+            pharmacy_id=pharmacy_id,
             medicament_id=med.id,
             date=row.get("Date") or None,
             transaction_ref=transaction_ref,
@@ -196,50 +198,50 @@ class TableUpload(BaseModel):
 async def upload_achat(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
     rows = _parse_csv(await file.read())
     if not rows:
         raise HTTPException(status_code=400, detail="No data found in file")
-    return _insert_achats(db, rows)
+    return _insert_achats(db, rows, current_user.pharmacy_id)
 
 
 @router.post("/achat-json")
 async def upload_achat_json(
     body: TableUpload,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if not body.rows:
         raise HTTPException(status_code=400, detail="No rows provided")
-    return _insert_achats(db, body.rows)
+    return _insert_achats(db, body.rows, current_user.pharmacy_id)
 
 
 @router.post("/vente")
 async def upload_vente(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
     rows = _parse_csv(await file.read())
     if not rows:
         raise HTTPException(status_code=400, detail="No data found in file")
-    return _insert_ventes(db, rows)
+    return _insert_ventes(db, rows, current_user.pharmacy_id)
 
 
 @router.post("/vente-json")
 async def upload_vente_json(
     body: TableUpload,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if not body.rows:
         raise HTTPException(status_code=400, detail="No rows provided")
-    return _insert_ventes(db, body.rows)
+    return _insert_ventes(db, body.rows, current_user.pharmacy_id)
 
 
 @router.post("/catalog")

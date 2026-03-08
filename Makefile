@@ -6,10 +6,10 @@ VENV := $(BACKEND_DIR)/.venv
 PIP  := $(VENV)/bin/python3 -m pip
 
 .PHONY: \
-	back-install back-dev \
+	back-install back-dev back-seed \
 	front-install front-dev \
 	ext-install ext-dev ext-build \
-	db db-ui down env install dev
+	db db-ui down env install dev seed
 
 # ── Environment ────────────────────────────────────────────────────────────────
 
@@ -37,6 +37,9 @@ back-install:
 	python3 -m venv $(VENV)
 	$(PIP) install -r $(BACKEND_DIR)/requirements.txt
 
+back-seed: env db
+	cd $(BACKEND_DIR) && .venv/bin/python seed.py
+
 back-dev: env db
 	cd $(BACKEND_DIR) && .venv/bin/uvicorn main:app --reload --port 8000
 
@@ -62,6 +65,8 @@ ext-build:
 # ── Shortcuts ─────────────────────────────────────────────────────────────────
 
 install: back-install front-install ext-install
+
+seed: back-seed
 
 dev:
 	@$(MAKE) back-dev &
