@@ -1,10 +1,7 @@
-import { useState } from "react";
 import "./app.css";
 import { DASHBOARD_URL } from "../constants";
 import { useToken, useClearToken } from "../hooks/use-token";
-import { useCaptureAndUpload } from "../hooks/use-capture";
-
-type TableType = "achat" | "ventes";
+import { useNotifications } from "../hooks/use-notifications";
 
 // ── Logo icon ────────────────────────────────────────────────────────────────
 
@@ -16,44 +13,30 @@ function PharmaIcon() {
   );
 }
 
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return "À l'instant";
+  if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+  return `il y a ${Math.floor(diff / 86400)} j`;
+}
+
 // ── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [tableType, setTableType] = useState<TableType>("achat");
-
   const { data: token, isLoading: authLoading } = useToken();
   const { mutate: clearToken } = useClearToken();
-  const {
-    mutate: startCapture,
-    isPending: isCapturing,
-    isSuccess: captureSuccess,
-    isError: captureError,
-    error: captureErr,
-    data: captureData,
-    reset: resetCapture,
-  } = useCaptureAndUpload();
+  const { notifications, clearAll } = useNotifications();
 
   const handleLoginRedirect = () => {
     chrome.tabs.create({ url: `${DASHBOARD_URL}/login` });
   };
 
-  const handleLogout = () => {
-    clearToken();
-    resetCapture();
+  const handleOpenDashboard = (path = "/") => {
+    chrome.tabs.create({ url: `${DASHBOARD_URL}${path}` });
   };
 
-  const handleCapture = () => {
-    if (!token) return;
-    resetCapture();
-    startCapture({ tableType, token });
-  };
-
-  const changeType = (type: TableType) => {
-    setTableType(type);
-    resetCapture();
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
 
   if (authLoading) {
     return (
@@ -63,7 +46,7 @@ export default function App() {
             <div className="popup-logo-icon"><PharmaIcon /></div>
             <div>
               <div className="popup-logo-name">APCM Pharma</div>
-              <div className="popup-logo-sub">Capture</div>
+              <div className="popup-logo-sub">Import auto</div>
             </div>
           </div>
         </div>
@@ -74,14 +57,6 @@ export default function App() {
     );
   }
 
-  const preview = captureData?.preview ?? null;
-
-  const sessionExpired =
-    captureError && (captureErr as Error).message === "SESSION_EXPIRED";
-
-  const userCancelled =
-    captureError && (captureErr as Error).message === "Annulé par l'utilisateur";
-
   return (
     <div className="popup">
       {/* Header */}
@@ -90,11 +65,11 @@ export default function App() {
           <div className="popup-logo-icon"><PharmaIcon /></div>
           <div>
             <div className="popup-logo-name">APCM Pharma</div>
-            <div className="popup-logo-sub">Capture</div>
+            <div className="popup-logo-sub">Import auto</div>
           </div>
         </div>
         {token && (
-          <button className="popup-logout-btn" onClick={handleLogout}>
+          <button className="popup-logout-btn" onClick={() => clearToken()}>
             Déconnexion
           </button>
         )}
@@ -102,8 +77,8 @@ export default function App() {
 
       {/* Body */}
       <div className="popup-body">
-        {!token || sessionExpired ? (
-          /* ── Not logged in / session expired ── */
+        {!token ? (
+          /* ── Not logged in ── */
           <div className="auth-card">
             <div className="auth-icon">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
@@ -111,13 +86,9 @@ export default function App() {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
             </div>
-            <div className="auth-title">
-              {sessionExpired ? "Session expirée" : "Vous n'êtes pas connecté"}
-            </div>
+            <div className="auth-title">Non connecté</div>
             <div className="auth-desc">
-              {sessionExpired
-                ? "Veuillez vous reconnecter au tableau de bord APCM Pharma."
-                : "Connectez-vous au tableau de bord APCM Pharma pour utiliser la capture de tableaux."}
+              Connectez-vous au tableau de bord APCM Pharma pour activer l'import automatique.
             </div>
             <button className="login-btn" onClick={handleLoginRedirect}>
               Ouvrir le tableau de bord →
@@ -126,81 +97,65 @@ export default function App() {
         ) : (
           /* ── Logged in ── */
           <>
-            {/* Table type selector */}
-            <div className="type-tabs">
-              <button
-                className={`type-tab ${tableType === "achat" ? "active" : ""}`}
-                onClick={() => changeType("achat")}
-              >
-                <div className="type-tab-label">Achats</div>
-                <div className="type-tab-desc">Bons de livraison</div>
-              </button>
-              <button
-                className={`type-tab ${tableType === "ventes" ? "active" : ""}`}
-                onClick={() => changeType("ventes")}
-              >
-                <div className="type-tab-label">Ventes</div>
-                <div className="type-tab-desc">Transactions de vente</div>
-              </button>
+            {/* Active status */}
+            <div className="status-card">
+              <div className="status-dot" />
+              <div>
+                <div className="status-title">Import automatique actif</div>
+                <div className="status-desc">
+                  Sur Sobrus, cliquez <strong>Télécharger en CSV</strong> pour importer vos données directement.
+                </div>
+              </div>
             </div>
 
-            {/* Capture button */}
-            <button
-              className="capture-btn"
-              onClick={handleCapture}
-              disabled={isCapturing}
-            >
-              {isCapturing ? (
-                <><div className="spinner" /> Sélectionnez la zone...</>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M3 9h18M9 21V9" />
-                  </svg>
-                  Capturer une zone
-                </>
+            {/* Recent imports */}
+            <div className="section-header">
+              <span>Imports récents</span>
+              {notifications.length > 0 && (
+                <button className="clear-btn" onClick={() => clearAll()}>Effacer</button>
               )}
-            </button>
+            </div>
 
-            {/* Status */}
-            {captureSuccess && (
-              <div className="status success">
-                {captureData.inserted} ligne(s) importée(s) dans{" "}
-                <strong>{captureData.tableType === "achat" ? "les achats" : "les ventes"}</strong>.
+            {notifications.length === 0 ? (
+              <div className="empty-state">Aucun import pour l'instant.</div>
+            ) : (
+              <div className="notif-list">
+                {notifications.slice(0, 8).map((n) => (
+                  <div key={n.id} className={`notif-item ${!n.read ? "unread" : ""}`}>
+                    <div className="notif-icon">
+                      {n.fileType === "achat" ? "📦" : "🧾"}
+                    </div>
+                    <div className="notif-content">
+                      <div className="notif-title">
+                        <strong>{n.inserted}</strong> lignes importées
+                        {n.skipped > 0 && <span className="notif-skipped"> · {n.skipped} ignorées</span>}
+                      </div>
+                      <div className="notif-meta">
+                        {n.fileType === "achat" ? "Achats" : "Ventes"} · {timeAgo(n.timestamp)}
+                      </div>
+                    </div>
+                    <button
+                      className="notif-view-btn"
+                      onClick={() => handleOpenDashboard(n.fileType === "achat" ? "/achat" : "/ventes")}
+                    >
+                      Voir →
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
-            {captureError && !userCancelled && !sessionExpired && (
-              <div className="status error">{(captureErr as Error).message}</div>
-            )}
 
-            {/* Preview table */}
-            {preview && preview.rows.length > 0 && (
-              <>
-                <div className="preview-label">
-                  Aperçu — {preview.rows.length} ligne(s) détectée(s)
-                </div>
-                <div className="preview-table-wrap">
-                  <table className="preview-table">
-                    <thead>
-                      <tr>
-                        {preview.headers.map((h, i) => <th key={i}>{h}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preview.rows.slice(0, 5).map((row, i) => (
-                        <tr key={i}>
-                          {preview.headers.map((h, j) => <td key={j}>{row[h]}</td>)}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
           </>
         )}
       </div>
+
+      {token && (
+        <div className="popup-footer">
+          <button className="dashboard-btn" onClick={() => handleOpenDashboard()}>
+            Ouvrir le tableau de bord
+          </button>
+        </div>
+      )}
     </div>
   );
 }

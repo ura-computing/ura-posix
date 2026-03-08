@@ -51,26 +51,6 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     return false; // no async response needed
   }
 
-  // ── Area capture → relay to content script ─────────────────────────────────
-  if (request.action === ACTIONS.START_AREA_CAPTURE) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab?.id) {
-        sendResponse({ success: false, error: "Aucun onglet actif trouvé" });
-        return;
-      }
-
-      chrome.tabs.sendMessage(tab.id, { action: ACTIONS.SELECT_AND_CAPTURE }, (contentResponse) => {
-        if (chrome.runtime.lastError) {
-          console.error("[Background] Content script error:", chrome.runtime.lastError.message);
-          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-        sendResponse(contentResponse);
-      });
-    });
-    return true;
-  }
 });
 
 console.log("[Background] Ready");

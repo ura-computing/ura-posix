@@ -66,7 +66,7 @@ export function CategoryMultiSelect({
       type="button"
       variant="outline"
       className={cn(
-        "w-full justify-between text-sm font-normal",
+        "w-full justify-between text-sm font-normal min-w-50",
         selected.length > 0 && activeClass,
         className,
       )}

@@ -7,8 +7,3 @@
 
 + adming dashboard to give or remove access from user
 
-Sobrus account : 
-anova.lesjoyaux@gmail.com
-passowrd : Anov@_4Ever!
-
-tldraw link: https://www.tldraw.com/f/wc14H9SlWNPHMbUF5e9Eg?d=v-3072.-840.2720.3137.page

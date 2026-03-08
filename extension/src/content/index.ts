@@ -278,193 +278,136 @@ if (window.location.origin === "http://localhost:5173") {
   });
 }
 
-// ─── DOM table extraction ─────────────────────────────────────────────────────
+// ─── Sobrus Indicator (Draggable widget) ─────────────────────────────────
 
-interface TableData {
-  headers: string[];
-  rows: Record<string, string>[];
-}
+function _initSobrusIndicator() {
+  if (!window.location.hostname.includes("sobrus")) return;
 
-function extractTableInRect(rect: { left: number; top: number; width: number; height: number }): TableData | null {
-  const tables = Array.from(document.querySelectorAll<HTMLTableElement>("table"));
+  const INDICATOR_ID = "__apcm-sobrus-indicator";
+  const POSITION_KEY = "apcm_indicator_pos";
 
-  // Find the table whose bounding box overlaps most with the drawn selection
-  let best: HTMLTableElement | null = null;
-  let bestOverlap = 0;
+  if (document.getElementById(INDICATOR_ID)) return;
 
-  for (const table of tables) {
-    const b = table.getBoundingClientRect();
-    const ox = Math.max(0, Math.min(b.right, rect.left + rect.width) - Math.max(b.left, rect.left));
-    const oy = Math.max(0, Math.min(b.bottom, rect.top + rect.height) - Math.max(b.top, rect.top));
-    const overlap = ox * oy;
-    if (overlap > bestOverlap) {
-      bestOverlap = overlap;
-      best = table;
+  // ── Pulse animation ──
+  if (!document.getElementById("__apcm-indicator-styles")) {
+    const style = document.createElement("style");
+    style.id = "__apcm-indicator-styles";
+    style.textContent = `
+      @keyframes __apcm_pulse {
+        0%   { box-shadow: 0 0 0 0   rgba(20,184,166,0.6); }
+        70%  { box-shadow: 0 0 0 6px rgba(20,184,166,0);   }
+        100% { box-shadow: 0 0 0 0   rgba(20,184,166,0);   }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ── Build widget ──
+  const saved = localStorage.getItem(POSITION_KEY);
+  const pos = saved
+    ? JSON.parse(saved)
+    : { x: window.innerWidth - 190, y: window.innerHeight - 60 };
+
+  const el = document.createElement("div");
+  el.id = INDICATOR_ID;
+  el.style.cssText = `
+    position:fixed;bottom:auto;top:${pos.y}px;left:${pos.x}px;z-index:2147483646;
+    display:flex;align-items:center;gap:7px;
+    padding:6px 12px 6px 8px;border-radius:10px;
+    cursor:grab;user-select:none;
+    background:#0f172a;
+    border:1px solid rgba(255,255,255,0.1);
+    box-shadow:0 4px 16px rgba(0,0,0,0.45),0 0 0 0.5px rgba(255,255,255,0.06);
+    font:500 11px/1.4 -apple-system,system-ui,sans-serif;
+    color:#e2e8f0;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    transition:box-shadow .15s, opacity .15s;
+  `;
+
+  // APCM logo pill (like Next.js "N")
+  const logo = document.createElement("div");
+  logo.style.cssText = `
+    width:18px;height:18px;border-radius:5px;
+    background:#14b8a6;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  `;
+  logo.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm6 4v4H8v2h4v4h2v-4h4v-2h-4V6h-2z"/></svg>`;
+
+  const dot = document.createElement("div");
+  dot.style.cssText = `
+    width:7px;height:7px;border-radius:50%;flex-shrink:0;
+    transition:background .3s;
+  `;
+
+  const label = document.createElement("span");
+  label.style.cssText = `letter-spacing:0.01em;`;
+
+  el.appendChild(logo);
+  el.appendChild(dot);
+  el.appendChild(label);
+  document.body.appendChild(el);
+
+  // ── Update display based on connection ──
+  function _setConnected(connected: boolean) {
+    if (connected) {
+      dot.style.background = "#14b8a6";
+      dot.style.animation = "__apcm_pulse 2.5s ease-out infinite";
+      label.textContent = "APCM Pharma";
+      el.style.borderColor = "rgba(20,184,166,0.35)";
+    } else {
+      dot.style.background = "#ef4444";
+      dot.style.animation = "none";
+      dot.style.boxShadow = "none";
+      label.textContent = "Non connecté";
+      el.style.borderColor = "rgba(239,68,68,0.35)";
     }
   }
 
-  if (!best || bestOverlap === 0) return null;
+  // ── Fetch token from chrome.storage.local (not page localStorage) ──
+  chrome.runtime.sendMessage({ action: "GET_TOKEN" }, (res) => {
+    _setConnected(!!(res?.token));
+  });
 
-  const allRows = Array.from(best.querySelectorAll<HTMLTableRowElement>("tr"));
-  if (allRows.length < 2) return null;
+  // ── React to login / logout in real-time ──
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local" || !("pharmagest_token" in changes)) return;
+    _setConnected(!!(changes["pharmagest_token"].newValue));
+  });
 
-  // Determine header row: prefer <thead> rows, otherwise first <tr>
-  const theadRows = Array.from(best.querySelectorAll<HTMLTableRowElement>("thead tr"));
-  const headerRow = theadRows.length > 0 ? theadRows[0] : allRows[0];
-  const headers = Array.from(headerRow.querySelectorAll("th, td")).map((c) => c.textContent?.trim() ?? "");
+  // ── Drag ──
+  let isDragging = false;
+  let startX = 0, startY = 0, origX = 0, origY = 0;
 
-  if (headers.length === 0) return null;
+  el.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    startX = e.clientX; startY = e.clientY;
+    origX = el.offsetLeft; origY = el.offsetTop;
+    el.style.cursor = "grabbing";
+    el.style.boxShadow = "0 6px 20px rgba(0,0,0,0.5)";
+    e.preventDefault();
+  });
 
-  // Data rows = everything that isn't a header row
-  const headerRowSet = new Set(theadRows.length > 0 ? theadRows : [allRows[0]]);
-  const dataRows = allRows.filter((r) => !headerRowSet.has(r));
+  document.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    const x = Math.max(0, Math.min(origX + e.clientX - startX, window.innerWidth - el.offsetWidth));
+    const y = Math.max(0, Math.min(origY + e.clientY - startY, window.innerHeight - el.offsetHeight));
+    el.style.left = `${x}px`;
+    el.style.top  = `${y}px`;
+  });
 
-  const rows: Record<string, string>[] = dataRows.map((tr) => {
-    const cells = Array.from(tr.querySelectorAll("td, th")).map((c) => c.textContent?.trim() ?? "");
-    const obj: Record<string, string> = {};
-    headers.forEach((h, i) => {
-      obj[h] = cells[i] ?? "";
-    });
-    return obj;
-  }).filter((r) => Object.values(r).some((v) => v !== ""));
+  document.addEventListener("mouseup", () => {
+    if (!isDragging) return;
+    isDragging = false;
+    el.style.cursor = "grab";
+    el.style.boxShadow = "0 2px 10px rgba(0,0,0,0.35)";
+    localStorage.setItem(POSITION_KEY, JSON.stringify({ x: el.offsetLeft, y: el.offsetTop }));
+  });
 
-  return { headers, rows };
+  el.addEventListener("mouseenter", () => { if (!isDragging) el.style.boxShadow = "0 4px 14px rgba(0,0,0,0.5)"; });
+  el.addEventListener("mouseleave", () => { if (!isDragging) el.style.boxShadow = "0 2px 10px rgba(0,0,0,0.35)"; });
 }
 
-// ─── Area selection + extraction ─────────────────────────────────────────────
-
-chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  console.log("[Content Script] Message received:", request);
-
-  if (request.action === "SELECT_AND_CAPTURE") {
-    console.log("[Content Script] Starting area selection");
-
-    // Remove any stale overlay
-    document.getElementById("__capture-overlay")?.remove();
-    document.getElementById("__capture-selection")?.remove();
-    document.getElementById("__capture-btn")?.remove();
-    document.getElementById("__capture-cancel")?.remove();
-
-    // ── Overlay ──
-    const overlay = document.createElement("div");
-    overlay.id = "__capture-overlay";
-    overlay.style.cssText = `
-      position: fixed; inset: 0; z-index: 2147483646;
-      cursor: crosshair; background: rgba(0,0,0,0.30);
-    `;
-
-    // ── Selection rectangle ──
-    const selection = document.createElement("div");
-    selection.id = "__capture-selection";
-    selection.style.cssText = `
-      position: fixed; border: 2px solid #14b8a6;
-      background: rgba(20,184,166,0.12); pointer-events: none;
-      display: none; z-index: 2147483647;
-    `;
-
-    // ── Instruction label ──
-    const label = document.createElement("div");
-    label.style.cssText = `
-      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 2147483648; background: #0f172a; color: #fff;
-      padding: 6px 16px; border-radius: 20px; font: 13px/1.5 system-ui;
-      pointer-events: none;
-    `;
-    label.textContent = "Sélectionnez la zone du tableau";
-
-    // ── Extract button ──
-    const processBtn = document.createElement("button");
-    processBtn.id = "__capture-btn";
-    processBtn.textContent = "Extraire les données";
-    processBtn.style.cssText = `
-      position: fixed; z-index: 2147483648; display: none;
-      background: #14b8a6; color: #fff; border: none;
-      border-radius: 8px; padding: 9px 20px;
-      font: 600 13px/1 system-ui; cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    `;
-
-    // ── Cancel button ──
-    const cancelBtn = document.createElement("button");
-    cancelBtn.id = "__capture-cancel";
-    cancelBtn.textContent = "Annuler";
-    cancelBtn.style.cssText = `
-      position: fixed; top: 12px; right: 12px; z-index: 2147483648;
-      background: #1e293b; color: #fff; border: none;
-      border-radius: 8px; padding: 7px 14px;
-      font: 13px/1 system-ui; cursor: pointer;
-    `;
-
-    document.body.append(overlay, selection, label, processBtn, cancelBtn);
-
-    let startX = 0, startY = 0, dragging = false;
-    let finalRect: { left: number; top: number; width: number; height: number } | null = null;
-
-    const cleanup = () => {
-      overlay.remove(); selection.remove(); label.remove();
-      processBtn.remove(); cancelBtn.remove();
-    };
-
-    cancelBtn.addEventListener("click", () => {
-      cleanup();
-      sendResponse({ success: false, error: "Annulé par l'utilisateur" });
-    });
-
-    const getRect = (x1: number, y1: number, x2: number, y2: number) => ({
-      left: Math.min(x1, x2),
-      top: Math.min(y1, y2),
-      width: Math.abs(x2 - x1),
-      height: Math.abs(y2 - y1),
-    });
-
-    overlay.addEventListener("mousedown", (e) => {
-      dragging = true;
-      startX = e.clientX; startY = e.clientY;
-      selection.style.display = "block";
-      selection.style.left = `${startX}px`;
-      selection.style.top = `${startY}px`;
-      selection.style.width = "0px";
-      selection.style.height = "0px";
-      processBtn.style.display = "none";
-    });
-
-    overlay.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      const r = getRect(startX, startY, e.clientX, e.clientY);
-      selection.style.left = `${r.left}px`;
-      selection.style.top = `${r.top}px`;
-      selection.style.width = `${r.width}px`;
-      selection.style.height = `${r.height}px`;
-    });
-
-    overlay.addEventListener("mouseup", (e) => {
-      if (!dragging) return;
-      dragging = false;
-      const r = getRect(startX, startY, e.clientX, e.clientY);
-      if (r.width < 20 || r.height < 20) { selection.style.display = "none"; return; }
-      finalRect = r;
-
-      const btnTop = r.top + r.height + 12;
-      const btnLeft = r.left + r.width / 2;
-      processBtn.style.display = "block";
-      processBtn.style.top = `${Math.min(btnTop, window.innerHeight - 56)}px`;
-      processBtn.style.left = `${btnLeft}px`;
-      processBtn.style.transform = "translateX(-50%)";
-    });
-
-    processBtn.addEventListener("click", () => {
-      if (!finalRect) return;
-      const data = extractTableInRect(finalRect);
-      cleanup();
-      if (!data || data.rows.length === 0) {
-        sendResponse({ success: false, error: "Aucun tableau trouvé dans la zone sélectionnée" });
-      } else {
-        sendResponse({ success: true, data });
-      }
-    });
-
-    return true; // keep message channel open
-  }
-});
+_initSobrusIndicator();
 
 console.log("[Content Script] Ready");
