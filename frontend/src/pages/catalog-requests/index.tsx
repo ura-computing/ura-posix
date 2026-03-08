@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { useGetIdentity } from "@refinedev/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import {
@@ -23,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { CatalogRequestOut } from "@/lib/api";
+import type { User } from "@/types";
 
 const QUERY_KEY = ["catalog-requests", "owner"] as const;
 
@@ -63,8 +66,19 @@ function StatusBadge({ status }: { status: CatalogRequestOut["status"] }) {
 }
 
 export default function CatalogRequestsPage() {
+  const navigate = useNavigate();
+  const { data: identity } = useGetIdentity<User>();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+
+  // Only owners can access this page
+  useEffect(() => {
+    if (identity && identity.role !== "owner") {
+      navigate("/", { replace: true });
+    }
+  }, [identity, navigate]);
+
+  const isOwner = identity?.role === "owner";
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     defaultValues: { product: "", tva: "", pph: "", ppv: "", category: "", zone: "", barcode1: "", laboratoire: "" },
@@ -73,6 +87,7 @@ export default function CatalogRequestsPage() {
   const { data: requests = [], isLoading } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: () => api.catalogRequests.list(),
+    enabled: isOwner,
   });
 
   const { mutate: submit, isPending: submitting } = useMutation({
@@ -97,6 +112,8 @@ export default function CatalogRequestsPage() {
   });
 
   const onSubmit = handleSubmit((values) => submit(values));
+
+  if (!isOwner) return null;
 
   return (
     <ListView>

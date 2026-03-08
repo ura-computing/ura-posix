@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
+from models import User, Pharmacy
 from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
 
@@ -46,13 +46,23 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     role = body.role if body.role in ("owner", "employee") else "owner"
+
+    # For employees, resolve pharmacy_name from pharmacy_id
+    employee_pharmacy_name = None
+    if role == "employee" and body.pharmacy_id:
+        pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
+        if not pharmacy:
+            raise HTTPException(status_code=400, detail="Pharmacy not found")
+        employee_pharmacy_name = pharmacy.name
+
     user = User(
         email=body.email,
         name=body.name,
+        phone=body.phone,
         password_hash=hash_password(body.password),
         role=role,
         status="pending",
-        pharmacy_name=body.pharmacy_name if role == "owner" else None,
+        pharmacy_name=body.pharmacy_name if role == "owner" else employee_pharmacy_name,
         pharmacy_id=body.pharmacy_id if role == "employee" else None,
     )
     db.add(user)
@@ -78,7 +88,7 @@ def get_me(current_user: User = Depends(get_current_user_any_status)):
 @router.put("/me", response_model=UserOut)
 def update_me(
     body: ProfileUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_any_status),
     db: Session = Depends(get_db),
 ):
     if body.name is not None:
@@ -90,7 +100,7 @@ def update_me(
     if body.image_url is not None:
         current_user.image_url = body.image_url
 
-    if current_user.name and current_user.phone and current_user.pharmacy_name:
+    if current_user.name and current_user.phone:
         current_user.profile_complete = True
 
     db.commit()

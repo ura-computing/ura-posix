@@ -6,5 +6,18 @@
     + find pages that shared lot of adds (in a region) with specific keywords
 
 + check if there is way to design dataabse to be more dynamic
-
++ seperate main db from dev db
 + admin import the catalog
++ logs (debuging), (tracking)
++ fix the bugs in achat
+
++ Parapharmacie - N transaction - 2:
++ example FAC-226539 → FAC-226539-2
+
++ apcm category:
+    + Pharmacy -1 (Medicaments, Parapharmacie )
+    + Parapharmacy -2 (Complement Alimentaire)
+    + Pharmacy speciaux -3 (Homeopathie (to be checked), )
+    + Parapharmacy speciaux -4 (to be checked)
+
++ extension should only work in export achat vente in dashbaord

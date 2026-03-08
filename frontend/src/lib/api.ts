@@ -156,6 +156,8 @@ export const api = {
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/approve`, { method: "PUT" }),
     rejectUser: (userId: number) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/reject`, { method: "PUT", body: JSON.stringify({}) }),
+    revokeUser: (userId: number) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/revoke`, { method: "PUT" }),
     updateUserRole: (userId: number, role: UserRole) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
     updateUserPharmacy: (userId: number, pharmacyId: number | null) =>
@@ -172,6 +174,8 @@ export const api = {
       request<MedicamentOut>(`/admin/catalog/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     deleteMedicament: (id: number) =>
       request<{ deleted: boolean }>(`/admin/catalog/${id}`, { method: "DELETE" }),
+    // Catalog CSV/XLSM import
+    importCatalog: (file: File) => uploadFile<{ imported: number }>("/uploads/catalog", file),
     // Catalog requests (admin side)
     listCatalogRequests: (status?: string) => {
       const qs = status ? `?status=${status}` : "";
@@ -189,8 +193,8 @@ export const api = {
       request<UserAdmin>(`/owner/employees/${id}/approve`, { method: "PUT" }),
     rejectEmployee: (id: number) =>
       request<UserAdmin>(`/owner/employees/${id}/reject`, { method: "PUT" }),
-    removeEmployee: (id: number) =>
-      request<{ removed: boolean }>(`/owner/employees/${id}`, { method: "DELETE" }),
+    revokeEmployee: (id: number) =>
+      request<UserAdmin>(`/owner/employees/${id}/revoke`, { method: "PUT" }),
   },
 
   catalogRequests: {

@@ -14,9 +14,18 @@ import { ACTIONS, UPLOAD_STATUS_KEY } from "../constants";
 
 const CHUNK_SIZE = 500;
 
-const fileType: "achat" | "vente" = window.location.pathname.includes("exportpurchases")
-  ? "achat"
-  : "vente";
+/** Detect achat vs vente from the CSV header row — more reliable than URL matching. */
+function detectFileType(headerLine: string): "achat" | "vente" {
+  const h = headerLine.toLowerCase();
+  if (
+    h.includes("référence de livraison") ||
+    h.includes("bon de livraison") ||
+    h.includes("fournisseur")
+  ) {
+    return "achat";
+  }
+  return "vente";
+}
 
 function sendMsg<T>(msg: object): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -24,12 +33,6 @@ function sendMsg<T>(msg: object): Promise<T> {
       if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
       else resolve(res as T);
     });
-  });
-}
-
-function setStatus(state: string, extra: object = {}) {
-  chrome.storage.local.set({
-    [UPLOAD_STATUS_KEY]: { state, fileType, timestamp: Date.now(), ...extra },
   });
 }
 
@@ -50,7 +53,11 @@ document.addEventListener(
 
 async function handleExport(apiUrl: string) {
   uploading = true;
-  setStatus("uploading", { current: 0, total: 1 });
+
+  // Placeholder status while we fetch (fileType unknown yet)
+  chrome.storage.local.set({
+    [UPLOAD_STATUS_KEY]: { state: "uploading", fileType: "achat", current: 0, total: 1, timestamp: Date.now() },
+  });
 
   try {
     // ── 1. Fetch CSV from Sobrus ───────────────────────────────────────────
@@ -60,14 +67,23 @@ async function handleExport(apiUrl: string) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       csvText = await res.text();
     } catch (err) {
-      setStatus("error", { error: `Téléchargement échoué: ${(err as Error).message}` });
+      chrome.storage.local.set({
+        [UPLOAD_STATUS_KEY]: { state: "error", error: `Téléchargement échoué: ${(err as Error).message}`, timestamp: Date.now() },
+      });
       return;
     }
 
-    // ── 2. Split into chunks ───────────────────────────────────────────────
+    // ── 2. Detect type from CSV headers ───────────────────────────────────
     const lines = csvText.split("\n");
     const header = lines[0];
+    const fileType = detectFileType(header);
     const dataLines = lines.slice(1).filter((l) => l.trim() !== "");
+
+    const setStatus = (state: string, extra: object = {}) => {
+      chrome.storage.local.set({
+        [UPLOAD_STATUS_KEY]: { state, fileType, timestamp: Date.now(), ...extra },
+      });
+    };
 
     if (dataLines.length === 0) {
       setStatus("error", { error: "Fichier CSV vide" });

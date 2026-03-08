@@ -199,6 +199,34 @@ def reject_user(
     return user
 
 
+@router.put("/users/{user_id}/revoke", response_model=UserAdminOut)
+def revoke_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """Revoke access from an active user — sets their status back to pending.
+    If the user is an owner, also revokes all active employees in their pharmacy."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Cannot revoke your own access")
+    if user.status != "active":
+        raise HTTPException(status_code=400, detail="User is not active")
+    user.status = "pending"
+    # If revoking an owner, also revoke all active employees in their pharmacy
+    if user.role == "owner" and user.pharmacy_id:
+        db.query(User).filter(
+            User.pharmacy_id == user.pharmacy_id,
+            User.role == "employee",
+            User.status == "active",
+        ).update({"status": "pending"})
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.put("/users/{user_id}/role", response_model=UserAdminOut)
 def update_user_role(
     user_id: int,

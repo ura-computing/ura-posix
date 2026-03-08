@@ -1,20 +1,24 @@
 """
 Database seeding script for PharmaGest.
 
-Creates default admin and owner accounts with a default pharmacy.
+Reads seed data from seed.json, then creates:
+  - A default admin account  (status: active)
+  - A default pharmacy + owner account (status: pending — must be approved by admin)
+
+  Employees are NOT seeded — they register via the owner's invite/management flow.
 
 Usage:
     # From project root:
-    make back-seed
-    
+    make seed
+
     # Or directly with venv:
     cd backend && .venv/bin/python seed.py
 """
 
+import json
 import sys
 from pathlib import Path
 
-# Add backend directory to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
@@ -25,78 +29,88 @@ from database import SessionLocal, engine, Base
 from models import User, Pharmacy
 from utils.auth import hash_password
 
+SEED_FILE = Path(__file__).parent / "seed.json"
+
+
 def seed_database():
-    """Create default pharmacy, admin, and owner accounts."""
-    
+    """Create default pharmacy, admin, and owner from seed.json."""
+
+    if not SEED_FILE.exists():
+        print(f"✗ seed.json not found at {SEED_FILE}")
+        sys.exit(1)
+
+    with open(SEED_FILE) as f:
+        cfg = json.load(f)
+
     # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
-    
+
     db: Session = SessionLocal()
-    
+
     try:
-        # Check if admin already exists
-        existing_admin = db.query(User).filter(User.email == "admin@gmail.com").first()
-        if existing_admin:
+        admin_cfg    = cfg["admin"]
+        owner_cfg    = cfg["owner"]
+        pharmacy_cfg = owner_cfg["pharmacy"]
+
+        # Guard — skip if already seeded
+        if db.query(User).filter(User.email == admin_cfg["email"]).first():
             print("✓ Admin account already exists, skipping seed.")
             return
-        
-        # 1. Create default pharmacy
-        default_pharmacy = Pharmacy(
-            name="Pharmacie Demo",
-            address="123 Rue Mohammed V, Casablanca",
-            phone="+212 5 22 12 34 56",
-            email="contact@pharmacie-demo.ma"
+
+        # 1. Pharmacy
+        pharmacy = Pharmacy(
+            name=pharmacy_cfg["name"],
+            address=pharmacy_cfg.get("address"),
+            phone=pharmacy_cfg.get("phone"),
+            email=pharmacy_cfg.get("email"),
         )
-        db.add(default_pharmacy)
-        db.flush()  # Get pharmacy ID
-        
-        print(f"✓ Created default pharmacy: {default_pharmacy.name} (ID: {default_pharmacy.id})")
-        
-        # 2. Create admin account
+        db.add(pharmacy)
+        db.flush()
+        print(f"✓ Pharmacy  : {pharmacy.name} (id={pharmacy.id})")
+
+        # 2. Admin — immediately active, not tied to any pharmacy
         admin = User(
-            email="admin@gmail.com",
-            name="Admin",
-            password_hash=hash_password("admin@123"),
+            email=admin_cfg["email"],
+            name=admin_cfg["name"],
+            password_hash=hash_password(admin_cfg["password"]),
             role="admin",
             status="active",
             profile_complete=True,
-            pharmacy_id=None  # Admin not tied to specific pharmacy
+            pharmacy_id=None,
         )
         db.add(admin)
-        
-        print(f"✓ Created admin account: {admin.email} / admin@123")
-        
-        # 3. Create owner account
+        print(f"✓ Admin     : {admin.email}  (status=active)")
+
+        # 3. Owner — pending until approved by admin
         owner = User(
-            email="owner@gmail.com",
-            name="Owner Demo",
-            password_hash=hash_password("owner@123"),
+            email=owner_cfg["email"],
+            name=owner_cfg["name"],
+            password_hash=hash_password(owner_cfg["password"]),
             role="owner",
-            status="active",
+            status="pending",
             profile_complete=True,
-            pharmacy_id=default_pharmacy.id,
-            pharmacy_name=default_pharmacy.name
+            pharmacy_id=pharmacy.id,
+            pharmacy_name=pharmacy.name,
         )
         db.add(owner)
-        
-        print(f"✓ Created owner account: {owner.email} / owner@123")
-        print(f"  → Assigned to pharmacy: {default_pharmacy.name}")
-        
-        # Commit all changes
+        print(f"✓ Owner     : {owner.email}  (status=pending — requires admin approval)")
+
+        # Employees are NOT seeded — they register via the owner's invite/management flow.
+
         db.commit()
-        
-        print("\n" + "="*60)
-        print("Database seeded successfully!")
-        print("="*60)
-        print("\nDefault Accounts:")
-        print(f"  Admin:  admin@gmail.com / admin@123")
-        print(f"  Owner:  owner@gmail.com / owner@123")
-        print(f"\nDefault Pharmacy: {default_pharmacy.name}")
-        print("="*60)
-        
+
+        print("\n" + "=" * 60)
+        print("Seed complete!")
+        print("=" * 60)
+        print(f"\n  Admin  :  {admin_cfg['email']}  /  {admin_cfg['password']}")
+        print(f"  Owner  :  {owner_cfg['email']}  /  {owner_cfg['password']}  (pending)")
+        print(f"\n  Pharmacy  :  {pharmacy.name}")
+        print("\n  Log in as admin to approve the owner account.")
+        print("=" * 60)
+
     except Exception as e:
         db.rollback()
-        print(f"✗ Error seeding database: {e}")
+        print(f"✗ Seed failed: {e}")
         raise
     finally:
         db.close()

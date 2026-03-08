@@ -36,13 +36,12 @@ export function Sidebar() {
   const { open } = useShadcnSidebar();
   const { menuItems, selectedKey } = useMenu();
   const { data: identity } = useGetIdentity<User>();
-  const isAdmin = identity?.role === "admin";
-  const isOwner = identity?.role === "owner";
+  const isPending = identity?.status !== "active";
 
   const visibleItems = menuItems.filter((item: TreeMenuItem) => {
-    if (item.meta?.adminOnly && !isAdmin) return false;
-    if (item.meta?.ownerOnly && !isOwner && !isAdmin) return false;
-    return true;
+    // Pending accounts can only see the dashboard link
+    if (isPending) return item.name === "dashboard";
+    return item?.meta?.allowed.includes(identity.role)
   });
 
   return (

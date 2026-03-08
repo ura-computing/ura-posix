@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
@@ -7,6 +7,7 @@ import {
   Trash2,
   Loader2,
   Search,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -106,7 +107,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
     onError: (err) => toast.error(err.message),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!form.product.trim()) return;
     mutate();
@@ -211,6 +212,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
 
 export default function AdminCatalogPage() {
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MedicamentOut | null>(null);
@@ -231,6 +233,24 @@ export default function AdminCatalogPage() {
     onError: (err) => toast.error(err.message),
   });
 
+  const { mutate: importCatalog, isPending: importing } = useMutation({
+    mutationFn: (file: File) => api.admin.importCatalog(file),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success(`Catalogue importé — ${data.imported} médicaments`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    onError: (err) => {
+      toast.error(err.message);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) importCatalog(file);
+  };
+
   const openCreate = () => { setEditTarget(null); setFormOpen(true); };
   const openEdit = (m: MedicamentOut) => { setEditTarget(m); setFormOpen(true); };
 
@@ -245,10 +265,28 @@ export default function AdminCatalogPage() {
             Gérez le catalogue partagé des médicaments.
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-2 shrink-0">
-          <Plus className="h-4 w-4" />
-          Ajouter
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsm"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={importing}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Importer CSV
+          </Button>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

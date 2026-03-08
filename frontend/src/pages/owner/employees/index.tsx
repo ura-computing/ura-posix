@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
+import { useGetIdentity } from "@refinedev/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users,
   UserCheck,
   UserX,
   Loader2,
-  UserMinus,
+  ShieldOff,
   Clock,
   ShieldCheck,
 } from "lucide-react";
@@ -29,7 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
-import type { UserAdmin } from "@/types";
+import type { User, UserAdmin } from "@/types";
 
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
@@ -39,19 +41,32 @@ function initials(name?: string, email?: string) {
 const QUERY_KEY = ["owner", "employees"] as const;
 
 export default function OwnerEmployeesPage() {
+  const navigate = useNavigate();
+  const { data: identity } = useGetIdentity<User>();
   const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
-  const [removeTarget, setRemoveTarget] = useState<UserAdmin | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
+
+  // Only owners can manage employees
+  useEffect(() => {
+    if (identity && identity.role !== "owner") {
+      navigate("/", { replace: true });
+    }
+  }, [identity, navigate]);
+
+  const isEmployee = identity?.role !== "owner";
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: api.owner.listEmployees,
+    enabled: !isEmployee,
   });
 
   const pending = employees.filter((e) => e.status === "pending");
   const active = employees.filter((e) => e.status === "active");
 
   const { mutate: approve, isPending: approving } = useMutation({
+
     mutationFn: (id: number) => api.owner.approveEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -70,15 +85,18 @@ export default function OwnerEmployeesPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const { mutate: remove, isPending: removing } = useMutation({
-    mutationFn: (id: number) => api.owner.removeEmployee(id),
+  const { mutate: revoke, isPending: revoking } = useMutation({
+    mutationFn: (id: number) => api.owner.revokeEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Employé retiré");
-      setRemoveTarget(null);
+      toast.success("Accès révoqué — l'employé est en attente");
+      setRevokeTarget(null);
     },
     onError: (err) => toast.error(err.message),
   });
+
+  // Prevent any content flash while redirect is in progress
+  if (isEmployee) return null;
 
   return (
     <ListView>
@@ -213,10 +231,10 @@ export default function OwnerEmployeesPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setRemoveTarget(emp)}
+                          onClick={() => setRevokeTarget(emp)}
                         >
-                          <UserMinus className="h-3.5 w-3.5" />
-                          Retirer
+                          <ShieldOff className="h-3.5 w-3.5" />
+                          Révoquer
                         </Button>
                       </div>
                     </div>
@@ -251,24 +269,24 @@ export default function OwnerEmployeesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Remove dialog */}
-      <AlertDialog open={!!removeTarget} onOpenChange={(v) => { if (!v) setRemoveTarget(null); }}>
+      {/* Revoke dialog */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(v) => { if (!v) setRevokeTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retirer "{removeTarget?.name ?? removeTarget?.email}" ?</AlertDialogTitle>
+            <AlertDialogTitle>Révoquer l'accès de "{revokeTarget?.name ?? revokeTarget?.email}" ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cet employé perdra l'accès à votre pharmacie. Vous pouvez le réinviter ultérieurement.
+              L'employé passera en statut "en attente" et perdra l'accès au tableau de bord. Vous pourrez le réapprouver à tout moment.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removing}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={revoking}>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={removing}
-              onClick={() => removeTarget && remove(removeTarget.id)}
+              disabled={revoking}
+              onClick={() => revokeTarget && revoke(revokeTarget.id)}
             >
-              {removing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Retirer
+              {revoking && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Révoquer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

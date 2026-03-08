@@ -7,6 +7,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     name: str
+    phone: Optional[str] = None
     role: str = "owner"              # owner | employee
     pharmacy_name: Optional[str] = None   # for owners
     pharmacy_id: Optional[int] = None    # for employees

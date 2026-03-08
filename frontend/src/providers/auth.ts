@@ -9,12 +9,7 @@ export const authProvider: AuthProvider = {
       api.storeSession(data);
       window.postMessage({ type: "APCM_AUTH_TOKEN", token: data.access_token }, window.location.origin);
 
-      // Check account status after login
-      if (data.user.status !== "active") {
-        return { success: true, redirectTo: "/pending" };
-      }
-      const redirectTo = data.user.profile_complete ? "/" : "/profile/setup";
-      return { success: true, redirectTo };
+      return { success: true, redirectTo: "/" };
     } catch (err) {
       return {
         success: false,
@@ -28,8 +23,8 @@ export const authProvider: AuthProvider = {
       const data = await api.auth.register(payload);
       api.storeSession(data);
       window.postMessage({ type: "APCM_AUTH_TOKEN", token: data.access_token }, window.location.origin);
-      // All new accounts start as pending — go to pending screen
-      return { success: true, redirectTo: "/pending" };
+      // New accounts are pending — setup profile first, then "/" shows the pending notice
+      return { success: true, redirectTo: "/profile/setup" };
     } catch (err) {
       return {
         success: false,
@@ -53,14 +48,7 @@ export const authProvider: AuthProvider = {
         error: { name: "Unauthorized", message: "Please log in" },
       };
     }
-    // Pending users are "authenticated" (have a token) but get redirected to /pending
-    if (user.status !== "active") {
-      return {
-        authenticated: false,
-        redirectTo: "/pending",
-        error: { name: "Pending", message: "account_pending" },
-      };
-    }
+    // Pending users are authenticated — they land on "/" and see the pending notice
     return { authenticated: true };
   },
 
@@ -71,9 +59,6 @@ export const authProvider: AuthProvider = {
   getPermissions: async () => null,
 
   onError: async (error) => {
-    if (error?.status === 403 && error?.message === "account_pending") {
-      return { redirectTo: "/pending" };
-    }
     if (error?.response?.status === 401) return { logout: true };
     return { error };
   },

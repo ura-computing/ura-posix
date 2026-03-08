@@ -39,6 +39,7 @@ import type { PharmacyPublic } from "@/lib/api";
 const schema = z.object({
   name: z.string().min(3, "Le nom doit comporter au moins 3 caractères"),
   email: z.string().email("Adresse email invalide"),
+  phone: z.string().min(8, "Numéro de téléphone invalide"),
   password: z.string().min(8, "Le mot de passe doit comporter au moins 8 caractères"),
   role: z.enum(["owner", "employee"]),
   pharmacy_name: z.string().optional(),
@@ -54,7 +55,7 @@ export const SignUpForm = () => {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", password: "", role: "owner" },
+    defaultValues: { name: "", email: "", phone: "", password: "", role: "owner" },
   });
 
   const role = form.watch("role");
@@ -141,6 +142,20 @@ export const SignUpForm = () => {
                     <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="votre@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Téléphone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+212 6 00 00 00 00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -48,6 +48,7 @@ export type RegisterPayload = {
   email: string;
   password: string;
   name: string;
+  phone?: string;
   role?: "owner" | "employee";
   pharmacy_name?: string;
   pharmacy_id?: number;

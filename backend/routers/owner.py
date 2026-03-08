@@ -72,8 +72,8 @@ def reject_employee(
     return user
 
 
-@router.delete("/employees/{user_id}")
-def remove_employee(
+@router.put("/employees/{user_id}/revoke", response_model=UserAdminOut)
+def revoke_employee(
     user_id: int,
     db: Session = Depends(get_db),
     current_owner: User = Depends(get_current_owner),
@@ -83,7 +83,9 @@ def remove_employee(
         raise HTTPException(status_code=404, detail="User not found")
     if user.pharmacy_id != current_owner.pharmacy_id:
         raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
-    user.pharmacy_id = None
-    user.status = "rejected"
+    if user.status != "active":
+        raise HTTPException(status_code=400, detail="Employee is not active")
+    user.status = "pending"
     db.commit()
-    return {"removed": True}
+    db.refresh(user)
+    return user

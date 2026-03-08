@@ -14,6 +14,7 @@ import {
   UserCog,
   UserCheck,
   UserX,
+  ShieldOff,
   X,
   Clock,
 } from "lucide-react";
@@ -90,6 +91,21 @@ function RoleBadge({ role }: { role: UserRole }) {
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
   return (email ?? "?").slice(0, 2).toUpperCase();
+}
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  active:  { label: "Actif",    className: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" },
+  pending: { label: "En attente", className: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800" },
+  rejected:{ label: "Refusé",   className: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", cfg.className)}>
+      {cfg.label}
+    </span>
+  );
 }
 
 // ── Pharmacy form dialog ───────────────────────────────────────────────────────
@@ -666,6 +682,7 @@ function PendingOwnersSection() {
 
 function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
   const queryClient = useQueryClient();
+  const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminUsers,
@@ -694,6 +711,17 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
     onError: (err) => toast.error(err.message),
   });
 
+  const { mutate: revoke, isPending: revoking } = useMutation({
+    mutationFn: (userId: number) => api.admin.revokeUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
+      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
+      toast.success("Accès retiré — compte repassé en attente");
+      setRevokeTarget(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -714,14 +742,15 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
         ) : (
           <div className="divide-y">
             {/* Table header */}
-            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>Utilisateur</span>
+              <span className="w-24 text-center">Statut</span>
               <span className="w-32 text-center">Rôle</span>
               <span className="w-36 text-center">Pharmacie</span>
-              <span className="w-28 text-center">Inscrit le</span>
+              <span className="w-8" />
             </div>
             {users.map((user: UserAdmin) => (
-              <div key={user.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
+              <div key={user.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
                 {/* User info */}
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar className="h-8 w-8 shrink-0">
@@ -734,6 +763,11 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
                     <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
                     {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
                   </div>
+                </div>
+
+                {/* Status */}
+                <div className="w-24 flex justify-center">
+                  <StatusBadge status={user.status} />
                 </div>
 
                 {/* Role */}
@@ -767,15 +801,50 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
                   </SelectContent>
                 </Select>
 
-                {/* Date */}
-                <span className="text-xs text-muted-foreground w-28 text-center">
-                  {user.created_at ? format(new Date(user.created_at), "d MMM yyyy", { locale: fr }) : "—"}
-                </span>
+                {/* Revoke access — only for active non-admin users */}
+                <div className="w-8 flex justify-center">
+                  {user.status === "active" && user.role !== "admin" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      title="Retirer l'accès"
+                      onClick={() => setRevokeTarget(user)}
+                    >
+                      <ShieldOff className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Revoke confirmation */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(v) => { if (!v) setRevokeTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Retirer l'accès à "{revokeTarget?.name ?? revokeTarget?.email}" ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Le compte repassera en attente. L'utilisateur ne pourra plus accéder au tableau de bord jusqu'à une nouvelle approbation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoking}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={revoking}
+              onClick={() => revokeTarget && revoke(revokeTarget.id)}
+            >
+              {revoking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Retirer l'accès
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
