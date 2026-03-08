@@ -8,8 +8,8 @@ export const authProvider: AuthProvider = {
       const data = await api.auth.login({ email, password });
       api.storeSession(data);
       window.postMessage({ type: "APCM_AUTH_TOKEN", token: data.access_token }, window.location.origin);
-      const redirectTo = data.user.profile_complete ? "/" : "/profile/setup";
-      return { success: true, redirectTo };
+
+      return { success: true, redirectTo: "/" };
     } catch (err) {
       return {
         success: false,
@@ -18,11 +18,12 @@ export const authProvider: AuthProvider = {
     }
   },
 
-  register: async ({ email, password, name }) => {
+  register: async (payload) => {
     try {
-      const data = await api.auth.register({ email, password, name });
+      const data = await api.auth.register(payload);
       api.storeSession(data);
       window.postMessage({ type: "APCM_AUTH_TOKEN", token: data.access_token }, window.location.origin);
+      // New accounts are pending — setup profile first, then "/" shows the pending notice
       return { success: true, redirectTo: "/profile/setup" };
     } catch (err) {
       return {
@@ -39,13 +40,16 @@ export const authProvider: AuthProvider = {
 
   check: async () => {
     const user = api.getStoredUser();
-    if (user) return { authenticated: true };
-    return {
-      authenticated: false,
-      logout: true,
-      redirectTo: "/login",
-      error: { name: "Unauthorized", message: "Please log in" },
-    };
+    if (!user) {
+      return {
+        authenticated: false,
+        logout: true,
+        redirectTo: "/login",
+        error: { name: "Unauthorized", message: "Please log in" },
+      };
+    }
+    // Pending users are authenticated — they land on "/" and see the pending notice
+    return { authenticated: true };
   },
 
   getIdentity: async () => {

@@ -7,10 +7,6 @@
 
 import { DASHBOARD_URL, TOKEN_STORAGE_KEY, UPLOAD_STATUS_KEY } from "../constants";
 
-const fileType: "achat" | "vente" = window.location.pathname.includes("exportpurchases")
-  ? "achat"
-  : "vente";
-
 const style = document.createElement("style");
 style.textContent = `@keyframes __apcm-spin { to { transform: rotate(360deg); } }`;
 document.head.appendChild(style);
@@ -127,9 +123,10 @@ function setBanner(state: "idle" | "no-auth" | "uploading" | "success" | "error"
     }
 
     case "success": {
-      const section = fileType === "achat" ? "les achats" : "les ventes";
-      const path = fileType === "achat" ? "/achat" : "/ventes";
-      const [inserted, skipped] = detail.split("|");
+      const [inserted, skipped, type] = detail.split("|");
+      const resolvedType = (type as "achat" | "vente") || "vente";
+      const section = resolvedType === "achat" ? "les achats" : "les ventes";
+      const path = resolvedType === "achat" ? "/achat" : "/ventes";
       const skippedNote = Number(skipped) > 0
         ? `<br><span style="color:#94a3b8;font-weight:400">${skipped} doublon(s) ignoré(s)</span>`
         : "";
@@ -170,6 +167,7 @@ chrome.storage.local.get(TOKEN_STORAGE_KEY, (result) => {
 
 type UploadStatus = {
   state: "uploading" | "success" | "error";
+  fileType?: "achat" | "vente";
   current?: number;
   total?: number;
   inserted?: number;
@@ -186,7 +184,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     const detail = (status.total ?? 0) > 1 ? `${status.current}/${status.total}` : "";
     setBanner("uploading", detail);
   } else if (status.state === "success") {
-    setBanner("success", `${status.inserted ?? 0}|${status.skipped ?? 0}`);
+    setBanner("success", `${status.inserted ?? 0}|${status.skipped ?? 0}|${status.fileType ?? "vente"}`);
   } else if (status.state === "error") {
     setBanner("error", status.error ?? "Erreur");
   }

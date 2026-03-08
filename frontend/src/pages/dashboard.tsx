@@ -15,15 +15,71 @@ import {
   MOCK_INVOICE_ROWS,
   formatCurrency,
 } from "@/data/mock-dashboard";
-import {  Pencil, ShoppingCart, Package, TriangleAlert, TrendingUp, UploadCloud } from "lucide-react";
+import { Clock, LogOut, Pencil, ShoppingCart, Package, TriangleAlert, TrendingUp, UploadCloud, XCircle } from "lucide-react";
 import { Link } from "react-router";
+import { useGetIdentity, useLogout } from "@refinedev/core";
+import type { User } from "@/types";
+
+function PendingNotice({ role, status }: { role: "owner" | "employee"; status: "pending" | "rejected" }) {
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  const isRejected = status === "rejected";
+
+  return (
+    <div className={`flex items-start justify-between gap-4 rounded-xl border px-5 py-4 ${
+      isRejected
+        ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
+        : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+    }`}>
+      <div className="flex items-start gap-3">
+        {isRejected
+          ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+          : <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        }
+        <div>
+          <p className={`text-sm font-semibold ${isRejected ? "text-red-800 dark:text-red-300" : "text-amber-800 dark:text-amber-300"}`}>
+            {isRejected ? "Compte refusé" : "Compte en attente d'approbation"}
+          </p>
+          <p className={`mt-0.5 text-sm ${isRejected ? "text-red-700 dark:text-red-400" : "text-amber-700 dark:text-amber-400"}`}>
+            {isRejected
+              ? (role === "employee"
+                  ? "Votre demande a été refusée. Contactez le propriétaire de votre pharmacie pour plus d'informations."
+                  : "Votre demande a été refusée. Contactez l'administrateur pour plus d'informations.")
+              : (role === "employee"
+                  ? "Contactez le propriétaire de votre pharmacie pour valider votre compte."
+                  : "Contactez l'administrateur pour valider votre compte.")
+            }
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => logout()}
+        disabled={isLoggingOut}
+        className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+          isRejected
+            ? "text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900"
+            : "text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900"
+        }`}
+      >
+        <LogOut className="h-3.5 w-3.5" />
+        {isLoggingOut ? "..." : "Se déconnecter"}
+      </button>
+    </div>
+  );
+}
 
 const Dashboard = () => {
+  const { data: identity } = useGetIdentity<User>();
+  const isPending = identity?.status !== "active";
   const kpis = MOCK_KPIS;
   const rows = MOCK_INVOICE_ROWS;
 
   return (
     <div className="space-y-6">
+      {isPending && identity && identity.role !== "admin" && (
+        <PendingNotice role={identity.role as "owner" | "employee"} status={identity.status as "pending" | "rejected"} />
+      )}
       <section>
         <h2 className="text-lg font-semibold text-foreground">Aperçu Rapide</h2>
         <p className="text-sm text-muted-foreground mb-4">Résumé de l'activité du jour</p>

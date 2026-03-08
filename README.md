@@ -56,62 +56,121 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 ## Database Design
 
 ```
-┌──────────────────┐         ┌────────────────────┐
-│   pharmacies     │         │      users         │
-├──────────────────┤         ├────────────────────┤
-│ id          (PK) │◄──┐     │ id          (PK)   │
-│ name             │   │     │ email       (UQ)   │
-│ address          │   │     │ password_hash      │
-│ phone            │   └─────│ pharmacy_id (FK)   │
-│ email            │   N:1   │ role               │
-│ created_at       │         │   admin            │
-└──────────────────┘         │   owner            │
-                             │   employee         │
-                             │ name, phone        │
-                             │ pharmacy_name      │
-                             │ image_url          │
-                             │ profile_complete   │
-                             └────────────────────┘
+┌──────────────────────┐
+│   pharmacies         │
+├──────────────────────┤
+│ id          (PK)     │◄─────┐
+│ name                 │      │
+│ address              │      │
+│ phone                │      │
+│ email                │      │
+│ created_at           │      │
+└──────────────────────┘      │
+           │                  │
+           │ 1:N              │ 1:N
+           ▼                  │
+┌────────────────────────────┐│
+│      users                 ││
+├────────────────────────────┤│
+│ id          (PK)           ││
+│ email       (UQ)           ││
+│ password_hash              ││
+│ google_id   (UQ, nullable) ││
+│ pharmacy_id (FK, nullable) │┘
+│ role                       │
+│   admin                    │
+│   owner                    │
+│   employee                 │
+│ status                     │
+│   pending                  │
+│   active                   │
+│   rejected                 │
+│ name, phone                │
+│ pharmacy_name              │
+│ image_url                  │
+│ profile_complete           │
+│ created_at, updated_at     │
+└────────────────────────────┘
 
 
-┌──────────────────────────────┐
-│         medicaments          │  (Product Catalog — source of truth)
-├──────────────────────────────┤
-│ id           (PK)            │
-│ pid          (UQ)            │  ← Sobrus product ID (or barcode fallback)
-│ product                      │  ← Product name
-│ category                     │  ← e.g. "Médicaments (7.0%)"
-│ zone                         │  ← Storage location
-│ laboratoire                  │  ← Manufacturer
-│ pph                          │  ← Purchase price (HT)
-│ ppv                          │  ← Public selling price
-│ tva                          │  ← Tax rate string e.g. "7%", "20%"
-│ barcode1, barcode2           │
-└──────────┬───────────────────┘
+┌──────────────────────────────────────┐
+│         medicaments                  │  (Product Catalog — source of truth)
+├──────────────────────────────────────┤
+│ id           (PK)                    │
+│ pid          (UQ)                    │  ← Sobrus product ID (or barcode fallback)
+│ product                              │  ← Product name
+│ category                             │  ← e.g. "Médicaments (7.0%)"
+│ zone                                 │  ← Storage location
+│ laboratoire                          │  ← Manufacturer
+│ pph                                  │  ← Purchase price (HT)
+│ ppv                                  │  ← Public selling price
+│ tva                                  │  ← Tax rate string e.g. "7%", "20%"
+│ barcode1, barcode2                   │
+│ created_at, updated_at               │
+└──────────┬───────────────────────────┘
            │ 1
-           ├──────────────────────────────────────────────┐
-           │ N                                            │ N
-┌──────────▼───────────────┐            ┌────────────────▼──────────────┐
-│          achats          │            │            ventes             │
-│       (Purchases)        │            │            (Sales)            │
-├──────────────────────────┤            ├───────────────────────────────┤
-│ id           (PK)        │            │ id            (PK)            │
-│ medicament_id (FK)       │            │ medicament_id (FK)            │
-│ delivery_date            │            │ date                          │
-│ delivery_ref             │            │ transaction_ref               │
-│ supplier                 │            │ client                        │
-│ quantity                 │            │ quantity                      │
-│ pph                      │            │ unit_price                    │
-│ ppv                      │            │ ppv                           │
-│ unit_price               │            │ discount                      │
-│ total                    │            │ total                         │
-│ expiry_date              │            └───────────────────────────────┘
-│ stock_min, stock_max     │
-└──────────────────────────┘
+           ├────────────────────────────────────────────────────┐
+           │ N                                                  │ N
+           ▼                                                    ▼
+┌────────────────────────────┐            ┌───────────────────────────────────┐
+│          achats            │            │            ventes                 │
+│       (Purchases)          │            │            (Sales)                │
+├────────────────────────────┤            ├───────────────────────────────────┤
+│ id              (PK)       │            │ id              (PK)              │
+│ pharmacy_id     (FK) ──────┼────┐       │ pharmacy_id     (FK) ─────────────┼────┐
+│ medicament_id   (FK)       │    │       │ medicament_id   (FK)              │    │
+│ created_at_source          │    │       │ date                              │    │
+│ delivery_date              │    │       │ transaction_ref                   │    │
+│ delivery_ref               │    │       │ client                            │    │
+│ supplier                   │    │       │ quantity                          │    │
+│ quantity                   │    │       │ unit_price                        │    │
+│ unit_price                 │    │       │ discount                          │    │
+│ expiry_date                │    │       │ total                             │    │
+│ stock_min, stock_max       │    │       │ uploaded_at                       │    │
+│ total                      │    │       └───────────────────────────────────┘    │
+│ uploaded_at                │    │                                                │
+└────────────────────────────┘    │                                                │
+           │                      │                                                │
+           │ N:1                  │                                                │
+           └──────────────────────┼────────────────────────────────────────────────┘
+                                  │ N:1
+                                  ▼
+                          ┌──────────────────────┐
+                          │   pharmacies         │
+                          │  (shown above)       │
+                          └──────────────────────┘
+
+
+┌──────────────────────────────────────┐
+│      catalog_requests                │  (Product addition requests)
+├──────────────────────────────────────┤
+│ id              (PK)                 │
+│ requested_by    (FK → users.id) ─────┼───► users
+│ pharmacy_id     (FK, nullable) ──────┼───► pharmacies
+│ status                               │
+│   pending                            │
+│   approved                           │
+│   rejected                           │
+│ reject_reason                        │
+│ product                              │
+│ tva, pph, ppv                        │
+│ category, zone                       │
+│ barcode1, laboratoire                │
+│ created_at, reviewed_at              │
+└──────────────────────────────────────┘
+
+Relationships:
+  pharmacies 1:N users          (one pharmacy has many users)
+  pharmacies 1:N achats         (one pharmacy has many purchases)
+  pharmacies 1:N ventes         (one pharmacy has many sales)
+  pharmacies 1:N catalog_requests (one pharmacy has many requests)
+  medicaments 1:N achats        (one product appears in many purchases)
+  medicaments 1:N ventes        (one product appears in many sales)
+  users 1:N catalog_requests    (one user can make many requests)
 
 Deduplication keys:
-  achats  → (delivery_ref, medicament_id)
-  ventes  → (transaction_ref, medicament_id)
+  achats  → (delivery_ref, medicament_id, pharmacy_id)
+  ventes  → (transaction_ref, medicament_id, pharmacy_id)
 ```
 
 ---
@@ -293,8 +352,20 @@ apcm-pharma/
 ```bash
 make install      # install all deps
 make db           # start PostgreSQL container
+make seed         # create default admin & owner accounts
 make dev          # start backend + frontend
 ```
+
+### Default Accounts
+
+After running `make back-seed`, you can log in with:
+
+| Role  | Email              | Password   | Description                          |
+|-------|--------------------|------------|--------------------------------------|
+| Admin | admin@gmail.com    | admin@123  | Full system access, user management  |
+| Owner | owner@gmail.com    | owner@123  | Pharmacy owner with demo pharmacy    |
+
+The seed script also creates a default pharmacy: "Pharmacie Demo"
 
 ### Environment (`backend/.env`)
 ```env
@@ -303,6 +374,8 @@ SECRET_KEY=<generate-secure-key>
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 ```
+
+**Note**: The seed script (`make seed`) will automatically create default accounts after the database is initialized. Run it once after your first `make db`.
 
 ### Chrome Extension
 ```bash

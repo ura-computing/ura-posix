@@ -1,17 +1,22 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from database import get_db
-from models import Pharmacy, User
+from models import Medicament, Pharmacy, User
 from routers.auth import get_current_user
 from schemas import (
+    MedicamentCreate,
+    MedicamentOut,
+    MedicamentUpdate,
     PharmacyCreate,
     PharmacyOut,
     PharmacyUpdate,
     UserAdminOut,
     UserPharmacyUpdate,
+    UserRejectBody,
     UserRoleUpdate,
 )
 
@@ -119,7 +124,6 @@ def delete_pharmacy(
     pharmacy = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
     if not pharmacy:
         raise HTTPException(status_code=404, detail="Pharmacy not found")
-    # Unlink users before deleting
     db.query(User).filter(User.pharmacy_id == pharmacy_id).update({"pharmacy_id": None})
     db.delete(pharmacy)
     db.commit()
@@ -138,6 +142,89 @@ def list_users(
     if pharmacy_id is not None:
         q = q.filter(User.pharmacy_id == pharmacy_id)
     return q.order_by(User.created_at.desc()).all()
+
+
+@router.get("/users/pending", response_model=List[UserAdminOut])
+def list_pending_owners(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """List pharmacy owner accounts awaiting admin approval."""
+    return (
+        db.query(User)
+        .filter(User.status == "pending", User.role == "owner")
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+
+@router.put("/users/{user_id}/approve", response_model=UserAdminOut)
+def approve_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Approve a pending owner: activate account and auto-create their pharmacy."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.status != "pending":
+        raise HTTPException(status_code=400, detail="User is not pending")
+
+    if user.role == "owner" and user.pharmacy_name and not user.pharmacy_id:
+        pharmacy = Pharmacy(name=user.pharmacy_name)
+        db.add(pharmacy)
+        db.flush()
+        user.pharmacy_id = pharmacy.id
+
+    user.status = "active"
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/{user_id}/reject", response_model=UserAdminOut)
+def reject_user(
+    user_id: int,
+    body: UserRejectBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.status = "rejected"
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/{user_id}/revoke", response_model=UserAdminOut)
+def revoke_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """Revoke access from an active user — sets their status back to pending.
+    If the user is an owner, also revokes all active employees in their pharmacy."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Cannot revoke your own access")
+    if user.status != "active":
+        raise HTTPException(status_code=400, detail="User is not active")
+    user.status = "pending"
+    # If revoking an owner, also revoke all active employees in their pharmacy
+    if user.role == "owner" and user.pharmacy_id:
+        db.query(User).filter(
+            User.pharmacy_id == user.pharmacy_id,
+            User.role == "employee",
+            User.status == "active",
+        ).update({"status": "pending"})
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.put("/users/{user_id}/role", response_model=UserAdminOut)
@@ -176,3 +263,68 @@ def update_user_pharmacy(
     db.commit()
     db.refresh(user)
     return user
+
+
+# ── Catalog (direct CRUD) ──────────────────────────────────────────────────────
+
+@router.get("/catalog", response_model=List[MedicamentOut])
+def list_catalog(
+    search: str = Query(""),
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    q = db.query(Medicament)
+    if search:
+        term = f"%{search}%"
+        q = q.filter(Medicament.product.ilike(term) | Medicament.pid.ilike(term))
+    total = q.count()
+    items = q.order_by(Medicament.product).offset((page - 1) * limit).limit(limit).all()
+    return items
+
+
+@router.post("/catalog", response_model=MedicamentOut)
+def create_medicament(
+    body: MedicamentCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    if db.query(Medicament).filter(Medicament.pid == body.pid).first():
+        raise HTTPException(status_code=400, detail="PID already exists")
+    med = Medicament(**body.model_dump())
+    db.add(med)
+    db.commit()
+    db.refresh(med)
+    return med
+
+
+@router.put("/catalog/{med_id}", response_model=MedicamentOut)
+def update_medicament(
+    med_id: int,
+    body: MedicamentUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    med = db.query(Medicament).filter(Medicament.id == med_id).first()
+    if not med:
+        raise HTTPException(status_code=404, detail="Medicament not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(med, field, value)
+    db.commit()
+    db.refresh(med)
+    return med
+
+
+@router.delete("/catalog/{med_id}")
+def delete_medicament(
+    med_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    med = db.query(Medicament).filter(Medicament.id == med_id).first()
+    if not med:
+        raise HTTPException(status_code=404, detail="Medicament not found")
+    db.delete(med)
+    db.commit()
+    return {"deleted": True}

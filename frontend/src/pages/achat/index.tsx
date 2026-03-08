@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { useTable } from "@refinedev/react-table";
+import { useGetIdentity } from "@refinedev/core";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { UploadCloud } from "lucide-react";
+import type { User } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/refine-ui/views/list-view";
@@ -76,6 +78,8 @@ function achatRowToCSV(r: Record<string, unknown>): string[] {
 }
 
 const AchatList = () => {
+  const { data: identity } = useGetIdentity<User>();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [allCategories, setAllCategories] = useState<string[]>([]);
@@ -83,6 +87,10 @@ const AchatList = () => {
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (identity?.role === "admin") navigate("/", { replace: true });
+  }, [identity, navigate]);
 
   useEffect(() => {
     api.tables.achatCategories().then(setAllCategories).catch(() => {});
@@ -239,6 +247,8 @@ const AchatList = () => {
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCats, selectedTva, dateRange]);
+
+  if (identity?.role === "admin") return null;
 
   return (
     <ListView>

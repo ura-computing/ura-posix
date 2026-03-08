@@ -1,5 +1,7 @@
 export type UserRole = "admin" | "owner" | "employee";
 
+export type UserStatus = "pending" | "active" | "rejected";
+
 export type User = {
   id: number;
   email: string;
@@ -9,6 +11,7 @@ export type User = {
   pharmacy_name?: string;
   profile_complete: boolean;
   role: UserRole;
+  status: UserStatus;
   pharmacy_id?: number;
 };
 
@@ -31,6 +34,7 @@ export type UserAdmin = {
   pharmacy_name?: string;
   profile_complete: boolean;
   role: UserRole;
+  status: UserStatus;
   pharmacy_id?: number;
   created_at?: string;
 };
@@ -44,6 +48,10 @@ export type RegisterPayload = {
   email: string;
   password: string;
   name: string;
+  phone?: string;
+  role?: "owner" | "employee";
+  pharmacy_name?: string;
+  pharmacy_id?: number;
 };
 
 export type ProfileUpdatePayload = {

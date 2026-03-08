@@ -7,6 +7,10 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     name: str
+    phone: Optional[str] = None
+    role: str = "owner"              # owner | employee
+    pharmacy_name: Optional[str] = None   # for owners
+    pharmacy_id: Optional[int] = None    # for employees
 
 
 class UserLogin(BaseModel):
@@ -23,6 +27,7 @@ class UserOut(BaseModel):
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False
     role: str = "owner"
+    status: str = "pending"
     pharmacy_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
@@ -69,6 +74,13 @@ class PharmacyOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PharmacyPublic(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 # ── Admin user management schemas ─────────────────────────────────────────────
 
 class UserAdminOut(BaseModel):
@@ -80,6 +92,7 @@ class UserAdminOut(BaseModel):
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False
     role: str = "owner"
+    status: str = "pending"
     pharmacy_id: Optional[int] = None
     created_at: Optional[datetime] = None
 
@@ -92,3 +105,90 @@ class UserRoleUpdate(BaseModel):
 
 class UserPharmacyUpdate(BaseModel):
     pharmacy_id: Optional[int] = None
+
+
+class UserRejectBody(BaseModel):
+    reason: Optional[str] = None
+
+
+# ── Catalog request schemas ────────────────────────────────────────────────────
+
+class CatalogRequestCreate(BaseModel):
+    product: str
+    tva: Optional[str] = None
+    pph: Optional[float] = None
+    ppv: Optional[float] = None
+    category: Optional[str] = None
+    zone: Optional[str] = None
+    barcode1: Optional[str] = None
+    laboratoire: Optional[str] = None
+
+
+class CatalogRequestOut(BaseModel):
+    id: int
+    requested_by: int
+    pharmacy_id: Optional[int] = None
+    status: str
+    reject_reason: Optional[str] = None
+    product: str
+    tva: Optional[str] = None
+    pph: Optional[float] = None
+    ppv: Optional[float] = None
+    category: Optional[str] = None
+    zone: Optional[str] = None
+    barcode1: Optional[str] = None
+    laboratoire: Optional[str] = None
+    created_at: Optional[datetime] = None
+    reviewed_at: Optional[datetime] = None
+    requester_name: Optional[str] = None
+    requester_email: Optional[str] = None
+    pharmacy_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class CatalogRejectBody(BaseModel):
+    reason: Optional[str] = None
+
+
+# ── Medicament schemas (admin direct CRUD) ─────────────────────────────────────
+
+class MedicamentCreate(BaseModel):
+    pid: str
+    product: str
+    tva: Optional[str] = None
+    pph: Optional[float] = None
+    ppv: Optional[float] = None
+    category: Optional[str] = None
+    zone: Optional[str] = None
+    barcode1: Optional[str] = None
+    barcode2: Optional[str] = None
+    laboratoire: Optional[str] = None
+
+
+class MedicamentUpdate(BaseModel):
+    product: Optional[str] = None
+    tva: Optional[str] = None
+    pph: Optional[float] = None
+    ppv: Optional[float] = None
+    category: Optional[str] = None
+    zone: Optional[str] = None
+    barcode1: Optional[str] = None
+    barcode2: Optional[str] = None
+    laboratoire: Optional[str] = None
+
+
+class MedicamentOut(BaseModel):
+    id: int
+    pid: str
+    product: str
+    tva: Optional[str] = None
+    pph: Optional[float] = None
+    ppv: Optional[float] = None
+    category: Optional[str] = None
+    zone: Optional[str] = None
+    barcode1: Optional[str] = None
+    barcode2: Optional[str] = None
+    laboratoire: Optional[str] = None
+
+    model_config = {"from_attributes": True}

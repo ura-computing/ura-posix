@@ -38,6 +38,33 @@ function getPageTitle(pathname: string) {
   return { title: "Tableau de Bord", subtitle: "Vue d'ensemble de votre pharmacie" };
 }
 
+const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
+  admin: {
+    label: "Administrateur",
+    className: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
+  },
+  owner: {
+    label: "Propriétaire",
+    className: "bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800",
+  },
+  employee: {
+    label: "Employé",
+    className: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+  },
+};
+
+function RoleBadge() {
+  const { data: user } = useGetIdentity<User>();
+  if (!user?.role) return null;
+  const cfg = ROLE_CONFIG[user.role];
+  if (!cfg) return null;
+  return (
+    <span className={cn("hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium shrink-0", cfg.className)}>
+      {cfg.label}
+    </span>
+  );
+}
+
 export const Header = () => {
   const { isMobile } = useSidebar();
   return <>{isMobile ? <MobileHeader /> : <DesktopHeader />}</>;
@@ -53,10 +80,11 @@ function DesktopHeader() {
         "sticky top-0 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background px-4 lg:px-6 z-40"
       )}
     >
-      <div className="flex flex-1 items-center gap-6 min-w-0">
+      <div className="flex flex-1 items-center gap-4 min-w-0">
         <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
+        <RoleBadge />
         {subtitle && (
-          <p className="text-sm text-muted-foreground hidden sm:block truncate">{subtitle}</p>
+          <p className="text-sm text-muted-foreground hidden lg:block truncate">{subtitle}</p>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">

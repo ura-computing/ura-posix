@@ -9,13 +9,6 @@ export const QUERY_KEYS = {
   token: ["token"] as const,
 } as const;
 
-export const ENDPOINTS = {
-  uploads: {
-    achatJson: "/uploads/achat-json",
-    venteJson: "/uploads/vente-json",
-  },
-} as const;
-
 export const ACTIONS = {
   GET_TOKEN: "GET_TOKEN",
   CLEAR_TOKEN: "CLEAR_TOKEN",

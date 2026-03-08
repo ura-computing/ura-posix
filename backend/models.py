@@ -30,6 +30,7 @@ class User(Base):
     pharmacy_name = Column(String, nullable=True)
     profile_complete = Column(Boolean, default=False)
     role = Column(String, default="owner", nullable=False)  # admin | owner | employee
+    status = Column(String, default="pending", nullable=False)  # pending | active | rejected
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -64,6 +65,7 @@ class Achat(Base):
     __tablename__ = "achats"
 
     id = Column(Integer, primary_key=True, index=True)
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True, index=True)
     medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True, index=True)
     medicament = relationship("Medicament", back_populates="achats")
 
@@ -85,6 +87,7 @@ class Vente(Base):
     __tablename__ = "ventes"
 
     id = Column(Integer, primary_key=True, index=True)
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True, index=True)
     medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True, index=True)
     medicament = relationship("Medicament", back_populates="ventes")
 
@@ -96,3 +99,28 @@ class Vente(Base):
     unit_price = Column(Float, nullable=True)            # "Prix unitaire"
     total = Column(Float, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CatalogRequest(Base):
+    """Product addition request submitted by a pharmacy owner, reviewed by admin."""
+    __tablename__ = "catalog_requests"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    requested_by  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    pharmacy_id   = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
+    status        = Column(String, default="pending", nullable=False)  # pending | approved | rejected
+    reject_reason = Column(String, nullable=True)
+
+    product       = Column(String, nullable=False)
+    tva           = Column(String, nullable=True)
+    pph           = Column(Float, nullable=True)
+    ppv           = Column(Float, nullable=True)
+    category      = Column(String, nullable=True)
+    zone          = Column(String, nullable=True)
+    barcode1      = Column(String, nullable=True)
+    laboratoire   = Column(String, nullable=True)
+
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    reviewed_at   = Column(DateTime(timezone=True), nullable=True)
+
+    requester = relationship("User", foreign_keys=[requested_by])

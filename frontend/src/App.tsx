@@ -1,4 +1,4 @@
-import { Authenticated, Refine } from "@refinedev/core";
+import { Authenticated, Refine, useGetIdentity } from "@refinedev/core";
 import { DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,7 +7,8 @@ import routerProvider, {
   NavigateToResource,
   UnsavedChangesNotifier,
 } from "@refinedev/react-router";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router";
+import { BrowserRouter, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
+import { useEffect } from "react";
 import "./App.css";
 import { Toaster } from "./components/refine-ui/notification/toaster";
 import { useNotificationProvider } from "./components/refine-ui/notification/use-notification-provider";
@@ -17,6 +18,26 @@ import { dataProvider } from "./providers/data";
 import { authProvider } from "./providers/auth";
 import { Login } from "./pages/login";
 import { routes, resources } from "./routes";
+import { useStatusPoller } from "./hooks/use-status-poller";
+import type { User } from "./types";
+
+// Blocks navigation to any route other than "/" for pending (not yet active) accounts.
+// Also polls the backend while pending so approval is reflected immediately.
+function PendingGuard() {
+  const { data: identity } = useGetIdentity<User>();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useStatusPoller(identity);
+
+  useEffect(() => {
+    if (identity && identity.status !== "active" && location.pathname !== "/") {
+      navigate("/", { replace: true });
+    }
+  }, [identity, location.pathname, navigate]);
+
+  return <Outlet />;
+}
 
 const queryClient = new QueryClient();
 
@@ -75,7 +96,7 @@ function App() {
                     element={
                       <Authenticated key="auth-with-layout" fallback={<Login />}>
                         <Layout>
-                          <Outlet />
+                          <PendingGuard />
                         </Layout>
                       </Authenticated>
                     }

@@ -32,6 +32,7 @@ def _base_query(
     db: Session,
     search: str,
     categories: List[str],
+    current_user: User,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     tva: Optional[List[str]] = None,
@@ -41,6 +42,8 @@ def _base_query(
         .options(joinedload(Vente.medicament))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
     )
+    if current_user.pharmacy_id:
+        q = q.filter(Vente.pharmacy_id == current_user.pharmacy_id)
     if search:
         term = f"%{search}%"
         q = q.filter(
@@ -63,32 +66,32 @@ def _base_query(
 @router.get("/categories")
 def get_vente_categories(
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    rows = (
+    q = (
         db.query(Medicament.category)
         .join(Vente, Vente.medicament_id == Medicament.id)
         .filter(Medicament.category.isnot(None))
-        .distinct()
-        .order_by(Medicament.category)
-        .all()
     )
+    if current_user.pharmacy_id:
+        q = q.filter(Vente.pharmacy_id == current_user.pharmacy_id)
+    rows = q.distinct().order_by(Medicament.category).all()
     return [r[0] for r in rows]
 
 
 @router.get("/tva-rates")
 def get_vente_tva_rates(
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    rows = (
+    q = (
         db.query(Medicament.tva)
         .join(Vente, Vente.medicament_id == Medicament.id)
         .filter(Medicament.tva.isnot(None))
-        .distinct()
-        .order_by(Medicament.tva)
-        .all()
     )
+    if current_user.pharmacy_id:
+        q = q.filter(Vente.pharmacy_id == current_user.pharmacy_id)
+    rows = q.distinct().order_by(Medicament.tva).all()
     return [r[0] for r in rows]
 
 
@@ -103,9 +106,9 @@ def list_ventes(
     tva: List[str] = Query(default=[]),
     export: bool = Query(False),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    q = _base_query(db, search, category, date_from, date_to, tva)
+    q = _base_query(db, search, category, current_user, date_from, date_to, tva)
     total = q.count()
 
     if export:

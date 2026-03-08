@@ -40,6 +40,42 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type PharmacyPublic = { id: number; name: string };
+export type CatalogRequestOut = {
+  id: number;
+  requested_by: number;
+  pharmacy_id: number | null;
+  status: "pending" | "approved" | "rejected";
+  reject_reason: string | null;
+  product: string;
+  tva: string | null;
+  pph: number | null;
+  ppv: number | null;
+  category: string | null;
+  zone: string | null;
+  barcode1: string | null;
+  laboratoire: string | null;
+  created_at: string | null;
+  reviewed_at: string | null;
+  requester_name: string | null;
+  requester_email: string | null;
+  pharmacy_name: string | null;
+};
+
+export type MedicamentOut = {
+  id: number;
+  pid: string;
+  product: string;
+  tva: string | null;
+  pph: number | null;
+  ppv: number | null;
+  category: string | null;
+  zone: string | null;
+  barcode1: string | null;
+  barcode2: string | null;
+  laboratoire: string | null;
+};
+
 export const api = {
   auth: {
     login: (payload: LoginPayload) =>
@@ -115,10 +151,66 @@ export const api = {
       const qs = pharmacyId !== undefined ? `?pharmacy_id=${pharmacyId}` : "";
       return request<UserAdmin[]>(`${ENDPOINTS.admin.users}${qs}`);
     },
+    listPendingOwners: () => request<UserAdmin[]>(`${ENDPOINTS.admin.users}/pending`),
+    approveUser: (userId: number) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/approve`, { method: "PUT" }),
+    rejectUser: (userId: number) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/reject`, { method: "PUT", body: JSON.stringify({}) }),
+    revokeUser: (userId: number) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/revoke`, { method: "PUT" }),
     updateUserRole: (userId: number, role: UserRole) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/role`, { method: "PUT", body: JSON.stringify({ role }) }),
     updateUserPharmacy: (userId: number, pharmacyId: number | null) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/pharmacy`, { method: "PUT", body: JSON.stringify({ pharmacy_id: pharmacyId }) }),
+    // Catalog direct CRUD
+    listCatalog: (search?: string, page = 1) => {
+      const p = new URLSearchParams({ page: String(page) });
+      if (search) p.set("search", search);
+      return request<MedicamentOut[]>(`/admin/catalog?${p}`);
+    },
+    createMedicament: (body: Omit<MedicamentOut, "id">) =>
+      request<MedicamentOut>("/admin/catalog", { method: "POST", body: JSON.stringify(body) }),
+    updateMedicament: (id: number, body: Partial<MedicamentOut>) =>
+      request<MedicamentOut>(`/admin/catalog/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    deleteMedicament: (id: number) =>
+      request<{ deleted: boolean }>(`/admin/catalog/${id}`, { method: "DELETE" }),
+    // Catalog CSV/XLSM import
+    importCatalog: (file: File) => uploadFile<{ imported: number }>("/uploads/catalog", file),
+    // Catalog requests (admin side)
+    listCatalogRequests: (status?: string) => {
+      const qs = status ? `?status=${status}` : "";
+      return request<CatalogRequestOut[]>(`/catalog-requests${qs}`);
+    },
+    approveCatalogRequest: (id: number) =>
+      request<CatalogRequestOut>(`/catalog-requests/${id}/approve`, { method: "PUT" }),
+    rejectCatalogRequest: (id: number, reason?: string) =>
+      request<CatalogRequestOut>(`/catalog-requests/${id}/reject`, { method: "PUT", body: JSON.stringify({ reason }) }),
+  },
+
+  owner: {
+    listEmployees: () => request<UserAdmin[]>("/owner/employees"),
+    approveEmployee: (id: number) =>
+      request<UserAdmin>(`/owner/employees/${id}/approve`, { method: "PUT" }),
+    rejectEmployee: (id: number) =>
+      request<UserAdmin>(`/owner/employees/${id}/reject`, { method: "PUT" }),
+    revokeEmployee: (id: number) =>
+      request<UserAdmin>(`/owner/employees/${id}/revoke`, { method: "PUT" }),
+  },
+
+  catalogRequests: {
+    submit: (body: { product: string; tva?: string; pph?: number; ppv?: number; category?: string; zone?: string; barcode1?: string; laboratoire?: string }) =>
+      request<CatalogRequestOut>("/catalog-requests", { method: "POST", body: JSON.stringify(body) }),
+    list: (status?: string) => {
+      const qs = status ? `?status=${status}` : "";
+      return request<CatalogRequestOut[]>(`/catalog-requests${qs}`);
+    },
+  },
+
+  public: {
+    listPharmacies: () => {
+      return fetch(`${API_URL}/public/pharmacies`)
+        .then((r) => r.json()) as Promise<PharmacyPublic[]>;
+    },
   },
 
   storeSession: (data: AuthToken) => {
