@@ -1,9 +1,9 @@
-BACKEND_DIR   := backend
-FRONTEND_DIR  := frontend
-EXTENSION_DIR := extension
+BACKEND_DIR   := ./backend
+FRONTEND_DIR  := ./frontend
+EXTENSION_DIR := ./extension
 
 VENV := $(BACKEND_DIR)/.venv
-PIP  := $(VENV)/bin/pip
+PIP  := $(VENV)/bin/python3 -m pip
 
 .PHONY: \
 	back-install back-dev \
@@ -22,11 +22,11 @@ env:
 # ── Database ───────────────────────────────────────────────────────────────────
 
 db:
-	docker compose up -d --wait db
+	docker compose up -d --wait db 
+# --remove-orphans
 
 db-ui:
-	docker compose up -d --wait db cloudbeaver
-	open http://localhost:8080
+	open tableplus://
 
 down:
 	docker compose down

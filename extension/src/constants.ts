@@ -2,6 +2,8 @@ export const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || "http://local
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export const TOKEN_STORAGE_KEY = "pharmagest_token";
+export const NOTIFICATIONS_STORAGE_KEY = "apcm_notifications";
+export const UPLOAD_STATUS_KEY = "apcm_upload_status";
 
 export const QUERY_KEYS = {
   token: ["token"] as const,
@@ -20,4 +22,6 @@ export const ACTIONS = {
   STORE_TOKEN: "STORE_TOKEN",
   START_AREA_CAPTURE: "START_AREA_CAPTURE",
   SELECT_AND_CAPTURE: "SELECT_AND_CAPTURE",
+  UPLOAD_CHUNK: "UPLOAD_CHUNK",
+  SAVE_NOTIFICATION: "SAVE_NOTIFICATION",
 } as const;
