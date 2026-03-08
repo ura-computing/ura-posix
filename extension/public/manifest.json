@@ -22,6 +22,14 @@
     {
       "matches": ["<all_urls>"],
       "js": ["src/content/index.ts"]
+    },
+    {
+      "matches": [
+        "https://app.pharma.sobrus.com/reports/exportpurchases*",
+        "https://app.pharma.sobrus.com/reports/exportsales*"
+      ],
+      "js": ["src/content/sobrus-export.ts", "src/content/sobrus-ui.ts"],
+      "run_at": "document_idle"
     }
   ]
 }

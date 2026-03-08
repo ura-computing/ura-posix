@@ -1,4 +1,7 @@
-import { ACTIONS, TOKEN_STORAGE_KEY as TOKEN_KEY } from "../constants";
+import { ACTIONS } from "../constants";
+import { uploadCsv } from "../lib/api";
+import { addNotification, clearToken, getToken, setToken } from "../lib/storage";
+import { openOrFocusDashboard } from "../lib/tabs";
 
 console.log("[Background] Service Worker Started");
 
@@ -7,30 +10,48 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 
   // ── Token storage ──────────────────────────────────────────────────────────
   if (request.action === ACTIONS.STORE_TOKEN) {
-    chrome.storage.local.set({ [TOKEN_KEY]: request.token }, () => {
-      console.log("[Background] Token stored");
-      sendResponse({ success: true });
-    });
+    setToken(request.token).then(() => sendResponse({ success: true }));
     return true;
   }
 
   if (request.action === ACTIONS.GET_TOKEN) {
-    chrome.storage.local.get(TOKEN_KEY, (result) => {
-      sendResponse({ token: result[TOKEN_KEY] ?? null });
-    });
+    getToken().then((token) => sendResponse({ token }));
     return true;
   }
 
   if (request.action === ACTIONS.CLEAR_TOKEN) {
-    chrome.storage.local.remove(TOKEN_KEY, () => {
-      sendResponse({ success: true });
-    });
+    clearToken().then(() => sendResponse({ success: true }));
     return true;
   }
 
+  // ── Upload a single CSV chunk (background can reach localhost, content script cannot) ─
+  if (request.action === ACTIONS.UPLOAD_CHUNK) {
+    const { csvChunk, fileType } = request as { csvChunk: string; fileType: "achat" | "vente" };
+    uploadCsv(fileType, csvChunk)
+      .then((data) => sendResponse({ success: true, ...data }))
+      .catch((err: Error) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  // ── Save notification after all chunks are done ────────────────────────────
+  if (request.action === ACTIONS.SAVE_NOTIFICATION) {
+    const { fileType, inserted, skipped } = request as {
+      fileType: "achat" | "vente";
+      inserted: number;
+      skipped: number;
+    };
+    addNotification({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fileType,
+      inserted,
+      skipped,
+      timestamp: Date.now(),
+      read: false,
+    }).then(() => openOrFocusDashboard(fileType === "achat" ? "/achat" : "/ventes"));
+    return false; // no async response needed
+  }
+
   // ── Area capture → relay to content script ─────────────────────────────────
-  // Popup sends START_AREA_CAPTURE → background finds active tab →
-  // sends SELECT_AND_CAPTURE to content script → relays result back to popup.
   if (request.action === ACTIONS.START_AREA_CAPTURE) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const tab = tabs[0];

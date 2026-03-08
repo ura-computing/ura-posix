@@ -38,17 +38,20 @@ class User(Base):
 
 
 class Medicament(Base):
-    """Product catalog — one row per unique Sobrus PID."""
+    """Product catalog — one row per unique product."""
     __tablename__ = "medicaments"
 
     id = Column(Integer, primary_key=True, index=True)
-    pid = Column(String, unique=True, index=True, nullable=False)  # Sobrus PID
+    pid = Column(String, unique=True, index=True, nullable=False)  # Sobrus PID or barcode fallback
     product = Column(String, nullable=False)
     tva = Column(String, nullable=True)
-    pph = Column(Float, nullable=True)   # latest purchase price
-    ppv = Column(Float, nullable=True)   # latest selling price
+    pph = Column(Float, nullable=True)        # purchase price
+    ppv = Column(Float, nullable=True)        # selling price
     category = Column(String, nullable=True)
     zone = Column(String, nullable=True)
+    barcode1 = Column(String, nullable=True)  # Code barre 1
+    barcode2 = Column(String, nullable=True)  # Code barre 2
+    laboratoire = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
