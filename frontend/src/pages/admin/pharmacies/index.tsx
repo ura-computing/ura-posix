@@ -8,7 +8,6 @@ import {
   Loader2,
   Phone,
   MapPin,
-  Mail,
   Users,
   ShieldCheck,
   UserCog,
@@ -53,10 +52,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { QUERY_KEYS } from "@/constants";
 import type { Pharmacy, UserAdmin, UserRole } from "@/types";
+import { eUserRole } from "@/types";
+
+const FEATURES: { key: string; label: string }[] = [
+  { key: "rapports", label: "Rapports" },
+  { key: "import", label: "Import" },
+  { key: "achat", label: "Achats" },
+  { key: "ventes", label: "Ventes" },
+  { key: "stock", label: "Stock" },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -242,9 +251,10 @@ type UsersPanelProps = {
 
 function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
   const queryClient = useQueryClient();
+  const panelQueryKey = [...QUERY_KEYS.adminUsers, pharmacy.id];
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: [...QUERY_KEYS.adminUsers, pharmacy.id],
+    queryKey: panelQueryKey,
     queryFn: () => api.admin.listUsers(pharmacy.id),
   });
 
@@ -252,7 +262,7 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
     mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
       api.admin.updateUserRole(userId, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.adminUsers, pharmacy.id] });
+      queryClient.invalidateQueries({ queryKey: panelQueryKey });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
       toast.success("Rôle mis à jour");
     },
@@ -263,9 +273,20 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number | null }) =>
       api.admin.updateUserPharmacy(userId, pharmacyId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEYS.adminUsers, pharmacy.id] });
+      queryClient.invalidateQueries({ queryKey: panelQueryKey });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
       toast.success("Pharmacie mise à jour");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { mutate: updatePermissions, isPending: updatingPerms } = useMutation({
+    mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
+      api.admin.updateUserPermissions(userId, permissions),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<UserAdmin[]>(panelQueryKey, (prev) =>
+        prev?.map((u) => (u.id === updated.id ? updated : u)) ?? []
+      );
     },
     onError: (err) => toast.error(err.message),
   });
@@ -296,48 +317,77 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
       ) : (
         <div className="divide-y">
           {users.map((user: UserAdmin) => (
-            <div key={user.id} className="flex items-center gap-3 px-5 py-3">
-              <Avatar className="h-8 w-8 shrink-0">
-                {user.image_url && <AvatarImage src={user.image_url} />}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {initials(user.name, user.email)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
-                {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+            <div key={user.id} className="px-5 py-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8 shrink-0">
+                  {user.image_url && <AvatarImage src={user.image_url} />}
+                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                    {initials(user.name, user.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
+                  {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Select
+                    value={user.role}
+                    onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="owner">Propriétaire</SelectItem>
+                      <SelectItem value="employee">Employé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={user.pharmacy_id?.toString() ?? "none"}
+                    onValueChange={(v) => updatePharmacy({ userId: user.id, pharmacyId: v === "none" ? null : Number(v) })}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-36">
+                      <SelectValue placeholder="Pharmacie…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Aucune —</SelectItem>
+                      {allPharmacies.map((p) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Role selector */}
-                <Select
-                  value={user.role}
-                  onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
-                >
-                  <SelectTrigger className="h-7 text-xs w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="owner">Propriétaire</SelectItem>
-                    <SelectItem value="employee">Employé</SelectItem>
-                  </SelectContent>
-                </Select>
-                {/* Pharmacy selector */}
-                <Select
-                  value={user.pharmacy_id?.toString() ?? "none"}
-                  onValueChange={(v) => updatePharmacy({ userId: user.id, pharmacyId: v === "none" ? null : Number(v) })}
-                >
-                  <SelectTrigger className="h-7 text-xs w-36">
-                    <SelectValue placeholder="Pharmacie…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Aucune —</SelectItem>
-                    {allPharmacies.map((p) => (
-                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
+              {/* Owner feature restrictions */}
+              {user.role === eUserRole.OWNER && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-11 pt-2">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-full">
+                    Restrictions d'accès
+                  </span>
+                  {FEATURES.map(({ key, label }) => {
+                    const allowed = user.permissions?.[key] !== false;
+                    return (
+                      <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <Switch
+                          checked={allowed}
+                          disabled={updatingPerms}
+                          onCheckedChange={(v) =>
+                            updatePermissions({
+                              userId: user.id,
+                              permissions: { ...(user.permissions ?? {}), [key]: v },
+                            })
+                          }
+                          className="scale-[0.8]"
+                        />
+                        <span className="text-xs text-muted-foreground">{label}</span>
+                      </label>
+                    );
+                  })}
+                  {updatingPerms && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -461,7 +511,7 @@ export default function PharmaciesAdminPage() {
 
                 <Separator className="my-3" />
 
-                {/* Info rows */}
+                {/* Owner info */}
                 <div className="space-y-1.5">
                   {p.address && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -469,17 +519,24 @@ export default function PharmaciesAdminPage() {
                       <span className="truncate">{p.address}</span>
                     </div>
                   )}
-                  {p.phone && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Phone className="h-3 w-3 shrink-0" />
-                      <span>{p.phone}</span>
+                  {(p.owner_name || p.owner_email) ? (
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground pt-0.5">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-bold mt-0.5">
+                        {(p.owner_name ?? p.owner_email ?? "?").slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        {p.owner_name && <p className="font-medium text-foreground truncate">{p.owner_name}</p>}
+                        {p.owner_email && <p className="truncate">{p.owner_email}</p>}
+                        {p.owner_phone && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Phone className="h-2.5 w-2.5 shrink-0" />
+                            <span>{p.owner_phone}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  {p.email && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Mail className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{p.email}</span>
-                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/50 italic">Aucun propriétaire</p>
                   )}
                 </div>
 
@@ -803,7 +860,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
                 {/* Revoke access — only for active non-admin users */}
                 <div className="w-8 flex justify-center">
-                  {user.status === "active" && user.role !== "admin" && (
+                  {user.status === "active" && user.role !== eUserRole.ADMIN && (
                     <Button
                       variant="ghost"
                       size="icon"

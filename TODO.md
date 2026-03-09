@@ -20,4 +20,10 @@
     + Pharmacy speciaux -3 (Homeopathie (to be checked), )
     + Parapharmacy speciaux -4 (to be checked)
 
-+ extension should only work in export achat vente in dashbaord
+
++ importing data form dahbaord to the backend should use batch
++ in sign up from, 2 pasword inputs
+
++ block cros origin from only one instance
+
+

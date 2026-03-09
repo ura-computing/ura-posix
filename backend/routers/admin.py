@@ -5,9 +5,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
-from models import Medicament, Pharmacy, User
+from models import CategorySuffix, Medicament, Pharmacy, User
 from routers.auth import get_current_user
 from schemas import (
+    CategorySuffixCreate,
+    CategorySuffixOut,
+    CategorySuffixUpdate,
+    EmployeePermissionsUpdate,
     MedicamentCreate,
     MedicamentOut,
     MedicamentUpdate,
@@ -44,6 +48,7 @@ def list_pharmacies(
     result = []
     for p in pharmacies:
         user_count = db.query(User).filter(User.pharmacy_id == p.id).count()
+        owner = db.query(User).filter(User.pharmacy_id == p.id, User.role == "owner").first()
         out = PharmacyOut(
             id=p.id,
             name=p.name,
@@ -52,6 +57,10 @@ def list_pharmacies(
             email=p.email,
             created_at=p.created_at,
             user_count=user_count,
+            owner_name=owner.name if owner else None,
+            owner_email=owner.email if owner else None,
+            owner_phone=owner.phone if owner else None,
+            owner_pharmacy_name=owner.pharmacy_name if owner else None,
         )
         result.append(out)
     return result
@@ -265,13 +274,31 @@ def update_user_pharmacy(
     return user
 
 
+@router.put("/users/{user_id}/permissions", response_model=UserAdminOut)
+def update_user_permissions(
+    user_id: int,
+    body: EmployeePermissionsUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Set feature permissions for any user. Used to restrict owner access (cascades to their employees)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.permissions = body.permissions
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 # ── Catalog (direct CRUD) ──────────────────────────────────────────────────────
 
-@router.get("/catalog", response_model=List[MedicamentOut])
+@router.get("/catalog")
 def list_catalog(
     search: str = Query(""),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
+    export: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
@@ -279,9 +306,18 @@ def list_catalog(
     if search:
         term = f"%{search}%"
         q = q.filter(Medicament.product.ilike(term) | Medicament.pid.ilike(term))
+    if export:
+        items = q.order_by(Medicament.product).all()
+        return {
+            "data": [MedicamentOut.model_validate(m) for m in items],
+            "pagination": {"total": len(items), "current": 1, "pageSize": len(items)},
+        }
     total = q.count()
     items = q.order_by(Medicament.product).offset((page - 1) * limit).limit(limit).all()
-    return items
+    return {
+        "data": [MedicamentOut.model_validate(m) for m in items],
+        "pagination": {"total": total, "current": page, "pageSize": limit},
+    }
 
 
 @router.post("/catalog", response_model=MedicamentOut)
@@ -328,3 +364,109 @@ def delete_medicament(
     db.delete(med)
     db.commit()
     return {"deleted": True}
+
+
+# ── Category Suffixes ──────────────────────────────────────────────────────────
+
+@router.get("/category-suffixes", response_model=List[CategorySuffixOut])
+def list_category_suffixes(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    return db.query(CategorySuffix).order_by(CategorySuffix.category).all()
+
+
+@router.post("/category-suffixes", response_model=CategorySuffixOut)
+def create_category_suffix(
+    body: CategorySuffixCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    if db.query(CategorySuffix).filter(CategorySuffix.category == body.category).first():
+        raise HTTPException(status_code=400, detail="Category already has a suffix mapping")
+    row = CategorySuffix(category=body.category, suffix=body.suffix, color=body.color)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.put("/category-suffixes/{suffix_id}", response_model=CategorySuffixOut)
+def update_category_suffix(
+    suffix_id: int,
+    body: CategorySuffixUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    row = db.query(CategorySuffix).filter(CategorySuffix.id == suffix_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Not found")
+    if body.category is not None:
+        row.category = body.category
+    if body.suffix is not None:
+        row.suffix = body.suffix
+    row.color = body.color  # always update; None clears it
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.delete("/category-suffixes/{suffix_id}")
+def delete_category_suffix(
+    suffix_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    row = db.query(CategorySuffix).filter(CategorySuffix.id == suffix_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(row)
+    db.commit()
+    return {"deleted": True}
+
+
+# ── Analytics ──────────────────────────────────────────────────────────────────
+
+@router.get("/analytics")
+def get_analytics(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    # Users by role
+    role_rows = db.query(User.role, func.count(User.id)).group_by(User.role).all()
+    role_counts = {r: 0 for r in ("owner", "employee", "admin")}
+    for role, count in role_rows:
+        if role in role_counts:
+            role_counts[role] = count
+
+    # Users by status (non-admin)
+    status_rows = (
+        db.query(User.status, func.count(User.id))
+        .filter(User.role != "admin")
+        .group_by(User.status)
+        .all()
+    )
+    status_counts = {"active": 0, "pending": 0, "rejected": 0}
+    for status, count in status_rows:
+        if status in status_counts:
+            status_counts[status] = count
+
+    # Monthly registrations — last 6 months
+    monthly_rows = (
+        db.query(
+            func.to_char(User.created_at, "YYYY-MM").label("month"),
+            func.count(User.id).label("count"),
+        )
+        .group_by("month")
+        .order_by("month")
+        .all()
+    )
+    # Keep only last 6 months
+    monthly = [{"month": row.month, "count": row.count} for row in monthly_rows if row.month]
+    monthly = monthly[-6:] if len(monthly) > 6 else monthly
+
+    return {
+        "users_by_role": role_counts,
+        "users_by_status": status_counts,
+        "monthly_registrations": monthly,
+    }

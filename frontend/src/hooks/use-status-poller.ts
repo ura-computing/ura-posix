@@ -1,14 +1,13 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { USER_KEY } from "@/constants";
+import { QUERY_KEYS } from "@/constants";
 import type { User } from "@/types";
 
 /**
- * Polls GET /auth/me every 4 seconds for all logged-in users.
- * Detects both approvals (pending→active) and revocations (active→pending),
- * updates localStorage and invalidates Refine's identity cache so the UI
- * reacts immediately without a re-login.
+ * Polls GET /auth/me every 4 seconds while the tab is active.
+ * Detects status changes (pending→active, active→pending) and updates
+ * the React Query cache so the UI reacts immediately without a re-login.
  */
 export function useStatusPoller(user: User | null | undefined) {
   const queryClient = useQueryClient();
@@ -22,11 +21,11 @@ export function useStatusPoller(user: User | null | undefined) {
     const interval = setInterval(async () => {
       try {
         const fresh = await api.auth.me();
-        if (fresh.status !== prevStatus.current) {
+        const statusChanged = fresh.status !== prevStatus.current;
+        const permissionsChanged = JSON.stringify(fresh.permissions) !== JSON.stringify(user?.permissions);
+        if (statusChanged || permissionsChanged) {
           prevStatus.current = fresh.status;
-          localStorage.setItem(USER_KEY, JSON.stringify(fresh));
-          // Immediately push new identity to all subscribers (no async refetch delay)
-          queryClient.setQueryData(["getUserIdentity"], fresh);
+          queryClient.setQueryData(QUERY_KEYS.me, fresh);
         }
       } catch {
         // Network error — silently ignore, will retry next tick
@@ -34,5 +33,5 @@ export function useStatusPoller(user: User | null | undefined) {
     }, 4_000);
 
     return () => clearInterval(interval);
-  }, [user?.id, queryClient]);
+  }, [user?.id, queryClient, user]);
 }

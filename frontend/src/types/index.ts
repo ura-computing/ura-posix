@@ -1,4 +1,10 @@
-export type UserRole = "admin" | "owner" | "employee";
+export enum eUserRole {
+  ADMIN = "admin",
+  OWNER = "owner",
+  EMPLOYEE = "employee",
+}
+
+export type UserRole = `${eUserRole}`;
 
 export type UserStatus = "pending" | "active" | "rejected";
 
@@ -12,7 +18,9 @@ export type User = {
   profile_complete: boolean;
   role: UserRole;
   status: UserStatus;
+  permissions?: Record<string, boolean>;
   pharmacy_id?: number;
+  pharmacy_address?: string;
 };
 
 export type Pharmacy = {
@@ -23,6 +31,10 @@ export type Pharmacy = {
   email?: string;
   created_at?: string;
   user_count: number;
+  owner_name?: string;
+  owner_email?: string;
+  owner_phone?: string;
+  owner_pharmacy_name?: string;
 };
 
 export type UserAdmin = {
@@ -35,6 +47,7 @@ export type UserAdmin = {
   profile_complete: boolean;
   role: UserRole;
   status: UserStatus;
+  permissions?: Record<string, boolean>;
   pharmacy_id?: number;
   created_at?: string;
 };
@@ -49,7 +62,7 @@ export type RegisterPayload = {
   password: string;
   name: string;
   phone?: string;
-  role?: "owner" | "employee";
+  role?: eUserRole.OWNER | eUserRole.EMPLOYEE;
   pharmacy_name?: string;
   pharmacy_id?: number;
 };
@@ -57,7 +70,9 @@ export type RegisterPayload = {
 export type ProfileUpdatePayload = {
   name?: string;
   phone?: string;
+  email?: string;
   pharmacy_name?: string;
+  pharmacy_address?: string;
   image_url?: string;
 };
 
@@ -118,8 +133,8 @@ declare global {
         options: Record<string, unknown>,
         callback: (
           error: unknown,
-          result: CloudinaryUploadWidgetResults
-        ) => void
+          result: CloudinaryUploadWidgetResults,
+        ) => void,
       ) => CloudinaryWidget;
     };
   }

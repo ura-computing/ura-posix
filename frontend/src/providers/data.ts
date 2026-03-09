@@ -2,7 +2,7 @@ import type { DataProvider } from "@refinedev/core";
 import { API_URL, TOKEN_KEY } from "@/constants";
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 async function apiFetch(path: string, options: RequestInit = {}) {
@@ -23,7 +23,7 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 export const dataProvider: DataProvider = {
-  getList: async ({ resource, pagination, filters }) => {
+  getList: async ({ resource, pagination, filters, meta }) => {
     const page =
       (pagination as { currentPage: number | undefined })?.currentPage ?? 1;
     const limit = pagination?.pageSize ?? 10;
@@ -51,7 +51,8 @@ export const dataProvider: DataProvider = {
       }
     });
 
-    const payload = await apiFetch(`/${resource}?${params}`);
+    const basePath = (meta as { path?: string })?.path ?? `/${resource}`;
+    const payload = await apiFetch(`${basePath}?${params}`);
     return {
       data: payload.data ?? [],
       total: payload.pagination?.total ?? payload.data?.length ?? 0,

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CategoryMultiSelect } from "@/components/category-multi-select";
+import { SearchAutocomplete } from "@/components/search-autocomplete";
 
 // ── TVA multi-select dropdown ───────────────────────────────────────────────
 
@@ -99,6 +100,9 @@ type TableToolbarProps = {
   allTvaRates?: string[];
   selectedTva?: string[];
   onTvaChange?: (rates: string[]) => void;
+  fetchSuggestions?: (q: string) => Promise<Record<string, string[]>>;
+  suggestionGroupLabels?: Record<string, string>;
+  rightAddon?: React.ReactNode;
 };
 
 export function TableToolbar({
@@ -115,6 +119,9 @@ export function TableToolbar({
   allTvaRates,
   selectedTva = [],
   onTvaChange,
+  fetchSuggestions,
+  suggestionGroupLabels = {},
+  rightAddon,
 }: TableToolbarProps) {
   const today = new Date();
   const [dateOpen, setDateOpen] = useState(false);
@@ -150,16 +157,28 @@ export function TableToolbar({
 
       {/* ── Row 1: Search + Export ── */}
       <div className="flex items-center gap-2">
-        <div className="search-field flex-1">
-          <Search className="search-icon" />
-          <Input
-            type="text"
-            placeholder={searchPlaceholder}
-            className="pl-10 w-full"
+        {fetchSuggestions ? (
+          <SearchAutocomplete
             value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
+            fetchSuggestions={fetchSuggestions}
+            placeholder={searchPlaceholder}
+            groupLabels={suggestionGroupLabels}
           />
-        </div>
+        ) : (
+          <div className="search-field flex-1">
+            <Search className="search-icon" />
+            <Input
+              type="text"
+              placeholder={searchPlaceholder}
+              className="pl-10 w-full"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+        )}
+
+        {rightAddon}
 
         <Button
           variant="outline"

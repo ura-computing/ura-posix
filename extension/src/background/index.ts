@@ -1,4 +1,4 @@
-import { ACTIONS } from "../constants";
+import { ACTIONS, DASHBOARD_URL } from "../constants";
 import { uploadCsv } from "../lib/api";
 import { addNotification, clearToken, getToken, setToken } from "../lib/storage";
 import { openOrFocusDashboard } from "../lib/tabs";
@@ -20,7 +20,15 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
 
   if (request.action === ACTIONS.CLEAR_TOKEN) {
-    clearToken().then(() => sendResponse({ success: true }));
+    clearToken().then(() => {
+      sendResponse({ success: true });
+      // Notify any open dashboard tabs so they log out too
+      chrome.tabs.query({ url: `${DASHBOARD_URL}/*` }, (tabs) => {
+        tabs.forEach(t => {
+          if (t.id) chrome.tabs.sendMessage(t.id, { type: "APCM_FORCE_LOGOUT" });
+        });
+      });
+    });
     return true;
   }
 

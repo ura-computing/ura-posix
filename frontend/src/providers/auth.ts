@@ -34,13 +34,14 @@ export const authProvider: AuthProvider = {
   },
 
   logout: async () => {
+    window.postMessage({ type: "APCM_CLEAR_TOKEN" }, window.location.origin);
     api.clearSession();
     return { success: true, redirectTo: "/login" };
   },
 
   check: async () => {
-    const user = api.getStoredUser();
-    if (!user) {
+    const token = sessionStorage.getItem("pharmagest_token");
+    if (!token) {
       return {
         authenticated: false,
         logout: true,
@@ -53,7 +54,11 @@ export const authProvider: AuthProvider = {
   },
 
   getIdentity: async () => {
-    return api.getStoredUser() as User | null;
+    try {
+      return await api.auth.me() as User;
+    } catch {
+      return null;
+    }
   },
 
   getPermissions: async () => null,

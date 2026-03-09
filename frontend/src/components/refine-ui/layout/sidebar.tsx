@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import {
-  useGetIdentity,
   useLink,
   useMenu,
   type TreeMenuItem,
@@ -30,18 +29,21 @@ import {
 import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
-import type { User } from "@/types";
+import { useMe } from "@/hooks/use-me";
 
 export function Sidebar() {
   const { open } = useShadcnSidebar();
   const { menuItems, selectedKey } = useMenu();
-  const { data: identity } = useGetIdentity<User>();
+  const { data: identity } = useMe();
   const isPending = identity?.status !== "active";
 
   const visibleItems = menuItems.filter((item: TreeMenuItem) => {
     // Pending accounts can only see the dashboard link
     if (isPending) return item.name === "dashboard";
-    return item?.meta?.allowed.includes(identity.role)
+    if (!item?.meta?.allowed.includes(identity?.role)) return false;
+    const permKey = item?.meta?.permission as string | undefined;
+    if (permKey && identity?.permissions?.[permKey] === false) return false;
+    return true;
   });
 
   return (

@@ -10,12 +10,14 @@ function sendMsg<T>(msg: object): Promise<T> {
   });
 }
 
-async function fetchToken(): Promise<string | null> {
+export type AuthState = { token: string; role: string; permissions?: Record<string, boolean> } | null;
+
+async function fetchToken(): Promise<AuthState> {
   const res = await sendMsg<{ token: string | null }>({ action: ACTIONS.GET_TOKEN });
   const token = res.token;
   if (!token) return null;
 
-  // Validate token against the backend
+  // Validate token against the backend and fetch user role
   try {
     const resp = await fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -24,11 +26,12 @@ async function fetchToken(): Promise<string | null> {
       await sendMsg({ action: ACTIONS.CLEAR_TOKEN });
       return null;
     }
+    const user = await resp.json();
+    return { token, role: user.role ?? "employee", permissions: user.permissions ?? {} };
   } catch {
-    // Backend unreachable — keep token, let capture fail with a proper error
+    // Backend unreachable — keep token, assume non-admin
+    return { token, role: "unknown" };
   }
-
-  return token;
 }
 
 async function removeToken(): Promise<void> {
@@ -36,7 +39,7 @@ async function removeToken(): Promise<void> {
 }
 
 export function useToken() {
-  return useQuery({
+  return useQuery<AuthState>({
     queryKey: QUERY_KEYS.token,
     queryFn: fetchToken,
     staleTime: Infinity,

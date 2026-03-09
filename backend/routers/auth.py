@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Pharmacy
 from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate
+
+ALL_FEATURES = ["rapports", "import", "achat", "ventes", "stock"]
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -80,8 +82,27 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-def get_me(current_user: User = Depends(get_current_user_any_status)):
-    """Always accessible regardless of account status."""
+def get_me(
+    current_user: User = Depends(get_current_user_any_status),
+    db: Session = Depends(get_db),
+):
+    """Always accessible regardless of account status.
+    For employees, computes effective permissions by intersecting with the owner's permissions."""
+    if current_user.role == "employee" and current_user.pharmacy_id:
+        owner = (
+            db.query(User)
+            .filter(User.pharmacy_id == current_user.pharmacy_id, User.role == "owner")
+            .first()
+        )
+        owner_perms = (owner.permissions or {}) if owner else {}
+        emp_perms = current_user.permissions or {}
+        effective = {
+            f: emp_perms.get(f, True) and owner_perms.get(f, True)
+            for f in ALL_FEATURES
+        }
+        response = UserOut.model_validate(current_user)
+        response.permissions = effective
+        return response
     return current_user
 
 
@@ -95,10 +116,18 @@ def update_me(
         current_user.name = body.name
     if body.phone is not None:
         current_user.phone = body.phone
-    if body.pharmacy_name is not None:
-        current_user.pharmacy_name = body.pharmacy_name
     if body.image_url is not None:
         current_user.image_url = body.image_url
+    if body.email is not None and body.email != current_user.email:
+        if db.query(User).filter(User.email == body.email, User.id != current_user.id).first():
+            raise HTTPException(status_code=400, detail="Email déjà utilisé")
+        current_user.email = body.email
+    if body.pharmacy_name is not None:
+        current_user.pharmacy_name = body.pharmacy_name
+        if current_user.role == "owner" and current_user.pharmacy:
+            current_user.pharmacy.name = body.pharmacy_name
+    if body.pharmacy_address is not None and current_user.role == "owner" and current_user.pharmacy:
+        current_user.pharmacy.address = body.pharmacy_address
 
     if current_user.name and current_user.phone:
         current_user.profile_complete = True

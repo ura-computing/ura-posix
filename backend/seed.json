@@ -3,16 +3,5 @@
     "email": "admin@gmail.com",
     "name": "Administrateur",
     "password": "admin@123"
-  },
-  "owner": {
-    "email": "owner@gmail.com",
-    "name": "Propriétaire Demo",
-    "password": "owner@123",
-    "pharmacy": {
-      "name": "Pharmacie Demo",
-      "address": "123 Rue Mohammed V, Casablanca",
-      "phone": "+212 5 22 12 34 56",
-      "email": "contact@pharmacie-demo.ma"
-    }
   }
 }

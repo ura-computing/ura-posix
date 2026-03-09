@@ -7,6 +7,7 @@ import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
 import { UploadCloud } from "lucide-react";
 import type { User } from "@/types";
+import { eUserRole } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/refine-ui/views/list-view";
@@ -16,8 +17,10 @@ import { TableToolbar } from "@/components/table-toolbar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { fmt, downloadCSV } from "@/lib/table-utils";
+import { SuffixBadge } from "@/components/suffix-badge";
+import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
 
-const VenteEmptyState = () => (
+const VenteEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#14b8a6]/10">
       <UploadCloud className="h-7 w-7 text-[#14b8a6]" />
@@ -28,13 +31,15 @@ const VenteEmptyState = () => (
         Importez un fichier CSV Sobrus pour voir vos transactions de vente.
       </p>
     </div>
-    <Link
-      to="/dashboard/upload-file"
-      className="inline-flex items-center gap-2 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-medium text-white hover:bg-[#0d9488] transition-colors"
-    >
-      <UploadCloud className="h-4 w-4" />
-      Importer les ventes
-    </Link>
+    {canImport && (
+      <Link
+        to="/dashboard/upload-file"
+        className="inline-flex items-center gap-2 rounded-lg bg-[#14b8a6] px-4 py-2 text-sm font-medium text-white hover:bg-[#0d9488] transition-colors"
+      >
+        <UploadCloud className="h-4 w-4" />
+        Importer les ventes
+      </Link>
+    )}
   </div>
 );
 
@@ -42,6 +47,8 @@ type VenteRow = {
   id: number;
   date: string | null;
   transaction_ref: string | null;
+  transaction_ref_final: string | null;
+  transaction_ref_color: string | null;
   client: string | null;
   pid: string | null;
   product: string | null;
@@ -54,26 +61,25 @@ type VenteRow = {
   total: number | null;
 };
 
-const VENTE_CSV_HEADERS = [
-  "Date", "N° Transaction", "Client", "Produit", "PID",
-  "Catégorie", "Qté", "Remise", "PPV", "Prix unitaire", "Total",
-];
+const VENTE_COL_LABELS: Record<string, string> = {
+  date: "Date", transaction_ref: "N° Transaction", transaction_ref_final: "N° Transaction Final",
+  client: "Client", product: "Produit", category: "Catégorie",
+  quantity: "Qté", discount: "Remise", ppv: "PPV", unit_price: "Prix unitaire", total: "Total",
+};
 
-function venteRowToCSV(r: Record<string, unknown>): string[] {
-  return [
-    String(r.date ?? ""),
-    String(r.transaction_ref ?? ""),
-    String(r.client ?? ""),
-    String(r.product ?? ""),
-    String(r.pid ?? ""),
-    String(r.category ?? ""),
-    String(r.quantity ?? ""),
-    String(r.discount ?? ""),
-    String(r.ppv ?? ""),
-    String(r.unit_price ?? ""),
-    String(r.total ?? ""),
-  ];
-}
+const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> = {
+  date: (r) => String(r.date ?? ""),
+  transaction_ref: (r) => String(r.transaction_ref ?? ""),
+  transaction_ref_final: (r) => String(r.transaction_ref_final ?? ""),
+  client: (r) => String(r.client ?? ""),
+  product: (r) => String(r.product ?? ""),
+  category: (r) => String(r.category ?? ""),
+  quantity: (r) => String(r.quantity ?? ""),
+  discount: (r) => String(r.discount ?? ""),
+  ppv: (r) => String(r.ppv ?? ""),
+  unit_price: (r) => String(r.unit_price ?? ""),
+  total: (r) => String(r.total ?? ""),
+};
 
 const VentesList = () => {
   const { data: identity } = useGetIdentity<User>();
@@ -87,7 +93,7 @@ const VentesList = () => {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (identity?.role === "admin") navigate("/", { replace: true });
+    if (identity?.role === eUserRole.ADMIN) navigate("/", { replace: true });
   }, [identity, navigate]);
 
   useEffect(() => {
@@ -101,7 +107,14 @@ const VentesList = () => {
       const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
       const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
       const res = await api.tables.exportVente(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
-      downloadCSV(res.data, venteRowToCSV, VENTE_CSV_HEADERS, `ventes_export_${Date.now()}.csv`);
+      const colValues: Record<string, (r: Record<string, unknown>) => string> = {
+        ...VENTE_COL_VALUES,
+        transaction_ref_final: (r) => String(r.transaction_ref_final ?? ""),
+      };
+      const visibleCols = table.reactTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      downloadCSV(res.data, rowMapper, headers, `ventes_export_${Date.now()}.csv`);
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
@@ -132,6 +145,24 @@ const VentesList = () => {
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
+      },
+      {
+        id: "transaction_ref_final",
+        size: 150,
+        header: () => <p className="column-title">N° Transaction Final</p>,
+        cell: ({ row }) => {
+          const ref = row.original.transaction_ref;
+          const final = row.original.transaction_ref_final;
+          const color = row.original.transaction_ref_color;
+          if (!final) return <span className="text-muted-foreground">—</span>;
+          const suffix = ref ? final.slice(ref.length) : final;
+          return (
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="font-mono text-xs">{ref}</Badge>
+              {suffix && <SuffixBadge suffix={suffix} color={color} />}
+            </div>
+          );
+        },
       },
       {
         id: "client",
@@ -249,7 +280,7 @@ const VentesList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCats, selectedTva, dateRange]);
 
-  if (identity?.role === "admin") return null;
+  if (identity?.role === eUserRole.ADMIN) return null;
 
   return (
     <ListView>
@@ -271,9 +302,18 @@ const VentesList = () => {
         allTvaRates={allTvaRates}
         selectedTva={selectedTva}
         onTvaChange={setSelectedTva}
+        fetchSuggestions={api.tables.venteSuggestions}
+        suggestionGroupLabels={{ products: "Produit", clients: "Client", refs: "N° Transaction" }}
+        rightAddon={
+          <ColumnVisibilityToggle
+            table={table.reactTable}
+            storageKey="ventes-cols"
+            columnLabels={VENTE_COL_LABELS}
+          />
+        }
       />
 
-      <DataTable table={table} emptyState={<VenteEmptyState />} />
+      <DataTable table={table} emptyState={<VenteEmptyState canImport={identity?.permissions?.import !== false} />} />
     </ListView>
   );
 };

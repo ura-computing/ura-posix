@@ -3,6 +3,16 @@ export const fmt = (n: number | null) =>
 
 export const stripPct = (s: string) => s.replace(/\s*\([\d.]+%\)/, "").trim();
 
+export function getPharmacySuffix(
+  category: string | null,
+  suffixes: { category: string; suffix: string }[],
+): string {
+  if (!category || suffixes.length === 0) return "";
+  const normalized = category.replace(/\s*\([\d.]+%\)/, "").trim().toLowerCase();
+  const match = suffixes.find((s) => normalized === s.category.toLowerCase());
+  return match?.suffix ?? "";
+}
+
 export function downloadCSV(
   rows: Record<string, unknown>[],
   rowToCSV: (r: Record<string, unknown>) => string[],

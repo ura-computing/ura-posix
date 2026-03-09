@@ -16,6 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type DataTableProps<TData extends BaseRecord> = {
@@ -171,6 +176,13 @@ export function DataTable<TData extends BaseRecord>({
                     data-state={row.getIsSelected() && "selected"}
                   >
                     {row.getVisibleCells().map((cell) => {
+                      const rawValue = cell.getValue();
+                      const tooltipText =
+                        typeof rawValue === "string" ||
+                        typeof rawValue === "number"
+                          ? String(rawValue)
+                          : undefined;
+
                       return (
                         <TableCell
                           key={cell.id}
@@ -181,12 +193,21 @@ export function DataTable<TData extends BaseRecord>({
                             }),
                           }}
                         >
-                          <div className="truncate">
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="truncate">
+                                {flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext()
+                                )}
+                              </div>
+                            </TooltipTrigger>
+                            {tooltipText && (
+                              <TooltipContent>
+                                <p>{tooltipText}</p>
+                              </TooltipContent>
                             )}
-                          </div>
+                          </Tooltip>
                         </TableCell>
                       );
                     })}

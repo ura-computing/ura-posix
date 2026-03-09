@@ -5,7 +5,7 @@
  * chrome.storage.local so it stays in sync with the dashboard banner.
  */
 
-import { DASHBOARD_URL, TOKEN_STORAGE_KEY, UPLOAD_STATUS_KEY } from "../constants";
+import { DASHBOARD_URL, UPLOAD_STATUS_KEY } from "../constants";
 
 const style = document.createElement("style");
 style.textContent = `@keyframes __apcm-spin { to { transform: rotate(360deg); } }`;
@@ -69,29 +69,10 @@ function hideBanner(delay = 0) {
   }, delay);
 }
 
-function setBanner(state: "idle" | "no-auth" | "uploading" | "success" | "error", detail = "") {
+function setBanner(state: "uploading" | "success" | "error", detail = "") {
   const el = getBanner();
 
   switch (state) {
-    case "idle":
-      el.innerHTML = `${DOT("#14b8a6")} APCM Pharma actif`;
-      break;
-
-    case "no-auth":
-      el.innerHTML = `
-        ${CLOSE_BTN}
-        ${DOT("#f59e0b")}
-        <span>
-          Non connecté à APCM.<br>
-          <a id="__apcm-login" style="color:#14b8a6;cursor:pointer;text-decoration:underline;font-weight:400">
-            Se connecter →
-          </a>
-        </span>`;
-      el.querySelector("#__apcm-login")?.addEventListener("click", () =>
-        chrome.tabs.create({ url: `${DASHBOARD_URL}/login` })
-      );
-      break;
-
     case "uploading": {
       const p = detail ? detail.split("/") : null;
       const hasChunks = p && p[1] !== "1";
@@ -151,17 +132,10 @@ function setBanner(state: "idle" | "no-auth" | "uploading" | "success" | "error"
         ${CLOSE_BTN}
         ${DOT("#ef4444")}
         <span style="font-weight:400">${detail || "Import échoué"}</span>`;
-      setTimeout(() => setBanner("idle"), 8_000);
+      hideBanner(8_000);
       break;
   }
 }
-
-// ── Init: show idle or no-auth ────────────────────────────────────────────────
-
-chrome.storage.local.get(TOKEN_STORAGE_KEY, (result) => {
-  const token = result[TOKEN_STORAGE_KEY] ?? null;
-  setBanner(token ? "idle" : "no-auth");
-});
 
 // ── Listen to upload status changes in chrome.storage ────────────────────────
 

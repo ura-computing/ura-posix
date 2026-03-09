@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 from routers.auth import get_current_user
-from schemas import UserAdminOut
+from schemas import EmployeePermissionsUpdate, UserAdminOut
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -67,6 +67,33 @@ def reject_employee(
     if user.pharmacy_id != current_owner.pharmacy_id:
         raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
     user.status = "rejected"
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/employees/{user_id}/permissions", response_model=UserAdminOut)
+def update_employee_permissions(
+    user_id: int,
+    body: EmployeePermissionsUpdate,
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Update feature permissions for an employee. Owner can only grant features they have access to."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.pharmacy_id != current_owner.pharmacy_id:
+        raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
+    if user.role != "employee":
+        raise HTTPException(status_code=400, detail="Target user is not an employee")
+    # Owner cannot grant features that are blocked for themselves
+    owner_perms = current_owner.permissions or {}
+    sanitized = {
+        k: v for k, v in body.permissions.items()
+        if not (v is True and owner_perms.get(k) is False)
+    }
+    user.permissions = sanitized
     db.commit()
     db.refresh(user)
     return user
