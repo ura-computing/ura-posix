@@ -1,18 +1,24 @@
-import { useRef, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRef, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
+import { useTable } from "@refinedev/react-table";
+import { useGetIdentity } from "@refinedev/core";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   Plus,
   Pencil,
   Trash2,
   Loader2,
-  Search,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router";
 
 import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { DataTable } from "@/components/refine-ui/data-table/data-table";
+import { TableToolbar } from "@/components/table-toolbar";
+import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -33,9 +39,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
-import type { MedicamentOut } from "@/lib/api";
+import type { MedicamentOut, CategorySuffixOut } from "@/lib/api";
+import { SuffixBadge, SUFFIX_COLORS, SWATCH_BG } from "@/components/suffix-badge";
+import { fmt, downloadCSV } from "@/lib/table-utils";
+import type { User } from "@/types";
+import { eUserRole } from "@/types";
 
-const QUERY_KEY = ["admin", "catalog"] as const;
+const SUFFIX_QUERY_KEY = ["admin", "category-suffixes"] as const;
+
+const CATALOG_COL_LABELS: Record<string, string> = {
+  product: "Produit",
+  category: "Catégorie",
+  tva: "TVA",
+  pph: "PPH",
+  ppv: "PPV",
+  barcode1: "Code-barres",
+};
 
 // ── Medicament form dialog ────────────────────────────────────────────────────
 
@@ -100,7 +119,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
         : api.admin.createMedicament(body as Omit<MedicamentOut, "id">);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
       toast.success(isEdit ? "Médicament mis à jour" : "Médicament ajouté");
       onClose();
     },
@@ -113,7 +132,6 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
     mutate();
   };
 
-  // Reset form when dialog re-opens with a different medicament
   const handleOpenChange = (v: boolean) => {
     if (v) setForm(emptyForm(medicament));
     if (!v && !isPending) onClose();
@@ -122,7 +140,6 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
-        {/* Header */}
         <div className="flex items-start gap-4 px-6 pt-6 pb-5 border-b bg-primary/[0.03]">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 border border-primary/20">
             <BookOpen className="h-4.5 w-4.5 text-primary" />
@@ -136,8 +153,6 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
             </p>
           </div>
         </div>
-
-        {/* Form */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
@@ -150,14 +165,12 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
                 <Input id="m-labo" value={form.laboratoire} onChange={set("laboratoire")} placeholder="Sanofi" />
               </div>
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="m-product">
                 Nom du produit <span className="text-destructive">*</span>
               </Label>
               <Input id="m-product" value={form.product} onChange={set("product")} placeholder="Doliprane 1000mg" required />
             </div>
-
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="m-pph">PPH (DH HT)</Label>
@@ -172,7 +185,6 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
                 <Input id="m-tva" value={form.tva} onChange={set("tva")} placeholder="7%" />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="m-category">Catégorie</Label>
@@ -192,7 +204,6 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
               </div>
             </div>
           </div>
-
           <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               Annuler
@@ -208,35 +219,332 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
   );
 }
 
+// ── Category Suffixes Section ─────────────────────────────────────────────────
+
+function CategorySuffixesSection() {
+  const qc = useQueryClient();
+
+  const { data: rows = [], isLoading: loadingSuffixes } = useQuery({
+    queryKey: SUFFIX_QUERY_KEY,
+    queryFn: api.admin.listCategorySuffixes,
+  });
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<CategorySuffixOut | null>(null);
+  const [form, setForm] = useState<{ category: string; suffix: string; color: string | null }>({ category: "", suffix: "", color: null });
+
+  const openCreate = () => { setEditing(null); setForm({ category: "", suffix: "", color: null }); setDialogOpen(true); };
+  const openEdit = (row: CategorySuffixOut) => { setEditing(row); setForm({ category: row.category, suffix: row.suffix, color: row.color ?? null }); setDialogOpen(true); };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      editing
+        ? api.admin.updateCategorySuffix(editing.id, form)
+        : api.admin.createCategorySuffix(form),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: SUFFIX_QUERY_KEY }); setDialogOpen(false); toast.success(editing ? "Mapping mis à jour" : "Mapping créé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [deleteTarget, setDeleteTarget] = useState<CategorySuffixOut | null>(null);
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.admin.deleteCategorySuffix(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: SUFFIX_QUERY_KEY }); toast.success("Mapping supprimé"); setDeleteTarget(null); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-semibold">Suffixes de catégories</h2>
+          <p className="text-sm text-muted-foreground">
+            Suffixe ajouté au N° Transaction Final selon la catégorie (ex: Médicament → -1).
+          </p>
+        </div>
+        <Button size="sm" variant="outline" className="gap-2" onClick={openCreate}>
+          <Plus className="h-4 w-4" />
+          Ajouter
+        </Button>
+      </div>
+
+      <div className="border rounded-xl overflow-hidden bg-card">
+        {loadingSuffixes ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">Aucun mapping configuré</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Catégorie (normalisée)</th>
+                <th className="px-5 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide w-40">Suffixe</th>
+                <th className="px-5 py-2.5 w-20" />
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="px-5 py-3 font-medium">{row.category}</td>
+                  <td className="px-5 py-3">
+                    <SuffixBadge suffix={row.suffix} color={row.color ?? null} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-1 justify-end">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(row)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(row)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <div className="px-6 pt-6 pb-2">
+            <p className="text-base font-semibold">{editing ? "Modifier le mapping" : "Nouveau mapping"}</p>
+          </div>
+          <div className="px-6 pb-2 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Catégorie (nom normalisé, sans %)</Label>
+              <Input placeholder="ex: Médicament" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Suffixe</Label>
+              <Input placeholder="ex: -1" value={form.suffix} onChange={(e) => setForm((f) => ({ ...f, suffix: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Couleur du badge</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, color: null }))}
+                  className={`h-7 w-7 rounded-full border-2 bg-muted transition-all ${form.color === null ? "border-foreground scale-110" : "border-transparent"}`}
+                  title="Aucune couleur"
+                />
+                {SUFFIX_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, color: c }))}
+                    className={`h-7 w-7 rounded-full border-2 transition-all ${SWATCH_BG[c]} ${form.color === c ? "border-foreground scale-110" : "border-transparent"}`}
+                    title={c}
+                  />
+                ))}
+                {form.color !== null && (
+                  <span className="ml-1">
+                    <SuffixBadge suffix={form.suffix || "-1"} color={form.color} />
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button disabled={!form.category || !form.suffix || saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editing ? "Enregistrer" : "Créer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce mapping ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le suffixe pour <strong>{deleteTarget?.category}</strong> sera supprimé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminCatalogPage() {
-  const queryClient = useQueryClient();
+  const { data: identity } = useGetIdentity<User>();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [search, setSearch] = useState("");
+
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MedicamentOut | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MedicamentOut | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const { data: medicaments = [], isLoading } = useQuery({
-    queryKey: [...QUERY_KEY, search],
-    queryFn: () => api.admin.listCatalog(search || undefined),
-  });
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const res = await api.admin.exportCatalog(searchQuery || undefined);
+      const rows = res.data ?? [];
+      downloadCSV(
+        rows as unknown as Record<string, unknown>[],
+        (r) => [
+          String(r.pid ?? ""),
+          String(r.product ?? ""),
+          String(r.category ?? ""),
+          String(r.tva ?? ""),
+          fmt(r.pph as number | null),
+          fmt(r.ppv as number | null),
+          String(r.barcode1 ?? ""),
+          String(r.laboratoire ?? ""),
+          String(r.zone ?? ""),
+        ],
+        ["PID", "Produit", "Catégorie", "TVA", "PPH", "PPV", "Code-barres", "Laboratoire", "Zone"],
+        `catalogue_${new Date().toISOString().slice(0, 10)}.csv`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
 
-  const { mutate: deleteMed, isPending: deleting } = useMutation({
-    mutationFn: (id: number) => api.admin.deleteMedicament(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Médicament supprimé");
-      setDeleteTarget(null);
+  if (identity && identity.role !== eUserRole.ADMIN) {
+    navigate("/", { replace: true });
+    return null;
+  }
+
+  const columns = useMemo<ColumnDef<MedicamentOut>[]>(
+    () => [
+      {
+        id: "product",
+        accessorKey: "product",
+        size: 300,
+        header: () => <p className="column-title">Produit</p>,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex flex-col min-w-0">
+            <span className="truncate text-sm font-medium">{row.original.product}</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              {row.original.pid && (
+                <Badge variant="outline" className="text-xs px-1.5 py-0 font-mono">{row.original.pid}</Badge>
+              )}
+              {row.original.laboratoire && (
+                <span className="text-xs text-muted-foreground">{row.original.laboratoire}</span>
+              )}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "category",
+        accessorKey: "category",
+        size: 160,
+        header: () => <p className="column-title">Catégorie</p>,
+        cell: ({ getValue }) => {
+          const v = getValue<string | null>();
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <Badge variant="secondary" className="text-xs max-w-[140px] truncate">{v}</Badge>;
+        },
+      },
+      {
+        id: "tva",
+        accessorKey: "tva",
+        size: 80,
+        header: () => <p className="column-title">TVA</p>,
+        cell: ({ getValue }) => (
+          <span className="text-sm text-muted-foreground">{getValue<string | null>() ?? "—"}</span>
+        ),
+      },
+      {
+        id: "pph",
+        accessorKey: "pph",
+        size: 100,
+        header: () => <p className="column-title">PPH</p>,
+        cell: ({ getValue }) => (
+          <span className="tabular-nums text-sm">{fmt(getValue<number | null>())}</span>
+        ),
+      },
+      {
+        id: "ppv",
+        accessorKey: "ppv",
+        size: 100,
+        header: () => <p className="column-title">PPV</p>,
+        cell: ({ getValue }) => (
+          <span className="tabular-nums text-sm">{fmt(getValue<number | null>())}</span>
+        ),
+      },
+      {
+        id: "barcode1",
+        accessorKey: "barcode1",
+        size: 140,
+        header: () => <p className="column-title">Code-barres</p>,
+        cell: ({ getValue }) => {
+          const v = getValue<string | null>();
+          return v
+            ? <span className="font-mono text-xs text-muted-foreground">{v}</span>
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        id: "actions",
+        size: 80,
+        enableHiding: false,
+        header: () => null,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1 justify-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => { setEditTarget(row.original); setFormOpen(true); }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => setDeleteTarget(row.original)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const table = useTable<MedicamentOut>({
+    columns,
+    refineCoreProps: {
+      resource: "admin-catalog",
+      meta: { path: "/admin/catalog" },
+      pagination: { pageSize: 50, mode: "server" },
     },
-    onError: (err) => toast.error(err.message),
   });
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    table.refineCore.setFilters(
+      q ? [{ field: "search", operator: "contains" as const, value: q }] : [],
+      "replace",
+    );
+  };
 
   const { mutate: importCatalog, isPending: importing } = useMutation({
     mutationFn: (file: File) => api.admin.importCatalog(file),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      table.refineCore.tableQuery.refetch();
       toast.success(`Catalogue importé — ${data.imported} médicaments`);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
@@ -246,140 +554,74 @@ export default function AdminCatalogPage() {
     },
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) importCatalog(file);
-  };
-
-  const openCreate = () => { setEditTarget(null); setFormOpen(true); };
-  const openEdit = (m: MedicamentOut) => { setEditTarget(m); setFormOpen(true); };
+  const { mutate: deleteMed, isPending: deleting } = useMutation({
+    mutationFn: (id: number) => api.admin.deleteMedicament(id),
+    onSuccess: () => {
+      table.refineCore.tableQuery.refetch();
+      toast.success("Médicament supprimé");
+      setDeleteTarget(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   return (
     <ListView>
       <Breadcrumb />
+      <h1 className="page-title">Catalogue médicaments</h1>
+      <p className="text-sm text-muted-foreground -mt-2">Gérez le catalogue partagé des médicaments.</p>
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title">Catalogue médicaments</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gérez le catalogue partagé des médicaments.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsm"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            variant="outline"
-            className="gap-2"
-            disabled={importing}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Importer CSV
-          </Button>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Ajouter
-          </Button>
-        </div>
-      </div>
+      {/* Category suffixes — at top */}
+      <CategorySuffixesSection />
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un médicament…"
-          className="pl-9"
-        />
-      </div>
+      <div className="border-t pt-2" />
 
-      {/* Table */}
-      <div className="border rounded-xl overflow-hidden bg-card">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      {/* Toolbar */}
+      <TableToolbar
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder="Rechercher un médicament…"
+        allCategories={[]}
+        selectedCats={[]}
+        onCatsChange={() => {}}
+        onExport={handleExport}
+        exporting={exporting}
+        rightAddon={
+          <div className="flex items-center gap-2">
+            <ColumnVisibilityToggle
+              table={table.reactTable}
+              storageKey="admin-catalog-cols"
+              columnLabels={CATALOG_COL_LABELS}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsm"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) importCatalog(f); }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 shrink-0"
+              disabled={importing}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <span className="hidden sm:inline">Importer CSV</span>
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 gap-2 shrink-0"
+              onClick={() => { setEditTarget(null); setFormOpen(true); }}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Ajouter</span>
+            </Button>
           </div>
-        ) : medicaments.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-14 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-              <BookOpen className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {search ? "Aucun résultat" : "Catalogue vide"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {search ? `Aucun médicament trouvé pour "${search}".` : "Ajoutez le premier médicament."}
-              </p>
-            </div>
-            {!search && (
-              <Button onClick={openCreate} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Ajouter un médicament
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="divide-y">
-            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              <span>Produit</span>
-              <span className="w-20 text-right">PPH</span>
-              <span className="w-20 text-right">PPV</span>
-              <span className="w-16 text-center">TVA</span>
-              <span className="w-28 truncate">Catégorie</span>
-              <span className="w-16 text-center">Actions</span>
-            </div>
-            {medicaments.map((m) => (
-              <div key={m.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{m.product}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {m.pid && <Badge variant="outline" className="text-xs px-1.5 py-0 font-mono">{m.pid}</Badge>}
-                    {m.laboratoire && <span className="text-xs text-muted-foreground">{m.laboratoire}</span>}
-                  </div>
-                </div>
-                <span className="text-sm text-muted-foreground w-20 text-right">
-                  {m.pph != null ? `${m.pph.toFixed(2)} DH` : "—"}
-                </span>
-                <span className="text-sm text-muted-foreground w-20 text-right">
-                  {m.ppv != null ? `${m.ppv.toFixed(2)} DH` : "—"}
-                </span>
-                <span className="text-sm text-muted-foreground w-16 text-center">
-                  {m.tva ?? "—"}
-                </span>
-                <span className="text-xs text-muted-foreground w-28 truncate">
-                  {m.category ?? "—"}
-                </span>
-                <div className="flex items-center gap-1 w-16 justify-center">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => openEdit(m)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteTarget(m)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        }
+      />
+
+      <DataTable table={table} />
 
       {/* Form dialog */}
       <MedicamentFormDialog

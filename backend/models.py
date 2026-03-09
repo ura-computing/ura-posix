@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Float, ForeignKey, Integer, JSON, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -31,11 +31,16 @@ class User(Base):
     profile_complete = Column(Boolean, default=False)
     role = Column(String, default="owner", nullable=False)  # admin | owner | employee
     status = Column(String, default="pending", nullable=False)  # pending | active | rejected
+    permissions = Column(JSON, nullable=True, default=lambda: {})  # feature flags, {} = all allowed
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     pharmacy = relationship("Pharmacy", back_populates="users")
+
+    @property
+    def pharmacy_address(self):
+        return self.pharmacy.address if self.pharmacy else None
 
 
 class Medicament(Base):
@@ -99,6 +104,19 @@ class Vente(Base):
     unit_price = Column(Float, nullable=True)            # "Prix unitaire"
     total = Column(Float, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CategorySuffix(Base):
+    """Maps a normalized category name to its transaction reference suffix.
+    E.g. "Médicament" → "-1", "Complément Alimentaire" → "-2"
+    Managed by admin; used by frontend to compute N° Transaction Final."""
+    __tablename__ = "category_suffixes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, nullable=False, unique=True)  # normalized, no (xx%)
+    suffix = Column(String, nullable=False)                  # e.g. "-1"
+    color = Column(String, nullable=True)                    # e.g. "teal", "blue"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class CatalogRequest(Base):

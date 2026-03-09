@@ -35,13 +35,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { PharmacyPublic } from "@/lib/api";
+import { eUserRole } from "@/types";
 
 const schema = z.object({
   name: z.string().min(3, "Le nom doit comporter au moins 3 caractères"),
   email: z.string().email("Adresse email invalide"),
   phone: z.string().min(8, "Numéro de téléphone invalide"),
   password: z.string().min(8, "Le mot de passe doit comporter au moins 8 caractères"),
-  role: z.enum(["owner", "employee"]),
+  role: z.enum([eUserRole.OWNER, eUserRole.EMPLOYEE]),
   pharmacy_name: z.string().optional(),
   pharmacy_id: z.number().optional(),
 });
@@ -55,7 +56,7 @@ export const SignUpForm = () => {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", phone: "", password: "", role: "owner" },
+    defaultValues: { name: "", email: "", phone: "", password: "", role: eUserRole.OWNER },
   });
 
   const role = form.watch("role");
@@ -98,7 +99,7 @@ export const SignUpForm = () => {
               <div className="space-y-2">
                 <p className="text-sm font-medium">Je suis</p>
                 <div className="grid grid-cols-2 gap-3">
-                  {(["owner", "employee"] as const).map((r) => (
+                  {([eUserRole.OWNER, eUserRole.EMPLOYEE] as const).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -110,11 +111,11 @@ export const SignUpForm = () => {
                           : "border-border bg-background text-muted-foreground hover:border-primary/30"
                       )}
                     >
-                      {r === "owner"
+                      {r === eUserRole.OWNER
                         ? <Building2 className="h-5 w-5" />
                         : <UserCog className="h-5 w-5" />
                       }
-                      {r === "owner" ? "Propriétaire" : "Employé"}
+                      {r === eUserRole.OWNER ? "Propriétaire" : "Employé"}
                     </button>
                   ))}
                 </div>
@@ -177,7 +178,7 @@ export const SignUpForm = () => {
               />
 
               {/* Conditional field based on role */}
-              {role === "owner" ? (
+              {role === eUserRole.OWNER ? (
                 <FormField
                   control={form.control}
                   name="pharmacy_name"

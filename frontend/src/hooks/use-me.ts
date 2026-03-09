@@ -6,6 +6,6 @@ export function useMe() {
   return useQuery({
     queryKey: QUERY_KEYS.me,
     queryFn: api.auth.me,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
   });
 }

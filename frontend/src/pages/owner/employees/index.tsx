@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useState } from "react";
 import { useGetIdentity } from "@refinedev/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +19,7 @@ import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,29 +32,94 @@ import {
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
 import type { User, UserAdmin } from "@/types";
+import { eUserRole } from "@/types";
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const FEATURES: { key: string; label: string }[] = [
+  { key: "rapports", label: "Rapports" },
+  { key: "import", label: "Import" },
+  { key: "achat", label: "Achats" },
+  { key: "ventes", label: "Ventes" },
+  { key: "stock", label: "Stock" },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
   return (email ?? "?").slice(0, 2).toUpperCase();
 }
 
+function isFeatureAllowed(permissions: Record<string, boolean> | undefined, key: string): boolean {
+  return permissions?.[key] !== false;
+}
+
 const QUERY_KEY = ["owner", "employees"] as const;
 
+// ── Permission toggles row ────────────────────────────────────────────────────
+
+function PermissionToggles({
+  employee,
+  ownerPermissions,
+}: {
+  employee: UserAdmin;
+  ownerPermissions: Record<string, boolean> | undefined;
+}) {
+  const queryClient = useQueryClient();
+  const { mutate: updatePermissions, isPending } = useMutation({
+    mutationFn: ({ id, permissions }: { id: number; permissions: Record<string, boolean> }) =>
+      api.owner.updateEmployeePermissions(id, permissions),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<UserAdmin[]>(QUERY_KEY, (prev) =>
+        prev?.map((e) => (e.id === updated.id ? updated : e)) ?? []
+      );
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function handleToggle(key: string, checked: boolean) {
+    const current = employee.permissions ?? {};
+    updatePermissions({
+      id: employee.id,
+      permissions: { ...current, [key]: checked },
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-11 pt-1 pb-2">
+      {FEATURES.map(({ key, label }) => {
+        const ownerHas = isFeatureAllowed(ownerPermissions, key);
+        const empHas = isFeatureAllowed(employee.permissions, key);
+        return (
+          <label
+            key={key}
+            className={`flex items-center gap-1.5 cursor-pointer select-none ${!ownerHas ? "opacity-40" : ""}`}
+          >
+            <Switch
+              checked={empHas}
+              disabled={isPending || !ownerHas}
+              onCheckedChange={(v) => handleToggle(key, v)}
+              className="scale-[0.8]"
+            />
+            <span className="text-xs text-muted-foreground">{label}</span>
+          </label>
+        );
+      })}
+      {isPending && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function OwnerEmployeesPage() {
-  const navigate = useNavigate();
   const { data: identity } = useGetIdentity<User>();
   const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
 
-  // Only owners can manage employees
-  useEffect(() => {
-    if (identity && identity.role !== "owner") {
-      navigate("/", { replace: true });
-    }
-  }, [identity, navigate]);
-
-  const isEmployee = identity?.role !== "owner";
+  const isEmployee = identity?.role !== eUserRole.OWNER;
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: QUERY_KEY,
@@ -66,7 +131,6 @@ export default function OwnerEmployeesPage() {
   const active = employees.filter((e) => e.status === "active");
 
   const { mutate: approve, isPending: approving } = useMutation({
-
     mutationFn: (id: number) => api.owner.approveEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -95,7 +159,6 @@ export default function OwnerEmployeesPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  // Prevent any content flash while redirect is in progress
   if (isEmployee) return null;
 
   return (
@@ -105,7 +168,7 @@ export default function OwnerEmployeesPage() {
       <div>
         <h1 className="page-title">Mes employés</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Gérez les demandes d'accès et les membres actifs de votre pharmacie.
+          Gérez les demandes d'accès et les permissions des membres de votre pharmacie.
         </p>
       </div>
 
@@ -202,41 +265,39 @@ export default function OwnerEmployeesPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    <span>Employé</span>
-                    <span className="w-28 text-center">Membre depuis</span>
-                    <span className="w-24 text-center">Actions</span>
-                  </div>
                   {active.map((emp) => (
-                    <div key={emp.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
-                      <div className="flex items-center gap-3 min-w-0">
+                    <div key={emp.id} className="px-5 py-3">
+                      {/* Employee info row */}
+                      <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8 shrink-0">
                           {emp.image_url && <AvatarImage src={emp.image_url} />}
                           <AvatarFallback className="text-xs bg-primary/10 text-primary">
                             {initials(emp.name, emp.email)}
                           </AvatarFallback>
                         </Avatar>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{emp.name ?? emp.email}</p>
                           {emp.name && <p className="text-xs text-muted-foreground truncate">{emp.email}</p>}
                         </div>
-                      </div>
-
-                      <span className="text-xs text-muted-foreground w-28 text-center">
-                        {emp.created_at ? format(new Date(emp.created_at), "d MMM yyyy", { locale: fr }) : "—"}
-                      </span>
-
-                      <div className="flex items-center justify-center w-24">
+                        <span className="hidden sm:block text-xs text-muted-foreground shrink-0">
+                          {emp.created_at ? format(new Date(emp.created_at), "d MMM yyyy", { locale: fr }) : "—"}
+                        </span>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
                           onClick={() => setRevokeTarget(emp)}
                         >
                           <ShieldOff className="h-3.5 w-3.5" />
                           Révoquer
                         </Button>
                       </div>
+
+                      {/* Permission toggles row */}
+                      <PermissionToggles
+                        employee={emp}
+                        ownerPermissions={identity?.permissions}
+                      />
                     </div>
                   ))}
                 </div>

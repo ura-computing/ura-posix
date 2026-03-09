@@ -9,6 +9,10 @@ export const QUERY_KEYS = {
   token: ["token"] as const,
 } as const;
 
+export const SOBRUS_HOSTNAME = "app.pharma.sobrus.com";
+export const SOBRUS_EXPORT_PATHS = ["/reports/exportpurchases", "/reports/exportsales"];
+export const INDICATOR_POSITION_KEY = "apcm_indicator_pos";
+
 export const ACTIONS = {
   GET_TOKEN: "GET_TOKEN",
   CLEAR_TOKEN: "CLEAR_TOKEN",

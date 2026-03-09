@@ -7,6 +7,7 @@ import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
 import { UploadCloud } from "lucide-react";
 import type { User } from "@/types";
+import { eUserRole } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/refine-ui/views/list-view";
@@ -16,8 +17,10 @@ import { TableToolbar } from "@/components/table-toolbar";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { fmt, downloadCSV } from "@/lib/table-utils";
+import { SuffixBadge } from "@/components/suffix-badge";
+import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
 
-const AchatEmptyState = () => (
+const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
     <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
       <UploadCloud className="h-7 w-7 text-violet-500" />
@@ -28,13 +31,15 @@ const AchatEmptyState = () => (
         Importez un fichier CSV Sobrus pour voir vos bons de livraison.
       </p>
     </div>
-    <Link
-      to="/dashboard/upload-file"
-      className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 transition-colors"
-    >
-      <UploadCloud className="h-4 w-4" />
-      Importer les achats
-    </Link>
+    {canImport && (
+      <Link
+        to="/dashboard/upload-file"
+        className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 transition-colors"
+      >
+        <UploadCloud className="h-4 w-4" />
+        Importer les achats
+      </Link>
+    )}
   </div>
 );
 
@@ -42,6 +47,8 @@ type AchatRow = {
   id: number;
   delivery_date: string | null;
   delivery_ref: string | null;
+  delivery_ref_final: string | null;
+  delivery_ref_color: string | null;
   supplier: string | null;
   pid: string | null;
   product: string | null;
@@ -55,27 +62,25 @@ type AchatRow = {
   total: number | null;
 };
 
-const ACHAT_CSV_HEADERS = [
-  "Date BL", "Référence", "Fournisseur", "Produit", "PID",
-  "Catégorie", "Qté", "PPH", "PPV", "Prix unitaire", "Péremption", "Total",
-];
+const ACHAT_COL_LABELS: Record<string, string> = {
+  delivery_date: "Date BL", delivery_ref: "Référence", delivery_ref_final: "Référence Finale",
+  supplier: "Fournisseur", product: "Produit", category: "Catégorie",
+  quantity: "Qté", pph: "PPH", unit_price: "Prix unitaire", expiry_date: "Péremption", total: "Total",
+};
 
-function achatRowToCSV(r: Record<string, unknown>): string[] {
-  return [
-    String(r.delivery_date ?? ""),
-    String(r.delivery_ref ?? ""),
-    String(r.supplier ?? ""),
-    String(r.product ?? ""),
-    String(r.pid ?? ""),
-    String(r.category ?? ""),
-    String(r.quantity ?? ""),
-    String(r.pph ?? ""),
-    String(r.ppv ?? ""),
-    String(r.unit_price ?? ""),
-    String(r.expiry_date ?? ""),
-    String(r.total ?? ""),
-  ];
-}
+const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> = {
+  delivery_date: (r) => String(r.delivery_date ?? ""),
+  delivery_ref: (r) => String(r.delivery_ref ?? ""),
+  delivery_ref_final: (r) => String(r.delivery_ref_final ?? ""),
+  supplier: (r) => String(r.supplier ?? ""),
+  product: (r) => String(r.product ?? ""),
+  category: (r) => String(r.category ?? ""),
+  quantity: (r) => String(r.quantity ?? ""),
+  pph: (r) => String(r.pph ?? ""),
+  unit_price: (r) => String(r.unit_price ?? ""),
+  expiry_date: (r) => String(r.expiry_date ?? ""),
+  total: (r) => String(r.total ?? ""),
+};
 
 const AchatList = () => {
   const { data: identity } = useGetIdentity<User>();
@@ -89,7 +94,7 @@ const AchatList = () => {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (identity?.role === "admin") navigate("/", { replace: true });
+    if (identity?.role === eUserRole.ADMIN) navigate("/", { replace: true });
   }, [identity, navigate]);
 
   useEffect(() => {
@@ -103,7 +108,14 @@ const AchatList = () => {
       const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
       const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
       const res = await api.tables.exportAchat(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
-      downloadCSV(res.data, achatRowToCSV, ACHAT_CSV_HEADERS, `achats_export_${Date.now()}.csv`);
+      const colValues: Record<string, (r: Record<string, unknown>) => string> = {
+        ...ACHAT_COL_VALUES,
+        delivery_ref_final: (r) => String(r.delivery_ref_final ?? ""),
+      };
+      const visibleCols = table.reactTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      downloadCSV(res.data, rowMapper, headers, `achats_export_${Date.now()}.csv`);
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
@@ -134,6 +146,24 @@ const AchatList = () => {
           ) : (
             <span className="text-muted-foreground">—</span>
           ),
+      },
+      {
+        id: "delivery_ref_final",
+        size: 150,
+        header: () => <p className="column-title">Référence Finale</p>,
+        cell: ({ row }) => {
+          const ref = row.original.delivery_ref;
+          const final = row.original.delivery_ref_final;
+          const color = row.original.delivery_ref_color;
+          if (!final) return <span className="text-muted-foreground">—</span>;
+          const suffix = ref ? final.slice(ref.length) : final;
+          return (
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="font-mono text-xs">{ref}</Badge>
+              {suffix && <SuffixBadge suffix={suffix} color={color} />}
+            </div>
+          );
+        },
       },
       {
         id: "supplier",
@@ -248,7 +278,7 @@ const AchatList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCats, selectedTva, dateRange]);
 
-  if (identity?.role === "admin") return null;
+  if (identity?.role === eUserRole.ADMIN) return null;
 
   return (
     <ListView>
@@ -270,9 +300,18 @@ const AchatList = () => {
         allTvaRates={allTvaRates}
         selectedTva={selectedTva}
         onTvaChange={setSelectedTva}
+        fetchSuggestions={api.tables.achatSuggestions}
+        suggestionGroupLabels={{ products: "Produit", suppliers: "Fournisseur", refs: "Référence" }}
+        rightAddon={
+          <ColumnVisibilityToggle
+            table={table.reactTable}
+            storageKey="achats-cols"
+            columnLabels={ACHAT_COL_LABELS}
+          />
+        }
       />
 
-      <DataTable table={table} emptyState={<AchatEmptyState />} />
+      <DataTable table={table} emptyState={<AchatEmptyState canImport={identity?.permissions?.import !== false} />} />
     </ListView>
   );
 };

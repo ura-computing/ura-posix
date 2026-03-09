@@ -1,8 +1,8 @@
-import { API_URL, ENDPOINTS, TOKEN_KEY, USER_KEY } from "@/constants";
+import { API_URL, ENDPOINTS, TOKEN_KEY } from "@/constants";
 import type { AuthToken, LoginPayload, Pharmacy, ProfileUpdatePayload, RegisterPayload, User, UserAdmin, UserRole } from "@/types";
 
 function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return sessionStorage.getItem(TOKEN_KEY);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -41,6 +41,7 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
 }
 
 export type PharmacyPublic = { id: number; name: string };
+export type CategorySuffixOut = { id: number; category: string; suffix: string; color?: string | null };
 export type CatalogRequestOut = {
   id: number;
   requested_by: number;
@@ -60,6 +61,32 @@ export type CatalogRequestOut = {
   requester_name: string | null;
   requester_email: string | null;
   pharmacy_name: string | null;
+};
+
+export type StatsKpis = {
+  ventes_total: number;
+  achats_total: number;
+  ventes_count: number;
+  achats_count: number;
+};
+export type MonthlyTrend = { month: string; ventes: number; achats: number };
+export type TopCategory = { category: string; total: number };
+export type StatsResponse = {
+  kpis: StatsKpis;
+  monthly_trend: MonthlyTrend[];
+  top_categories: TopCategory[];
+};
+export type AdminStats = {
+  total_pharmacies: number;
+  total_active_users: number;
+  total_catalog_items: number;
+  pending_catalog_requests: number;
+};
+
+export type AdminAnalytics = {
+  users_by_role: { owner: number; employee: number; admin: number };
+  users_by_status: { active: number; pending: number; rejected: number };
+  monthly_registrations: { month: string; count: number }[];
 };
 
 export type MedicamentOut = {
@@ -118,6 +145,11 @@ export const api = {
       tva?.forEach((t) => p.append("tva", t));
       return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.ventes.list}?${p}`);
     },
+    achatSuggestions: (q: string) =>
+      request<{ products: string[]; suppliers: string[]; refs: string[] }>(`/achat/suggestions?q=${encodeURIComponent(q)}`),
+    venteSuggestions: (q: string) =>
+      request<{ products: string[]; clients: string[]; refs: string[] }>(`/ventes/suggestions?q=${encodeURIComponent(q)}`),
+    getCategorySuffixes: () => request<CategorySuffixOut[]>("/category-suffixes"),
   },
 
   data: {
@@ -176,6 +208,23 @@ export const api = {
       request<{ deleted: boolean }>(`/admin/catalog/${id}`, { method: "DELETE" }),
     // Catalog CSV/XLSM import
     importCatalog: (file: File) => uploadFile<{ imported: number }>("/uploads/catalog", file),
+    // Category suffixes
+    listCategorySuffixes: () => request<CategorySuffixOut[]>("/admin/category-suffixes"),
+    createCategorySuffix: (body: { category: string; suffix: string; color?: string | null }) =>
+      request<CategorySuffixOut>("/admin/category-suffixes", { method: "POST", body: JSON.stringify(body) }),
+    updateCategorySuffix: (id: number, body: { category?: string; suffix?: string; color?: string | null }) =>
+      request<CategorySuffixOut>(`/admin/category-suffixes/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+    deleteCategorySuffix: (id: number) =>
+      request<{ deleted: boolean }>(`/admin/category-suffixes/${id}`, { method: "DELETE" }),
+    getStats: () => request<AdminStats>("/admin/stats"),
+    getAnalytics: () => request<AdminAnalytics>("/admin/analytics"),
+    exportCatalog: (search?: string) => {
+      const p = new URLSearchParams({ export: "true" });
+      if (search) p.set("search", search);
+      return request<{ data: MedicamentOut[] }>(`/admin/catalog?${p}`);
+    },
+    updateUserPermissions: (userId: number, permissions: Record<string, boolean>) =>
+      request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/permissions`, { method: "PUT", body: JSON.stringify({ permissions }) }),
     // Catalog requests (admin side)
     listCatalogRequests: (status?: string) => {
       const qs = status ? `?status=${status}` : "";
@@ -187,6 +236,16 @@ export const api = {
       request<CatalogRequestOut>(`/catalog-requests/${id}/reject`, { method: "PUT", body: JSON.stringify({ reason }) }),
   },
 
+  stats: {
+    get: (dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams();
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      const qs = p.toString();
+      return request<StatsResponse>(`/stats${qs ? `?${qs}` : ""}`);
+    },
+  },
+
   owner: {
     listEmployees: () => request<UserAdmin[]>("/owner/employees"),
     approveEmployee: (id: number) =>
@@ -195,6 +254,8 @@ export const api = {
       request<UserAdmin>(`/owner/employees/${id}/reject`, { method: "PUT" }),
     revokeEmployee: (id: number) =>
       request<UserAdmin>(`/owner/employees/${id}/revoke`, { method: "PUT" }),
+    updateEmployeePermissions: (id: number, permissions: Record<string, boolean>) =>
+      request<UserAdmin>(`/owner/employees/${id}/permissions`, { method: "PUT", body: JSON.stringify({ permissions }) }),
   },
 
   catalogRequests: {
@@ -214,17 +275,10 @@ export const api = {
   },
 
   storeSession: (data: AuthToken) => {
-    localStorage.setItem(TOKEN_KEY, data.access_token);
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    sessionStorage.setItem(TOKEN_KEY, data.access_token);
   },
 
   clearSession: () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-  },
-
-  getStoredUser: (): User | null => {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+    sessionStorage.removeItem(TOKEN_KEY);
   },
 };

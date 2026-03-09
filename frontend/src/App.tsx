@@ -1,4 +1,4 @@
-import { Authenticated, Refine, useGetIdentity } from "@refinedev/core";
+import { Authenticated, Refine, useLogout } from "@refinedev/core";
 import { DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,8 +7,8 @@ import routerProvider, {
   NavigateToResource,
   UnsavedChangesNotifier,
 } from "@refinedev/react-router";
-import { BrowserRouter, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
-import { useEffect } from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
+import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/refine-ui/notification/toaster";
 import { useNotificationProvider } from "./components/refine-ui/notification/use-notification-provider";
@@ -19,16 +19,18 @@ import { authProvider } from "./providers/auth";
 import { Login } from "./pages/login";
 import { routes, resources } from "./routes";
 import { useStatusPoller } from "./hooks/use-status-poller";
-import type { User } from "./types";
+import { useMe } from "./hooks/use-me";
+import type { UserRole } from "./types";
 
 // Blocks navigation to any route other than "/" for pending (not yet active) accounts.
 // Also polls the backend while pending so approval is reflected immediately.
 function PendingGuard() {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: identity } = useMe();
   const location = useLocation();
   const navigate = useNavigate();
 
   useStatusPoller(identity);
+  useExtensionLogoutSync();
 
   useEffect(() => {
     if (identity && identity.status !== "active" && location.pathname !== "/") {
@@ -39,10 +41,32 @@ function PendingGuard() {
   return <Outlet />;
 }
 
+// Listens for APCM_FORCE_LOGOUT message fired by the extension's content script
+// when the user logs out from the extension popup.
+function useExtensionLogoutSync() {
+  const { mutate: logout } = useLogout();
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "APCM_FORCE_LOGOUT") logout();
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [logout]);
+}
+
+function RoleGuard({ allowed, permission, children }: { allowed?: UserRole[]; permission?: string; children: ReactNode }) {
+  const { data: identity, isLoading } = useMe();
+  if (isLoading || !identity) return null;
+  if (allowed && !allowed.includes(identity.role as UserRole)) return <Navigate to="/" replace />;
+  if (permission && identity.permissions?.[permission] === false) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 const queryClient = new QueryClient();
 
 function App() {
-  const publicRoutes = routes.filter((r) => !r.requireAuth);
+  const universalRoutes = routes.filter((r) => r.layout === "universal");
+  const publicRoutes = routes.filter((r) => !r.requireAuth && r.layout !== "universal");
   const authRoutesNoLayout = routes.filter((r) => r.requireAuth && r.layout === "none");
   const authRoutesWithLayout = routes.filter((r) => r.requireAuth && r.layout === "sidebar");
 
@@ -60,16 +84,21 @@ function App() {
                 options={{
                   syncWithLocation: true,
                   warnWhenUnsavedChanges: true,
-                  projectId: "kkWuv7-GgBIfw-P8CGy0",
+                  projectId: import.meta.env.VITE_REFINE_PROJECT_ID ?? "kkWuv7-GgBIfw-P8CGy0",
                 }}
                 resources={resources}
               >
                 <Routes>
-                  {/* Public routes (no auth required) */}
+                  {/* Universal routes (accessible to all, no auth wrapper) */}
+                  {universalRoutes.map((route) => (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  ))}
+
+                  {/* Public routes (no auth required, redirect to dashboard if authenticated) */}
                   <Route
                     element={
                       <Authenticated key="public-routes" fallback={<Outlet />}>
-                        <NavigateToResource fallbackTo="/" />
+                        <NavigateToResource fallbackTo="/dashboard" />
                       </Authenticated>
                     }
                   >
@@ -94,7 +123,7 @@ function App() {
                   {/* Auth routes with sidebar layout */}
                   <Route
                     element={
-                      <Authenticated key="auth-with-layout" fallback={<Login />}>
+                      <Authenticated key="auth-with-layout" fallback={<Navigate to="/" replace />}>
                         <Layout>
                           <PendingGuard />
                         </Layout>
@@ -102,7 +131,15 @@ function App() {
                     }
                   >
                     {authRoutesWithLayout.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
+                      <Route
+                        key={route.path}
+                        path={route.path}
+                        element={
+                          <RoleGuard allowed={route.allowed} permission={route.permission}>
+                            {route.element}
+                          </RoleGuard>
+                        }
+                      />
                     ))}
                   </Route>
                 </Routes>

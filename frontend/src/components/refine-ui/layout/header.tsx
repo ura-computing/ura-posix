@@ -7,16 +7,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useNotifications, type ApcmNotification } from "@/hooks/use-notifications";
 import { cn } from "@/lib/utils";
-import { useGetIdentity, useLogout } from "@refinedev/core";
-import { Bell, CheckCheck, LogOutIcon, Package, Receipt, Search, Trash2, UploadCloud, UserRound } from "lucide-react";
+import { useLogout } from "@refinedev/core";
+import { useMe } from "@/hooks/use-me";
+import { Bell, CheckCheck, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import type { User } from "@/types";
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/": { title: "Tableau de Bord", subtitle: "Vue d'ensemble de votre pharmacie" },
@@ -54,7 +53,7 @@ const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 function RoleBadge() {
-  const { data: user } = useGetIdentity<User>();
+  const { data: user } = useMe();
   if (!user?.role) return null;
   const cfg = ROLE_CONFIG[user.role];
   if (!cfg) return null;
@@ -88,13 +87,6 @@ function DesktopHeader() {
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <div className="relative w-56 lg:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher un produit..."
-            className="pl-9 h-9 bg-muted/50 border-0"
-          />
-        </div>
         <NotificationBell />
         <ThemeToggle className="border-border text-muted-foreground hover:text-foreground" />
         <UserDropdown />
@@ -242,9 +234,11 @@ function NotificationBell() {
 }
 
 const UserDropdown = () => {
-  const { data: user } = useGetIdentity<User>();
+  const { data: user } = useMe();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const navigate = useNavigate();
+
+  const canImport = user?.role !== "admin" && user?.permissions?.import !== false;
 
   return (
     <DropdownMenu>
@@ -269,10 +263,12 @@ const UserDropdown = () => {
           <UserRound className="h-4 w-4" />
           <span className="ml-2">Mon profil</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/dashboard/upload-file")}>
-          <UploadCloud className="h-4 w-4" />
-          <span className="ml-2">Importer Achats / Ventes</span>
-        </DropdownMenuItem>
+        {canImport && (
+          <DropdownMenuItem onClick={() => navigate("/dashboard/upload-file")}>
+            <UploadCloud className="h-4 w-4" />
+            <span className="ml-2">Importer Achats / Ventes</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => logout()}>
           <LogOutIcon className="text-destructive h-4 w-4" />

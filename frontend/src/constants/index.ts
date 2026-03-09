@@ -6,7 +6,6 @@ export const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 export const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export const TOKEN_KEY = "pharmagest_token";
-export const USER_KEY = "pharmagest_user";
 
 export const QUERY_KEYS = {
   me: ["me"] as const,

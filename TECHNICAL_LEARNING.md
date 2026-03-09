@@ -256,7 +256,7 @@ PharmaGest handles sensitive business data. Proper authentication prevents unaut
 
 **JWT (JSON Web Tokens):**
 ```python
-payload = {"sub": str(user.id), "exp": datetime.utcnow() + timedelta(days=7)}
+payload = {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(days=7)}
 token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 ```
 

@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useState } from "react";
 import { useGetIdentity } from "@refinedev/core";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -26,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { CatalogRequestOut } from "@/lib/api";
 import type { User } from "@/types";
+import { eUserRole } from "@/types";
 
 const QUERY_KEY = ["catalog-requests", "owner"] as const;
 
@@ -66,19 +66,11 @@ function StatusBadge({ status }: { status: CatalogRequestOut["status"] }) {
 }
 
 export default function CatalogRequestsPage() {
-  const navigate = useNavigate();
   const { data: identity } = useGetIdentity<User>();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
 
-  // Only owners can access this page
-  useEffect(() => {
-    if (identity && identity.role !== "owner") {
-      navigate("/", { replace: true });
-    }
-  }, [identity, navigate]);
-
-  const isOwner = identity?.role === "owner";
+  const isOwner = identity?.role === eUserRole.OWNER;
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     defaultValues: { product: "", tva: "", pph: "", ppv: "", category: "", zone: "", barcode1: "", laboratoire: "" },

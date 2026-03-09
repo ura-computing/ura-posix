@@ -194,11 +194,17 @@ class TableUpload(BaseModel):
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
+def _require_import(current_user: User = Depends(get_current_user)) -> User:
+    if (current_user.permissions or {}).get("import") is False:
+        raise HTTPException(status_code=403, detail="Import access denied")
+    return current_user
+
+
 @router.post("/achat")
 async def upload_achat(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_require_import),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
@@ -212,7 +218,7 @@ async def upload_achat(
 async def upload_achat_json(
     body: TableUpload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_require_import),
 ):
     if not body.rows:
         raise HTTPException(status_code=400, detail="No rows provided")
@@ -223,7 +229,7 @@ async def upload_achat_json(
 async def upload_vente(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_require_import),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
@@ -237,7 +243,7 @@ async def upload_vente(
 async def upload_vente_json(
     body: TableUpload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_require_import),
 ):
     if not body.rows:
         raise HTTPException(status_code=400, detail="No rows provided")

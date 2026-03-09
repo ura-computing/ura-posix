@@ -89,6 +89,7 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 │ pharmacy_name              │
 │ image_url                  │
 │ profile_complete           │
+│ permissions (JSON)         │  ← feature flags: { import, achat, ventes, rapports, stock }
 │ created_at, updated_at     │
 └────────────────────────────┘
 
@@ -121,7 +122,8 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 │ medicament_id   (FK)       │    │       │ medicament_id   (FK)              │    │
 │ created_at_source          │    │       │ date                              │    │
 │ delivery_date              │    │       │ transaction_ref                   │    │
-│ delivery_ref               │    │       │ client                            │    │
+│ delivery_ref               │    │       │ transaction_ref_final             │    │
+│ delivery_ref_final         │    │       │ client                            │    │
 │ supplier                   │    │       │ quantity                          │    │
 │ quantity                   │    │       │ unit_price                        │    │
 │ unit_price                 │    │       │ discount                          │    │
@@ -191,7 +193,7 @@ Deduplication keys:
 ```
 User login → POST /auth/login
            → bcrypt verify → JWT generated
-           → token stored in localStorage (dashboard)
+           → token stored in sessionStorage (dashboard)
            → content script picks up postMessage(APCM_AUTH_TOKEN)
            → token stored in chrome.storage.local (extension)
            → Sobrus indicator updates to green ●
@@ -269,9 +271,19 @@ User uploads XLSM accounting file
 |--------|----------|-------------|
 | GET/POST | `/admin/pharmacies` | List / create pharmacies |
 | PUT/DELETE | `/admin/pharmacies/{id}` | Update / delete pharmacy |
-| GET | `/admin/users` | List users |
+| GET | `/admin/users` | List all users |
+| GET | `/admin/users/pending` | List pending owner accounts |
+| PUT | `/admin/users/{id}/approve` | Approve a pending account |
+| PUT | `/admin/users/{id}/reject` | Reject a pending account |
+| PUT | `/admin/users/{id}/revoke` | Revoke an active account |
 | PUT | `/admin/users/{id}/role` | Change user role |
 | PUT | `/admin/users/{id}/pharmacy` | Assign pharmacy |
+| PUT | `/admin/users/{id}/permissions` | Update feature permissions |
+| GET/POST | `/admin/catalog` | List / create catalog products |
+| PUT/DELETE | `/admin/catalog/{id}` | Update / delete product |
+| GET/POST | `/admin/category-suffixes` | Manage delivery ref suffixes |
+| PUT/DELETE | `/admin/category-suffixes/{id}` | Update / delete suffix |
+| GET | `/admin/analytics` | Platform-wide analytics and trends |
 
 ### Query Parameters (GET /achat, GET /ventes)
 | Param | Type | Description |
@@ -328,9 +340,11 @@ apcm-pharma/
 │       └── admin/pharmacies.tsx     # Admin panel
 │
 └── extension/src/
-    ├── background/index.ts  # Token storage, CSV chunk upload, notifications
-    ├── content/index.ts     # Auth relay, notification bridge, Sobrus indicator
-    ├── popup/app.tsx        # Auth status + recent import history panel
+    ├── background/index.ts      # Token storage, CSV chunk upload, notifications
+    ├── content/index.ts         # Auth relay, notification bridge, draggable Sobrus indicator
+    ├── content/sobrus-export.ts # Intercepts CSV download click, chunks + uploads to backend
+    ├── content/sobrus-ui.ts     # Upload progress banner on Sobrus export pages
+    ├── popup/app.tsx            # Auth status + recent import history panel
     ├── hooks/
     │   ├── use-token.ts         # chrome.storage token read/write
     │   └── use-notifications.ts # Import history from chrome.storage
@@ -350,29 +364,30 @@ apcm-pharma/
 
 ### Install
 ```bash
-make install      # install all deps
-make db           # start PostgreSQL container
-make seed         # create default admin & owner accounts
-make dev          # start backend + frontend
+make          # install all deps, start DB, seed admin, start dev servers
+# — or step by step —
+make install  # install all deps
+make db       # start PostgreSQL container
+make seed     # create default admin account
+make dev      # start backend + frontend
 ```
 
 ### Default Accounts
 
-After running `make back-seed`, you can log in with:
+After running `make seed`, you can log in with:
 
-| Role  | Email              | Password   | Description                          |
-|-------|--------------------|------------|--------------------------------------|
-| Admin | admin@gmail.com    | admin@123  | Full system access, user management  |
-| Owner | owner@gmail.com    | owner@123  | Pharmacy owner with demo pharmacy    |
+| Role  | Email              | Password   | Description                                   |
+|-------|--------------------|------------|-----------------------------------------------|
+| Admin | admin@gmail.com    | admin@123  | Full system access, user and pharmacy management |
 
-The seed script also creates a default pharmacy: "Pharmacie Demo"
+Owners register themselves via the app (`/register`). The admin then approves them from the Pharmacies panel.
 
 ### Environment (`backend/.env`)
 ```env
-DATABASE_URL=postgresql://pharmagest:password@localhost:5432/pharmagest
+DATABASE_URL=postgresql://pharmagest:pharmagest@localhost:5432/pharmagest
 SECRET_KEY=<generate-secure-key>
-ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
+CORS_ORIGINS=http://localhost:5173
 ```
 
 **Note**: The seed script (`make seed`) will automatically create default accounts after the database is initialized. Run it once after your first `make db`.
@@ -394,12 +409,12 @@ cd extension && npm run build
 | **chrome.storage for sync** | Upload progress and notifications persist across tabs without a WebSocket server |
 | **Token relay via postMessage** | Extension can't read dashboard's localStorage directly; dashboard fires a message on login that content script forwards to background |
 | **Medicament upsert by PID** | Same product may appear across multiple CSV imports; PID is the stable Sobrus identifier |
-| **Draggable Sobrus indicator** | Visual confirmation that extension is active and connected, positioned by user preference (saved to localStorage) |
+| **Draggable Sobrus indicator** | Visual confirmation that extension is active and connected, positioned by user preference (saved to `chrome.storage.local`) |
 
 ---
 
 ## Security Notes
-- JWT expires after 7 days (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+- JWT expires after 7 days by default (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES` in `backend/.env`)
 - Passwords hashed with bcrypt (cost 12)
 - CORS `*` in development — restrict to specific origins in production
 - SQL injection prevented by SQLAlchemy parameterized queries

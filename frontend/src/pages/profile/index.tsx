@@ -21,11 +21,15 @@ import { toast } from "sonner";
 import UploadWidget from "@/components/upload-widget";
 import { useMe } from "@/hooks/use-me";
 import { useUpdateMe } from "@/hooks/use-update-me";
+import { useGetIdentity } from "@refinedev/core";
+import type { User } from "@/types";
 
 const schema = z.object({
   name: z.string().min(2, "Nom requis"),
-  phone: z.string().min(8, "Numéro invalide"),
-  pharmacy_name: z.string().min(2, "Nom de la pharmacie requis"),
+  phone: z.string().optional().or(z.literal("")),
+  email: z.string().email("Email invalide"),
+  pharmacy_name: z.string().optional(),
+  pharmacy_address: z.string().optional(),
   image_url: z.string().optional(),
 });
 
@@ -33,11 +37,15 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ProfilePage() {
   const { data: user, isLoading } = useMe();
+  const { data: identity } = useGetIdentity<User>();
   const { mutate: updateMe, isPending } = useUpdateMe();
+
+  const isAdmin = identity?.role === "admin";
+  const isEmployee = identity?.role === "employee";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", phone: "", pharmacy_name: "", image_url: "" },
+    defaultValues: { name: "", phone: "", email: "", pharmacy_name: "", pharmacy_address: "", image_url: "" },
   });
 
   useEffect(() => {
@@ -45,7 +53,9 @@ export default function ProfilePage() {
       form.reset({
         name: user.name ?? "",
         phone: user.phone ?? "",
+        email: user.email ?? "",
         pharmacy_name: user.pharmacy_name ?? "",
+        pharmacy_address: user.pharmacy_address ?? "",
         image_url: user.image_url ?? "",
       });
     }
@@ -122,7 +132,13 @@ export default function ProfilePage() {
           <Card className="border border-border rounded-xl">
             <CardHeader>
               <CardTitle className="text-base">Informations personnelles</CardTitle>
-              <CardDescription>Mettez à jour vos coordonnées et le nom de votre pharmacie</CardDescription>
+              <CardDescription>
+                {isAdmin
+                  ? "Mettez à jour vos coordonnées"
+                  : isEmployee
+                  ? "Mettez à jour vos coordonnées"
+                  : "Mettez à jour vos coordonnées et les informations de votre pharmacie"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FormField
@@ -153,25 +169,68 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <Input value={user?.email ?? ""} disabled className="bg-muted/50" />
-                </FormItem>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="email@exemple.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              <FormField
-                control={form.control}
-                name="pharmacy_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom de la pharmacie</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Pharmacie Centrale" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Pharmacy section — role-aware */}
+              {!isAdmin && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium">Pharmacie</p>
+                    {isEmployee ? (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Pharmacie associée</p>
+                        <p className="text-sm font-medium">{user?.pharmacy_name ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          La pharmacie ne peut pas être modifiée après l'inscription.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="pharmacy_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nom de la pharmacie</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Pharmacie Centrale" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="pharmacy_address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Adresse</FormLabel>
+                              <FormControl>
+                                <Input placeholder="12 rue Mohammed V, Casablanca" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 

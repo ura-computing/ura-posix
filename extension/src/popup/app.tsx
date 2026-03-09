@@ -24,8 +24,11 @@ function timeAgo(ts: number): string {
 // ── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { data: token, isLoading: authLoading } = useToken();
+  const { data: auth, isLoading: authLoading } = useToken();
   const { mutate: clearToken } = useClearToken();
+  const token = auth?.token ?? null;
+  const isAdmin = auth?.role === "admin";
+  const canImport = !isAdmin && auth?.permissions?.import !== false;
   const { notifications, clearAll } = useNotifications();
 
   const handleLoginRedirect = () => {
@@ -94,6 +97,41 @@ export default function App() {
               Ouvrir le tableau de bord →
             </button>
           </div>
+        ) : isAdmin ? (
+          /* ── Admin — not supported ── */
+          <div className="auth-card">
+            <div className="auth-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div className="auth-title">Accès non disponible</div>
+            <div className="auth-desc">
+              L'extension est réservée aux propriétaires et employés de pharmacie. Les administrateurs gèrent la plateforme depuis le tableau de bord.
+            </div>
+            <button className="login-btn" onClick={() => handleOpenDashboard()}>
+              Ouvrir le tableau de bord →
+            </button>
+          </div>
+        ) : !canImport ? (
+          /* ── Import blocked ── */
+          <div className="auth-card">
+            <div className="auth-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+              </svg>
+            </div>
+            <div className="auth-title">Import non disponible</div>
+            <div className="auth-desc">
+              L'accès à l'import a été désactivé par le propriétaire de la pharmacie.
+            </div>
+            <button className="login-btn" onClick={() => handleOpenDashboard()}>
+              Ouvrir le tableau de bord →
+            </button>
+          </div>
         ) : (
           /* ── Logged in ── */
           <>
@@ -149,7 +187,7 @@ export default function App() {
         )}
       </div>
 
-      {token && (
+      {token && !isAdmin && canImport && (
         <div className="popup-footer">
           <button className="dashboard-btn" onClick={() => handleOpenDashboard()}>
             Ouvrir le tableau de bord

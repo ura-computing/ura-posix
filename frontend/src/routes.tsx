@@ -31,7 +31,8 @@ import AdminCatalogRequestsPage from "./pages/admin/catalog-requests";
 import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
 import CatalogRequestsPage from "./pages/catalog-requests";
-import { UserRole } from "./types";
+import WelcomePage from "./pages/welcome";
+import { UserRole, eUserRole } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,9 @@ export type RouteConfig = {
   path: string;
   element: ReactNode;
   requireAuth: boolean;
-  layout?: "sidebar" | "none"; // "sidebar" = with sidebar, "none" = no sidebar
+  layout?: "sidebar" | "none" | "universal"; // "sidebar" = with sidebar, "none" = no sidebar, "universal" = no auth required
+  allowed?: UserRole[];
+  permission?: string; // feature key, e.g. "rapports" — checked against identity.permissions
 };
 
 export type ResourceConfig = {
@@ -49,13 +52,17 @@ export type ResourceConfig = {
     label: string;
     icon: ReactNode;
     allowed: UserRole[];
+    permission?: string;
   };
 };
 
 // ─── All Routes ───────────────────────────────────────────────────────────────
 
 export const routes: RouteConfig[] = [
-  // Public routes (no auth required)
+  // Universal route (accessible to all, no sidebar)
+  { path: "/", element: <WelcomePage />, requireAuth: false, layout: "universal" },
+
+  // Public routes (no auth required, redirect to dashboard if authenticated)
   { path: "/login", element: <Login />, requireAuth: false },
   { path: "/register", element: <Register />, requireAuth: false },
 
@@ -74,78 +81,95 @@ export const routes: RouteConfig[] = [
   },
 
   // Private routes (auth required, with sidebar)
-  { path: "/", element: <Dashboard />, requireAuth: true, layout: "sidebar" },
+  { path: "/dashboard", element: <Dashboard />, requireAuth: true, layout: "sidebar", allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE] },
   {
     path: "/dashboard/upload-file",
     element: <DashboardUploadFile />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "import",
   },
   {
     path: "/achat",
     element: <AchatList />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "achat",
   },
   {
     path: "/ventes",
     element: <VentesList />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "ventes",
   },
   {
     path: "/stock",
     element: <StockList />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "stock",
   },
   {
     path: "/rapports",
     element: <RapportsPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "rapports",
   },
   {
     path: "/parametres",
     element: <ParametresList />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER],
   },
   {
     path: "/profile",
     element: <ProfilePage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
   },
   {
     path: "/admin/pharmacies",
     element: <PharmaciesAdminPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.ADMIN],
   },
   {
     path: "/admin/catalog-requests",
     element: <AdminCatalogRequestsPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.ADMIN],
   },
   {
     path: "/admin/catalog",
     element: <AdminCatalogPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.ADMIN],
   },
   {
     path: "/owner/employees",
     element: <OwnerEmployeesPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER],
   },
   {
     path: "/catalog-requests",
     element: <CatalogRequestsPage />,
     requireAuth: true,
     layout: "sidebar",
+    allowed: [eUserRole.OWNER],
   },
 ];
 
@@ -154,11 +178,11 @@ export const routes: RouteConfig[] = [
 export const resources: ResourceConfig[] = [
   {
     name: "dashboard",
-    list: "/",
+    list: "/dashboard",
     meta: {
       label: "Tableau de bord",
       icon: <LayoutDashboard />,
-      allowed: ["admin", "owner", "employee"],
+      allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
     },
   },
   {
@@ -167,8 +191,8 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "achat",
       icon: <ShoppingCart />,
-      // notAdmin: true,
-      allowed: ["owner", "employee"],
+      allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+      permission: "achat",
     },
   },
   {
@@ -177,8 +201,8 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "Ventes",
       icon: <ShoppingBasket />,
-      // notAdmin: true,
-      allowed: ["owner", "employee"],
+      allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+      permission: "ventes",
     },
   },
   {
@@ -187,7 +211,8 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "Alertes Stock",
       icon: <TriangleAlert />,
-      allowed: ["owner", "employee"],
+      allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+      permission: "stock",
     },
   },
   {
@@ -196,7 +221,8 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "Rapports",
       icon: <BarChart3 />,
-      allowed: ["admin", "owner", "employee"],
+      allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
+      permission: "rapports",
     },
   },
   {
@@ -205,7 +231,7 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "Paramètres",
       icon: <Settings />,
-      allowed: ["owner"],
+      allowed: [eUserRole.OWNER],
     },
   },
   {
@@ -215,7 +241,7 @@ export const resources: ResourceConfig[] = [
       label: "Pharmacies",
       icon: <Building2 />,
       // adminOnly: true,
-      allowed: ["admin"],
+      allowed: [eUserRole.ADMIN],
     },
   },
   {
@@ -225,7 +251,7 @@ export const resources: ResourceConfig[] = [
       label: "Demandes catalogue",
       icon: <ClipboardCheck />,
       // adminOnly: true,
-      allowed: ["admin"],
+      allowed: [eUserRole.ADMIN],
     },
   },
   {
@@ -235,7 +261,7 @@ export const resources: ResourceConfig[] = [
       label: "Catalogue",
       icon: <BookOpen />,
       // adminOnly: true,
-      allowed: ["admin"],
+      allowed: [eUserRole.ADMIN],
     },
   },
   {
@@ -245,7 +271,7 @@ export const resources: ResourceConfig[] = [
       label: "Mes employés",
       icon: <Users />,
       // ownerOnly: true,
-      allowed: ["owner"],
+      allowed: [eUserRole.OWNER],
     },
   },
   {
@@ -255,7 +281,7 @@ export const resources: ResourceConfig[] = [
       label: "Demandes catalogue",
       icon: <PackagePlus />,
       // ownerOnly: true,
-      allowed: ["owner"],
+      allowed: [eUserRole.OWNER],
     },
   },
 ];

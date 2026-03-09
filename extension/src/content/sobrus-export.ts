@@ -27,12 +27,28 @@ function detectFileType(headerLine: string): "achat" | "vente" {
   return "vente";
 }
 
+function isExtensionAlive(): boolean {
+  try { return !!chrome.runtime?.id; } catch { return false; }
+}
+
 function sendMsg<T>(msg: object): Promise<T> {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(msg, (res) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(res as T);
-    });
+    if (!isExtensionAlive()) {
+      // Write error directly to storage so the banner shows immediately
+      chrome.storage.local.set({
+        [UPLOAD_STATUS_KEY]: { state: "error", error: "Extension rechargée — veuillez rafraîchir la page", timestamp: Date.now() },
+      });
+      reject(new Error("context_invalidated"));
+      return;
+    }
+    try {
+      chrome.runtime.sendMessage(msg, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res as T);
+      });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -46,7 +62,9 @@ document.addEventListener(
     );
     if (!anchor) return;
     if (uploading) return;
-    handleExport(anchor.href).catch(console.error);
+    handleExport(anchor.href).catch(() => {
+      // All errors are already written to chrome.storage and shown as banners — nothing to do here
+    });
   },
   true
 );
@@ -119,12 +137,14 @@ async function handleExport(apiUrl: string) {
     // ── 4. Success ─────────────────────────────────────────────────────────
     setStatus("success", { inserted: totalInserted, skipped: totalSkipped });
 
-    chrome.runtime.sendMessage({
-      action: ACTIONS.SAVE_NOTIFICATION,
-      fileType,
-      inserted: totalInserted,
-      skipped: totalSkipped,
-    });
+    if (isExtensionAlive()) {
+      chrome.runtime.sendMessage({
+        action: ACTIONS.SAVE_NOTIFICATION,
+        fileType,
+        inserted: totalInserted,
+        skipped: totalSkipped,
+      });
+    }
   } finally {
     uploading = false;
   }

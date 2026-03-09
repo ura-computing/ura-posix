@@ -1,18 +1,37 @@
+import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY } from "../constants";
+
 console.log("[Content Script] Loaded");
 
 // ─── Auth token relay ─────────────────────────────────────────────────────────
-// 1. On every load: if localStorage already has the token (user was previously
-//    logged in), sync it immediately. Covers reinstalls / storage wipes.
-const _storedToken = localStorage.getItem("pharmagest_token");
-if (_storedToken) {
-  chrome.runtime.sendMessage({ action: "STORE_TOKEN", token: _storedToken });
+// 1. On every load: if sessionStorage already has the token (user is logged in),
+//    sync it immediately to chrome.storage. Covers reinstalls / storage wipes.
+function _send(msg: object) {
+  try {
+    if (chrome.runtime?.id) chrome.runtime.sendMessage(msg);
+  } catch { /* extension context invalidated — silently ignore */ }
 }
 
-// 2. After login/register: authProvider fires this message — store the new token.
+const _storedToken = sessionStorage.getItem("pharmagest_token");
+if (_storedToken) {
+  _send({ action: ACTIONS.STORE_TOKEN, token: _storedToken });
+}
+
+// 2. After login/register: authProvider fires APCM_AUTH_TOKEN — store the new token.
+//    After logout: authProvider fires APCM_CLEAR_TOKEN — clear the token.
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (event.data?.type === "APCM_AUTH_TOKEN" && event.data?.token) {
-    chrome.runtime.sendMessage({ action: "STORE_TOKEN", token: event.data.token });
+    _send({ action: ACTIONS.STORE_TOKEN, token: event.data.token });
+  }
+  if (event.data?.type === "APCM_CLEAR_TOKEN") {
+    _send({ action: ACTIONS.CLEAR_TOKEN });
+  }
+});
+
+// 3. Background → content: force logout message relayed to the dashboard page.
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "APCM_FORCE_LOGOUT") {
+    window.postMessage({ type: "APCM_FORCE_LOGOUT" }, "*");
   }
 });
 
@@ -281,10 +300,10 @@ if (window.location.origin === "http://localhost:5173") {
 // ─── Sobrus Indicator (Draggable widget) ─────────────────────────────────
 
 function _initSobrusIndicator() {
-  if (!window.location.hostname.includes("sobrus")) return;
+  if (!window.location.hostname.includes(SOBRUS_HOSTNAME)) return;
+  // Badge shows on ALL Sobrus pages — export pages also get the badge (sobrus-ui.ts handles upload progress separately)
 
   const INDICATOR_ID = "__apcm-sobrus-indicator";
-  const POSITION_KEY = "apcm_indicator_pos";
 
   if (document.getElementById(INDICATOR_ID)) return;
 
@@ -303,18 +322,12 @@ function _initSobrusIndicator() {
   }
 
   // ── Build widget ──
-  const saved = localStorage.getItem(POSITION_KEY);
-  const pos = saved
-    ? JSON.parse(saved)
-    : { x: window.innerWidth - 190, y: window.innerHeight - 60 };
-
   const el = document.createElement("div");
   el.id = INDICATOR_ID;
   el.style.cssText = `
-    position:fixed;bottom:auto;top:${pos.y}px;left:${pos.x}px;z-index:2147483646;
+    position:fixed;bottom:16px;left:16px;z-index:2147483646;
     display:flex;align-items:center;gap:7px;
     padding:6px 12px 6px 8px;border-radius:10px;
-    cursor:grab;user-select:none;
     background:#0f172a;
     border:1px solid rgba(255,255,255,0.1);
     box-shadow:0 4px 16px rgba(0,0,0,0.45),0 0 0 0.5px rgba(255,255,255,0.06);
@@ -322,7 +335,6 @@ function _initSobrusIndicator() {
     color:#e2e8f0;
     backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);
-    transition:box-shadow .15s, opacity .15s;
   `;
 
   // APCM logo pill (like Next.js "N")
@@ -347,6 +359,45 @@ function _initSobrusIndicator() {
   el.appendChild(dot);
   el.appendChild(label);
   document.body.appendChild(el);
+
+  // ── Restore saved position ──
+  chrome.storage.local.get([INDICATOR_POSITION_KEY], (res) => {
+    const pos = res[INDICATOR_POSITION_KEY] as { left: number; top: number } | undefined;
+    if (pos) {
+      el.style.bottom = "";
+      el.style.left = pos.left + "px";
+      el.style.top  = pos.top  + "px";
+    }
+  });
+
+  // ── Drag to reposition ──
+  el.style.cursor = "grab";
+  let _dragging = false, _ox = 0, _oy = 0;
+
+  el.addEventListener("mousedown", (e) => {
+    const r = el.getBoundingClientRect();
+    el.style.bottom = "";
+    el.style.top  = r.top  + "px";
+    el.style.left = r.left + "px";
+    _ox = e.clientX - r.left;
+    _oy = e.clientY - r.top;
+    _dragging = true;
+    el.style.cursor = "grabbing";
+    e.preventDefault();
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!_dragging) return;
+    el.style.left = (e.clientX - _ox) + "px";
+    el.style.top  = (e.clientY - _oy) + "px";
+  });
+  document.addEventListener("mouseup", () => {
+    if (!_dragging) return;
+    _dragging = false;
+    el.style.cursor = "grab";
+    chrome.storage.local.set({
+      [INDICATOR_POSITION_KEY]: { left: parseInt(el.style.left), top: parseInt(el.style.top) },
+    });
+  });
 
   // ── Update display based on connection ──
   function _setConnected(connected: boolean) {
@@ -375,37 +426,6 @@ function _initSobrusIndicator() {
     _setConnected(!!(changes["pharmagest_token"].newValue));
   });
 
-  // ── Drag ──
-  let isDragging = false;
-  let startX = 0, startY = 0, origX = 0, origY = 0;
-
-  el.addEventListener("mousedown", (e) => {
-    isDragging = true;
-    startX = e.clientX; startY = e.clientY;
-    origX = el.offsetLeft; origY = el.offsetTop;
-    el.style.cursor = "grabbing";
-    el.style.boxShadow = "0 6px 20px rgba(0,0,0,0.5)";
-    e.preventDefault();
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    const x = Math.max(0, Math.min(origX + e.clientX - startX, window.innerWidth - el.offsetWidth));
-    const y = Math.max(0, Math.min(origY + e.clientY - startY, window.innerHeight - el.offsetHeight));
-    el.style.left = `${x}px`;
-    el.style.top  = `${y}px`;
-  });
-
-  document.addEventListener("mouseup", () => {
-    if (!isDragging) return;
-    isDragging = false;
-    el.style.cursor = "grab";
-    el.style.boxShadow = "0 2px 10px rgba(0,0,0,0.35)";
-    localStorage.setItem(POSITION_KEY, JSON.stringify({ x: el.offsetLeft, y: el.offsetTop }));
-  });
-
-  el.addEventListener("mouseenter", () => { if (!isDragging) el.style.boxShadow = "0 4px 14px rgba(0,0,0,0.5)"; });
-  el.addEventListener("mouseleave", () => { if (!isDragging) el.style.boxShadow = "0 2px 10px rgba(0,0,0,0.35)"; });
 }
 
 _initSobrusIndicator();
