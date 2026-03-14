@@ -23,8 +23,8 @@ export const authProvider: AuthProvider = {
       const data = await api.auth.register(payload);
       api.storeSession(data);
       window.postMessage({ type: "APCM_AUTH_TOKEN", token: data.access_token }, window.location.origin);
-      // New accounts are pending — setup profile first, then "/" shows the pending notice
-      return { success: true, redirectTo: "/profile/setup" };
+      // New accounts are pending — "/" shows the pending notice
+      return { success: true, redirectTo: "/" };
     } catch (err) {
       return {
         success: false,

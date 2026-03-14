@@ -99,6 +99,35 @@ def update_employee_permissions(
     return user
 
 
+@router.get("/notifications")
+def get_owner_notifications(
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Return pending employees for the owner's pharmacy."""
+    pending = (
+        db.query(User)
+        .filter(
+            User.pharmacy_id == current_owner.pharmacy_id,
+            User.role == "employee",
+            User.status == "pending",
+        )
+        .order_by(User.created_at.desc())
+        .all()
+    )
+    return {
+        "pending_employees": [
+            {
+                "id": u.id,
+                "name": u.name,
+                "email": u.email,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            }
+            for u in pending
+        ]
+    }
+
+
 @router.put("/employees/{user_id}/revoke", response_model=UserAdminOut)
 def revoke_employee(
     user_id: int,

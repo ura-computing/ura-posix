@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
 
 
@@ -22,7 +22,6 @@ class UserOut(BaseModel):
     id: int
     email: str
     name: Optional[str] = None
-    image_url: Optional[str] = None
     phone: Optional[str] = None
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False
@@ -52,7 +51,6 @@ class ProfileUpdate(BaseModel):
     email: Optional[str] = None
     pharmacy_name: Optional[str] = None
     pharmacy_address: Optional[str] = None
-    image_url: Optional[str] = None
 
 
 # ── Pharmacy schemas ───────────────────────────────────────────────────────────
@@ -71,6 +69,15 @@ class PharmacyUpdate(BaseModel):
     email: Optional[str] = None
 
 
+class OwnerOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: str
+    phone: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class PharmacyOut(BaseModel):
     id: int
     name: str
@@ -79,6 +86,8 @@ class PharmacyOut(BaseModel):
     email: Optional[str] = None
     created_at: Optional[datetime] = None
     user_count: int = 0
+    owners: List[OwnerOut] = []
+    # Kept for backwards compat — populated from first active owner
     owner_name: Optional[str] = None
     owner_email: Optional[str] = None
     owner_phone: Optional[str] = None
@@ -100,7 +109,6 @@ class UserAdminOut(BaseModel):
     id: int
     email: str
     name: Optional[str] = None
-    image_url: Optional[str] = None
     phone: Optional[str] = None
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False

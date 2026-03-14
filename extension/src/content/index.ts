@@ -1,4 +1,4 @@
-import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY } from "../constants";
+import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY, DASHBOARD_URL } from "../constants";
 
 console.log("[Content Script] Loaded");
 
@@ -43,7 +43,7 @@ const UPLOAD_STATUS_KEY = "apcm_upload_status";
 type NotifEntry = { id: string; fileType: string; inserted: number; skipped: number; read: boolean; timestamp: number };
 
 type UploadStatus = {
-  state: "uploading" | "success" | "error";
+  state: "uploading" | "success" | "error" | "cancelled";
   fileType: "achat" | "vente";
   current?: number;
   total?: number;
@@ -155,6 +155,21 @@ function _showUploadBanner(status: UploadStatus) {
     let t = setTimeout(hide, 12_000);
     el.addEventListener("mouseenter", () => clearTimeout(t));
     el.addEventListener("mouseleave", () => { t = setTimeout(hide, 12_000); });
+  } else if (status.state === "cancelled") {
+    const note = (status.inserted ?? 0) > 0
+      ? `<br><span style="color:#94a3b8;font-weight:400">${status.inserted} ligne(s) déjà importée(s)</span>`
+      : "";
+    el.innerHTML = `
+      ${CLOSE}
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        ${DOT("#f59e0b")}
+        <span>Import annulé.${note}</span>
+      </div>`;
+    setTimeout(() => {
+      el!.style.transition = "opacity .4s";
+      el!.style.opacity = "0";
+      setTimeout(() => el!.remove(), 500);
+    }, 6_000);
   } else {
     el.innerHTML = `
       ${CLOSE}
@@ -234,7 +249,7 @@ function _showImportToast(n: { fileType: string; inserted: number; skipped: numb
   el.addEventListener("mouseleave", scheduleHide);
 }
 
-if (window.location.origin === "http://localhost:5173") {
+if (window.location.origin === new URL(DASHBOARD_URL).origin) {
   // Initial load — send stored notifications to the React app
   // Also show toast for any very recent unread notification (covers the case where
   // the background saved a notification and then navigated to this tab — onChanged

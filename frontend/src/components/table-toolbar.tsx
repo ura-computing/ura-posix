@@ -196,7 +196,7 @@ export function TableToolbar({
 
       {/* ── Row 2: Filters ── */}
       {showFilters && (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 min-w-0">
 
           {/* Date range — trigger + separate × clear button */}
           {onDateRangeChange && (

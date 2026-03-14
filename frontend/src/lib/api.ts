@@ -120,6 +120,16 @@ export const api = {
   uploads: {
     achat: (file: File) => uploadFile<{ inserted: number }>(ENDPOINTS.uploads.achat, file),
     vente: (file: File) => uploadFile<{ inserted: number }>(ENDPOINTS.uploads.vente, file),
+    achatJson: (rows: Record<string, string>[]) =>
+      request<{ inserted: number; skipped: number }>(ENDPOINTS.uploads.achatJson, {
+        method: "POST",
+        body: JSON.stringify({ rows }),
+      }),
+    venteJson: (rows: Record<string, string>[]) =>
+      request<{ inserted: number; skipped: number }>(ENDPOINTS.uploads.venteJson, {
+        method: "POST",
+        body: JSON.stringify({ rows }),
+      }),
   },
 
   tables: {
@@ -184,6 +194,10 @@ export const api = {
       return request<UserAdmin[]>(`${ENDPOINTS.admin.users}${qs}`);
     },
     listPendingOwners: () => request<UserAdmin[]>(`${ENDPOINTS.admin.users}/pending`),
+    getNotifications: () => request<{
+      pending_users: { id: number; name: string; email: string; pharmacy_name?: string; created_at?: string }[];
+      pending_requests: { id: number; product: string; pharmacy_name?: string; created_at?: string }[];
+    }>("/admin/notifications"),
     approveUser: (userId: number) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/approve`, { method: "PUT" }),
     rejectUser: (userId: number) =>
@@ -209,6 +223,7 @@ export const api = {
     // Catalog CSV/XLSM import
     importCatalog: (file: File) => uploadFile<{ imported: number }>("/uploads/catalog", file),
     // Category suffixes
+    listCatalogCategories: () => request<string[]>("/admin/catalog/categories"),
     listCategorySuffixes: () => request<CategorySuffixOut[]>("/admin/category-suffixes"),
     createCategorySuffix: (body: { category: string; suffix: string; color?: string | null }) =>
       request<CategorySuffixOut>("/admin/category-suffixes", { method: "POST", body: JSON.stringify(body) }),
@@ -218,6 +233,13 @@ export const api = {
       request<{ deleted: boolean }>(`/admin/category-suffixes/${id}`, { method: "DELETE" }),
     getStats: () => request<AdminStats>("/admin/stats"),
     getAnalytics: () => request<AdminAnalytics>("/admin/analytics"),
+    getPharmacyStats: (pharmacyId: number, dateFrom?: string, dateTo?: string) => {
+      const p = new URLSearchParams();
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      const qs = p.toString();
+      return request<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs ? `?${qs}` : ""}`);
+    },
     exportCatalog: (search?: string) => {
       const p = new URLSearchParams({ export: "true" });
       if (search) p.set("search", search);
@@ -247,6 +269,9 @@ export const api = {
   },
 
   owner: {
+    getNotifications: () => request<{
+      pending_employees: { id: number; name: string; email: string; created_at?: string }[];
+    }>("/owner/notifications"),
     listEmployees: () => request<UserAdmin[]>("/owner/employees"),
     approveEmployee: (id: number) =>
       request<UserAdmin>(`/owner/employees/${id}/approve`, { method: "PUT" }),

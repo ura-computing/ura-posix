@@ -49,13 +49,31 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
 
     role = body.role if body.role in ("owner", "employee") else "owner"
 
-    # For employees, resolve pharmacy_name from pharmacy_id
-    employee_pharmacy_name = None
-    if role == "employee" and body.pharmacy_id:
+    # Resolve pharmacy_name and pharmacy_id based on role
+    resolved_pharmacy_name = None
+    resolved_pharmacy_id = None
+
+    if role == "employee":
+        if not body.pharmacy_id:
+            raise HTTPException(status_code=400, detail="Veuillez sélectionner une pharmacie")
         pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
         if not pharmacy:
             raise HTTPException(status_code=400, detail="Pharmacy not found")
-        employee_pharmacy_name = pharmacy.name
+        resolved_pharmacy_name = pharmacy.name
+        resolved_pharmacy_id = pharmacy.id
+    elif role == "owner":
+        if body.pharmacy_id:
+            # Joining an existing pharmacy
+            pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
+            if not pharmacy:
+                raise HTTPException(status_code=400, detail="Pharmacy not found")
+            resolved_pharmacy_name = pharmacy.name
+            resolved_pharmacy_id = pharmacy.id
+        else:
+            # Creating a new pharmacy — name required
+            if not body.pharmacy_name:
+                raise HTTPException(status_code=400, detail="pharmacy_name required for new owners")
+            resolved_pharmacy_name = body.pharmacy_name
 
     user = User(
         email=body.email,
@@ -64,8 +82,8 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
         password_hash=hash_password(body.password),
         role=role,
         status="pending",
-        pharmacy_name=body.pharmacy_name if role == "owner" else employee_pharmacy_name,
-        pharmacy_id=body.pharmacy_id if role == "employee" else None,
+        pharmacy_name=resolved_pharmacy_name,
+        pharmacy_id=resolved_pharmacy_id,
     )
     db.add(user)
     db.commit()

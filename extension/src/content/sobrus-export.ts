@@ -10,7 +10,7 @@
  *  4. Sends SAVE_NOTIFICATION when done.
  */
 
-import { ACTIONS, UPLOAD_STATUS_KEY } from "../constants";
+import { ACTIONS, CANCEL_UPLOAD_KEY, UPLOAD_STATUS_KEY } from "../constants";
 
 const CHUNK_SIZE = 500;
 
@@ -114,6 +114,16 @@ async function handleExport(apiUrl: string) {
 
     // ── 3. Send each chunk to background (background can reach localhost) ──
     for (let i = 0; i < dataLines.length; i += CHUNK_SIZE) {
+      // Check if the user requested cancellation via the popup
+      const cancelCheck = await new Promise<boolean>((resolve) => {
+        chrome.storage.local.get(CANCEL_UPLOAD_KEY, (res) => resolve(!!(res[CANCEL_UPLOAD_KEY])));
+      });
+      if (cancelCheck) {
+        chrome.storage.local.remove(CANCEL_UPLOAD_KEY);
+        setStatus("cancelled", { inserted: totalInserted, skipped: totalSkipped });
+        return;
+      }
+
       const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
       setStatus("uploading", { current: chunkNum, total: totalChunks });
 

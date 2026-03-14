@@ -23,7 +23,6 @@ import VentesList from "./pages/ventes";
 import StockList from "./pages/stock";
 import ParametresList from "./pages/parametres";
 import RapportsPage from "./pages/rapports";
-import ProfileSetup from "./pages/profile/setup";
 import ProfilePage from "./pages/profile/index";
 import PendingApproval from "./pages/pending";
 import PharmaciesAdminPage from "./pages/admin/pharmacies";
@@ -67,12 +66,6 @@ export const routes: RouteConfig[] = [
   { path: "/register", element: <Register />, requireAuth: false },
 
   // Auth required, no sidebar
-  {
-    path: "/profile/setup",
-    element: <ProfileSetup />,
-    requireAuth: true,
-    layout: "none",
-  },
   {
     path: "/pending",
     element: <PendingApproval />,

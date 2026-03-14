@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Camera, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,9 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import UploadWidget from "@/components/upload-widget";
 import { useMe } from "@/hooks/use-me";
 import { useUpdateMe } from "@/hooks/use-update-me";
 import { useGetIdentity } from "@refinedev/core";
@@ -30,7 +28,6 @@ const schema = z.object({
   email: z.string().email("Email invalide"),
   pharmacy_name: z.string().optional(),
   pharmacy_address: z.string().optional(),
-  image_url: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -45,7 +42,7 @@ export default function ProfilePage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", phone: "", email: "", pharmacy_name: "", pharmacy_address: "", image_url: "" },
+    defaultValues: { name: "", phone: "", email: "", pharmacy_name: "", pharmacy_address: "" },
   });
 
   useEffect(() => {
@@ -56,7 +53,6 @@ export default function ProfilePage() {
         email: user.email ?? "",
         pharmacy_name: user.pharmacy_name ?? "",
         pharmacy_address: user.pharmacy_address ?? "",
-        image_url: user.image_url ?? "",
       });
     }
   }, [user, form]);
@@ -67,9 +63,6 @@ export default function ProfilePage() {
       onError: (err) => toast.error(err.message),
     });
   };
-
-  const imageUrl = form.watch("image_url");
-  const initials = (user?.name ?? "U").slice(0, 2).toUpperCase();
 
   if (isLoading) {
     return (
@@ -90,44 +83,6 @@ export default function ProfilePage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Avatar section */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader>
-              <CardTitle className="text-base">Photo de profil</CardTitle>
-              <CardDescription>Elle apparaît dans l'en-tête de l'application</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-6">
-                <div className="relative shrink-0">
-                  <Avatar className="h-20 w-20 ring-2 ring-border">
-                    <AvatarImage src={imageUrl} alt={user?.name} />
-                    <AvatarFallback className="bg-teal-500 text-white text-xl font-semibold">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-background border border-border flex items-center justify-center">
-                    <Camera className="h-3 w-3 text-muted-foreground" />
-                  </div>
-                </div>
-                <FormField
-                  control={form.control}
-                  name="image_url"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormControl>
-                        <UploadWidget
-                          value={field.value ? { url: field.value, publicId: "" } : null}
-                          onChange={(file) => field.onChange(file?.url ?? "")}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Info section */}
           <Card className="border border-border rounded-xl">
             <CardHeader>

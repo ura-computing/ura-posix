@@ -18,7 +18,7 @@ import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -200,7 +200,6 @@ export default function OwnerEmployeesPage() {
                     <div key={emp.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar className="h-8 w-8 shrink-0">
-                          {emp.image_url && <AvatarImage src={emp.image_url} />}
                           <AvatarFallback className="text-xs bg-primary/10 text-primary">
                             {initials(emp.name, emp.email)}
                           </AvatarFallback>
@@ -270,7 +269,6 @@ export default function OwnerEmployeesPage() {
                       {/* Employee info row */}
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8 shrink-0">
-                          {emp.image_url && <AvatarImage src={emp.image_url} />}
                           <AvatarFallback className="text-xs bg-primary/10 text-primary">
                             {initials(emp.name, emp.email)}
                           </AvatarFallback>

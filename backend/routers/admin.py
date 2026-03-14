@@ -1,3 +1,4 @@
+import unicodedata
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
-from models import CategorySuffix, Medicament, Pharmacy, User
+from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, User, Vente
 from routers.auth import get_current_user
 from schemas import (
     CategorySuffixCreate,
@@ -15,6 +16,7 @@ from schemas import (
     MedicamentCreate,
     MedicamentOut,
     MedicamentUpdate,
+    OwnerOut,
     PharmacyCreate,
     PharmacyOut,
     PharmacyUpdate,
@@ -27,6 +29,10 @@ from schemas import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 VALID_ROLES = {"admin", "owner", "employee"}
+
+
+def strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
 
 
 def get_current_admin(
@@ -48,7 +54,12 @@ def list_pharmacies(
     result = []
     for p in pharmacies:
         user_count = db.query(User).filter(User.pharmacy_id == p.id).count()
-        owner = db.query(User).filter(User.pharmacy_id == p.id, User.role == "owner").first()
+        owners = (
+            db.query(User)
+            .filter(User.pharmacy_id == p.id, User.role == "owner", User.status == "active")
+            .all()
+        )
+        first = owners[0] if owners else None
         out = PharmacyOut(
             id=p.id,
             name=p.name,
@@ -57,10 +68,11 @@ def list_pharmacies(
             email=p.email,
             created_at=p.created_at,
             user_count=user_count,
-            owner_name=owner.name if owner else None,
-            owner_email=owner.email if owner else None,
-            owner_phone=owner.phone if owner else None,
-            owner_pharmacy_name=owner.pharmacy_name if owner else None,
+            owners=[OwnerOut(id=o.id, name=o.name, email=o.email, phone=o.phone) for o in owners],
+            owner_name=first.name if first else None,
+            owner_email=first.email if first else None,
+            owner_phone=first.phone if first else None,
+            owner_pharmacy_name=first.pharmacy_name if first else None,
         )
         result.append(out)
     return result
@@ -165,6 +177,47 @@ def list_pending_owners(
         .order_by(User.created_at.desc())
         .all()
     )
+
+
+@router.get("/notifications")
+def get_admin_notifications(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Pending owners + pending catalog requests — for the admin notification bell."""
+    pending_users = (
+        db.query(User)
+        .filter(User.status == "pending", User.role == "owner")
+        .order_by(User.created_at.desc())
+        .all()
+    )
+    pending_requests = (
+        db.query(CatalogRequest)
+        .filter(CatalogRequest.status == "pending")
+        .order_by(CatalogRequest.created_at.desc())
+        .all()
+    )
+    return {
+        "pending_users": [
+            {
+                "id": u.id,
+                "name": u.name,
+                "email": u.email,
+                "pharmacy_name": u.pharmacy_name,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            }
+            for u in pending_users
+        ],
+        "pending_requests": [
+            {
+                "id": r.id,
+                "product": r.product,
+                "pharmacy_name": r.requester.pharmacy_name if r.requester else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in pending_requests
+        ],
+    }
 
 
 @router.put("/users/{user_id}/approve", response_model=UserAdminOut)
@@ -293,6 +346,95 @@ def update_user_permissions(
 
 # ── Catalog (direct CRUD) ──────────────────────────────────────────────────────
 
+@router.get("/catalog/categories")
+def list_catalog_categories(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Return distinct non-null category values from the catalog, sorted alphabetically."""
+    rows = (
+        db.query(Medicament.category)
+        .filter(Medicament.category.isnot(None), Medicament.category != "")
+        .distinct()
+        .order_by(Medicament.category)
+        .all()
+    )
+    return [r.category for r in rows]
+
+
+@router.post("/catalog/deduplicate")
+def deduplicate_catalog(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Merge medicament rows that have the same accent-stripped, lowercased name.
+    Keeps the row with the most complete PID (prefers a real Sobrus PID over a
+    name-derived fallback), then re-points all Achat/Vente rows to the survivor
+    and deletes the duplicates.
+    Returns { merged_groups: int, deleted: int }.
+    """
+    all_meds = db.query(Medicament).all()
+
+    # Group by normalised name
+    groups: dict[str, list[Medicament]] = {}
+    for med in all_meds:
+        key = strip_accents((med.product or "").lower().strip())
+        groups.setdefault(key, []).append(med)
+
+    merged_groups = 0
+    deleted = 0
+
+    for key, meds in groups.items():
+        if len(meds) < 2:
+            continue
+
+        # Choose the survivor: prefer the entry whose PID looks like a real Sobrus
+        # code (all-digits or short alphanumeric), otherwise the one with the lowest id.
+        def _pid_score(m: Medicament) -> int:
+            p = m.pid or ""
+            # A barcode/Sobrus PID is typically pure digits or short alphanum
+            if p.isdigit():
+                return 0
+            if len(p) <= 20 and p.replace("-", "").isalnum():
+                return 1
+            return 2  # name-derived fallback — least preferred
+
+        meds.sort(key=lambda m: (_pid_score(m), m.id))
+        survivor = meds[0]
+        duplicates = meds[1:]
+
+        for dup in duplicates:
+            # Re-point all transaction rows
+            db.query(Achat).filter(Achat.medicament_id == dup.id).update(
+                {"medicament_id": survivor.id}
+            )
+            db.query(Vente).filter(Vente.medicament_id == dup.id).update(
+                {"medicament_id": survivor.id}
+            )
+            db.delete(dup)
+            deleted += 1
+
+        # Fill in any missing fields on the survivor from the duplicates
+        for dup in duplicates:
+            if not survivor.tva and dup.tva:
+                survivor.tva = dup.tva
+            if survivor.pph is None and dup.pph is not None:
+                survivor.pph = dup.pph
+            if survivor.ppv is None and dup.ppv is not None:
+                survivor.ppv = dup.ppv
+            if not survivor.category and dup.category:
+                survivor.category = dup.category
+            if not survivor.barcode1 and dup.barcode1:
+                survivor.barcode1 = dup.barcode1
+            if not survivor.laboratoire and dup.laboratoire:
+                survivor.laboratoire = dup.laboratoire
+
+        merged_groups += 1
+
+    db.commit()
+    return {"merged_groups": merged_groups, "deleted": deleted}
+
+
 @router.get("/catalog")
 def list_catalog(
     search: str = Query(""),
@@ -305,7 +447,12 @@ def list_catalog(
     q = db.query(Medicament)
     if search:
         term = f"%{search}%"
-        q = q.filter(Medicament.product.ilike(term) | Medicament.pid.ilike(term))
+        norm = f"%{strip_accents(search.lower())}%"
+        q = q.filter(
+            Medicament.product.ilike(term)
+            | Medicament.pid.ilike(term)
+            | func.lower(Medicament.product).ilike(norm)
+        )
     if export:
         items = q.order_by(Medicament.product).all()
         return {
@@ -328,7 +475,10 @@ def create_medicament(
 ):
     if db.query(Medicament).filter(Medicament.pid == body.pid).first():
         raise HTTPException(status_code=400, detail="PID already exists")
-    med = Medicament(**body.model_dump())
+    data = body.model_dump()
+    if data.get("category"):
+        data["category"] = strip_accents(data["category"].strip())
+    med = Medicament(**data)
     db.add(med)
     db.commit()
     db.refresh(med)
@@ -345,11 +495,31 @@ def update_medicament(
     med = db.query(Medicament).filter(Medicament.id == med_id).first()
     if not med:
         raise HTTPException(status_code=404, detail="Medicament not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    if updates.get("category"):
+        updates["category"] = strip_accents(updates["category"].strip())
+    for field, value in updates.items():
         setattr(med, field, value)
     db.commit()
     db.refresh(med)
     return med
+
+
+@router.post("/catalog/normalize-categories")
+def normalize_categories(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """One-time migration: strip accents from all existing category values."""
+    meds = db.query(Medicament).filter(Medicament.category.isnot(None)).all()
+    updated = 0
+    for m in meds:
+        norm = strip_accents(m.category.strip())
+        if norm != m.category:
+            m.category = norm
+            updated += 1
+    db.commit()
+    return {"updated": updated}
 
 
 @router.delete("/catalog/{med_id}")

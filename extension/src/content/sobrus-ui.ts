@@ -5,7 +5,7 @@
  * chrome.storage.local so it stays in sync with the dashboard banner.
  */
 
-import { DASHBOARD_URL, UPLOAD_STATUS_KEY } from "../constants";
+import { CANCEL_UPLOAD_KEY, DASHBOARD_URL, UPLOAD_STATUS_KEY } from "../constants";
 
 const style = document.createElement("style");
 style.textContent = `@keyframes __apcm-spin { to { transform: rotate(360deg); } }`;
@@ -48,11 +48,16 @@ function getBanner(): HTMLElement {
     pointer-events:auto;
   `;
 
-  // Close button via event delegation (survives innerHTML replacements)
+  // Button delegation (survives innerHTML replacements)
   el.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).id === "__apcm-x") {
+    const target = e.target as HTMLElement;
+    if (target.id === "__apcm-x") {
       el!.style.opacity = "0";
       setTimeout(() => el!.remove(), 400);
+    } else if (target.id === "__apcm-cancel") {
+      chrome.storage.local.set({ [CANCEL_UPLOAD_KEY]: true });
+      (target as HTMLButtonElement).disabled = true;
+      target.textContent = "Annulation…";
     }
   });
 
@@ -69,6 +74,17 @@ function hideBanner(delay = 0) {
   }, delay);
 }
 
+function setBannerCancelled(note: string) {
+  const el = getBanner();
+  el.innerHTML = `
+    ${CLOSE_BTN}
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      ${DOT("#f59e0b")}
+      <span>Import annulé.${note}</span>
+    </div>`;
+  hideBanner(6_000);
+}
+
 function setBanner(state: "uploading" | "success" | "error", detail = "") {
   const el = getBanner();
 
@@ -79,26 +95,31 @@ function setBanner(state: "uploading" | "success" | "error", detail = "") {
       const label = hasChunks ? `Lot ${p![0]}/${p![1]}` : "Import en cours";
       const pct = hasChunks ? Math.round((parseInt(p![0]) / parseInt(p![1])) * 100) : null;
 
-      // Smooth update of existing bar
+      // Smooth update of existing bar without re-rendering (preserves cancel button state)
       const existingFill = el.querySelector<HTMLElement>("#__apcm-fill");
       const existingLabel = el.querySelector<HTMLElement>("#__apcm-label");
-      if (existingFill && existingLabel && pct !== null) {
-        existingFill.style.width = `${pct}%`;
+      if (existingLabel) {
         existingLabel.textContent = `${label}…`;
+        if (existingFill && pct !== null) existingFill.style.width = `${pct}%`;
         break;
       }
 
       el.innerHTML = `
         ${CLOSE_BTN}
         <div style="width:100%">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${pct !== null ? "7px" : "0"}">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
             ${SPINNER}
             <span id="__apcm-label">${label}…</span>
           </div>
           ${pct !== null ? `
-          <div style="width:100%;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden">
+          <div style="width:100%;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden;margin-bottom:8px">
             <div id="__apcm-fill" style="height:100%;background:#14b8a6;border-radius:2px;width:${pct}%;transition:width .35s ease"></div>
           </div>` : ""}
+          <button id="__apcm-cancel" style="
+            width:100%;padding:4px 0;font-size:11px;font-weight:500;
+            background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);
+            color:#f87171;border-radius:6px;cursor:pointer;
+          ">Annuler l'import</button>
         </div>`;
       break;
     }
@@ -140,7 +161,7 @@ function setBanner(state: "uploading" | "success" | "error", detail = "") {
 // ── Listen to upload status changes in chrome.storage ────────────────────────
 
 type UploadStatus = {
-  state: "uploading" | "success" | "error";
+  state: "uploading" | "success" | "error" | "cancelled";
   fileType?: "achat" | "vente";
   current?: number;
   total?: number;
@@ -161,6 +182,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     setBanner("success", `${status.inserted ?? 0}|${status.skipped ?? 0}|${status.fileType ?? "vente"}`);
   } else if (status.state === "error") {
     setBanner("error", status.error ?? "Erreur");
+  } else if (status.state === "cancelled") {
+    const note = (status.inserted ?? 0) > 0
+      ? `<br><span style="color:#94a3b8;font-weight:400">${status.inserted} ligne(s) déjà importée(s)</span>`
+      : "";
+    setBannerCancelled(note);
   }
 });
 
@@ -170,5 +196,10 @@ chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
   if (status?.state === "uploading") {
     const detail = (status.total ?? 0) > 1 ? `${status.current}/${status.total}` : "";
     setBanner("uploading", detail);
+  } else if (status?.state === "cancelled") {
+    const note = (status.inserted ?? 0) > 0
+      ? `<br><span style="color:#94a3b8;font-weight:400">${status.inserted} ligne(s) déjà importée(s)</span>`
+      : "";
+    setBannerCancelled(note);
   }
 });

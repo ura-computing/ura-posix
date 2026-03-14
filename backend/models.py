@@ -25,7 +25,6 @@ class User(Base):
     name = Column(String, nullable=True)
     password_hash = Column(String, nullable=True)  # null for Google-only users
     google_id = Column(String, unique=True, nullable=True)
-    image_url = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     pharmacy_name = Column(String, nullable=True)
     profile_complete = Column(Boolean, default=False)

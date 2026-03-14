@@ -43,8 +43,9 @@ const MONTH_LABELS: Record<string, string> = {
 };
 
 function shortMonth(m: string) {
-  const [, mm] = m.split("-");
-  return MONTH_LABELS[mm] ?? m;
+  const [yy, mm] = m.split("-");
+  const monthName = MONTH_LABELS[mm] ?? m;
+  return `${monthName} ${yy?.slice(2) ?? ""}`;
 }
 
 // ── Pending / Rejected Notice ─────────────────────────────────────────────────
@@ -210,7 +211,7 @@ function PharmacyDashboard({ identity }: { identity: User }) {
 
 // ── Admin Dashboard ────────────────────────────────────────────────────────────
 
-const PIE_COLORS = ["hsl(var(--primary))", "hsl(var(--muted-foreground))", "#8b5cf6"];
+const PIE_COLORS = ["#14b8a6", "#8b5cf6", "#f59e0b"];
 
 function AdminDashboard() {
   const { data: stats, isLoading } = useQuery({
@@ -298,7 +299,7 @@ function AdminDashboard() {
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => [v, ""]} />
+                    <Tooltip formatter={(v: number) => [v, ""]} separator="" />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -321,9 +322,9 @@ function AdminDashboard() {
                 <ResponsiveContainer width="100%" height={192}>
                   <BarChart data={registrations} barGap={2}>
                     <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: number) => [v, "Inscriptions"]} />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={24} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} height={36} />
+                    <Tooltip formatter={(v: number) => [v, "Inscriptions"]} contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))" }} labelStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="count" fill="#14b8a6" radius={[3, 3, 0, 0]} maxBarSize={28} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
