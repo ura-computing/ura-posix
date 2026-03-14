@@ -11,9 +11,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useNotifications, type ApcmNotification } from "@/hooks/use-notifications";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { useLogout } from "@refinedev/core";
 import { useMe } from "@/hooks/use-me";
-import { Bell, CheckCheck, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, CheckCheck, ClipboardList, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -170,12 +172,42 @@ function NotificationItem({
 
 function NotificationBell() {
   const { notifications, unreadCount, clearAll, dismiss, markAllRead } = useNotifications();
+  const { data: user } = useMe();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const isAdmin = user?.role === "admin";
+  const isOwner = user?.role === "owner";
+
+  const { data: adminNotifs } = useQuery({
+    queryKey: ["admin-notifications"],
+    queryFn: () => api.admin.getNotifications(),
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
+
+  const { data: ownerNotifs } = useQuery({
+    queryKey: ["owner-notifications"],
+    queryFn: () => api.owner.getNotifications(),
+    enabled: isOwner,
+    refetchInterval: 30_000,
+  });
+
+  const pendingUsers = adminNotifs?.pending_users ?? [];
+  const pendingRequests = adminNotifs?.pending_requests ?? [];
+  const adminUnread = pendingUsers.length + pendingRequests.length;
+
+  const pendingEmployees = ownerNotifs?.pending_employees ?? [];
+  const ownerUnread = pendingEmployees.length;
+
+  const totalUnread = unreadCount + adminUnread + ownerUnread;
 
   const handleOpen = (v: boolean) => {
     setOpen(v);
     if (v && unreadCount > 0) markAllRead();
   };
+
+  const isEmpty = notifications.length === 0 && adminUnread === 0 && ownerUnread === 0;
 
   return (
     <Popover open={open} onOpenChange={handleOpen}>
@@ -186,9 +218,9 @@ function NotificationBell() {
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
+          {totalUnread > 0 && (
             <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-              {unreadCount > 9 ? "9+" : unreadCount}
+              {totalUnread > 9 ? "9+" : totalUnread}
             </span>
           )}
         </button>
@@ -199,9 +231,6 @@ function NotificationBell() {
           <div className="flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
             <span className="font-semibold text-sm">Notifications</span>
-            {notifications.length > 0 && (
-              <span className="text-xs text-muted-foreground">({notifications.length})</span>
-            )}
           </div>
           {notifications.length > 0 && (
             <button
@@ -216,13 +245,62 @@ function NotificationBell() {
         </div>
 
         {/* List */}
-        {notifications.length === 0 ? (
+        {isEmpty ? (
           <div className="py-10 flex flex-col items-center gap-2 text-muted-foreground">
             <Bell className="h-8 w-8 opacity-30" />
             <p className="text-sm">Aucune notification</p>
           </div>
         ) : (
           <div className="max-h-80 overflow-y-auto divide-y divide-border">
+            {/* Admin: pending user signups */}
+            {pendingUsers.map((u) => (
+              <button
+                key={`user-${u.id}`}
+                type="button"
+                onClick={() => { navigate("/admin/pharmacies"); setOpen(false); }}
+                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left bg-amber-500/5"
+              >
+                <UserPlus className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-snug">Nouvelle inscription propriétaire</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.name ?? u.email} — {u.pharmacy_name ?? "—"}</p>
+                  {u.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(u.created_at).getTime())}</p>}
+                </div>
+              </button>
+            ))}
+            {/* Admin: pending catalog requests */}
+            {pendingRequests.map((r) => (
+              <button
+                key={`req-${r.id}`}
+                type="button"
+                onClick={() => { navigate("/admin/catalog-requests"); setOpen(false); }}
+                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left bg-blue-500/5"
+              >
+                <ClipboardList className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-snug">Demande catalogue</p>
+                  <p className="text-xs text-muted-foreground truncate">{r.product}{r.pharmacy_name ? ` — ${r.pharmacy_name}` : ""}</p>
+                  {r.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(r.created_at).getTime())}</p>}
+                </div>
+              </button>
+            ))}
+            {/* Owner: pending employee signups */}
+            {pendingEmployees.map((e) => (
+              <button
+                key={`emp-${e.id}`}
+                type="button"
+                onClick={() => { navigate("/owner/employees"); setOpen(false); }}
+                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left bg-green-500/5"
+              >
+                <UserPlus className="h-4 w-4 shrink-0 text-green-500 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-snug">Nouvel employé en attente</p>
+                  <p className="text-xs text-muted-foreground truncate">{e.name ?? e.email}</p>
+                  {e.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(e.created_at).getTime())}</p>}
+                </div>
+              </button>
+            ))}
+            {/* Extension import notifications */}
             {notifications.map((n) => (
               <NotificationItem key={n.id} n={n} onDismiss={dismiss} />
             ))}

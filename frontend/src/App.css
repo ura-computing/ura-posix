@@ -210,6 +210,9 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  button, [role="button"], select, label[for] {
+    cursor: pointer;
+  }
 }
 
 @layer components {
@@ -255,7 +258,7 @@ body {
 
     .card {
       @apply w-full max-w-md mt-6 border-0 shadow-2xl;
-      padding: clamp(1.25rem, 5vw, 2.5rem);
+      padding: clamp(0.625rem, 2.5vw, 1.25rem);
     }
 
     .header {
@@ -349,7 +352,7 @@ body {
 
     .card {
       @apply w-full max-w-md mt-6 border-0 shadow-2xl;
-      padding: clamp(1.25rem, 5vw, 2.5rem);
+      padding: clamp(0.625rem, 2.5vw, 1.25rem);
     }
 
     .header {
@@ -510,4 +513,11 @@ body {
     }
   }
 
+}
+
+@layer utilities {
+  input::placeholder,
+  textarea::placeholder {
+    color: oklch(0.55 0 0) !important;
+  }
 }

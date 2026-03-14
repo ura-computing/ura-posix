@@ -2,7 +2,7 @@ import { useRegister, useLink } from "@refinedev/core";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Building2, UserCog } from "lucide-react";
+import { Loader2, Building2, UserCog, PlusCircle, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,9 +42,25 @@ const schema = z.object({
   email: z.string().email("Adresse email invalide"),
   phone: z.string().min(8, "Numéro de téléphone invalide"),
   password: z.string().min(8, "Le mot de passe doit comporter au moins 8 caractères"),
+  confirmPassword: z.string(),
   role: z.enum([eUserRole.OWNER, eUserRole.EMPLOYEE]),
   pharmacy_name: z.string().optional(),
   pharmacy_id: z.number().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Les mots de passe ne correspondent pas",
+  path: ["confirmPassword"],
+}).refine((data) => {
+  if (data.role === eUserRole.EMPLOYEE) return !!data.pharmacy_id;
+  return true;
+}, {
+  message: "Veuillez sélectionner une pharmacie",
+  path: ["pharmacy_id"],
+}).refine((data) => {
+  if (data.role === eUserRole.OWNER && !data.pharmacy_id) return !!data.pharmacy_name?.trim();
+  return true;
+}, {
+  message: "Veuillez saisir le nom de votre pharmacie",
+  path: ["pharmacy_name"],
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -56,17 +72,31 @@ export const SignUpForm = () => {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", phone: "", password: "", role: eUserRole.OWNER },
+    defaultValues: { name: "", email: "", phone: "", password: "", confirmPassword: "", role: eUserRole.OWNER },
   });
 
   const role = form.watch("role");
+  const [ownerMode, setOwnerMode] = useState<"new" | "join">("new");
 
   useEffect(() => {
     api.public.listPharmacies().then(setPharmacies).catch(() => {});
   }, []);
 
+  // Clear stale pharmacy fields when mode or role changes
+  useEffect(() => {
+    if (role === eUserRole.OWNER) {
+      if (ownerMode === "new") {
+        form.setValue("pharmacy_id", undefined);
+      } else {
+        form.setValue("pharmacy_name", undefined);
+      }
+    }
+  }, [role, ownerMode, form]);
+
   const onSubmit = (values: FormValues) => {
-    register(values, {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confirmPassword, ...payload } = values;
+    register(payload, {
       onSuccess: (data) => {
         if (!data.success) {
           toast.error(data.error?.message, { richColors: true });
@@ -121,19 +151,35 @@ export const SignUpForm = () => {
                 </div>
               </div>
 
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom complet</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Jean Dupont" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Row: Nom + Téléphone */}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nom complet</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Jean Dupont" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Téléphone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+212 6 00 00 00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}
@@ -149,49 +195,113 @@ export const SignUpForm = () => {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Téléphone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+212 6 00 00 00 00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mot de passe</FormLabel>
-                    <FormControl>
-                      <InputPassword placeholder="Au moins 8 caractères" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Conditional field based on role */}
-              {role === eUserRole.OWNER ? (
+              {/* Row: Mot de passe + Confirmer */}
+              <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
-                  name="pharmacy_name"
+                  name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nom de votre pharmacie</FormLabel>
+                      <FormLabel>Mot de passe</FormLabel>
                       <FormControl>
-                        <Input placeholder="Pharmacie Al Amal" {...field} />
+                        <InputPassword placeholder="8 caractères min." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmer</FormLabel>
+                      <FormControl>
+                        <InputPassword placeholder="Répétez" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Conditional field based on role */}
+              {role === eUserRole.OWNER ? (
+                <div className="space-y-3">
+                  {/* Owner mode toggle */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOwnerMode("new")}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                        ownerMode === "new"
+                          ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                          : "border-border text-muted-foreground hover:border-primary/30"
+                      )}
+                    >
+                      <PlusCircle className="h-3.5 w-3.5" />
+                      Nouvelle pharmacie
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOwnerMode("join")}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                        ownerMode === "join"
+                          ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                          : "border-border text-muted-foreground hover:border-primary/30"
+                      )}
+                    >
+                      <LogIn className="h-3.5 w-3.5" />
+                      Rejoindre existante
+                    </button>
+                  </div>
+
+                  {ownerMode === "new" ? (
+                    <FormField
+                      control={form.control}
+                      name="pharmacy_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nom de votre pharmacie</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Pharmacie Al Amal" {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="pharmacy_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pharmacie à rejoindre</FormLabel>
+                          <Select
+                            value={field.value?.toString() ?? ""}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionnez une pharmacie" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {pharmacies.map((p) => (
+                                <SelectItem key={p.id} value={p.id.toString()}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
               ) : (
                 <FormField
                   control={form.control}
@@ -209,7 +319,11 @@ export const SignUpForm = () => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {pharmacies.map((p) => (
+                          {pharmacies.length === 0 ? (
+                            <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+                              Aucune pharmacie disponible. Le propriétaire doit d'abord créer son compte.
+                            </div>
+                          ) : pharmacies.map((p) => (
                             <SelectItem key={p.id} value={p.id.toString()}>
                               {p.name}
                             </SelectItem>

@@ -12,7 +12,6 @@ export type User = {
   id: number;
   email: string;
   name?: string;
-  image_url?: string;
   phone?: string;
   pharmacy_name?: string;
   profile_complete: boolean;
@@ -23,6 +22,13 @@ export type User = {
   pharmacy_address?: string;
 };
 
+export type PharmacyOwner = {
+  id: number;
+  name?: string;
+  email: string;
+  phone?: string;
+};
+
 export type Pharmacy = {
   id: number;
   name: string;
@@ -31,6 +37,7 @@ export type Pharmacy = {
   email?: string;
   created_at?: string;
   user_count: number;
+  owners?: PharmacyOwner[];
   owner_name?: string;
   owner_email?: string;
   owner_phone?: string;
@@ -41,7 +48,6 @@ export type UserAdmin = {
   id: number;
   email: string;
   name?: string;
-  image_url?: string;
   phone?: string;
   pharmacy_name?: string;
   profile_complete: boolean;
@@ -73,7 +79,6 @@ export type ProfileUpdatePayload = {
   email?: string;
   pharmacy_name?: string;
   pharmacy_address?: string;
-  image_url?: string;
 };
 
 export type AuthToken = {

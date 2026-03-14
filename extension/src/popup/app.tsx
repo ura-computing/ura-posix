@@ -1,7 +1,8 @@
 import "./app.css";
-import { DASHBOARD_URL } from "../constants";
+import { CANCEL_UPLOAD_KEY, DASHBOARD_URL } from "../constants";
 import { useToken, useClearToken } from "../hooks/use-token";
 import { useNotifications } from "../hooks/use-notifications";
+import { useUploadStatus } from "../hooks/use-upload-status";
 
 // ── Logo icon ────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,11 @@ export default function App() {
   const isAdmin = auth?.role === "admin";
   const canImport = !isAdmin && auth?.permissions?.import !== false;
   const { notifications, clearAll } = useNotifications();
+  const uploadStatus = useUploadStatus();
+
+  const handleCancelUpload = () => {
+    chrome.storage.local.set({ [CANCEL_UPLOAD_KEY]: true });
+  };
 
   const handleLoginRedirect = () => {
     chrome.tabs.create({ url: `${DASHBOARD_URL}/login` });
@@ -145,6 +151,35 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* Upload progress */}
+            {uploadStatus?.state === "uploading" && (
+              <div className="upload-progress-card">
+                <div className="upload-progress-header">
+                  <div className="upload-progress-spinner" />
+                  <span className="upload-progress-label">
+                    {uploadStatus.fileType === "achat" ? "Achats" : "Ventes"} — import en cours
+                  </span>
+                </div>
+                {(uploadStatus.total ?? 0) > 1 && (
+                  <>
+                    <div className="upload-progress-bar-track">
+                      <div
+                        className="upload-progress-bar-fill"
+                        style={{ width: `${Math.round(((uploadStatus.current ?? 0) / (uploadStatus.total ?? 1)) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="upload-progress-meta">
+                      <span>Lot {uploadStatus.current}/{uploadStatus.total}</span>
+                      <span>{Math.round(((uploadStatus.current ?? 0) / (uploadStatus.total ?? 1)) * 100)}%</span>
+                    </div>
+                  </>
+                )}
+                <button className="upload-cancel-btn" onClick={handleCancelUpload}>
+                  Annuler l'import
+                </button>
+              </div>
+            )}
 
             {/* Recent imports */}
             <div className="section-header">

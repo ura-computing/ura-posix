@@ -123,7 +123,7 @@ function App() {
                   {/* Auth routes with sidebar layout */}
                   <Route
                     element={
-                      <Authenticated key="auth-with-layout" fallback={<Navigate to="/" replace />}>
+                      <Authenticated key="auth-with-layout" fallback={<Navigate to="/login" replace />}>
                         <Layout>
                           <PendingGuard />
                         </Layout>
@@ -141,7 +141,11 @@ function App() {
                         }
                       />
                     ))}
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
+
+                  {/* Global catch-all: redirect unknown URLs to welcome page */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
 
                 <Toaster />

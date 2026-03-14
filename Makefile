@@ -90,9 +90,9 @@ install: back-install front-install ext-install
 
 build: back-build front-build ext-build
 
-seed: back-seed
 
 db-clean: back-db-clean
+seed: back-seed
 
 dev:
 	@$(MAKE) back-dev &

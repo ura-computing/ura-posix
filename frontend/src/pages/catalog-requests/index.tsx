@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import type { CatalogRequestOut } from "@/lib/api";
+import { CategoryCombobox } from "@/components/category-combobox";
 import type { User } from "@/types";
 import { eUserRole } from "@/types";
 
@@ -71,8 +72,9 @@ export default function CatalogRequestsPage() {
   const [formOpen, setFormOpen] = useState(false);
 
   const isOwner = identity?.role === eUserRole.OWNER;
+  const [categoryValue, setCategoryValue] = useState("");
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: { product: "", tva: "", pph: "", ppv: "", category: "", zone: "", barcode1: "", laboratoire: "" },
   });
 
@@ -97,7 +99,7 @@ export default function CatalogRequestsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Demande envoyée à l'administrateur");
-      reset();
+      reset(); setCategoryValue("");
       setFormOpen(false);
     },
     onError: (err) => toast.error(err.message),
@@ -170,8 +172,13 @@ export default function CatalogRequestsPage() {
                 <Input id="cr-tva" placeholder="7%" {...register("tva")} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="cr-category">Catégorie</Label>
-                <Input id="cr-category" placeholder="Analgésiques" {...register("category")} />
+                <Label>Catégorie</Label>
+                <CategoryCombobox
+                  value={categoryValue}
+                  onChange={(v) => { setCategoryValue(v); setValue("category", v); }}
+                  placeholder="Analgésiques"
+                  disabled={submitting}
+                />
               </div>
 
               <div className="space-y-1.5">

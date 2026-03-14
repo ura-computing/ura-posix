@@ -1,11 +1,20 @@
+import logging
 import os
+import time
 from dotenv import load_dotenv
 load_dotenv()
 
 from typing import List
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("apcm")
 from sqlalchemy.orm import Session
 
 from database import engine, Base, get_db
@@ -30,6 +39,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration = (time.perf_counter() - start) * 1000
+    logger.info("%s %s → %s  (%.1fms)", request.method, request.url.path, response.status_code, duration)
+    return response
+
+
 app.include_router(auth.router)
 app.include_router(public.router)
 app.include_router(uploads.router)
@@ -43,10 +62,10 @@ app.include_router(stats_router)
 
 
 _DEFAULTS = [
-    ("Médicament", "-1"),
+    ("Medicament", "-1"),
     ("Parapharmacie", "-1"),
-    ("Complément Alimentaire", "-2"),
-    ("Homéopathie", "-3"),
+    ("Complement Alimentaire", "-2"),
+    ("Homeopathie", "-3"),
 ]
 
 

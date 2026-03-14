@@ -1,11 +1,13 @@
 import csv
 import io
+import unicodedata
 from typing import Any
 
 import openpyxl
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from database import get_db
 from models import Achat, Medicament, User, Vente
@@ -43,18 +45,39 @@ def _parse_csv(content: bytes) -> list[dict]:
     ]
 
 
+def _strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+
+def _normalize_category(category: str | None) -> str | None:
+    """Strip accents and normalize whitespace from a category string."""
+    if not category:
+        return None
+    return _strip_accents(category.strip()) or None
+
+
 def _upsert_medicament(db: Session, pid: str, product: str, tva: str | None,
                         pph: float | None, ppv: float | None,
                         category: str | None, zone: str | None) -> Medicament:
+    category = _normalize_category(category)
     # 1. Try exact Sobrus PID match
     med = db.query(Medicament).filter(Medicament.pid == pid).first()
     if not med:
-        # 2. Fall back to name match — claim the catalog entry and stamp it with the Sobrus pid
+        # 2. Fall back to name match (case + accent insensitive)
         name = (product or "").strip()
         if name:
             med = db.query(Medicament).filter(
                 Medicament.product.ilike(name)
             ).first()
+            # 2b. Try accent-stripped match if still not found
+            if not med:
+                norm = _strip_accents(name.lower())
+                med = db.query(Medicament).filter(
+                    func.lower(Medicament.product).ilike(f"%{norm}%")
+                ).first()
+                # Only accept if the stripped name is an exact match, not just a substring
+                if med and _strip_accents((med.product or "").lower()) != norm:
+                    med = None
         if med:
             med.pid = pid  # claim: barcode/name pid → Sobrus pid
         else:
@@ -273,7 +296,7 @@ def _parse_catalog_csv(content: bytes) -> list[Medicament]:
         medicaments.append(Medicament(
             pid=pid,
             product=name,
-            category=(row.get("Categorie") or "").strip() or None,
+            category=_normalize_category(row.get("Categorie")),
             tva=(row.get("TVA") or "").strip() or None,
             ppv=_parse_float(row.get("PPV", "")),
             pph=_parse_float(row.get("PPH", "")),
@@ -332,7 +355,7 @@ async def upload_catalog(
                 tva=str(row[2]).strip() if row[2] else None,
                 ppv=float(row[3]) if isinstance(row[3], (int, float)) else None,
                 pph=float(row[4]) if isinstance(row[4], (int, float)) else None,
-                category=str(row[1]).strip() if row[1] else None,
+                category=_normalize_category(str(row[1])) if row[1] else None,
                 zone=None,
             ))
 

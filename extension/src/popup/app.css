@@ -374,6 +374,80 @@ body {
   border-color: #cbd5e1;
 }
 
+/* ── Upload progress card ── */
+.upload-progress-card {
+  background: var(--surface);
+  border: 1px solid rgba(20,184,166,0.35);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 0 0 3px rgba(20,184,166,0.06);
+}
+
+.upload-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.upload-progress-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(20,184,166,0.25);
+  border-top-color: var(--primary);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.upload-progress-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #0f766e;
+  flex: 1;
+}
+
+.upload-progress-bar-track {
+  height: 5px;
+  background: rgba(20,184,166,0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.upload-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #14b8a6, #0d9488);
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+.upload-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.upload-cancel-btn {
+  align-self: flex-end;
+  background: none;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: all 0.15s;
+}
+
+.upload-cancel-btn:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+}
+
 /* ── Spinner ── */
 @keyframes spin {
   to { transform: rotate(360deg); }

@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState } from "react";
-import { ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet, CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar, Loader2 } from "lucide-react";
+import {
+  ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet,
+  CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
+  Loader2, Ban,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUploadCsv } from "@/hooks/use-upload";
+import { useUploadCsvBatched } from "@/hooks/use-upload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -80,7 +84,6 @@ function TypeCard({ type, selected, onClick }: { type: DocType; selected: boolea
           : "border-border bg-card hover:border-muted-foreground/30"
       )}
     >
-      {/* Top-right indicator */}
       <div className="absolute top-3 right-3">
         {selected ? (
           <CheckCircle2 className="h-5 w-5 text-[#14b8a6]" />
@@ -110,6 +113,18 @@ function TypeCard({ type, selected, onClick }: { type: DocType; selected: boolea
   );
 }
 
+// ─── Filename validation ───────────────────────────────────────────────────────
+
+const SOBRUS_FILENAME_PATTERN: Record<DocType, RegExp> = {
+  achat:  /^Sobrus - Achats \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i,
+  vente:  /^Sobrus - Ventes \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i,
+};
+
+const SOBRUS_FILENAME_EXAMPLE: Record<DocType, string> = {
+  achat:  "Sobrus - Achats YYYY-MM-DD - YYYY-MM-DD.csv",
+  vente:  "Sobrus - Ventes YYYY-MM-DD - YYYY-MM-DD.csv",
+};
+
 // ─── Step 2: file drop zone ───────────────────────────────────────────────────
 
 function DropZone({ docType, onFile }: { docType: DocType; onFile: (f: File) => void }) {
@@ -119,6 +134,13 @@ function DropZone({ docType, onFile }: { docType: DocType; onFile: (f: File) => 
   const accept = (file: File) => {
     if (!file.name.endsWith(".csv")) {
       toast.error("Seuls les fichiers CSV sont acceptés");
+      return;
+    }
+    if (!SOBRUS_FILENAME_PATTERN[docType].test(file.name)) {
+      toast.error(
+        `Nom de fichier invalide. Format attendu : ${SOBRUS_FILENAME_EXAMPLE[docType]}`,
+        { duration: 6000 }
+      );
       return;
     }
     onFile(file);
@@ -158,15 +180,16 @@ function DropZone({ docType, onFile }: { docType: DocType; onFile: (f: File) => 
         <UploadCloud className={cn("h-8 w-8", cfg.color)} />
       </div>
       <div className="text-center">
-        <p className="text-base font-semibold text-foreground">
-          Glissez votre fichier ici
-        </p>
+        <p className="text-base font-semibold text-foreground">Glissez votre fichier ici</p>
         <p className="text-sm text-muted-foreground mt-1">
           ou <span className={cn("font-semibold underline", cfg.color)}>cliquez pour parcourir</span>
         </p>
         <p className="text-xs text-muted-foreground mt-3">
           Fichier CSV exporté depuis Sobrus · Délimiteur&nbsp;
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">;</code>
+        </p>
+        <p className="text-xs text-muted-foreground/70 mt-1 font-mono">
+          {SOBRUS_FILENAME_EXAMPLE[docType]}
         </p>
       </div>
       <div className="flex items-center gap-2">
@@ -289,6 +312,27 @@ function DateRangeIndicator({
   );
 }
 
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+function UploadProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-foreground">Importation en cours…</span>
+        <span className="text-muted-foreground tabular-nums">Lot {current} / {total}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full bg-[#14b8a6] transition-all duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground text-center">{pct}% complété</p>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DashboardUploadFile() {
@@ -298,15 +342,12 @@ export default function DashboardUploadFile() {
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd]     = useState("");
 
-  const {
-    mutate: uploadCsv,
-    isPending,
-    isSuccess,
-    isError,
-    data: uploadResult,
-    error: uploadErr,
-    reset: resetUpload,
-  } = useUploadCsv();
+  const { state, upload, cancel, reset: resetUpload } = useUploadCsvBatched();
+
+  const isUploading = state.status === "uploading";
+  const isSuccess   = state.status === "success";
+  const isError     = state.status === "error";
+  const isCancelled = state.status === "cancelled";
 
   const reset = () => {
     setDocType(null);
@@ -323,21 +364,13 @@ export default function DashboardUploadFile() {
     setDateStart(parsed?.start ?? "");
     setDateEnd(parsed?.end ?? "");
     setStep(3);
+    resetUpload();
   };
 
   const handleImport = () => {
     if (!docType || !file) return;
-    uploadCsv(
-      { type: docType, file },
-      {
-        onSuccess: (res: { inserted: number }) => toast.success(`${res.inserted} lignes importées avec succès`),
-        onError: (err: Error) => toast.error(err.message),
-      },
-    );
+    upload(file, docType);
   };
-
-  const insertedCount = uploadResult?.inserted ?? 0;
-  const errorMsg = uploadErr ? (uploadErr as Error).message : "";
 
   const cfg = docType ? DOC_CONFIG[docType] : null;
 
@@ -404,7 +437,12 @@ export default function DashboardUploadFile() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => { setFile(null); setStep(2); resetUpload(); }} className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+              <button
+                type="button"
+                onClick={() => { setFile(null); setStep(2); resetUpload(); }}
+                disabled={isUploading}
+                className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50 disabled:pointer-events-none"
+              >
                 ← Choisir un autre fichier
               </button>
               <span className={cn("rounded-full px-3 py-0.5 text-xs font-semibold", cfg.badge)}>
@@ -413,14 +451,35 @@ export default function DashboardUploadFile() {
             </div>
           </div>
 
+          {/* Upload progress */}
+          {isUploading && state.status === "uploading" && (
+            <div className="rounded-2xl border border-[#14b8a6]/30 bg-[#14b8a6]/5 px-6 py-6 space-y-4">
+              <UploadProgressBar current={state.progress.current} total={state.progress.total} />
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={cancel}
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                  Annuler l'import
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Success state */}
-          {isSuccess && (
+          {isSuccess && state.status === "success" && (
             <div className="flex flex-col items-center gap-4 rounded-2xl border border-[#14b8a6]/30 bg-[#14b8a6]/5 px-6 py-10 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#14b8a6]/15">
                 <CheckCircle2 className="h-8 w-8 text-[#14b8a6]" />
               </div>
               <div>
-                <p className="text-xl font-bold text-foreground">{insertedCount} lignes importées</p>
+                <p className="text-xl font-bold text-foreground">{state.inserted} lignes importées</p>
+                {state.skipped > 0 && (
+                  <p className="text-sm text-muted-foreground mt-0.5">{state.skipped} doublons ignorés</p>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">
                   Le fichier <span className="font-medium">{file.name}</span> a été importé avec succès.
                 </p>
@@ -431,13 +490,31 @@ export default function DashboardUploadFile() {
             </div>
           )}
 
+          {/* Cancelled state */}
+          {isCancelled && state.status === "cancelled" && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/30 px-4 py-4">
+              <Ban className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Import annulé</p>
+                <p className="text-xs text-amber-600/80 dark:text-amber-500 mt-0.5">
+                  {state.inserted > 0
+                    ? `${state.inserted} lignes ont déjà été importées avant l'annulation.`
+                    : "Aucune ligne n'a été importée."}
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={reset} className="gap-1.5 shrink-0">
+                <RotateCcw className="h-3.5 w-3.5" /> Recommencer
+              </Button>
+            </div>
+          )}
+
           {/* Error state */}
-          {isError && (
+          {isError && state.status === "error" && (
             <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
               <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-destructive">Erreur d'importation</p>
-                <p className="text-xs text-destructive/80 mt-0.5">{errorMsg}</p>
+                <p className="text-xs text-destructive/80 mt-0.5">{state.message}</p>
               </div>
               <button type="button" onClick={resetUpload} className="cursor-pointer text-destructive hover:text-destructive/70">
                 <X className="h-4 w-4" />
@@ -445,8 +522,8 @@ export default function DashboardUploadFile() {
             </div>
           )}
 
-          {/* Preview + import */}
-          {!isSuccess && (
+          {/* Preview + import button */}
+          {!isUploading && !isSuccess && (
             <>
               <DateRangeIndicator
                 start={dateStart}
@@ -461,15 +538,10 @@ export default function DashboardUploadFile() {
                 </p>
                 <Button
                   onClick={handleImport}
-                  disabled={isPending}
                   className="bg-[#14b8a6] hover:bg-[#0d9488] text-white border-0 gap-2"
                 >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <UploadCloud className="h-4 w-4" />
-                  )}
-                  {isPending ? "Import en cours…" : "Importer dans la base"}
+                  <UploadCloud className="h-4 w-4" />
+                  Importer dans la base
                 </Button>
               </div>
             </>

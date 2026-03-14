@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -134,15 +134,14 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
   const [phone, setPhone] = useState(pharmacy?.phone ?? "");
   const [email, setEmail] = useState(pharmacy?.email ?? "");
 
-  // Reset when dialog opens
-  useState(() => {
+  useEffect(() => {
     if (open) {
       setName(pharmacy?.name ?? "");
       setAddress(pharmacy?.address ?? "");
       setPhone(pharmacy?.phone ?? "");
       setEmail(pharmacy?.email ?? "");
     }
-  });
+  }, [open, pharmacy]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: () =>
@@ -320,7 +319,6 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
             <div key={user.id} className="px-5 py-3">
               <div className="flex items-center gap-3">
                 <Avatar className="h-8 w-8 shrink-0">
-                  {user.image_url && <AvatarImage src={user.image_url} />}
                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
                     {initials(user.name, user.email)}
                   </AvatarFallback>
@@ -519,21 +517,25 @@ export default function PharmaciesAdminPage() {
                       <span className="truncate">{p.address}</span>
                     </div>
                   )}
-                  {(p.owner_name || p.owner_email) ? (
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground pt-0.5">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-bold mt-0.5">
-                        {(p.owner_name ?? p.owner_email ?? "?").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        {p.owner_name && <p className="font-medium text-foreground truncate">{p.owner_name}</p>}
-                        {p.owner_email && <p className="truncate">{p.owner_email}</p>}
-                        {p.owner_phone && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Phone className="h-2.5 w-2.5 shrink-0" />
-                            <span>{p.owner_phone}</span>
+                  {(p.owners && p.owners.length > 0) ? (
+                    <div className="space-y-1.5 pt-0.5">
+                      {p.owners.map((owner) => (
+                        <div key={owner.id} className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[9px] font-bold mt-0.5">
+                            {(owner.name ?? owner.email ?? "?").slice(0, 2).toUpperCase()}
                           </div>
-                        )}
-                      </div>
+                          <div className="min-w-0">
+                            {owner.name && <p className="font-medium text-foreground truncate">{owner.name}</p>}
+                            <p className="truncate">{owner.email}</p>
+                            {owner.phone && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Phone className="h-2.5 w-2.5 shrink-0" />
+                                <span>{owner.phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground/50 italic">Aucun propriétaire</p>
@@ -665,8 +667,7 @@ function PendingOwnersSection() {
               <div key={user.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3 items-start sm:items-center">
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar className="h-8 w-8 shrink-0">
-                    {user.image_url && <AvatarImage src={user.image_url} />}
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
                       {initials(user.name, user.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -811,8 +812,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
                 {/* User info */}
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar className="h-8 w-8 shrink-0">
-                    {user.image_url && <AvatarImage src={user.image_url} />}
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
                       {initials(user.name, user.email)}
                     </AvatarFallback>
                   </Avatar>

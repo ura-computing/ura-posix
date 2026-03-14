@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { useTable } from "@refinedev/react-table";
 import { useGetIdentity } from "@refinedev/core";
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api";
 import type { MedicamentOut, CategorySuffixOut } from "@/lib/api";
+import { CategoryCombobox } from "@/components/category-combobox";
 import { SuffixBadge, SUFFIX_COLORS, SWATCH_BG } from "@/components/suffix-badge";
 import { fmt, downloadCSV } from "@/lib/table-utils";
 import type { User } from "@/types";
@@ -132,8 +133,11 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
     mutate();
   };
 
+  useEffect(() => {
+    if (open) setForm(emptyForm(medicament));
+  }, [open, medicament]);
+
   const handleOpenChange = (v: boolean) => {
-    if (v) setForm(emptyForm(medicament));
     if (!v && !isPending) onClose();
   };
 
@@ -187,8 +191,13 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="m-category">Catégorie</Label>
-                <Input id="m-category" value={form.category} onChange={set("category")} placeholder="Analgésiques" />
+                <Label>Catégorie</Label>
+                <CategoryCombobox
+                  value={form.category}
+                  onChange={(v) => setForm((f) => ({ ...f, category: v }))}
+                  placeholder="Analgésiques"
+                  disabled={isPending}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="m-zone">Zone</Label>
@@ -427,7 +436,7 @@ export default function AdminCatalogPage() {
       {
         id: "product",
         accessorKey: "product",
-        size: 300,
+        size: 360,
         header: () => <p className="column-title">Produit</p>,
         enableHiding: false,
         cell: ({ row }) => (
@@ -447,7 +456,7 @@ export default function AdminCatalogPage() {
       {
         id: "category",
         accessorKey: "category",
-        size: 160,
+        size: 200,
         header: () => <p className="column-title">Catégorie</p>,
         cell: ({ getValue }) => {
           const v = getValue<string | null>();
@@ -485,7 +494,7 @@ export default function AdminCatalogPage() {
       {
         id: "barcode1",
         accessorKey: "barcode1",
-        size: 140,
+        size: 150,
         header: () => <p className="column-title">Code-barres</p>,
         cell: ({ getValue }) => {
           const v = getValue<string | null>();
