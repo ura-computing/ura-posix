@@ -76,6 +76,7 @@ type FormState = {
   barcode1: string;
   barcode2: string;
   laboratoire: string;
+  product_type: string;
 };
 
 function emptyForm(m?: MedicamentOut | null): FormState {
@@ -90,6 +91,7 @@ function emptyForm(m?: MedicamentOut | null): FormState {
     barcode1: m?.barcode1 ?? "",
     barcode2: m?.barcode2 ?? "",
     laboratoire: m?.laboratoire ?? "",
+    product_type: m?.product_type ?? "",
   };
 }
 
@@ -114,6 +116,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
         barcode1: form.barcode1 || null,
         barcode2: form.barcode2 || null,
         laboratoire: form.laboratoire || null,
+        product_type: form.product_type || null,
       };
       return isEdit
         ? api.admin.updateMedicament(medicament!.id, body)
@@ -198,6 +201,20 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
                   placeholder="Analgésiques"
                   disabled={isPending}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Type produit</Label>
+                <select
+                  value={form.product_type}
+                  onChange={(e) => setForm((f) => ({ ...f, product_type: e.target.value }))}
+                  disabled={isPending}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Auto-détection</option>
+                  <option value="pharmacie">Pharmacie</option>
+                  <option value="parapharmacie">Parapharmacie</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground">Remplace la détection par catégorie</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="m-zone">Zone</Label>
@@ -462,6 +479,23 @@ export default function AdminCatalogPage() {
           const v = getValue<string | null>();
           if (!v) return <span className="text-muted-foreground">—</span>;
           return <Badge variant="secondary" className="text-xs max-w-[140px] truncate">{v}</Badge>;
+        },
+      },
+      {
+        id: "product_type",
+        size: 120,
+        header: () => <p className="column-title">Type</p>,
+        cell: ({ row }) => {
+          const pt = row.original.product_type;
+          const cat = (row.original.category ?? "").toLowerCase();
+          const resolved = pt || (cat.includes("edicament") || cat.includes("oméopath") || cat.includes("omeopath") ? "pharmacie" : "parapharmacie");
+          return (
+            <Badge variant="outline" className={resolved === "pharmacie"
+              ? "text-blue-700 border-blue-300 bg-blue-50 text-xs"
+              : "text-purple-700 border-purple-300 bg-purple-50 text-xs"}>
+              {pt ? resolved.charAt(0).toUpperCase() + resolved.slice(1) : `${resolved.charAt(0).toUpperCase() + resolved.slice(1)} *`}
+            </Badge>
+          );
         },
       },
       {

@@ -63,7 +63,7 @@ type VenteRow = {
 
 const VENTE_COL_LABELS: Record<string, string> = {
   date: "Date", transaction_ref: "N° Transaction", transaction_ref_final: "N° Transaction Final",
-  client: "Client", product: "Produit", category: "Catégorie",
+  client: "Client", product: "Produit", category: "Catégorie", tva: "TVA",
   quantity: "Qté", discount: "Remise", ppv: "PPV", unit_price: "Prix unitaire", total: "Total",
 };
 
@@ -74,6 +74,7 @@ const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
   client: (r) => String(r.client ?? ""),
   product: (r) => String(r.product ?? ""),
   category: (r) => String(r.category ?? ""),
+  tva: (r) => String(r.tva ?? ""),
   quantity: (r) => String(r.quantity ?? ""),
   discount: (r) => String(r.discount ?? ""),
   ppv: (r) => String(r.ppv ?? ""),
@@ -115,6 +116,28 @@ const VentesList = () => {
       const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
       const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
       downloadCSV(res.data, rowMapper, headers, `ventes_export_${Date.now()}.csv`);
+      toast.success(`${res.data.length} lignes exportées`);
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportByType = async (type: "medicament" | "parapharmacie") => {
+    setExporting(true);
+    try {
+      const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+      const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
+      const medCats  = allCategories.filter(c => c.toLowerCase().includes("médicament"));
+      const paraCats = allCategories.filter(c => !c.toLowerCase().includes("médicament"));
+      const cats = type === "medicament" ? medCats : paraCats;
+      const res = await api.tables.exportVente("", cats, dateFrom, dateTo);
+      const colValues = { ...VENTE_COL_VALUES };
+      const visibleCols = table.reactTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      downloadCSV(res.data, rowMapper, headers, `ventes_${type}_${Date.now()}.csv`);
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
@@ -203,6 +226,34 @@ const VentesList = () => {
         },
       },
       {
+        id: "type",
+        size: 120,
+        header: () => <p className="column-title">Type</p>,
+        cell: ({ row }) => {
+          const cat = (row.original.category ?? "").toLowerCase();
+          const isPharmacy = cat.includes("edicament") || cat.includes("oméopath") || cat.includes("omeopath");
+          if (!row.original.category) return <span className="text-muted-foreground">—</span>;
+          return (
+            <Badge variant="outline" className={isPharmacy
+              ? "text-blue-700 border-blue-300 bg-blue-50 text-xs"
+              : "text-purple-700 border-purple-300 bg-purple-50 text-xs"}>
+              {isPharmacy ? "Pharmacie" : "Parapharmacie"}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: "tva",
+        accessorKey: "tva",
+        size: 80,
+        header: () => <p className="column-title">TVA</p>,
+        cell: ({ getValue }) => {
+          const v = getValue<string | null>();
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          return <Badge variant="outline" className="text-xs font-mono">{v}</Badge>;
+        },
+      },
+      {
         id: "quantity",
         accessorKey: "quantity",
         size: 70,
@@ -280,6 +331,16 @@ const VentesList = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCats, selectedTva, dateRange]);
 
+  const tableData = table.refineCore.tableQuery.data as { data: VenteRow[] } | undefined;
+
+  const tvaPageTotal = useMemo(() =>
+    (tableData?.data ?? []).reduce((acc, row) => {
+      const m = String(row.tva ?? "").match(/([\d.]+)\s*%/);
+      const rate = m ? parseFloat(m[1]) / 100 : 0;
+      return acc + (row.total ?? 0) * rate;
+    }, 0),
+  [tableData]);
+
   if (identity?.role === eUserRole.ADMIN) return null;
 
   return (
@@ -305,15 +366,38 @@ const VentesList = () => {
         fetchSuggestions={api.tables.venteSuggestions}
         suggestionGroupLabels={{ products: "Produit", clients: "Client", refs: "N° Transaction" }}
         rightAddon={
-          <ColumnVisibilityToggle
-            table={table.reactTable}
-            storageKey="ventes-cols"
-            columnLabels={VENTE_COL_LABELS}
-          />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExportByType("medicament")}
+              disabled={exporting}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              Médicaments
+            </button>
+            <button
+              onClick={() => handleExportByType("parapharmacie")}
+              disabled={exporting}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              Parapharmacie
+            </button>
+            <ColumnVisibilityToggle
+              table={table.reactTable}
+              storageKey="ventes-cols"
+              columnLabels={VENTE_COL_LABELS}
+            />
+          </div>
         }
       />
 
       <DataTable table={table} emptyState={<VenteEmptyState canImport={identity?.permissions?.import !== false} />} />
+
+      {(tableData?.data?.length ?? 0) > 0 && (
+        <div className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-2 flex items-center gap-4 text-sm">
+          <span className="text-muted-foreground">TVA encaissée (page courante) :</span>
+          <span className="font-semibold tabular-nums">{fmt(tvaPageTotal)} MAD</span>
+        </div>
+      )}
     </ListView>
   );
 };

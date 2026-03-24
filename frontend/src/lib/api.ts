@@ -71,8 +71,36 @@ export type StatsKpis = {
 };
 export type MonthlyTrend = { month: string; ventes: number; achats: number };
 export type TopCategory = { category: string; total: number };
+
+export type AdvancedKpis = {
+  ticket_moyen: number;
+  vente_moyenne_par_jour: number;
+  best_day_dh:     { date: string; total: number } | null;
+  worst_day_dh:    { date: string; total: number } | null;
+  best_day_count:  { date: string; count: number } | null;
+  worst_day_count: { date: string; count: number } | null;
+};
+export type TvaStats = {
+  tva_encaissee: number;
+  tva_payee: number;
+  tva_a_declarer: number;
+};
+export type MargeStats = {
+  marge_pct: number;
+  marge_brute_dh: number;
+  marge_nette_dh: number;
+};
+export type TypeBreakdown = {
+  pharmacie:     { ventes_total: number };
+  parapharmacie: { ventes_total: number };
+};
+
 export type StatsResponse = {
   kpis: StatsKpis;
+  advanced_kpis: AdvancedKpis;
+  tva: TvaStats;
+  marge: MargeStats;
+  type_breakdown: TypeBreakdown;
   monthly_trend: MonthlyTrend[];
   top_categories: TopCategory[];
 };
@@ -101,6 +129,7 @@ export type MedicamentOut = {
   barcode1: string | null;
   barcode2: string | null;
   laboratoire: string | null;
+  product_type: "pharmacie" | "parapharmacie" | null;
 };
 
 export const api = {
@@ -265,6 +294,24 @@ export const api = {
       if (dateTo) p.set("date_to", dateTo);
       const qs = p.toString();
       return request<StatsResponse>(`/stats${qs ? `?${qs}` : ""}`);
+    },
+    exportExcel: (dateFrom?: string, dateTo?: string, categoryType: "all" | "pharmacie" | "parapharmacie" = "all"): Promise<Blob> => {
+      const token = getToken();
+      const p = new URLSearchParams({ category_type: categoryType });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo)   p.set("date_to",   dateTo);
+      return fetch(`${API_URL}/stats/export-excel?${p}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      }).then(r => { if (!r.ok) throw new Error("Export failed"); return r.blob(); });
+    },
+    exportExcelForPharmacy: (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType: "all" | "pharmacie" | "parapharmacie" = "all"): Promise<Blob> => {
+      const token = getToken();
+      const p = new URLSearchParams({ category_type: categoryType });
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo)   p.set("date_to",   dateTo);
+      return fetch(`${API_URL}/admin/pharmacy/${pharmacyId}/stats/export-excel?${p}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      }).then(r => { if (!r.ok) throw new Error("Export failed"); return r.blob(); });
     },
   },
 

@@ -57,6 +57,7 @@ class Medicament(Base):
     barcode1 = Column(String, nullable=True)  # Code barre 1
     barcode2 = Column(String, nullable=True)  # Code barre 2
     laboratoire = Column(String, nullable=True)
+    product_type = Column(String, nullable=True)  # "pharmacie" | "parapharmacie" | None (auto-detect)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
