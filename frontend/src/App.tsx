@@ -98,7 +98,7 @@ function App() {
                   <Route
                     element={
                       <Authenticated key="public-routes" fallback={<Outlet />}>
-                        <NavigateToResource fallbackTo="/dashboard" />
+                        <NavigateToResource fallbackTo="/rapports" />
                       </Authenticated>
                     }
                   >

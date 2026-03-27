@@ -4,7 +4,6 @@ import {
   BookOpen,
   Building2,
   ClipboardCheck,
-  LayoutDashboard,
   PackagePlus,
   ShoppingCart,
   ShoppingBasket,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 
 // Page imports
-import Dashboard from "./pages/dashboard";
 import DashboardUploadFile from "./pages/dashboard/upload-file";
 import { Login } from "./pages/login";
 import { Register } from "./pages/register";
@@ -31,6 +29,7 @@ import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
 import CatalogRequestsPage from "./pages/catalog-requests";
 import WelcomePage from "./pages/welcome";
+import { Navigate } from "react-router";
 import { UserRole, eUserRole } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,7 +73,7 @@ export const routes: RouteConfig[] = [
   },
 
   // Private routes (auth required, with sidebar)
-  { path: "/dashboard", element: <Dashboard />, requireAuth: true, layout: "sidebar", allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE] },
+  { path: "/dashboard", element: <Navigate to="/rapports" replace />, requireAuth: true, layout: "sidebar", allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE] },
   {
     path: "/dashboard/upload-file",
     element: <DashboardUploadFile />,
@@ -113,7 +112,6 @@ export const routes: RouteConfig[] = [
     requireAuth: true,
     layout: "sidebar",
     allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
-    permission: "rapports",
   },
   {
     path: "/parametres",
@@ -170,11 +168,11 @@ export const routes: RouteConfig[] = [
 
 export const resources: ResourceConfig[] = [
   {
-    name: "dashboard",
-    list: "/dashboard",
+    name: "rapports",
+    list: "/rapports",
     meta: {
-      label: "Tableau de bord",
-      icon: <LayoutDashboard />,
+      label: "Rapports",
+      icon: <BarChart3 />,
       allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
     },
   },
@@ -206,16 +204,6 @@ export const resources: ResourceConfig[] = [
       icon: <TriangleAlert />,
       allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
       permission: "stock",
-    },
-  },
-  {
-    name: "rapports",
-    list: "/rapports",
-    meta: {
-      label: "Rapports",
-      icon: <BarChart3 />,
-      allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
-      permission: "rapports",
     },
   },
   {

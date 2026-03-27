@@ -199,6 +199,7 @@ class MedicamentCreate(BaseModel):
     barcode1: Optional[str] = None
     barcode2: Optional[str] = None
     laboratoire: Optional[str] = None
+    product_type: Optional[str] = None
 
 
 class MedicamentUpdate(BaseModel):
@@ -211,6 +212,7 @@ class MedicamentUpdate(BaseModel):
     barcode1: Optional[str] = None
     barcode2: Optional[str] = None
     laboratoire: Optional[str] = None
+    product_type: Optional[str] = None
 
 
 class CategorySuffixOut(BaseModel):
@@ -246,5 +248,6 @@ class MedicamentOut(BaseModel):
     barcode1: Optional[str] = None
     barcode2: Optional[str] = None
     laboratoire: Optional[str] = None
+    product_type: Optional[str] = None
 
     model_config = {"from_attributes": True}

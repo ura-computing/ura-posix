@@ -35,3 +35,5 @@ build/
 **/*.db
 **/.venv
 **/__pycache__
+
+**/*.png
