@@ -104,6 +104,23 @@ export type StatsResponse = {
   monthly_trend: MonthlyTrend[];
   top_categories: TopCategory[];
 };
+
+export type MargeKpiItem = { label: string; value: number; qty: number } | null;
+export type AnalyseMargeKpis = {
+  total_ventes_dh: number;
+  total_ventes_unites: number;
+  marge_pct_avg: number | null;
+  marge_pct_min: MargeKpiItem;
+  marge_pct_max: MargeKpiItem;
+  marge_dh_avg: number | null;
+  marge_dh_min: MargeKpiItem;
+  marge_dh_max: MargeKpiItem;
+  difference_gain_dh: number | null;
+};
+export type AnalyseMargeResponse = {
+  kpis: AnalyseMargeKpis;
+  rows: Record<string, unknown>[];
+};
 export type AdminStats = {
   total_pharmacies: number;
   total_active_users: number;
@@ -288,12 +305,22 @@ export const api = {
   },
 
   stats: {
-    get: (dateFrom?: string, dateTo?: string) => {
+    get: (dateFrom?: string, dateTo?: string, categoryType?: string) => {
       const p = new URLSearchParams();
       if (dateFrom) p.set("date_from", dateFrom);
       if (dateTo) p.set("date_to", dateTo);
+      if (categoryType && categoryType !== "all") p.set("category_type", categoryType);
       const qs = p.toString();
       return request<StatsResponse>(`/stats${qs ? `?${qs}` : ""}`);
+    },
+    analyseMarge: (dateFrom?: string, dateTo?: string, categoryType?: string, mode?: string) => {
+      const p = new URLSearchParams();
+      if (dateFrom) p.set("date_from", dateFrom);
+      if (dateTo) p.set("date_to", dateTo);
+      if (categoryType && categoryType !== "all") p.set("category_type", categoryType);
+      if (mode) p.set("mode", mode);
+      const qs = p.toString();
+      return request<AnalyseMargeResponse>(`/stats/analyse-marge${qs ? `?${qs}` : ""}`);
     },
     exportExcel: (dateFrom?: string, dateTo?: string, categoryType: "all" | "pharmacie" | "parapharmacie" = "all"): Promise<Blob> => {
       const token = getToken();

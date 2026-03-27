@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useGetIdentity } from "@refinedev/core";
 import { useQuery } from "@tanstack/react-query";
+import type { AnalyseMargeResponse } from "@/lib/api";
+import { DataTablePagination } from "@/components/refine-ui/data-table/data-table-pagination";
 import { MonthlyTrendChart } from "@/components/monthly-trend-chart";
 import {
   AreaChart,
@@ -24,10 +26,8 @@ import {
   ClipboardCheck,
   Download,
   Package,
-  Percent,
   Receipt,
   ShoppingCart,
-  TrendingDown,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -74,23 +74,160 @@ function KpiSkeleton({ primary }: { primary?: boolean }) {
   return <Skeleton className={`h-8 w-28 mt-1 ${primary ? "bg-white/20" : ""}`} />;
 }
 
+// ── Analyse de marge table ────────────────────────────────────────────────────
+
+type MargeMode = "produit" | "categorie" | "fournisseur" | "bl";
+type SortState = { key: string; dir: "asc" | "desc" };
+
+const MARGE_COLS: Record<MargeMode, { key: string; label: string; numeric?: boolean }[]> = {
+  produit:     [
+    { key: "product",   label: "Produit" },
+    { key: "category",  label: "Catégorie" },
+    { key: "tva",       label: "TVA" },
+    { key: "ppv",       label: "PPV", numeric: true },
+    { key: "prix_max",  label: "Prix max", numeric: true },
+    { key: "prix_min",  label: "Prix min", numeric: true },
+    { key: "prix_avg",  label: "Prix moy.", numeric: true },
+    { key: "marge_pct", label: "Marge %", numeric: true },
+    { key: "marge_dh",  label: "Marge DH", numeric: true },
+    { key: "qty",       label: "Qté", numeric: true },
+    { key: "ca",        label: "CA (MAD)", numeric: true },
+  ],
+  categorie:   [
+    { key: "category",      label: "Catégorie" },
+    { key: "prix_max",      label: "Prix max", numeric: true },
+    { key: "prix_min",      label: "Prix min", numeric: true },
+    { key: "prix_avg",      label: "Prix moy.", numeric: true },
+    { key: "marge_pct_avg", label: "Marge % moy.", numeric: true },
+    { key: "marge_dh_avg",  label: "Marge DH moy.", numeric: true },
+    { key: "qty",           label: "Qté", numeric: true },
+    { key: "ca",            label: "CA (MAD)", numeric: true },
+  ],
+  fournisseur: [
+    { key: "supplier",  label: "Fournisseur" },
+    { key: "prix_max",  label: "Prix max", numeric: true },
+    { key: "prix_min",  label: "Prix min", numeric: true },
+    { key: "prix_avg",  label: "Prix moy.", numeric: true },
+    { key: "qty",       label: "Qté", numeric: true },
+    { key: "ca",        label: "CA (MAD)", numeric: true },
+  ],
+  bl:          [
+    { key: "delivery_ref",  label: "Référence BL" },
+    { key: "supplier",      label: "Fournisseur" },
+    { key: "delivery_date", label: "Date livraison" },
+    { key: "nb_produits",   label: "Nb produits", numeric: true },
+    { key: "qty",           label: "Quantité", numeric: true },
+    { key: "total",         label: "Total achats (MAD)", numeric: true },
+  ],
+};
+
+function AnalyseMargeTable({ mode, data, loading }: {
+  mode: MargeMode;
+  data: AnalyseMargeResponse | undefined;
+  loading: boolean;
+}) {
+  const [sort, setSort] = useState<SortState>({ key: "", dir: "asc" });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const cols = MARGE_COLS[mode];
+  const rawRows = (data?.rows ?? []) as Record<string, unknown>[];
+
+  const sorted = useMemo(() => {
+    if (!sort.key) return rawRows;
+    return [...rawRows].sort((a, b) => {
+      const av = a[sort.key] ?? "";
+      const bv = b[sort.key] ?? "";
+      const cmp = typeof av === "number" && typeof bv === "number"
+        ? av - bv
+        : String(av).localeCompare(String(bv));
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }, [rawRows, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const rows = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  const toggle = (key: string) => {
+    setPage(1);
+    setSort((s) => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
+  };
+
+  if (loading) return <Skeleton className="h-48 w-full" />;
+  if (!sorted.length) return (
+    <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">Aucune donnée</div>
+  );
+
+  const fmtCell = (v: unknown) => {
+    if (v === null || v === undefined) return "—";
+    if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(2);
+    return String(v);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              {cols.map((col) => (
+                <th
+                  key={col.key}
+                  className={`px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground cursor-pointer select-none whitespace-nowrap hover:text-foreground ${col.numeric ? "text-right" : ""}`}
+                  onClick={() => toggle(col.key)}
+                >
+                  {col.label}
+                  {sort.key === col.key ? (sort.dir === "asc" ? " ↑" : " ↓") : " ↕"}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                {cols.map((col) => (
+                  <td key={col.key} className={`px-3 py-2 text-[12px] ${col.numeric ? "text-right tabular-nums" : ""}`}>
+                    {fmtCell(row[col.key])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <DataTablePagination
+        currentPage={page}
+        pageCount={pageCount}
+        setCurrentPage={setPage}
+        pageSize={pageSize}
+        setPageSize={(s) => { setPageSize(s); setPage(1); }}
+        total={sorted.length}
+      />
+    </div>
+  );
+}
+
 // ── Owner / Employee Rapports ─────────────────────────────────────────────────
 
 function PharmacyRapports() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
+  const [margeMode, setMargeMode] = useState<MargeMode>("produit");
 
   const { data: stats, isLoading } = useQuery({
-    queryKey: ["stats", dateFrom, dateTo],
-    queryFn: () => api.stats.get(dateFrom || undefined, dateTo || undefined),
+    queryKey: ["stats", dateFrom, dateTo, categoryType],
+    queryFn: () => api.stats.get(dateFrom || undefined, dateTo || undefined, categoryType),
+  });
+
+  const { data: margeData, isLoading: margeLoading } = useQuery({
+    queryKey: ["analyse-marge", dateFrom, dateTo, categoryType, margeMode],
+    queryFn: () => api.stats.analyseMarge(dateFrom || undefined, dateTo || undefined, categoryType, margeMode),
   });
 
   const kpis     = stats?.kpis;
   const advKpis  = stats?.advanced_kpis;
   const tva      = stats?.tva;
-  const marge    = stats?.marge;
-  const breakdown = stats?.type_breakdown;
   const trend    = (stats?.monthly_trend ?? []).map((t) => ({ ...t, label: shortMonth(t.month) }));
   const topCats  = stats?.top_categories ?? [];
   const maxCatTotal = topCats[0]?.total ?? 1;
@@ -148,35 +285,27 @@ function PharmacyRapports() {
                   Réinitialiser
                 </Button>
               )}
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                {(["all", "pharmacie", "parapharmacie"] as const).map((t) => (
+                  <Button
+                    key={t}
+                    size="sm"
+                    variant={categoryType === t ? "default" : "outline"}
+                    className="h-9"
+                    onClick={() => setCategoryType(t)}
+                  >
+                    {t === "all" ? "Mixte" : t === "pharmacie" ? "Pharmacie" : "Parapharmacie"}
+                  </Button>
+                ))}
                 <Button
                   size="sm"
-                  className="h-9"
+                  variant="ghost"
+                  className="h-9 ml-1"
                   disabled={!!exporting}
-                  onClick={() => handleExcel("all")}
+                  title="Exporter Excel"
+                  onClick={() => handleExcel(categoryType)}
                 >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  {exporting === "all" ? "Export…" : "Exporter Excel"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9"
-                  disabled={!!exporting}
-                  onClick={() => handleExcel("pharmacie")}
-                >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  {exporting === "pharmacie" ? "Export…" : "Pharmacie"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9"
-                  disabled={!!exporting}
-                  onClick={() => handleExcel("parapharmacie")}
-                >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  {exporting === "parapharmacie" ? "Export…" : "Parapharmacie"}
+                  <Download className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -254,45 +383,6 @@ function PharmacyRapports() {
         </div>
       </section>
 
-      {/* ── Répartition Pharmacie / Parapharmacie ── */}
-      <section>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Répartition des ventes</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card className="border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300">CA Pharmacie</p>
-                  {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight text-blue-800 dark:text-blue-200">
-                      {fmt(breakdown?.pharmacie.ventes_total ?? null)}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5">MAD • Médicaments</p>
-                </div>
-                <Receipt className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-purple-700 dark:text-purple-300">CA Parapharmacie</p>
-                  {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight text-purple-800 dark:text-purple-200">
-                      {fmt(breakdown?.parapharmacie.ventes_total ?? null)}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-0.5">MAD • Cosmétiques & autres</p>
-                </div>
-                <Package className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
 
       {/* ── Indicateurs avancés ── */}
       <section>
@@ -448,49 +538,81 @@ function PharmacyRapports() {
         </div>
       </section>
 
-      {/* ── Marge ── */}
+      {/* ── Analyse de marge ── */}
       <section>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Analyse de marge</h2>
-        <Card className="border border-border">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border gap-0">
-              <div className="pb-4 sm:pb-0 sm:pr-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <Percent className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] font-medium text-muted-foreground">Marge %</p>
-                </div>
-                {isLoading ? <Skeleton className="h-8 w-24 mt-1" /> : (
-                  <p className="text-3xl font-bold text-foreground">
-                    {marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)}%` : "—"}
-                  </p>
-                )}
-                <p className="text-[11px] text-muted-foreground mt-1">(1 − PPH/PPV) × 100</p>
-              </div>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 className="text-lg font-semibold text-foreground">Analyse de marge</h2>
+          <div className="flex items-center gap-1 flex-wrap">
+            {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                variant={margeMode === m ? "default" : "outline"}
+                className="h-8 text-xs"
+                onClick={() => setMargeMode(m)}
+              >
+                {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
+              </Button>
+            ))}
+          </div>
+        </div>
 
-              <div className="py-4 sm:py-0 sm:px-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] font-medium text-muted-foreground">Marge brute</p>
-                </div>
-                {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                  <p className="text-3xl font-bold text-foreground">{fmt(marge?.marge_brute_dh ?? null)}</p>
-                )}
-                <p className="text-[11px] text-muted-foreground mt-1">MAD • PPV − PPH</p>
-              </div>
+        {/* KPI cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <Card className="border border-border">
+            <CardContent className="p-5">
+              <p className="text-[11px] font-medium text-muted-foreground">Total ventes</p>
+              {margeLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
+                <p className="text-2xl font-bold mt-1">{fmt(margeData?.kpis.total_ventes_dh ?? null)}</p>
+              )}
+              <p className="text-[11px] text-muted-foreground">MAD</p>
+              {margeLoading ? <Skeleton className="h-4 w-20 mt-2" /> : (
+                <p className="text-sm font-semibold mt-2">{margeData?.kpis.total_ventes_unites?.toFixed(0) ?? "—"} unités</p>
+              )}
+            </CardContent>
+          </Card>
 
-              <div className="pt-4 sm:pt-0 sm:pl-6">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingDown className="h-4 w-4 text-primary" />
-                  <p className="text-[11px] font-medium text-muted-foreground">Marge nette</p>
+          <Card className="border border-border">
+            <CardContent className="p-5">
+              <p className="text-[11px] font-medium text-muted-foreground">Marge moyenne</p>
+              {margeLoading ? <Skeleton className="h-8 w-24 mt-1" /> : (
+                <p className="text-2xl font-bold mt-1">
+                  {margeData?.kpis.marge_pct_avg != null ? `${margeData.kpis.marge_pct_avg.toFixed(1)} %` : "—"}
+                </p>
+              )}
+              {!margeLoading && margeData?.kpis.marge_pct_min && (
+                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                  <p>Min: <span className="font-medium text-foreground">{margeData.kpis.marge_pct_min.label}</span> ({margeData.kpis.marge_pct_min.value?.toFixed(1)}%) — {margeData.kpis.marge_pct_min.qty} unités</p>
+                  <p>Max: <span className="font-medium text-foreground">{margeData?.kpis.marge_pct_max?.label}</span> ({margeData?.kpis.marge_pct_max?.value?.toFixed(1)}%) — {margeData?.kpis.marge_pct_max?.qty} unités</p>
                 </div>
-                {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                  <p className="text-3xl font-bold text-foreground">{fmt(marge?.marge_nette_dh ?? null)}</p>
-                )}
-                <p className="text-[11px] text-muted-foreground mt-1">MAD • PPV HT − PPH HT</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border">
+            <CardContent className="p-5">
+              <p className="text-[11px] font-medium text-muted-foreground">Marge moy. / unité</p>
+              {margeLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
+                <p className="text-2xl font-bold mt-1">
+                  {margeData?.kpis.marge_dh_avg != null ? `${fmt(margeData.kpis.marge_dh_avg)} MAD` : "—"}
+                </p>
+              )}
+              {!margeLoading && margeData?.kpis.marge_dh_min && (
+                <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                  <p>Min: <span className="font-medium">{margeData.kpis.marge_dh_min.label}</span> ({fmt(margeData.kpis.marge_dh_min.value)} DH)</p>
+                  <p>Max: <span className="font-medium">{margeData?.kpis.marge_dh_max?.label}</span> ({fmt(margeData?.kpis.marge_dh_max?.value)} DH)</p>
+                </div>
+              )}
+              {!margeLoading && margeData?.kpis.difference_gain_dh != null && (
+                <p className={`text-sm font-semibold mt-2 ${(margeData.kpis.difference_gain_dh ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  Écart gain: {fmt(margeData.kpis.difference_gain_dh)} DH
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <AnalyseMargeTable mode={margeMode} data={margeData} loading={margeLoading} />
       </section>
 
       {/* ── Monthly trend ── */}
