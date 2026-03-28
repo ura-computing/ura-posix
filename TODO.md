@@ -174,3 +174,14 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
 + admin can set medicament type (pharamcy or parapharmacy)
 
 
+
++ adapt the color system of the entire web site to follow the collor system of pharmacies in morocco
++ mqke qll titiltle in cards bolder
+
+
++ instead of demande catalogue in owenr (the logic needs to be updated for both oowner and admin)
++ owener should do request for produit non declarer, and it will be send to admin to aprove it, prduit is based on the ones in catlagues, and if it's not dclare it won't be considere in rapport
+
++ in Analyse de marge:
+    + add a button creer un analyse, where use can creare a anaylys sumulation, by selecting parudut, fourincieur etc.. based on all filter alrady used in alayse, it should no be saved in database since it's only a simulation done so owner can find what goes best for him
+

@@ -8,9 +8,9 @@ import {
   Building2,
   ClipboardCheck,
   Clock,
+  PackageX,
   LayoutDashboard,
   LogOut,
-  PackagePlus,
   Settings,
   ShoppingBasket,
   ShoppingCart,
@@ -206,7 +206,7 @@ function AdminView({ name }: { name: string }) {
       <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
         <QuickLink to="/dashboard" icon={LayoutDashboard} label="Tableau de bord" desc="Vue système et statistiques globales" />
         <QuickLink to="/admin/pharmacies" icon={Building2} label="Pharmacies" desc="Gérer les comptes et les pharmacies" />
-        <QuickLink to="/admin/catalog-requests" icon={ClipboardCheck} label="Demandes catalogue" desc="Traiter les demandes en attente" />
+        <QuickLink to="/admin/catalog-requests" icon={ClipboardCheck} label="Demandes d'exclusion" desc="Traiter les demandes en attente" />
         <QuickLink to="/admin/catalog" icon={BookOpen} label="Catalogue" desc="Gérer le catalogue médicaments" />
         <QuickLink to="/rapports" icon={BarChart3} label="Rapports" desc="Statistiques et indicateurs clés" />
       </div>
@@ -244,7 +244,7 @@ function OwnerView({ identity }: { identity: User }) {
           <QuickLink to="/ventes" icon={ShoppingBasket} label="Ventes" desc="Historique de vos transactions ventes" />
           <QuickLink to="/rapports" icon={BarChart3} label="Rapports" desc="Analyses et indicateurs clés" />
           <QuickLink to="/owner/employees" icon={Users} label="Mes employés" desc="Gérer les accès de votre équipe" />
-          <QuickLink to="/catalog-requests" icon={PackagePlus} label="Demandes catalogue" desc="Ajouter des médicaments au catalogue" />
+          <QuickLink to="/catalog-requests" icon={PackageX} label="Produits non déclarés" desc="Exclure des produits de vos rapports" />
           <QuickLink to="/parametres" icon={Settings} label="Paramètres" desc="Configuration de la pharmacie" />
         </div>
       )}

@@ -11,7 +11,7 @@ from sqlalchemy import Date, case as sa_case, func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Achat, CatalogRequest, Medicament, Pharmacy, User, Vente
+from models import Achat, CatalogRequest, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
 
 router = APIRouter(tags=["stats"])
@@ -81,6 +81,19 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
     if dt:
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
+
+    # Non-declared products filter: exclude products explicitly set as non-declared for this pharmacy
+    if pharmacy_id:
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
+        base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
+        base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
 
     # Category-type filter (joins Medicament when needed)
     cat_filter_v: list = []
@@ -214,7 +227,7 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
 
 # ── Medications list for Excel ─────────────────────────────────────────────────
 
-def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None):
+def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=None):
     q = db.query(
         Medicament.product,
         Medicament.category,
@@ -227,6 +240,8 @@ def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None):
     ).join(Medicament, Vente.medicament_id == Medicament.id)
     if pharmacy_id:
         q = q.filter(Vente.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        q = q.filter(Vente.medicament_id.notin_(non_declared_sub))
     if df:
         q = q.filter(Vente.date >= df)
     if dt:
@@ -395,6 +410,17 @@ def get_stats(
         cat_filter_v = [_pharma_expr() == False]
         cat_filter_a = [_pharma_expr() == False]
 
+    non_declared_sub = None
+    if pharmacy_id:
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
+
     # ── KPIs ──────────────────────────────────────────────────────────────────
     vq = db.query(func.sum(Vente.total), func.count(Vente.id))
     aq = db.query(func.sum(Achat.total), func.count(Achat.id))
@@ -405,6 +431,9 @@ def get_stats(
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
         aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
+        aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -443,6 +472,9 @@ def get_stats(
     if pharmacy_id:
         v_trend_q = v_trend_q.filter(Vente.pharmacy_id == pharmacy_id)
         a_trend_q = a_trend_q.filter(Achat.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        v_trend_q = v_trend_q.filter(Vente.medicament_id.notin_(non_declared_sub))
+        a_trend_q = a_trend_q.filter(Achat.medicament_id.notin_(non_declared_sub))
 
     v_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in v_trend_q.group_by("month").all()}
     a_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in a_trend_q.group_by("month").all()}
@@ -464,6 +496,8 @@ def get_stats(
         cat_q = cat_q.filter(*cat_filter_v)
     if pharmacy_id:
         cat_q = cat_q.filter(Vente.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        cat_q = cat_q.filter(Vente.medicament_id.notin_(non_declared_sub))
     if df:
         cat_q = cat_q.filter(Vente.date >= df)
     if dt:
@@ -500,6 +534,18 @@ def _compute_analyse_marge(db, pharmacy_id, df, dt, category_type, mode):
     if dt:
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
+
+    if pharmacy_id:
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
+        base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
+        base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -763,11 +809,25 @@ def export_stats_excel(
     df, dt = date_from or None, date_to or None
     pharmacy_id = current_user.pharmacy_id
 
+    nd_sub = None
+    if pharmacy_id:
+        nd_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
+
     vq = db.query(func.sum(Vente.total), func.count(Vente.id))
     aq = db.query(func.sum(Achat.total), func.count(Achat.id))
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
         aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
+    if nd_sub is not None:
+        vq = vq.filter(Vente.medicament_id.notin_(nd_sub))
+        aq = aq.filter(Achat.medicament_id.notin_(nd_sub))
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -793,7 +853,7 @@ def export_stats_excel(
     cat_filter = ([_pharma_expr() == True] if category_type == "pharmacie"
                   else [_pharma_expr() == False] if category_type == "parapharmacie"
                   else None)
-    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter)
+    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter, non_declared_sub=nd_sub)
     buf = _build_excel(title, period, kpis, extra, med_rows)
     filename = f"rapport_{category_type}_{df or 'all'}_{dt or 'all'}.xlsx"
     return StreamingResponse(
@@ -819,8 +879,23 @@ def get_pharmacy_stats_for_admin(
     df = date_from or None
     dt = date_to or None
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(Vente.pharmacy_id == pharmacy_id)
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(Achat.pharmacy_id == pharmacy_id)
+    non_declared_sub = (
+        db.query(PharmacyMedicamentStatus.medicament_id)
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        )
+        .subquery()
+    )
+
+    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(
+        Vente.pharmacy_id == pharmacy_id,
+        Vente.medicament_id.notin_(non_declared_sub),
+    )
+    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.notin_(non_declared_sub),
+    )
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -845,7 +920,12 @@ def get_pharmacy_stats_for_admin(
         for r in db.query(
             func.date_trunc("month", func.cast(Vente.date, Date)).label("month"),
             func.sum(Vente.total).label("total"),
-        ).filter(Vente.pharmacy_id == pharmacy_id, Vente.date >= trend_start_str, Vente.date < trend_end_str)
+        ).filter(
+            Vente.pharmacy_id == pharmacy_id,
+            Vente.date >= trend_start_str,
+            Vente.date < trend_end_str,
+            Vente.medicament_id.notin_(non_declared_sub),
+        )
         .group_by("month").all()
     }
     a_by_month = {
@@ -853,7 +933,12 @@ def get_pharmacy_stats_for_admin(
         for r in db.query(
             func.date_trunc("month", func.cast(Achat.delivery_date, Date)).label("month"),
             func.sum(Achat.total).label("total"),
-        ).filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_date >= trend_start_str, Achat.delivery_date < trend_end_str)
+        ).filter(
+            Achat.pharmacy_id == pharmacy_id,
+            Achat.delivery_date >= trend_start_str,
+            Achat.delivery_date < trend_end_str,
+            Achat.medicament_id.notin_(non_declared_sub),
+        )
         .group_by("month").all()
     }
     monthly_trend = []
@@ -866,7 +951,11 @@ def get_pharmacy_stats_for_admin(
     cat_q = (
         db.query(Medicament.category.label("category"), func.sum(Vente.total).label("total"))
         .join(Medicament, Vente.medicament_id == Medicament.id)
-        .filter(Vente.pharmacy_id == pharmacy_id, Medicament.category.isnot(None))
+        .filter(
+            Vente.pharmacy_id == pharmacy_id,
+            Medicament.category.isnot(None),
+            Vente.medicament_id.notin_(non_declared_sub),
+        )
     )
     if df:
         cat_q = cat_q.filter(Vente.date >= df)
@@ -906,8 +995,23 @@ def export_pharmacy_stats_excel(
 
     df, dt = date_from or None, date_to or None
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(Vente.pharmacy_id == pharmacy_id)
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(Achat.pharmacy_id == pharmacy_id)
+    nd_sub = (
+        db.query(PharmacyMedicamentStatus.medicament_id)
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        )
+        .subquery()
+    )
+
+    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(
+        Vente.pharmacy_id == pharmacy_id,
+        Vente.medicament_id.notin_(nd_sub),
+    )
+    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.notin_(nd_sub),
+    )
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -932,7 +1036,7 @@ def export_pharmacy_stats_excel(
     cat_filter = ([_pharma_expr() == True] if category_type == "pharmacie"
                   else [_pharma_expr() == False] if category_type == "parapharmacie"
                   else None)
-    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter)
+    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter, non_declared_sub=nd_sub)
     buf = _build_excel(title, period, kpis, extra, med_rows)
     filename = f"rapport_pharmacie{pharmacy_id}_{category_type}_{df or 'all'}_{dt or 'all'}.xlsx"
     return StreamingResponse(
@@ -982,3 +1086,53 @@ def get_admin_stats(
         "total_catalog_items": total_catalog_items,
         "pending_catalog_requests": pending_catalog_requests,
     }
+
+
+# ── Owner: list pharmacy products for non-declare requests ────────────────────
+
+@router.get("/stats/products")
+def list_my_products(
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return distinct products available in this pharmacy's achats/ventes."""
+    if current_user.role == "admin":
+        raise HTTPException(status_code=403, detail="Admins use pharmacy-specific endpoints")
+
+    pharmacy_id = current_user.pharmacy_id
+    if not pharmacy_id:
+        return []
+
+    vente_ids = db.query(Vente.medicament_id).filter(
+        Vente.pharmacy_id == pharmacy_id,
+        Vente.medicament_id.isnot(None),
+    ).distinct()
+    achat_ids = db.query(Achat.medicament_id).filter(
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.isnot(None),
+    ).distinct()
+    med_ids = {r[0] for r in vente_ids.all()} | {r[0] for r in achat_ids.all()}
+
+    q = db.query(Medicament).filter(Medicament.id.in_(med_ids))
+    if search:
+        q = q.filter(Medicament.product.ilike(f"%{search}%"))
+
+    meds = q.order_by(Medicament.product).limit(50).all()
+
+    non_declared_ids = {
+        r[0] for r in db.query(PharmacyMedicamentStatus.medicament_id).filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        ).all()
+    }
+
+    return [
+        {
+            "medicament_id": m.id,
+            "product": m.product,
+            "category": m.category,
+            "declared": m.id not in non_declared_ids,
+        }
+        for m in meds
+    ]

@@ -159,12 +159,21 @@ class CatalogRequestCreate(BaseModel):
     laboratoire: Optional[str] = None
 
 
+class NonDeclareRequestCreate(BaseModel):
+    medicament_id: int
+    notes: Optional[str] = None
+
+
 class CatalogRequestOut(BaseModel):
     id: int
     requested_by: int
     pharmacy_id: Optional[int] = None
     status: str
     reject_reason: Optional[str] = None
+    request_type: str = "new_product"
+    medicament_id: Optional[int] = None
+    medicament_name: Optional[str] = None
+    notes: Optional[str] = None
     product: str
     tva: Optional[str] = None
     pph: Optional[float] = None
