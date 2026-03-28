@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, JSON, String, Boolean, DateTime
+from sqlalchemy import Column, Float, ForeignKey, Integer, JSON, String, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -120,7 +120,7 @@ class CategorySuffix(Base):
 
 
 class CatalogRequest(Base):
-    """Product addition request submitted by a pharmacy owner, reviewed by admin."""
+    """Product addition OR non-declare request submitted by a pharmacy owner, reviewed by admin."""
     __tablename__ = "catalog_requests"
 
     id            = Column(Integer, primary_key=True, index=True)
@@ -128,6 +128,9 @@ class CatalogRequest(Base):
     pharmacy_id   = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     status        = Column(String, default="pending", nullable=False)  # pending | approved | rejected
     reject_reason = Column(String, nullable=True)
+    request_type  = Column(String, default="new_product", nullable=False)  # new_product | non_declare
+    medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True)  # for non_declare
+    notes         = Column(String, nullable=True)  # owner's reason for non_declare request
 
     product       = Column(String, nullable=False)
     tva           = Column(String, nullable=True)
@@ -141,4 +144,19 @@ class CatalogRequest(Base):
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     reviewed_at   = Column(DateTime(timezone=True), nullable=True)
 
-    requester = relationship("User", foreign_keys=[requested_by])
+    requester  = relationship("User", foreign_keys=[requested_by])
+    medicament = relationship("Medicament", foreign_keys=[medicament_id])
+
+
+class PharmacyMedicamentStatus(Base):
+    """Tracks explicitly non-declared products per pharmacy.
+    Absence = declared (default). A row only exists when admin approved a non-declare request."""
+    __tablename__ = "pharmacy_medicament_status"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    pharmacy_id   = Column(Integer, ForeignKey("pharmacies.id"), nullable=False)
+    medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=False)
+    declared      = Column(Boolean, default=False, nullable=False)  # False = non-declared
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("pharmacy_id", "medicament_id", name="uq_pharmacy_medicament"),)

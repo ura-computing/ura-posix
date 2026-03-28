@@ -60,7 +60,7 @@ function RoleBadge() {
   const cfg = ROLE_CONFIG[user.role];
   if (!cfg) return null;
   return (
-    <span className={cn("hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium shrink-0", cfg.className)}>
+    <span className={cn("hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold shrink-0", cfg.className)}>
       {cfg.label}
     </span>
   );
@@ -85,7 +85,7 @@ function DesktopHeader() {
         <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
         <RoleBadge />
         {subtitle && (
-          <p className="text-sm text-muted-foreground hidden lg:block truncate">{subtitle}</p>
+          <p className="text-sm font-bold text-muted-foreground hidden lg:block truncate">{subtitle}</p>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -278,7 +278,7 @@ function NotificationBell() {
               >
                 <ClipboardList className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-snug">Demande catalogue</p>
+                  <p className="text-sm font-medium leading-snug">Demande d'exclusion</p>
                   <p className="text-xs text-muted-foreground truncate">{r.product}{r.pharmacy_name ? ` — ${r.pharmacy_name}` : ""}</p>
                   {r.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(r.created_at).getTime())}</p>}
                 </div>

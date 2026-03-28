@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useGetIdentity } from "@refinedev/core";
 import { useQuery } from "@tanstack/react-query";
 import type { AnalyseMargeResponse } from "@/lib/api";
@@ -26,7 +26,9 @@ import {
   ClipboardCheck,
   Download,
   Package,
+  Plus,
   Receipt,
+  Search,
   ShoppingCart,
   TrendingUp,
   Users,
@@ -37,8 +39,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { fmt } from "@/lib/table-utils";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { User } from "@/types";
 import { eUserRole } from "@/types";
@@ -78,6 +89,10 @@ function KpiSkeleton({ primary }: { primary?: boolean }) {
 
 type MargeMode = "produit" | "categorie" | "fournisseur" | "bl";
 type SortState = { key: string; dir: "asc" | "desc" };
+
+const SIM_LABEL_KEY: Record<MargeMode, string> = {
+  produit: "product", categorie: "category", fournisseur: "supplier", bl: "delivery_ref",
+};
 
 const MARGE_COLS: Record<MargeMode, { key: string; label: string; numeric?: boolean }[]> = {
   produit:     [
@@ -215,6 +230,11 @@ function PharmacyRapports() {
   const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
   const [margeMode, setMargeMode] = useState<MargeMode>("produit");
 
+  // Simulation dialog state
+  const [simOpen, setSimOpen] = useState(false);
+  const [simSelected, setSimSelected] = useState<Set<number>>(new Set());
+  const [simSearch, setSimSearch] = useState("");
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ["stats", dateFrom, dateTo, categoryType],
     queryFn: () => api.stats.get(dateFrom || undefined, dateTo || undefined, categoryType),
@@ -249,6 +269,89 @@ function PharmacyRapports() {
     dateFrom && dateTo ? `${dateFrom} → ${dateTo}` :
     dateFrom ? `À partir du ${dateFrom}` :
     dateTo ? `Jusqu'au ${dateTo}` : null;
+
+  const typeTheme = useMemo(() => {
+    if (categoryType === "pharmacie") return {
+      primaryCard:  "bg-green-600 text-white border-0",
+      border:       "border-green-200 dark:border-green-800",
+      bg:           "bg-green-50/50 dark:bg-green-950/20",
+      text:         "text-green-700 dark:text-green-300",
+      textValue:    "text-green-800 dark:text-green-200",
+      textSubtle:   "text-green-600 dark:text-green-400",
+      icon:         "text-green-500",
+      iconHex:      "#22c55e",
+    };
+    if (categoryType === "parapharmacie") return {
+      primaryCard:  "bg-purple-600 text-white border-0",
+      border:       "border-purple-200 dark:border-purple-800",
+      bg:           "bg-purple-50/50 dark:bg-purple-950/20",
+      text:         "text-purple-700 dark:text-purple-300",
+      textValue:    "text-purple-800 dark:text-purple-200",
+      textSubtle:   "text-purple-600 dark:text-purple-400",
+      icon:         "text-purple-500",
+      iconHex:      "#a855f7",
+    };
+    return {
+      primaryCard:  "bg-primary text-primary-foreground border-0",
+      border:       "border-emerald-200 dark:border-emerald-800",
+      bg:           "bg-emerald-50/50 dark:bg-emerald-950/20",
+      text:         "text-emerald-700 dark:text-emerald-300",
+      textValue:    "text-emerald-800 dark:text-emerald-200",
+      textSubtle:   "text-emerald-600 dark:text-emerald-400",
+      icon:         "text-emerald-500",
+      iconHex:      "#14b8a6",
+    };
+  }, [categoryType]);
+
+  const allMargeRows = useMemo(
+    () => (margeData?.rows ?? []) as Record<string, unknown>[],
+    [margeData]
+  );
+
+  const simFilteredRows = useMemo(() => {
+    if (!simSearch.trim()) return allMargeRows.map((r, i) => ({ row: r, idx: i }));
+    const q = simSearch.toLowerCase();
+    return allMargeRows
+      .map((r, i) => ({ row: r, idx: i }))
+      .filter(({ row }) => String(row[SIM_LABEL_KEY[margeMode]] ?? "").toLowerCase().includes(q));
+  }, [allMargeRows, simSearch, margeMode]);
+
+  const simKpis = useMemo(() => {
+    const selected = allMargeRows.filter((_, i) => simSelected.has(i));
+    const ca    = selected.reduce((s, r) => s + (Number(r.ca ?? r.total) || 0), 0);
+    const qty   = selected.reduce((s, r) => s + (Number(r.qty) || 0), 0);
+    const pcts  = selected.map(r => Number(r.marge_pct ?? r.marge_pct_avg ?? NaN)).filter(v => !isNaN(v));
+    const dhs   = selected.map(r => Number(r.marge_dh ?? r.marge_dh_avg ?? NaN)).filter(v => !isNaN(v));
+    return {
+      ca,
+      qty,
+      margePctAvg: pcts.length ? pcts.reduce((s, v) => s + v, 0) / pcts.length : null,
+      margeDhAvg:  dhs.length  ? dhs.reduce((s, v) => s + v, 0)  / dhs.length  : null,
+    };
+  }, [allMargeRows, simSelected]);
+
+  const toggleSimRow = useCallback((idx: number) => {
+    setSimSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  }, []);
+
+  const exportSimCsv = useCallback(() => {
+    const selected = allMargeRows.filter((_, i) => simSelected.has(i));
+    if (!selected.length) return;
+    const cols = MARGE_COLS[margeMode];
+    const header = cols.map(c => c.label).join(",");
+    const lines = selected.map(row =>
+      cols.map(c => {
+        const v = row[c.key];
+        return v == null ? "" : String(v).includes(",") ? `"${v}"` : String(v);
+      }).join(",")
+    );
+    const csv = [header, ...lines].join("\n");
+    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `analyse_${margeMode}_selection.csv`);
+  }, [allMargeRows, simSelected, margeMode]);
 
   return (
     <div>
@@ -286,17 +389,34 @@ function PharmacyRapports() {
                 </Button>
               )}
               <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-                {(["all", "pharmacie", "parapharmacie"] as const).map((t) => (
-                  <Button
-                    key={t}
-                    size="sm"
-                    variant={categoryType === t ? "default" : "outline"}
-                    className="h-9"
-                    onClick={() => setCategoryType(t)}
-                  >
-                    {t === "all" ? "Mixte" : t === "pharmacie" ? "Pharmacie" : "Parapharmacie"}
-                  </Button>
-                ))}
+                <Button
+                  size="sm"
+                  variant={categoryType === "all" ? "default" : "outline"}
+                  className="h-9"
+                  onClick={() => setCategoryType("all")}
+                >
+                  Mixte
+                </Button>
+                <Button
+                  size="sm"
+                  className={cn("h-9 border", categoryType === "pharmacie"
+                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                    : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
+                  )}
+                  onClick={() => setCategoryType("pharmacie")}
+                >
+                  Pharmacie
+                </Button>
+                <Button
+                  size="sm"
+                  className={cn("h-9 border", categoryType === "parapharmacie"
+                    ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                    : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
+                  )}
+                  onClick={() => setCategoryType("parapharmacie")}
+                >
+                  Parapharmacie
+                </Button>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -323,15 +443,14 @@ function PharmacyRapports() {
           )}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-primary text-primary-foreground border-0">
+          <Card className={cn(typeTheme.primaryCard)}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-medium opacity-85">Chiffre d'affaires</p>
+                  <p className="text-sm font-medium opacity-85">Chiffre d'affaires</p>
                   {isLoading ? <KpiSkeleton primary /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)}</p>
+                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
                   )}
-                  <p className="text-[11px] opacity-75">MAD</p>
                 </div>
                 <TrendingUp className="h-8 w-8 opacity-60 shrink-0" />
               </div>
@@ -342,13 +461,12 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground">Achats totaux</p>
+                  <p className="text-sm font-medium text-muted-foreground">Achats totaux</p>
                   {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)}</p>
+                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)} MAD</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-0.5">MAD</p>
                 </div>
-                <ShoppingCart className="h-8 w-8 text-primary" />
+                <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
@@ -357,12 +475,12 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground">Transactions ventes</p>
+                  <p className="text-sm font-medium text-muted-foreground">Transactions ventes</p>
                   {isLoading ? <KpiSkeleton /> : (
                     <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.ventes_count ?? 0}</p>
                   )}
                 </div>
-                <BarChart3 className="h-8 w-8 text-primary" />
+                <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
@@ -371,12 +489,12 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground">Transactions achats</p>
+                  <p className="text-sm font-medium text-muted-foreground">Transactions achats</p>
                   {isLoading ? <KpiSkeleton /> : (
                     <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.achats_count ?? 0}</p>
                   )}
                 </div>
-                <Package className="h-8 w-8 text-primary" />
+                <Package className={cn("h-8 w-8", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
@@ -393,13 +511,13 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground">Ticket moyen</p>
+                  <p className="text-sm font-medium text-muted-foreground">Ticket moyen</p>
                   {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)}</p>
+                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-0.5">MAD / transaction</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">par transaction</p>
                 </div>
-                <Receipt className="h-7 w-7 text-primary" />
+                <Receipt className={cn("h-9 w-9", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
@@ -409,53 +527,52 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-muted-foreground">Vente moyenne / jour</p>
+                  <p className="text-sm font-medium text-muted-foreground">Vente moyenne / jour</p>
                   {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)}</p>
+                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-0.5">MAD</p>
                 </div>
-                <BarChart3 className="h-7 w-7 text-primary" />
+                <BarChart3 className={cn("h-9 w-9", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
 
           {/* Best day DH */}
-          <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Meilleure journée (DH)</p>
+                  <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (DH)</p>
                   {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                    <p className="text-2xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">
-                      {advKpis?.best_day_dh ? fmt(advKpis.best_day_dh.total) : "—"}
+                    <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
+                      {advKpis?.best_day_dh ? `${fmt(advKpis.best_day_dh.total)} MAD` : "—"}
                     </p>
                   )}
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
                     {advKpis?.best_day_dh?.date ?? "—"}
                   </p>
                 </div>
-                <CalendarCheck className="h-7 w-7 text-emerald-500" />
+                <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
 
           {/* Best day ops */}
-          <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">Meilleure journée (opé)</p>
+                  <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (opé)</p>
                   {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-                    <p className="text-2xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">
+                    <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
                       {advKpis?.best_day_count ? `${advKpis.best_day_count.count} opé` : "—"}
                     </p>
                   )}
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
                     {advKpis?.best_day_count?.date ?? "—"}
                   </p>
                 </div>
-                <CalendarCheck className="h-7 w-7 text-emerald-500" />
+                <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
@@ -465,17 +582,17 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (DH)</p>
+                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (DH)</p>
                   {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
                     <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
-                      {advKpis?.worst_day_dh ? fmt(advKpis.worst_day_dh.total) : "—"}
+                      {advKpis?.worst_day_dh ? `${fmt(advKpis.worst_day_dh.total)} MAD` : "—"}
                     </p>
                   )}
                   <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
                     {advKpis?.worst_day_dh?.date ?? "—"}
                   </p>
                 </div>
-                <CalendarX className="h-7 w-7 text-rose-500" />
+                <CalendarX className="h-9 w-9 text-rose-500" />
               </div>
             </CardContent>
           </Card>
@@ -485,7 +602,7 @@ function PharmacyRapports() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (opé)</p>
+                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (opé)</p>
                   {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
                     <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
                       {advKpis?.worst_day_count ? `${advKpis.worst_day_count.count} opé` : "—"}
@@ -495,7 +612,7 @@ function PharmacyRapports() {
                     {advKpis?.worst_day_count?.date ?? "—"}
                   </p>
                 </div>
-                <CalendarX className="h-7 w-7 text-rose-500" />
+                <CalendarX className="h-9 w-9 text-rose-500" />
               </div>
             </CardContent>
           </Card>
@@ -506,33 +623,31 @@ function PharmacyRapports() {
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">Déclaration TVA</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
             <CardContent className="p-6">
-              <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">TVA encaissée (ventes)</p>
+              <p className={cn("text-sm font-medium", typeTheme.text)}>TVA encaissée (ventes)</p>
               {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                <p className="text-2xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">{fmt(tva?.tva_encaissee ?? null)}</p>
+                <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>{fmt(tva?.tva_encaissee ?? null)} MAD</p>
               )}
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">MAD</p>
             </CardContent>
           </Card>
 
           <Card className="border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <CardContent className="p-6">
-              <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">TVA payée (achats)</p>
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">TVA payée (achats)</p>
               {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                <p className="text-2xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)}</p>
+                <p className="text-2xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>
               )}
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">MAD</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-primary text-primary-foreground border-0">
+          <Card className={cn(typeTheme.primaryCard)}>
             <CardContent className="p-6">
-              <p className="text-[11px] font-medium opacity-85">TVA à déclarer</p>
+              <p className="text-sm font-medium opacity-85">TVA à déclarer</p>
               {isLoading ? <KpiSkeleton primary /> : (
-                <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)}</p>
+                <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>
               )}
-              <p className="text-[11px] opacity-75 mt-0.5">MAD = encaissée − payée</p>
+              <p className="text-[11px] opacity-75 mt-0.5">encaissée − payée</p>
             </CardContent>
           </Card>
         </div>
@@ -542,18 +657,30 @@ function PharmacyRapports() {
       <section>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="text-lg font-semibold text-foreground">Analyse de marge</h2>
-          <div className="flex items-center gap-1 flex-wrap">
-            {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant={margeMode === m ? "default" : "outline"}
-                className="h-8 text-xs"
-                onClick={() => setMargeMode(m)}
-              >
-                {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
-              </Button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
+                <Button
+                  key={m}
+                  size="sm"
+                  variant="outline"
+                  className={cn("h-8 text-xs", margeMode === m ? cn(typeTheme.primaryCard, "hover:opacity-90") : "")}
+                  onClick={() => setMargeMode(m)}
+                >
+                  {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
+                </Button>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => { setSimOpen(true); setSimSelected(new Set()); setSimSearch(""); }}
+              disabled={!allMargeRows.length}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Créer une analyse
+            </Button>
           </div>
         </div>
 
@@ -561,11 +688,10 @@ function PharmacyRapports() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <Card className="border border-border">
             <CardContent className="p-5">
-              <p className="text-[11px] font-medium text-muted-foreground">Total ventes</p>
+              <p className="text-sm font-medium text-muted-foreground">Total ventes</p>
               {margeLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
-                <p className="text-2xl font-bold mt-1">{fmt(margeData?.kpis.total_ventes_dh ?? null)}</p>
+                <p className="text-2xl font-bold mt-1">{fmt(margeData?.kpis.total_ventes_dh ?? null)} MAD</p>
               )}
-              <p className="text-[11px] text-muted-foreground">MAD</p>
               {margeLoading ? <Skeleton className="h-4 w-20 mt-2" /> : (
                 <p className="text-sm font-semibold mt-2">{margeData?.kpis.total_ventes_unites?.toFixed(0) ?? "—"} unités</p>
               )}
@@ -574,7 +700,7 @@ function PharmacyRapports() {
 
           <Card className="border border-border">
             <CardContent className="p-5">
-              <p className="text-[11px] font-medium text-muted-foreground">Marge moyenne</p>
+              <p className="text-sm font-medium text-muted-foreground">Marge moyenne</p>
               {margeLoading ? <Skeleton className="h-8 w-24 mt-1" /> : (
                 <p className="text-2xl font-bold mt-1">
                   {margeData?.kpis.marge_pct_avg != null ? `${margeData.kpis.marge_pct_avg.toFixed(1)} %` : "—"}
@@ -591,7 +717,7 @@ function PharmacyRapports() {
 
           <Card className="border border-border">
             <CardContent className="p-5">
-              <p className="text-[11px] font-medium text-muted-foreground">Marge moy. / unité</p>
+              <p className="text-sm font-medium text-muted-foreground">Marge moy. / unité</p>
               {margeLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
                 <p className="text-2xl font-bold mt-1">
                   {margeData?.kpis.marge_dh_avg != null ? `${fmt(margeData.kpis.marge_dh_avg)} MAD` : "—"}
@@ -600,7 +726,7 @@ function PharmacyRapports() {
               {!margeLoading && margeData?.kpis.marge_dh_min && (
                 <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
                   <p>Min: <span className="font-medium">{margeData.kpis.marge_dh_min.label}</span> ({fmt(margeData.kpis.marge_dh_min.value)} DH)</p>
-                  <p>Max: <span className="font-medium">{margeData?.kpis.marge_dh_max?.label}</span> ({fmt(margeData?.kpis.marge_dh_max?.value)} DH)</p>
+                  <p>Max: <span className="font-medium">{margeData?.kpis.marge_dh_max?.label}</span> ({fmt(margeData?.kpis.marge_dh_max?.value ?? null)} DH)</p>
                 </div>
               )}
               {!margeLoading && margeData?.kpis.difference_gain_dh != null && (
@@ -614,6 +740,148 @@ function PharmacyRapports() {
 
         <AnalyseMargeTable mode={margeMode} data={margeData} loading={margeLoading} />
       </section>
+
+      {/* ── Simulation dialog ── */}
+      <Dialog open={simOpen} onOpenChange={(v) => { if (!v) { setSimOpen(false); setSimSearch(""); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Créer une analyse personnalisée</DialogTitle>
+            <DialogDescription>
+              Sélectionnez des éléments pour simuler leurs KPIs combinés.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden py-2">
+            {/* Search + select-all */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filtrer les éléments..."
+                  className="pl-9 h-9"
+                  value={simSearch}
+                  onChange={(e) => setSimSearch(e.target.value)}
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 text-xs shrink-0"
+                onClick={() => {
+                  if (simSelected.size === allMargeRows.length) {
+                    setSimSelected(new Set());
+                  } else {
+                    setSimSelected(new Set(allMargeRows.map((_, i) => i)));
+                  }
+                }}
+              >
+                {simSelected.size === allMargeRows.length ? "Désélectionner tout" : "Tout sélectionner"}
+              </Button>
+            </div>
+
+            {/* Live KPI preview */}
+            {simSelected.size > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-[11px] text-muted-foreground">CA sélectionné</p>
+                  <p className="text-lg font-bold mt-0.5">{fmt(simKpis.ca)} <span className="text-xs font-normal">MAD</span></p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{simKpis.qty.toFixed(0)} unités</p>
+                </div>
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-[11px] text-muted-foreground">Marge % moy.</p>
+                  <p className="text-lg font-bold mt-0.5">
+                    {simKpis.margePctAvg != null ? `${simKpis.margePctAvg.toFixed(1)} %` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-3 bg-muted/30">
+                  <p className="text-[11px] text-muted-foreground">Marge DH moy.</p>
+                  <p className="text-lg font-bold mt-0.5">
+                    {simKpis.margeDhAvg != null ? `${fmt(simKpis.margeDhAvg)} MAD` : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Row list */}
+            <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg">
+              {simFilteredRows.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">Aucun élément trouvé</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
+                    <tr>
+                      <th className="w-10 px-3 py-2.5" />
+                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        {MARGE_COLS[margeMode][0].label}
+                      </th>
+                      {MARGE_COLS[margeMode].slice(1, 4).map(col => (
+                        <th key={col.key} className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                          {col.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {simFilteredRows.map(({ row, idx }) => (
+                      <tr
+                        key={idx}
+                        className={cn(
+                          "border-t border-border cursor-pointer hover:bg-muted/30 transition-colors",
+                          simSelected.has(idx) && "bg-primary/5"
+                        )}
+                        onClick={() => toggleSimRow(idx)}
+                      >
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            readOnly
+                            checked={simSelected.has(idx)}
+                            className="h-4 w-4 accent-primary"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-medium truncate max-w-[200px]">
+                          {String(row[SIM_LABEL_KEY[margeMode]] ?? "—")}
+                        </td>
+                        {MARGE_COLS[margeMode].slice(1, 4).map(col => (
+                          <td key={col.key} className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                            {row[col.key] == null ? "—" : typeof row[col.key] === "number"
+                              ? (row[col.key] as number).toFixed(2)
+                              : String(row[col.key])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {simSelected.size} élément{simSelected.size !== 1 ? "s" : ""} sélectionné{simSelected.size !== 1 ? "s" : ""}
+              {simSelected.size > 0 && " — cliquez sur une ligne pour désélectionner"}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSimSelected(new Set())}>
+              Réinitialiser
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={simSelected.size === 0}
+              onClick={exportSimCsv}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exporter CSV
+            </Button>
+            <Button size="sm" onClick={() => { setSimOpen(false); setSimSearch(""); }}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Monthly trend ── */}
       <section>
@@ -646,8 +914,8 @@ function PharmacyRapports() {
                   <AreaChart data={trend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="gVentes" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                        <stop offset="5%" stopColor={typeTheme.iconHex} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={typeTheme.iconHex} stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="gAchats" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -660,7 +928,7 @@ function PharmacyRapports() {
                       tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
                     <Tooltip formatter={(v: number) => [fmt(v), ""]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                    <Area type="monotone" dataKey="ventes" name="Ventes" stroke="#14b8a6" strokeWidth={2} fill="url(#gVentes)" dot={false} />
+                    <Area type="monotone" dataKey="ventes" name="Ventes" stroke={typeTheme.iconHex} strokeWidth={2} fill="url(#gVentes)" dot={false} />
                     <Area type="monotone" dataKey="achats" name="Achats" stroke="#8b5cf6" strokeWidth={2} fill="url(#gAchats)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -808,7 +1076,7 @@ function AdminRapports() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className={`text-[11px] font-medium ${isFirst ? "opacity-85" : "text-muted-foreground"}`}>{card.label}</p>
+                      <p className={`text-sm font-medium ${isFirst ? "opacity-85" : "text-muted-foreground"}`}>{card.label}</p>
                       {systemLoading
                         ? <Skeleton className={`h-8 w-16 mt-1 ${isFirst ? "bg-white/20" : ""}`} />
                         : <p className="text-3xl font-bold mt-1 leading-tight">{card.value}</p>}
@@ -900,7 +1168,7 @@ function AdminRapports() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className={`text-[11px] font-medium ${primary ? "opacity-85" : "text-muted-foreground"}`}>{label}</p>
+                        <p className={`text-sm font-medium ${primary ? "opacity-85" : "text-muted-foreground"}`}>{label}</p>
                         {pharmLoading ? <Skeleton className={`h-8 w-24 mt-1 ${primary ? "bg-white/20" : ""}`} /> : (
                           <p className="text-2xl font-bold mt-1 leading-tight">{value}</p>
                         )}
@@ -914,16 +1182,16 @@ function AdminRapports() {
 
             {/* Répartition Pharmacie / Parapharmacie */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <Card className="border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300">CA Pharmacie</p>
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">CA Pharmacie</p>
                       {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                        <p className="text-2xl font-bold mt-1 text-blue-800 dark:text-blue-200">{fmt(breakdown?.pharmacie.ventes_total ?? null)} MAD</p>
+                        <p className="text-2xl font-bold mt-1 text-green-800 dark:text-green-200">{fmt(breakdown?.pharmacie.ventes_total ?? null)} MAD</p>
                       )}
                     </div>
-                    <Receipt className="h-7 w-7 text-blue-500" />
+                    <Receipt className="h-7 w-7 text-green-500" />
                   </div>
                 </CardContent>
               </Card>
@@ -931,7 +1199,7 @@ function AdminRapports() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] font-medium text-purple-700 dark:text-purple-300">CA Parapharmacie</p>
+                      <p className="text-sm font-medium text-purple-700 dark:text-purple-300">CA Parapharmacie</p>
                       {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
                         <p className="text-2xl font-bold mt-1 text-purple-800 dark:text-purple-200">{fmt(breakdown?.parapharmacie.ventes_total ?? null)} MAD</p>
                       )}
@@ -946,19 +1214,19 @@ function AdminRapports() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card className="border border-border">
                 <CardContent className="p-5">
-                  <p className="text-[11px] text-muted-foreground font-medium">Ticket moyen</p>
+                  <p className="text-sm text-muted-foreground font-medium">Ticket moyen</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>}
                 </CardContent>
               </Card>
               <Card className="border border-border">
                 <CardContent className="p-5">
-                  <p className="text-[11px] text-muted-foreground font-medium">Vente moy / jour</p>
+                  <p className="text-sm text-muted-foreground font-medium">Vente moy / jour</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>}
                 </CardContent>
               </Card>
               <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <CardContent className="p-5">
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">Meilleure journée (DH)</p>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Meilleure journée (DH)</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
                     <>
                       <p className="text-xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">{advKpis?.best_day_dh ? fmt(advKpis.best_day_dh.total) : "—"} MAD</p>
@@ -973,19 +1241,19 @@ function AdminRapports() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <CardContent className="p-5">
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">TVA encaissée</p>
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">TVA encaissée</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">{fmt(tva?.tva_encaissee ?? null)} MAD</p>}
                 </CardContent>
               </Card>
               <Card className="border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
                 <CardContent className="p-5">
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">TVA payée</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">TVA payée</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>}
                 </CardContent>
               </Card>
               <Card className="bg-primary text-primary-foreground border-0">
                 <CardContent className="p-5">
-                  <p className="text-[11px] opacity-85 font-medium">TVA à déclarer</p>
+                  <p className="text-sm opacity-85 font-medium">TVA à déclarer</p>
                   {pharmLoading ? <Skeleton className="h-7 w-24 mt-1 bg-white/20" /> : <p className="text-xl font-bold mt-1">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>}
                 </CardContent>
               </Card>
@@ -996,15 +1264,15 @@ function AdminRapports() {
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
                   <div className="pb-4 sm:pb-0 sm:pr-6">
-                    <p className="text-[11px] text-muted-foreground font-medium">Marge %</p>
+                    <p className="text-sm text-muted-foreground font-medium">Marge %</p>
                     {pharmLoading ? <Skeleton className="h-7 w-16 mt-1" /> : <p className="text-2xl font-bold mt-1">{marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)}%` : "—"}</p>}
                   </div>
                   <div className="py-4 sm:py-0 sm:px-6">
-                    <p className="text-[11px] text-muted-foreground font-medium">Marge brute</p>
+                    <p className="text-sm text-muted-foreground font-medium">Marge brute</p>
                     {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-2xl font-bold mt-1">{fmt(marge?.marge_brute_dh ?? null)} MAD</p>}
                   </div>
                   <div className="pt-4 sm:pt-0 sm:pl-6">
-                    <p className="text-[11px] text-muted-foreground font-medium">Marge nette</p>
+                    <p className="text-sm text-muted-foreground font-medium">Marge nette</p>
                     {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-2xl font-bold mt-1">{fmt(marge?.marge_nette_dh ?? null)} MAD</p>}
                   </div>
                 </div>

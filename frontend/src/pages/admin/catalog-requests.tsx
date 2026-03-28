@@ -8,6 +8,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  PackageX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -69,22 +70,25 @@ function StatusBadge({ status }: { status: CatalogRequestOut["status"] }) {
   );
 }
 
+
 export default function AdminCatalogRequestsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [rejectTarget, setRejectTarget] = useState<CatalogRequestOut | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data: requests = [], isLoading } = useQuery({
+  const { data: allRequests = [], isLoading } = useQuery({
     queryKey: [...QUERY_KEY, statusFilter],
     queryFn: () => api.admin.listCatalogRequests(statusFilter === "all" ? undefined : statusFilter),
   });
+
+  const requests = allRequests;
 
   const { mutate: approve, isPending: approving } = useMutation({
     mutationFn: (id: number) => api.admin.approveCatalogRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Médicament ajouté au catalogue");
+      toast.success("Produit marqué comme non déclaré");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -101,41 +105,44 @@ export default function AdminCatalogRequestsPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const pendingCount = allRequests.filter((r) => r.status === "pending").length;
 
   return (
     <ListView>
       <Breadcrumb />
 
       <div>
-        <h1 className="page-title">Demandes catalogue</h1>
+        <h1 className="page-title">Demandes d'exclusion</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Examinez les demandes d'ajout de médicaments soumises par les pharmacies.
+          Examinez les demandes d'exclusion de produits soumises par les pharmacies.
         </p>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex items-center gap-1 border rounded-xl p-1 bg-muted/30 w-fit">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setStatusFilter(tab.key)}
-            className={cn(
-              "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
-              statusFilter === tab.key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-            {tab.key === "pending" && pendingCount > 0 && statusFilter !== "pending" && (
-              <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
-                {pendingCount}
-              </Badge>
-            )}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-3 items-center">
+        {/* Status filter */}
+        <div className="flex items-center gap-1 border rounded-xl p-1 bg-muted/30">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setStatusFilter(tab.key)}
+              className={cn(
+                "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
+                statusFilter === tab.key
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab.label}
+              {tab.key === "pending" && pendingCount > 0 && statusFilter !== "pending" && (
+                <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
+                  {pendingCount}
+                </Badge>
+              )}
+            </button>
+          ))}
+        </div>
+
       </div>
 
       {/* Requests list */}
@@ -153,7 +160,7 @@ export default function AdminCatalogRequestsPage() {
               <p className="text-sm font-medium">Aucune demande</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {statusFilter === "all"
-                  ? "Aucune demande de catalogue pour l'instant."
+                  ? "Aucune demande pour l'instant."
                   : `Aucune demande avec le statut "${STATUS_TABS.find(t => t.key === statusFilter)?.label}".`}
               </p>
             </div>
@@ -171,13 +178,12 @@ export default function AdminCatalogRequestsPage() {
               <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
                 {/* Product info */}
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{req.product}</p>
-                  <div className="flex flex-wrap gap-2 mt-0.5">
-                    {req.pph != null && <span className="text-xs text-muted-foreground">PPH: {req.pph.toFixed(2)} DH</span>}
-                    {req.ppv != null && <span className="text-xs text-muted-foreground">PPV: {req.ppv.toFixed(2)} DH</span>}
-                    {req.category && <span className="text-xs text-muted-foreground">{req.category}</span>}
-                    {req.laboratoire && <span className="text-xs text-muted-foreground">{req.laboratoire}</span>}
-                  </div>
+                  <p className="text-sm font-medium truncate">
+                    {req.medicament_name ?? req.product}
+                  </p>
+                  {req.notes && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
+                  )}
                   {req.reject_reason && (
                     <p className="text-xs text-destructive mt-0.5">Motif : {req.reject_reason}</p>
                   )}
@@ -237,16 +243,18 @@ export default function AdminCatalogRequestsPage() {
       <AlertDialog open={!!rejectTarget} onOpenChange={(v) => { if (!v) setRejectTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Rejeter "{rejectTarget?.product}" ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Rejeter "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Ce médicament ne sera pas ajouté au catalogue.
+              Le produit restera déclaré dans les rapports de cette pharmacie.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-6 pb-2 space-y-1.5">
             <Label htmlFor="reject-reason">Motif (optionnel)</Label>
             <Input
               id="reject-reason"
-              placeholder="Ex. : produit déjà existant sous un autre nom"
+              placeholder="Ex. : ce produit doit rester déclaré"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
             />
