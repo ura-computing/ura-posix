@@ -5,8 +5,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { cn } from "@/utils/cn";
+import { listCatalogCategories } from "@/api/admin";
 
 type Props = {
   value: string;
@@ -22,7 +22,7 @@ export function CategoryCombobox({ value, onChange, placeholder = "Catégorie", 
 
   const { data: categories = [] } = useQuery({
     queryKey: ["catalog-categories"],
-    queryFn: () => api.admin.listCatalogCategories(),
+    queryFn: () => listCatalogCategories(),
     staleTime: 60_000,
   });
 

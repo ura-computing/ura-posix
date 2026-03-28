@@ -7,72 +7,53 @@ import {
   BreadcrumbPage as ShadcnBreadcrumbPage,
   BreadcrumbSeparator as ShadcnBreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import {
-  matchResourceFromRoute,
-  useBreadcrumb,
-  useLink,
-  useResourceParams,
-} from "@refinedev/core";
 import { Home } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { Fragment } from "react";
+import { Link, useLocation } from "react-router";
+
+const PATH_LABELS: Record<string, string> = {
+  achat: "Achats",
+  ventes: "Ventes",
+  stock: "Alertes Stock",
+  rapports: "Tableau de Bord",
+  parametres: "Paramètres",
+  profile: "Mon profil",
+  "dashboard": "Tableau de Bord",
+  "dashboard/upload-file": "Importer",
+  "admin/pharmacies": "Pharmacies",
+  "admin/catalog-requests": "Demandes d'exclusion",
+  "admin/catalog": "Catalogue",
+  "owner/employees": "Mes employés",
+  "catalog-requests": "Produits non déclarés",
+};
 
 export function Breadcrumb() {
-  const Link = useLink();
-  const { breadcrumbs } = useBreadcrumb();
-  const { resources } = useResourceParams();
-  const rootRouteResource = matchResourceFromRoute("/", resources);
+  const { pathname } = useLocation();
+  const segments = pathname.replace(/^\//, "").split("/").filter(Boolean);
+  const label = PATH_LABELS[segments.join("/")] ?? PATH_LABELS[segments[0]] ?? segments[0];
 
-  const breadCrumbItems = useMemo(() => {
-    const list: {
-      key: string;
-      href: string;
-      Component: React.ReactNode;
-    }[] = [];
-
-    list.push({
-      key: "breadcrumb-item-home",
-      href: rootRouteResource.matchedRoute ?? "/",
-      Component: (
-        <Link to={rootRouteResource.matchedRoute ?? "/"}>
-          {rootRouteResource?.resource?.meta?.icon ?? (
-            <Home className="h-4 w-4" />
-          )}
-        </Link>
-      ),
-    });
-
-    for (const { label, href } of breadcrumbs) {
-      list.push({
-        key: `breadcrumb-item-${label}`,
-        href: href ?? "",
-        Component: href ? <Link to={href}>{label}</Link> : <span>{label}</span>,
-      });
-    }
-
-    return list;
-  }, [breadcrumbs, Link, rootRouteResource]);
+  if (!label) {
+    return (
+      <ShadcnBreadcrumb>
+        <ShadcnBreadcrumbList>
+          <ShadcnBreadcrumbPage>
+            <Link to="/"><Home className="h-4 w-4" /></Link>
+          </ShadcnBreadcrumbPage>
+        </ShadcnBreadcrumbList>
+      </ShadcnBreadcrumb>
+    );
+  }
 
   return (
     <ShadcnBreadcrumb>
       <ShadcnBreadcrumbList>
-        {breadCrumbItems.map((item, index) => {
-          if (index === breadCrumbItems.length - 1) {
-            return (
-              <ShadcnBreadcrumbPage key={item.key}>
-                {item.Component}
-              </ShadcnBreadcrumbPage>
-            );
-          }
-
-          return (
-            <Fragment key={item.key}>
-              <ShadcnBreadcrumbItem key={item.key}>
-                {item.Component}
-              </ShadcnBreadcrumbItem>
-              <ShadcnBreadcrumbSeparator />
-            </Fragment>
-          );
-        })}
+        <Fragment>
+          <ShadcnBreadcrumbItem>
+            <Link to="/"><Home className="h-4 w-4" /></Link>
+          </ShadcnBreadcrumbItem>
+          <ShadcnBreadcrumbSeparator />
+        </Fragment>
+        <ShadcnBreadcrumbPage>{label}</ShadcnBreadcrumbPage>
       </ShadcnBreadcrumbList>
     </ShadcnBreadcrumb>
   );

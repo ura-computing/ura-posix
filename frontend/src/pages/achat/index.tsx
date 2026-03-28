@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { useTable } from "@refinedev/react-table";
-import { useGetIdentity } from "@refinedev/core";
+import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { useQuery } from "@tanstack/react-query";
+import { useMe } from "@/hooks/use-me";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
 import { UploadCloud } from "lucide-react";
-import type { User } from "@/types";
 import { eUserRole } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +13,10 @@ import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { DataTable } from "@/components/refine-ui/data-table/data-table";
 import { TableToolbar } from "@/components/table-toolbar";
-import { api } from "@/lib/api";
+import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
-import { fmt, downloadCSV } from "@/lib/table-utils";
+import { fmt } from "@/utils/format";
+import { downloadCSV } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffix-badge";
 import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
 
@@ -84,7 +84,7 @@ const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
 };
 
 const AchatList = () => {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: user } = useMe();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
@@ -93,59 +93,40 @@ const AchatList = () => {
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [exporting, setExporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
 
   useEffect(() => {
-    if (identity?.role === eUserRole.ADMIN) navigate("/", { replace: true });
-  }, [identity, navigate]);
+    if (user?.role === eUserRole.ADMIN) navigate("/", { replace: true });
+  }, [user, navigate]);
 
   useEffect(() => {
-    api.tables.achatCategories().then(setAllCategories).catch(() => {});
-    api.tables.achatTvaRates().then(setAllTvaRates).catch(() => {});
+    transactionsApi.achatCategories().then(setAllCategories).catch(() => {});
+    transactionsApi.achatTvaRates().then(setAllTvaRates).catch(() => {});
   }, []);
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
-      const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
-      const res = await api.tables.exportAchat(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
-      const colValues: Record<string, (r: Record<string, unknown>) => string> = {
-        ...ACHAT_COL_VALUES,
-        delivery_ref_final: (r) => String(r.delivery_ref_final ?? ""),
-      };
-      const visibleCols = table.reactTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
-      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
-      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, `achats_export_${Date.now()}.csv`);
-      toast.success(`${res.data.length} lignes exportées`);
-    } catch {
-      toast.error("Erreur lors de l'export");
-    } finally {
-      setExporting(false);
-    }
-  };
+  const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
+  const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
 
-  const handleExportByType = async (type: "medicament" | "parapharmacie") => {
-    setExporting(true);
-    try {
-      const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
-      const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
-      const medCats  = allCategories.filter(c => c.toLowerCase().includes("médicament"));
-      const paraCats = allCategories.filter(c => !c.toLowerCase().includes("médicament"));
-      const cats = type === "medicament" ? medCats : paraCats;
-      const res = await api.tables.exportAchat("", cats, dateFrom, dateTo);
-      const colValues = { ...ACHAT_COL_VALUES };
-      const visibleCols = table.reactTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
-      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
-      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, `achats_${type}_${Date.now()}.csv`);
-      toast.success(`${res.data.length} lignes exportées`);
-    } catch {
-      toast.error("Erreur lors de l'export");
-    } finally {
-      setExporting(false);
-    }
-  };
+  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange]);
+
+  const { data: queryResult, isLoading } = useQuery({
+    queryKey: ["achat", page, limit, searchQuery, selectedCats, selectedTva, dateFrom, dateTo],
+    queryFn: () =>
+      transactionsApi.listAchats({
+        page,
+        limit,
+        search: searchQuery || undefined,
+        categories: selectedCats.length ? selectedCats : undefined,
+        tva: selectedTva.length ? selectedTva : undefined,
+        dateFrom,
+        dateTo,
+      }),
+  });
+
+  const rows = (queryResult?.data ?? []) as AchatRow[];
+  const paginationMeta = queryResult?.pagination;
+  const pageCount = paginationMeta?.totalPages ?? 1;
 
   const columns = useMemo<ColumnDef<AchatRow>[]>(
     () => [
@@ -304,42 +285,63 @@ const AchatList = () => {
     [],
   );
 
-  const table = useTable<AchatRow>({
+  const tableInstance = useReactTable({
+    data: rows,
     columns,
-    refineCoreProps: {
-      resource: "achat",
-      pagination: { pageSize: 20, mode: "server" },
-      sorters: { initial: [{ field: "id", order: "desc" }] },
-    },
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    pageCount,
   });
 
-  useEffect(() => {
-    const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
-    const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
-    table.refineCore.setFilters(
-      [
-        ...(searchQuery ? [{ field: "search", operator: "contains" as const, value: searchQuery }] : []),
-        ...(selectedCats.length > 0 ? [{ field: "categories", operator: "in" as const, value: selectedCats }] : []),
-        ...(selectedTva.length > 0 ? [{ field: "tva", operator: "in" as const, value: selectedTva }] : []),
-        ...(dateFrom ? [{ field: "date_from", operator: "gte" as const, value: dateFrom }] : []),
-        ...(dateTo ? [{ field: "date_to", operator: "lte" as const, value: dateTo }] : []),
-      ],
-      "replace",
-    );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedCats, selectedTva, dateRange]);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await transactionsApi.exportAchat(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
+      const colValues: Record<string, (r: Record<string, unknown>) => string> = {
+        ...ACHAT_COL_VALUES,
+        delivery_ref_final: (r) => String(r.delivery_ref_final ?? ""),
+      };
+      const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      downloadCSV(res.data, rowMapper, headers, `achats_export_${Date.now()}.csv`);
+      toast.success(`${res.data.length} lignes exportées`);
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
 
-  const tableData = table.refineCore.tableQuery.data as { data: AchatRow[] } | undefined;
+  const handleExportByType = async (type: "medicament" | "parapharmacie") => {
+    setExporting(true);
+    try {
+      const medCats  = allCategories.filter(c => c.toLowerCase().includes("médicament"));
+      const paraCats = allCategories.filter(c => !c.toLowerCase().includes("médicament"));
+      const cats = type === "medicament" ? medCats : paraCats;
+      const res = await transactionsApi.exportAchat("", cats, dateFrom, dateTo);
+      const colValues = { ...ACHAT_COL_VALUES };
+      const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      downloadCSV(res.data, rowMapper, headers, `achats_${type}_${Date.now()}.csv`);
+      toast.success(`${res.data.length} lignes exportées`);
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const tvaPageTotal = useMemo(() =>
-    (tableData?.data ?? []).reduce((acc, row) => {
+    rows.reduce((acc, row) => {
       const m = String(row.tva ?? "").match(/([\d.]+)\s*%/);
       const rate = m ? parseFloat(m[1]) / 100 : 0;
       return acc + (row.total ?? 0) * rate;
     }, 0),
-  [tableData]);
+  [rows]);
 
-  if (identity?.role === eUserRole.ADMIN) return null;
+  if (user?.role === eUserRole.ADMIN) return null;
 
   return (
     <ListView>
@@ -361,7 +363,7 @@ const AchatList = () => {
         allTvaRates={allTvaRates}
         selectedTva={selectedTva}
         onTvaChange={setSelectedTva}
-        fetchSuggestions={api.tables.achatSuggestions}
+        fetchSuggestions={transactionsApi.achatSuggestions}
         suggestionGroupLabels={{ products: "Produit", suppliers: "Fournisseur", refs: "Référence" }}
         rightAddon={
           <div className="flex items-center gap-2">
@@ -380,7 +382,7 @@ const AchatList = () => {
               Parapharmacie
             </button>
             <ColumnVisibilityToggle
-              table={table.reactTable}
+              table={tableInstance}
               storageKey="achats-cols"
               columnLabels={ACHAT_COL_LABELS}
             />
@@ -388,9 +390,21 @@ const AchatList = () => {
         }
       />
 
-      <DataTable table={table} emptyState={<AchatEmptyState canImport={identity?.permissions?.import !== false} />} />
+      <DataTable
+        table={tableInstance}
+        isLoading={isLoading}
+        pagination={{
+          currentPage: page,
+          setCurrentPage: setPage,
+          pageCount,
+          pageSize: limit,
+          setPageSize: setLimit,
+          total: paginationMeta?.total,
+        }}
+        emptyState={<AchatEmptyState canImport={user?.permissions?.import !== false} />}
+      />
 
-      {(tableData?.data?.length ?? 0) > 0 && (
+      {rows.length > 0 && (
         <div className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-2 flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">TVA payée (page courante) :</span>
           <span className="font-semibold tabular-nums">{fmt(tvaPageTotal)} MAD</span>

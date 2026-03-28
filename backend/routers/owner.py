@@ -5,18 +5,10 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User
-from routers.auth import get_current_user
+from utils.permissions import get_current_owner
 from schemas import EmployeePermissionsUpdate, UserAdminOut
 
 router = APIRouter(prefix="/owner", tags=["owner"])
-
-
-def get_current_owner(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in ("owner", "admin"):
-        raise HTTPException(status_code=403, detail="Owner access required")
-    if not current_user.pharmacy_id:
-        raise HTTPException(status_code=403, detail="No pharmacy associated with this account")
-    return current_user
 
 
 @router.get("/employees", response_model=List[UserAdminOut])

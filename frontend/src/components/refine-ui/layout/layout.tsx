@@ -4,7 +4,7 @@ import { Header } from "@/components/refine-ui/layout/header";
 import { ThemeProvider } from "@/components/refine-ui/theme/theme-provider";
 import { TopLoadingBar } from "@/components/top-loading-bar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import type { PropsWithChildren } from "react";
 import { Sidebar } from "./sidebar";
 

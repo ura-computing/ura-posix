@@ -5,7 +5,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { useGo, useResourceParams, useTranslate } from "@refinedev/core";
 import { ChevronLeft, InfoIcon } from "lucide-react";
 import { useEffect, useState } from "react";

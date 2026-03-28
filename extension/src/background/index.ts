@@ -49,7 +49,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       skipped: number;
     };
     addNotification({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id: crypto.randomUUID(),
       fileType,
       inserted,
       skipped,

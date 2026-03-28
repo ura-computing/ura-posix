@@ -1,4 +1,5 @@
-import { useRegister, useLink } from "@refinedev/core";
+import { Link } from "react-router";
+import { useRegisterMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -31,10 +32,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
-import type { PharmacyPublic } from "@/lib/api";
+import { cn } from "@/utils/cn";
+import { listPharmacies as listPublicPharmacies } from "@/api/public";
+import type { PharmacyPublic } from "@/api/public";
 import { eUserRole } from "@/types";
 
 const schema = z.object({
@@ -66,8 +66,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export const SignUpForm = () => {
-  const Link = useLink();
-  const { mutate: register, isPending } = useRegister();
+  const { mutate: register, isPending } = useRegisterMutation();
   const [pharmacies, setPharmacies] = useState<PharmacyPublic[]>([]);
 
   const form = useForm<FormValues>({
@@ -79,7 +78,7 @@ export const SignUpForm = () => {
   const [ownerMode, setOwnerMode] = useState<"new" | "join">("new");
 
   useEffect(() => {
-    api.public.listPharmacies().then(setPharmacies).catch(() => {});
+    listPublicPharmacies().then(setPharmacies).catch(() => {});
   }, []);
 
   // Clear stale pharmacy fields when mode or role changes
@@ -96,13 +95,7 @@ export const SignUpForm = () => {
   const onSubmit = (values: FormValues) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword, ...payload } = values;
-    register(payload, {
-      onSuccess: (data) => {
-        if (!data.success) {
-          toast.error(data.error?.message, { richColors: true });
-        }
-      },
-    });
+    register(payload as Parameters<typeof register>[0]);
   };
 
   return (

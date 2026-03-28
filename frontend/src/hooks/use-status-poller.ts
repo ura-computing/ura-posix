@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { me } from "@/api/auth";
 import { QUERY_KEYS } from "@/constants";
 import type { User } from "@/types";
 
@@ -20,7 +20,7 @@ export function useStatusPoller(user: User | null | undefined) {
 
     const interval = setInterval(async () => {
       try {
-        const fresh = await api.auth.me();
+        const fresh = await me();
         const statusChanged = fresh.status !== prevStatus.current;
         const permissionsChanged = JSON.stringify(fresh.permissions) !== JSON.stringify(user?.permissions);
         if (statusChanged || permissionsChanged) {

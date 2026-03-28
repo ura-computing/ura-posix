@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { achatJson, venteJson } from "@/api/uploads";
 import { QUERY_KEYS } from "@/constants";
 
 type DocType = "achat" | "vente";
@@ -72,8 +72,8 @@ export function useUploadCsvBatched() {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
       try {
         const res = docType === "achat"
-          ? await api.uploads.achatJson(chunk)
-          : await api.uploads.venteJson(chunk);
+          ? await achatJson(chunk)
+          : await venteJson(chunk);
         totalInserted += res.inserted ?? 0;
         totalSkipped += res.skipped ?? 0;
       } catch (err) {

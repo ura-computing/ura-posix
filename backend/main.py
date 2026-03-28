@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import CategorySuffix
 from schemas import CategorySuffixOut
-from routers import achat, admin, auth, catalog_requests, data, owner, public, uploads, vente
+from routers import admin, auth, catalog_requests, data, owner, public, uploads
+from routers.transactions import achat_router, vente_router
 from routers.stats import router as stats_router
 from routers.auth import get_current_user
 from models import User
@@ -52,8 +53,8 @@ async def log_requests(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(public.router)
 app.include_router(uploads.router)
-app.include_router(achat.router)
-app.include_router(vente.router)
+app.include_router(achat_router)
+app.include_router(vente_router)
 app.include_router(data.router)
 app.include_router(admin.router)
 app.include_router(owner.router)

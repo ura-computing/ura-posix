@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetIdentity } from "@refinedev/core";
+import { useMe } from "@/hooks/use-me";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users,
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+import { PageLoader } from "@/components/shared/pageLoader";
 import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api } from "@/lib/api";
-import type { User, UserAdmin } from "@/types";
+import * as ownerApi from "@/api/owner";
+import type { UserAdmin } from "@/types";
 import { eUserRole } from "@/types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ function PermissionToggles({
   const queryClient = useQueryClient();
   const { mutate: updatePermissions, isPending } = useMutation({
     mutationFn: ({ id, permissions }: { id: number; permissions: Record<string, boolean> }) =>
-      api.owner.updateEmployeePermissions(id, permissions),
+      ownerApi.updateEmployeePermissions(id, permissions),
     onSuccess: (updated) => {
       queryClient.setQueryData<UserAdmin[]>(QUERY_KEY, (prev) =>
         prev?.map((e) => (e.id === updated.id ? updated : e)) ?? []
@@ -114,7 +115,7 @@ function PermissionToggles({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function OwnerEmployeesPage() {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: identity } = useMe();
   const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
@@ -123,7 +124,7 @@ export default function OwnerEmployeesPage() {
 
   const { data: employees = [], isLoading } = useQuery({
     queryKey: QUERY_KEY,
-    queryFn: api.owner.listEmployees,
+    queryFn: ownerApi.listEmployees,
     enabled: !isEmployee,
   });
 
@@ -131,7 +132,7 @@ export default function OwnerEmployeesPage() {
   const active = employees.filter((e) => e.status === "active");
 
   const { mutate: approve, isPending: approving } = useMutation({
-    mutationFn: (id: number) => api.owner.approveEmployee(id),
+    mutationFn: (id: number) => ownerApi.approveEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Employé approuvé");
@@ -140,7 +141,7 @@ export default function OwnerEmployeesPage() {
   });
 
   const { mutate: reject, isPending: rejecting } = useMutation({
-    mutationFn: (id: number) => api.owner.rejectEmployee(id),
+    mutationFn: (id: number) => ownerApi.rejectEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Demande refusée");
@@ -150,7 +151,7 @@ export default function OwnerEmployeesPage() {
   });
 
   const { mutate: revoke, isPending: revoking } = useMutation({
-    mutationFn: (id: number) => api.owner.revokeEmployee(id),
+    mutationFn: (id: number) => ownerApi.revokeEmployee(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Accès révoqué — l'employé est en attente");
@@ -173,9 +174,7 @@ export default function OwnerEmployeesPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <PageLoader />
       ) : (
         <div className="space-y-8">
           {/* Pending section */}

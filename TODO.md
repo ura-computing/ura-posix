@@ -185,3 +185,18 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
 + in Analyse de marge:
     + add a button creer un analyse, where use can creare a anaylys sumulation, by selecting parudut, fourincieur etc.. based on all filter alrady used in alayse, it should no be saved in database since it's only a simulation done so owner can find what goes best for him
 
+
++ whenever you i stopped the backened , and run it again it seems like the tokesns already validate why ?
++ add forget password, functionality and in log in pgae
++ chrome store account for the extension
++ make batch loading pop up bigger (extension)
++ for colons show everything by default
++ list ventes:
+    + update colors cimilar to the ones in rapport page
++ fix build
++ password reset
++ ask about fancounalty of produit non declare
++ ask about analyze
++ user (employee and owner) can't change information
++ verfy number option
++ can't chnage languege

@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { cn } from "@/utils/cn";
+
+import * as transactionsApi from "@/api/transactions";
 import { useClearAchats, useClearVentes } from "@/hooks/use-clear-data";
 import { CategoryMultiSelect } from "@/components/category-multi-select";
 
@@ -228,8 +229,8 @@ const ParametresList = () => {
   const [venteCategories, setVenteCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    api.tables.achatCategories().then(setAchatCategories).catch(() => {});
-    api.tables.venteCategories().then(setVenteCategories).catch(() => {});
+    transactionsApi.achatCategories().then(setAchatCategories).catch(() => {});
+    transactionsApi.venteCategories().then(setVenteCategories).catch(() => {});
   }, []);
 
   return (

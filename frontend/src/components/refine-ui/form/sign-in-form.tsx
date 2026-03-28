@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useLink, useLogin } from "@refinedev/core";
+import { Link } from "react-router";
+import { useLoginMutation } from "@/hooks/useAuthMutations";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
@@ -33,8 +34,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export const SignInForm = () => {
-  const Link = useLink();
-  const { mutate: login, isPending } = useLogin();
+  const { mutate: login, isPending } = useLoginMutation();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

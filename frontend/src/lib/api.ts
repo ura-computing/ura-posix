@@ -194,6 +194,24 @@ export const api = {
     venteCategories: () => request<string[]>(ENDPOINTS.ventes.categories),
     achatTvaRates: () => request<string[]>(ENDPOINTS.achat.tvaRates),
     venteTvaRates: () => request<string[]>(ENDPOINTS.ventes.tvaRates),
+    listAchats: (p: { page: number; limit: number; search?: string; categories?: string[]; tva?: string[]; dateFrom?: string; dateTo?: string }) => {
+      const qs = new URLSearchParams({ page: String(p.page), limit: String(p.limit) });
+      if (p.search) qs.set("search", p.search);
+      p.categories?.forEach((c) => qs.append("category", c));
+      p.tva?.forEach((t) => qs.append("tva", t));
+      if (p.dateFrom) qs.set("date_from", p.dateFrom);
+      if (p.dateTo) qs.set("date_to", p.dateTo);
+      return request<{ data: Record<string, unknown>[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/achat?${qs}`);
+    },
+    listVentes: (p: { page: number; limit: number; search?: string; categories?: string[]; tva?: string[]; dateFrom?: string; dateTo?: string }) => {
+      const qs = new URLSearchParams({ page: String(p.page), limit: String(p.limit) });
+      if (p.search) qs.set("search", p.search);
+      p.categories?.forEach((c) => qs.append("category", c));
+      p.tva?.forEach((t) => qs.append("tva", t));
+      if (p.dateFrom) qs.set("date_from", p.dateFrom);
+      if (p.dateTo) qs.set("date_to", p.dateTo);
+      return request<{ data: Record<string, unknown>[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>(`/ventes?${qs}`);
+    },
     exportAchat: (search: string, categories: string[], dateFrom?: string, dateTo?: string, tva?: string[]) => {
       const p = new URLSearchParams({ export: "true" });
       if (search) p.set("search", search);
@@ -266,10 +284,10 @@ export const api = {
     updateUserPharmacy: (userId: number, pharmacyId: number | null) =>
       request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/pharmacy`, { method: "PUT", body: JSON.stringify({ pharmacy_id: pharmacyId }) }),
     // Catalog direct CRUD
-    listCatalog: (search?: string, page = 1) => {
-      const p = new URLSearchParams({ page: String(page) });
+    listCatalog: (search?: string, page = 1, limit = 50) => {
+      const p = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (search) p.set("search", search);
-      return request<MedicamentOut[]>(`/admin/catalog?${p}`);
+      return request<{ data: MedicamentOut[]; pagination: { total: number; current: number; pageSize: number } }>(`/admin/catalog?${p}`);
     },
     createMedicament: (body: Omit<MedicamentOut, "id">) =>
       request<MedicamentOut>("/admin/catalog", { method: "POST", body: JSON.stringify(body) }),
@@ -398,5 +416,9 @@ export const api = {
 
   clearSession: () => {
     sessionStorage.removeItem(TOKEN_KEY);
+  },
+
+  hasSession: (): boolean => {
+    return !!sessionStorage.getItem(TOKEN_KEY);
   },
 };

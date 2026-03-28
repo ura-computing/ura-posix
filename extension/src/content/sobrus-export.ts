@@ -81,7 +81,14 @@ async function handleExport(apiUrl: string) {
     // ── 1. Fetch CSV from Sobrus ───────────────────────────────────────────
     let csvText: string;
     try {
-      const res = await fetch(apiUrl, { credentials: "include" });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      let res: Response;
+      try {
+        res = await fetch(apiUrl, { credentials: "include", signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       csvText = await res.text();
     } catch (err) {
