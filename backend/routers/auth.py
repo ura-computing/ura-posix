@@ -6,8 +6,8 @@ from database import get_db
 from models import User, Pharmacy
 from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate
 
-ALL_FEATURES = ["rapports", "import", "achat", "ventes", "stock"]
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
+from utils.constants import FEATURE_FLAGS as ALL_FEATURES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()

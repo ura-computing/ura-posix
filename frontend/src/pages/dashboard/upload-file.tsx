@@ -4,7 +4,7 @@ import {
   CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
   Loader2, Ban,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { useUploadCsvBatched } from "@/hooks/use-upload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

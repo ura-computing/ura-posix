@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+import { PageLoader } from "@/components/shared/pageLoader";
 import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,8 +54,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { cn } from "@/utils/cn";
+import { UserStatusBadge } from "@/components/shared/statusBadge";
+import * as adminApi from "@/api/admin";
 import { QUERY_KEYS } from "@/constants";
 import type { Pharmacy, UserAdmin, UserRole } from "@/types";
 import { eUserRole } from "@/types";
@@ -102,21 +104,6 @@ function initials(name?: string, email?: string) {
   return (email ?? "?").slice(0, 2).toUpperCase();
 }
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  active:  { label: "Actif",    className: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800" },
-  pending: { label: "En attente", className: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800" },
-  rejected:{ label: "Refusé",   className: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
-  return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", cfg.className)}>
-      {cfg.label}
-    </span>
-  );
-}
-
 // ── Pharmacy form dialog ───────────────────────────────────────────────────────
 
 type PharmacyFormProps = {
@@ -146,8 +133,8 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
   const { mutate, isPending } = useMutation({
     mutationFn: () =>
       isEdit
-        ? api.admin.updatePharmacy(pharmacy!.id, { name, address: address || undefined, phone: phone || undefined, email: email || undefined })
-        : api.admin.createPharmacy({ name, address: address || undefined, phone: phone || undefined, email: email || undefined }),
+        ? adminApi.updatePharmacy(pharmacy!.id, { name, address: address || undefined, phone: phone || undefined, email: email || undefined })
+        : adminApi.createPharmacy({ name, address: address || undefined, phone: phone || undefined, email: email || undefined }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
       toast.success(isEdit ? "Pharmacie mise à jour" : "Pharmacie créée");
@@ -254,12 +241,12 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: panelQueryKey,
-    queryFn: () => api.admin.listUsers(pharmacy.id),
+    queryFn: () => adminApi.listUsers(pharmacy.id),
   });
 
   const { mutate: updateRole } = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
-      api.admin.updateUserRole(userId, role),
+      adminApi.updateUserRole(userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: panelQueryKey });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
@@ -270,7 +257,7 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
 
   const { mutate: updatePharmacy } = useMutation({
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number | null }) =>
-      api.admin.updateUserPharmacy(userId, pharmacyId),
+      adminApi.updateUserPharmacy(userId, pharmacyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: panelQueryKey });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
@@ -281,7 +268,7 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
 
   const { mutate: updatePermissions, isPending: updatingPerms } = useMutation({
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
-      api.admin.updateUserPermissions(userId, permissions),
+      adminApi.updateUserPermissions(userId, permissions),
     onSuccess: (updated) => {
       queryClient.setQueryData<UserAdmin[]>(panelQueryKey, (prev) =>
         prev?.map((u) => (u.id === updated.id ? updated : u)) ?? []
@@ -305,9 +292,7 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        </div>
+        <PageLoader />
       ) : users.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-10 text-center">
           <Users className="h-8 w-8 text-muted-foreground/40" />
@@ -401,7 +386,7 @@ export default function PharmaciesAdminPage() {
 
   const { data: pharmacies = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.pharmacies,
-    queryFn: api.admin.listPharmacies,
+    queryFn: adminApi.listPharmacies,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -410,7 +395,7 @@ export default function PharmaciesAdminPage() {
   const [usersTarget, setUsersTarget] = useState<Pharmacy | null>(null);
 
   const { mutate: deletePharmacy, isPending: deleting } = useMutation({
-    mutationFn: (id: number) => api.admin.deletePharmacy(id),
+    mutationFn: (id: number) => adminApi.deletePharmacy(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
       toast.success("Pharmacie supprimée");
@@ -443,9 +428,7 @@ export default function PharmaciesAdminPage() {
 
       {/* Pharmacies grid */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <PageLoader />
       ) : pharmacies.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
@@ -616,11 +599,11 @@ function PendingOwnersSection() {
 
   const { data: pendingOwners = [], isLoading } = useQuery({
     queryKey: ["pendingOwners"],
-    queryFn: api.admin.listPendingOwners,
+    queryFn: adminApi.listPendingOwners,
   });
 
   const { mutate: approve, isPending: approving } = useMutation({
-    mutationFn: (userId: number) => api.admin.approveUser(userId),
+    mutationFn: (userId: number) => adminApi.approveUser(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
@@ -630,7 +613,7 @@ function PendingOwnersSection() {
   });
 
   const { mutate: reject, isPending: rejecting } = useMutation({
-    mutationFn: (userId: number) => api.admin.rejectUser(userId),
+    mutationFn: (userId: number) => adminApi.rejectUser(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
       toast.success("Demande refusée");
@@ -651,9 +634,7 @@ function PendingOwnersSection() {
 
       <div className="border rounded-xl overflow-hidden bg-card">
         {isLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+          <PageLoader />
         ) : (
           <div className="divide-y">
             {/* Table header */}
@@ -744,12 +725,12 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminUsers,
-    queryFn: () => api.admin.listUsers(),
+    queryFn: () => adminApi.listUsers(),
   });
 
   const { mutate: updateRole } = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
-      api.admin.updateUserRole(userId, role),
+      adminApi.updateUserRole(userId, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
@@ -760,7 +741,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
   const { mutate: updatePharmacy } = useMutation({
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number | null }) =>
-      api.admin.updateUserPharmacy(userId, pharmacyId),
+      adminApi.updateUserPharmacy(userId, pharmacyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
@@ -770,7 +751,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
   });
 
   const { mutate: revoke, isPending: revoking } = useMutation({
-    mutationFn: (userId: number) => api.admin.revokeUser(userId),
+    mutationFn: (userId: number) => adminApi.revokeUser(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
       queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
@@ -789,9 +770,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
       <div className="border rounded-xl overflow-hidden bg-card">
         {isLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+          <PageLoader />
         ) : users.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             <Users className="h-8 w-8 text-muted-foreground/40" />
@@ -824,7 +803,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
                 {/* Status */}
                 <div className="w-24 flex justify-center">
-                  <StatusBadge status={user.status} />
+                  <UserStatusBadge status={user.status} />
                 </div>
 
                 {/* Role */}

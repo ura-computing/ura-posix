@@ -2,7 +2,7 @@
 
 import { useTheme } from "@/components/refine-ui/theme/theme-provider";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { Moon, Sun } from "lucide-react";
 
 type ThemeToggleProps = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 

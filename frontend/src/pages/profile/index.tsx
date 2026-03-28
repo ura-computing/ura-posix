@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
+import { PageLoader } from "@/components/shared/pageLoader";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,8 +20,6 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useMe } from "@/hooks/use-me";
 import { useUpdateMe } from "@/hooks/use-update-me";
-import { useGetIdentity } from "@refinedev/core";
-import type { User } from "@/types";
 
 const schema = z.object({
   name: z.string().min(2, "Nom requis"),
@@ -34,11 +33,10 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ProfilePage() {
   const { data: user, isLoading } = useMe();
-  const { data: identity } = useGetIdentity<User>();
   const { mutate: updateMe, isPending } = useUpdateMe();
 
-  const isAdmin = identity?.role === "admin";
-  const isEmployee = identity?.role === "employee";
+  const isAdmin = user?.role === "admin";
+  const isEmployee = user?.role === "employee";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -64,13 +62,7 @@ export default function ProfilePage() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (isLoading) return <PageLoader />;
 
   return (
     <div className="space-y-6 max-w-2xl">

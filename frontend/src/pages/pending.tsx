@@ -1,11 +1,11 @@
 import { Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useGetIdentity, useLogout } from "@refinedev/core";
-import type { User } from "@/types";
+import { useMe } from "@/hooks/use-me";
+import { useLogout } from "@/hooks/useLogout";
 import { eUserRole } from "@/types";
 
 export default function PendingApproval() {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: identity } = useMe();
   const { mutate: logout } = useLogout();
 
   const isEmployee = identity?.role === eUserRole.EMPLOYEE;

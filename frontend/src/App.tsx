@@ -1,28 +1,35 @@
-import { Authenticated, Refine, useLogout } from "@refinedev/core";
-import { DevtoolsProvider } from "@refinedev/devtools";
-import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import routerProvider, {
-  DocumentTitleHandler,
-  NavigateToResource,
-  UnsavedChangesNotifier,
-} from "@refinedev/react-router";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/refine-ui/notification/toaster";
-import { useNotificationProvider } from "./components/refine-ui/notification/use-notification-provider";
 import { ThemeProvider } from "./components/refine-ui/theme/theme-provider";
 import { Layout } from "./components/refine-ui/layout/layout";
-import { dataProvider } from "./providers/data";
-import { authProvider } from "./providers/auth";
 import { Login } from "./pages/login";
-import { routes, resources } from "./routes";
+import { routes } from "./routes";
 import { useStatusPoller } from "./hooks/use-status-poller";
 import { useMe } from "./hooks/use-me";
+import { useLogout } from "./hooks/useLogout";
+import { hasSession } from "./utils/session";
 import type { UserRole } from "./types";
 
-// Blocks navigation to any route other than "/" for pending (not yet active) accounts.
+// Redirects to /login if no session token exists (synchronous — no flicker).
+function ProtectedRoute({ fallback, children }: { fallback?: ReactNode; children?: ReactNode }) {
+  if (!hasSession()) {
+    return fallback ?? <Navigate to="/login" replace />;
+  }
+  return children ? <>{children}</> : <Outlet />;
+}
+
+// Redirects authenticated users away from guest-only pages (login, register).
+function GuestRoute() {
+  if (hasSession()) {
+    return <Navigate to="/rapports" replace />;
+  }
+  return <Outlet />;
+}
+
+// Blocks navigation to any route other than "/" for pending accounts.
 // Also polls the backend while pending so approval is reflected immediately.
 function PendingGuard() {
   const { data: identity } = useMe();
@@ -73,89 +80,57 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <RefineKbarProvider>
-          <ThemeProvider defaultTheme="light">
-            <DevtoolsProvider>
-              <Refine
-                dataProvider={dataProvider}
-                authProvider={authProvider}
-                notificationProvider={useNotificationProvider()}
-                routerProvider={routerProvider}
-                options={{
-                  syncWithLocation: true,
-                  warnWhenUnsavedChanges: true,
-                  projectId: import.meta.env.VITE_REFINE_PROJECT_ID ?? "kkWuv7-GgBIfw-P8CGy0",
-                }}
-                resources={resources}
-              >
-                <Routes>
-                  {/* Universal routes (accessible to all, no auth wrapper) */}
-                  {universalRoutes.map((route) => (
-                    <Route key={route.path} path={route.path} element={route.element} />
-                  ))}
+        <ThemeProvider defaultTheme="light">
+          <Routes>
+            {/* Universal routes (accessible to all, no auth wrapper) */}
+            {universalRoutes.map((route) => (
+              <Route key={route.path} path={route.path} element={route.element} />
+            ))}
 
-                  {/* Public routes (no auth required, redirect to dashboard if authenticated) */}
-                  <Route
-                    element={
-                      <Authenticated key="public-routes" fallback={<Outlet />}>
-                        <NavigateToResource fallbackTo="/rapports" />
-                      </Authenticated>
-                    }
-                  >
-                    {publicRoutes.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
-                    ))}
-                  </Route>
+            {/* Public routes (redirect to /rapports if already logged in) */}
+            <Route element={<GuestRoute />}>
+              {publicRoutes.map((route) => (
+                <Route key={route.path} path={route.path} element={route.element} />
+              ))}
+            </Route>
 
-                  {/* Auth routes without sidebar layout */}
-                  <Route
-                    element={
-                      <Authenticated key="auth-no-layout" fallback={<Login />}>
-                        <Outlet />
-                      </Authenticated>
-                    }
-                  >
-                    {authRoutesNoLayout.map((route) => (
-                      <Route key={route.path} path={route.path} element={route.element} />
-                    ))}
-                  </Route>
+            {/* Auth routes without sidebar layout */}
+            <Route element={<ProtectedRoute fallback={<Login />} />}>
+              {authRoutesNoLayout.map((route) => (
+                <Route key={route.path} path={route.path} element={route.element} />
+              ))}
+            </Route>
 
-                  {/* Auth routes with sidebar layout */}
-                  <Route
-                    element={
-                      <Authenticated key="auth-with-layout" fallback={<Navigate to="/login" replace />}>
-                        <Layout>
-                          <PendingGuard />
-                        </Layout>
-                      </Authenticated>
-                    }
-                  >
-                    {authRoutesWithLayout.map((route) => (
-                      <Route
-                        key={route.path}
-                        path={route.path}
-                        element={
-                          <RoleGuard allowed={route.allowed} permission={route.permission}>
-                            {route.element}
-                          </RoleGuard>
-                        }
-                      />
-                    ))}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Route>
+            {/* Auth routes with sidebar layout */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <PendingGuard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            >
+              {authRoutesWithLayout.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={
+                    <RoleGuard allowed={route.allowed} permission={route.permission}>
+                      {route.element}
+                    </RoleGuard>
+                  }
+                />
+              ))}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
 
-                  {/* Global catch-all: redirect unknown URLs to welcome page */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+            {/* Global catch-all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
 
-                <Toaster />
-                <RefineKbar />
-                <UnsavedChangesNotifier />
-                <DocumentTitleHandler />
-              </Refine>
-            </DevtoolsProvider>
-          </ThemeProvider>
-        </RefineKbarProvider>
+          <Toaster />
+        </ThemeProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

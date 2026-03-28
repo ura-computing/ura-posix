@@ -1,4 +1,4 @@
-import { useLogout } from "@refinedev/core";
+import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/use-me";
 import { useStatusPoller } from "@/hooks/use-status-poller";
 import { Link } from "react-router";

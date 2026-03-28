@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { Check, ChevronDown, Monitor, Moon, Sun } from "lucide-react";
 import React from "react";
 import { useTheme } from "./theme-provider";

@@ -1,4 +1,3 @@
-import unicodedata
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,7 +6,10 @@ from sqlalchemy.sql import func
 
 from database import get_db
 from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, User, Vente
+from utils.strings import normalize_category, strip_accents, strip_percentage
+from utils.constants import VALID_ROLES
 from routers.auth import get_current_user
+from utils.permissions import get_current_admin
 from schemas import (
     CategorySuffixCreate,
     CategorySuffixOut,
@@ -27,20 +29,6 @@ from schemas import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-VALID_ROLES = {"admin", "owner", "employee"}
-
-
-def strip_accents(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
-
-
-def get_current_admin(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
 
 
 # ── Pharmacies ─────────────────────────────────────────────────────────────────

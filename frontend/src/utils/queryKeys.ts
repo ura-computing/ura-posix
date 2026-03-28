@@ -1,0 +1,20 @@
+export const QUERY_KEYS = {
+  me: ["me"] as const,
+  achats: (f?: unknown) => ["achats", f] as const,
+  ventes: (f?: unknown) => ["ventes", f] as const,
+  stats: (f?: unknown) => ["stats", f] as const,
+  analyseMarge: (f?: unknown) => ["analyse-marge", f] as const,
+  adminStats: ["admin-stats"] as const,
+  adminPharmacies: ["admin-pharmacies"] as const,
+  pharmacyStats: (id: number, f?: unknown) => ["pharmacy-stats", id, f] as const,
+  adminCatalog: (f?: unknown) => ["admin", "catalog", f] as const,
+  adminUsers: (pharmacyId?: number) => ["admin", "users", pharmacyId] as const,
+  adminNotifs: ["admin-notifications"] as const,
+  ownerNotifs: ["owner-notifications"] as const,
+  ownerEmployees: ["owner-employees"] as const,
+  catalogRequests: {
+    owner: (status?: string) => ["catalog-requests", "owner", status] as const,
+    admin: (status?: string) => ["admin", "catalog-requests", status] as const,
+  },
+  categorySuffixes: ["admin", "category-suffixes"] as const,
+} as const;

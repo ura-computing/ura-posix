@@ -5,16 +5,14 @@ import {
   Loader2,
   UserCheck,
   UserX,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  PackageX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
+import { RequestStatusBadge } from "@/components/shared/statusBadge";
 
+import { PageLoader } from "@/components/shared/pageLoader";
 import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -31,8 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api } from "@/lib/api";
-import type { CatalogRequestOut } from "@/lib/api";
+import * as adminApi from "@/api/admin";
+import type { CatalogRequestOut } from "@/api/admin";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -45,31 +43,6 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "rejected", label: "Rejetés" },
 ];
 
-function StatusBadge({ status }: { status: CatalogRequestOut["status"] }) {
-  if (status === "pending") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
-        <Clock className="h-3 w-3" />
-        En attente
-      </span>
-    );
-  }
-  if (status === "approved") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
-        <CheckCircle2 className="h-3 w-3" />
-        Approuvé
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-      <XCircle className="h-3 w-3" />
-      Refusé
-    </span>
-  );
-}
-
 
 export default function AdminCatalogRequestsPage() {
   const queryClient = useQueryClient();
@@ -79,13 +52,13 @@ export default function AdminCatalogRequestsPage() {
 
   const { data: allRequests = [], isLoading } = useQuery({
     queryKey: [...QUERY_KEY, statusFilter],
-    queryFn: () => api.admin.listCatalogRequests(statusFilter === "all" ? undefined : statusFilter),
+    queryFn: () => adminApi.listCatalogRequests(statusFilter === "all" ? undefined : statusFilter),
   });
 
   const requests = allRequests;
 
   const { mutate: approve, isPending: approving } = useMutation({
-    mutationFn: (id: number) => api.admin.approveCatalogRequest(id),
+    mutationFn: (id: number) => adminApi.approveCatalogRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Produit marqué comme non déclaré");
@@ -95,7 +68,7 @@ export default function AdminCatalogRequestsPage() {
 
   const { mutate: reject, isPending: rejecting } = useMutation({
     mutationFn: ({ id, reason }: { id: number; reason: string }) =>
-      api.admin.rejectCatalogRequest(id, reason || undefined),
+      adminApi.rejectCatalogRequest(id, reason || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast.success("Demande rejetée");
@@ -148,9 +121,7 @@ export default function AdminCatalogRequestsPage() {
       {/* Requests list */}
       <div className="border rounded-xl overflow-hidden bg-card">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
+          <PageLoader />
         ) : requests.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-14 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
@@ -197,7 +168,7 @@ export default function AdminCatalogRequestsPage() {
 
                 {/* Status */}
                 <div className="w-24 flex justify-center">
-                  <StatusBadge status={req.status} />
+                  <RequestStatusBadge status={req.status} />
                 </div>
 
                 {/* Date */}

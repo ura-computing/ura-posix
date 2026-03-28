@@ -10,9 +10,10 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useNotifications, type ApcmNotification } from "@/hooks/use-notifications";
-import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
-import { useLogout } from "@refinedev/core";
+import { cn } from "@/utils/cn";
+import { getNotifications as getAdminNotifications } from "@/api/admin";
+import { getNotifications as getOwnerNotifications } from "@/api/owner";
+import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/use-me";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, CheckCheck, ClipboardList, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound, UserPlus } from "lucide-react";
@@ -181,14 +182,14 @@ function NotificationBell() {
 
   const { data: adminNotifs } = useQuery({
     queryKey: ["admin-notifications"],
-    queryFn: () => api.admin.getNotifications(),
+    queryFn: () => getAdminNotifications(),
     enabled: isAdmin,
     refetchInterval: 30_000,
   });
 
   const { data: ownerNotifs } = useQuery({
     queryKey: ["owner-notifications"],
-    queryFn: () => api.owner.getNotifications(),
+    queryFn: () => getOwnerNotifications(),
     enabled: isOwner,
     refetchInterval: 30_000,
   });

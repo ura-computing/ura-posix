@@ -2,17 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Sidebar as ShadcnSidebar,
   SidebarContent as ShadcnSidebarContent,
   SidebarHeader as ShadcnSidebarHeader,
@@ -20,28 +9,24 @@ import {
   SidebarTrigger as ShadcnSidebarTrigger,
   useSidebar as useShadcnSidebar,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import {
-  useLink,
-  useMenu,
-  type TreeMenuItem,
-} from "@refinedev/core";
+import { cn } from "@/utils/cn";
 import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
+import { Link, useLocation } from "react-router";
 import { useMe } from "@/hooks/use-me";
+import { resources, type ResourceConfig } from "@/routes";
 
 export function Sidebar() {
   const { open } = useShadcnSidebar();
-  const { menuItems, selectedKey } = useMenu();
   const { data: identity } = useMe();
+  const { pathname } = useLocation();
   const isPending = identity?.status !== "active";
 
-  const visibleItems = menuItems.filter((item: TreeMenuItem) => {
-    // Pending accounts can only see the dashboard link
-    if (isPending) return item.name === "dashboard";
-    if (!item?.meta?.allowed.includes(identity?.role)) return false;
-    const permKey = item?.meta?.permission as string | undefined;
+  const visibleItems = resources.filter((item: ResourceConfig) => {
+    if (isPending) return false;
+    if (!item.meta.allowed.includes(identity?.role as never)) return false;
+    const permKey = item.meta.permission;
     if (permKey && identity?.permissions?.[permKey] === false) return false;
     return true;
   });
@@ -79,11 +64,11 @@ export function Sidebar() {
           }
         )}
       >
-        {visibleItems.map((item: TreeMenuItem) => (
-          <SidebarItem
-            key={item.key || item.name}
+        {visibleItems.map((item: ResourceConfig) => (
+          <SidebarItemLink
+            key={item.name}
             item={item}
-            selectedKey={selectedKey}
+            isSelected={pathname === item.list || pathname.startsWith(item.list + "/")}
           />
         ))}
       </ShadcnSidebarContent>
@@ -101,146 +86,51 @@ export function Sidebar() {
   );
 }
 
-type MenuItemProps = {
-  item: TreeMenuItem;
-  selectedKey?: string;
+type SidebarItemLinkProps = {
+  item: ResourceConfig;
+  isSelected: boolean;
 };
 
-function SidebarItem({ item, selectedKey }: MenuItemProps) {
+function SidebarItemLink({ item, isSelected }: SidebarItemLinkProps) {
   const { open } = useShadcnSidebar();
-
-  if (item.meta?.group) {
-    return <SidebarItemGroup item={item} selectedKey={selectedKey} />;
-  }
-
-  if (item.children && item.children.length > 0) {
-    if (open) {
-      return <SidebarItemCollapsible item={item} selectedKey={selectedKey} />;
-    }
-    return <SidebarItemDropdown item={item} selectedKey={selectedKey} />;
-  }
-
-  return <SidebarItemLink item={item} selectedKey={selectedKey} />;
-}
-
-function SidebarItemGroup({ item, selectedKey }: MenuItemProps) {
-  const { children } = item;
-  const { open } = useShadcnSidebar();
+  const icon = item.meta.icon;
 
   return (
-    <div className={cn("border-t", "border-sidebar-border", "pt-4")}>
-      <span
-        className={cn(
-          "ml-3",
-          "block",
-          "text-xs",
-          "font-semibold",
-          "uppercase",
-          "text-muted-foreground",
-          "transition-all",
-          "duration-200",
-          {
-            "h-8": open,
-            "h-0": !open,
-            "opacity-0": !open,
-            "opacity-100": open,
-            "pointer-events-none": !open,
-            "pointer-events-auto": open,
-          }
-        )}
-      >
-        {getDisplayName(item)}
-      </span>
-      {children && children.length > 0 && (
-        <div className={cn("flex", "flex-col")}>
-          {children.map((child: TreeMenuItem) => (
-            <SidebarItem
-              key={child.key || child.name}
-              item={child}
-              selectedKey={selectedKey}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SidebarItemCollapsible({ item, selectedKey }: MenuItemProps) {
-  const { name, children } = item;
-
-  const chevronIcon = (
-    <ChevronRight
+    <Button
+      asChild
+      variant="ghost"
+      size="lg"
       className={cn(
-        "h-4",
-        "w-4",
-        "shrink-0",
-        "text-muted-foreground",
-        "transition-transform",
-        "duration-200",
-        "group-data-[state=open]:rotate-90"
+        "flex w-full items-center justify-start gap-2 py-2 !px-3 text-sm rounded-xl",
+        {
+          "bg-sidebar-primary": isSelected,
+          "hover:!bg-sidebar-primary/90": isSelected,
+          "text-sidebar-primary-foreground": isSelected,
+          "hover:text-sidebar-primary-foreground": isSelected,
+          "hover:!bg-sidebar-accent": !isSelected,
+        }
       )}
-    />
+    >
+      <Link to={item.list} className="flex w-full items-center gap-2">
+        <div className={cn("w-4", {
+          "text-sidebar-foreground/70": !isSelected,
+          "text-sidebar-primary-foreground": isSelected,
+        })}>
+          {icon ?? <ListIcon />}
+        </div>
+        <span
+          className={cn("tracking-[-0.00875rem] line-clamp-1 truncate", {
+            "font-normal": !isSelected,
+            "font-semibold": isSelected,
+            "text-sidebar-primary-foreground": isSelected,
+            "text-sidebar-foreground": !isSelected,
+          })}
+        >
+          {item.meta.label}
+        </span>
+      </Link>
+    </Button>
   );
-
-  return (
-    <Collapsible key={`collapsible-${name}`} className={cn("w-full", "group")}>
-      <CollapsibleTrigger asChild>
-        <SidebarButton item={item} rightIcon={chevronIcon} />
-      </CollapsibleTrigger>
-      <CollapsibleContent className={cn("ml-6", "flex", "flex-col", "gap-2")}>
-        {children?.map((child: TreeMenuItem) => (
-          <SidebarItem
-            key={child.key || child.name}
-            item={child}
-            selectedKey={selectedKey}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function SidebarItemDropdown({ item, selectedKey }: MenuItemProps) {
-  const { children } = item;
-  const Link = useLink();
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <SidebarButton item={item} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="start">
-        {children?.map((child: TreeMenuItem) => {
-          const { key: childKey } = child;
-          const isSelected = childKey === selectedKey;
-
-          return (
-            <DropdownMenuItem key={childKey || child.name} asChild>
-              <Link
-                to={child.route || ""}
-                className={cn("flex w-full items-center gap-2", {
-                  "bg-accent text-accent-foreground": isSelected,
-                })}
-              >
-                <ItemIcon
-                  icon={child.meta?.icon ?? child.icon}
-                  isSelected={isSelected}
-                />
-                <span>{getDisplayName(child)}</span>
-              </Link>
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function SidebarItemLink({ item, selectedKey }: MenuItemProps) {
-  const isSelected = item.key === selectedKey;
-
-  return <SidebarButton item={item} isSelected={isSelected} asLink={true} />;
 }
 
 function SidebarHeader() {
@@ -301,98 +191,6 @@ function SidebarHeader() {
         })}
       />
     </ShadcnSidebarHeader>
-  );
-}
-
-function getDisplayName(item: TreeMenuItem) {
-  return item.meta?.label ?? item.label ?? item.name;
-}
-
-type IconProps = {
-  icon: React.ReactNode;
-  isSelected?: boolean;
-};
-
-function ItemIcon({ icon, isSelected }: IconProps) {
-  return (
-    <div
-      className={cn("w-4", {
-        "text-sidebar-foreground/70": !isSelected,
-        "text-sidebar-primary-foreground": isSelected,
-      })}
-    >
-      {icon ?? <ListIcon />}
-    </div>
-  );
-}
-
-type SidebarButtonProps = React.ComponentProps<typeof Button> & {
-  item: TreeMenuItem;
-  isSelected?: boolean;
-  rightIcon?: React.ReactNode;
-  asLink?: boolean;
-  onClick?: () => void;
-};
-
-function SidebarButton({
-  item,
-  isSelected = false,
-  rightIcon,
-  asLink = false,
-  className,
-  onClick,
-  ...props
-}: SidebarButtonProps) {
-  const Link = useLink();
-
-  const buttonContent = (
-    <>
-      <ItemIcon icon={item.meta?.icon ?? item.icon} isSelected={isSelected} />
-      <span
-        className={cn("tracking-[-0.00875rem]", {
-          "flex-1": rightIcon,
-          "text-left": rightIcon,
-          "line-clamp-1": !rightIcon,
-          truncate: !rightIcon,
-          "font-normal": !isSelected,
-          "font-semibold": isSelected,
-          "text-sidebar-primary-foreground": isSelected,
-          "text-sidebar-foreground": !isSelected,
-        })}
-      >
-        {getDisplayName(item)}
-      </span>
-      {rightIcon}
-    </>
-  );
-
-  return (
-    <Button
-      asChild={!!(asLink && item.route)}
-      variant="ghost"
-      size="lg"
-      className={cn(
-        "flex w-full items-center justify-start gap-2 py-2 !px-3 text-sm rounded-xl",
-        {
-          "bg-sidebar-primary": isSelected,
-          "hover:!bg-sidebar-primary/90": isSelected,
-          "text-sidebar-primary-foreground": isSelected,
-          "hover:text-sidebar-primary-foreground": isSelected,
-          "hover:!bg-sidebar-accent": !isSelected,
-        },
-        className
-      )}
-      onClick={onClick}
-      {...props}
-    >
-      {asLink && item.route ? (
-        <Link to={item.route} className={cn("flex w-full items-center gap-2")}> 
-          {buttonContent}
-        </Link>
-      ) : (
-        buttonContent
-      )}
-    </Button>
   );
 }
 

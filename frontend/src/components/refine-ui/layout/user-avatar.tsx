@@ -1,11 +1,10 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-import { useGetIdentity } from "@refinedev/core";
-import type { User } from "@/types";
+import { cn } from "@/utils/cn";
+import { useMe } from "@/hooks/use-me";
 
 export function UserAvatar() {
-  const { data: user, isLoading: userIsLoading } = useGetIdentity<User>();
+  const { data: user, isLoading: userIsLoading } = useMe();
 
   if (userIsLoading || !user) {
     return <Skeleton className={cn("h-9", "w-9", "rounded-full")} />;

@@ -1,20 +1,19 @@
 import { useState, useCallback, useRef } from "react";
-import { useGetIdentity } from "@refinedev/core";
+import { useMe } from "@/hooks/use-me";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   PackageX,
   Loader2,
-  Clock,
   CheckCircle2,
-  XCircle,
   Search,
   FileX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
+import { PageLoader } from "@/components/shared/pageLoader";
 import { ListView } from "@/components/refine-ui/views/list-view";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -30,41 +29,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/api";
-import type { CatalogRequestOut } from "@/lib/api";
-import type { User } from "@/types";
+import * as catalogRequestsApi from "@/api/catalogRequests";
+import { RequestStatusBadge } from "@/components/shared/statusBadge";
 import { eUserRole } from "@/types";
 
 const REQUESTS_KEY = ["catalog-requests", "owner"] as const;
 const PRODUCTS_KEY = ["my-products"] as const;
 
-function StatusBadge({ status }: { status: CatalogRequestOut["status"] }) {
-  if (status === "pending") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-        <Clock className="h-3 w-3" />
-        En attente
-      </span>
-    );
-  }
-  if (status === "approved") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-        <CheckCircle2 className="h-3 w-3" />
-        Approuvé
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-      <XCircle className="h-3 w-3" />
-      Refusé
-    </span>
-  );
-}
 
 export default function CatalogRequestsPage() {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: identity } = useMe();
   const queryClient = useQueryClient();
 
   const isOwner = identity?.role === eUserRole.OWNER;
@@ -102,7 +76,7 @@ export default function CatalogRequestsPage() {
   // Existing non-declare requests
   const { data: requests = [], isLoading: requestsLoading } = useQuery({
     queryKey: REQUESTS_KEY,
-    queryFn: () => api.catalogRequests.list(),
+    queryFn: () => catalogRequestsApi.list(),
     enabled: isOwner,
     select: (data) => data.filter((r) => r.request_type === "non_declare"),
   });
@@ -111,7 +85,7 @@ export default function CatalogRequestsPage() {
   const hasSearch = debouncedSearch.trim().length > 0;
   const { data: products = [], isFetching: productsLoading } = useQuery({
     queryKey: [...PRODUCTS_KEY, debouncedSearch],
-    queryFn: () => api.catalogRequests.myProducts(debouncedSearch),
+    queryFn: () => catalogRequestsApi.myProducts(debouncedSearch),
     enabled: dialogOpen && hasSearch,
     // Hide already-excluded products; keep declared ones (pending or selectable)
     select: (data) => data.filter((p) => p.declared),
@@ -122,7 +96,7 @@ export default function CatalogRequestsPage() {
       const ids = Array.from(selectedIds);
       await Promise.all(
         ids.map((id) =>
-          api.catalogRequests.submitNonDeclare({
+          catalogRequestsApi.submitNonDeclare({
             medicament_id: id,
             notes: notes.trim() || undefined,
           })
@@ -177,9 +151,7 @@ export default function CatalogRequestsPage() {
 
         <div className="border rounded-xl overflow-hidden bg-card">
           {requestsLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
+            <PageLoader />
           ) : requests.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-14 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
@@ -221,7 +193,7 @@ export default function CatalogRequestsPage() {
                     )}
                   </div>
                   <div className="w-24 flex justify-center">
-                    <StatusBadge status={req.status} />
+                    <RequestStatusBadge status={req.status} />
                   </div>
                   <span className="text-xs text-muted-foreground w-28 text-center">
                     {req.created_at

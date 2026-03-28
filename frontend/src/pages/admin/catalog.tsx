@@ -1,8 +1,7 @@
 import { useRef, useMemo, useState, useEffect } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { useTable } from "@refinedev/react-table";
-import { useGetIdentity } from "@refinedev/core";
+import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/hooks/use-me";
 import {
   BookOpen,
   Plus,
@@ -38,12 +37,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api } from "@/lib/api";
-import type { MedicamentOut, CategorySuffixOut } from "@/lib/api";
+import * as adminApi from "@/api/admin";
+import type { MedicamentOut, CategorySuffixOut } from "@/api/admin";
 import { CategoryCombobox } from "@/components/category-combobox";
 import { SuffixBadge, SUFFIX_COLORS, SWATCH_BG } from "@/components/suffix-badge";
-import { fmt, downloadCSV } from "@/lib/table-utils";
-import type { User } from "@/types";
+import { fmt } from "@/utils/format";
+import { downloadCSV } from "@/utils/table";
 import { eUserRole } from "@/types";
 
 const SUFFIX_QUERY_KEY = ["admin", "category-suffixes"] as const;
@@ -116,11 +115,11 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
         barcode1: form.barcode1 || null,
         barcode2: form.barcode2 || null,
         laboratoire: form.laboratoire || null,
-        product_type: form.product_type || null,
+        product_type: (form.product_type || null) as "pharmacie" | "parapharmacie" | null,
       };
       return isEdit
-        ? api.admin.updateMedicament(medicament!.id, body)
-        : api.admin.createMedicament(body as Omit<MedicamentOut, "id">);
+        ? adminApi.updateMedicament(medicament!.id, body)
+        : adminApi.createMedicament(body as Omit<MedicamentOut, "id">);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "catalog"] });
@@ -252,7 +251,7 @@ function CategorySuffixesSection() {
 
   const { data: rows = [], isLoading: loadingSuffixes } = useQuery({
     queryKey: SUFFIX_QUERY_KEY,
-    queryFn: api.admin.listCategorySuffixes,
+    queryFn: adminApi.listCategorySuffixes,
   });
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -265,15 +264,15 @@ function CategorySuffixesSection() {
   const saveMutation = useMutation({
     mutationFn: () =>
       editing
-        ? api.admin.updateCategorySuffix(editing.id, form)
-        : api.admin.createCategorySuffix(form),
+        ? adminApi.updateCategorySuffix(editing.id, form)
+        : adminApi.createCategorySuffix(form),
     onSuccess: () => { qc.invalidateQueries({ queryKey: SUFFIX_QUERY_KEY }); setDialogOpen(false); toast.success(editing ? "Mapping mis à jour" : "Mapping créé"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const [deleteTarget, setDeleteTarget] = useState<CategorySuffixOut | null>(null);
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.admin.deleteCategorySuffix(id),
+    mutationFn: (id: number) => adminApi.deleteCategorySuffix(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: SUFFIX_QUERY_KEY }); toast.success("Mapping supprimé"); setDeleteTarget(null); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -406,21 +405,26 @@ function CategorySuffixesSection() {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+const CATALOG_QUERY_KEY = ["admin", "catalog"] as const;
+
 export default function AdminCatalogPage() {
-  const { data: identity } = useGetIdentity<User>();
+  const { data: user } = useMe();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MedicamentOut | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MedicamentOut | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
 
   async function handleExport() {
     setExporting(true);
     try {
-      const res = await api.admin.exportCatalog(searchQuery || undefined);
+      const res = await adminApi.exportCatalog(searchQuery || undefined);
       const rows = res.data ?? [];
       downloadCSV(
         rows as unknown as Record<string, unknown>[],
@@ -443,10 +447,20 @@ export default function AdminCatalogPage() {
     }
   }
 
-  if (identity && identity.role !== eUserRole.ADMIN) {
-    navigate("/", { replace: true });
-    return null;
-  }
+  const { data: queryResult, isLoading } = useQuery({
+    queryKey: [...CATALOG_QUERY_KEY, page, limit, searchQuery],
+    queryFn: () => adminApi.listCatalog(searchQuery || undefined, page, limit),
+  });
+
+  const rows = queryResult?.data ?? [];
+  const paginationMeta = queryResult?.pagination;
+  const pageCount = paginationMeta ? Math.ceil(paginationMeta.total / limit) : 1;
+
+  useEffect(() => {
+    if (user && user.role !== eUserRole.ADMIN) navigate("/", { replace: true });
+  }, [user, navigate]);
+
+  if (user && user.role !== eUserRole.ADMIN) return null;
 
   const columns = useMemo<ColumnDef<MedicamentOut>[]>(
     () => [
@@ -567,27 +581,23 @@ export default function AdminCatalogPage() {
     [],
   );
 
-  const table = useTable<MedicamentOut>({
+  const tableInstance = useReactTable({
+    data: rows,
     columns,
-    refineCoreProps: {
-      resource: "admin-catalog",
-      meta: { path: "/admin/catalog" },
-      pagination: { pageSize: 50, mode: "server" },
-    },
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    pageCount,
   });
 
   const handleSearchChange = (q: string) => {
     setSearchQuery(q);
-    table.refineCore.setFilters(
-      q ? [{ field: "search", operator: "contains" as const, value: q }] : [],
-      "replace",
-    );
+    setPage(1);
   };
 
   const { mutate: importCatalog, isPending: importing } = useMutation({
-    mutationFn: (file: File) => api.admin.importCatalog(file),
-    onSuccess: (data) => {
-      table.refineCore.tableQuery.refetch();
+    mutationFn: (file: File) => adminApi.importCatalog(file),
+    onSuccess: (data: { imported: number }) => {
+      queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
       toast.success(`Catalogue importé — ${data.imported} médicaments`);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
@@ -598,9 +608,9 @@ export default function AdminCatalogPage() {
   });
 
   const { mutate: deleteMed, isPending: deleting } = useMutation({
-    mutationFn: (id: number) => api.admin.deleteMedicament(id),
+    mutationFn: (id: number) => adminApi.deleteMedicament(id),
     onSuccess: () => {
-      table.refineCore.tableQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
       toast.success("Médicament supprimé");
       setDeleteTarget(null);
     },
@@ -631,7 +641,7 @@ export default function AdminCatalogPage() {
         rightAddon={
           <div className="flex items-center gap-2">
             <ColumnVisibilityToggle
-              table={table.reactTable}
+              table={tableInstance}
               storageKey="admin-catalog-cols"
               columnLabels={CATALOG_COL_LABELS}
             />
@@ -664,7 +674,18 @@ export default function AdminCatalogPage() {
         }
       />
 
-      <DataTable table={table} />
+      <DataTable
+        table={tableInstance}
+        isLoading={isLoading}
+        pagination={{
+          currentPage: page,
+          setCurrentPage: setPage,
+          pageCount,
+          pageSize: limit,
+          setPageSize: setLimit,
+          total: paginationMeta?.total,
+        }}
+      />
 
       {/* Form dialog */}
       <MedicamentFormDialog
