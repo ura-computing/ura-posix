@@ -1,10 +1,13 @@
 import os
+import secrets as _secrets
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+# New random key on every startup — all previous tokens are invalidated on restart.
+# Set SECRET_KEY in the environment only if you need persistent sessions across restarts.
+SECRET_KEY = os.getenv("SECRET_KEY") or _secrets.token_urlsafe(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(7 * 24 * 60)))
 

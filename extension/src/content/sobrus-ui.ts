@@ -43,9 +43,11 @@ function getBanner(): HTMLElement {
     font:600 13px/1.5 system-ui,sans-serif;
     box-shadow:0 8px 24px rgba(0,0,0,0.4);
     display:flex;align-items:center;gap:8px;
-    max-width:320px;transition:opacity 0.4s;
+    transition:opacity 0.4s;
     border:1px solid rgba(20,184,166,0.35);
     pointer-events:auto;
+    width: 400px;
+    height: 100px;
   `;
 
   // Button delegation (survives innerHTML replacements)

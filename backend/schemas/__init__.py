@@ -1,4 +1,4 @@
-from .auth import ProfileUpdate, Token, UserLogin, UserOut, UserRegister
+from .auth import ForgotPasswordPayload, ProfileUpdate, ResetPasswordPayload, Token, UserLogin, UserOut, UserRegister
 from .catalog import (
     CatalogRejectBody,
     CatalogRequestCreate,
@@ -28,6 +28,7 @@ from .pharmacy import (
 __all__ = [
     # auth
     "UserRegister", "UserLogin", "UserOut", "Token", "ProfileUpdate",
+    "ForgotPasswordPayload", "ResetPasswordPayload",
     # pharmacy
     "PharmacyCreate", "PharmacyUpdate", "PharmacyOut", "PharmacyPublic", "OwnerOut",
     "UserAdminOut", "EmployeePermissionsUpdate", "EmployeeStatusUpdate",

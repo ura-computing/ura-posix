@@ -1,13 +1,17 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, Pharmacy
-from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate
+from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate, ForgotPasswordPayload, ResetPasswordPayload
 
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
 from utils.constants import FEATURE_FLAGS as ALL_FEATURES
+from utils.email import send_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
@@ -153,3 +157,28 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.post("/forgot-password", status_code=204)
+async def forgot_password(body: ForgotPasswordPayload, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == body.email).first()
+    if not user:
+        return  # silent — don't reveal whether the email exists
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    db.commit()
+    await send_reset_email(user.email, token)
+
+
+@router.post("/reset-password", status_code=204)
+def reset_password(body: ResetPasswordPayload, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.reset_token == body.token).first()
+    if not user or not user.reset_token_expires:
+        raise HTTPException(status_code=400, detail="Lien invalide ou expiré")
+    if user.reset_token_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Lien expiré")
+    user.password_hash = hash_password(body.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
