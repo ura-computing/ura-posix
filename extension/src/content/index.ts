@@ -79,10 +79,10 @@ function _showUploadBanner(status: UploadStatus) {
     el.style.cssText = `
       position:fixed;bottom:24px;right:24px;z-index:2147483647;
       background:#0f172a;color:#f1f5f9;border-radius:12px;
-      padding:10px 40px 10px 16px;
-      font:600 13px/1.5 system-ui,sans-serif;
+      padding:18px 48px 18px 22px;
+      font:600 14px/1.5 system-ui,sans-serif;
       box-shadow:0 8px 24px rgba(0,0,0,0.4);
-      max-width:320px;border:1px solid rgba(20,184,166,0.35);
+      max-width:400px;border:1px solid rgba(20,184,166,0.35);
       pointer-events:auto;animation:__apcm_up .3s ease;
     `;
     el.addEventListener("click", (e) => {
@@ -99,7 +99,7 @@ function _showUploadBanner(status: UploadStatus) {
     position:absolute;top:7px;right:8px;background:none;border:none;
     color:#94a3b8;cursor:pointer;font-size:17px;line-height:1;padding:2px 5px;border-radius:4px
   ">×</button>`;
-  const SPINNER = `<span style="width:14px;height:14px;border-radius:50%;flex-shrink:0;border:2px solid rgba(20,184,166,0.3);border-top-color:#14b8a6;animation:__apcm-spin 0.7s linear infinite;display:inline-block"></span>`;
+  const SPINNER = `<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:2.5px solid rgba(20,184,166,0.3);border-top-color:#14b8a6;animation:__apcm-spin 0.7s linear infinite;display:inline-block"></span>`;
   const DOT = (c: string) => `<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${c};display:inline-block;margin-top:3px"></span>`;
 
   const section = status.fileType === "achat" ? "les achats" : "les ventes";
@@ -121,13 +121,13 @@ function _showUploadBanner(status: UploadStatus) {
     el.innerHTML = `
       ${CLOSE}
       <div style="width:100%">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:${pct !== null ? "7px" : "0"}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:${pct !== null ? "12px" : "0"}">
           ${SPINNER}
           <span id="__apcm-label">${label}…</span>
         </div>
         ${pct !== null ? `
-        <div style="width:100%;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden">
-          <div id="__apcm-fill" style="height:100%;background:#14b8a6;border-radius:2px;width:${pct}%;transition:width .35s ease"></div>
+        <div style="width:100%;height:8px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden">
+          <div id="__apcm-fill" style="height:100%;background:#14b8a6;border-radius:99px;width:${pct}%;transition:width .35s ease"></div>
         </div>` : ""}
       </div>`;
   } else if (status.state === "success") {

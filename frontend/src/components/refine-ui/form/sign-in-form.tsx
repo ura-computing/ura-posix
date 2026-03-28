@@ -83,7 +83,16 @@ export const SignInForm = () => {
                 name="password"
                 render={({ field }) => (
                   <FormItem className="field">
-                    <FormLabel>Mot de passe</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Mot de passe</FormLabel>
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-muted-foreground hover:underline"
+                        tabIndex={-1}
+                      >
+                        Mot de passe oublié ?
+                      </Link>
+                    </div>
                     <FormControl>
                       <InputPassword id="password" {...field} />
                     </FormControl>

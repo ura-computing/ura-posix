@@ -33,6 +33,8 @@ class User(Base):
     status = Column(String, default="pending", nullable=False)  # pending | active | rejected
     permissions = Column(JSON, nullable=True, default=lambda: {})  # feature flags, {} = all allowed
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
+    reset_token         = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

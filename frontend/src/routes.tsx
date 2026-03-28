@@ -29,6 +29,8 @@ import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
 import CatalogRequestsPage from "./pages/catalog-requests";
 import WelcomePage from "./pages/welcome";
+import ForgotPasswordPage from "./pages/forgot-password";
+import ResetPasswordPage from "./pages/reset-password";
 import { Navigate } from "react-router";
 import { UserRole, eUserRole } from "./types";
 
@@ -63,6 +65,8 @@ export const routes: RouteConfig[] = [
   // Public routes (no auth required, redirect to dashboard if authenticated)
   { path: "/login", element: <Login />, requireAuth: false },
   { path: "/register", element: <Register />, requireAuth: false },
+  { path: "/forgot-password", element: <ForgotPasswordPage />, requireAuth: false },
+  { path: "/reset-password", element: <ResetPasswordPage />, requireAuth: false },
 
   // Auth required, no sidebar
   {

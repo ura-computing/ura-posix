@@ -194,7 +194,6 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
 + list ventes:
     + update colors cimilar to the ones in rapport page
 + fix build
-+ password reset
 + ask about fancounalty of produit non declare
 + ask about analyze
 + user (employee and owner) can't change information

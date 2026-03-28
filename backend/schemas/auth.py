@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class UserRegister(BaseModel):
@@ -50,3 +50,12 @@ class ProfileUpdate(BaseModel):
     email: Optional[str] = None
     pharmacy_name: Optional[str] = None
     pharmacy_address: Optional[str] = None
+
+
+class ForgotPasswordPayload(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordPayload(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6)
