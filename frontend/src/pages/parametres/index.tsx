@@ -6,21 +6,29 @@ import {
   Loader2,
   CalendarDays,
   Tag,
+  UserRound,
 } from "lucide-react";
 
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/utils/cn";
+import { toast } from "sonner";
 
 import * as transactionsApi from "@/api/transactions";
-import { useClearAchats, useClearVentes } from "@/hooks/useClearData";
+import { useClearAchats, useClearVentes, useImports, useDeleteImport } from "@/hooks/useClearData";
 import { CategoryMultiSelect } from "@/components/categoryMultiSelect";
+import { useMe } from "@/hooks/useMe";
+import { useUpdateMe } from "@/hooks/useUpdateMe";
+import { useProfileForm } from "@/schemas/profile";
+import type { ProfileFormValues } from "@/schemas/profile";
+import { eUserRole } from "@/types";
 
 type ClearTarget = "achats" | "ventes";
 
@@ -245,14 +253,157 @@ function DeleteDialog({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+function formatImportDate(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    + " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+// ── Profile section ──────────────────────────────────────────────────────────
+
+function ProfileSection() {
+  const { me: user } = useMe();
+  const { updateMe, updateMePending } = useUpdateMe();
+  const form = useProfileForm();
+
+  const isAdmin = user?.role === eUserRole.ADMIN;
+  const isEmployee = user?.role === eUserRole.EMPLOYEE;
+
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        name: user.name ?? "",
+        phone: user.phone ?? "",
+        email: user.email ?? "",
+        pharmacy_name: user.pharmacy_name ?? "",
+        pharmacy_address: user.pharmacy_address ?? "",
+      });
+    }
+  }, [user, form]);
+
+  const onSubmit = (values: ProfileFormValues) => {
+    updateMe(values, {
+      onSuccess: () => toast.success("Profil mis à jour"),
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <UserRound className="h-4 w-4" />
+          Mon profil
+        </CardTitle>
+        <CardDescription>
+          {isAdmin
+            ? "Mettez à jour vos coordonnées"
+            : isEmployee
+            ? "Mettez à jour vos coordonnées"
+            : "Mettez à jour vos coordonnées et les informations de votre pharmacie"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nom complet</FormLabel>
+                  <FormControl><Input placeholder="Dr. Jean Dupont" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Téléphone</FormLabel>
+                    <FormControl><Input placeholder="+212 6 00 00 00 00" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl><Input placeholder="email@exemple.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {!isAdmin && (
+              <>
+                <Separator />
+                <p className="text-sm font-medium">Pharmacie</p>
+                {isEmployee ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Pharmacie associée</p>
+                    <p className="text-sm font-medium">{user?.pharmacy_name ?? "—"}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="pharmacy_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nom de la pharmacie</FormLabel>
+                          <FormControl><Input placeholder="Pharmacie Centrale" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pharmacy_address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Adresse</FormLabel>
+                          <FormControl><Input placeholder="12 rue Mohammed V, Casablanca" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={updateMePending} className="min-w-32 gap-2">
+                {updateMePending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {updateMePending ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 const ParametresList = () => {
   const [dialogTarget, setDialogTarget] = useState<ClearTarget | null>(null);
-  const [lastResult, setLastResult] = useState<{
-    target: ClearTarget;
-    deleted: number;
-  } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [achatCategories, setAchatCategories] = useState<string[]>([]);
   const [venteCategories, setVenteCategories] = useState<string[]>([]);
+
+  const { imports, isLoading: importsLoading } = useImports();
+  const { deleteImport, deleting } = useDeleteImport();
 
   useEffect(() => {
     transactionsApi
@@ -271,19 +422,7 @@ const ParametresList = () => {
       <h1 className="page-title">Paramètres</h1>
 
       <div className="grid gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Settings className="h-4 w-4" />
-              Configuration de la pharmacie
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Les paramètres de la pharmacie seront disponibles ici.
-            </p>
-          </CardContent>
-        </Card>
+        <ProfileSection />
 
         <Card className="border-destructive/40">
           <CardHeader>
@@ -292,60 +431,120 @@ const ParametresList = () => {
               Zone de danger
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Ces actions sont irréversibles. Les données supprimées ne peuvent
-              pas être récupérées.
-            </p>
+          <CardContent className="space-y-5">
+            <div>
+              <p className="text-sm font-medium mb-1">Historique des imports</p>
+              <p className="text-xs text-muted-foreground">
+                Supprimez un import spécifique pour annuler toutes les données importées par ce fichier.
+              </p>
+            </div>
 
-            {(
-              [
-                {
-                  target: "achats" as ClearTarget,
-                  label: "Supprimer des achats",
-                  desc: "Supprimez tout ou une sélection de bons de livraison.",
-                },
-                {
-                  target: "ventes" as ClearTarget,
-                  label: "Supprimer des ventes",
-                  desc: "Supprimez tout ou une sélection de transactions de vente.",
-                },
-              ] as const
-            ).map(({ target, label, desc }) => (
-              <div
-                key={target}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0 ml-4"
-                  onClick={() => {
-                    setLastResult(null);
-                    setDialogTarget(target);
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                  Supprimer
-                </Button>
+            {importsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ))}
-
-            {lastResult && (
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-teal-600 dark:text-teal-400">
-                  {lastResult.deleted} enregistrement(s) supprimé(s) des{" "}
-                  {lastResult.target}.
-                </p>
-                <Badge variant="secondary" className="text-xs">
-                  {lastResult.target}
-                </Badge>
+            ) : imports.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-8 text-center border-2 border-dashed rounded-lg">
+                <CalendarDays className="h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Aucun import enregistré.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {imports.map((batch) => (
+                  <div key={batch.id} className="rounded-lg border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge
+                            variant="secondary"
+                            className={cn("text-xs shrink-0", batch.file_type === "achat"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            )}
+                          >
+                            {batch.file_type === "achat" ? "Achats" : "Ventes"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatImportDate(batch.imported_at)}
+                          </span>
+                        </div>
+                        {batch.filename && (
+                          <p className="text-sm font-medium truncate" title={batch.filename}>
+                            {batch.filename.replace(/\.csv$/i, "")}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {batch.rows_inserted} ligne{batch.rows_inserted !== 1 ? "s" : ""} importée{batch.rows_inserted !== 1 ? "s" : ""}
+                          {batch.rows_skipped > 0 && ` · ${batch.rows_skipped} doublon${batch.rows_skipped !== 1 ? "s" : ""} ignoré${batch.rows_skipped !== 1 ? "s" : ""}`}
+                        </p>
+                      </div>
+                      {deleteConfirm === batch.id ? (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-7 text-xs"
+                            disabled={deleting}
+                            onClick={() => {
+                              deleteImport(batch.id, { onSuccess: () => setDeleteConfirm(null) });
+                            }}
+                          >
+                            {deleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Confirmer
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => setDeleteConfirm(null)}
+                          >
+                            Annuler
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0 h-7 text-xs"
+                          onClick={() => setDeleteConfirm(batch.id)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Supprimer
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
+
+            <Separator />
+
+            <div>
+              <p className="text-sm font-medium mb-1">Suppression avancée</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Supprimez des données par date et catégorie (pour les imports antérieurs au suivi par lot).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { target: "achats" as ClearTarget, label: "Supprimer des achats" },
+                    { target: "ventes" as ClearTarget, label: "Supprimer des ventes" },
+                  ] as const
+                ).map(({ target, label }) => (
+                  <Button
+                    key={target}
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 text-xs"
+                    onClick={() => setDialogTarget(target)}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -358,9 +557,7 @@ const ParametresList = () => {
             dialogTarget === "achats" ? achatCategories : venteCategories
           }
           onClose={() => setDialogTarget(null)}
-          onDeleted={(count) =>
-            setLastResult({ target: dialogTarget, deleted: count })
-          }
+          onDeleted={() => setDialogTarget(null)}
         />
       )}
     </ListView>

@@ -3,10 +3,11 @@ import { useResetPasswordForm } from "@/schemas/resetPassword";
 import type { ResetPasswordFormValues } from "@/schemas/resetPassword";
 import { Loader2, XCircle } from "lucide-react";
 
+import { AppLogo } from "@/components/shared/appLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { InputPassword } from "@/components/refine-ui/form/inputPassword";
+import { InputPassword } from "@/components/form/inputPassword";
 import { Separator } from "@/components/ui/separator";
 import { useAuthenticate } from "@/hooks/useAuthenticate";
 
@@ -47,8 +48,8 @@ export default function ResetPasswordPage() {
   return (
     <div className="login">
       <div className="logo">
-        <img src="/logo.png" alt="PharmaGest" />
-        <span className="brand-name">PharmaGest</span>
+        <AppLogo />
+        <span className="brand-name">APCM Pharma</span>
         <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 

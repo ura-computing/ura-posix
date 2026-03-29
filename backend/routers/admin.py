@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
-from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, User, Vente
-from utils.strings import normalize_category, strip_accents, strip_percentage
-from utils.constants import VALID_ROLES
+from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
+from utils.strings import strip_accents
+from utils.constants import VALID_ROLES, Role, Status
 from routers.auth import get_current_user
 from utils.permissions import get_current_admin
 from schemas import (
@@ -44,7 +44,7 @@ def list_pharmacies(
         user_count = db.query(User).filter(User.pharmacy_id == p.id).count()
         owners = (
             db.query(User)
-            .filter(User.pharmacy_id == p.id, User.role == "owner", User.status == "active")
+            .filter(User.pharmacy_id == p.id, User.role == Role.OWNER, User.status == Status.ACTIVE)
             .all()
         )
         first = owners[0] if owners else None
@@ -54,6 +54,7 @@ def list_pharmacies(
             address=p.address,
             phone=p.phone,
             email=p.email,
+            options=p.options or {},
             created_at=p.created_at,
             user_count=user_count,
             owners=[OwnerOut(id=o.id, name=o.name, email=o.email, phone=o.phone) for o in owners],
@@ -101,7 +102,7 @@ def update_pharmacy(
 ):
     pharmacy = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
     if not pharmacy:
-        raise HTTPException(status_code=404, detail="Pharmacy not found")
+        raise HTTPException(status_code=404, detail="Pharmacie introuvable")
     if body.name is not None:
         pharmacy.name = body.name
     if body.address is not None:
@@ -132,11 +133,73 @@ def delete_pharmacy(
 ):
     pharmacy = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
     if not pharmacy:
-        raise HTTPException(status_code=404, detail="Pharmacy not found")
+        raise HTTPException(status_code=404, detail="Pharmacie introuvable")
     db.query(User).filter(User.pharmacy_id == pharmacy_id).update({"pharmacy_id": None})
     db.delete(pharmacy)
     db.commit()
     return {"deleted": True}
+
+
+@router.get("/pharmacy/{pharmacy_id}/non-declared")
+def list_non_declared_products(
+    pharmacy_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """List products marked as non-declared for a specific pharmacy."""
+    rows = (
+        db.query(Medicament)
+        .join(
+            PharmacyMedicamentStatus,
+            PharmacyMedicamentStatus.medicament_id == Medicament.id,
+        )
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        )
+        .order_by(Medicament.product)
+        .all()
+    )
+    return [
+        {
+            "medicament_id": m.id,
+            "product": m.product,
+            "category": m.category,
+            "ppv": m.ppv,
+            "pph": m.pph,
+            "tva": m.tva,
+        }
+        for m in rows
+    ]
+
+
+@router.get("/pharmacies/{pharmacy_id}/options")
+def get_pharmacy_options(
+    pharmacy_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    pharmacy = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
+    if not pharmacy:
+        raise HTTPException(status_code=404, detail="Pharmacie introuvable")
+    return pharmacy.options or {}
+
+
+@router.put("/pharmacies/{pharmacy_id}/options")
+def update_pharmacy_options(
+    pharmacy_id: int,
+    body: EmployeePermissionsUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Update pharmacy-level feature options. These act as a ceiling for all users in that pharmacy."""
+    pharmacy = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
+    if not pharmacy:
+        raise HTTPException(status_code=404, detail="Pharmacie introuvable")
+    pharmacy.options = body.permissions
+    db.commit()
+    db.refresh(pharmacy)
+    return pharmacy.options or {}
 
 
 # ── Users ──────────────────────────────────────────────────────────────────────
@@ -161,7 +224,7 @@ def list_pending_owners(
     """List pharmacy owner accounts awaiting admin approval."""
     return (
         db.query(User)
-        .filter(User.status == "pending", User.role == "owner")
+        .filter(User.status == Status.PENDING, User.role == Role.OWNER)
         .order_by(User.created_at.desc())
         .all()
     )
@@ -175,13 +238,13 @@ def get_admin_notifications(
     """Pending owners + pending catalog requests — for the admin notification bell."""
     pending_users = (
         db.query(User)
-        .filter(User.status == "pending", User.role == "owner")
+        .filter(User.status == Status.PENDING, User.role == Role.OWNER)
         .order_by(User.created_at.desc())
         .all()
     )
     pending_requests = (
         db.query(CatalogRequest)
-        .filter(CatalogRequest.status == "pending")
+        .filter(CatalogRequest.status == Status.PENDING)
         .order_by(CatalogRequest.created_at.desc())
         .all()
     )
@@ -217,17 +280,17 @@ def approve_user(
     """Approve a pending owner: activate account and auto-create their pharmacy."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.status != "pending":
-        raise HTTPException(status_code=400, detail="User is not pending")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    if user.status != Status.PENDING:
+        raise HTTPException(status_code=400, detail="L'utilisateur n'est pas en attente")
 
-    if user.role == "owner" and user.pharmacy_name and not user.pharmacy_id:
+    if user.role == Role.OWNER and user.pharmacy_name and not user.pharmacy_id:
         pharmacy = Pharmacy(name=user.pharmacy_name)
         db.add(pharmacy)
         db.flush()
         user.pharmacy_id = pharmacy.id
 
-    user.status = "active"
+    user.status = Status.ACTIVE
     db.commit()
     db.refresh(user)
     return user
@@ -242,8 +305,8 @@ def reject_user(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.status = "rejected"
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    user.status = Status.REJECTED
     db.commit()
     db.refresh(user)
     return user
@@ -259,19 +322,19 @@ def revoke_user(
     If the user is an owner, also revokes all active employees in their pharmacy."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if user.id == current_admin.id:
-        raise HTTPException(status_code=400, detail="Cannot revoke your own access")
-    if user.status != "active":
-        raise HTTPException(status_code=400, detail="User is not active")
-    user.status = "pending"
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas révoquer votre propre accès")
+    if user.status != Status.ACTIVE:
+        raise HTTPException(status_code=400, detail="L'utilisateur n'est pas actif")
+    user.status = Status.PENDING
     # If revoking an owner, also revoke all active employees in their pharmacy
-    if user.role == "owner" and user.pharmacy_id:
+    if user.role == Role.OWNER and user.pharmacy_id:
         db.query(User).filter(
             User.pharmacy_id == user.pharmacy_id,
-            User.role == "employee",
-            User.status == "active",
-        ).update({"status": "pending"})
+            User.role == Role.EMPLOYEE,
+            User.status == Status.ACTIVE,
+        ).update({"status": Status.PENDING})
     db.commit()
     db.refresh(user)
     return user
@@ -285,10 +348,10 @@ def update_user_role(
     current_admin: User = Depends(get_current_admin),
 ):
     if body.role not in VALID_ROLES:
-        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}")
+        raise HTTPException(status_code=400, detail=f"Rôle invalide. Doit être l'un des suivants : {', '.join(VALID_ROLES)}")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     user.role = body.role
     db.commit()
     db.refresh(user)
@@ -304,11 +367,11 @@ def update_user_pharmacy(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if body.pharmacy_id is not None:
         pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
         if not pharmacy:
-            raise HTTPException(status_code=404, detail="Pharmacy not found")
+            raise HTTPException(status_code=404, detail="Pharmacie introuvable")
     user.pharmacy_id = body.pharmacy_id
     db.commit()
     db.refresh(user)
@@ -322,11 +385,22 @@ def update_user_permissions(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
-    """Set feature permissions for any user. Used to restrict owner access (cascades to their employees)."""
+    """Set feature permissions for any user. Used to restrict owner access (cascades to their employees).
+    Cannot grant a feature that is disabled at pharmacy level."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.permissions = body.permissions
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    # Enforce pharmacy-level ceiling
+    if user.pharmacy_id:
+        pharmacy = db.query(Pharmacy).filter(Pharmacy.id == user.pharmacy_id).first()
+        pharmacy_options = (pharmacy.options or {}) if pharmacy else {}
+        sanitized = {
+            k: v for k, v in body.permissions.items()
+            if not (v is True and pharmacy_options.get(k) is False)
+        }
+        user.permissions = sanitized
+    else:
+        user.permissions = body.permissions
     db.commit()
     db.refresh(user)
     return user
@@ -462,7 +536,7 @@ def create_medicament(
     _: User = Depends(get_current_admin),
 ):
     if db.query(Medicament).filter(Medicament.pid == body.pid).first():
-        raise HTTPException(status_code=400, detail="PID already exists")
+        raise HTTPException(status_code=400, detail="Ce PID existe déjà")
     data = body.model_dump()
     if data.get("category"):
         data["category"] = strip_accents(data["category"].strip())
@@ -482,7 +556,7 @@ def update_medicament(
 ):
     med = db.query(Medicament).filter(Medicament.id == med_id).first()
     if not med:
-        raise HTTPException(status_code=404, detail="Medicament not found")
+        raise HTTPException(status_code=404, detail="Médicament introuvable")
     updates = body.model_dump(exclude_unset=True)
     if updates.get("category"):
         updates["category"] = strip_accents(updates["category"].strip())
@@ -518,7 +592,7 @@ def delete_medicament(
 ):
     med = db.query(Medicament).filter(Medicament.id == med_id).first()
     if not med:
-        raise HTTPException(status_code=404, detail="Medicament not found")
+        raise HTTPException(status_code=404, detail="Médicament introuvable")
     db.delete(med)
     db.commit()
     return {"deleted": True}
@@ -541,7 +615,7 @@ def create_category_suffix(
     _: User = Depends(get_current_admin),
 ):
     if db.query(CategorySuffix).filter(CategorySuffix.category == body.category).first():
-        raise HTTPException(status_code=400, detail="Category already has a suffix mapping")
+        raise HTTPException(status_code=400, detail="Cette catégorie a déjà un mapping de suffixe")
     row = CategorySuffix(category=body.category, suffix=body.suffix, color=body.color)
     db.add(row)
     db.commit()
@@ -558,7 +632,7 @@ def update_category_suffix(
 ):
     row = db.query(CategorySuffix).filter(CategorySuffix.id == suffix_id).first()
     if not row:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=404, detail="Introuvable")
     if body.category is not None:
         row.category = body.category
     if body.suffix is not None:
@@ -577,7 +651,7 @@ def delete_category_suffix(
 ):
     row = db.query(CategorySuffix).filter(CategorySuffix.id == suffix_id).first()
     if not row:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=404, detail="Introuvable")
     db.delete(row)
     db.commit()
     return {"deleted": True}
@@ -592,7 +666,7 @@ def get_analytics(
 ):
     # Users by role
     role_rows = db.query(User.role, func.count(User.id)).group_by(User.role).all()
-    role_counts = {r: 0 for r in ("owner", "employee", "admin")}
+    role_counts = {r: 0 for r in (Role.OWNER, Role.EMPLOYEE, Role.ADMIN)}
     for role, count in role_rows:
         if role in role_counts:
             role_counts[role] = count
@@ -600,11 +674,11 @@ def get_analytics(
     # Users by status (non-admin)
     status_rows = (
         db.query(User.status, func.count(User.id))
-        .filter(User.role != "admin")
+        .filter(User.role != Role.ADMIN)
         .group_by(User.status)
         .all()
     )
-    status_counts = {"active": 0, "pending": 0, "rejected": 0}
+    status_counts = {Status.ACTIVE: 0, Status.PENDING: 0, Status.REJECTED: 0}
     for status, count in status_rows:
         if status in status_counts:
             status_counts[status] = count

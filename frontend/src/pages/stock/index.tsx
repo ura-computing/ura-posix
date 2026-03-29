@@ -1,6 +1,6 @@
 import { Package } from "lucide-react";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 
 const StockList = () => {
   return (

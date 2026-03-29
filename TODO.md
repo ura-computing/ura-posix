@@ -178,5 +178,16 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
 + ask about fancounalty of produit non declare
 + creer analyse should 
 + user (employee and owner) can't change information
-+ verfy number option
 + can't chnage languege
+
++ seprate the dev, demo, prod envirment, database etc...:
+    + tests envirement -> demo (use only the word demo so you don't get confused)
+    + make it so like this: make dev, make demo, make prod
++ files:
+    + update all READMES based on all the chnages mad in the app,
+    + rename SEUP_GUIDE_TESET to SETUP_GUIDE_DEMO
+    + check TECHNICAL_LEANING if anyhting is missing there
++ extensions:
+    + all files should follow cammel case naming convension
+    + all the logic should go through hook
+

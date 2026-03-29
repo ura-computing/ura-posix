@@ -14,8 +14,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -31,17 +31,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { UserAdmin } from "@/types";
-import { eUserRole } from "@/types";
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const FEATURES: { key: string; label: string }[] = [
-  { key: "rapports", label: "Rapports" },
-  { key: "import", label: "Import" },
-  { key: "achat", label: "Achats" },
-  { key: "ventes", label: "Ventes" },
-  { key: "stock", label: "Stock" },
-];
+import { eUserRole, eUserStatus } from "@/types";
+import { FEATURES } from "@/constants";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -118,8 +109,8 @@ export default function OwnerEmployeesPage() {
     revoking,
   } = useOwnerEmployees(!isEmployee);
 
-  const pending = employees.filter((e) => e.status === "pending");
-  const active = employees.filter((e) => e.status === "active");
+  const pending = employees.filter((e) => e.status === eUserStatus.PENDING);
+  const active = employees.filter((e) => e.status === eUserStatus.ACTIVE);
 
   if (isEmployee) return null;
 

@@ -37,11 +37,11 @@
   --sidebar-border: oklch(0.8800 0.020 191);
   --sidebar-ring: oklch(0.8348 0.1302 160.908);
 
-  /* PharmaGest sidebar (dark navy + teal) */
-  --pharmagest-sidebar: #071b2b;
-  --pharmagest-sidebar-foreground: #e2e8f0;
-  --pharmagest-sidebar-active: #14b8a6;
-  --pharmagest-sidebar-active-foreground: #fff;
+  /* APCM Pharma sidebar (dark navy + teal) */
+  --apcm-sidebar: #071b2b;
+  --apcm-sidebar-foreground: #e2e8f0;
+  --apcm-sidebar-active: #14b8a6;
+  --apcm-sidebar-active-foreground: #fff;
   --font-sans: "Inter", sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: monospace;
@@ -191,14 +191,14 @@ body {
   letter-spacing: var(--tracking-normal);
 }
 
-/* PharmaGest layout: dark sidebar */
-[data-pharmagest-sidebar] {
-  --sidebar: var(--pharmagest-sidebar);
-  --sidebar-foreground: var(--pharmagest-sidebar-foreground);
-  --sidebar-primary: var(--pharmagest-sidebar-active);
-  --sidebar-primary-foreground: var(--pharmagest-sidebar-active-foreground);
+/* APCM Pharma layout: dark sidebar */
+[data-apcm-sidebar] {
+  --sidebar: var(--apcm-sidebar);
+  --sidebar-foreground: var(--apcm-sidebar-foreground);
+  --sidebar-primary: var(--apcm-sidebar-active);
+  --sidebar-primary-foreground: var(--apcm-sidebar-active-foreground);
   --sidebar-accent: rgba(20, 184, 166, 0.15);
-  --sidebar-accent-foreground: var(--pharmagest-sidebar-foreground);
+  --sidebar-accent-foreground: var(--apcm-sidebar-foreground);
   --sidebar-border: rgba(255, 255, 255, 0.08);
 }
 
@@ -237,27 +237,22 @@ body {
   }
 
   .signup {
-    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh;
-    background: radial-gradient(ellipse at top, #0d2a3a 0%, #071b2b 70%);
+    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh bg-background;
 
     .logo {
-      @apply flex flex-col items-center justify-center gap-2;
-
-      img {
-        @apply h-16 w-16;
-      }
+      @apply flex flex-col items-center justify-center gap-3;
 
       .brand-name {
-        @apply text-white text-xl font-bold tracking-wide;
+        @apply text-foreground text-xl font-bold tracking-wide;
       }
 
       .brand-sub {
-        @apply text-[#14b8a6] text-xs font-medium tracking-widest uppercase;
+        @apply text-primary text-xs font-medium tracking-widest uppercase;
       }
     }
 
     .card {
-      @apply w-full max-w-md mt-6 border-0 shadow-2xl;
+      @apply w-full max-w-md mt-6 border shadow-lg;
       padding: clamp(0.625rem, 2.5vw, 1.25rem);
     }
 
@@ -314,7 +309,7 @@ body {
     }
 
     .submit {
-      @apply w-full mt-2 bg-[#14b8a6] hover:bg-[#0d9488] text-white border-0;
+      @apply w-full mt-2;
     }
 
     .footer {
@@ -325,33 +320,28 @@ body {
       }
 
       a {
-        @apply font-semibold text-[#14b8a6] no-underline hover:underline;
+        @apply font-semibold text-primary no-underline hover:underline;
       }
     }
   }
 
   .login {
-    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh;
-    background: radial-gradient(ellipse at top, #0d2a3a 0%, #071b2b 70%);
+    @apply flex flex-col items-center justify-center px-4 py-8 min-h-svh bg-background;
 
     .logo {
-      @apply flex flex-col items-center justify-center gap-2;
-
-      img {
-        @apply h-16 w-16;
-      }
+      @apply flex flex-col items-center justify-center gap-3;
 
       .brand-name {
-        @apply text-white text-xl font-bold tracking-wide;
+        @apply text-foreground text-xl font-bold tracking-wide;
       }
 
       .brand-sub {
-        @apply text-[#14b8a6] text-xs font-medium tracking-widest uppercase;
+        @apply text-primary text-xs font-medium tracking-widest uppercase;
       }
     }
 
     .card {
-      @apply w-full max-w-md mt-6 border-0 shadow-2xl;
+      @apply w-full max-w-md mt-6 border shadow-lg;
       padding: clamp(0.625rem, 2.5vw, 1.25rem);
     }
 
@@ -404,7 +394,7 @@ body {
     }
 
     .submit {
-      @apply w-full mt-4 bg-[#14b8a6] hover:bg-[#0d9488] text-white border-0;
+      @apply w-full mt-4;
     }
 
     .split {
@@ -444,7 +434,7 @@ body {
       }
 
       a {
-        @apply font-semibold text-[#14b8a6] no-underline hover:underline;
+        @apply font-semibold text-primary no-underline hover:underline;
       }
     }
   }

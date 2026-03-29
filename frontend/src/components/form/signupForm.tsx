@@ -4,6 +4,7 @@ import { useSignupForm } from "@/schemas/signupForm";
 import type { SignupFormValues } from "@/schemas/signupForm";
 import { Loader2, Building2, UserCog, PlusCircle, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
+import { AppLogo } from "@/components/shared/appLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +15,7 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { InputPassword } from "@/components/refine-ui/form/inputPassword";
+import { InputPassword } from "@/components/form/inputPassword";
 import {
   Form,
   FormControl,
@@ -68,8 +69,8 @@ export const SignupForm = () => {
   return (
     <div className="signup">
       <div className="logo">
-        <img src="/logo.png" alt="PharmaGest" />
-        <span className="brand-name">PharmaGest</span>
+        <AppLogo />
+        <span className="brand-name">APCM Pharma</span>
         <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 
@@ -77,7 +78,7 @@ export const SignupForm = () => {
         <CardHeader className="header">
           <CardTitle className="title">Créer un compte</CardTitle>
           <CardDescription className="description">
-            Commencez avec PharmaGest
+            Commencez avec APCM Pharma
           </CardDescription>
         </CardHeader>
 

@@ -16,8 +16,8 @@ import { cn } from "@/utils/cn";
 import { RequestStatusBadge } from "@/components/shared/statusBadge";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -33,14 +33,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { CatalogRequestOut } from "@/api/admin";
+import { eUserStatus, eRequestType, eRequestStatus } from "@/types";
 
-type StatusFilter = "all" | "pending" | "approved" | "rejected";
+type StatusFilter = "all" | `${eRequestStatus}`;
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "Tous" },
-  { key: "pending", label: "En attente" },
-  { key: "approved", label: "Approuvés" },
-  { key: "rejected", label: "Rejetés" },
+  { key: eRequestStatus.PENDING, label: "En attente" },
+  { key: eRequestStatus.APPROVED, label: "Approuvés" },
+  { key: eRequestStatus.REJECTED, label: "Rejetés" },
 ];
 
 
@@ -53,14 +54,14 @@ export default function AdminCatalogRequestsPage() {
   const { approve, approving } = useApproveCatalogRequest();
   const { reject, rejecting } = useRejectCatalogRequest();
 
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const pendingCount = requests.filter((r) => r.status === eRequestStatus.PENDING).length;
 
   return (
     <ListView>
       <Breadcrumb />
 
       <div>
-        <h1 className="page-title">Demandes catalogue</h1>
+        <h1 className="page-title">Demandes d'exclusion</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Examinez les demandes d'exclusion et d'annulation soumises par les pharmacies.
         </p>
@@ -82,7 +83,7 @@ export default function AdminCatalogRequestsPage() {
               )}
             >
               {tab.label}
-              {tab.key === "pending" && pendingCount > 0 && statusFilter !== "pending" && (
+              {tab.key === eRequestStatus.PENDING && pendingCount > 0 && statusFilter !== eRequestStatus.PENDING && (
                 <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
                   {pendingCount}
                 </Badge>
@@ -122,7 +123,7 @@ export default function AdminCatalogRequestsPage() {
               <span className="w-36 text-center">Actions</span>
             </div>
             {requests.map((req) => {
-              const isAnnulation = req.request_type === "annulation";
+              const isAnnulation = req.request_type === eRequestType.ANNULATION;
               return (
                 <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
                   {/* Product info */}
@@ -171,7 +172,7 @@ export default function AdminCatalogRequestsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 w-36 justify-center">
-                    {req.status === "pending" ? (
+                    {req.status === eUserStatus.PENDING ? (
                       <>
                         <Button
                           size="sm"
@@ -209,10 +210,10 @@ export default function AdminCatalogRequestsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Rejeter la demande {rejectTarget?.request_type === "annulation" ? "d'annulation" : "d'exclusion"} de "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
+              Rejeter la demande {rejectTarget?.request_type === eRequestType.ANNULATION ? "d'annulation" : "d'exclusion"} de "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {rejectTarget?.request_type === "annulation"
+              {rejectTarget?.request_type === eRequestType.ANNULATION
                 ? "Le produit restera exclu (non déclaré) des rapports de cette pharmacie."
                 : "Le produit restera déclaré dans les rapports de cette pharmacie."}
             </AlertDialogDescription>

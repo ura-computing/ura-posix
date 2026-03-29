@@ -19,8 +19,8 @@ import { fr } from "date-fns/locale";
 import { cn } from "@/utils/cn";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RequestStatusBadge } from "@/components/shared/statusBadge";
-import { eUserRole } from "@/types";
+import { eUserRole, eUserStatus, eRequestType, eRequestStatus } from "@/types";
 
 export default function CatalogRequestsPage() {
   const { me: identity } = useMe();
@@ -87,14 +87,14 @@ export default function CatalogRequestsPage() {
   // Product IDs that already have a pending request (non_declare or annulation)
   const pendingMedIds = new Set(
     requests
-      .filter((r) => r.status === "pending" && r.medicament_id)
+      .filter((r) => r.status === eUserStatus.PENDING && r.medicament_id)
       .map((r) => r.medicament_id!)
   );
 
   // Product IDs where cancel button should NOT show (pending or approved annulation)
   const annulationMedIds = new Set(
     requests
-      .filter((r) => r.request_type === "annulation" && (r.status === "pending" || r.status === "approved") && r.medicament_id)
+      .filter((r) => r.request_type === eRequestType.ANNULATION && (r.status === eRequestStatus.PENDING || r.status === eRequestStatus.APPROVED) && r.medicament_id)
       .map((r) => r.medicament_id!)
   );
 
@@ -148,10 +148,10 @@ export default function CatalogRequestsPage() {
                 <span className="w-28 text-center">Action</span>
               </div>
               {requests.map((req) => {
-                const isAnnulation = req.request_type === "annulation";
+                const isAnnulation = req.request_type === eRequestType.ANNULATION;
                 const canCancel =
                   !isAnnulation &&
-                  req.status === "approved" &&
+                  req.status === eRequestStatus.APPROVED &&
                   req.medicament_id &&
                   !annulationMedIds.has(req.medicament_id);
                 return (

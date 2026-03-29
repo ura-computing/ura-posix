@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+.git
+.env
+.env.local
+*.log
+.pytest_cache
+.coverage
+seed.json

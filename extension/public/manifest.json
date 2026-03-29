@@ -28,7 +28,7 @@
         "https://app.pharma.sobrus.com/reports/exportpurchases*",
         "https://app.pharma.sobrus.com/reports/exportsales*"
       ],
-      "js": ["src/content/sobrus-export.ts", "src/content/sobrus-ui.ts"],
+      "js": ["src/content/sobrusExport.ts", "src/content/sobrusUi.ts"],
       "run_at": "document_idle"
     }
   ]

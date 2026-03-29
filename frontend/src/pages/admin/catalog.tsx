@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
-import { DataTable } from "@/components/refine-ui/data-table/dataTable";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
+import { DataTable } from "@/components/data-table/dataTable";
 import { TableToolbar } from "@/components/tableToolbar";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { Button } from "@/components/ui/button";

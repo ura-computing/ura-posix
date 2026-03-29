@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import * as adminApi from "@/api/admin";
 import { QUERY_KEYS } from "@/constants";
 import type { UserAdmin, UserRole } from "@/types";
+import type { NonDeclaredProduct } from "@/api/admin";
 
 // ── PharmacyFormDialog ───────────────────────────────────────────────────────
 
@@ -194,4 +195,38 @@ export function useAllUsers() {
   });
 
   return { users, isLoading, updateRole, updatePharmacy, revoke, revoking };
+}
+
+// ── Non-declared products ──────────────────────────────────────────────────
+
+export function useNonDeclaredProducts(pharmacyId: number) {
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ["admin-non-declared", pharmacyId],
+    queryFn: () => adminApi.listNonDeclaredProducts(pharmacyId),
+  });
+  return { products, isLoading };
+}
+
+// ── Pharmacy options ───────────────────────────────────────────────────────
+
+export function usePharmacyOptions(pharmacyId: number) {
+  const queryClient = useQueryClient();
+
+  const { data: options = {}, isLoading } = useQuery({
+    queryKey: ["admin-pharmacy-options", pharmacyId],
+    queryFn: () => adminApi.getPharmacyOptions(pharmacyId),
+  });
+
+  const { mutate: updateOptions, isPending: updatingOptions } = useMutation({
+    mutationFn: (opts: Record<string, boolean>) =>
+      adminApi.updatePharmacyOptions(pharmacyId, opts),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["admin-pharmacy-options", pharmacyId], data);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
+      toast.success("Options mises à jour");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return { options, isLoading, updateOptions, updatingOptions };
 }

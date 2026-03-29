@@ -1,7 +1,7 @@
 "use client";
 
-import { Header } from "@/components/refine-ui/layout/header";
-import { ThemeProvider } from "@/components/refine-ui/theme/themeProvider";
+import { Header } from "@/components/layout/header";
+import { ThemeProvider } from "@/components/theme/themeProvider";
 import { TopLoadingBar } from "@/components/topLoadingBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
@@ -12,7 +12,7 @@ export function Layout({ children }: PropsWithChildren) {
   return (
     <ThemeProvider>
       <TopLoadingBar />
-      <SidebarProvider data-pharmagest-sidebar="">
+      <SidebarProvider data-apcm-sidebar="">
         <Sidebar />
         <SidebarInset>
           <Header />

@@ -1,4 +1,5 @@
 import { request, fetchBlob } from "./client";
+import { eCategoryType } from "@/types";
 
 export type StatsKpis = {
   ventes_total: number;
@@ -53,7 +54,7 @@ function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): str
   const p = new URLSearchParams();
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== "all") p.set("category_type", categoryType);
+  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
   const qs = p.toString();
   return qs ? `?${qs}` : "";
 }
@@ -70,7 +71,7 @@ export const analyseMarge = (
   const p = new URLSearchParams();
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== "all") p.set("category_type", categoryType);
+  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
   if (mode) p.set("mode", mode);
   const qs = p.toString();
   return request<AnalyseMargeResponse>(`/stats/analyse-marge${qs ? `?${qs}` : ""}`);
@@ -79,7 +80,7 @@ export const analyseMarge = (
 export const exportExcel = (
   dateFrom?: string,
   dateTo?: string,
-  categoryType: "all" | "pharmacie" | "parapharmacie" = "all",
+  categoryType: eCategoryType = eCategoryType.ALL,
 ): Promise<Blob> => {
   const p = new URLSearchParams({ category_type: categoryType });
   if (dateFrom) p.set("date_from", dateFrom);
@@ -91,7 +92,7 @@ export const exportExcelForPharmacy = (
   pharmacyId: number,
   dateFrom?: string,
   dateTo?: string,
-  categoryType: "all" | "pharmacie" | "parapharmacie" = "all",
+  categoryType: eCategoryType = eCategoryType.ALL,
 ): Promise<Blob> => {
   const p = new URLSearchParams({ category_type: categoryType });
   if (dateFrom) p.set("date_from", dateFrom);
@@ -99,10 +100,27 @@ export const exportExcelForPharmacy = (
   return fetchBlob(`/admin/pharmacy/${pharmacyId}/stats/export-excel?${p}`);
 };
 
-export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?: string) => {
+export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType?: string) => {
   const p = new URLSearchParams();
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
+  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
   const qs = p.toString();
   return request<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs ? `?${qs}` : ""}`);
+};
+
+export const analyseMargeForPharmacy = (
+  pharmacyId: number,
+  dateFrom?: string,
+  dateTo?: string,
+  categoryType?: string,
+  mode?: string,
+) => {
+  const p = new URLSearchParams();
+  if (dateFrom) p.set("date_from", dateFrom);
+  if (dateTo) p.set("date_to", dateTo);
+  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
+  if (mode) p.set("mode", mode);
+  const qs = p.toString();
+  return request<AnalyseMargeResponse>(`/admin/pharmacy/${pharmacyId}/stats/analyse-marge${qs ? `?${qs}` : ""}`);
 };

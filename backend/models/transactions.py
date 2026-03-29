@@ -5,6 +5,19 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+class ImportBatch(Base):
+    """Tracks each CSV import so users can delete a specific import."""
+    __tablename__ = "import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=False, index=True)
+    file_type = Column(String, nullable=False)          # "achat" or "vente"
+    filename = Column(String, nullable=True)             # original Sobrus filename
+    rows_inserted = Column(Integer, default=0)
+    rows_skipped = Column(Integer, default=0)
+    imported_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Achat(Base):
     """One row = one line-item on a purchase delivery note."""
     __tablename__ = "achats"
@@ -12,6 +25,7 @@ class Achat(Base):
     id = Column(Integer, primary_key=True, index=True)
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True, index=True)
     medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True, index=True)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True, index=True)
     medicament = relationship("Medicament", back_populates="achats")
 
     created_at_source = Column(String, nullable=True)   # "Créée le"
@@ -39,6 +53,7 @@ class Vente(Base):
     id = Column(Integer, primary_key=True, index=True)
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True, index=True)
     medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True, index=True)
+    import_batch_id = Column(Integer, ForeignKey("import_batches.id"), nullable=True, index=True)
     medicament = relationship("Medicament", back_populates="ventes")
 
     # NOTE: stored as VARCHAR (ISO date string e.g. "2024-01-15") — safe for BETWEEN comparisons

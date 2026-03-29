@@ -1,5 +1,10 @@
-import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY, DASHBOARD_URL } from "../constants";
-import { showUploadBanner, type UploadStatus } from "./upload-banner";
+import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY, DASHBOARD_URL, TOKEN_STORAGE_KEY } from "../constants";
+import { showUploadBanner, cleanOldJobs } from "./uploadBanner";
+import type { UploadJob } from "./sobrusExport";
+
+function toJobs(raw: unknown): UploadJob[] {
+  return Array.isArray(raw) ? raw : [];
+}
 
 console.log("[Content Script] Loaded");
 
@@ -12,7 +17,7 @@ function _send(msg: object) {
   } catch { /* extension context invalidated — silently ignore */ }
 }
 
-const _storedToken = sessionStorage.getItem("pharmagest_token");
+const _storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
 if (_storedToken) {
   _send({ action: ACTIONS.STORE_TOKEN, token: _storedToken });
 }
@@ -52,80 +57,11 @@ const _bannerConfig = { onViewData: (path: string) => { window.location.href = p
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _showImportToast(n: { fileType: string; inserted: number; skipped: number }) {
-  if (document.getElementById("__apcm-upload-banner")) return; // upload banner already visible
-  const id = "__apcm-import-toast";
-  document.getElementById(id)?.remove();
-
-  const s = document.createElement("style");
-  s.textContent = `@keyframes __apcm_in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`;
-  document.head.appendChild(s);
-
-  const el = document.createElement("div");
-  el.id = id;
-  el.style.cssText = `
-    position:fixed;bottom:24px;right:24px;z-index:2147483647;
-    background:#0f172a;color:#f1f5f9;border-radius:12px;
-    padding:10px 40px 10px 16px;
-    font:600 13px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,0.4);
-    max-width:320px;border:1px solid rgba(20,184,166,0.35);
-    display:flex;align-items:flex-start;gap:8px;
-    animation:__apcm_in .3s ease;pointer-events:auto;
-  `;
-
-  const section = n.fileType === "achat" ? "les achats" : "les ventes";
-  const path = n.fileType === "achat" ? "/achat" : "/ventes";
-  const skippedNote = n.skipped > 0
-    ? `<br><span style="color:#94a3b8;font-weight:400">${n.skipped} doublon(s) ignoré(s)</span>`
-    : "";
-
-  el.innerHTML = `
-    <button id="__apcm-toast-close" aria-label="Fermer" style="
-      position:absolute;top:7px;right:8px;background:none;border:none;
-      color:#94a3b8;cursor:pointer;font-size:17px;line-height:1;padding:2px 5px;border-radius:4px
-    ">×</button>
-    <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;margin-top:4px;display:inline-block"></span>
-    <span>
-      <strong>${n.inserted}</strong> ligne(s) importée(s) dans ${section}.${skippedNote}<br>
-      <a id="__apcm-toast-link" style="color:#14b8a6;cursor:pointer;text-decoration:underline;font-weight:400">
-        Voir les données →
-      </a>
-    </span>
-  `;
-
-  document.body.appendChild(el);
-
-  el.querySelector("#__apcm-toast-close")?.addEventListener("click", () => el.remove());
-  el.querySelector("#__apcm-toast-link")?.addEventListener("click", () => {
-    window.location.href = path;
-    el.remove();
-  });
-
-  let hideTimer: ReturnType<typeof setTimeout>;
-  const scheduleHide = () => {
-    hideTimer = setTimeout(() => {
-      el.style.transition = "opacity .4s";
-      el.style.opacity = "0";
-      setTimeout(() => el.remove(), 500);
-    }, 12_000);
-  };
-  scheduleHide();
-  el.addEventListener("mouseenter", () => clearTimeout(hideTimer));
-  el.addEventListener("mouseleave", scheduleHide);
-}
-
 if (window.location.origin === new URL(DASHBOARD_URL).origin) {
   // Initial load — send stored notifications to the React app
-  // Also show toast for any very recent unread notification (covers the case where
-  // the background saved a notification and then navigated to this tab — onChanged
-  // won't fire because the save already happened before this script ran).
-  let _prevLen = 0;
   chrome.storage.local.get(NOTIF_KEY, (res) => {
     const notifications = (res[NOTIF_KEY] as NotifEntry[] | undefined) ?? [];
     _postNotifications(notifications);
-    _prevLen = notifications.length;
-    const recent = notifications.find((n) => !n.read && Date.now() - n.timestamp < 30_000);
-    if (recent) _showImportToast(recent);
   });
 
   // Live updates
@@ -134,20 +70,19 @@ if (window.location.origin === new URL(DASHBOARD_URL).origin) {
     if (changes[NOTIF_KEY]) {
       const next = (changes[NOTIF_KEY].newValue as NotifEntry[] | undefined) ?? [];
       _postNotifications(next);
-      if (next.length > _prevLen) _showImportToast(next[0]);
-      _prevLen = next.length;
     }
     if (changes[UPLOAD_STATUS_KEY]) {
-      const status = changes[UPLOAD_STATUS_KEY].newValue as UploadStatus | undefined;
-      if (status) showUploadBanner(status, _bannerConfig);
+      const jobs = toJobs(changes[UPLOAD_STATUS_KEY].newValue);
+      if (jobs.length) showUploadBanner(cleanOldJobs(jobs), _bannerConfig);
     }
   });
 
-  // Show upload banner on page load if an upload is in progress or just finished
+  // Show upload banner on page load if jobs exist
   chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
-    const status = res[UPLOAD_STATUS_KEY] as UploadStatus | undefined;
-    if (status && status.timestamp && Date.now() - status.timestamp < 60_000) {
-      showUploadBanner(status, _bannerConfig);
+    const jobs = toJobs(res[UPLOAD_STATUS_KEY]);
+    if (jobs.length) {
+      const active = cleanOldJobs(jobs);
+      if (active.length) showUploadBanner(active, _bannerConfig);
     }
   });
 
@@ -302,8 +237,8 @@ function _initSobrusIndicator() {
 
   // ── React to login / logout in real-time ──
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local" || !("pharmagest_token" in changes)) return;
-    _setConnected(!!(changes["pharmagest_token"].newValue));
+    if (area !== "local" || !(TOKEN_STORAGE_KEY in changes)) return;
+    _setConnected(!!(changes[TOKEN_STORAGE_KEY].newValue));
   });
 
 }

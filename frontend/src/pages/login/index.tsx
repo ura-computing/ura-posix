@@ -1,4 +1,4 @@
-import { LoginForm } from "@/components/refine-ui/form/loginForm";
+import { LoginForm } from "@/components/form/loginForm";
 
 export const Login = () => {
   return <LoginForm />;

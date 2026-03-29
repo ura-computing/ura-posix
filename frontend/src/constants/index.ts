@@ -1,7 +1,7 @@
 export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL || "http://localhost:8000/";
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-export const TOKEN_KEY = "pharmagest_token";
+export const TOKEN_KEY = "apcm_token";
 
 export const QUERY_KEYS = {
   me: ["me"] as const,
@@ -17,6 +17,8 @@ export const ENDPOINTS = {
     signup: "/auth/signup",
     me: "/auth/me",
     forgotPassword: "/auth/forgot-password",
+    forgotPasswordWhatsApp: "/auth/forgot-password-whatsapp",
+    verifyOtp: "/auth/verify-otp",
     resetPassword: "/auth/reset-password",
   },
   uploads: {
@@ -44,3 +46,11 @@ export const ENDPOINTS = {
     users: "/admin/users",
   },
 } as const;
+
+export const FEATURES = [
+  { key: "rapports", label: "Rapports" },
+  { key: "import", label: "Import" },
+  { key: "achat", label: "Achats" },
+  { key: "ventes", label: "Ventes" },
+  { key: "stock", label: "Stock" },
+] as const;

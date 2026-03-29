@@ -1,4 +1,4 @@
-# PharmaGest — Test / Demo Setup Guide
+# APCM Pharma — Demo Setup Guide
 
 Get the full application built and running inside Docker with a single command.
 
@@ -50,7 +50,7 @@ That's it. This will:
 
 ## Set Up a Pharmacy (Owner + Employees)
 
-The seed only creates the admin. To test the full pharmacy workflow:
+The seed only creates the admin. To demo the full pharmacy workflow:
 
 1. **Register an owner** — open http://localhost:4173/signup in a new browser profile or incognito window, select **Proprietaire**, fill in the pharmacy details, and submit.
 2. **Approve the owner** — log in as admin → **Pharmacies** → find the pending account → approve.
@@ -58,7 +58,7 @@ The seed only creates the admin. To test the full pharmacy workflow:
 
 ---
 
-## Test the Full Feature Set
+## Demo the Full Feature Set
 
 ### As Admin
 - **Pharmacies** — manage pharmacies, users, permissions
@@ -68,7 +68,7 @@ The seed only creates the admin. To test the full pharmacy workflow:
 
 ### As Owner
 - **Achats / Ventes** — paginated tables with search, category/TVA/date filters, pharmacie/parapharmacie toggle, CSV export
-- **Rapports** �� KPIs, TVA, marge, monthly trends, Excel export
+- **Rapports** — KPIs, TVA, marge, monthly trends, Excel export
 - **Import** — CSV upload wizard or auto-import via Chrome extension
 - **Produits non declares** — request product exclusions, cancel approved exclusions
 - **Mes employes** — approve/reject employees, manage per-feature permissions

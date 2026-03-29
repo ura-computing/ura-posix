@@ -163,7 +163,7 @@ def list_achats(
     current_user: User = Depends(get_current_user),
 ):
     if (current_user.permissions or {}).get("achat") is False:
-        raise HTTPException(status_code=403, detail="Achat access denied")
+        raise HTTPException(status_code=403, detail="Accès aux achats refusé")
     suffixes_map = _get_suffixes_map(db)
     q = _base_achat_query(db, current_user, search, category, date_from, date_to, tva)
     total = q.count()
@@ -300,7 +300,7 @@ def list_ventes(
     current_user: User = Depends(get_current_user),
 ):
     if (current_user.permissions or {}).get("ventes") is False:
-        raise HTTPException(status_code=403, detail="Ventes access denied")
+        raise HTTPException(status_code=403, detail="Accès aux ventes refusé")
     suffixes_map = _get_suffixes_map(db)
     q = _base_vente_query(db, current_user, search, category, date_from, date_to, tva)
     total = q.count()

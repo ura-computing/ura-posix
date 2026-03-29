@@ -4,11 +4,14 @@ import { getToken } from "./storage";
 export interface UploadResult {
   inserted: number;
   skipped: number;
+  batch_id: number;
 }
 
 export async function uploadCsv(
   fileType: "achat" | "vente",
-  csvText: string
+  csvText: string,
+  filename?: string,
+  batchId?: number,
 ): Promise<UploadResult> {
   const token = await getToken();
   if (!token) throw new Error("Non authentifié");
@@ -16,7 +19,8 @@ export async function uploadCsv(
   const endpoint = fileType === "achat" ? "/uploads/achat" : "/uploads/vente";
   const blob = new Blob([csvText], { type: "text/csv" });
   const formData = new FormData();
-  formData.append("file", blob, "export.csv");
+  formData.append("file", blob, filename || "export.csv");
+  if (batchId) formData.append("batch_id", String(batchId));
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);

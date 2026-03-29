@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, field_validator
+from utils.constants import Role, Status
 
 
 class PharmacyCreate(BaseModel):
@@ -32,6 +33,7 @@ class PharmacyOut(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    options: Dict[str, bool] = {}
     created_at: Optional[datetime] = None
     user_count: int = 0
     owners: List[OwnerOut] = []
@@ -39,6 +41,11 @@ class PharmacyOut(BaseModel):
     owner_email: Optional[str] = None
     owner_phone: Optional[str] = None
     owner_pharmacy_name: Optional[str] = None
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def coerce_options(cls, v: Any) -> Dict[str, bool]:
+        return v if v is not None else {}
 
     model_config = {"from_attributes": True}
 
@@ -59,8 +66,8 @@ class UserAdminOut(BaseModel):
     phone: Optional[str] = None
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False
-    role: str = "owner"
-    status: str = "pending"
+    role: str = Role.OWNER
+    status: str = Status.PENDING
     permissions: Dict[str, bool] = {}
     pharmacy_id: Optional[int] = None
     created_at: Optional[datetime] = None
@@ -78,7 +85,7 @@ class EmployeePermissionsUpdate(BaseModel):
 
 
 class EmployeeStatusUpdate(BaseModel):
-    status: Literal["active", "rejected"]
+    status: Literal[Status.ACTIVE, Status.REJECTED]
 
 
 class UserRoleUpdate(BaseModel):

@@ -1,4 +1,4 @@
-# PharmaGest — Developer Setup Guide
+# APCM Pharma — Developer Setup Guide
 
 Complete setup instructions for local development.
 
@@ -32,7 +32,7 @@ cp backend/.env.example backend/.env
 
 Edit `backend/.env`:
 ```env
-DATABASE_URL=postgresql://pharmagest:pharmagest@localhost:5432/pharmagest
+DATABASE_URL=postgresql://apcm:apcm@localhost:5432/apcm
 SECRET_KEY=<generate-with: python3 -c "import secrets; print(secrets.token_urlsafe(32))">
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 CORS_ORIGINS=http://localhost:5173
@@ -121,7 +121,7 @@ make db                                          # start PostgreSQL
 docker compose stop                              # stop container (keep data)
 make down                                        # stop + delete data
 make db-clean                                    # clear all rows via script
-docker compose exec db psql -U pharmagest -d pharmagest  # psql shell
+docker compose exec db psql -U apcm -d apcm  # psql shell
 docker compose logs db                           # view DB logs
 ```
 
@@ -214,6 +214,65 @@ Normal — seed is idempotent. Run `make db-clean && make seed` to reset complet
 2. You're logged in to the dashboard
 3. Extension popup shows green connected badge
 4. You're on a Sobrus export page (`app.pharma.sobrus.com`)
+
+---
+
+## WhatsApp OTP Setup (Password Reset via WhatsApp)
+
+The app supports password reset via WhatsApp OTP using Meta's Cloud API.
+
+### 1. Create Meta Business & Developer Accounts
+
+- Create a business account at [business.facebook.com](https://business.facebook.com)
+- Create a developer account at [developers.facebook.com](https://developers.facebook.com)
+
+### 2. Create a Meta App
+
+1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps) → **Create App**
+2. Choose **"Business"** type
+3. Name it (e.g. "APCM Pharma"), select your business account
+4. On the app dashboard, find **WhatsApp** and click **Set Up**
+
+### 3. Add a Phone Number
+
+1. In WhatsApp → **Getting Started**, Meta provides a test phone number (free)
+2. To use your own: go to **Phone Numbers** → **Add Phone Number** and verify via SMS/call
+3. Note your **Phone Number ID** (displayed on the page)
+
+### 4. Create the Authentication Template
+
+1. Go to **WhatsApp** → **Message Templates** → **Create Template**
+2. Configure:
+   - **Category**: `Authentication`
+   - **Name**: `password_reset_otp`
+   - **Language**: `French (fr)`
+   - **OTP type**: Copy code
+   - **Security disclaimer**: Yes
+   - **Expiry warning**: 10 minutes
+3. Submit for review (usually approved within minutes)
+
+### 5. Generate a Permanent Access Token
+
+1. Go to [business.facebook.com/settings/system-users](https://business.facebook.com/settings/system-users)
+2. Create a **System User** with Admin role
+3. Click **Generate Token** → select your app → grant `whatsapp_business_messaging` permission
+4. Copy the token (shown only once)
+
+### 6. Set Environment Variables
+
+Add to `backend/.env`:
+
+```env
+WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
+WHATSAPP_ACCESS_TOKEN=your_permanent_access_token
+```
+
+### Important Notes
+
+- **Test mode**: The test phone number can only send to numbers manually added in WhatsApp → Getting Started → "To" field
+- **Production**: Verify your business and get your phone number approved to send to any number
+- **Phone format**: Numbers must be in E.164 format (e.g. `212600000000` for Morocco — country code + number without leading 0)
+- **Cost**: ~$0.03 per authentication message to Morocco
 
 ---
 
