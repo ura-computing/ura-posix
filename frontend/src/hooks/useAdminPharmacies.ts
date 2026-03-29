@@ -9,7 +9,7 @@ import type { UserAdmin, UserRole } from "@/types";
 export function usePharmacyFormMutation(onSuccess: () => void) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: savePharmacy, isPending: savingPharmacy } = useMutation({
     mutationFn: ({
       isEdit,
       pharmacyId,
@@ -30,7 +30,7 @@ export function usePharmacyFormMutation(onSuccess: () => void) {
     onError: (err) => toast.error(err.message),
   });
 
-  return { mutate, isPending };
+  return { savePharmacy, savingPharmacy };
 }
 
 // ── UsersPanel (users for a specific pharmacy) ──────────────────────────────

@@ -106,7 +106,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
   const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const { mutate, isPending } = useCatalogMutation({ onSuccess: onClose });
+  const { saveMedicament, savingMedicament } = useCatalogMutation({ onSuccess: onClose });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -124,7 +124,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
       laboratoire: form.laboratoire || null,
       product_type: (form.product_type || null) as "pharmacie" | "parapharmacie" | null,
     };
-    mutate({
+    saveMedicament({
       isEdit,
       editId: medicament?.id,
       body: body as Omit<MedicamentOut, "id">,
@@ -136,7 +136,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
   }, [open, medicament]);
 
   const handleOpenChange = (v: boolean) => {
-    if (!v && !isPending) onClose();
+    if (!v && !savingMedicament) onClose();
   };
 
   return (
@@ -194,7 +194,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
                   value={form.category}
                   onChange={(v) => setForm((f) => ({ ...f, category: v }))}
                   placeholder="Analgésiques"
-                  disabled={isPending}
+                  disabled={savingMedicament}
                 />
               </div>
               <div className="space-y-1.5">
@@ -202,7 +202,7 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
                 <select
                   value={form.product_type}
                   onChange={(e) => setForm((f) => ({ ...f, product_type: e.target.value }))}
-                  disabled={isPending}
+                  disabled={savingMedicament}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Auto-détection</option>
@@ -226,11 +226,11 @@ function MedicamentFormDialog({ open, onClose, medicament }: MedicamentFormProps
             </div>
           </div>
           <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={savingMedicament}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending || !form.product.trim()} className="gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={savingMedicament || !form.product.trim()} className="gap-2">
+              {savingMedicament && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? "Enregistrer" : "Ajouter"}
             </Button>
           </DialogFooter>
@@ -252,10 +252,10 @@ function CategorySuffixesSection() {
   const openCreate = () => { setEditing(null); setForm({ category: "", suffix: "", color: null }); setDialogOpen(true); };
   const openEdit = (row: CategorySuffixOut) => { setEditing(row); setForm({ category: row.category, suffix: row.suffix, color: row.color ?? null }); setDialogOpen(true); };
 
-  const saveMutation = useSuffixSave({ onSuccess: () => setDialogOpen(false) });
+  const { saveSuffix, savingSuffix } = useSuffixSave({ onSuccess: () => setDialogOpen(false) });
 
   const [deleteTarget, setDeleteTarget] = useState<CategorySuffixOut | null>(null);
-  const deleteMutation = useSuffixDelete({ onSuccess: () => setDeleteTarget(null) });
+  const { deleteSuffix, deletingSuffix } = useSuffixDelete({ onSuccess: () => setDeleteTarget(null) });
 
   return (
     <div className="space-y-3">
@@ -352,8 +352,8 @@ function CategorySuffixesSection() {
           </div>
           <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button disabled={!form.category || !form.suffix || saveMutation.isPending} onClick={() => saveMutation.mutate({ editing, form })}>
-              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button disabled={!form.category || !form.suffix || savingSuffix} onClick={() => saveSuffix({ editing, form })}>
+              {savingSuffix && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               {editing ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>
@@ -372,7 +372,7 @@ function CategorySuffixesSection() {
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() => deleteTarget && deleteSuffix(deleteTarget.id)}
             >
               Supprimer
             </AlertDialogAction>
@@ -564,11 +564,11 @@ export default function AdminCatalogPage() {
     setPage(1);
   };
 
-  const { mutate: importCatalog, isPending: importing } = useCatalogImport({
+  const { importCatalog, importing } = useCatalogImport({
     onSettled: () => { if (fileInputRef.current) fileInputRef.current.value = ""; },
   });
 
-  const { mutate: deleteMed, isPending: deleting } = useCatalogDelete({
+  const { deleteMedicament: deleteMed, deletingMedicament: deleting } = useCatalogDelete({
     onSuccess: () => setDeleteTarget(null),
   });
 

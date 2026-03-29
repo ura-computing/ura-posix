@@ -10,10 +10,42 @@ export function useCatalogRequestsList(enabled: boolean) {
     queryKey: REQUESTS_KEY,
     queryFn: () => catalogRequestsApi.list(),
     enabled,
-    select: (data) => data.filter((r) => r.request_type === "non_declare"),
+    select: (data) => {
+      // Collect medicament IDs where annulation was approved (exclusion reversed)
+      const reversedMedIds = new Set(
+        data
+          .filter((r) => r.request_type === "annulation" && r.status === "approved" && r.medicament_id)
+          .map((r) => r.medicament_id!)
+      );
+      return data.filter((r) => {
+        if (r.request_type === "annulation") return r.status === "pending" || r.status === "rejected";
+        if (r.request_type === "non_declare") {
+          // Hide approved exclusions that were later reversed
+          if (r.status === "approved" && r.medicament_id && reversedMedIds.has(r.medicament_id)) return false;
+          return true;
+        }
+        return false;
+      });
+    },
   });
 
   return { requests, requestsLoading };
+}
+
+export function useSubmitAnnulation() {
+  const queryClient = useQueryClient();
+
+  const { mutate: submitAnnulation, isPending: submittingAnnulation } = useMutation({
+    mutationFn: (params: { medicament_id: number; notes?: string }) =>
+      catalogRequestsApi.submitAnnulation(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
+      toast.success("Demande d'annulation envoyée à l'administrateur");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  return { submitAnnulation, submittingAnnulation };
 }
 
 export function useMyProducts(debouncedSearch: string, dialogOpen: boolean) {

@@ -155,47 +155,30 @@ export function TableToolbar({
   return (
     <div className="flex flex-col gap-2 w-full">
 
-      {/* ── Row 1: Search + Export ── */}
-      <div className="flex items-center gap-2">
-        {fetchSuggestions ? (
-          <SearchAutocomplete
-            value={searchQuery}
-            onChange={onSearchChange}
-            fetchSuggestions={fetchSuggestions}
+      {/* ── Row 1: Search (full width) ── */}
+      {fetchSuggestions ? (
+        <SearchAutocomplete
+          value={searchQuery}
+          onChange={onSearchChange}
+          fetchSuggestions={fetchSuggestions}
+          placeholder={searchPlaceholder}
+          groupLabels={suggestionGroupLabels}
+        />
+      ) : (
+        <div className="search-field">
+          <Search className="search-icon" />
+          <Input
+            type="text"
             placeholder={searchPlaceholder}
-            groupLabels={suggestionGroupLabels}
+            className="pl-10 w-full"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
           />
-        ) : (
-          <div className="search-field flex-1">
-            <Search className="search-icon" />
-            <Input
-              type="text"
-              placeholder={searchPlaceholder}
-              className="pl-10 w-full"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
-        )}
+        </div>
+      )}
 
-        {rightAddon}
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 gap-2 shrink-0"
-          onClick={onExport}
-          disabled={exporting}
-        >
-          {exporting
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <Download className="h-4 w-4" />}
-          <span className="hidden sm:inline">{exporting ? "Export…" : "Exporter CSV"}</span>
-        </Button>
-      </div>
-
-      {/* ── Row 2: Filters ── */}
-      {showFilters && (
+      {/* ── Row 2: Filters + Type buttons + Export ── */}
+      {(showFilters || rightAddon) && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 min-w-0">
 
           {/* Date range — trigger + separate × clear button */}
@@ -298,6 +281,23 @@ export function TableToolbar({
               Effacer
             </button>
           )}
+
+          {/* Right addon + Export — pushed to the right */}
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            {rightAddon}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-2 shrink-0"
+              onClick={onExport}
+              disabled={exporting}
+            >
+              {exporting
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Download className="h-4 w-4" />}
+              <span className="hidden sm:inline">{exporting ? "Export…" : "Exporter CSV"}</span>
+            </Button>
+          </div>
         </div>
       )}
     </div>

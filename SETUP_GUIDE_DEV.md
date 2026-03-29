@@ -87,10 +87,10 @@ Then in Chrome:
 Only the admin is seeded. To test with an owner or employee:
 
 1. Log in as admin at http://localhost:5173
-2. Open a second browser profile (or incognito) → go to http://localhost:5173/register
-3. Register as an **Owner** (fill in pharmacy details)
-4. Back in the admin panel → **Pharmacies** → approve the new account
-5. Register additional employees from the owner's account under **Mes employés**
+2. Open a second browser profile (or incognito) → go to http://localhost:5173/signup
+3. Register as an **Owner** (fill in pharmacy details) or **Employee** (select existing pharmacy)
+4. Back in the admin panel → **Pharmacies** → approve the new owner account
+5. For employees: the pharmacy owner approves them from **Mes employes**
 
 ---
 
@@ -149,6 +149,45 @@ Open http://localhost:5173 → log in → you should see the admin dashboard.
 
 ---
 
+## Frontend Conventions
+
+- **All filenames**: camelCase (`useMe.ts`, `loginForm.tsx`, `tableToolbar.tsx`)
+- **Logic in hooks**: Pages/components never call `useQuery`/`useMutation` directly — all TanStack logic lives in `hooks/`
+- **API calls in `api/` only**: Never call `fetch` directly in a component
+- **Zod schemas in `schemas/`**: Form validation + `useForm` hooks live in schema files, not in UI components
+- **Role checks use `eUserRole` enum**: No string literals (`"admin"`, `"owner"`, `"employee"`)
+
+---
+
+## Project Structure
+
+```
+backend/
+├── models/          # SQLAlchemy models (auth.py, catalog.py, transactions.py)
+├── schemas/         # Pydantic request/response models
+├── routers/         # API endpoints
+│   └── stats/       # Analytics engine (queries, marge, excel export)
+└── utils/           # JWT, permissions, email, string helpers
+
+frontend/src/
+├── api/             # Typed API layer (one file per domain)
+├── hooks/           # All TanStack Query/Mutation logic (~20 hooks)
+├── schemas/         # Zod schemas + useForm hooks
+├── pages/           # Route pages (thin UI, delegate to hooks)
+├── components/      # Shared UI components
+├── utils/           # session, format, table export, cn
+├── types/           # TypeScript types + eUserRole enum
+└── constants/       # API_URL, TOKEN_KEY, QUERY_KEYS
+
+extension/src/
+├── background/      # Token storage, upload orchestration
+├── content/         # Auth relay, CSV intercept, Sobrus UI
+├── popup/           # Extension popup UI
+└── hooks/           # Token, notifications, upload status
+```
+
+---
+
 ## Troubleshooting
 
 ### Database Connection Error
@@ -181,8 +220,7 @@ Normal — seed is idempotent. Run `make db-clean && make seed` to reset complet
 ## Additional Resources
 
 - API docs: http://localhost:8000/docs
-- DB models: `backend/models.py`
+- DB models: `backend/models/`
 - Frontend routes: `frontend/src/routes.tsx`
 - Extension manifest: `extension/public/manifest.json`
 - Architecture: `README.md`
-- Learning guide: `TECHNICAL_LEARNING.md`

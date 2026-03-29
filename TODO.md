@@ -169,30 +169,14 @@ Ila chfti 33.93%, rahouwa Médicament (Pharmacie pure).
 Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
 
 
-+ section to show either the medament is pharmacy or prapharmacy in vente/achat tables
 + admin can set medicament type (pharamcy or parapharmacy)
-
-
-
-+ adapt the color system of the entire web site to follow the collor system of pharmacies in morocco
-+ mqke qll titiltle in cards bolder
-
-
-+ instead of demande catalogue in owenr (the logic needs to be updated for both oowner and admin)
-+ owener should do request for produit non declarer, and it will be send to admin to aprove it, prduit is based on the ones in catlagues, and if it's not dclare it won't be considere in rapport
-
-+ in Analyse de marge:
-    + add a button creer un analyse, where use can creare a anaylys sumulation, by selecting parudut, fourincieur etc.. based on all filter alrady used in alayse, it should no be saved in database since it's only a simulation done so owner can find what goes best for him
 
 
 + add forget password, functionality and in log in pgae
 + chrome store account for the extension
-+ for colons show everything by default
-+ list ventes:
-    + update colors cimilar to the ones in rapport page
-+ fix build
+
 + ask about fancounalty of produit non declare
-+ ask about analyze
++ creer analyse should 
 + user (employee and owner) can't change information
 + verfy number option
 + can't chnage languege

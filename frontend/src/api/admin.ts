@@ -44,7 +44,7 @@ export type CatalogRequestOut = {
   pharmacy_id: number | null;
   status: "pending" | "approved" | "rejected";
   reject_reason: string | null;
-  request_type: "new_product" | "non_declare";
+  request_type: "new_product" | "non_declare" | "annulation";
   medicament_id: number | null;
   medicament_name: string | null;
   notes: string | null;

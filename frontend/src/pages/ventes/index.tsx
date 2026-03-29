@@ -19,6 +19,7 @@ import { fmt } from "@/utils/format";
 import { downloadCSV } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
+import { cn } from "@/utils/cn";
 
 const VenteEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -91,6 +92,7 @@ const VentesList = () => {
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -107,12 +109,22 @@ const VentesList = () => {
   const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
   const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
 
-  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange]);
+  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange, categoryType]);
+
+  const effectiveCategories = useMemo(() => {
+    const typeCats = categoryType === "all"
+      ? allCategories
+      : categoryType === "pharmacie"
+        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
+        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
+    if (selectedCats.length === 0) return categoryType === "all" ? [] : typeCats;
+    return selectedCats.filter(c => typeCats.includes(c));
+  }, [allCategories, selectedCats, categoryType]);
 
   const { ventesRows, ventesPagination: paginationMeta, ventesPageCount: pageCount, ventesLoading: isLoading } = useVentesList({
     page, limit,
     search: searchQuery,
-    categories: selectedCats,
+    categories: effectiveCategories,
     tva: selectedTva,
     dateFrom, dateTo,
   });
@@ -306,26 +318,6 @@ const VentesList = () => {
     }
   };
 
-  const handleExportByType = async (type: "medicament" | "parapharmacie") => {
-    setExporting(true);
-    try {
-      const medCats  = allCategories.filter(c => c.toLowerCase().includes("médicament"));
-      const paraCats = allCategories.filter(c => !c.toLowerCase().includes("médicament"));
-      const cats = type === "medicament" ? medCats : paraCats;
-      const res = await transactionsApi.exportVente("", cats, dateFrom, dateTo);
-      const colValues = { ...VENTE_COL_VALUES };
-      const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
-      const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
-      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, `ventes_${type}_${Date.now()}.csv`);
-      toast.success(`${res.data.length} lignes exportées`);
-    } catch {
-      toast.error("Erreur lors de l'export");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const tvaPageTotal = useMemo(() =>
     rows.reduce((acc, row) => {
       const m = String(row.tva ?? "").match(/([\d.]+)\s*%/);
@@ -361,16 +353,24 @@ const VentesList = () => {
         rightAddon={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handleExportByType("medicament")}
-              disabled={exporting}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              onClick={() => setCategoryType(categoryType === "pharmacie" ? "all" : "pharmacie")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                categoryType === "pharmacie"
+                  ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                  : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
+              )}
             >
-              Médicaments
+              Pharmacie
             </button>
             <button
-              onClick={() => handleExportByType("parapharmacie")}
-              disabled={exporting}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              onClick={() => setCategoryType(categoryType === "parapharmacie" ? "all" : "parapharmacie")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                categoryType === "parapharmacie"
+                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                  : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
+              )}
             >
               Parapharmacie
             </button>

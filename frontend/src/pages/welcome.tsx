@@ -106,7 +106,7 @@ function UnauthenticatedView() {
           <Link to="/login">Se connecter</Link>
         </Button>
         <Button asChild variant="outline" size="lg" className="rounded-xl px-8 border-primary/30 hover:bg-primary/5">
-          <Link to="/register">Créer un compte</Link>
+          <Link to="/signup">Créer un compte</Link>
         </Button>
       </div>
 

@@ -65,8 +65,8 @@ function DeleteDialog({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
-    const mutate = target === "achats" ? clearAchats : clearVentes;
-    mutate(filters, {
+    const clearFn = target === "achats" ? clearAchats : clearVentes;
+    clearFn(filters, {
       onSuccess: (data: { deleted: number }) => {
         onDeleted(data.deleted);
         onClose();

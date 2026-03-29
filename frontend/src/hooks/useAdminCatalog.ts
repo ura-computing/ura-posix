@@ -36,7 +36,7 @@ export function useCatalogMutation(opts: {
 }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: saveMedicament, isPending: savingMedicament } = useMutation({
     mutationFn: (params: {
       isEdit: boolean;
       editId?: number;
@@ -56,7 +56,7 @@ export function useCatalogMutation(opts: {
     onError: (err) => toast.error(err.message),
   });
 
-  return { mutate, isPending };
+  return { saveMedicament, savingMedicament };
 }
 
 // ── Delete medicament mutation ───────────────────────────────────────────────
@@ -64,7 +64,7 @@ export function useCatalogMutation(opts: {
 export function useCatalogDelete(opts: { onSuccess: () => void }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: deleteMedicament, isPending: deletingMedicament } = useMutation({
     mutationFn: (id: number) => adminApi.deleteMedicament(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
@@ -74,7 +74,7 @@ export function useCatalogDelete(opts: { onSuccess: () => void }) {
     onError: (err) => toast.error(err.message),
   });
 
-  return { mutate, isPending };
+  return { deleteMedicament, deletingMedicament };
 }
 
 // ── Import catalog CSV mutation ──────────────────────────────────────────────
@@ -84,7 +84,7 @@ export function useCatalogImport(opts: {
 }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: importCatalog, isPending: importing } = useMutation({
     mutationFn: (file: File) => adminApi.importCatalog(file),
     onSuccess: (data: { imported: number }) => {
       queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
@@ -97,7 +97,7 @@ export function useCatalogImport(opts: {
     },
   });
 
-  return { mutate, isPending };
+  return { importCatalog, importing };
 }
 
 // ── Suffix list query ────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export function useSuffixList() {
 export function useSuffixSave(opts: { onSuccess: () => void }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: saveSuffix, isPending: savingSuffix } = useMutation({
     mutationFn: (params: {
       editing: CategorySuffixOut | null;
       form: { category: string; suffix: string; color: string | null };
@@ -134,7 +134,7 @@ export function useSuffixSave(opts: { onSuccess: () => void }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  return { mutate, isPending };
+  return { saveSuffix, savingSuffix };
 }
 
 // ── Suffix delete mutation ───────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export function useSuffixSave(opts: { onSuccess: () => void }) {
 export function useSuffixDelete(opts: { onSuccess: () => void }) {
   const queryClient = useQueryClient();
 
-  const { mutate, isPending } = useMutation({
+  const { mutate: deleteSuffix, isPending: deletingSuffix } = useMutation({
     mutationFn: (id: number) => adminApi.deleteCategorySuffix(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SUFFIX_QUERY_KEY });
@@ -152,5 +152,5 @@ export function useSuffixDelete(opts: { onSuccess: () => void }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  return { mutate, isPending };
+  return { deleteSuffix, deletingSuffix };
 }

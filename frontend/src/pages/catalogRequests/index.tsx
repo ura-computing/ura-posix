@@ -4,6 +4,7 @@ import {
   useCatalogRequestsList,
   useMyProducts,
   useSubmitNonDeclareRequests,
+  useSubmitAnnulation,
 } from "@/hooks/useCatalogRequests";
 import {
   PackageX,
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   Search,
   FileX,
+  Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -78,13 +80,21 @@ export default function CatalogRequestsPage() {
   const { products, productsLoading } = useMyProducts(debouncedSearch, dialogOpen);
 
   const { submitRequests, submitting } = useSubmitNonDeclareRequests(selectedIds, resetDialog);
+  const { submitAnnulation, submittingAnnulation } = useSubmitAnnulation();
 
   if (!isOwner) return null;
 
-  // Product IDs that already have a pending request
+  // Product IDs that already have a pending request (non_declare or annulation)
   const pendingMedIds = new Set(
     requests
       .filter((r) => r.status === "pending" && r.medicament_id)
+      .map((r) => r.medicament_id!)
+  );
+
+  // Product IDs where cancel button should NOT show (pending or approved annulation)
+  const annulationMedIds = new Set(
+    requests
+      .filter((r) => r.request_type === "annulation" && (r.status === "pending" || r.status === "approved") && r.medicament_id)
       .map((r) => r.medicament_id!)
   );
 
@@ -129,47 +139,86 @@ export default function CatalogRequestsPage() {
             </div>
           ) : (
             <div className="divide-y">
-              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 <span>Produit</span>
+                <span className="w-24 text-center">Type</span>
                 <span className="w-24 text-center">Statut</span>
                 <span className="w-28 text-center">Date</span>
-                <span className="w-36 text-right">Traité le</span>
+                <span className="w-28 text-center">Traité le</span>
+                <span className="w-28 text-center">Action</span>
               </div>
-              {requests.map((req) => (
-                <div
-                  key={req.id}
-                  className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {req.medicament_name ?? req.product}
-                    </p>
-                    {req.notes && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        Note : {req.notes}
+              {requests.map((req) => {
+                const isAnnulation = req.request_type === "annulation";
+                const canCancel =
+                  !isAnnulation &&
+                  req.status === "approved" &&
+                  req.medicament_id &&
+                  !annulationMedIds.has(req.medicament_id);
+                return (
+                  <div
+                    key={req.id}
+                    className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {req.medicament_name ?? req.product}
                       </p>
-                    )}
-                    {req.reject_reason && (
-                      <p className="text-xs text-destructive mt-0.5 truncate">
-                        Motif de refus : {req.reject_reason}
-                      </p>
-                    )}
+                      {req.notes && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          Note : {req.notes}
+                        </p>
+                      )}
+                      {req.reject_reason && (
+                        <p className="text-xs text-destructive mt-0.5 truncate">
+                          Motif de refus : {req.reject_reason}
+                        </p>
+                      )}
+                    </div>
+                    <div className="w-24 flex justify-center">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs",
+                          isAnnulation
+                            ? "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/30"
+                            : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/30"
+                        )}
+                      >
+                        {isAnnulation ? "Annulation" : "Exclusion"}
+                      </Badge>
+                    </div>
+                    <div className="w-24 flex justify-center">
+                      <RequestStatusBadge status={req.status} />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-28 text-center">
+                      {req.created_at
+                        ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr })
+                        : "—"}
+                    </span>
+                    <span className="text-xs text-muted-foreground w-28 text-center">
+                      {req.reviewed_at
+                        ? format(new Date(req.reviewed_at), "d MMM yyyy", { locale: fr })
+                        : "—"}
+                    </span>
+                    <div className="w-28 flex justify-center">
+                      {canCancel ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1.5 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                          disabled={submittingAnnulation}
+                          onClick={() => submitAnnulation({ medicament_id: req.medicament_id! })}
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          Annuler
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="w-24 flex justify-center">
-                    <RequestStatusBadge status={req.status} />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-28 text-center">
-                    {req.created_at
-                      ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr })
-                      : "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground w-36 text-right">
-                    {req.reviewed_at
-                      ? format(new Date(req.reviewed_at), "d MMM yyyy", { locale: fr })
-                      : "—"}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -25,6 +25,12 @@ export const submitNonDeclare = (body: { medicament_id: number; notes?: string }
     body: JSON.stringify(body),
   });
 
+export const submitAnnulation = (body: { medicament_id: number; notes?: string }) =>
+  request<CatalogRequestOut>("/catalog-requests/annulation", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 export const list = (status?: string) => {
   const qs = status ? `?status=${status}` : "";
   return request<CatalogRequestOut[]>(`/catalog-requests${qs}`);

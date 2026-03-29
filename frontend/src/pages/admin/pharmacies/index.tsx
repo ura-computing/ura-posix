@@ -15,8 +15,6 @@ import {
   Phone,
   MapPin,
   Users,
-  ShieldCheck,
-  UserCog,
   UserCheck,
   UserX,
   ShieldOff,
@@ -72,36 +70,6 @@ const FEATURES: { key: string; label: string }[] = [
   { key: "stock", label: "Stock" },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const ROLE_CONFIG: Record<UserRole, { label: string; className: string; icon: React.ReactNode }> = {
-  admin: {
-    label: "Admin",
-    className: "bg-primary/10 text-primary border-primary/20",
-    icon: <ShieldCheck className="h-3 w-3" />,
-  },
-  owner: {
-    label: "Propriétaire",
-    className: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
-    icon: <UserCheck className="h-3 w-3" />,
-  },
-  employee: {
-    label: "Employé",
-    className: "bg-muted text-muted-foreground border-border",
-    icon: <UserCog className="h-3 w-3" />,
-  },
-};
-
-function RoleBadge({ role }: { role: UserRole }) {
-  const cfg = ROLE_CONFIG[role] ?? ROLE_CONFIG.employee;
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", cfg.className)}>
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-}
-
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
   return (email ?? "?").slice(0, 2).toUpperCase();
@@ -132,12 +100,12 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
     }
   }, [open, pharmacy]);
 
-  const { mutate, isPending } = usePharmacyFormMutation(onClose);
+  const { savePharmacy, savingPharmacy } = usePharmacyFormMutation(onClose);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    mutate({
+    savePharmacy({
       isEdit,
       pharmacyId: pharmacy?.id,
       data: { name, address: address || undefined, phone: phone || undefined, email: email || undefined },
@@ -145,7 +113,7 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !savingPharmacy) onClose(); }}>
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-start gap-4 px-6 pt-6 pb-5 border-b bg-primary/[0.03]">
@@ -208,11 +176,11 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
           </div>
 
           <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={savingPharmacy}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending || !name.trim()} className="gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={savingPharmacy || !name.trim()} className="gap-2">
+              {savingPharmacy && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>

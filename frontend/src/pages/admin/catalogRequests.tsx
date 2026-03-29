@@ -60,9 +60,9 @@ export default function AdminCatalogRequestsPage() {
       <Breadcrumb />
 
       <div>
-        <h1 className="page-title">Demandes d'exclusion</h1>
+        <h1 className="page-title">Demandes catalogue</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Examinez les demandes d'exclusion de produits soumises par les pharmacies.
+          Examinez les demandes d'exclusion et d'annulation soumises par les pharmacies.
         </p>
       </div>
 
@@ -113,74 +113,93 @@ export default function AdminCatalogRequestsPage() {
           </div>
         ) : (
           <div className="divide-y">
-            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
               <span>Produit</span>
               <span className="w-36">Pharmacie / Demandeur</span>
+              <span className="w-24 text-center">Type</span>
               <span className="w-24 text-center">Statut</span>
               <span className="w-28 text-center">Date</span>
               <span className="w-36 text-center">Actions</span>
             </div>
-            {requests.map((req) => (
-              <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
-                {/* Product info */}
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {req.medicament_name ?? req.product}
-                  </p>
-                  {req.notes && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
-                  )}
-                  {req.reject_reason && (
-                    <p className="text-xs text-destructive mt-0.5">Motif : {req.reject_reason}</p>
-                  )}
-                </div>
+            {requests.map((req) => {
+              const isAnnulation = req.request_type === "annulation";
+              return (
+                <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
+                  {/* Product info */}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {req.medicament_name ?? req.product}
+                    </p>
+                    {req.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
+                    )}
+                    {req.reject_reason && (
+                      <p className="text-xs text-destructive mt-0.5">Motif : {req.reject_reason}</p>
+                    )}
+                  </div>
 
-                {/* Pharmacy / requester */}
-                <div className="w-36 min-w-0">
-                  <p className="text-sm truncate">{req.pharmacy_name ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{req.requester_name ?? req.requester_email ?? "—"}</p>
-                </div>
+                  {/* Pharmacy / requester */}
+                  <div className="w-36 min-w-0">
+                    <p className="text-sm truncate">{req.pharmacy_name ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{req.requester_name ?? req.requester_email ?? "—"}</p>
+                  </div>
 
-                {/* Status */}
-                <div className="w-24 flex justify-center">
-                  <RequestStatusBadge status={req.status} />
-                </div>
+                  {/* Type */}
+                  <div className="w-24 flex justify-center">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs",
+                        isAnnulation
+                          ? "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/30"
+                          : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/30"
+                      )}
+                    >
+                      {isAnnulation ? "Annulation" : "Exclusion"}
+                    </Badge>
+                  </div>
 
-                {/* Date */}
-                <span className="text-xs text-muted-foreground w-28 text-center">
-                  {req.created_at ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr }) : "—"}
-                </span>
+                  {/* Status */}
+                  <div className="w-24 flex justify-center">
+                    <RequestStatusBadge status={req.status} />
+                  </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 w-36 justify-center">
-                  {req.status === "pending" ? (
-                    <>
-                      <Button
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs"
-                        disabled={approving}
-                        onClick={() => approve(req.id)}
-                      >
-                        <UserCheck className="h-3.5 w-3.5" />
-                        Approuver
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => { setRejectTarget(req); setRejectReason(""); }}
-                      >
-                        <UserX className="h-3.5 w-3.5" />
-                      </Button>
-                    </>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {req.reviewed_at ? format(new Date(req.reviewed_at), "d MMM", { locale: fr }) : "—"}
-                    </span>
-                  )}
+                  {/* Date */}
+                  <span className="text-xs text-muted-foreground w-28 text-center">
+                    {req.created_at ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr }) : "—"}
+                  </span>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 w-36 justify-center">
+                    {req.status === "pending" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          disabled={approving}
+                          onClick={() => approve(req.id)}
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Approuver
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => { setRejectTarget(req); setRejectReason(""); }}
+                        >
+                          <UserX className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {req.reviewed_at ? format(new Date(req.reviewed_at), "d MMM", { locale: fr }) : "—"}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -190,10 +209,12 @@ export default function AdminCatalogRequestsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Rejeter "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
+              Rejeter la demande {rejectTarget?.request_type === "annulation" ? "d'annulation" : "d'exclusion"} de "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Le produit restera déclaré dans les rapports de cette pharmacie.
+              {rejectTarget?.request_type === "annulation"
+                ? "Le produit restera exclu (non déclaré) des rapports de cette pharmacie."
+                : "Le produit restera déclaré dans les rapports de cette pharmacie."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-6 pb-2 space-y-1.5">
