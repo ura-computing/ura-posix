@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Achat, CatalogRequest, Medicament, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
+from utils.constants import Role, Status, RequestStatus, RequestType
 from schemas import CatalogRejectBody, CatalogRequestCreate, CatalogRequestOut, NonDeclareRequestCreate
 
 router = APIRouter(prefix="/catalog-requests", tags=["catalog-requests"])
@@ -19,7 +20,7 @@ def _to_out(req: CatalogRequest) -> CatalogRequestOut:
         pharmacy_id=req.pharmacy_id,
         status=req.status,
         reject_reason=req.reject_reason,
-        request_type=req.request_type or "new_product",
+        request_type=req.request_type or RequestType.NEW_PRODUCT,
         medicament_id=req.medicament_id,
         medicament_name=req.medicament.product if req.medicament else None,
         notes=req.notes,
@@ -45,8 +46,8 @@ def submit_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in ("owner", "admin"):
-        raise HTTPException(status_code=403, detail="Only pharmacy owners can submit catalog requests")
+    if current_user.role not in (Role.OWNER, Role.ADMIN):
+        raise HTTPException(status_code=403, detail="Seuls les propriétaires de pharmacie peuvent soumettre des demandes")
     req = CatalogRequest(
         requested_by=current_user.id,
         pharmacy_id=current_user.pharmacy_id,
@@ -67,7 +68,7 @@ def list_requests(
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(CatalogRequest)
-    if current_user.role != "admin":
+    if current_user.role != Role.ADMIN:
         # Owners see only their own requests
         q = q.filter(CatalogRequest.requested_by == current_user.id)
     if status:
@@ -82,7 +83,7 @@ def submit_non_declare_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role not in ("owner", "employee"):
+    if current_user.role not in (Role.OWNER, Role.EMPLOYEE):
         raise HTTPException(status_code=403, detail="Réservé aux propriétaires de pharmacie")
     med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
     if not med:
@@ -104,15 +105,15 @@ def submit_non_declare_request(
     existing = db.query(CatalogRequest).filter(
         CatalogRequest.pharmacy_id == current_user.pharmacy_id,
         CatalogRequest.medicament_id == body.medicament_id,
-        CatalogRequest.request_type == "non_declare",
-        CatalogRequest.status == "pending",
+        CatalogRequest.request_type == RequestType.NON_DECLARE,
+        CatalogRequest.status == Status.PENDING,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Une demande est déjà en cours pour ce produit")
     req = CatalogRequest(
         requested_by=current_user.id,
         pharmacy_id=current_user.pharmacy_id,
-        request_type="non_declare",
+        request_type=RequestType.NON_DECLARE,
         medicament_id=body.medicament_id,
         notes=body.notes,
         product=med.product,  # store name for display
@@ -131,7 +132,7 @@ def submit_annulation_request(
     current_user: User = Depends(get_current_user),
 ):
     """Owner requests to cancel a previously approved non-declare exclusion."""
-    if current_user.role not in ("owner", "employee"):
+    if current_user.role not in (Role.OWNER, Role.EMPLOYEE):
         raise HTTPException(status_code=403, detail="Réservé aux propriétaires de pharmacie")
     med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
     if not med:
@@ -148,15 +149,15 @@ def submit_annulation_request(
     existing = db.query(CatalogRequest).filter(
         CatalogRequest.pharmacy_id == current_user.pharmacy_id,
         CatalogRequest.medicament_id == body.medicament_id,
-        CatalogRequest.request_type == "annulation",
-        CatalogRequest.status == "pending",
+        CatalogRequest.request_type == RequestType.ANNULATION,
+        CatalogRequest.status == Status.PENDING,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Une demande d'annulation est déjà en cours pour ce produit")
     req = CatalogRequest(
         requested_by=current_user.id,
         pharmacy_id=current_user.pharmacy_id,
-        request_type="annulation",
+        request_type=RequestType.ANNULATION,
         medicament_id=body.medicament_id,
         notes=body.notes,
         product=med.product,
@@ -174,15 +175,15 @@ def approve_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
     req = db.query(CatalogRequest).filter(CatalogRequest.id == req_id).first()
     if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
-    if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Request is not pending")
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    if req.status != Status.PENDING:
+        raise HTTPException(status_code=400, detail="La demande n'est pas en attente")
 
-    if req.request_type == "annulation":
+    if req.request_type == RequestType.ANNULATION:
         # Reverse a previously approved non-declare: mark product as declared again
         status_row = db.query(PharmacyMedicamentStatus).filter(
             PharmacyMedicamentStatus.pharmacy_id == req.pharmacy_id,
@@ -190,7 +191,7 @@ def approve_request(
         ).first()
         if status_row:
             db.delete(status_row)
-    elif req.request_type == "non_declare":
+    elif req.request_type == RequestType.NON_DECLARE:
         # Mark product as non-declared for this pharmacy
         existing = db.query(PharmacyMedicamentStatus).filter(
             PharmacyMedicamentStatus.pharmacy_id == req.pharmacy_id,
@@ -221,7 +222,7 @@ def approve_request(
             laboratoire=req.laboratoire,
         ))
 
-    req.status = "approved"
+    req.status = RequestStatus.APPROVED
     req.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(req)
@@ -236,12 +237,12 @@ def reject_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
     req = db.query(CatalogRequest).filter(CatalogRequest.id == req_id).first()
     if not req:
-        raise HTTPException(status_code=404, detail="Request not found")
-    req.status = "rejected"
+        raise HTTPException(status_code=404, detail="Demande introuvable")
+    req.status = RequestStatus.REJECTED
     req.reject_reason = body.reason
     req.reviewed_at = datetime.now(timezone.utc)
     db.commit()

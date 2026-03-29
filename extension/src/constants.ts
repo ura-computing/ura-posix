@@ -1,7 +1,7 @@
 export const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL || "http://localhost:5173";
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-export const TOKEN_STORAGE_KEY = "pharmagest_token";
+export const TOKEN_STORAGE_KEY = "apcm_token";
 export const NOTIFICATIONS_STORAGE_KEY = "apcm_notifications";
 export const UPLOAD_STATUS_KEY = "apcm_upload_status";
 export const CANCEL_UPLOAD_KEY = "apcm_cancel_upload";

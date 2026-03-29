@@ -3,17 +3,19 @@ import io
 from typing import Any
 
 import openpyxl
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
-from models import Achat, Medicament, User, Vente
+from models import Achat, ImportBatch, Medicament, User, Vente
 from routers.auth import get_current_user
 from utils.strings import normalize_category, strip_accents
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,7 +25,7 @@ def _decode(content: bytes) -> str:
             return content.decode(enc)
         except UnicodeDecodeError:
             continue
-    raise HTTPException(status_code=400, detail="Cannot decode file encoding")
+    raise HTTPException(status_code=400, detail="Impossible de décoder l'encodage du fichier")
 
 
 def _parse_float(val: str) -> float | None:
@@ -91,7 +93,7 @@ def _upsert_medicament(db: Session, pid: str, product: str, tva: str | None,
     return med
 
 
-def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None) -> dict:
+def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None, filename: str | None = None, batch_id: int | None = None) -> dict:
     # Pre-load existing (delivery_ref, medicament_id) pairs scoped to this pharmacy
     incoming_refs = {
         (row.get("Référence de livraison") or "").strip()
@@ -106,6 +108,17 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
         if pharmacy_id is not None:
             q = q.filter(Achat.pharmacy_id == pharmacy_id)
         existing_pairs = {(a.delivery_ref, a.medicament_id) for a in q.all()}
+
+    if batch_id:
+        batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
+        if not batch:
+            batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="achat", filename=filename)
+            db.add(batch)
+            db.flush()
+    else:
+        batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="achat", filename=filename)
+        db.add(batch)
+        db.flush()
 
     achats = []
     skipped = 0
@@ -130,6 +143,7 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
         achats.append(Achat(
             pharmacy_id=pharmacy_id,
             medicament_id=med.id,
+            import_batch_id=batch.id,
             created_at_source=row.get("Créée le") or None,
             delivery_date=row.get("Date Bon de Livraison") or None,
             delivery_ref=delivery_ref,
@@ -142,11 +156,13 @@ def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
             total=_parse_float(str(row.get("Total", ""))),
         ))
     db.bulk_save_objects(achats)
+    batch.rows_inserted = (batch.rows_inserted or 0) + len(achats)
+    batch.rows_skipped = (batch.rows_skipped or 0) + skipped
     db.commit()
-    return {"inserted": len(achats), "skipped": skipped}
+    return {"inserted": len(achats), "skipped": skipped, "batch_id": batch.id}
 
 
-def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None) -> dict:
+def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None, filename: str | None = None, batch_id: int | None = None) -> dict:
     # Pre-load existing (transaction_ref, medicament_id) pairs scoped to this pharmacy
     incoming_refs = {
         (row.get("Numéro de transaction") or "").strip()
@@ -161,6 +177,17 @@ def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
         if pharmacy_id is not None:
             q = q.filter(Vente.pharmacy_id == pharmacy_id)
         existing_pairs = {(v.transaction_ref, v.medicament_id) for v in q.all()}
+
+    if batch_id:
+        batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
+        if not batch:
+            batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="vente", filename=filename)
+            db.add(batch)
+            db.flush()
+    else:
+        batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="vente", filename=filename)
+        db.add(batch)
+        db.flush()
 
     ventes = []
     skipped = 0
@@ -185,6 +212,7 @@ def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
         ventes.append(Vente(
             pharmacy_id=pharmacy_id,
             medicament_id=med.id,
+            import_batch_id=batch.id,
             date=row.get("Date") or None,
             transaction_ref=transaction_ref,
             client=row.get("Client") or None,
@@ -194,36 +222,44 @@ def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | N
             total=_parse_float(str(row.get("Total", ""))),
         ))
     db.bulk_save_objects(ventes)
+    batch.rows_inserted = (batch.rows_inserted or 0) + len(ventes)
+    batch.rows_skipped = (batch.rows_skipped or 0) + skipped
     db.commit()
-    return {"inserted": len(ventes), "skipped": skipped}
+    return {"inserted": len(ventes), "skipped": skipped, "batch_id": batch.id}
 
 
 # ─── Pydantic models ──────────────────────────────────────────────────────────
 
 class TableUpload(BaseModel):
     rows: list[dict[str, Any]]
+    filename: str | None = None
+    batch_id: int | None = None
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 def _require_import(current_user: User = Depends(get_current_user)) -> User:
     if (current_user.permissions or {}).get("import") is False:
-        raise HTTPException(status_code=403, detail="Import access denied")
+        raise HTTPException(status_code=403, detail="Accès à l'import refusé")
     return current_user
 
 
 @router.post("/achat")
 async def upload_achat(
     file: UploadFile = File(...),
+    batch_id: int | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_import),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
-    rows = _parse_csv(await file.read())
+        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
+    rows = _parse_csv(content)
     if not rows:
-        raise HTTPException(status_code=400, detail="No data found in file")
-    return _insert_achats(db, rows, current_user.pharmacy_id)
+        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
+    return _insert_achats(db, rows, current_user.pharmacy_id, filename=file.filename, batch_id=batch_id)
 
 
 @router.post("/achat-json")
@@ -233,22 +269,26 @@ async def upload_achat_json(
     current_user: User = Depends(_require_import),
 ):
     if not body.rows:
-        raise HTTPException(status_code=400, detail="No rows provided")
-    return _insert_achats(db, body.rows, current_user.pharmacy_id)
+        raise HTTPException(status_code=400, detail="Aucune ligne fournie")
+    return _insert_achats(db, body.rows, current_user.pharmacy_id, filename=body.filename, batch_id=body.batch_id)
 
 
 @router.post("/vente")
 async def upload_vente(
     file: UploadFile = File(...),
+    batch_id: int | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(_require_import),
 ):
     if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
-    rows = _parse_csv(await file.read())
+        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
+    rows = _parse_csv(content)
     if not rows:
-        raise HTTPException(status_code=400, detail="No data found in file")
-    return _insert_ventes(db, rows, current_user.pharmacy_id)
+        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
+    return _insert_ventes(db, rows, current_user.pharmacy_id, filename=file.filename, batch_id=batch_id)
 
 
 @router.post("/vente-json")
@@ -258,8 +298,8 @@ async def upload_vente_json(
     current_user: User = Depends(_require_import),
 ):
     if not body.rows:
-        raise HTTPException(status_code=400, detail="No rows provided")
-    return _insert_ventes(db, body.rows, current_user.pharmacy_id)
+        raise HTTPException(status_code=400, detail="Aucune ligne fournie")
+    return _insert_ventes(db, body.rows, current_user.pharmacy_id, filename=body.filename, batch_id=body.batch_id)
 
 
 def _parse_catalog_csv(content: bytes) -> list[Medicament]:
@@ -305,9 +345,11 @@ async def upload_catalog(
     """Import catalog from CSV or XLSM. Clears all existing medicaments then re-imports."""
     fname = (file.filename or "").lower()
     if not fname.endswith(".csv") and not fname.endswith(".xlsm"):
-        raise HTTPException(status_code=400, detail="Only .csv or .xlsm files are accepted")
+        raise HTTPException(status_code=400, detail="Seuls les fichiers .csv ou .xlsm sont acceptés")
 
     content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
 
     if fname.endswith(".csv"):
         medicaments = _parse_catalog_csv(content)
@@ -316,9 +358,9 @@ async def upload_catalog(
         try:
             wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, keep_vba=True)
         except Exception:
-            raise HTTPException(status_code=400, detail="Cannot open Excel file")
+            raise HTTPException(status_code=400, detail="Impossible d'ouvrir le fichier Excel")
         if "LISTING" not in wb.sheetnames:
-            raise HTTPException(status_code=400, detail="Sheet 'LISTING' not found in file")
+            raise HTTPException(status_code=400, detail="Feuille 'LISTING' introuvable dans le fichier")
         ws = wb["LISTING"]
         xlsm_rows = list(ws.iter_rows(min_row=2, values_only=True))
 
@@ -349,7 +391,7 @@ async def upload_catalog(
             ))
 
     if not medicaments:
-        raise HTTPException(status_code=400, detail="No products found in file")
+        raise HTTPException(status_code=400, detail="Aucun produit trouvé dans le fichier")
 
     db.query(Medicament).delete()
     db.commit()

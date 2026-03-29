@@ -6,12 +6,12 @@ import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
 import { UploadCloud } from "lucide-react";
-import { eUserRole } from "@/types";
+import { eUserRole, eCategoryType } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
-import { DataTable } from "@/components/refine-ui/data-table/dataTable";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
+import { DataTable } from "@/components/data-table/dataTable";
 import { TableToolbar } from "@/components/tableToolbar";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
@@ -93,7 +93,7 @@ const AchatList = () => {
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
+  const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -113,12 +113,12 @@ const AchatList = () => {
   useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange, categoryType]);
 
   const effectiveCategories = useMemo(() => {
-    const typeCats = categoryType === "all"
+    const typeCats = categoryType === eCategoryType.ALL
       ? allCategories
-      : categoryType === "pharmacie"
+      : categoryType === eCategoryType.PHARMACIE
         ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
         : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
-    if (selectedCats.length === 0) return categoryType === "all" ? [] : typeCats;
+    if (selectedCats.length === 0) return categoryType === eCategoryType.ALL ? [] : typeCats;
     return selectedCats.filter(c => typeCats.includes(c));
   }, [allCategories, selectedCats, categoryType]);
 
@@ -351,10 +351,10 @@ const AchatList = () => {
         rightAddon={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCategoryType(categoryType === "pharmacie" ? "all" : "pharmacie")}
+              onClick={() => setCategoryType(categoryType === eCategoryType.PHARMACIE ? eCategoryType.ALL : eCategoryType.PHARMACIE)}
               className={cn(
                 "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
-                categoryType === "pharmacie"
+                categoryType === eCategoryType.PHARMACIE
                   ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
                   : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
               )}
@@ -362,10 +362,10 @@ const AchatList = () => {
               Pharmacie
             </button>
             <button
-              onClick={() => setCategoryType(categoryType === "parapharmacie" ? "all" : "parapharmacie")}
+              onClick={() => setCategoryType(categoryType === eCategoryType.PARAPHARMACIE ? eCategoryType.ALL : eCategoryType.PARAPHARMACIE)}
               className={cn(
                 "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
-                categoryType === "parapharmacie"
+                categoryType === eCategoryType.PARAPHARMACIE
                   ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
                   : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
               )}

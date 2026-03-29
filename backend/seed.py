@@ -1,5 +1,5 @@
 """
-Database seeding script for PharmaGest.
+Database seeding script for APCM Pharma.
 
 Reads seed data from seed.json, then creates:
   - A default admin account  (status: active)
@@ -71,7 +71,7 @@ def seed_database():
         print("\n" + "=" * 60)
         print("Seed complete!")
         print("=" * 60)
-        print(f"\n  Admin  :  {admin_cfg['email']}  /  {admin_cfg['password']}")
+        print(f"\n  Admin  :  {admin_cfg['email']}  (password from seed.json)")
         print("\n  Log in as admin to manage pharmacies and approve owners.")
         print("=" * 60)
 

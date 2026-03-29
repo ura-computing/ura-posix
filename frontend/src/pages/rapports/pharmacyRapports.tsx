@@ -45,12 +45,13 @@ import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { CAT_COLORS, shortMonth, downloadBlob, KpiSkeleton } from "./shared";
 import { AnalyseMargeTable, MARGE_COLS, SIM_LABEL_KEY, type MargeMode } from "./margeTable";
+import { eCategoryType } from "@/types";
 
 export function PharmacyRapports() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
-  const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
+  const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [margeMode, setMargeMode] = useState<MargeMode>("produit");
 
   // Simulation dialog state
@@ -68,7 +69,7 @@ export function PharmacyRapports() {
   const topCats  = stats?.top_categories ?? [];
   const maxCatTotal = topCats[0]?.total ?? 1;
 
-  const handleExcel = async (type: "all" | "pharmacie" | "parapharmacie") => {
+  const handleExcel = async (type: eCategoryType) => {
     setExporting(type);
     try {
       const blob = await statsApi.exportExcel(dateFrom || undefined, dateTo || undefined, type);
@@ -87,7 +88,7 @@ export function PharmacyRapports() {
     dateTo ? `Jusqu'au ${dateTo}` : null;
 
   const typeTheme = useMemo(() => {
-    if (categoryType === "pharmacie") return {
+    if (categoryType === eCategoryType.PHARMACIE) return {
       primaryCard:  "bg-green-600 text-white border-0",
       border:       "border-green-200 dark:border-green-800",
       bg:           "bg-green-50/50 dark:bg-green-950/20",
@@ -97,7 +98,7 @@ export function PharmacyRapports() {
       icon:         "text-green-500",
       iconHex:      "#22c55e",
     };
-    if (categoryType === "parapharmacie") return {
+    if (categoryType === eCategoryType.PARAPHARMACIE) return {
       primaryCard:  "bg-purple-600 text-white border-0",
       border:       "border-purple-200 dark:border-purple-800",
       bg:           "bg-purple-50/50 dark:bg-purple-950/20",
@@ -207,29 +208,29 @@ export function PharmacyRapports() {
               <div className="flex items-center gap-1.5 ml-auto flex-wrap">
                 <Button
                   size="sm"
-                  variant={categoryType === "all" ? "default" : "outline"}
+                  variant={categoryType === eCategoryType.ALL ? "default" : "outline"}
                   className="h-9"
-                  onClick={() => setCategoryType("all")}
+                  onClick={() => setCategoryType(eCategoryType.ALL)}
                 >
                   Mixte
                 </Button>
                 <Button
                   size="sm"
-                  className={cn("h-9 border", categoryType === "pharmacie"
+                  className={cn("h-9 border", categoryType === eCategoryType.PHARMACIE
                     ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
                     : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
                   )}
-                  onClick={() => setCategoryType("pharmacie")}
+                  onClick={() => setCategoryType(eCategoryType.PHARMACIE)}
                 >
                   Pharmacie
                 </Button>
                 <Button
                   size="sm"
-                  className={cn("h-9 border", categoryType === "parapharmacie"
+                  className={cn("h-9 border", categoryType === eCategoryType.PARAPHARMACIE
                     ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
                     : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
                   )}
-                  onClick={() => setCategoryType("parapharmacie")}
+                  onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}
                 >
                   Parapharmacie
                 </Button>

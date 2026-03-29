@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { login, signup, forgotPassword, resetPassword } from "@/api/auth";
+import { login, signup, forgotPassword, forgotPasswordWhatsApp, verifyOtp, resetPassword } from "@/api/auth";
 import { storeSession, clearSession } from "@/utils/session";
 import { QUERY_KEYS } from "@/constants";
 import type { LoginPayload, SignupPayload } from "@/types";
@@ -38,6 +38,16 @@ export function useAuthenticate() {
     onError: (err: Error) => toast.error(err.message, { richColors: true }),
   });
 
+  const { mutate: forgotWhatsAppSubmit, isPending: forgotWhatsAppPending } = useMutation({
+    mutationFn: (phone: string) => forgotPasswordWhatsApp(phone),
+    onError: (err: Error) => toast.error(err.message, { richColors: true }),
+  });
+
+  const { mutate: verifyOtpSubmit, isPending: verifyOtpPending } = useMutation({
+    mutationFn: ({ phone, otp }: { phone: string; otp: string }) => verifyOtp(phone, otp),
+    onError: (err: Error) => toast.error(err.message, { richColors: true }),
+  });
+
   const {
     mutate: resetSubmit,
     isPending: resetPending,
@@ -60,6 +70,8 @@ export function useAuthenticate() {
     login: { submit: loginSubmit, loginPending },
     signup: { submit: signupSubmit, signupPending },
     forgotPassword: { submit: forgotSubmit, forgotPending },
+    forgotPasswordWhatsApp: { submit: forgotWhatsAppSubmit, forgotWhatsAppPending },
+    verifyOtp: { submit: verifyOtpSubmit, verifyOtpPending },
     resetPassword: { submit: resetSubmit, resetPending, resetIsError, resetError },
     logout,
   };

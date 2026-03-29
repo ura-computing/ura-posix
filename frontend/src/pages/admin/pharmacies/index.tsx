@@ -5,11 +5,15 @@ import {
   usePharmacyList,
   usePendingOwners,
   useAllUsers,
+  useNonDeclaredProducts,
+  usePharmacyOptions,
 } from "@/hooks/useAdminPharmacies";
 import {
   Building2,
+  Package,
   Plus,
   Pencil,
+  Settings,
   Trash2,
   Loader2,
   Phone,
@@ -25,8 +29,8 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/listView";
-import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
+import { ListView } from "@/components/shared/listView";
+import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,18 +61,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/utils/cn";
+import { fmt } from "@/utils/format";
 import { UserStatusBadge } from "@/components/shared/statusBadge";
 import type { Pharmacy, UserAdmin, UserRole } from "@/types";
-import { eUserRole } from "@/types";
-
-const FEATURES: { key: string; label: string }[] = [
-  { key: "rapports", label: "Rapports" },
-  { key: "import", label: "Import" },
-  { key: "achat", label: "Achats" },
-  { key: "ventes", label: "Ventes" },
-  { key: "stock", label: "Stock" },
-];
+import { eUserRole, eUserStatus } from "@/types";
+import { FEATURES } from "@/constants";
 
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
@@ -190,114 +189,242 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
   );
 }
 
-// ── Users panel (slide-in within page) ───────────────────────────────────────
+// ── Pharmacy panel (tabbed slide-in) ─────────────────────────────────────────
 
-type UsersPanelProps = {
+type PharmacyPanelProps = {
   pharmacy: Pharmacy;
   onClose: () => void;
   allPharmacies: Pharmacy[];
 };
 
-function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
-  const { users, isLoading, updateRole, updatePharmacy, updatePermissions, updatingPerms } =
-    usePharmacyUsersList(pharmacy.id);
-
+function PharmacyPanel({ pharmacy, onClose, allPharmacies }: PharmacyPanelProps) {
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
       {/* Panel header */}
       <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/30">
         <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-muted-foreground" />
-          <span className="font-semibold text-sm">Membres — {pharmacy.name}</span>
-          <Badge variant="secondary" className="text-xs">{users.length}</Badge>
+          <Building2 className="h-4 w-4 text-muted-foreground" />
+          <span className="font-semibold text-sm">{pharmacy.name}</span>
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {isLoading ? (
-        <PageLoader />
-      ) : users.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-10 text-center">
-          <Users className="h-8 w-8 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">Aucun membre assigné à cette pharmacie.</p>
-        </div>
-      ) : (
-        <div className="divide-y">
-          {users.map((user: UserAdmin) => (
-            <div key={user.id} className="px-5 py-3">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                    {initials(user.name, user.email)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
-                  {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Select
-                    value={user.role}
-                    onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={eUserRole.ADMIN}>Admin</SelectItem>
-                      <SelectItem value={eUserRole.OWNER}>Propriétaire</SelectItem>
-                      <SelectItem value={eUserRole.EMPLOYEE}>Employé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={user.pharmacy_id?.toString() ?? "none"}
-                    onValueChange={(v) => updatePharmacy({ userId: user.id, pharmacyId: v === "none" ? null : Number(v) })}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-36">
-                      <SelectValue placeholder="Pharmacie…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— Aucune —</SelectItem>
-                      {allPharmacies.map((p) => (
-                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+      <Tabs defaultValue="membres" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
+          <TabsTrigger
+            value="membres"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
+          >
+            <Users className="h-3.5 w-3.5 mr-1.5" />
+            Membres
+          </TabsTrigger>
+          <TabsTrigger
+            value="non-declares"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
+          >
+            <Package className="h-3.5 w-3.5 mr-1.5" />
+            Produits non déclarés
+          </TabsTrigger>
+          <TabsTrigger
+            value="options"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
+          >
+            <Settings className="h-3.5 w-3.5 mr-1.5" />
+            Options
+          </TabsTrigger>
+        </TabsList>
 
-              {/* Owner feature restrictions */}
-              {user.role === eUserRole.OWNER && (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-11 pt-2">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-full">
-                    Restrictions d'accès
-                  </span>
-                  {FEATURES.map(({ key, label }) => {
-                    const allowed = user.permissions?.[key] !== false;
-                    return (
-                      <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <Switch
-                          checked={allowed}
-                          disabled={updatingPerms}
-                          onCheckedChange={(v) =>
-                            updatePermissions({
-                              userId: user.id,
-                              permissions: { ...(user.permissions ?? {}), [key]: v },
-                            })
-                          }
-                          className="scale-[0.8]"
-                        />
-                        <span className="text-xs text-muted-foreground">{label}</span>
-                      </label>
-                    );
-                  })}
-                  {updatingPerms && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                </div>
-              )}
+        <TabsContent value="membres" className="mt-0">
+          <MembresTab pharmacy={pharmacy} allPharmacies={allPharmacies} />
+        </TabsContent>
+        <TabsContent value="non-declares" className="mt-0">
+          <NonDeclaresTab pharmacyId={pharmacy.id} />
+        </TabsContent>
+        <TabsContent value="options" className="mt-0">
+          <OptionsTab pharmacyId={pharmacy.id} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ── Membres tab ──────────────────────────────────────────────────────────────
+
+function MembresTab({ pharmacy, allPharmacies }: { pharmacy: Pharmacy; allPharmacies: Pharmacy[] }) {
+  const { users, isLoading, updateRole, updatePharmacy, updatePermissions, updatingPerms } =
+    usePharmacyUsersList(pharmacy.id);
+  const pharmacyOptions = pharmacy.options ?? {};
+
+  if (isLoading) return <PageLoader />;
+
+  if (users.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <Users className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">Aucun membre assigné à cette pharmacie.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y">
+      {users.map((user: UserAdmin) => (
+        <div key={user.id} className="px-5 py-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                {initials(user.name, user.email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
+              {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
             </div>
-          ))}
+            <div className="flex items-center gap-2 shrink-0">
+              <Select
+                value={user.role}
+                onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
+              >
+                <SelectTrigger className="h-7 text-xs w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={eUserRole.ADMIN}>Admin</SelectItem>
+                  <SelectItem value={eUserRole.OWNER}>Propriétaire</SelectItem>
+                  <SelectItem value={eUserRole.EMPLOYEE}>Employé</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={user.pharmacy_id?.toString() ?? "none"}
+                onValueChange={(v) => updatePharmacy({ userId: user.id, pharmacyId: v === "none" ? null : Number(v) })}
+              >
+                <SelectTrigger className="h-7 text-xs w-36">
+                  <SelectValue placeholder="Pharmacie…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Aucune —</SelectItem>
+                  {allPharmacies.map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Owner feature restrictions */}
+          {user.role === eUserRole.OWNER && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pl-11 pt-2">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide w-full">
+                Restrictions d'accès
+              </span>
+              {FEATURES.map(({ key, label }) => {
+                const pharmacyBlocked = pharmacyOptions[key] === false;
+                const allowed = !pharmacyBlocked && user.permissions?.[key] !== false;
+                return (
+                  <label key={key} className={cn("flex items-center gap-1.5 select-none", pharmacyBlocked ? "opacity-40 cursor-not-allowed" : "cursor-pointer")}>
+                    <Switch
+                      checked={allowed}
+                      disabled={updatingPerms || pharmacyBlocked}
+                      onCheckedChange={(v) =>
+                        updatePermissions({
+                          userId: user.id,
+                          permissions: { ...(user.permissions ?? {}), [key]: v },
+                        })
+                      }
+                      className="scale-[0.8]"
+                    />
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                  </label>
+                );
+              })}
+              {updatingPerms && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Non-declared products tab ────────────────────────────────────────────────
+
+function NonDeclaresTab({ pharmacyId }: { pharmacyId: number }) {
+  const { products, isLoading } = useNonDeclaredProducts(pharmacyId);
+
+  if (isLoading) return <PageLoader />;
+
+  if (products.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <Package className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">Aucun produit non déclaré pour cette pharmacie.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <span>Produit</span>
+        <span className="w-32">Catégorie</span>
+        <span className="w-20 text-right">PPV</span>
+        <span className="w-16 text-right">TVA</span>
+      </div>
+      <div className="divide-y">
+        {products.map((p) => (
+          <div key={p.medicament_id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 items-center">
+            <span className="text-sm truncate">{p.product}</span>
+            <span className="text-xs text-muted-foreground w-32 truncate">{p.category ?? "—"}</span>
+            <span className="text-xs tabular-nums w-20 text-right">{p.ppv != null ? `${fmt(p.ppv)} MAD` : "—"}</span>
+            <span className="text-xs text-muted-foreground w-16 text-right">{p.tva ?? "—"}</span>
+          </div>
+        ))}
+      </div>
+      <div className="px-5 py-3 border-t bg-muted/20">
+        <p className="text-xs text-muted-foreground">{products.length} produit{products.length !== 1 ? "s" : ""} non déclaré{products.length !== 1 ? "s" : ""}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Options tab ──────────────────────────────────────────────────────────────
+
+function OptionsTab({ pharmacyId }: { pharmacyId: number }) {
+  const { options, isLoading, updateOptions, updatingOptions } = usePharmacyOptions(pharmacyId);
+
+  if (isLoading) return <PageLoader />;
+
+  return (
+    <div className="px-5 py-4 space-y-4">
+      <div>
+        <p className="text-sm font-medium text-foreground">Fonctionnalités activées</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Désactivez une fonctionnalité pour la bloquer pour tous les membres de cette pharmacie.
+        </p>
+      </div>
+      <div className="space-y-3">
+        {FEATURES.map(({ key, label }) => {
+          const allowed = options[key] !== false;
+          return (
+            <label key={key} className="flex items-center justify-between cursor-pointer select-none">
+              <span className="text-sm">{label}</span>
+              <Switch
+                checked={allowed}
+                disabled={updatingOptions}
+                onCheckedChange={(v) =>
+                  updateOptions({ ...options, [key]: v })
+                }
+              />
+            </label>
+          );
+        })}
+      </div>
+      {updatingOptions && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Mise à jour...
         </div>
       )}
     </div>
@@ -453,9 +580,9 @@ export default function PharmaciesAdminPage() {
         </div>
       )}
 
-      {/* Users panel */}
+      {/* Pharmacy panel */}
       {usersTarget && (
-        <UsersPanel
+        <PharmacyPanel
           pharmacy={usersTarget}
           onClose={() => setUsersTarget(null)}
           allPharmacies={pharmacies}
@@ -690,7 +817,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
 
                 {/* Revoke access — only for active non-admin users */}
                 <div className="w-8 flex justify-center">
-                  {user.status === "active" && user.role !== eUserRole.ADMIN && (
+                  {user.status === eUserStatus.ACTIVE && user.role !== eUserRole.ADMIN && (
                     <Button
                       variant="ghost"
                       size="icon"

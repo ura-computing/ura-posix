@@ -1,6 +1,6 @@
-# Technical Learning Roadmap: PharmaGest
+# Technical Learning Roadmap: APCM Pharma
 
-This document provides a structured learning path for understanding the technologies and patterns used in the PharmaGest project. The roadmap follows a "prerequisites-first" approach, building from foundational concepts to advanced implementation details.
+This document provides a structured learning path for understanding the technologies and patterns used in the APCM Pharma project. The roadmap follows a "prerequisites-first" approach, building from foundational concepts to advanced implementation details.
 
 ## Learning Path Overview
 
@@ -17,7 +17,7 @@ This document provides a structured learning path for understanding the technolo
    ↓
 6. Dependency Injection
    ↓
-7. Frontend Architecture (React + Refine)
+7. Frontend Architecture (React + TanStack Query)
    ↓
 8. Chrome Extension Architecture
    ↓
@@ -29,7 +29,7 @@ This document provides a structured learning path for understanding the technolo
 ## 1. Data Modeling (The Foundation)
 
 ### Why This Matters
-Before writing any code, you must understand the domain model. PharmaGest models a pharmacy's business operations: products, purchases, sales, and users. The database schema is the single source of truth.
+Before writing any code, you must understand the domain model. APCM Pharma models a pharmacy's business operations: products, purchases, sales, and users. The database schema is the single source of truth.
 
 ### Core Concepts
 
@@ -250,7 +250,7 @@ This pattern prevents duplicate products while allowing catalog updates.
 ## 5. Authentication & Security
 
 ### Why This Matters
-PharmaGest handles sensitive business data. Proper authentication prevents unauthorized access, and secure password storage protects user credentials even if the database is compromised.
+APCM Pharma handles sensitive business data. Proper authentication prevents unauthorized access, and secure password storage protects user credentials even if the database is compromised.
 
 ### Core Concepts
 
@@ -264,7 +264,7 @@ token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 1. User logs in with email/password
 2. Backend validates credentials
 3. Backend generates JWT containing user ID
-4. Frontend stores token in localStorage
+4. Frontend stores token in sessionStorage
 5. Frontend includes token in `Authorization: Bearer <token>` header
 6. Backend validates token and extracts user ID
 
@@ -288,6 +288,13 @@ if bcrypt.checkpw(password.encode(), stored_hash):
 - OAuth 2.0 and OpenID Connect (for future Google login)
 - Password hashing best practices
 - HTTPS and TLS (transport security)
+
+**WhatsApp OTP Flow (Password Reset):**
+In addition to email-based password reset, APCM Pharma supports WhatsApp OTP via the Meta Cloud API:
+1. User submits their phone number to `POST /auth/forgot-password-whatsapp`
+2. Backend generates a 6-digit OTP, stores it with an expiry, and sends it via the WhatsApp Cloud API using the `password_reset_otp` authentication template
+3. User receives the OTP on WhatsApp and submits it with their new password to `POST /auth/verify-otp`
+4. Backend verifies the OTP, resets the password, and returns a JWT
 
 ### In This Project
 Study `backend/utils/auth.py` and `backend/routers/auth.py`:
@@ -390,74 +397,88 @@ async def upload_achat(
 
 ---
 
-## 7. Frontend Architecture (React + Refine)
+## 7. Frontend Architecture (React + TanStack Query)
 
 ### Why This Matters
-The frontend is built with Refine, a headless admin framework that provides data fetching, routing, and authentication hooks. Understanding Refine's architecture is key to extending the dashboard.
+The frontend uses plain React Router for routing and TanStack Query for server state management. Refine was previously used but has been removed in favor of custom hooks and a typed API layer, giving more control and simpler debugging.
 
 ### Core Concepts
 
-**Refine Architecture:**
+**Architecture:**
 ```
-<Refine
-  dataProvider={dataProvider}      // Handles API calls
-  authProvider={authProvider}      // Handles authentication
-  routerProvider={routerProvider}  // Handles routing
-  resources={resources}            // Defines sidebar navigation
->
-  <Routes>...</Routes>
-</Refine>
+App.tsx (route guards: Protected, Guest, Pending, Role)
+  └── routes.tsx (RouteConfig[] + ResourceConfig[] for sidebar)
+        └── pages/ (thin UI, delegate to hooks)
+              └── hooks/ (all TanStack Query/Mutation logic)
+                    └── api/ (typed fetch wrappers, one file per domain)
 ```
 
-**Data Provider Pattern:**
+**API Layer Pattern:**
 ```typescript
-export const dataProvider: DataProvider = {
-  getList: async ({ resource, pagination, filters }) => {
-    // Fetch paginated data from API
-    const response = await fetch(`/api/${resource}?page=${page}&limit=${limit}`);
-    return { data: response.data, total: response.total };
-  },
-  create: async ({ resource, variables }) => { /* ... */ },
-  update: async ({ resource, id, variables }) => { /* ... */ },
-  // ...
-};
+// api/client.ts — base request function
+export async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}${url}`, {
+    headers: { Authorization: `Bearer ${getToken()}`, ...options?.headers },
+    ...options,
+  });
+  if (res.status === 401) window.dispatchEvent(new Event("auth:unauthorized"));
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// api/transactions.ts — domain-specific calls
+export const getAchatList = (params: AchatParams) =>
+  request<PaginatedResponse<Achat>>(`/achat?${toQuery(params)}`);
 ```
 
-**Why Refine:**
-1. **Abstraction**: Separates data fetching from UI components
-2. **Consistency**: All API calls follow same pattern
-3. **Caching**: Built on TanStack Query for automatic caching
-4. **Type Safety**: Full TypeScript support
+**Hook Pattern:**
+```typescript
+// hooks/useAchatList.ts
+export function useAchatList(params: AchatParams) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.ACHAT, params],
+    queryFn: () => getAchatList(params),
+  });
+}
+```
+
+**Why This Architecture (instead of Refine):**
+1. **Simplicity**: No framework abstraction layer between you and the API
+2. **Full control**: Custom hooks can handle any API shape or side effect
+3. **Caching**: TanStack Query provides automatic caching and refetching
+4. **Type Safety**: Full TypeScript from API call to component prop
 
 ### Learning Resources
 - React fundamentals: https://react.dev/learn
-- Refine documentation: https://refine.dev/docs/
 - TanStack Query: https://tanstack.com/query/latest
-- React Router v7
+- React Router v7: https://reactrouter.com/
+- Zod: https://zod.dev/
 
 ### In This Project
 Study `frontend/src/`:
-- `providers/data.ts`: How API calls are abstracted
-- `providers/auth.ts`: How JWT tokens are managed
-- `routes.tsx`: How routes are configured with `requireAuth` flags
-- `pages/achat/index.tsx`: How `useTable` hook fetches and displays data
+- `api/client.ts`: Base request function with auth and error handling
+- `api/auth.ts`: Auth API calls (login, signup, me, password reset)
+- `hooks/useAuthenticate.ts`: Auth mutations (login, register, logout)
+- `hooks/useAchatList.ts`: Paginated data query with filters
+- `routes.tsx`: How routes are configured with role guards
+- `pages/achat/index.tsx`: How hooks provide data to the table UI
 
 **Key Pattern (Data Fetching):**
 ```typescript
-const table = useTable<AchatRow>({
-  columns,
-  refineCoreProps: {
-    resource: "achat",  // Maps to /achat endpoint
-    pagination: { pageSize: 20, mode: "server" },
-    sorters: { initial: [{ field: "id", order: "desc" }] },
-  },
-});
+// In the page component — thin UI, no direct TanStack usage
+function AchatPage() {
+  const [params, setParams] = useState<AchatParams>({ page: 1, limit: 20 });
+  const { data, isLoading } = useAchatList(params);
 
-// Refine automatically:
-// 1. Calls dataProvider.getList({ resource: "achat", ... })
-// 2. Caches the response
-// 3. Provides loading/error states
-// 4. Re-fetches on filter changes
+  return (
+    <DataTable
+      data={data?.items ?? []}
+      total={data?.total ?? 0}
+      loading={isLoading}
+      onParamsChange={setParams}
+    />
+  );
+}
 ```
 
 ---
@@ -465,7 +486,7 @@ const table = useTable<AchatRow>({
 ## 8. Chrome Extension Architecture
 
 ### Why This Matters
-The Chrome extension is the primary data input method for PharmaGest. It bridges the gap between Sobrus web interface and the PharmaGest backend by capturing data directly from the browser. Understanding Chrome Extension architecture is essential for maintaining and extending the data capture functionality.
+The Chrome extension is the primary data input method for APCM Pharma. It bridges the gap between Sobrus web interface and the APCM Pharma backend by capturing data directly from the browser. Understanding Chrome Extension architecture is essential for maintaining and extending the data capture functionality.
 
 ### Core Concepts
 
@@ -522,13 +543,13 @@ The Chrome extension is the primary data input method for PharmaGest. It bridges
 **Pattern 1: Token Relay (Content Script → Background)**
 ```typescript
 // Content script (runs on dashboard)
-const token = localStorage.getItem("pharmagest_token");
+const token = localStorage.getItem("apcm_token");
 chrome.runtime.sendMessage({ action: "STORE_TOKEN", token });
 
 // Background service worker
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "STORE_TOKEN") {
-    chrome.storage.local.set({ pharmagest_token: request.token });
+    chrome.storage.local.set({ apcm_token: request.token });
   }
 });
 ```
@@ -695,10 +716,10 @@ Study:
 **Key Pattern (Environment-Specific Config):**
 ```python
 # Development
-DATABASE_URL = "postgresql://localhost:5432/pharmagest_dev"
+DATABASE_URL = "postgresql://localhost:5432/apcm_dev"
 
 # Production
-DATABASE_URL = "postgresql://prod-server:5432/pharmagest_prod"
+DATABASE_URL = "postgresql://prod-server:5432/apcm_prod"
 
 # Same code, different behavior based on environment
 ```
@@ -756,10 +777,10 @@ Once you've mastered the core concepts, explore these advanced topics:
    - Study `backend/utils/auth.py`
    - Understand dependency chains in route handlers
 
-4. **Week 7-8**: React + Refine
+4. **Week 7-8**: React + TanStack Query
    - Build a simple admin dashboard
    - Study `frontend/src/pages/achat/index.tsx`
-   - Practice using `useTable` and `useForm` hooks
+   - Practice writing custom hooks with `useQuery` and `useMutation`
 
 5. **Week 9-10**: Chrome Extension
    - Build a simple content script that extracts table data
@@ -784,8 +805,8 @@ This learning path is designed to build your understanding incrementally. Each l
 - **SQLAlchemy** persists your data
 - **Authentication** secures your data
 - **Dependency Injection** organizes your code
-- **React + Refine** presents your data
+- **React + TanStack Query** presents your data
 - **Chrome Extension** captures your data
 - **Deployment** delivers your application
 
-Focus on understanding the "why" behind each technology choice. The PharmaGest codebase demonstrates production-ready patterns that you can apply to any full-stack application.
+Focus on understanding the "why" behind each technology choice. The APCM Pharma codebase demonstrates production-ready patterns that you can apply to any full-stack application.

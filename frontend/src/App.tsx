@@ -2,16 +2,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useEffect, type ReactNode } from "react";
 import "./App.css";
-import { Toaster } from "./components/refine-ui/notification/toaster";
-import { ThemeProvider } from "./components/refine-ui/theme/themeProvider";
-import { Layout } from "./components/refine-ui/layout/layout";
+import { Toaster } from "./components/shared/toaster";
+import { ThemeProvider } from "./components/theme/themeProvider";
+import { Layout } from "./components/layout/layout";
 import { Login } from "./pages/login";
 import { routes } from "./routes";
 import { useStatusPoller } from "./hooks/useStatusPoller";
 import { useMe } from "./hooks/useMe";
 import { useAuthenticate } from "./hooks/useAuthenticate";
 import { hasSession } from "./utils/session";
-import type { UserRole } from "./types";
+import { eUserStatus, type UserRole } from "./types";
 
 // Redirects to /login if no session token exists (synchronous — no flicker).
 function ProtectedRoute({ fallback, children }: { fallback?: ReactNode; children?: ReactNode }) {
@@ -40,7 +40,7 @@ function PendingGuard() {
   useExtensionLogoutSync();
 
   useEffect(() => {
-    if (identity && identity.status !== "active" && location.pathname !== "/") {
+    if (identity && identity.status !== eUserStatus.ACTIVE && location.pathname !== "/") {
       navigate("/", { replace: true });
     }
   }, [identity, location.pathname, navigate]);

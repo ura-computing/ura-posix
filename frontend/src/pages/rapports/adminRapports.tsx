@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { useAdminSystemStats, useAdminPharmacyList, useAdminPharmacyStats } from "@/hooks/useAdminRapports";
+import { useState, useMemo } from "react";
+import { useAdminSystemStats, useAdminPharmacyList, useAdminPharmacyStats, useAdminAnalyseMarge } from "@/hooks/useAdminRapports";
 import {
   BarChart3,
   BookOpen,
   Building2,
+  CalendarCheck,
+  CalendarX,
   ClipboardCheck,
   Download,
   Package,
@@ -19,20 +21,26 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
+import { AnalyseMargeTable, type MargeMode } from "./margeTable";
 import * as statsApi from "@/api/stats";
 import { fmt } from "@/utils/format";
+import { cn } from "@/utils/cn";
 import { toast } from "sonner";
-import { CAT_COLORS, shortMonth, downloadBlob } from "./shared";
+import { CAT_COLORS, shortMonth, downloadBlob, KpiSkeleton } from "./shared";
+import { eCategoryType } from "@/types";
 
 export function AdminRapports() {
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
+  const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
+  const [margeMode, setMargeMode] = useState<MargeMode>("produit");
 
   const { systemStats, systemLoading } = useAdminSystemStats();
   const { pharmacies } = useAdminPharmacyList();
-  const { pharmStats, pharmLoading } = useAdminPharmacyStats(selectedPharmacyId, dateFrom, dateTo);
+  const { pharmStats, pharmLoading } = useAdminPharmacyStats(selectedPharmacyId, dateFrom, dateTo, categoryType);
+  const { margeData, margeLoading } = useAdminAnalyseMarge(selectedPharmacyId, dateFrom, dateTo, categoryType, margeMode);
 
   const selectedName = pharmacies.find((p) => p.id === selectedPharmacyId)?.name;
   const systemCards = [
@@ -46,17 +54,54 @@ export function AdminRapports() {
   const advKpis = pharmStats?.advanced_kpis;
   const tva = pharmStats?.tva;
   const marge = pharmStats?.marge;
-  const breakdown = pharmStats?.type_breakdown;
   const pharmTrend = (pharmStats?.monthly_trend ?? []).map((t) => ({ ...t, label: shortMonth(t.month) }));
   const pharmTopCats = pharmStats?.top_categories ?? [];
   const pharmMaxCat = pharmTopCats[0]?.total ?? 1;
 
-  const handleExcel = async (type: "all" | "pharmacie" | "parapharmacie") => {
+  const allMargeRows = useMemo(
+    () => (margeData?.rows ?? []) as Record<string, unknown>[],
+    [margeData],
+  );
+
+  const typeTheme = useMemo(() => {
+    if (categoryType === eCategoryType.PHARMACIE) return {
+      primaryCard:  "bg-green-600 text-white border-0",
+      border:       "border-green-200 dark:border-green-800",
+      bg:           "bg-green-50/50 dark:bg-green-950/20",
+      text:         "text-green-700 dark:text-green-300",
+      textValue:    "text-green-800 dark:text-green-200",
+      textSubtle:   "text-green-600 dark:text-green-400",
+      icon:         "text-green-500",
+      iconHex:      "#22c55e",
+    };
+    if (categoryType === eCategoryType.PARAPHARMACIE) return {
+      primaryCard:  "bg-purple-600 text-white border-0",
+      border:       "border-purple-200 dark:border-purple-800",
+      bg:           "bg-purple-50/50 dark:bg-purple-950/20",
+      text:         "text-purple-700 dark:text-purple-300",
+      textValue:    "text-purple-800 dark:text-purple-200",
+      textSubtle:   "text-purple-600 dark:text-purple-400",
+      icon:         "text-purple-500",
+      iconHex:      "#a855f7",
+    };
+    return {
+      primaryCard:  "bg-primary text-primary-foreground border-0",
+      border:       "border-emerald-200 dark:border-emerald-800",
+      bg:           "bg-emerald-50/50 dark:bg-emerald-950/20",
+      text:         "text-emerald-700 dark:text-emerald-300",
+      textValue:    "text-emerald-800 dark:text-emerald-200",
+      textSubtle:   "text-emerald-600 dark:text-emerald-400",
+      icon:         "text-emerald-500",
+      iconHex:      "#14b8a6",
+    };
+  }, [categoryType]);
+
+  const handleExcel = async () => {
     if (!selectedPharmacyId) return;
-    setExporting(type);
+    setExporting(categoryType);
     try {
-      const blob = await statsApi.exportExcelForPharmacy(selectedPharmacyId, dateFrom || undefined, dateTo || undefined, type);
-      downloadBlob(blob, `rapport_pharmacie${selectedPharmacyId}_${type}_${dateFrom || "all"}_${dateTo || "all"}.xlsx`);
+      const blob = await statsApi.exportExcelForPharmacy(selectedPharmacyId, dateFrom || undefined, dateTo || undefined, categoryType);
+      downloadBlob(blob, `rapport_pharmacie${selectedPharmacyId}_${categoryType}_${dateFrom || "all"}_${dateTo || "all"}.xlsx`);
       toast.success("Rapport exporté");
     } catch {
       toast.error("Erreur lors de l'export");
@@ -64,6 +109,11 @@ export function AdminRapports() {
       setExporting(null);
     }
   };
+
+  const periodLabel =
+    dateFrom && dateTo ? `${dateFrom} → ${dateTo}` :
+    dateFrom ? `À partir du ${dateFrom}` :
+    dateTo ? `Jusqu'au ${dateTo}` : null;
 
   return (
     <div className="space-y-8">
@@ -101,10 +151,10 @@ export function AdminRapports() {
           <p className="text-sm text-muted-foreground">Sélectionnez une pharmacie pour consulter ses statistiques détaillées.</p>
         </div>
 
-        <section className="sticky top-0 z-10 bg-background pb-2">
-          <Card className="border border-border">
+        <div className="sticky top-16 z-10 bg-background pb-4">
+          <Card className="border border-border shadow-sm">
             <CardContent className="p-4">
-              <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-wrap items-end gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Pharmacie</Label>
                   <Select value={selectedPharmacyId?.toString() ?? ""} onValueChange={(v) => setSelectedPharmacyId(v ? Number(v) : null)}>
@@ -132,22 +182,51 @@ export function AdminRapports() {
                   </Button>
                 )}
                 {selectedPharmacyId && (
-                  <div className="flex items-center gap-2 ml-auto">
-                    <Button size="sm" className="h-9" disabled={!!exporting} onClick={() => handleExcel("all")}>
-                      <Download className="h-4 w-4 mr-1.5" />{exporting === "all" ? "Export…" : "Excel"}
+                  <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+                    <Button
+                      size="sm"
+                      variant={categoryType === eCategoryType.ALL ? "default" : "outline"}
+                      className="h-9"
+                      onClick={() => setCategoryType(eCategoryType.ALL)}
+                    >
+                      Mixte
                     </Button>
-                    <Button size="sm" variant="outline" className="h-9" disabled={!!exporting} onClick={() => handleExcel("pharmacie")}>
-                      <Download className="h-4 w-4 mr-1.5" />{exporting === "pharmacie" ? "Export…" : "Pharmacie"}
+                    <Button
+                      size="sm"
+                      className={cn("h-9 border", categoryType === eCategoryType.PHARMACIE
+                        ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                        : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
+                      )}
+                      onClick={() => setCategoryType(eCategoryType.PHARMACIE)}
+                    >
+                      Pharmacie
                     </Button>
-                    <Button size="sm" variant="outline" className="h-9" disabled={!!exporting} onClick={() => handleExcel("parapharmacie")}>
-                      <Download className="h-4 w-4 mr-1.5" />{exporting === "parapharmacie" ? "Export…" : "Parapharmacie"}
+                    <Button
+                      size="sm"
+                      className={cn("h-9 border", categoryType === eCategoryType.PARAPHARMACIE
+                        ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                        : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
+                      )}
+                      onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}
+                    >
+                      Parapharmacie
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 ml-1"
+                      disabled={!!exporting}
+                      title="Exporter Excel"
+                      onClick={handleExcel}
+                    >
+                      <Download className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
-        </section>
+        </div>
 
         {selectedPharmacyId == null ? (
           <div className="flex items-center justify-center rounded-2xl border-2 border-dashed border-border py-16 text-center">
@@ -157,113 +236,222 @@ export function AdminRapports() {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <h3 className="text-base font-semibold text-foreground">{selectedName}</h3>
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: "Chiffre d'affaires", value: kpis ? fmt(kpis.ventes_total) + " MAD" : "—", icon: TrendingUp, primary: true },
-                { label: "Achats totaux", value: kpis ? fmt(kpis.achats_total) + " MAD" : "—", icon: ShoppingCart, primary: false },
-                { label: "Transactions ventes", value: String(kpis?.ventes_count ?? 0), icon: BarChart3, primary: false },
-                { label: "Transactions achats", value: String(kpis?.achats_count ?? 0), icon: Package, primary: false },
-              ].map(({ label, value, icon: Icon, primary }) => (
-                <Card key={label} className={primary ? "bg-primary text-primary-foreground border-0" : "border border-border"}>
+            {/* ── Indicateurs clés ── */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                Indicateurs clés
+                {periodLabel && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">{periodLabel}</span>
+                )}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className={cn(typeTheme.primaryCard)}>
                   <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className={`text-sm font-medium ${primary ? "opacity-85" : "text-muted-foreground"}`}>{label}</p>
-                        {pharmLoading ? <Skeleton className={`h-8 w-24 mt-1 ${primary ? "bg-white/20" : ""}`} /> : (
-                          <p className="text-2xl font-bold mt-1 leading-tight">{value}</p>
+                        <p className="text-sm font-medium opacity-85">Chiffre d'affaires</p>
+                        {pharmLoading ? <KpiSkeleton primary /> : (
+                          <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
                         )}
                       </div>
-                      <Icon className={`h-8 w-8 shrink-0 ${primary ? "opacity-60" : "text-primary"}`} />
+                      <TrendingUp className="h-8 w-8 opacity-60 shrink-0" />
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
 
-            {/* Répartition Pharmacie / Parapharmacie */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-700 dark:text-green-300">CA Pharmacie</p>
-                      {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                        <p className="text-2xl font-bold mt-1 text-green-800 dark:text-green-200">{fmt(breakdown?.pharmacie.ventes_total ?? null)} MAD</p>
-                      )}
+                <Card className="border border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Achats totaux</p>
+                        {pharmLoading ? <KpiSkeleton /> : (
+                          <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)} MAD</p>
+                        )}
+                      </div>
+                      <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
                     </div>
-                    <Receipt className="h-7 w-7 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-purple-700 dark:text-purple-300">CA Parapharmacie</p>
-                      {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                        <p className="text-2xl font-bold mt-1 text-purple-800 dark:text-purple-200">{fmt(breakdown?.parapharmacie.ventes_total ?? null)} MAD</p>
-                      )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Transactions ventes</p>
+                        {pharmLoading ? <KpiSkeleton /> : (
+                          <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.ventes_count ?? 0}</p>
+                        )}
+                      </div>
+                      <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
                     </div>
-                    <Package className="h-7 w-7 text-purple-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  </CardContent>
+                </Card>
 
-            {/* Advanced KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Card className="border border-border">
-                <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground font-medium">Ticket moyen</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>}
-                </CardContent>
-              </Card>
-              <Card className="border border-border">
-                <CardContent className="p-5">
-                  <p className="text-sm text-muted-foreground font-medium">Vente moy / jour</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>}
-                </CardContent>
-              </Card>
-              <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-                <CardContent className="p-5">
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">Meilleure journée (DH)</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                    <>
-                      <p className="text-xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">{advKpis?.best_day_dh ? fmt(advKpis.best_day_dh.total) : "—"} MAD</p>
-                      <p className="text-[11px] text-emerald-600 mt-0.5">{advKpis?.best_day_dh?.date ?? "—"}</p>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                <Card className="border border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Transactions achats</p>
+                        {pharmLoading ? <KpiSkeleton /> : (
+                          <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.achats_count ?? 0}</p>
+                        )}
+                      </div>
+                      <Package className={cn("h-8 w-8", typeTheme.icon)} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
 
-            {/* TVA */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-                <CardContent className="p-5">
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">TVA encaissée</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1 text-emerald-800 dark:text-emerald-200">{fmt(tva?.tva_encaissee ?? null)} MAD</p>}
-                </CardContent>
-              </Card>
-              <Card className="border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
-                <CardContent className="p-5">
-                  <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">TVA payée</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : <p className="text-xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>}
-                </CardContent>
-              </Card>
-              <Card className="bg-primary text-primary-foreground border-0">
-                <CardContent className="p-5">
-                  <p className="text-sm opacity-85 font-medium">TVA à déclarer</p>
-                  {pharmLoading ? <Skeleton className="h-7 w-24 mt-1 bg-white/20" /> : <p className="text-xl font-bold mt-1">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>}
-                </CardContent>
-              </Card>
-            </div>
+            {/* ── Indicateurs avancés ── */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Indicateurs avancés</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card className="border border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Ticket moyen</p>
+                        {pharmLoading ? <KpiSkeleton /> : (
+                          <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground mt-0.5">par transaction</p>
+                      </div>
+                      <Receipt className={cn("h-9 w-9", typeTheme.icon)} />
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Marge */}
+                <Card className="border border-border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Vente moyenne / jour</p>
+                        {pharmLoading ? <KpiSkeleton /> : (
+                          <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>
+                        )}
+                      </div>
+                      <BarChart3 className={cn("h-9 w-9", typeTheme.icon)} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (DH)</p>
+                        {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
+                          <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
+                            {advKpis?.best_day_dh ? `${fmt(advKpis.best_day_dh.total)} MAD` : "—"}
+                          </p>
+                        )}
+                        <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
+                          {advKpis?.best_day_dh?.date ?? "—"}
+                        </p>
+                      </div>
+                      <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (opé)</p>
+                        {pharmLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                          <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
+                            {advKpis?.best_day_count ? `${advKpis.best_day_count.count} opé` : "—"}
+                          </p>
+                        )}
+                        <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
+                          {advKpis?.best_day_count?.date ?? "—"}
+                        </p>
+                      </div>
+                      <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (DH)</p>
+                        {pharmLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
+                          <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
+                            {advKpis?.worst_day_dh ? `${fmt(advKpis.worst_day_dh.total)} MAD` : "—"}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
+                          {advKpis?.worst_day_dh?.date ?? "—"}
+                        </p>
+                      </div>
+                      <CalendarX className="h-9 w-9 text-rose-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (opé)</p>
+                        {pharmLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
+                          <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
+                            {advKpis?.worst_day_count ? `${advKpis.worst_day_count.count} opé` : "—"}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
+                          {advKpis?.worst_day_count?.date ?? "—"}
+                        </p>
+                      </div>
+                      <CalendarX className="h-9 w-9 text-rose-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+
+            {/* ── TVA ── */}
+            <section>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Déclaration TVA</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
+                  <CardContent className="p-6">
+                    <p className={cn("text-sm font-medium", typeTheme.text)}>TVA encaissée (ventes)</p>
+                    {pharmLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
+                      <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>{fmt(tva?.tva_encaissee ?? null)} MAD</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardContent className="p-6">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">TVA payée (achats)</p>
+                    {pharmLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
+                      <p className="text-2xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className={cn(typeTheme.primaryCard)}>
+                  <CardContent className="p-6">
+                    <p className="text-sm font-medium opacity-85">TVA à déclarer</p>
+                    {pharmLoading ? <KpiSkeleton primary /> : (
+                      <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>
+                    )}
+                    <p className="text-[11px] opacity-75 mt-0.5">encaissée − payée</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </section>
+
+            {/* ── Marge summary ── */}
             <Card className="border border-border">
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
@@ -283,14 +471,40 @@ export function AdminRapports() {
               </CardContent>
             </Card>
 
-            {/* Monthly trend */}
+            {/* ── Analyse de marge ── */}
+            <section>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h2 className="text-lg font-semibold text-foreground">Analyse de marge</h2>
+                <div className="flex items-center gap-1">
+                  {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
+                    <Button
+                      key={m}
+                      size="sm"
+                      variant="outline"
+                      className={cn("h-8 text-xs", margeMode === m ? cn(typeTheme.primaryCard, "hover:opacity-90") : "")}
+                      onClick={() => setMargeMode(m)}
+                    >
+                      {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <AnalyseMargeTable
+                mode={margeMode}
+                data={margeData}
+                loading={margeLoading}
+              />
+            </section>
+
+            {/* ── Monthly trend ── */}
             <MonthlyTrendChart
               trend={pharmTrend}
               isLoading={pharmLoading}
-              subtitle={dateFrom && dateTo ? `${dateFrom} → ${dateTo}` : dateFrom ? `À partir du ${dateFrom}` : dateTo ? `Jusqu'au ${dateTo}` : undefined}
+              subtitle={periodLabel ?? undefined}
             />
 
-            {/* Top categories */}
+            {/* ── Top categories ── */}
             {pharmTopCats.length > 0 && (
               <Card className="border border-border">
                 <CardContent className="p-6 space-y-4">

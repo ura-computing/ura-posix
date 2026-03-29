@@ -4,9 +4,33 @@ export enum eUserRole {
   EMPLOYEE = "employee",
 }
 
+export enum eUserStatus {
+  PENDING = "pending",
+  ACTIVE = "active",
+  REJECTED = "rejected",
+}
+
+export enum eRequestType {
+  NEW_PRODUCT = "new_product",
+  NON_DECLARE = "non_declare",
+  ANNULATION = "annulation",
+}
+
+export enum eRequestStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+}
+
+export enum eCategoryType {
+  ALL = "all",
+  PHARMACIE = "pharmacie",
+  PARAPHARMACIE = "parapharmacie",
+}
+
 export type UserRole = `${eUserRole}`;
 
-export type UserStatus = "pending" | "active" | "rejected";
+export type UserStatus = `${eUserStatus}`;
 
 export type User = {
   id: number;
@@ -35,6 +59,7 @@ export type Pharmacy = {
   address?: string;
   phone?: string;
   email?: string;
+  options?: Record<string, boolean>;
   created_at?: string;
   user_count: number;
   owners?: PharmacyOwner[];
@@ -87,60 +112,3 @@ export type AuthToken = {
   user: User;
 };
 
-export type ListResponse<T = unknown> = {
-  data?: T[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
-export type CreateResponse<T = unknown> = {
-  data?: T;
-};
-
-export type GetOneResponse<T = unknown> = {
-  data?: T;
-};
-
-export interface UploadWidgetValue {
-  url: string;
-  publicId: string;
-}
-
-export interface UploadWidgetProps {
-  value?: UploadWidgetValue | null;
-  onChange?: (value: UploadWidgetValue | null) => void;
-  disabled?: boolean;
-}
-
-declare global {
-  interface CloudinaryUploadWidgetResults {
-    event: string;
-    info: {
-      secure_url: string;
-      public_id: string;
-      delete_token?: string;
-      resource_type: string;
-      original_filename: string;
-    };
-  }
-
-  interface CloudinaryWidget {
-    open: () => void;
-  }
-
-  interface Window {
-    cloudinary?: {
-      createUploadWidget: (
-        options: Record<string, unknown>,
-        callback: (
-          error: unknown,
-          result: CloudinaryUploadWidgetResults,
-        ) => void,
-      ) => CloudinaryWidget;
-    };
-  }
-}

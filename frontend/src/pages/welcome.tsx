@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { User } from "@/types";
-import { eUserRole } from "@/types";
+import { eUserRole, eUserStatus } from "@/types";
 
 // ── Background decoration ─────────────────────────────────────────────────────
 
@@ -132,9 +132,9 @@ function UnauthenticatedView() {
 
 // ── Pending / Rejected notice ─────────────────────────────────────────────────
 
-function PendingNotice({ role, status }: { role: eUserRole.OWNER | eUserRole.EMPLOYEE; status: "pending" | "rejected" }) {
+function PendingNotice({ role, status }: { role: eUserRole.OWNER | eUserRole.EMPLOYEE; status: eUserStatus.PENDING | eUserStatus.REJECTED }) {
   const { logout } = useAuthenticate();
-  const isRejected = status === "rejected";
+  const isRejected = status === eUserStatus.REJECTED;
   return (
     <div className={`flex items-start justify-between gap-4 rounded-xl border px-5 py-4 ${
       isRejected
@@ -217,7 +217,7 @@ function AdminView({ name }: { name: string }) {
 
 function OwnerView({ identity }: { identity: User }) {
   const name = identity.name || "Propriétaire";
-  const isPending = identity.status !== "active";
+  const isPending = identity.status !== eUserStatus.ACTIVE;
 
   return (
     <div className="max-w-2xl mx-auto w-full space-y-8 text-center">
@@ -233,7 +233,7 @@ function OwnerView({ identity }: { identity: User }) {
 
       {isPending ? (
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
-          <PendingNotice role={eUserRole.OWNER} status={identity.status as "pending" | "rejected"} />
+          <PendingNotice role={eUserRole.OWNER} status={identity.status as eUserStatus.PENDING | eUserStatus.REJECTED} />
         </div>
       ) : (
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
@@ -255,7 +255,7 @@ function OwnerView({ identity }: { identity: User }) {
 
 function EmployeeView({ identity }: { identity: User }) {
   const name = identity.name || "Employé";
-  const isPending = identity.status !== "active";
+  const isPending = identity.status !== eUserStatus.ACTIVE;
 
   return (
     <div className="max-w-2xl mx-auto w-full space-y-8 text-center">
@@ -271,7 +271,7 @@ function EmployeeView({ identity }: { identity: User }) {
 
       {isPending ? (
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
-          <PendingNotice role={eUserRole.EMPLOYEE} status={identity.status as "pending" | "rejected"} />
+          <PendingNotice role={eUserRole.EMPLOYEE} status={identity.status as eUserStatus.PENDING | eUserStatus.REJECTED} />
         </div>
       ) : (
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>

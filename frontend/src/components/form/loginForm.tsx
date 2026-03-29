@@ -4,7 +4,8 @@ import { useLoginForm } from "@/schemas/loginForm";
 import type { LoginFormValues } from "@/schemas/loginForm";
 import { Loader2 } from "lucide-react";
 
-import { InputPassword } from "@/components/refine-ui/form/inputPassword";
+import { AppLogo } from "@/components/shared/appLogo";
+import { InputPassword } from "@/components/form/inputPassword";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,8 +37,8 @@ export const LoginForm = () => {
   return (
     <div className="login">
       <div className="logo">
-        <img src="/logo.png" alt="PharmaGest" />
-        <span className="brand-name">PharmaGest</span>
+        <AppLogo />
+        <span className="brand-name">APCM Pharma</span>
         <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 
@@ -45,7 +46,7 @@ export const LoginForm = () => {
         <CardHeader className="header">
           <CardTitle className="title">Connexion</CardTitle>
           <CardDescription className="description">
-            Bienvenue sur PharmaGest
+            Bienvenue sur APCM Pharma
           </CardDescription>
         </CardHeader>
 

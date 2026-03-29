@@ -1,4 +1,4 @@
-# PharmaGest
+# APCM Pharma
 
 A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Chrome extension automatically intercepts CSV exports from Sobrus and uploads them directly to the backend — no manual file handling required.
 
@@ -221,7 +221,9 @@ Owner wants to reverse → submits annulation request
 | GET | `/auth/me` | Current user profile |
 | PUT | `/auth/me` | Update profile |
 | POST | `/auth/forgot-password` | Send password reset email |
-| POST | `/auth/reset-password` | Reset password with token |
+| POST | `/auth/forgot-password-whatsapp` | Send OTP via WhatsApp |
+| POST | `/auth/verify-otp` | Verify WhatsApp OTP and reset password |
+| POST | `/auth/reset-password` | Reset password with email token |
 
 ### Uploads
 | Method | Endpoint | Description |
@@ -401,11 +403,11 @@ apcm-pharma/
 │   │   ├── owner/employees/     # Owner: employee management
 │   │   └── admin/               # Admin: pharmacies, catalog, catalog requests
 │   ├── components/
-│   │   ├── refine-ui/layout/    # header, sidebar, layout, breadcrumb, userAvatar
-│   │   ├── refine-ui/form/      # loginForm, signupForm, inputPassword
-│   │   ├── refine-ui/data-table/# dataTable, dataTablePagination
-│   │   ├── refine-ui/theme/     # themeProvider, themeToggle, themeSelect
-│   │   ├── refine-ui/views/     # listView
+│   │   ├── layout/              # header, sidebar, layout, breadcrumb, userAvatar
+│   │   ├── form/                # loginForm, signupForm, inputPassword
+│   │   ├── data-table/          # dataTable, dataTablePagination
+│   │   ├── theme/               # themeProvider, themeToggle, themeSelect
+│   │   ├── shared/              # listView, reusable UI pieces
 │   │   ├── tableToolbar.tsx     # 2-row filter toolbar (search, date, cat, TVA, type)
 │   │   ├── categoryMultiSelect.tsx
 │   │   ├── searchAutocomplete.tsx
@@ -463,7 +465,7 @@ Owners register via `/signup`. The admin approves them from the Pharmacies panel
 
 ### Environment (`backend/.env`)
 ```env
-DATABASE_URL=postgresql://pharmagest:pharmagest@localhost:5432/pharmagest
+DATABASE_URL=postgresql://apcm:apcm@localhost:5432/apcm
 SECRET_KEY=<generate-secure-key>
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 CORS_ORIGINS=http://localhost:5173
@@ -474,6 +476,63 @@ CORS_ORIGINS=http://localhost:5173
 cd extension && npm run build
 # Chrome → chrome://extensions/ → Load unpacked → select extension/dist/
 ```
+
+### WhatsApp OTP Setup (Password Reset via WhatsApp)
+
+The app supports password reset via WhatsApp OTP using Meta's Cloud API.
+
+#### 1. Create Meta Business & Developer Accounts
+
+- Create a business account at [business.facebook.com](https://business.facebook.com)
+- Create a developer account at [developers.facebook.com](https://developers.facebook.com)
+
+#### 2. Create a Meta App
+
+1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps) → **Create App**
+2. Choose **"Business"** type
+3. Name it (e.g. "APCM Pharma"), select your business account
+4. On the app dashboard, find **WhatsApp** and click **Set Up**
+
+#### 3. Add a Phone Number
+
+1. In WhatsApp → **Getting Started**, Meta provides a test phone number (free)
+2. To use your own: go to **Phone Numbers** → **Add Phone Number** and verify via SMS/call
+3. Note your **Phone Number ID** (displayed on the page)
+
+#### 4. Create the Authentication Template
+
+1. Go to **WhatsApp** → **Message Templates** → **Create Template**
+2. Configure:
+   - **Category**: `Authentication`
+   - **Name**: `password_reset_otp`
+   - **Language**: `French (fr)`
+   - **OTP type**: Copy code
+   - **Security disclaimer**: Yes
+   - **Expiry warning**: 10 minutes
+3. Submit for review (usually approved within minutes)
+
+#### 5. Generate a Permanent Access Token
+
+1. Go to [business.facebook.com/settings/system-users](https://business.facebook.com/settings/system-users)
+2. Create a **System User** with Admin role
+3. Click **Generate Token** → select your app → grant `whatsapp_business_messaging` permission
+4. Copy the token (shown only once)
+
+#### 6. Set Environment Variables
+
+Add to `backend/.env`:
+
+```env
+WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
+WHATSAPP_ACCESS_TOKEN=your_permanent_access_token
+```
+
+#### Important Notes
+
+- **Test mode**: The test phone number can only send to numbers manually added in WhatsApp → Getting Started → "To" field
+- **Production**: Verify your business and get your phone number approved to send to any number
+- **Phone format**: Numbers must be in E.164 format (e.g. `212600000000` for Morocco — country code + number without leading 0)
+- **Cost**: ~$0.03 per authentication message to Morocco
 
 ---
 
@@ -504,4 +563,4 @@ cd extension && npm run build
 
 ---
 
-(c) 2026 PharmaGest. All rights reserved.
+(c) 2026 APCM Pharma. All rights reserved.

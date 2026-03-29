@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
+from utils.constants import Role, Status
 
 
 class Pharmacy(Base):
@@ -13,6 +14,7 @@ class Pharmacy(Base):
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    options = Column(JSON, nullable=True, default=lambda: {})  # feature flags at pharmacy level, {} = all allowed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     users = relationship("User", back_populates="pharmacy")
@@ -29,8 +31,8 @@ class User(Base):
     phone = Column(String, nullable=True)
     pharmacy_name = Column(String, nullable=True)
     profile_complete = Column(Boolean, default=False)
-    role = Column(String, default="owner", nullable=False)  # admin | owner | employee
-    status = Column(String, default="pending", nullable=False)  # pending | active | rejected
+    role = Column(String, default=Role.OWNER, nullable=False)  # admin | owner | employee
+    status = Column(String, default=Status.PENDING, nullable=False)  # pending | active | rejected
     permissions = Column(JSON, nullable=True, default=lambda: {})  # feature flags, {} = all allowed
     pharmacy_id = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
     reset_token         = Column(String, nullable=True)

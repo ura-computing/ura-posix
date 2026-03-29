@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from database import Base
+from utils.constants import RequestStatus, RequestType
 
 
 class Medicament(Base):
@@ -50,9 +51,9 @@ class CatalogRequest(Base):
     id            = Column(Integer, primary_key=True, index=True)
     requested_by  = Column(Integer, ForeignKey("users.id"), nullable=False)
     pharmacy_id   = Column(Integer, ForeignKey("pharmacies.id"), nullable=True)
-    status        = Column(String, default="pending", nullable=False)  # pending | approved | rejected
+    status        = Column(String, default=RequestStatus.PENDING, nullable=False)  # pending | approved | rejected
     reject_reason = Column(String, nullable=True)
-    request_type  = Column(String, default="new_product", nullable=False)  # new_product | non_declare
+    request_type  = Column(String, default=RequestType.NEW_PRODUCT, nullable=False)  # new_product | non_declare
     medicament_id = Column(Integer, ForeignKey("medicaments.id"), nullable=True)
     notes         = Column(String, nullable=True)
 

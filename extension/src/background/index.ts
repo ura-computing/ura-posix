@@ -34,8 +34,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 
   // ── Upload a single CSV chunk (background can reach localhost, content script cannot) ─
   if (request.action === ACTIONS.UPLOAD_CHUNK) {
-    const { csvChunk, fileType } = request as { csvChunk: string; fileType: "achat" | "vente" };
-    uploadCsv(fileType, csvChunk)
+    const { csvChunk, fileType, filename, batchId } = request as {
+      csvChunk: string; fileType: "achat" | "vente"; filename?: string; batchId?: number;
+    };
+    uploadCsv(fileType, csvChunk, filename, batchId)
       .then((data) => sendResponse({ success: true, ...data }))
       .catch((err: Error) => sendResponse({ success: false, error: err.message }));
     return true;

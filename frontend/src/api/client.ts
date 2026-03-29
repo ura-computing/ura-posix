@@ -16,7 +16,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? "Request failed");
+    throw new Error(err.detail ?? "Une erreur est survenue");
   }
   if (res.status === 204 || res.headers.get("content-length") === "0") {
     return undefined as T;
@@ -38,7 +38,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? "Upload failed");
+    throw new Error(err.detail ?? "Erreur lors de l'envoi");
   }
   return res.json() as Promise<T>;
 }
@@ -48,6 +48,6 @@ export async function fetchBlob(path: string): Promise<Blob> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
-  if (!res.ok) throw new Error("Export failed");
+  if (!res.ok) throw new Error("Erreur lors de l'export");
   return res.blob();
 }

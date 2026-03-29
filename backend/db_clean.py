@@ -1,5 +1,5 @@
 """
-Database clean script for PharmaGest.
+Database clean script for APCM Pharma.
 
 Drops all tables and recreates them (empty schema).
 Run `make seed` afterwards to re-populate with default accounts.

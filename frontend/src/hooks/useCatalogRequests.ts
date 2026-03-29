@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as catalogRequestsApi from "@/api/catalogRequests";
+import { eRequestStatus, eRequestType } from "@/types";
 
 const REQUESTS_KEY = ["catalog-requests", "owner"] as const;
 const PRODUCTS_KEY = ["my-products"] as const;
@@ -14,14 +15,14 @@ export function useCatalogRequestsList(enabled: boolean) {
       // Collect medicament IDs where annulation was approved (exclusion reversed)
       const reversedMedIds = new Set(
         data
-          .filter((r) => r.request_type === "annulation" && r.status === "approved" && r.medicament_id)
+          .filter((r) => r.request_type === eRequestType.ANNULATION && r.status === eRequestStatus.APPROVED && r.medicament_id)
           .map((r) => r.medicament_id!)
       );
       return data.filter((r) => {
-        if (r.request_type === "annulation") return r.status === "pending" || r.status === "rejected";
-        if (r.request_type === "non_declare") {
+        if (r.request_type === eRequestType.ANNULATION) return r.status === eRequestStatus.PENDING || r.status === eRequestStatus.REJECTED;
+        if (r.request_type === eRequestType.NON_DECLARE) {
           // Hide approved exclusions that were later reversed
-          if (r.status === "approved" && r.medicament_id && reversedMedIds.has(r.medicament_id)) return false;
+          if (r.status === eRequestStatus.APPROVED && r.medicament_id && reversedMedIds.has(r.medicament_id)) return false;
           return true;
         }
         return false;

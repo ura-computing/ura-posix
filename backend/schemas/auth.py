@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from utils.constants import Role, Status
 
 
 class UserSignup(BaseModel):
@@ -7,7 +8,7 @@ class UserSignup(BaseModel):
     password: str
     name: str
     phone: Optional[str] = None
-    role: str = "owner"              # owner | employee
+    role: str = Role.OWNER              # owner | employee
     pharmacy_name: Optional[str] = None   # for owners
     pharmacy_id: Optional[int] = None    # for employees
 
@@ -24,8 +25,8 @@ class UserOut(BaseModel):
     phone: Optional[str] = None
     pharmacy_name: Optional[str] = None
     profile_complete: bool = False
-    role: str = "owner"
-    status: str = "pending"
+    role: str = Role.OWNER
+    status: str = Status.PENDING
     permissions: Dict[str, bool] = {}
     pharmacy_id: Optional[int] = None
     pharmacy_address: Optional[str] = None
@@ -59,3 +60,12 @@ class ForgotPasswordPayload(BaseModel):
 class ResetPasswordPayload(BaseModel):
     token: str
     new_password: str = Field(min_length=6)
+
+
+class ForgotPasswordWhatsAppPayload(BaseModel):
+    phone: str
+
+
+class VerifyOtpPayload(BaseModel):
+    phone: str
+    otp: str

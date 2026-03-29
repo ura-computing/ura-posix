@@ -1,5 +1,5 @@
-import { UserAvatar } from "@/components/refine-ui/layout/userAvatar";
-import { ThemeToggle } from "@/components/refine-ui/theme/themeToggle";
+import { UserAvatar } from "@/components/layout/userAvatar";
+import { ThemeToggle } from "@/components/theme/themeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,

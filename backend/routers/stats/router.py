@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Achat, CatalogRequest, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
+from utils.constants import Role, Status
 from .excel import _build_excel
 from .marge import _compute_analyse_marge
 from .queries import (
@@ -29,8 +30,8 @@ def get_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == "admin":
-        raise HTTPException(status_code=403, detail="Admins use /admin/stats")
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/stats")
 
     pharmacy_id = current_user.pharmacy_id
     df = date_from or None
@@ -120,8 +121,8 @@ def stats_analyse_marge(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == "admin":
-        raise HTTPException(status_code=403, detail="Admins use /admin/pharmacy/{id}/stats/analyse-marge")
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/analyse-marge")
     return _compute_analyse_marge(
         db, current_user.pharmacy_id, date_from or None, date_to or None, category_type, mode
     )
@@ -135,8 +136,8 @@ def export_stats_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role == "admin":
-        raise HTTPException(status_code=403, detail="Admins use /admin/pharmacy/{id}/stats/export-excel")
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/export-excel")
 
     df, dt = date_from or None, date_to or None
     pharmacy_id = current_user.pharmacy_id
@@ -199,14 +200,24 @@ def get_pharmacy_stats_for_admin(
     pharmacy_id: int,
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    category_type: str = Query("all"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
 
     df = date_from or None
     dt = date_to or None
+
+    cat_filter_v: list = []
+    cat_filter_a: list = []
+    if category_type == "pharmacie":
+        cat_filter_v = [_pharma_expr() == True]
+        cat_filter_a = [_pharma_expr() == True]
+    elif category_type == "parapharmacie":
+        cat_filter_v = [_pharma_expr() == False]
+        cat_filter_a = [_pharma_expr() == False]
 
     non_declared_sub = (
         db.query(PharmacyMedicamentStatus.medicament_id)
@@ -217,14 +228,14 @@ def get_pharmacy_stats_for_admin(
         .subquery()
     )
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(
-        Vente.pharmacy_id == pharmacy_id,
-        Vente.medicament_id.notin_(non_declared_sub),
-    )
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(
-        Achat.pharmacy_id == pharmacy_id,
-        Achat.medicament_id.notin_(non_declared_sub),
-    )
+    vq = db.query(func.sum(Vente.total), func.count(Vente.id))
+    aq = db.query(func.sum(Achat.total), func.count(Achat.id))
+    if cat_filter_v:
+        vq = vq.join(Medicament, Vente.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_v)
+    if cat_filter_a:
+        aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
+    vq = vq.filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.notin_(non_declared_sub))
+    aq = aq.filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id.notin_(non_declared_sub))
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -245,13 +256,15 @@ def get_pharmacy_stats_for_admin(
             Vente.medicament_id.notin_(non_declared_sub),
         )
     )
+    if cat_filter_v:
+        cat_q = cat_q.filter(*cat_filter_v)
     if df:
         cat_q = cat_q.filter(Vente.date >= df)
     if dt:
         cat_q = cat_q.filter(Vente.date <= dt)
     top_categories = _merge_top_categories(cat_q.group_by(Medicament.category).all())
 
-    extra = _compute_extra_stats(db, pharmacy_id, df, dt)
+    extra = _compute_extra_stats(db, pharmacy_id, df, dt, category_type)
 
     return {
         "kpis": {
@@ -275,8 +288,8 @@ def export_pharmacy_stats_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
 
     df, dt = date_from or None, date_to or None
 
@@ -341,8 +354,8 @@ def admin_analyse_marge(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
     return _compute_analyse_marge(
         db, pharmacy_id, date_from or None, date_to or None, category_type, mode
     )
@@ -353,15 +366,15 @@ def get_admin_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
 
     total_pharmacies = db.query(func.count(Pharmacy.id)).scalar() or 0
-    total_active_users = db.query(func.count(User.id)).filter(User.status == "active").scalar() or 0
+    total_active_users = db.query(func.count(User.id)).filter(User.status == Status.ACTIVE).scalar() or 0
     total_catalog_items = db.query(func.count(Medicament.id)).scalar() or 0
     pending_catalog_requests = (
         db.query(func.count(CatalogRequest.id))
-        .filter(CatalogRequest.status == "pending")
+        .filter(CatalogRequest.status == Status.PENDING)
         .scalar() or 0
     )
 
@@ -380,8 +393,8 @@ def list_my_products(
     current_user: User = Depends(get_current_user),
 ):
     """Return distinct products available in this pharmacy's achats/ventes."""
-    if current_user.role == "admin":
-        raise HTTPException(status_code=403, detail="Admins use pharmacy-specific endpoints")
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent les endpoints spécifiques à la pharmacie")
 
     pharmacy_id = current_user.pharmacy_id
     if not pharmacy_id:

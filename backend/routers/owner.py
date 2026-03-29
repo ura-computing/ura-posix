@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
+from models import Pharmacy, User
 from utils.permissions import get_current_owner
+from utils.constants import Role, Status
 from schemas import EmployeePermissionsUpdate, UserAdminOut
 
 router = APIRouter(prefix="/owner", tags=["owner"])
@@ -21,7 +22,7 @@ def list_employees(
         db.query(User)
         .filter(
             User.pharmacy_id == current_owner.pharmacy_id,
-            User.role == "employee",
+            User.role == Role.EMPLOYEE,
         )
         .order_by(User.created_at.desc())
         .all()
@@ -36,12 +37,12 @@ def approve_employee(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if user.pharmacy_id != current_owner.pharmacy_id:
-        raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
-    if user.status != "pending":
-        raise HTTPException(status_code=400, detail="User is not pending")
-    user.status = "active"
+        raise HTTPException(status_code=403, detail="Cet employé n'appartient pas à votre pharmacie")
+    if user.status != Status.PENDING:
+        raise HTTPException(status_code=400, detail="L'utilisateur n'est pas en attente")
+    user.status = Status.ACTIVE
     db.commit()
     db.refresh(user)
     return user
@@ -55,10 +56,10 @@ def reject_employee(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if user.pharmacy_id != current_owner.pharmacy_id:
-        raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
-    user.status = "rejected"
+        raise HTTPException(status_code=403, detail="Cet employé n'appartient pas à votre pharmacie")
+    user.status = Status.REJECTED
     db.commit()
     db.refresh(user)
     return user
@@ -74,16 +75,18 @@ def update_employee_permissions(
     """Update feature permissions for an employee. Owner can only grant features they have access to."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if user.pharmacy_id != current_owner.pharmacy_id:
-        raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
-    if user.role != "employee":
-        raise HTTPException(status_code=400, detail="Target user is not an employee")
-    # Owner cannot grant features that are blocked for themselves
+        raise HTTPException(status_code=403, detail="Cet employé n'appartient pas à votre pharmacie")
+    if user.role != Role.EMPLOYEE:
+        raise HTTPException(status_code=400, detail="L'utilisateur cible n'est pas un employé")
+    # Owner cannot grant features that are blocked for themselves or at pharmacy level
     owner_perms = current_owner.permissions or {}
+    pharmacy = db.query(Pharmacy).filter(Pharmacy.id == current_owner.pharmacy_id).first()
+    pharmacy_options = (pharmacy.options or {}) if pharmacy else {}
     sanitized = {
         k: v for k, v in body.permissions.items()
-        if not (v is True and owner_perms.get(k) is False)
+        if not (v is True and (owner_perms.get(k) is False or pharmacy_options.get(k) is False))
     }
     user.permissions = sanitized
     db.commit()
@@ -101,8 +104,8 @@ def get_owner_notifications(
         db.query(User)
         .filter(
             User.pharmacy_id == current_owner.pharmacy_id,
-            User.role == "employee",
-            User.status == "pending",
+            User.role == Role.EMPLOYEE,
+            User.status == Status.PENDING,
         )
         .order_by(User.created_at.desc())
         .all()
@@ -128,12 +131,12 @@ def revoke_employee(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
     if user.pharmacy_id != current_owner.pharmacy_id:
-        raise HTTPException(status_code=403, detail="Employee does not belong to your pharmacy")
-    if user.status != "active":
-        raise HTTPException(status_code=400, detail="Employee is not active")
-    user.status = "pending"
+        raise HTTPException(status_code=403, detail="Cet employé n'appartient pas à votre pharmacie")
+    if user.status != Status.ACTIVE:
+        raise HTTPException(status_code=400, detail="L'employé n'est pas actif")
+    user.status = Status.PENDING
     db.commit()
     db.refresh(user)
     return user

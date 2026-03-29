@@ -1,5 +1,6 @@
 import { request, uploadFile } from "./client";
 import { ENDPOINTS } from "@/constants";
+import { eRequestStatus, eRequestType } from "@/types";
 import type { Pharmacy, UserAdmin, UserRole } from "@/types";
 import type { StatsResponse } from "./stats";
 
@@ -42,9 +43,9 @@ export type CatalogRequestOut = {
   id: number;
   requested_by: number;
   pharmacy_id: number | null;
-  status: "pending" | "approved" | "rejected";
+  status: `${eRequestStatus}`;
   reject_reason: string | null;
-  request_type: "new_product" | "non_declare" | "annulation";
+  request_type: `${eRequestType}`;
   medicament_id: number | null;
   medicament_name: string | null;
   notes: string | null;
@@ -80,6 +81,27 @@ export const updatePharmacy = (id: number, body: { name?: string; address?: stri
 
 export const deletePharmacy = (id: number) =>
   request<{ deleted: boolean }>(`${ENDPOINTS.admin.pharmacies}/${id}`, { method: "DELETE" });
+
+export type NonDeclaredProduct = {
+  medicament_id: number;
+  product: string;
+  category: string | null;
+  ppv: number | null;
+  pph: number | null;
+  tva: string | null;
+};
+
+export const listNonDeclaredProducts = (pharmacyId: number) =>
+  request<NonDeclaredProduct[]>(`/admin/pharmacy/${pharmacyId}/non-declared`);
+
+export const getPharmacyOptions = (pharmacyId: number) =>
+  request<Record<string, boolean>>(`${ENDPOINTS.admin.pharmacies}/${pharmacyId}/options`);
+
+export const updatePharmacyOptions = (pharmacyId: number, options: Record<string, boolean>) =>
+  request<Record<string, boolean>>(`${ENDPOINTS.admin.pharmacies}/${pharmacyId}/options`, {
+    method: "PUT",
+    body: JSON.stringify({ permissions: options }),
+  });
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
