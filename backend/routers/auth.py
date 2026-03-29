@@ -143,8 +143,6 @@ def update_me(
         current_user.name = body.name
     if body.phone is not None:
         current_user.phone = body.phone
-    if body.image_url is not None:
-        current_user.image_url = body.image_url
     if body.email is not None and body.email != current_user.email:
         if db.query(User).filter(User.email == body.email, User.id != current_user.id).first():
             raise HTTPException(status_code=400, detail="Email déjà utilisé")

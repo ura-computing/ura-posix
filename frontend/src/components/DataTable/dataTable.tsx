@@ -5,7 +5,7 @@ import { flexRender } from "@tanstack/react-table";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { DataTablePagination } from "@/components/data-table/dataTablePagination";
+import { DataTablePagination } from "@/components/DataTable/dataTablePagination";
 import {
   Table as TableUI,
   TableBody,

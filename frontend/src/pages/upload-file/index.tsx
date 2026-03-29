@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet,
   CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
-  Loader2, Ban,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useUploadCsvBatched } from "@/hooks/useUpload";

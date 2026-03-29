@@ -326,7 +326,7 @@ const UserDropdown = () => {
           )}
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/profile")}>
+        <DropdownMenuItem onClick={() => navigate("/parametres")}>
           <UserRound className="h-4 w-4" />
           <span className="ml-2">Mon profil</span>
         </DropdownMenuItem>

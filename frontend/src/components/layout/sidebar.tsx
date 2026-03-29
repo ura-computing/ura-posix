@@ -10,7 +10,7 @@ import {
   useSidebar as useShadcnSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
-import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
+import { FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
 import { Link, useLocation } from "react-router";

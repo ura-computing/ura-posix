@@ -25,12 +25,13 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4173}
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/docs || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

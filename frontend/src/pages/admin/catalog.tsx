@@ -22,7 +22,7 @@ import { useNavigate } from "react-router";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
-import { DataTable } from "@/components/data-table/dataTable";
+import { DataTable } from "@/components/DataTable/dataTable";
 import { TableToolbar } from "@/components/tableToolbar";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { Button } from "@/components/ui/button";

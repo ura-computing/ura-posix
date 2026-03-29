@@ -11,7 +11,7 @@ import { eUserRole, eCategoryType } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
-import { DataTable } from "@/components/data-table/dataTable";
+import { DataTable } from "@/components/DataTable/dataTable";
 import { TableToolbar } from "@/components/tableToolbar";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";

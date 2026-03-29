@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 // Page imports
-import DashboardUploadFile from "./pages/dashboard/upload-file";
+import DashboardUploadFile from "./pages/upload-file";
 import { Login } from "./pages/login";
 import { Signup } from "./pages/signup";
 import AchatList from "./pages/achat";
@@ -21,13 +21,12 @@ import VentesList from "./pages/ventes";
 import StockList from "./pages/stock";
 import ParametresList from "./pages/parametres";
 import RapportsPage from "./pages/rapports";
-import ProfilePage from "./pages/profile/index";
 import PendingApproval from "./pages/pending";
 import PharmaciesAdminPage from "./pages/admin/pharmacies";
 import AdminCatalogRequestsPage from "./pages/admin/catalogRequests";
 import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
-import CatalogRequestsPage from "./pages/catalogRequests";
+import CatalogRequestsPage from "./pages/owner/catalogRequests";
 import WelcomePage from "./pages/welcome";
 import ForgotPasswordPage from "./pages/forgotPassword";
 import ResetPasswordPage from "./pages/resetPassword";
@@ -122,13 +121,6 @@ export const routes: RouteConfig[] = [
     element: <ParametresList />,
     requireAuth: true,
     layout: "sidebar",
-    allowed: [eUserRole.OWNER],
-  },
-  {
-    path: "/profile",
-    element: <ProfilePage />,
-    requireAuth: true,
-    layout: "sidebar",
     allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
   },
   {
@@ -216,7 +208,7 @@ export const resources: ResourceConfig[] = [
     meta: {
       label: "Paramètres",
       icon: <Settings />,
-      allowed: [eUserRole.OWNER],
+      allowed: [eUserRole.ADMIN, eUserRole.OWNER, eUserRole.EMPLOYEE],
     },
   },
   {

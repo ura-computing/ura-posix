@@ -8,4 +8,3 @@ __pycache__
 *.log
 .pytest_cache
 .coverage
-seed.json

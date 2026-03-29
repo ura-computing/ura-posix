@@ -10,4 +10,4 @@ COPY . .
 RUN useradd -m -r -u 1000 appuser
 USER appuser
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000"]
