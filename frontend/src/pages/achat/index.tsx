@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import { useQuery } from "@tanstack/react-query";
-import { useMe } from "@/hooks/use-me";
+import { useMe } from "@/hooks/useMe";
+import { useAchatList } from "@/hooks/useAchatList";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
@@ -9,16 +9,17 @@ import { UploadCloud } from "lucide-react";
 import { eUserRole } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
-import { DataTable } from "@/components/refine-ui/data-table/data-table";
-import { TableToolbar } from "@/components/table-toolbar";
+import { DataTable } from "@/components/refine-ui/data-table/dataTable";
+import { TableToolbar } from "@/components/tableToolbar";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
 import { downloadCSV } from "@/utils/table";
-import { SuffixBadge } from "@/components/suffix-badge";
-import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
+import { SuffixBadge } from "@/components/suffixBadge";
+import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
+import { cn } from "@/utils/cn";
 
 const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -84,7 +85,7 @@ const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
 };
 
 const AchatList = () => {
-  const { data: user } = useMe();
+  const { me: user } = useMe();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
@@ -92,6 +93,7 @@ const AchatList = () => {
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [categoryType, setCategoryType] = useState<"all" | "pharmacie" | "parapharmacie">("all");
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
@@ -108,25 +110,26 @@ const AchatList = () => {
   const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
   const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
 
-  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange]);
+  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange, categoryType]);
 
-  const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["achat", page, limit, searchQuery, selectedCats, selectedTva, dateFrom, dateTo],
-    queryFn: () =>
-      transactionsApi.listAchats({
-        page,
-        limit,
-        search: searchQuery || undefined,
-        categories: selectedCats.length ? selectedCats : undefined,
-        tva: selectedTva.length ? selectedTva : undefined,
-        dateFrom,
-        dateTo,
-      }),
+  const effectiveCategories = useMemo(() => {
+    const typeCats = categoryType === "all"
+      ? allCategories
+      : categoryType === "pharmacie"
+        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
+        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
+    if (selectedCats.length === 0) return categoryType === "all" ? [] : typeCats;
+    return selectedCats.filter(c => typeCats.includes(c));
+  }, [allCategories, selectedCats, categoryType]);
+
+  const { achatRows, achatPagination: paginationMeta, achatPageCount: pageCount, achatLoading: isLoading } = useAchatList({
+    page, limit,
+    search: searchQuery,
+    categories: effectiveCategories,
+    tva: selectedTva,
+    dateFrom, dateTo,
   });
-
-  const rows = (queryResult?.data ?? []) as AchatRow[];
-  const paginationMeta = queryResult?.pagination;
-  const pageCount = paginationMeta?.totalPages ?? 1;
+  const rows = achatRows as AchatRow[];
 
   const columns = useMemo<ColumnDef<AchatRow>[]>(
     () => [
@@ -313,26 +316,6 @@ const AchatList = () => {
     }
   };
 
-  const handleExportByType = async (type: "medicament" | "parapharmacie") => {
-    setExporting(true);
-    try {
-      const medCats  = allCategories.filter(c => c.toLowerCase().includes("médicament"));
-      const paraCats = allCategories.filter(c => !c.toLowerCase().includes("médicament"));
-      const cats = type === "medicament" ? medCats : paraCats;
-      const res = await transactionsApi.exportAchat("", cats, dateFrom, dateTo);
-      const colValues = { ...ACHAT_COL_VALUES };
-      const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
-      const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
-      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, `achats_${type}_${Date.now()}.csv`);
-      toast.success(`${res.data.length} lignes exportées`);
-    } catch {
-      toast.error("Erreur lors de l'export");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const tvaPageTotal = useMemo(() =>
     rows.reduce((acc, row) => {
       const m = String(row.tva ?? "").match(/([\d.]+)\s*%/);
@@ -368,16 +351,24 @@ const AchatList = () => {
         rightAddon={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handleExportByType("medicament")}
-              disabled={exporting}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              onClick={() => setCategoryType(categoryType === "pharmacie" ? "all" : "pharmacie")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                categoryType === "pharmacie"
+                  ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                  : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
+              )}
             >
-              Médicaments
+              Pharmacie
             </button>
             <button
-              onClick={() => handleExportByType("parapharmacie")}
-              disabled={exporting}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              onClick={() => setCategoryType(categoryType === "parapharmacie" ? "all" : "parapharmacie")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                categoryType === "parapharmacie"
+                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
+                  : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
+              )}
             >
               Parapharmacie
             </button>

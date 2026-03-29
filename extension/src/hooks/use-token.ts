@@ -39,17 +39,19 @@ async function removeToken(): Promise<void> {
 }
 
 export function useToken() {
-  return useQuery<AuthState>({
+  const { data: auth, isLoading: authLoading } = useQuery<AuthState>({
     queryKey: QUERY_KEYS.token,
     queryFn: fetchToken,
     staleTime: Infinity,
   });
+  return { auth, authLoading };
 }
 
 export function useClearToken() {
   const queryClient = useQueryClient();
-  return useMutation({
+  const { mutate: clearToken, isPending: clearingToken } = useMutation({
     mutationFn: removeToken,
     onSuccess: () => queryClient.setQueryData(QUERY_KEYS.token, null),
   });
+  return { clearToken, clearingToken };
 }

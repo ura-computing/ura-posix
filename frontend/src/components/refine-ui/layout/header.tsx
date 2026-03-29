@@ -1,5 +1,5 @@
-import { UserAvatar } from "@/components/refine-ui/layout/user-avatar";
-import { ThemeToggle } from "@/components/refine-ui/theme/theme-toggle";
+import { UserAvatar } from "@/components/refine-ui/layout/userAvatar";
+import { ThemeToggle } from "@/components/refine-ui/theme/themeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,14 +9,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { useNotifications, type ApcmNotification } from "@/hooks/use-notifications";
+import { useNotifications, type ApcmNotification } from "@/hooks/useNotifications";
 import { cn } from "@/utils/cn";
-import { getNotifications as getAdminNotifications } from "@/api/admin";
-import { getNotifications as getOwnerNotifications } from "@/api/owner";
-import { useLogout } from "@/hooks/useLogout";
-import { useMe } from "@/hooks/use-me";
-import { useQuery } from "@tanstack/react-query";
+import { useAdminNotifications, useOwnerNotifications } from "@/hooks/useAdminOwnerNotifications";
+import { useAuthenticate } from "@/hooks/useAuthenticate";
+import { useMe } from "@/hooks/useMe";
 import { Bell, CheckCheck, ClipboardList, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound, UserPlus } from "lucide-react";
+import { eUserRole } from "@/types";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -40,25 +39,25 @@ function getPageTitle(pathname: string) {
   return { title: "Tableau de Bord", subtitle: "Vue d'ensemble de votre pharmacie" };
 }
 
-const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
-  admin: {
+const ROLE_CONFIG: Record<eUserRole, { label: string; className: string }> = {
+  [eUserRole.ADMIN]: {
     label: "Administrateur",
     className: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
   },
-  owner: {
+  [eUserRole.OWNER]: {
     label: "Propriétaire",
     className: "bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800",
   },
-  employee: {
+  [eUserRole.EMPLOYEE]: {
     label: "Employé",
     className: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
   },
 };
 
 function RoleBadge() {
-  const { data: user } = useMe();
+  const { me: user } = useMe();
   if (!user?.role) return null;
-  const cfg = ROLE_CONFIG[user.role];
+  const cfg = ROLE_CONFIG[user.role as eUserRole];
   if (!cfg) return null;
   return (
     <span className={cn("hidden sm:inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold shrink-0", cfg.className)}>
@@ -173,26 +172,15 @@ function NotificationItem({
 
 function NotificationBell() {
   const { notifications, unreadCount, clearAll, dismiss, markAllRead } = useNotifications();
-  const { data: user } = useMe();
+  const { me: user } = useMe();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === "admin";
-  const isOwner = user?.role === "owner";
+  const isAdmin = user?.role === eUserRole.ADMIN;
+  const isOwner = user?.role === eUserRole.OWNER;
 
-  const { data: adminNotifs } = useQuery({
-    queryKey: ["admin-notifications"],
-    queryFn: () => getAdminNotifications(),
-    enabled: isAdmin,
-    refetchInterval: 30_000,
-  });
-
-  const { data: ownerNotifs } = useQuery({
-    queryKey: ["owner-notifications"],
-    queryFn: () => getOwnerNotifications(),
-    enabled: isOwner,
-    refetchInterval: 30_000,
-  });
+  const { adminNotifs } = useAdminNotifications(isAdmin);
+  const { ownerNotifs } = useOwnerNotifications(isOwner);
 
   const pendingUsers = adminNotifs?.pending_users ?? [];
   const pendingRequests = adminNotifs?.pending_requests ?? [];
@@ -313,11 +301,11 @@ function NotificationBell() {
 }
 
 const UserDropdown = () => {
-  const { data: user } = useMe();
-  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+  const { me: user } = useMe();
+  const { logout } = useAuthenticate();
   const navigate = useNavigate();
 
-  const canImport = user?.role !== "admin" && user?.permissions?.import !== false;
+  const canImport = user?.role !== eUserRole.ADMIN && user?.permissions?.import !== false;
 
   return (
     <DropdownMenu>
@@ -352,7 +340,7 @@ const UserDropdown = () => {
         <DropdownMenuItem onClick={() => logout()}>
           <LogOutIcon className="text-destructive h-4 w-4" />
           <span className="text-destructive ml-2">
-            {isLoggingOut ? "Déconnexion..." : "Déconnexion"}
+            Déconnexion
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>

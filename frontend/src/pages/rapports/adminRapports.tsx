@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useAdminSystemStats, useAdminPharmacyList, useAdminPharmacyStats } from "@/hooks/useAdminRapports";
 import {
   BarChart3,
   BookOpen,
@@ -18,9 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MonthlyTrendChart } from "@/components/monthly-trend-chart";
+import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import * as statsApi from "@/api/stats";
-import * as adminApi from "@/api/admin";
 import { fmt } from "@/utils/format";
 import { toast } from "sonner";
 import { CAT_COLORS, shortMonth, downloadBlob } from "./shared";
@@ -31,21 +30,9 @@ export function AdminRapports() {
   const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
 
-  const { data: systemStats, isLoading: systemLoading } = useQuery({
-    queryKey: ["admin-stats"],
-    queryFn: () => adminApi.getStats(),
-  });
-
-  const { data: pharmacies = [] } = useQuery({
-    queryKey: ["admin-pharmacies"],
-    queryFn: () => adminApi.listPharmacies(),
-  });
-
-  const { data: pharmStats, isLoading: pharmLoading } = useQuery({
-    queryKey: ["admin-pharmacy-stats", selectedPharmacyId, dateFrom, dateTo],
-    queryFn: () => adminApi.getPharmacyStats(selectedPharmacyId!, dateFrom || undefined, dateTo || undefined),
-    enabled: selectedPharmacyId != null,
-  });
+  const { systemStats, systemLoading } = useAdminSystemStats();
+  const { pharmacies } = useAdminPharmacyList();
+  const { pharmStats, pharmLoading } = useAdminPharmacyStats(selectedPharmacyId, dateFrom, dateTo);
 
   const selectedName = pharmacies.find((p) => p.id === selectedPharmacyId)?.name;
   const systemCards = [

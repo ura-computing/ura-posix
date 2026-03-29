@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useMe } from "@/hooks/use-me";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/hooks/useMe";
+import { useOwnerEmployees, useEmployeePermissions } from "@/hooks/useOwnerEmployees";
 import {
   Users,
   UserCheck,
@@ -10,12 +10,11 @@ import {
   Clock,
   ShieldCheck,
 } from "lucide-react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import * as ownerApi from "@/api/owner";
 import type { UserAdmin } from "@/types";
 import { eUserRole } from "@/types";
 
@@ -56,8 +54,6 @@ function isFeatureAllowed(permissions: Record<string, boolean> | undefined, key:
   return permissions?.[key] !== false;
 }
 
-const QUERY_KEY = ["owner", "employees"] as const;
-
 // ── Permission toggles row ────────────────────────────────────────────────────
 
 function PermissionToggles({
@@ -67,17 +63,7 @@ function PermissionToggles({
   employee: UserAdmin;
   ownerPermissions: Record<string, boolean> | undefined;
 }) {
-  const queryClient = useQueryClient();
-  const { mutate: updatePermissions, isPending } = useMutation({
-    mutationFn: ({ id, permissions }: { id: number; permissions: Record<string, boolean> }) =>
-      ownerApi.updateEmployeePermissions(id, permissions),
-    onSuccess: (updated) => {
-      queryClient.setQueryData<UserAdmin[]>(QUERY_KEY, (prev) =>
-        prev?.map((e) => (e.id === updated.id ? updated : e)) ?? []
-      );
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const { updatePermissions, permissionsPending: isPending } = useEmployeePermissions();
 
   function handleToggle(key: string, checked: boolean) {
     const current = employee.permissions ?? {};
@@ -115,50 +101,25 @@ function PermissionToggles({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function OwnerEmployeesPage() {
-  const { data: identity } = useMe();
-  const queryClient = useQueryClient();
+  const { me: identity } = useMe();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
 
   const isEmployee = identity?.role !== eUserRole.OWNER;
 
-  const { data: employees = [], isLoading } = useQuery({
-    queryKey: QUERY_KEY,
-    queryFn: ownerApi.listEmployees,
-    enabled: !isEmployee,
-  });
+  const {
+    employees,
+    isLoading,
+    approve,
+    approving,
+    reject,
+    rejecting,
+    revoke,
+    revoking,
+  } = useOwnerEmployees(!isEmployee);
 
   const pending = employees.filter((e) => e.status === "pending");
   const active = employees.filter((e) => e.status === "active");
-
-  const { mutate: approve, isPending: approving } = useMutation({
-    mutationFn: (id: number) => ownerApi.approveEmployee(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Employé approuvé");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: reject, isPending: rejecting } = useMutation({
-    mutationFn: (id: number) => ownerApi.rejectEmployee(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Demande refusée");
-      setRejectTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: revoke, isPending: revoking } = useMutation({
-    mutationFn: (id: number) => ownerApi.revokeEmployee(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success("Accès révoqué — l'employé est en attente");
-      setRevokeTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
 
   if (isEmployee) return null;
 
@@ -318,7 +279,7 @@ export default function OwnerEmployeesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={rejecting}
-              onClick={() => rejectTarget && reject(rejectTarget.id)}
+              onClick={() => rejectTarget && reject(rejectTarget.id, { onSuccess: () => setRejectTarget(null) })}
             >
               {rejecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Refuser
@@ -341,7 +302,7 @@ export default function OwnerEmployeesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={revoking}
-              onClick={() => revokeTarget && revoke(revokeTarget.id)}
+              onClick={() => revokeTarget && revoke(revokeTarget.id, { onSuccess: () => setRevokeTarget(null) })}
             >
               {revoking && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Révoquer

@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  usePharmacyFormMutation,
+  usePharmacyUsersList,
+  usePharmacyList,
+  usePendingOwners,
+  useAllUsers,
+} from "@/hooks/useAdminPharmacies";
 import {
   Building2,
   Plus,
@@ -9,20 +15,17 @@ import {
   Phone,
   MapPin,
   Users,
-  ShieldCheck,
-  UserCog,
   UserCheck,
   UserX,
   ShieldOff,
   X,
   Clock,
 } from "lucide-react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { PageLoader } from "@/components/shared/pageLoader";
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,8 +59,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/utils/cn";
 import { UserStatusBadge } from "@/components/shared/statusBadge";
-import * as adminApi from "@/api/admin";
-import { QUERY_KEYS } from "@/constants";
 import type { Pharmacy, UserAdmin, UserRole } from "@/types";
 import { eUserRole } from "@/types";
 
@@ -68,36 +69,6 @@ const FEATURES: { key: string; label: string }[] = [
   { key: "ventes", label: "Ventes" },
   { key: "stock", label: "Stock" },
 ];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const ROLE_CONFIG: Record<UserRole, { label: string; className: string; icon: React.ReactNode }> = {
-  admin: {
-    label: "Admin",
-    className: "bg-primary/10 text-primary border-primary/20",
-    icon: <ShieldCheck className="h-3 w-3" />,
-  },
-  owner: {
-    label: "Propriétaire",
-    className: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
-    icon: <UserCheck className="h-3 w-3" />,
-  },
-  employee: {
-    label: "Employé",
-    className: "bg-muted text-muted-foreground border-border",
-    icon: <UserCog className="h-3 w-3" />,
-  },
-};
-
-function RoleBadge({ role }: { role: UserRole }) {
-  const cfg = ROLE_CONFIG[role] ?? ROLE_CONFIG.employee;
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", cfg.className)}>
-      {cfg.icon}
-      {cfg.label}
-    </span>
-  );
-}
 
 function initials(name?: string, email?: string) {
   if (name) return name.slice(0, 2).toUpperCase();
@@ -113,7 +84,6 @@ type PharmacyFormProps = {
 };
 
 function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
-  const queryClient = useQueryClient();
   const isEdit = !!pharmacy;
 
   const [name, setName] = useState(pharmacy?.name ?? "");
@@ -130,27 +100,20 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
     }
   }, [open, pharmacy]);
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: () =>
-      isEdit
-        ? adminApi.updatePharmacy(pharmacy!.id, { name, address: address || undefined, phone: phone || undefined, email: email || undefined })
-        : adminApi.createPharmacy({ name, address: address || undefined, phone: phone || undefined, email: email || undefined }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success(isEdit ? "Pharmacie mise à jour" : "Pharmacie créée");
-      onClose();
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const { savePharmacy, savingPharmacy } = usePharmacyFormMutation(onClose);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    mutate();
+    savePharmacy({
+      isEdit,
+      pharmacyId: pharmacy?.id,
+      data: { name, address: address || undefined, phone: phone || undefined, email: email || undefined },
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !savingPharmacy) onClose(); }}>
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="flex items-start gap-4 px-6 pt-6 pb-5 border-b bg-primary/[0.03]">
@@ -213,11 +176,11 @@ function PharmacyFormDialog({ open, onClose, pharmacy }: PharmacyFormProps) {
           </div>
 
           <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={savingPharmacy}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending || !name.trim()} className="gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={savingPharmacy || !name.trim()} className="gap-2">
+              {savingPharmacy && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEdit ? "Enregistrer" : "Créer"}
             </Button>
           </DialogFooter>
@@ -236,46 +199,8 @@ type UsersPanelProps = {
 };
 
 function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
-  const queryClient = useQueryClient();
-  const panelQueryKey = [...QUERY_KEYS.adminUsers, pharmacy.id];
-
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: panelQueryKey,
-    queryFn: () => adminApi.listUsers(pharmacy.id),
-  });
-
-  const { mutate: updateRole } = useMutation({
-    mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
-      adminApi.updateUserRole(userId, role),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: panelQueryKey });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Rôle mis à jour");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: updatePharmacy } = useMutation({
-    mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number | null }) =>
-      adminApi.updateUserPharmacy(userId, pharmacyId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: panelQueryKey });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Pharmacie mise à jour");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: updatePermissions, isPending: updatingPerms } = useMutation({
-    mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
-      adminApi.updateUserPermissions(userId, permissions),
-    onSuccess: (updated) => {
-      queryClient.setQueryData<UserAdmin[]>(panelQueryKey, (prev) =>
-        prev?.map((u) => (u.id === updated.id ? updated : u)) ?? []
-      );
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const { users, isLoading, updateRole, updatePharmacy, updatePermissions, updatingPerms } =
+    usePharmacyUsersList(pharmacy.id);
 
   return (
     <div className="border rounded-xl bg-card overflow-hidden">
@@ -321,9 +246,9 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="owner">Propriétaire</SelectItem>
-                      <SelectItem value="employee">Employé</SelectItem>
+                      <SelectItem value={eUserRole.ADMIN}>Admin</SelectItem>
+                      <SelectItem value={eUserRole.OWNER}>Propriétaire</SelectItem>
+                      <SelectItem value={eUserRole.EMPLOYEE}>Employé</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select
@@ -382,28 +307,12 @@ function UsersPanel({ pharmacy, onClose, allPharmacies }: UsersPanelProps) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function PharmaciesAdminPage() {
-  const queryClient = useQueryClient();
-
-  const { data: pharmacies = [], isLoading } = useQuery({
-    queryKey: QUERY_KEYS.pharmacies,
-    queryFn: adminApi.listPharmacies,
-  });
+  const { pharmacies, isLoading, deletePharmacy, deleting } = usePharmacyList();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Pharmacy | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Pharmacy | null>(null);
   const [usersTarget, setUsersTarget] = useState<Pharmacy | null>(null);
-
-  const { mutate: deletePharmacy, isPending: deleting } = useMutation({
-    mutationFn: (id: number) => adminApi.deletePharmacy(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Pharmacie supprimée");
-      setDeleteTarget(null);
-      if (usersTarget?.id === deleteTarget?.id) setUsersTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
 
   const openCreate = () => { setEditTarget(null); setFormOpen(true); };
   const openEdit = (p: Pharmacy) => { setEditTarget(p); setFormOpen(true); };
@@ -579,7 +488,12 @@ export default function PharmaciesAdminPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleting}
-              onClick={() => deleteTarget && deletePharmacy(deleteTarget.id)}
+              onClick={() => deleteTarget && deletePharmacy(deleteTarget.id, {
+                onSuccess: () => {
+                  setDeleteTarget(null);
+                  if (usersTarget?.id === deleteTarget?.id) setUsersTarget(null);
+                },
+              })}
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Supprimer
@@ -594,33 +508,8 @@ export default function PharmaciesAdminPage() {
 // ── Pending owners section ────────────────────────────────────────────────────
 
 function PendingOwnersSection() {
-  const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
-
-  const { data: pendingOwners = [], isLoading } = useQuery({
-    queryKey: ["pendingOwners"],
-    queryFn: adminApi.listPendingOwners,
-  });
-
-  const { mutate: approve, isPending: approving } = useMutation({
-    mutationFn: (userId: number) => adminApi.approveUser(userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Propriétaire approuvé — pharmacie créée");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: reject, isPending: rejecting } = useMutation({
-    mutationFn: (userId: number) => adminApi.rejectUser(userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
-      toast.success("Demande refusée");
-      setRejectTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const { pendingOwners, isLoading, approve, approving, reject, rejecting } = usePendingOwners();
 
   if (!isLoading && pendingOwners.length === 0) return null;
 
@@ -705,7 +594,7 @@ function PendingOwnersSection() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={rejecting}
-              onClick={() => rejectTarget && reject(rejectTarget.id)}
+              onClick={() => rejectTarget && reject(rejectTarget.id, { onSuccess: () => setRejectTarget(null) })}
             >
               {rejecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Refuser
@@ -720,46 +609,8 @@ function PendingOwnersSection() {
 // ── All users section ─────────────────────────────────────────────────────────
 
 function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
-  const queryClient = useQueryClient();
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
-
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: QUERY_KEYS.adminUsers,
-    queryFn: () => adminApi.listUsers(),
-  });
-
-  const { mutate: updateRole } = useMutation({
-    mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
-      adminApi.updateUserRole(userId, role),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Rôle mis à jour");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: updatePharmacy } = useMutation({
-    mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number | null }) =>
-      adminApi.updateUserPharmacy(userId, pharmacyId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pharmacies });
-      toast.success("Pharmacie mise à jour");
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const { mutate: revoke, isPending: revoking } = useMutation({
-    mutationFn: (userId: number) => adminApi.revokeUser(userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
-      queryClient.invalidateQueries({ queryKey: ["pendingOwners"] });
-      toast.success("Accès retiré — compte repassé en attente");
-      setRevokeTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const { users, isLoading, updateRole, updatePharmacy, revoke, revoking } = useAllUsers();
 
   return (
     <div>
@@ -815,9 +666,9 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="owner">Propriétaire</SelectItem>
-                    <SelectItem value="employee">Employé</SelectItem>
+                    <SelectItem value={eUserRole.ADMIN}>Admin</SelectItem>
+                    <SelectItem value={eUserRole.OWNER}>Propriétaire</SelectItem>
+                    <SelectItem value={eUserRole.EMPLOYEE}>Employé</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -873,7 +724,7 @@ function AllUsersSection({ pharmacies }: { pharmacies: Pharmacy[] }) {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={revoking}
-              onClick={() => revokeTarget && revoke(revokeTarget.id)}
+              onClick={() => revokeTarget && revoke(revokeTarget.id, { onSuccess: () => setRevokeTarget(null) })}
             >
               {revoking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Retirer l'accès

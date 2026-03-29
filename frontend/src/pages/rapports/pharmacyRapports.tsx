@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { AnalyseMargeResponse } from "@/api/stats";
+import { usePharmacyStats, useAnalyseMarge } from "@/hooks/usePharmacyRapports";
 import {
   AreaChart,
   Area,
@@ -39,7 +38,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { MonthlyTrendChart } from "@/components/monthly-trend-chart";
+import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import * as statsApi from "@/api/stats";
 import { fmt } from "@/utils/format";
 import { cn } from "@/utils/cn";
@@ -59,15 +58,8 @@ export function PharmacyRapports() {
   const [simSelected, setSimSelected] = useState<Set<number>>(new Set());
   const [simSearch, setSimSearch] = useState("");
 
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["stats", dateFrom, dateTo, categoryType],
-    queryFn: () => statsApi.getStats(dateFrom || undefined, dateTo || undefined, categoryType),
-  });
-
-  const { data: margeData, isLoading: margeLoading } = useQuery({
-    queryKey: ["analyse-marge", dateFrom, dateTo, categoryType, margeMode],
-    queryFn: () => statsApi.analyseMarge(dateFrom || undefined, dateTo || undefined, categoryType, margeMode),
-  });
+  const { stats, statsLoading: isLoading } = usePharmacyStats(dateFrom, dateTo, categoryType);
+  const { margeData, margeLoading } = useAnalyseMarge(dateFrom, dateTo, categoryType, margeMode);
 
   const kpis     = stats?.kpis;
   const advKpis  = stats?.advanced_kpis;

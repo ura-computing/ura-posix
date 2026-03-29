@@ -5,7 +5,7 @@ import {
   Loader2, Ban,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { useUploadCsvBatched } from "@/hooks/use-upload";
+import { useUploadCsvBatched } from "@/hooks/useUpload";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";

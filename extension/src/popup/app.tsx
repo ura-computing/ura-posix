@@ -25,8 +25,8 @@ function timeAgo(ts: number): string {
 // ── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { data: auth, isLoading: authLoading } = useToken();
-  const { mutate: clearToken } = useClearToken();
+  const { auth, authLoading } = useToken();
+  const { clearToken } = useClearToken();
   const token = auth?.token ?? null;
   const isAdmin = auth?.role === "admin";
   const canImport = !isAdmin && auth?.permissions?.import !== false;

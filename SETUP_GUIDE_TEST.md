@@ -52,9 +52,30 @@ That's it. This will:
 
 The seed only creates the admin. To test the full pharmacy workflow:
 
-1. **Register an owner** — open http://localhost:4173/register in a new browser profile or incognito window, select **Propriétaire**, fill in the pharmacy details, and submit.
+1. **Register an owner** — open http://localhost:4173/signup in a new browser profile or incognito window, select **Proprietaire**, fill in the pharmacy details, and submit.
 2. **Approve the owner** — log in as admin → **Pharmacies** → find the pending account → approve.
-3. **Add employees** — log in as the owner → **Mes employés** → invite / manage employee accounts.
+3. **Add employees** — log in as the owner → **Mes employes** → employees register themselves via `/signup` selecting the pharmacy, then the owner approves them.
+
+---
+
+## Test the Full Feature Set
+
+### As Admin
+- **Pharmacies** — manage pharmacies, users, permissions
+- **Catalogue** — CRUD products, import catalog XLSM, manage category suffixes
+- **Demandes catalogue** — approve/reject exclusion and annulation requests
+- **Rapports** — system-wide stats, per-pharmacy drill-down with Excel export
+
+### As Owner
+- **Achats / Ventes** — paginated tables with search, category/TVA/date filters, pharmacie/parapharmacie toggle, CSV export
+- **Rapports** �� KPIs, TVA, marge, monthly trends, Excel export
+- **Import** — CSV upload wizard or auto-import via Chrome extension
+- **Produits non declares** — request product exclusions, cancel approved exclusions
+- **Mes employes** — approve/reject employees, manage per-feature permissions
+- **Parametres** — clear achat/vente data with optional filters
+
+### As Employee
+- Same as owner but limited by permissions set by the owner
 
 ---
 

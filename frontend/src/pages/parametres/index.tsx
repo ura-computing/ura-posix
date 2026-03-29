@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { Settings, Trash2, AlertTriangle, Loader2, CalendarDays, Tag } from "lucide-react";
+import {
+  Settings,
+  Trash2,
+  AlertTriangle,
+  Loader2,
+  CalendarDays,
+  Tag,
+} from "lucide-react";
 
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +19,8 @@ import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/utils/cn";
 
 import * as transactionsApi from "@/api/transactions";
-import { useClearAchats, useClearVentes } from "@/hooks/use-clear-data";
-import { CategoryMultiSelect } from "@/components/category-multi-select";
+import { useClearAchats, useClearVentes } from "@/hooks/useClearData";
+import { CategoryMultiSelect } from "@/components/categoryMultiSelect";
 
 type ClearTarget = "achats" | "ventes";
 
@@ -36,17 +43,9 @@ function DeleteDialog({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const {
-    mutate: clearAchats,
-    isPending: clearAchatsPending,
-    reset: resetAchats,
-  } = useClearAchats();
+  const { clearAchats, clearAchatsPending, resetAchats } = useClearAchats();
 
-  const {
-    mutate: clearVentes,
-    isPending: clearVentesPending,
-    reset: resetVentes,
-  } = useClearVentes();
+  const { clearVentes, clearVentesPending, resetVentes } = useClearVentes();
 
   const isPending = clearAchatsPending || clearVentesPending;
 
@@ -57,7 +56,7 @@ function DeleteDialog({
     setDateTo("");
     resetAchats();
     resetVentes();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, target]);
 
   const handleConfirm = () => {
@@ -66,9 +65,9 @@ function DeleteDialog({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
-    const mutate = target === "achats" ? clearAchats : clearVentes;
-    mutate(filters, {
-      onSuccess: (data) => {
+    const clearFn = target === "achats" ? clearAchats : clearVentes;
+    clearFn(filters, {
+      onSuccess: (data: { deleted: number }) => {
         onDeleted(data.deleted);
         onClose();
       },
@@ -78,9 +77,13 @@ function DeleteDialog({
   const isFiltered = selectedCats.length > 0 || !!dateFrom || !!dateTo;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !isPending) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden">
-
         {/* ── Header band ── */}
         <div className="flex items-start gap-4 px-6 pt-6 pb-5 border-b bg-destructive/[0.04]">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 border border-destructive/20">
@@ -91,15 +94,15 @@ function DeleteDialog({
               Supprimer des {target}
             </p>
             <p className="text-sm text-muted-foreground">
-              Filtrez la suppression ou laissez vide pour tout supprimer.{" "}
-              Cette action est <span className="font-medium text-foreground">irréversible</span>.
+              Filtrez la suppression ou laissez vide pour tout supprimer. Cette
+              action est{" "}
+              <span className="font-medium text-foreground">irréversible</span>.
             </p>
           </div>
         </div>
 
         {/* ── Body ── */}
         <div className="px-6 py-5 space-y-5">
-
           {/* Category filter */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
@@ -126,7 +129,9 @@ function DeleteDialog({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Du</label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Du
+                </label>
                 <Input
                   type="date"
                   value={dateFrom}
@@ -134,12 +139,15 @@ function DeleteDialog({
                   onChange={(e) => setDateFrom(e.target.value)}
                   className={cn(
                     "h-9 text-sm",
-                    dateFrom && "border-destructive/50 text-destructive focus-visible:ring-destructive/30"
+                    dateFrom &&
+                      "border-destructive/50 text-destructive focus-visible:ring-destructive/30",
                   )}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Au</label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Au
+                </label>
                 <Input
                   type="date"
                   value={dateTo}
@@ -147,7 +155,8 @@ function DeleteDialog({
                   onChange={(e) => setDateTo(e.target.value)}
                   className={cn(
                     "h-9 text-sm",
-                    dateTo && "border-destructive/50 text-destructive focus-visible:ring-destructive/30"
+                    dateTo &&
+                      "border-destructive/50 text-destructive focus-visible:ring-destructive/30",
                   )}
                 />
               </div>
@@ -160,26 +169,35 @@ function DeleteDialog({
               "flex items-start gap-2.5 rounded-lg border p-3.5",
               isFiltered
                 ? "border-amber-400/40 bg-amber-50/80 dark:bg-amber-500/10"
-                : "border-destructive/30 bg-destructive/5"
+                : "border-destructive/30 bg-destructive/5",
             )}
           >
             <AlertTriangle
               className={cn(
                 "h-4 w-4 shrink-0 mt-0.5",
-                isFiltered ? "text-amber-500" : "text-destructive"
+                isFiltered ? "text-amber-500" : "text-destructive",
               )}
             />
-            <p className={cn(
-              "text-sm leading-snug",
-              isFiltered ? "text-amber-700 dark:text-amber-400" : "text-destructive"
-            )}>
+            <p
+              className={cn(
+                "text-sm leading-snug",
+                isFiltered
+                  ? "text-amber-700 dark:text-amber-400"
+                  : "text-destructive",
+              )}
+            >
               {isFiltered ? (
                 <>
                   Suppression filtrée :{" "}
                   {selectedCats.length > 0 && (
-                    <strong>{selectedCats.length} catégorie{selectedCats.length > 1 ? "s" : ""}</strong>
+                    <strong>
+                      {selectedCats.length} catégorie
+                      {selectedCats.length > 1 ? "s" : ""}
+                    </strong>
                   )}
-                  {selectedCats.length > 0 && (dateFrom || dateTo) && <span> · </span>}
+                  {selectedCats.length > 0 && (dateFrom || dateTo) && (
+                    <span> · </span>
+                  )}
                   {(dateFrom || dateTo) && (
                     <strong>
                       {dateFrom && dateTo
@@ -192,7 +210,8 @@ function DeleteDialog({
                 </>
               ) : (
                 <>
-                  <strong>Toutes</strong> les données de {target} seront supprimées définitivement.
+                  <strong>Toutes</strong> les données de {target} seront
+                  supprimées définitivement.
                 </>
               )}
             </p>
@@ -201,7 +220,12 @@ function DeleteDialog({
 
         {/* ── Footer ── */}
         <DialogFooter className="px-6 pb-6 gap-2 sm:gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isPending} className="flex-1 sm:flex-none">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 sm:flex-none"
+          >
             Annuler
           </Button>
           <Button
@@ -214,7 +238,6 @@ function DeleteDialog({
             {isPending ? "Suppression..." : "Confirmer la suppression"}
           </Button>
         </DialogFooter>
-
       </DialogContent>
     </Dialog>
   );
@@ -224,13 +247,22 @@ function DeleteDialog({
 
 const ParametresList = () => {
   const [dialogTarget, setDialogTarget] = useState<ClearTarget | null>(null);
-  const [lastResult, setLastResult] = useState<{ target: ClearTarget; deleted: number } | null>(null);
+  const [lastResult, setLastResult] = useState<{
+    target: ClearTarget;
+    deleted: number;
+  } | null>(null);
   const [achatCategories, setAchatCategories] = useState<string[]>([]);
   const [venteCategories, setVenteCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    transactionsApi.achatCategories().then(setAchatCategories).catch(() => {});
-    transactionsApi.venteCategories().then(setVenteCategories).catch(() => {});
+    transactionsApi
+      .achatCategories()
+      .then(setAchatCategories)
+      .catch(() => {});
+    transactionsApi
+      .venteCategories()
+      .then(setVenteCategories)
+      .catch(() => {});
   }, []);
 
   return (
@@ -262,7 +294,8 @@ const ParametresList = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Ces actions sont irréversibles. Les données supprimées ne peuvent pas être récupérées.
+              Ces actions sont irréversibles. Les données supprimées ne peuvent
+              pas être récupérées.
             </p>
 
             {(
@@ -279,7 +312,10 @@ const ParametresList = () => {
                 },
               ] as const
             ).map(({ target, label, desc }) => (
-              <div key={target} className="flex items-center justify-between rounded-lg border p-4">
+              <div
+                key={target}
+                className="flex items-center justify-between rounded-lg border p-4"
+              >
                 <div>
                   <p className="text-sm font-medium">{label}</p>
                   <p className="text-xs text-muted-foreground">{desc}</p>
@@ -288,7 +324,10 @@ const ParametresList = () => {
                   size="sm"
                   variant="outline"
                   className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0 ml-4"
-                  onClick={() => { setLastResult(null); setDialogTarget(target); }}
+                  onClick={() => {
+                    setLastResult(null);
+                    setDialogTarget(target);
+                  }}
                 >
                   <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                   Supprimer
@@ -299,9 +338,12 @@ const ParametresList = () => {
             {lastResult && (
               <div className="flex items-center gap-2">
                 <p className="text-sm text-teal-600 dark:text-teal-400">
-                  {lastResult.deleted} enregistrement(s) supprimé(s) des {lastResult.target}.
+                  {lastResult.deleted} enregistrement(s) supprimé(s) des{" "}
+                  {lastResult.target}.
                 </p>
-                <Badge variant="secondary" className="text-xs">{lastResult.target}</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {lastResult.target}
+                </Badge>
               </div>
             )}
           </CardContent>
@@ -312,9 +354,13 @@ const ParametresList = () => {
         <DeleteDialog
           target={dialogTarget}
           open={!!dialogTarget}
-          allCategories={dialogTarget === "achats" ? achatCategories : venteCategories}
+          allCategories={
+            dialogTarget === "achats" ? achatCategories : venteCategories
+          }
           onClose={() => setDialogTarget(null)}
-          onDeleted={(count) => setLastResult({ target: dialogTarget, deleted: count })}
+          onDeleted={(count) =>
+            setLastResult({ target: dialogTarget, deleted: count })
+          }
         />
       )}
     </ListView>

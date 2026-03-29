@@ -124,6 +124,50 @@ def submit_non_declare_request(
     return _to_out(req)
 
 
+@router.post("/annulation", response_model=CatalogRequestOut)
+def submit_annulation_request(
+    body: NonDeclareRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Owner requests to cancel a previously approved non-declare exclusion."""
+    if current_user.role not in ("owner", "employee"):
+        raise HTTPException(status_code=403, detail="Réservé aux propriétaires de pharmacie")
+    med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
+    if not med:
+        raise HTTPException(status_code=404, detail="Produit introuvable")
+    # Verify the product is actually non-declared for this pharmacy
+    status_row = db.query(PharmacyMedicamentStatus).filter(
+        PharmacyMedicamentStatus.pharmacy_id == current_user.pharmacy_id,
+        PharmacyMedicamentStatus.medicament_id == body.medicament_id,
+        PharmacyMedicamentStatus.declared == False,
+    ).first()
+    if not status_row:
+        raise HTTPException(status_code=400, detail="Ce produit n'est pas exclu de vos rapports")
+    # Avoid duplicate pending annulation
+    existing = db.query(CatalogRequest).filter(
+        CatalogRequest.pharmacy_id == current_user.pharmacy_id,
+        CatalogRequest.medicament_id == body.medicament_id,
+        CatalogRequest.request_type == "annulation",
+        CatalogRequest.status == "pending",
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Une demande d'annulation est déjà en cours pour ce produit")
+    req = CatalogRequest(
+        requested_by=current_user.id,
+        pharmacy_id=current_user.pharmacy_id,
+        request_type="annulation",
+        medicament_id=body.medicament_id,
+        notes=body.notes,
+        product=med.product,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    req = db.query(CatalogRequest).filter(CatalogRequest.id == req.id).first()
+    return _to_out(req)
+
+
 @router.put("/{req_id}/approve", response_model=CatalogRequestOut)
 def approve_request(
     req_id: int,
@@ -138,7 +182,15 @@ def approve_request(
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Request is not pending")
 
-    if req.request_type == "non_declare":
+    if req.request_type == "annulation":
+        # Reverse a previously approved non-declare: mark product as declared again
+        status_row = db.query(PharmacyMedicamentStatus).filter(
+            PharmacyMedicamentStatus.pharmacy_id == req.pharmacy_id,
+            PharmacyMedicamentStatus.medicament_id == req.medicament_id,
+        ).first()
+        if status_row:
+            db.delete(status_row)
+    elif req.request_type == "non_declare":
         # Mark product as non-declared for this pharmacy
         existing = db.query(PharmacyMedicamentStatus).filter(
             PharmacyMedicamentStatus.pharmacy_id == req.pharmacy_id,

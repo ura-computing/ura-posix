@@ -1,12 +1,12 @@
 import { request } from "./client";
 import { ENDPOINTS } from "@/constants";
-import type { AuthToken, LoginPayload, ProfileUpdatePayload, RegisterPayload, User } from "@/types";
+import type { AuthToken, LoginPayload, ProfileUpdatePayload, SignupPayload, User } from "@/types";
 
 export const login = (payload: LoginPayload) =>
   request<AuthToken>(ENDPOINTS.auth.login, { method: "POST", body: JSON.stringify(payload) });
 
-export const register = (payload: RegisterPayload) =>
-  request<AuthToken>(ENDPOINTS.auth.register, { method: "POST", body: JSON.stringify(payload) });
+export const signup = (payload: SignupPayload) =>
+  request<AuthToken>(ENDPOINTS.auth.signup, { method: "POST", body: JSON.stringify(payload) });
 
 export const me = () => request<User>(ENDPOINTS.auth.me);
 

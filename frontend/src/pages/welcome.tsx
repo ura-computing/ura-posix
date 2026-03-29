@@ -1,6 +1,6 @@
-import { useLogout } from "@/hooks/useLogout";
-import { useMe } from "@/hooks/use-me";
-import { useStatusPoller } from "@/hooks/use-status-poller";
+import { useAuthenticate } from "@/hooks/useAuthenticate";
+import { useMe } from "@/hooks/useMe";
+import { useStatusPoller } from "@/hooks/useStatusPoller";
 import { Link } from "react-router";
 import {
   BarChart3,
@@ -106,7 +106,7 @@ function UnauthenticatedView() {
           <Link to="/login">Se connecter</Link>
         </Button>
         <Button asChild variant="outline" size="lg" className="rounded-xl px-8 border-primary/30 hover:bg-primary/5">
-          <Link to="/register">Créer un compte</Link>
+          <Link to="/signup">Créer un compte</Link>
         </Button>
       </div>
 
@@ -133,7 +133,7 @@ function UnauthenticatedView() {
 // ── Pending / Rejected notice ─────────────────────────────────────────────────
 
 function PendingNotice({ role, status }: { role: eUserRole.OWNER | eUserRole.EMPLOYEE; status: "pending" | "rejected" }) {
-  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+  const { logout } = useAuthenticate();
   const isRejected = status === "rejected";
   return (
     <div className={`flex items-start justify-between gap-4 rounded-xl border px-5 py-4 ${
@@ -159,7 +159,6 @@ function PendingNotice({ role, status }: { role: eUserRole.OWNER | eUserRole.EMP
       <button
         type="button"
         onClick={() => logout()}
-        disabled={isLoggingOut}
         className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
           isRejected
             ? "text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900"
@@ -167,7 +166,7 @@ function PendingNotice({ role, status }: { role: eUserRole.OWNER | eUserRole.EMP
         }`}
       >
         <LogOut className="h-3.5 w-3.5" />
-        {isLoggingOut ? "..." : "Se déconnecter"}
+        Se déconnecter
       </button>
     </div>
   );
@@ -290,7 +289,7 @@ function EmployeeView({ identity }: { identity: User }) {
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function WelcomePage() {
-  const { data: identity } = useMe();
+  const { me: identity } = useMe();
   useStatusPoller(identity);
 
   return (

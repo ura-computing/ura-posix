@@ -12,6 +12,9 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail ?? "Request failed");
   }
@@ -31,6 +34,9 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
     body,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail ?? "Upload failed");
   }

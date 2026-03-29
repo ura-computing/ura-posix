@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import type { AnalyseMargeResponse } from "@/api/stats";
-import { DataTablePagination } from "@/components/refine-ui/data-table/data-table-pagination";
+import { DataTablePagination } from "@/components/refine-ui/data-table/dataTablePagination";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

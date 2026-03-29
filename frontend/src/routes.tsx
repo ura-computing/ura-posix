@@ -15,7 +15,7 @@ import {
 // Page imports
 import DashboardUploadFile from "./pages/dashboard/upload-file";
 import { Login } from "./pages/login";
-import { Register } from "./pages/register";
+import { Signup } from "./pages/signup";
 import AchatList from "./pages/achat";
 import VentesList from "./pages/ventes";
 import StockList from "./pages/stock";
@@ -24,13 +24,13 @@ import RapportsPage from "./pages/rapports";
 import ProfilePage from "./pages/profile/index";
 import PendingApproval from "./pages/pending";
 import PharmaciesAdminPage from "./pages/admin/pharmacies";
-import AdminCatalogRequestsPage from "./pages/admin/catalog-requests";
+import AdminCatalogRequestsPage from "./pages/admin/catalogRequests";
 import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
-import CatalogRequestsPage from "./pages/catalog-requests";
+import CatalogRequestsPage from "./pages/catalogRequests";
 import WelcomePage from "./pages/welcome";
-import ForgotPasswordPage from "./pages/forgot-password";
-import ResetPasswordPage from "./pages/reset-password";
+import ForgotPasswordPage from "./pages/forgotPassword";
+import ResetPasswordPage from "./pages/resetPassword";
 import { Navigate } from "react-router";
 import { UserRole, eUserRole } from "./types";
 
@@ -64,7 +64,7 @@ export const routes: RouteConfig[] = [
 
   // Public routes (no auth required, redirect to dashboard if authenticated)
   { path: "/login", element: <Login />, requireAuth: false },
-  { path: "/register", element: <Register />, requireAuth: false },
+  { path: "/signup", element: <Signup />, requireAuth: false },
   { path: "/forgot-password", element: <ForgotPasswordPage />, requireAuth: false },
   { path: "/reset-password", element: <ResetPasswordPage />, requireAuth: false },
 

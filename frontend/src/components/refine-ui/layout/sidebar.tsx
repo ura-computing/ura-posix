@@ -14,12 +14,12 @@ import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
 import { Link, useLocation } from "react-router";
-import { useMe } from "@/hooks/use-me";
+import { useMe } from "@/hooks/useMe";
 import { resources, type ResourceConfig } from "@/routes";
 
 export function Sidebar() {
   const { open } = useShadcnSidebar();
-  const { data: identity } = useMe();
+  const { me: identity } = useMe();
   const { pathname } = useLocation();
   const isPending = identity?.status !== "active";
 

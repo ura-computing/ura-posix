@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import User, Pharmacy
-from schemas import UserRegister, UserLogin, UserOut, Token, ProfileUpdate, ForgotPasswordPayload, ResetPasswordPayload
+from schemas import UserSignup, UserLogin, UserOut, Token, ProfileUpdate, ForgotPasswordPayload, ResetPasswordPayload
 
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
 from utils.constants import FEATURE_FLAGS as ALL_FEATURES
@@ -46,8 +46,8 @@ def get_current_user_any_status(
     return _get_user_from_token(credentials, db)
 
 
-@router.post("/register", response_model=Token)
-def register(body: UserRegister, db: Session = Depends(get_db)):
+@router.post("/signup", response_model=Token)
+def signup(body: UserSignup, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 

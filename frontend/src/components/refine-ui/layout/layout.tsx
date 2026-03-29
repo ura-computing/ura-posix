@@ -1,8 +1,8 @@
 "use client";
 
 import { Header } from "@/components/refine-ui/layout/header";
-import { ThemeProvider } from "@/components/refine-ui/theme/theme-provider";
-import { TopLoadingBar } from "@/components/top-loading-bar";
+import { ThemeProvider } from "@/components/refine-ui/theme/themeProvider";
+import { TopLoadingBar } from "@/components/topLoadingBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
 import type { PropsWithChildren } from "react";
