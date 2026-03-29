@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import { useQuery } from "@tanstack/react-query";
-import { useMe } from "@/hooks/use-me";
+import { useMe } from "@/hooks/useMe";
+import { useVentesList } from "@/hooks/useVentesList";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
@@ -9,16 +9,16 @@ import { UploadCloud } from "lucide-react";
 import { eUserRole } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
-import { DataTable } from "@/components/refine-ui/data-table/data-table";
-import { TableToolbar } from "@/components/table-toolbar";
+import { DataTable } from "@/components/refine-ui/data-table/dataTable";
+import { TableToolbar } from "@/components/tableToolbar";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
 import { downloadCSV } from "@/utils/table";
-import { SuffixBadge } from "@/components/suffix-badge";
-import { ColumnVisibilityToggle } from "@/components/column-visibility-toggle";
+import { SuffixBadge } from "@/components/suffixBadge";
+import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 
 const VenteEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -83,7 +83,7 @@ const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
 };
 
 const VentesList = () => {
-  const { data: user } = useMe();
+  const { me: user } = useMe();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
@@ -109,23 +109,14 @@ const VentesList = () => {
 
   useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange]);
 
-  const { data: queryResult, isLoading } = useQuery({
-    queryKey: ["ventes", page, limit, searchQuery, selectedCats, selectedTva, dateFrom, dateTo],
-    queryFn: () =>
-      transactionsApi.listVentes({
-        page,
-        limit,
-        search: searchQuery || undefined,
-        categories: selectedCats.length ? selectedCats : undefined,
-        tva: selectedTva.length ? selectedTva : undefined,
-        dateFrom,
-        dateTo,
-      }),
+  const { ventesRows, ventesPagination: paginationMeta, ventesPageCount: pageCount, ventesLoading: isLoading } = useVentesList({
+    page, limit,
+    search: searchQuery,
+    categories: selectedCats,
+    tva: selectedTva,
+    dateFrom, dateTo,
   });
-
-  const rows = (queryResult?.data ?? []) as VenteRow[];
-  const paginationMeta = queryResult?.pagination;
-  const pageCount = paginationMeta?.totalPages ?? 1;
+  const rows = ventesRows as VenteRow[];
 
   const columns = useMemo<ColumnDef<VenteRow>[]>(
     () => [

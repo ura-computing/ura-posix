@@ -3,13 +3,13 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigat
 import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/refine-ui/notification/toaster";
-import { ThemeProvider } from "./components/refine-ui/theme/theme-provider";
+import { ThemeProvider } from "./components/refine-ui/theme/themeProvider";
 import { Layout } from "./components/refine-ui/layout/layout";
 import { Login } from "./pages/login";
 import { routes } from "./routes";
-import { useStatusPoller } from "./hooks/use-status-poller";
-import { useMe } from "./hooks/use-me";
-import { useLogout } from "./hooks/useLogout";
+import { useStatusPoller } from "./hooks/useStatusPoller";
+import { useMe } from "./hooks/useMe";
+import { useAuthenticate } from "./hooks/useAuthenticate";
 import { hasSession } from "./utils/session";
 import type { UserRole } from "./types";
 
@@ -32,7 +32,7 @@ function GuestRoute() {
 // Blocks navigation to any route other than "/" for pending accounts.
 // Also polls the backend while pending so approval is reflected immediately.
 function PendingGuard() {
-  const { data: identity } = useMe();
+  const { me: identity } = useMe();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -48,21 +48,25 @@ function PendingGuard() {
   return <Outlet />;
 }
 
-// Listens for APCM_FORCE_LOGOUT message fired by the extension's content script
-// when the user logs out from the extension popup.
+// Listens for APCM_FORCE_LOGOUT (extension popup logout) and auth:unauthorized (401 from API).
 function useExtensionLogoutSync() {
-  const { mutate: logout } = useLogout();
+  const { logout } = useAuthenticate();
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
+    const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === "APCM_FORCE_LOGOUT") logout();
     };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
+    const handleUnauthorized = () => logout();
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("auth:unauthorized", handleUnauthorized);
+    };
   }, [logout]);
 }
 
 function RoleGuard({ allowed, permission, children }: { allowed?: UserRole[]; permission?: string; children: ReactNode }) {
-  const { data: identity, isLoading } = useMe();
+  const { me: identity, meLoading: isLoading } = useMe();
   if (isLoading || !identity) return null;
   if (allowed && !allowed.includes(identity.role as UserRole)) return <Navigate to="/" replace />;
   if (permission && identity.permissions?.[permission] === false) return <Navigate to="/" replace />;

@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
-class UserRegister(BaseModel):
+class UserSignup(BaseModel):
     email: EmailStr
     password: str
     name: str

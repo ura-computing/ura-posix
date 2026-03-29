@@ -1,4 +1,5 @@
 import { ACTIONS, SOBRUS_HOSTNAME, INDICATOR_POSITION_KEY, DASHBOARD_URL } from "../constants";
+import { showUploadBanner, type UploadStatus } from "./upload-banner";
 
 console.log("[Content Script] Loaded");
 
@@ -42,148 +43,12 @@ const UPLOAD_STATUS_KEY = "apcm_upload_status";
 
 type NotifEntry = { id: string; fileType: string; inserted: number; skipped: number; read: boolean; timestamp: number };
 
-type UploadStatus = {
-  state: "uploading" | "success" | "error" | "cancelled";
-  fileType: "achat" | "vente";
-  current?: number;
-  total?: number;
-  inserted?: number;
-  skipped?: number;
-  error?: string;
-  timestamp?: number;
-};
 
 function _postNotifications(notifications: unknown[]) {
   window.postMessage({ type: "APCM_NOTIFICATIONS", notifications }, "*");
 }
 
-// ── Upload progress / success / error banner (same on Sobrus + dashboard) ────
-
-function _showUploadBanner(status: UploadStatus) {
-  const BANNER_ID = "__apcm-upload-banner";
-  let el = document.getElementById(BANNER_ID);
-
-  if (!document.getElementById("__apcm-dash-styles")) {
-    const s = document.createElement("style");
-    s.id = "__apcm-dash-styles";
-    s.textContent = `
-      @keyframes __apcm-spin { to { transform: rotate(360deg); } }
-      @keyframes __apcm_up { from { opacity:0;transform:translateY(12px) } to { opacity:1;transform:none } }
-    `;
-    document.head.appendChild(s);
-  }
-
-  if (!el) {
-    el = document.createElement("div");
-    el.id = BANNER_ID;
-    el.style.cssText = `
-      position:fixed;bottom:24px;right:24px;z-index:2147483647;
-      background:#0f172a;color:#f1f5f9;border-radius:12px;
-      padding:18px 48px 18px 22px;
-      font:600 14px/1.5 system-ui,sans-serif;
-      box-shadow:0 8px 24px rgba(0,0,0,0.4);
-      max-width:400px;border:1px solid rgba(20,184,166,0.35);
-      pointer-events:auto;animation:__apcm_up .3s ease;
-    `;
-    el.addEventListener("click", (e) => {
-      if ((e.target as HTMLElement).id === "__apcm-x") {
-        el!.style.transition = "opacity .3s";
-        el!.style.opacity = "0";
-        setTimeout(() => el!.remove(), 300);
-      }
-    });
-    document.body.appendChild(el);
-  }
-
-  const CLOSE = `<button id="__apcm-x" aria-label="Fermer" style="
-    position:absolute;top:7px;right:8px;background:none;border:none;
-    color:#94a3b8;cursor:pointer;font-size:17px;line-height:1;padding:2px 5px;border-radius:4px
-  ">×</button>`;
-  const SPINNER = `<span style="width:18px;height:18px;border-radius:50%;flex-shrink:0;border:2.5px solid rgba(20,184,166,0.3);border-top-color:#14b8a6;animation:__apcm-spin 0.7s linear infinite;display:inline-block"></span>`;
-  const DOT = (c: string) => `<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${c};display:inline-block;margin-top:3px"></span>`;
-
-  const section = status.fileType === "achat" ? "les achats" : "les ventes";
-  const path = status.fileType === "achat" ? "/achat" : "/ventes";
-
-  if (status.state === "uploading") {
-    const hasChunks = (status.total ?? 0) > 1;
-    const label = hasChunks ? `Lot ${status.current}/${status.total}` : "Import en cours";
-    const pct = hasChunks ? Math.round((status.current! / status.total!) * 100) : null;
-
-    const existingFill = el.querySelector<HTMLElement>("#__apcm-fill");
-    const existingLabel = el.querySelector<HTMLElement>("#__apcm-label");
-    if (existingFill && existingLabel && pct !== null) {
-      existingFill.style.width = `${pct}%`;
-      existingLabel.textContent = `${label}…`;
-      return;
-    }
-
-    el.innerHTML = `
-      ${CLOSE}
-      <div style="width:100%">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:${pct !== null ? "12px" : "0"}">
-          ${SPINNER}
-          <span id="__apcm-label">${label}…</span>
-        </div>
-        ${pct !== null ? `
-        <div style="width:100%;height:8px;background:rgba(255,255,255,0.12);border-radius:99px;overflow:hidden">
-          <div id="__apcm-fill" style="height:100%;background:#14b8a6;border-radius:99px;width:${pct}%;transition:width .35s ease"></div>
-        </div>` : ""}
-      </div>`;
-  } else if (status.state === "success") {
-    const skippedNote = (status.skipped ?? 0) > 0
-      ? `<br><span style="color:#94a3b8;font-weight:400">${status.skipped} doublon(s) ignoré(s)</span>`
-      : "";
-    el.innerHTML = `
-      ${CLOSE}
-      <div style="display:flex;align-items:flex-start;gap:8px">
-        ${DOT("#22c55e")}
-        <span>
-          <strong>${status.inserted ?? 0}</strong> ligne(s) importée(s) dans ${section}.${skippedNote}<br>
-          <a id="__apcm-link" style="color:#14b8a6;cursor:pointer;text-decoration:underline;font-weight:400">Voir les données →</a>
-        </span>
-      </div>`;
-    el.querySelector("#__apcm-link")?.addEventListener("click", () => {
-      window.location.href = path;
-      el!.remove();
-    });
-    const hide = () => {
-      el!.style.transition = "opacity .4s";
-      el!.style.opacity = "0";
-      setTimeout(() => el!.remove(), 500);
-    };
-    let t = setTimeout(hide, 12_000);
-    el.addEventListener("mouseenter", () => clearTimeout(t));
-    el.addEventListener("mouseleave", () => { t = setTimeout(hide, 12_000); });
-  } else if (status.state === "cancelled") {
-    const note = (status.inserted ?? 0) > 0
-      ? `<br><span style="color:#94a3b8;font-weight:400">${status.inserted} ligne(s) déjà importée(s)</span>`
-      : "";
-    el.innerHTML = `
-      ${CLOSE}
-      <div style="display:flex;align-items:flex-start;gap:8px">
-        ${DOT("#f59e0b")}
-        <span>Import annulé.${note}</span>
-      </div>`;
-    setTimeout(() => {
-      el!.style.transition = "opacity .4s";
-      el!.style.opacity = "0";
-      setTimeout(() => el!.remove(), 500);
-    }, 6_000);
-  } else {
-    el.innerHTML = `
-      ${CLOSE}
-      <div style="display:flex;align-items:center;gap:8px">
-        ${DOT("#ef4444")}
-        <span style="font-weight:400">${status.error ?? "Import échoué"}</span>
-      </div>`;
-    setTimeout(() => {
-      el!.style.transition = "opacity .4s";
-      el!.style.opacity = "0";
-      setTimeout(() => el!.remove(), 500);
-    }, 8_000);
-  }
-}
+const _bannerConfig = { onViewData: (path: string) => { window.location.href = path; } };
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -274,7 +139,7 @@ if (window.location.origin === new URL(DASHBOARD_URL).origin) {
     }
     if (changes[UPLOAD_STATUS_KEY]) {
       const status = changes[UPLOAD_STATUS_KEY].newValue as UploadStatus | undefined;
-      if (status) _showUploadBanner(status);
+      if (status) showUploadBanner(status, _bannerConfig);
     }
   });
 
@@ -282,7 +147,7 @@ if (window.location.origin === new URL(DASHBOARD_URL).origin) {
   chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
     const status = res[UPLOAD_STATUS_KEY] as UploadStatus | undefined;
     if (status && status.timestamp && Date.now() - status.timestamp < 60_000) {
-      _showUploadBanner(status);
+      showUploadBanner(status, _bannerConfig);
     }
   });
 

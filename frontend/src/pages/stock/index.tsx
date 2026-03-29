@@ -1,5 +1,5 @@
 import { Package } from "lucide-react";
-import { ListView } from "@/components/refine-ui/views/list-view";
+import { ListView } from "@/components/refine-ui/views/listView";
 import { Breadcrumb } from "@/components/refine-ui/layout/breadcrumb";
 
 const StockList = () => {

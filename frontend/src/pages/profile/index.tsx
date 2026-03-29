@@ -1,7 +1,6 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useProfileForm } from "@/schemas/profile";
+import type { ProfileFormValues } from "@/schemas/profile";
 import { Loader2 } from "lucide-react";
 import { PageLoader } from "@/components/shared/pageLoader";
 
@@ -18,30 +17,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useMe } from "@/hooks/use-me";
-import { useUpdateMe } from "@/hooks/use-update-me";
-
-const schema = z.object({
-  name: z.string().min(2, "Nom requis"),
-  phone: z.string().optional().or(z.literal("")),
-  email: z.string().email("Email invalide"),
-  pharmacy_name: z.string().optional(),
-  pharmacy_address: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
+import { useMe } from "@/hooks/useMe";
+import { useUpdateMe } from "@/hooks/useUpdateMe";
+import { eUserRole } from "@/types";
 
 export default function ProfilePage() {
-  const { data: user, isLoading } = useMe();
-  const { mutate: updateMe, isPending } = useUpdateMe();
+  const { me: user, meLoading: isLoading } = useMe();
+  const { updateMe, updateMePending } = useUpdateMe();
 
-  const isAdmin = user?.role === "admin";
-  const isEmployee = user?.role === "employee";
+  const isAdmin = user?.role === eUserRole.ADMIN;
+  const isEmployee = user?.role === eUserRole.EMPLOYEE;
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: "", phone: "", email: "", pharmacy_name: "", pharmacy_address: "" },
-  });
+  const form = useProfileForm();
 
   useEffect(() => {
     if (user) {
@@ -55,7 +42,7 @@ export default function ProfilePage() {
     }
   }, [user, form]);
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = (values: ProfileFormValues) => {
     updateMe(values, {
       onSuccess: () => toast.success("Profil mis à jour"),
       onError: (err) => toast.error(err.message),
@@ -182,9 +169,9 @@ export default function ProfilePage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" disabled={isPending} className="min-w-32 gap-2">
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isPending ? "Enregistrement..." : "Enregistrer"}
+            <Button type="submit" disabled={updateMePending} className="min-w-32 gap-2">
+              {updateMePending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {updateMePending ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </div>
         </form>

@@ -14,7 +14,7 @@ export const QUERY_KEYS = {
 export const ENDPOINTS = {
   auth: {
     login: "/auth/login",
-    register: "/auth/register",
+    signup: "/auth/signup",
     me: "/auth/me",
     forgotPassword: "/auth/forgot-password",
     resetPassword: "/auth/reset-password",

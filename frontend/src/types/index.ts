@@ -63,7 +63,7 @@ export type LoginPayload = {
   password: string;
 };
 
-export type RegisterPayload = {
+export type SignupPayload = {
   email: string;
   password: string;
   name: string;
