@@ -192,3 +192,5 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
     + all the logic should go through hook
 
 + fix modify personal infos
+
++ createa analys page for "create analyse" feature

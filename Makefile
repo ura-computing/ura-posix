@@ -71,10 +71,14 @@ back-seed: check-env db
 back-db-clean: db
 	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python db_clean.py
 
-back-dev: check-env db back-install
+back-dev: back-install
+	$(call _load-env,dev)
+	@APP_ENV=dev $(MAKE) check-env db
 	cd $(BACKEND_DIR) && APP_ENV=dev .venv/bin/uvicorn main:app --reload --port 8000
 
-back-prod: check-env db
+back-prod:
+	$(call _load-env,prod)
+	@APP_ENV=prod $(MAKE) check-env db
 	cd $(BACKEND_DIR) && APP_ENV=prod .venv/bin/uvicorn main:app --port 8000
 
 back-build: back-install

@@ -60,16 +60,38 @@ def _resolve_type(product_type, category) -> str:
 
 
 def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=None):
+    # Build achat filters matching the same scope for avg purchase price
+    achat_filters: list = []
+    if pharmacy_id:
+        achat_filters.append(Achat.pharmacy_id == pharmacy_id)
+    if df:
+        achat_filters.append(Achat.delivery_date >= df)
+    if dt:
+        achat_filters.append(Achat.delivery_date <= dt)
+    if non_declared_sub is not None:
+        achat_filters.append(Achat.medicament_id.notin_(non_declared_sub))
+
+    avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+        )
+        .filter(*achat_filters)
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
+
     q = db.query(
         Medicament.product,
         Medicament.category,
         Medicament.tva,
         Medicament.product_type,
-        Medicament.pph,
+        avg_pu_sub.c.avg_pu,
         Medicament.ppv,
         func.sum(Vente.quantity).label("qty"),
-        func.sum(Vente.total).label("total"),
-    ).join(Medicament, Vente.medicament_id == Medicament.id)
+        func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
+    ).join(Medicament, Vente.medicament_id == Medicament.id
+    ).outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
     if pharmacy_id:
         q = q.filter(Vente.pharmacy_id == pharmacy_id)
     if non_declared_sub is not None:
@@ -84,9 +106,9 @@ def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=N
         q.group_by(
             Medicament.id, Medicament.product, Medicament.category,
             Medicament.tva, Medicament.product_type,
-            Medicament.pph, Medicament.ppv,
+            avg_pu_sub.c.avg_pu, Medicament.ppv,
         )
-        .order_by(func.sum(Vente.total).desc())
+        .order_by(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).desc())
         .all()
     )
 
@@ -141,8 +163,11 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
         return q.filter(*base_filter_a)
 
     # ── Daily stats ──────────────────────────────────────────────────────────
+    daily_q = db.query(Vente.date, func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id)).join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    if cat_filter_v:
+        daily_q = daily_q.filter(*cat_filter_v)
     daily = (
-        vente_base_q(db.query(Vente.date, func.sum(Vente.total), func.count(Vente.id)))
+        daily_q.filter(*base_filter_v)
         .group_by(Vente.date)
         .all()
     )
@@ -171,13 +196,13 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
 
     # ── TVA ───────────────────────────────────────────────────────────────────
     vente_tva_rows = (
-        db.query(Vente.total, Medicament.tva)
+        db.query((Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ppv_total"), Medicament.tva)
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
         .all()
     )
-    tva_encaissee = sum((r.total or 0) * _parse_tva_rate(r.tva) for r in vente_tva_rows)
+    tva_encaissee = sum((r.ppv_total or 0) * _parse_tva_rate(r.tva) for r in vente_tva_rows)
 
     achat_tva_rows = (
         db.query(Achat.total, Medicament.tva)
@@ -194,23 +219,40 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
         "tva_a_declarer": round(tva_encaissee - tva_payee, 2),
     }
 
-    # ── Marge ─────────────────────────────────────────────────────────────────
+    # ── Marge (using avg actual purchase price from achats) ─────────────────
+    avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+        )
+        .filter(*base_filter_a)
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
+    # outerjoin: products with sales but no purchases in the range still appear
+    # fallback: if no avg_pu, use Medicament.pph as last resort
     marge_rows = (
-        db.query(Vente.quantity, Medicament.ppv, Medicament.pph, Medicament.tva)
+        db.query(
+            Vente.quantity, Medicament.ppv,
+            func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
+            Medicament.tva,
+        )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
-        .filter(Medicament.ppv.isnot(None), Medicament.pph.isnot(None))
+        .filter(Medicament.ppv.isnot(None))
         .all()
     )
+    marge_rows = [r for r in marge_rows if r.pu is not None]
     sum_ppv = sum((r.quantity or 0) * (r.ppv or 0) for r in marge_rows)
-    sum_pph = sum((r.quantity or 0) * (r.pph or 0) for r in marge_rows)
-    marge_brute = sum_ppv - sum_pph
-    marge_pct   = (1 - sum_pph / sum_ppv) * 100 if sum_ppv else 0
+    sum_pu  = sum((r.quantity or 0) * (r.pu or 0) for r in marge_rows)
+    marge_brute = sum_ppv - sum_pu
+    marge_pct   = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
     marge_nette = sum(
         (r.quantity or 0) * (
             (r.ppv or 0) / (1 + _parse_tva_rate(r.tva)) -
-            (r.pph or 0) / (1 + _parse_tva_rate(r.tva))
+            (r.pu or 0) / (1 + _parse_tva_rate(r.tva))
         )
         for r in marge_rows
     )
@@ -222,14 +264,14 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
 
     # ── CA breakdown: Pharmacie vs Parapharmacie ─────────────────────────────
     pharm_total = (
-        db.query(func.sum(Vente.total))
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .filter(_pharma_expr() == True)
         .scalar() or 0
     )
     para_total = (
-        db.query(func.sum(Vente.total))
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .filter(_pharma_expr() == False)
@@ -263,8 +305,9 @@ def build_monthly_trend(db: Session, pharmacy_id, df: Optional[str], dt: Optiona
     v_q = (
         db.query(
             func.date_trunc("month", func.cast(Vente.date, Date)).label("month"),
-            func.sum(Vente.total).label("total"),
+            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
         )
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(Vente.date >= trend_start_str, Vente.date < trend_end_str)
     )
     a_q = (

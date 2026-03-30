@@ -81,7 +81,6 @@ export function Sidebar() {
         }
       )}>
         <p className="text-xs text-sidebar-foreground/70 px-3">© 2026 APCM Pharma</p>
-        <p className="text-xs text-sidebar-foreground/50 px-3 mt-1">Made with Visily</p>
       </ShadcnSidebarFooter>
     </ShadcnSidebar>
   );

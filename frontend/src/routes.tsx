@@ -255,7 +255,7 @@ export const resources: ResourceConfig[] = [
     name: "catalog-requests",
     list: "/catalog-requests",
     meta: {
-      label: "Produits non déclarés",
+      label: "Produits spéciaux",
       icon: <PackageX />,
       allowed: [eUserRole.OWNER],
     },

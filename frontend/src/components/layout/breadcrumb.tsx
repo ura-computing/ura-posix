@@ -24,7 +24,7 @@ const PATH_LABELS: Record<string, string> = {
   "admin/catalog-requests": "Demandes d'exclusion",
   "admin/catalog": "Catalogue",
   "owner/employees": "Mes employés",
-  "catalog-requests": "Produits non déclarés",
+  "catalog-requests": "Produits spéciaux",
 };
 
 export function Breadcrumb() {

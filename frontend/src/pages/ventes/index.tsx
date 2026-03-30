@@ -379,6 +379,15 @@ const VentesList = () => {
               storageKey="ventes-cols"
               columnLabels={VENTE_COL_LABELS}
             />
+            {user?.permissions?.import !== false && (
+              <Link
+                to="/dashboard/upload-file"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                Importer
+              </Link>
+            )}
           </div>
         }
       />

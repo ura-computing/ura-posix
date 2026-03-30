@@ -57,10 +57,14 @@ def get_stats(
             .subquery()
         )
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id))
+    # Ventes total uses PPV (catalog sale price), achats total uses Achat.total (PU × qty)
+    vq = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    )
     aq = db.query(func.sum(Achat.total), func.count(Achat.id))
     if cat_filter_v:
-        vq = vq.join(Medicament, Vente.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_v)
+        vq = vq.filter(*cat_filter_v)
     if cat_filter_a:
         aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:
@@ -81,7 +85,7 @@ def get_stats(
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
     cat_q = (
-        db.query(Medicament.category.label("category"), func.sum(Vente.total).label("total"))
+        db.query(Medicament.category.label("category"), func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"))
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .filter(Medicament.category.isnot(None))
     )
@@ -153,7 +157,10 @@ def export_stats_excel(
             .subquery()
         )
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id))
+    vq = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    )
     aq = db.query(func.sum(Achat.total), func.count(Achat.id))
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
@@ -228,10 +235,13 @@ def get_pharmacy_stats_for_admin(
         .subquery()
     )
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id))
+    vq = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    )
     aq = db.query(func.sum(Achat.total), func.count(Achat.id))
     if cat_filter_v:
-        vq = vq.join(Medicament, Vente.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_v)
+        vq = vq.filter(*cat_filter_v)
     if cat_filter_a:
         aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     vq = vq.filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.notin_(non_declared_sub))
@@ -248,7 +258,7 @@ def get_pharmacy_stats_for_admin(
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
     cat_q = (
-        db.query(Medicament.category.label("category"), func.sum(Vente.total).label("total"))
+        db.query(Medicament.category.label("category"), func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"))
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .filter(
             Vente.pharmacy_id == pharmacy_id,
@@ -302,9 +312,10 @@ def export_pharmacy_stats_excel(
         .subquery()
     )
 
-    vq = db.query(func.sum(Vente.total), func.count(Vente.id)).filter(
-        Vente.pharmacy_id == pharmacy_id,
-        Vente.medicament_id.notin_(nd_sub),
+    vq = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.notin_(nd_sub))
     )
     aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(
         Achat.pharmacy_id == pharmacy_id,

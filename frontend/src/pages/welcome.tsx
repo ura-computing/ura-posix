@@ -243,7 +243,7 @@ function OwnerView({ identity }: { identity: User }) {
           <QuickLink to="/ventes" icon={ShoppingBasket} label="Ventes" desc="Historique de vos transactions ventes" />
           <QuickLink to="/rapports" icon={BarChart3} label="Rapports" desc="Analyses et indicateurs clés" />
           <QuickLink to="/owner/employees" icon={Users} label="Mes employés" desc="Gérer les accès de votre équipe" />
-          <QuickLink to="/catalog-requests" icon={PackageX} label="Produits non déclarés" desc="Exclure des produits de vos rapports" />
+          <QuickLink to="/catalog-requests" icon={PackageX} label="Produits spéciaux" desc="Exclure des produits de vos rapports" />
           <QuickLink to="/parametres" icon={Settings} label="Paramètres" desc="Configuration de la pharmacie" />
         </div>
       )}

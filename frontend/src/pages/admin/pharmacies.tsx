@@ -225,7 +225,7 @@ function PharmacyPanel({ pharmacy, onClose, allPharmacies }: PharmacyPanelProps)
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
           >
             <Package className="h-3.5 w-3.5 mr-1.5" />
-            Produits non déclarés
+            Produits spéciaux
           </TabsTrigger>
           <TabsTrigger
             value="options"
