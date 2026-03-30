@@ -445,7 +445,7 @@ export function AdminRapports() {
                     {pharmLoading ? <KpiSkeleton primary /> : (
                       <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>
                     )}
-                    <p className="text-[11px] opacity-75 mt-0.5">encaissée − payée</p>
+                    <p className="text-[11px] opacity-75 mt-0.5">estimation</p>
                   </CardContent>
                 </Card>
               </div>

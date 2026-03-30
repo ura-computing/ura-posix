@@ -191,3 +191,6 @@ Ila chfti 33.33%, rahouwa Parapharmacie (Cosmétique/Compléments).
     + all files should follow cammel case naming convension
     + all the logic should go through hook
 
++ fix modify personal infos
+
++ createa analys page for "create analyse" feature

@@ -11,7 +11,7 @@ import { eUserRole, eCategoryType } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
-import { DataTable } from "@/components/data-table/dataTable";
+import { DataTable } from "@/components/DataTable/dataTable";
 import { TableToolbar } from "@/components/tableToolbar";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
@@ -66,7 +66,7 @@ type AchatRow = {
 const ACHAT_COL_LABELS: Record<string, string> = {
   delivery_date: "Date BL", delivery_ref: "Référence", delivery_ref_final: "Référence Finale",
   supplier: "Fournisseur", product: "Produit", category: "Catégorie", tva: "TVA",
-  quantity: "Qté", pph: "PPH", unit_price: "Prix unitaire", expiry_date: "Péremption", total: "Total",
+  quantity: "Qté", pph: "PPH (catalogue)", unit_price: "PU (achat)", expiry_date: "Péremption", total: "Total",
 };
 
 const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> = {
@@ -248,7 +248,7 @@ const AchatList = () => {
         id: "pph",
         accessorKey: "pph",
         size: 100,
-        header: () => <p className="column-title">PPH</p>,
+        header: () => <p className="column-title">PPH (catalogue)</p>,
         cell: ({ getValue }) => (
           <span className="tabular-nums text-sm">{fmt(getValue<number | null>())}</span>
         ),
@@ -257,7 +257,7 @@ const AchatList = () => {
         id: "unit_price",
         accessorKey: "unit_price",
         size: 110,
-        header: () => <p className="column-title">Prix unitaire</p>,
+        header: () => <p className="column-title">PU (achat)</p>,
         cell: ({ getValue }) => (
           <span className="tabular-nums text-sm">{fmt(getValue<number | null>())}</span>
         ),
@@ -377,6 +377,15 @@ const AchatList = () => {
               storageKey="achats-cols"
               columnLabels={ACHAT_COL_LABELS}
             />
+            {user?.permissions?.import !== false && (
+              <Link
+                to="/dashboard/upload-file"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                Importer
+              </Link>
+            )}
           </div>
         }
       />

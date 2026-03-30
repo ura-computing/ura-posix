@@ -104,7 +104,7 @@ export default function CatalogRequestsPage() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">Produits non déclarés</h1>
+          <h1 className="page-title">Produits spéciaux</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Demandez à l'administrateur d'exclure un produit de vos rapports.
           </p>

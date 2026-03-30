@@ -40,13 +40,22 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
     rows_out = []
 
     if mode == "produit":
+        avg_pu_sub = (
+            db.query(
+                Achat.medicament_id,
+                (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+            )
+            .filter(*base_filter_a)
+            .group_by(Achat.medicament_id)
+            .subquery()
+        )
         q = (
             db.query(
                 Medicament.product,
                 Medicament.category,
                 Medicament.tva,
                 Medicament.ppv,
-                Medicament.pph,
+                func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
                 func.sum(Vente.quantity).label("qty"),
                 func.sum(Vente.total).label("ca"),
                 func.max(Vente.unit_price).label("prix_max"),
@@ -54,22 +63,24 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 func.avg(Vente.unit_price).label("prix_avg"),
             )
             .join(Medicament, Vente.medicament_id == Medicament.id)
+            .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
             .filter(*base_filter_v, *cat_filter)
             .group_by(
                 Medicament.id, Medicament.product, Medicament.category,
-                Medicament.tva, Medicament.ppv, Medicament.pph,
+                Medicament.tva, Medicament.ppv, Medicament.pph, avg_pu_sub.c.avg_pu,
             )
         )
         for r in q.all():
             ppv = float(r.ppv or 0)
-            pph = float(r.pph or 0)
-            marge_pct = round((1 - pph / ppv) * 100, 2) if ppv and pph else None
-            marge_dh  = round(ppv - pph, 4) if ppv and pph else None
+            pu  = float(r.pu or 0)
+            marge_pct = round((1 - pu / ppv) * 100, 2) if ppv and pu else None
+            marge_dh  = round(ppv - pu, 4) if ppv and pu else None
             rows_out.append({
                 "product":   r.product or "—",
                 "category":  _strip_pct(r.category or ""),
                 "tva":       r.tva or "—",
                 "ppv":       round(ppv, 4) if ppv else None,
+                "pu":        round(pu, 4) if pu else None,
                 "prix_max":  round(float(r.prix_max or 0), 4),
                 "prix_min":  round(float(r.prix_min or 0), 4),
                 "prix_avg":  round(float(r.prix_avg or 0), 4),
@@ -93,30 +104,42 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             .filter(*base_filter_v, *cat_filter)
             .group_by(Medicament.category)
         )
-        # Weighted marge per category
+        # Weighted marge per category (using avg actual purchase price)
+        avg_pu_sub_cat = (
+            db.query(
+                Achat.medicament_id,
+                (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+            )
+            .filter(*base_filter_a)
+            .group_by(Achat.medicament_id)
+            .subquery()
+        )
         med_marge_q = (
             db.query(
                 Medicament.category,
                 Medicament.ppv,
-                Medicament.pph,
+                func.coalesce(avg_pu_sub_cat.c.avg_pu, Medicament.pph).label("pu"),
                 func.sum(Vente.quantity).label("qty"),
             )
             .join(Medicament, Vente.medicament_id == Medicament.id)
+            .outerjoin(avg_pu_sub_cat, Medicament.id == avg_pu_sub_cat.c.medicament_id)
             .filter(*base_filter_v, *cat_filter,
-                    Medicament.ppv.isnot(None), Medicament.pph.isnot(None))
-            .group_by(Medicament.id, Medicament.category, Medicament.ppv, Medicament.pph)
+                    Medicament.ppv.isnot(None))
+            .group_by(Medicament.id, Medicament.category, Medicament.ppv, Medicament.pph, avg_pu_sub_cat.c.avg_pu)
         )
         cat_margin: dict = {}
         for m in med_marge_q.all():
+            if m.pu is None:
+                continue
             key = _strip_pct(m.category or "")
             qty = float(m.qty or 0)
             ppv = float(m.ppv or 0)
-            pph = float(m.pph or 0)
+            pu  = float(m.pu or 0)
             if key not in cat_margin:
                 cat_margin[key] = {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0}
-            marge_pct = (1 - pph / ppv) * 100 if ppv else 0
+            marge_pct = (1 - pu / ppv) * 100 if ppv else 0
             cat_margin[key]["sum_qty_pct"] += qty * marge_pct
-            cat_margin[key]["sum_qty_dh"]  += qty * (ppv - pph)
+            cat_margin[key]["sum_qty_dh"]  += qty * (ppv - pu)
             cat_margin[key]["total_qty"]   += qty
 
         for r in q.all():

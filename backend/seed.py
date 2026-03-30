@@ -16,13 +16,17 @@ Usage:
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
+_env_name = os.getenv("APP_ENV", "dev")
+_env_file = Path(__file__).resolve().parent.parent / "env" / _env_name / "backend.env"
+if _env_file.exists():
+    load_dotenv(_env_file)
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base

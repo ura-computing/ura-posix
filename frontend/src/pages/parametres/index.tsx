@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Settings,
   Trash2,
   AlertTriangle,
   Loader2,
@@ -397,6 +396,8 @@ function ProfileSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const ParametresList = () => {
+  const { me: currentUser } = useMe();
+  const isAdmin = currentUser?.role === eUserRole.ADMIN;
   const [dialogTarget, setDialogTarget] = useState<ClearTarget | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [achatCategories, setAchatCategories] = useState<string[]>([]);
@@ -406,6 +407,7 @@ const ParametresList = () => {
   const { deleteImport, deleting } = useDeleteImport();
 
   useEffect(() => {
+    if (isAdmin) return;
     transactionsApi
       .achatCategories()
       .then(setAchatCategories)
@@ -414,7 +416,7 @@ const ParametresList = () => {
       .venteCategories()
       .then(setVenteCategories)
       .catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   return (
     <ListView>
@@ -424,7 +426,7 @@ const ParametresList = () => {
       <div className="grid gap-4">
         <ProfileSection />
 
-        <Card className="border-destructive/40">
+        {!isAdmin && <Card className="border-destructive/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -546,10 +548,10 @@ const ParametresList = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
-      {dialogTarget && (
+      {!isAdmin && dialogTarget && (
         <DeleteDialog
           target={dialogTarget}
           open={!!dialogTarget}

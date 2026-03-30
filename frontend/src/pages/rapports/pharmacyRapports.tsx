@@ -268,6 +268,7 @@ export function PharmacyRapports() {
                   {isLoading ? <KpiSkeleton primary /> : (
                     <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
                   )}
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
                 </div>
                 <TrendingUp className="h-8 w-8 opacity-60 shrink-0" />
               </div>
@@ -332,7 +333,7 @@ export function PharmacyRapports() {
                   {isLoading ? <KpiSkeleton /> : (
                     <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-0.5">par transaction</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">CA ÷ nb transactions</p>
                 </div>
                 <Receipt className={cn("h-9 w-9", typeTheme.icon)} />
               </div>
@@ -446,6 +447,7 @@ export function PharmacyRapports() {
               {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
                 <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>{fmt(tva?.tva_encaissee ?? null)} MAD</p>
               )}
+              <p className={cn("text-[10px] mt-1 font-mono", typeTheme.textSubtle, "opacity-60")}>PPV × taux TVA</p>
             </CardContent>
           </Card>
 
@@ -455,6 +457,7 @@ export function PharmacyRapports() {
               {isLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
                 <p className="text-2xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>
               )}
+              <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-mono">PU × taux TVA</p>
             </CardContent>
           </Card>
 
@@ -464,7 +467,7 @@ export function PharmacyRapports() {
               {isLoading ? <KpiSkeleton primary /> : (
                 <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>
               )}
-              <p className="text-[11px] opacity-75 mt-0.5">encaissée − payée</p>
+              <p className="text-[10px] opacity-50 mt-1 font-mono">encaissée − payée (estimation)</p>
             </CardContent>
           </Card>
         </div>
@@ -529,6 +532,9 @@ export function PharmacyRapports() {
                   <p>Max: <span className="font-medium text-foreground">{margeData?.kpis.marge_pct_max?.label}</span> ({margeData?.kpis.marge_pct_max?.value?.toFixed(1)}%) — {margeData?.kpis.marge_pct_max?.qty} unités</p>
                 </div>
               )}
+              <p className="text-[10px] text-muted-foreground/60 mt-2 leading-tight font-mono">
+                (1 − PU÷PPV) × 100, pondérée par qté
+              </p>
             </CardContent>
           </Card>
 
@@ -551,6 +557,9 @@ export function PharmacyRapports() {
                   Écart gain: {fmt(margeData.kpis.difference_gain_dh)} DH
                 </p>
               )}
+              <p className="text-[10px] text-muted-foreground/60 mt-2 leading-tight font-mono">
+                PPV − PU, pondérée par qté
+              </p>
             </CardContent>
           </Card>
         </div>

@@ -10,7 +10,7 @@ import {
   useSidebar as useShadcnSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
-import { ChevronRight, FilePlus, ListIcon } from "lucide-react";
+import { FilePlus, ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
 import { Link, useLocation } from "react-router";
@@ -81,7 +81,6 @@ export function Sidebar() {
         }
       )}>
         <p className="text-xs text-sidebar-foreground/70 px-3">© 2026 APCM Pharma</p>
-        <p className="text-xs text-sidebar-foreground/50 px-3 mt-1">Made with Visily</p>
       </ShadcnSidebarFooter>
     </ShadcnSidebar>
   );

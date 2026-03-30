@@ -62,7 +62,7 @@ def _build_excel(title: str, period: str, kpis: dict, extra: dict, med_rows=None
     ws2 = wb.create_sheet("Produits")
     med_headers = [
         "Médicament", "Catégorie", "Type", "TVA",
-        "PPH HT (MAD)", "PPV TTC (MAD)", "PPV HT (MAD)",
+        "PU moy. (MAD)", "PPV TTC (MAD)", "PPV HT (MAD)",
         "Marge %", "Marge Brute (MAD)", "Marge Nette (MAD)",
         "Qté vendue", "CA TTC (MAD)", "TVA encaissée (MAD)",
     ]
@@ -74,15 +74,15 @@ def _build_excel(title: str, period: str, kpis: dict, extra: dict, med_rows=None
 
     for r in (med_rows or []):
         tva_rate = _parse_tva_rate(r.tva)
-        pph   = float(r.pph  or 0)
-        ppv   = float(r.ppv  or 0)
-        qty   = float(r.qty  or 0)
-        total = float(r.total or 0)
+        avg_pu = float(r.avg_pu or 0)
+        ppv    = float(r.ppv  or 0)
+        qty    = float(r.qty  or 0)
+        total  = float(r.total or 0)
 
         ppv_ht     = round(ppv / (1 + tva_rate), 4) if tva_rate > 0 and ppv else ppv
-        marge_pct  = round((1 - pph / ppv) * 100, 2) if ppv and pph else "—"
-        marge_brut = round((ppv - pph) * qty, 2)      if ppv and pph else "—"
-        marge_net  = round((ppv_ht - pph) * qty, 2)   if ppv and pph else "—"
+        marge_pct  = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else "—"
+        marge_brut = round((ppv - avg_pu) * qty, 2)      if ppv and avg_pu else "—"
+        marge_net  = round((ppv_ht - avg_pu) * qty, 2)   if ppv and avg_pu else "—"
         tva_enc    = round(total * tva_rate, 2)
 
         ws2.append([
@@ -90,7 +90,7 @@ def _build_excel(title: str, period: str, kpis: dict, extra: dict, med_rows=None
             _strip_pct(r.category or ""),
             _resolve_type(r.product_type, r.category),
             r.tva or "—",
-            round(pph, 4) if pph else "—",
+            round(avg_pu, 4) if avg_pu else "—",
             round(ppv, 4) if ppv else "—",
             round(ppv_ht, 4) if ppv else "—",
             marge_pct,

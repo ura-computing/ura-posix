@@ -2,8 +2,13 @@ import logging
 import os
 import sys
 import time
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+
+_env_name = os.getenv("APP_ENV", "dev")
+_env_file = Path(__file__).resolve().parent.parent / "env" / _env_name / "backend.env"
+if _env_file.exists():
+    load_dotenv(_env_file)
 
 # ---------------------------------------------------------------------------
 # Environment variable validation (runs before any other imports so we fail

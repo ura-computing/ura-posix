@@ -7,7 +7,7 @@ import { AppLogo } from "@/components/shared/appLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { InputPassword } from "@/components/form/inputPassword";
+import { InputPassword } from "@/components/inputPassword";
 import { Separator } from "@/components/ui/separator";
 import { useAuthenticate } from "@/hooks/useAuthenticate";
 
