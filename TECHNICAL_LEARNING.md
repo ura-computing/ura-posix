@@ -1,6 +1,6 @@
-# Technical Learning Roadmap: APCM Pharma
+# Technical Learning Roadmap: PharmaGest
 
-This document provides a structured learning path for understanding the technologies and patterns used in the APCM Pharma project. The roadmap follows a "prerequisites-first" approach, building from foundational concepts to advanced implementation details.
+This document provides a structured learning path for understanding the technologies and patterns used in the PharmaGest project. The roadmap follows a "prerequisites-first" approach, building from foundational concepts to advanced implementation details.
 
 ## Learning Path Overview
 
@@ -17,11 +17,15 @@ This document provides a structured learning path for understanding the technolo
    ↓
 6. Dependency Injection
    ↓
-7. Frontend Architecture (React + TanStack Query)
+7. Frontend Architecture (React Router + TanStack Query + Hooks)
    ↓
 8. Chrome Extension Architecture
    ↓
 9. Deployment & Environment
+   ↓
+10. Math Formulas & Business Logic
+   ↓
+11. Testing
 ```
 
 ---
@@ -29,7 +33,7 @@ This document provides a structured learning path for understanding the technolo
 ## 1. Data Modeling (The Foundation)
 
 ### Why This Matters
-Before writing any code, you must understand the domain model. APCM Pharma models a pharmacy's business operations: products, purchases, sales, and users. The database schema is the single source of truth.
+Before writing any code, you must understand the domain model. PharmaGest models a pharmacy's business operations: products, purchases, sales, and users. The database schema is the single source of truth.
 
 ### Core Concepts
 
@@ -250,7 +254,7 @@ This pattern prevents duplicate products while allowing catalog updates.
 ## 5. Authentication & Security
 
 ### Why This Matters
-APCM Pharma handles sensitive business data. Proper authentication prevents unauthorized access, and secure password storage protects user credentials even if the database is compromised.
+PharmaGest handles sensitive business data. Proper authentication prevents unauthorized access, and secure password storage protects user credentials even if the database is compromised.
 
 ### Core Concepts
 
@@ -290,7 +294,7 @@ if bcrypt.checkpw(password.encode(), stored_hash):
 - HTTPS and TLS (transport security)
 
 **WhatsApp OTP Flow (Password Reset):**
-In addition to email-based password reset, APCM Pharma supports WhatsApp OTP via the Meta Cloud API:
+In addition to email-based password reset, PharmaGest supports WhatsApp OTP via the Meta Cloud API:
 1. User submits their phone number to `POST /auth/forgot-password-whatsapp`
 2. Backend generates a 6-digit OTP, stores it with an expiry, and sends it via the WhatsApp Cloud API using the `password_reset_otp` authentication template
 3. User receives the OTP on WhatsApp and submits it with their new password to `POST /auth/verify-otp`
@@ -397,10 +401,10 @@ async def upload_achat(
 
 ---
 
-## 7. Frontend Architecture (React + TanStack Query)
+## 7. Frontend Architecture (React Router + TanStack Query + Hooks)
 
 ### Why This Matters
-The frontend uses plain React Router for routing and TanStack Query for server state management. Refine was previously used but has been removed in favor of custom hooks and a typed API layer, giving more control and simpler debugging.
+The frontend uses plain React Router for routing and TanStack Query for server state management. There is no framework abstraction layer (no Refine, no Next.js) -- just custom hooks and a typed API layer, giving full control and simpler debugging.
 
 ### Core Concepts
 
@@ -442,11 +446,16 @@ export function useAchatList(params: AchatParams) {
 }
 ```
 
-**Why This Architecture (instead of Refine):**
+**Why This Architecture:**
 1. **Simplicity**: No framework abstraction layer between you and the API
 2. **Full control**: Custom hooks can handle any API shape or side effect
 3. **Caching**: TanStack Query provides automatic caching and refetching
 4. **Type Safety**: Full TypeScript from API call to component prop
+
+**Key Hooks:**
+- `useAnalysePage` -- drives the Rapports/analytics pages, handles filter state, KPI aggregation, and chart data
+- `useAccounting` -- financial calculations (marge, TVA, totals) used across achat/vente views
+- Enums `eCategoryType`, `eRequestStatus`, `eRequestType` from `types/index.ts` are used in all hooks and components to avoid string literals
 
 ### Learning Resources
 - React fundamentals: https://react.dev/learn
@@ -486,7 +495,7 @@ function AchatPage() {
 ## 8. Chrome Extension Architecture
 
 ### Why This Matters
-The Chrome extension is the primary data input method for APCM Pharma. It bridges the gap between Sobrus web interface and the APCM Pharma backend by capturing data directly from the browser. Understanding Chrome Extension architecture is essential for maintaining and extending the data capture functionality.
+The Chrome extension is the primary data input method for PharmaGest. It bridges the gap between the Sobrus web interface and the PharmaGest backend by capturing data directly from the browser. Understanding Chrome Extension architecture is essential for maintaining and extending the data capture functionality.
 
 ### Core Concepts
 
@@ -656,6 +665,7 @@ Study `extension/src/`:
 3. **Chrome Storage Sync**: Enables real-time UI updates across tabs (Sobrus page + dashboard)
 4. **Token Relay**: Dashboard stores token in localStorage, content script syncs to Chrome Storage for extension access
 5. **Bounding Box Overlap**: Area selection uses geometric overlap detection to find tables within selected region
+6. **Upload Queue System**: Uploads are managed via an in-memory jobs array in the background service worker. Each job tracks file type, chunk progress, and status (pending/uploading/done/error). This enables batch tracking -- multiple CSV files can be queued and processed sequentially without losing state
 
 ---
 
@@ -667,10 +677,15 @@ Environment variables separate configuration from code, enabling the same codeba
 ### Core Concepts
 
 **Environment Variables:**
-```bash
-# backend/.env
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
-SECRET_KEY=super-secret-key-change-in-production
+
+PharmaGest uses an `env/` folder structure with `APP_ENV` to select the active environment:
+
+```
+env/
+├── dev/       # local development
+├── demo/      # Docker demo build
+├── prod/      # production
+└── test/      # test suite
 ```
 
 ```python
@@ -678,13 +693,14 @@ SECRET_KEY=super-secret-key-change-in-production
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+app_env = os.getenv("APP_ENV", "dev")
+load_dotenv(f"env/{app_env}/.env.backend")
 DATABASE_URL = os.getenv("DATABASE_URL")
 ```
 
 **Why This Pattern:**
 1. **Security**: Secrets never committed to version control
-2. **Flexibility**: Same code runs in multiple environments
+2. **Flexibility**: Same code runs in multiple environments via `APP_ENV`
 3. **12-Factor App**: Industry standard for cloud-native apps
 
 **Docker Compose:**
@@ -722,6 +738,204 @@ DATABASE_URL = "postgresql://localhost:5432/apcm_dev"
 DATABASE_URL = "postgresql://prod-server:5432/apcm_prod"
 
 # Same code, different behavior based on environment
+```
+
+---
+
+## 10. Math Formulas & Business Logic
+
+### Why This Matters
+PharmaGest computes financial KPIs for pharmacy owners. Understanding the formulas ensures the analytics engine produces correct results and that edge cases (zero denominators, missing prices) are handled gracefully.
+
+### Margin Formulas
+
+**Marge brute (Gross Margin):**
+```
+Marge brute = PPV - PPH
+```
+Where PPV = Prix Public de Vente, PPH = Prix Hors Taxe (purchase price).
+
+**Marge % (Margin Percentage):**
+```
+Marge % = ((PPV - PPH) / PPH) * 100
+```
+
+Example: PPH = 80 MAD, PPV = 120 MAD
+```
+Marge brute = 120 - 80 = 40 MAD
+Marge %     = (40 / 80) * 100 = 50%
+```
+
+**Marge nette (Net Margin):**
+```
+Marge nette = Marge brute - (TVA amount)
+            = (PPV - PPH) - (PPV * TVA_rate / (100 + TVA_rate))
+```
+
+### PU Weighted Average (Prix Unitaire Moyen Pondere)
+
+When a product is purchased at different prices across multiple imports:
+```
+PU moyen = SUM(quantity_i * unit_price_i) / SUM(quantity_i)
+```
+
+Example: 50 units at 10 MAD + 30 units at 12 MAD
+```
+PU moyen = (50*10 + 30*12) / (50+30) = 860/80 = 10.75 MAD
+```
+
+### TVA Calculations
+
+Morocco uses multiple TVA rates (0%, 7%, 10%, 14%, 20%). The system groups transactions by TVA rate and computes:
+
+```
+TVA amount       = PPV * TVA_rate / (100 + TVA_rate)
+Montant HT       = PPV - TVA amount
+Total TVA (group)= SUM(TVA amount for all items in group)
+```
+
+### Stock ABCD Classification
+
+Products are classified into 4 categories based on their contribution to total revenue:
+
+```
+Ratio = (product_revenue / total_revenue) * 100
+```
+
+| Class | Cumulative ratio range |
+|-------|----------------------|
+| A     | 0% -- 80%            |
+| B     | 80% -- 95%           |
+| C     | 95% -- 99%           |
+| D     | 99% -- 100%          |
+
+Products are sorted by revenue descending, then assigned a class based on where their cumulative ratio falls.
+
+### Stock MIN / MAX Formulas
+
+```
+Stock MIN = average_daily_sales * lead_time_days * safety_factor
+Stock MAX = Stock MIN + (average_daily_sales * reorder_period_days)
+```
+
+Where:
+- `average_daily_sales` = total quantity sold / number of days in period
+- `lead_time_days` = supplier delivery delay
+- `safety_factor` = buffer multiplier (typically 1.5)
+- `reorder_period_days` = time between orders
+
+### Sante Financiere (Financial Health Grading)
+
+The system assigns a grade based on combined KPI scores:
+
+| Grade | Criteria                                         |
+|-------|--------------------------------------------------|
+| A     | Marge % >= 30%, stock rotation healthy, no debt  |
+| B     | Marge % >= 20%, minor stock issues               |
+| C     | Marge % >= 10%, stock or debt concerns            |
+| D     | Marge % < 10% or critical financial indicators    |
+
+---
+
+## 11. Testing
+
+### Why This Matters
+PharmaGest has 298 tests across backend, frontend, and extension. Understanding the test setup ensures you can write reliable tests and debug failures quickly.
+
+### Backend Tests (pytest)
+
+**Setup:**
+- Tests use `APP_ENV=test` which loads `env/test/.env.backend` with a dedicated test database
+- `conftest.py` provides shared fixtures: `db_session`, `client`, `admin_user`, `owner_user`
+- Each test runs inside a **transaction that is rolled back** after completion, ensuring test isolation without needing to recreate the database
+
+**Key patterns:**
+```python
+# conftest.py
+@pytest.fixture
+def db_session():
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection)
+    yield session
+    session.close()
+    transaction.rollback()  # All changes reverted
+    connection.close()
+
+@pytest.fixture
+def client(db_session):
+    def override_get_db():
+        yield db_session
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+```
+
+**Running:**
+```bash
+make test-back   # runs pytest with APP_ENV=test
+```
+
+### Frontend Tests (vitest + MSW)
+
+**Setup:**
+- Uses vitest as the test runner (compatible with Vite config)
+- MSW (Mock Service Worker) intercepts API calls at the network level
+- No real backend needed -- all API responses are mocked
+
+**Key patterns:**
+```typescript
+// Mock API handler
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+
+const server = setupServer(
+  http.get("/api/achat", () => {
+    return HttpResponse.json({ items: [...], total: 10 });
+  })
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+**Running:**
+```bash
+make test-front   # runs vitest
+```
+
+### Extension Tests (vitest + Chrome API Mocks)
+
+**Setup:**
+- Uses vitest with Chrome API mocking (chrome.storage, chrome.runtime, chrome.tabs)
+- Global mocks defined in test setup file replace `chrome.*` APIs with vi.fn() stubs
+
+**Key patterns:**
+```typescript
+// Chrome API mock setup
+global.chrome = {
+  storage: {
+    local: {
+      get: vi.fn().mockResolvedValue({}),
+      set: vi.fn().mockResolvedValue(undefined),
+    },
+    onChanged: { addListener: vi.fn() },
+  },
+  runtime: {
+    sendMessage: vi.fn(),
+    onMessage: { addListener: vi.fn() },
+  },
+  tabs: {
+    query: vi.fn().mockResolvedValue([]),
+    sendMessage: vi.fn(),
+  },
+} as any;
+```
+
+**Running:**
+```bash
+make test-ext   # runs vitest for extension
 ```
 
 ---
@@ -809,4 +1023,4 @@ This learning path is designed to build your understanding incrementally. Each l
 - **Chrome Extension** captures your data
 - **Deployment** delivers your application
 
-Focus on understanding the "why" behind each technology choice. The APCM Pharma codebase demonstrates production-ready patterns that you can apply to any full-stack application.
+Focus on understanding the "why" behind each technology choice. The PharmaGest codebase demonstrates production-ready patterns that you can apply to any full-stack application.

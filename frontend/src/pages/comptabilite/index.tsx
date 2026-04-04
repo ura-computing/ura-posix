@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
+import { eCategoryType } from "@/types";
 import { usePayments, useSavePayment } from "@/hooks/useAccounting";
 import { usePharmacyStats } from "@/hooks/usePharmacyRapports";
 
@@ -41,16 +42,18 @@ function getCurrentMonth() {
 }
 
 export default function ComptabilitePage() {
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMonth, setEditMonth] = useState(getCurrentMonth());
   const [editMethod, setEditMethod] = useState("tpe");
   const [editPharma, setEditPharma] = useState("");
   const [editPara, setEditPara] = useState("");
   const [editCount, setEditCount] = useState("");
 
-  const { payments, isLoading: paymentsLoading } = usePayments(selectedMonth);
+  const { payments, isLoading: paymentsLoading } = usePayments();
   const { savePayment, saving } = useSavePayment();
-  const { stats, statsLoading } = usePharmacyStats("", "", "all" as never);
+  const { stats, statsLoading } = usePharmacyStats(dateFrom, dateTo, eCategoryType.ALL);
 
   const kpis = stats?.kpis;
   const tva = stats?.tva;
@@ -80,7 +83,7 @@ export default function ComptabilitePage() {
   const handleSave = () => {
     savePayment(
       {
-        month: selectedMonth,
+        month: editMonth,
         method: editMethod,
         pharmacie_amount: parseFloat(editPharma) || 0,
         parapharmacie_amount: parseFloat(editPara) || 0,
@@ -98,15 +101,21 @@ export default function ComptabilitePage() {
         Saisissez vos encaissements par mode de paiement et consultez votre bilan.
       </p>
 
-      {/* Month selector */}
-      <div className="flex items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Mois :</Label>
-        <Input
-          type="month"
-          value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="h-9 w-48 text-sm"
-        />
+      {/* Date range filter */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Du</Label>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-40 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Au</Label>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-40 text-sm" />
+        </div>
+        {(dateFrom || dateTo) && (
+          <Button variant="ghost" size="sm" className="h-9 text-muted-foreground mt-5" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+            Réinitialiser
+          </Button>
+        )}
       </div>
 
       {/* Payment method cards */}
@@ -223,10 +232,14 @@ export default function ComptabilitePage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {METHODS.find((m) => m.key === editMethod)?.label ?? "Paiement"} — {selectedMonth}
+              {METHODS.find((m) => m.key === editMethod)?.label ?? "Paiement"} — {editMonth}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Mois</Label>
+              <Input type="month" value={editMonth} onChange={(e) => setEditMonth(e.target.value)} className="h-9" />
+            </div>
             <div className="space-y-1.5">
               <Label>Mode de paiement</Label>
               <Select value={editMethod} onValueChange={setEditMethod}>
