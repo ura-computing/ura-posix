@@ -74,8 +74,10 @@ back-db-clean: db
 
 back-dev: back-install
 	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env db
-	@APP_ENV=dev $(MAKE) db-clean seed
+	@APP_ENV=dev $(MAKE) check-env
+	@docker compose down -v 2>/dev/null || true
+	@docker compose up -d --wait db
+	@APP_ENV=dev $(MAKE) seed
 	cd $(BACKEND_DIR) && APP_ENV=dev .venv/bin/uvicorn main:app --reload --port 8000
 
 back-prod:

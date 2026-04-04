@@ -10,7 +10,7 @@ import {
   useSidebar as useShadcnSidebar,
 } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
-import { FilePlus, ListIcon } from "lucide-react";
+import { ListIcon } from "lucide-react";
 import { SidebarFooter as ShadcnSidebarFooter } from "@/components/ui/sidebar";
 import React from "react";
 import { Link, useLocation } from "react-router";
@@ -80,7 +80,7 @@ export function Sidebar() {
           "opacity-100": open,
         }
       )}>
-        <p className="text-xs text-sidebar-foreground/70 px-3">© 2026 APCM Pharma</p>
+        <p className="text-xs text-sidebar-foreground/70 px-3">© 2026 PharmaGest</p>
       </ShadcnSidebarFooter>
     </ShadcnSidebar>
   );
@@ -174,10 +174,10 @@ function SidebarHeader() {
           )}
           aria-label="Toggle sidebar"
         >
-          <FilePlus className="h-6 w-6 shrink-0 text-[#14b8a6]" />
+          <img src="/logo.png" alt="PharmaGest" className="h-8 w-8 shrink-0 object-contain mix-blend-screen rounded" />
         </button>
         <div className={cn("flex flex-col min-w-0", { "opacity-0 w-0 overflow-hidden": !open })}>
-          <h2 className="text-sm font-bold text-sidebar-foreground">APCM Pharma</h2>
+          <h2 className="text-sm font-bold text-sidebar-foreground">PharmaGest</h2>
           <span className="text-xs text-sidebar-foreground/70">Gestion Pharmacie</span>
         </div>
       </div>

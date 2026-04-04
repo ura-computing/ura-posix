@@ -12,7 +12,7 @@ export function Layout({ children }: PropsWithChildren) {
   return (
     <ThemeProvider>
       <TopLoadingBar />
-      <SidebarProvider data-apcm-sidebar="">
+      <SidebarProvider data-pg-sidebar="">
         <Sidebar />
         <SidebarInset>
           <Header />
