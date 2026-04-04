@@ -37,8 +37,11 @@ def clean_database():
 
 
 if __name__ == "__main__":
-    confirm = input("This will DELETE all data. Type 'yes' to confirm: ").strip().lower()
-    if confirm != "yes":
-        print("Aborted.")
-        sys.exit(0)
-    clean_database()
+    if "--force" in sys.argv or os.getenv("DB_CLEAN_FORCE"):
+        clean_database()
+    else:
+        confirm = input("This will DELETE all data. Type 'yes' to confirm: ").strip().lower()
+        if confirm != "yes":
+            print("Aborted.")
+            sys.exit(0)
+        clean_database()

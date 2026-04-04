@@ -70,13 +70,12 @@ back-seed: check-env db
 	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python seed.py
 
 back-db-clean: db
-	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python db_clean.py
+	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python db_clean.py --force
 
 back-dev: back-install
 	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env
-	@docker compose down -v 2>/dev/null || true
-	@docker compose up -d --wait db
+	@APP_ENV=dev $(MAKE) check-env db
+	@APP_ENV=dev $(MAKE) db-clean seed
 	cd $(BACKEND_DIR) && APP_ENV=dev .venv/bin/uvicorn main:app --reload --port 8000
 
 back-prod:
@@ -158,7 +157,8 @@ demo:
 	@$(MAKE) ext-install ext-build
 	@cp resources/catalog.csv $(BACKEND_DIR)/catalog.csv 2>/dev/null || true
 	docker compose down -v
-	docker compose up --build
+	docker compose build --no-cache
+	docker compose up
 	@rm -f $(BACKEND_DIR)/catalog.csv
 
 # ── Prod environment (optimised backend + pre-built frontend, local DB) ───────
