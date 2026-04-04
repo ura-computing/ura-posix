@@ -5,7 +5,7 @@ import { useAchatList } from "@/hooks/useAchatList";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
-import { UploadCloud } from "lucide-react";
+import { ChevronDown, Package, TrendingUp, FileText, UploadCloud } from "lucide-react";
 import { eUserRole, eCategoryType } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,8 @@ import { downloadCSV } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { cn } from "@/utils/cn";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 
 const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -67,6 +69,148 @@ const ACHAT_COL_LABELS: Record<string, string> = {
   delivery_date: "Date BL", delivery_ref: "Référence", delivery_ref_final: "Référence Finale",
   supplier: "Fournisseur", product: "Produit", category: "Catégorie", tva: "TVA",
   quantity: "Qté", pph: "PPH (catalogue)", unit_price: "PU (achat)", expiry_date: "Péremption", total: "Total",
+};
+
+type SupplierSummary = {
+  name: string;
+  totalMAD: number;
+  blCount: number;
+  unitCount: number;
+  lineCount: number;
+};
+
+function computeSupplierSummaries(rows: AchatRow[]): SupplierSummary[] {
+  const map = new Map<string, { totalMAD: number; refs: Set<string>; unitCount: number; lineCount: number }>();
+  for (const row of rows) {
+    const name = (row.supplier ?? "").trim();
+    if (!name) continue;
+    let entry = map.get(name);
+    if (!entry) {
+      entry = { totalMAD: 0, refs: new Set(), unitCount: 0, lineCount: 0 };
+      map.set(name, entry);
+    }
+    entry.totalMAD += row.total ?? 0;
+    if (row.delivery_ref) entry.refs.add(row.delivery_ref);
+    entry.unitCount += row.quantity ?? 0;
+    entry.lineCount += 1;
+  }
+  return Array.from(map.entries())
+    .map(([name, d]) => ({ name, totalMAD: d.totalMAD, blCount: d.refs.size, unitCount: d.unitCount, lineCount: d.lineCount }))
+    .sort((a, b) => b.totalMAD - a.totalMAD);
+}
+
+const SupplierSummarySection = ({ rows }: { rows: AchatRow[] }) => {
+  const [open, setOpen] = useState(true);
+
+  const summaries = useMemo(() => computeSupplierSummaries(rows), [rows]);
+  const top5 = summaries.slice(0, 5);
+  const maxMAD = top5.length > 0 ? top5[0].totalMAD : 1;
+
+  const grandTotal = useMemo(() => rows.reduce((s, r) => s + (r.total ?? 0), 0), [rows]);
+  const totalBLs = useMemo(() => {
+    const refs = new Set<string>();
+    for (const r of rows) if (r.delivery_ref) refs.add(r.delivery_ref);
+    return refs.size;
+  }, [rows]);
+  const totalUnits = useMemo(() => rows.reduce((s, r) => s + (r.quantity ?? 0), 0), [rows]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="rounded-lg border border-border bg-card shadow-sm">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">Resume fournisseurs</span>
+            <Badge variant="secondary" className="text-xs ml-1">{summaries.length} fournisseurs</Badge>
+          </div>
+          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="border-t border-border px-4 py-4">
+            {/* Global totals */}
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total achats</p>
+                  <p className="text-base font-bold tabular-nums">{fmt(grandTotal)} MAD</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Bons de livraison</p>
+                  <p className="text-base font-bold tabular-nums">{totalBLs}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
+                  <Package className="h-4 w-4 text-violet-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Unites</p>
+                  <p className="text-base font-bold tabular-nums">{totalUnits.toLocaleString("fr-MA")}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Top 5 suppliers */}
+            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Top 5 fournisseurs (page courante)</p>
+            <div className="space-y-3">
+              {top5.map((s, i) => {
+                const pct = maxMAD > 0 ? (s.totalMAD / maxMAD) * 100 : 0;
+                const shareOfTotal = grandTotal > 0 ? (s.totalMAD / grandTotal) * 100 : 0;
+                return (
+                  <div key={s.name} className="group">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-medium truncate">{s.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
+                        <span>{s.blCount} BL</span>
+                        <span>{s.unitCount.toLocaleString("fr-MA")} u.</span>
+                        <span className="font-semibold text-foreground tabular-nums">{fmt(s.totalMAD)} MAD</span>
+                        <Badge variant="outline" className="text-[10px] tabular-nums px-1.5">{shareOfTotal.toFixed(1)}%</Badge>
+                      </div>
+                    </div>
+                    <Progress
+                      value={pct}
+                      className="h-2"
+                      style={{
+                        "--progress-background": [
+                          "hsl(var(--chart-1, 142 71% 45%))",
+                          "hsl(var(--chart-2, 217 91% 60%))",
+                          "hsl(var(--chart-3, 262 83% 58%))",
+                          "hsl(var(--chart-4, 37 92% 50%))",
+                          "hsl(var(--chart-5, 0 72% 51%))",
+                        ][i],
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {summaries.length > 5 && (
+              <p className="text-xs text-muted-foreground mt-3">
+                + {summaries.length - 5} autre{summaries.length - 5 > 1 ? "s" : ""} fournisseur{summaries.length - 5 > 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
 };
 
 const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> = {
@@ -389,6 +533,8 @@ const AchatList = () => {
           </div>
         }
       />
+
+      <SupplierSummarySection rows={rows} />
 
       <DataTable
         table={tableInstance}

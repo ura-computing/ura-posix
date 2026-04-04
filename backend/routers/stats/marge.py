@@ -213,6 +213,73 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 "total":         round(float(r.total or 0), 2),
             })
 
+    elif mode == "laboratoire":
+        q = (
+            db.query(
+                Medicament.laboratoire,
+                func.sum(Vente.quantity).label("qty"),
+                func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+                func.max(Vente.unit_price).label("prix_max"),
+                func.min(Vente.unit_price).label("prix_min"),
+                func.avg(Vente.unit_price).label("prix_avg"),
+            )
+            .join(Medicament, Vente.medicament_id == Medicament.id)
+            .filter(*base_filter_v, *cat_filter)
+            .filter(Medicament.laboratoire.isnot(None))
+            .group_by(Medicament.laboratoire)
+        )
+        for r in q.all():
+            rows_out.append({
+                "laboratoire": r.laboratoire or "—",
+                "prix_max": round(float(r.prix_max or 0), 4),
+                "prix_min": round(float(r.prix_min or 0), 4),
+                "prix_avg": round(float(r.prix_avg or 0), 4),
+                "qty":      round(float(r.qty or 0), 2),
+                "ca":       round(float(r.ca or 0), 2),
+            })
+
+    elif mode == "operateur":
+        q = (
+            db.query(
+                Vente.client,
+                func.sum(Vente.quantity).label("qty"),
+                func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+                func.count(Vente.id).label("nb_transactions"),
+            )
+            .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+            .filter(*base_filter_v, *cat_filter)
+            .group_by(Vente.client)
+        )
+        for r in q.all():
+            rows_out.append({
+                "client":          r.client or "Anonyme",
+                "nb_transactions": r.nb_transactions or 0,
+                "qty":             round(float(r.qty or 0), 2),
+                "ca":              round(float(r.ca or 0), 2),
+            })
+
+    elif mode == "mois":
+        from sqlalchemy import Date
+        q = (
+            db.query(
+                func.to_char(func.cast(Vente.date, Date), "YYYY-MM").label("mois"),
+                func.sum(Vente.quantity).label("qty"),
+                func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+                func.count(Vente.id).label("nb_transactions"),
+            )
+            .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+            .filter(*base_filter_v, *cat_filter)
+            .group_by("mois")
+            .order_by("mois")
+        )
+        for r in q.all():
+            rows_out.append({
+                "mois":            r.mois or "—",
+                "nb_transactions": r.nb_transactions or 0,
+                "qty":             round(float(r.qty or 0), 2),
+                "ca":              round(float(r.ca or 0), 2),
+            })
+
     # ── KPI computation ────────────────────────────────────────────────────────
     total_ventes_dh     = sum(r.get("ca", r.get("total", 0)) or 0 for r in rows_out)
     total_ventes_unites = sum(float(r.get("qty") or 0) for r in rows_out)
@@ -279,3 +346,130 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
         )
 
     return {"kpis": kpis, "rows": rows_out}
+
+
+def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str) -> dict:
+    """Group products by margin brackets for the Alertes Marges dashboard section."""
+
+    base_filter_v: list = []
+    base_filter_a: list = []
+    if pharmacy_id:
+        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
+        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
+    if df:
+        base_filter_v.append(Vente.date >= df)
+        base_filter_a.append(Achat.delivery_date >= df)
+    if dt:
+        base_filter_v.append(Vente.date <= dt)
+        base_filter_a.append(Achat.delivery_date <= dt)
+
+    if pharmacy_id:
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
+        base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
+        base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
+
+    cat_filter: list = []
+    if category_type == "pharmacie":
+        cat_filter = [_pharma_expr() == True]
+    elif category_type == "parapharmacie":
+        cat_filter = [_pharma_expr() == False]
+
+    # Weighted average purchase price per product
+    avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+        )
+        .filter(*base_filter_a)
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
+
+    q = (
+        db.query(
+            Medicament.product,
+            Medicament.ppv,
+            func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
+            func.sum(Vente.quantity).label("qty"),
+            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+        )
+        .join(Medicament, Vente.medicament_id == Medicament.id)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
+        .filter(*base_filter_v, *cat_filter)
+        .filter(Medicament.ppv.isnot(None))
+        .group_by(
+            Medicament.id, Medicament.product, Medicament.ppv,
+            Medicament.pph, avg_pu_sub.c.avg_pu,
+        )
+    )
+
+    # Define brackets
+    brackets = {
+        "negative":  {"min": None, "max": 0},
+        "low":       {"min": 0,    "max": 10},
+        "medium":    {"min": 10,   "max": 60},
+        "high":      {"min": 60,   "max": 90},
+        "very_high": {"min": 90,   "max": None},
+    }
+    result: dict = {
+        key: {"count": 0, "total_ca": 0.0, "total_margin_dh": 0.0, "products": []}
+        for key in brackets
+    }
+
+    for r in q.all():
+        ppv = float(r.ppv or 0)
+        pu = float(r.pu or 0)
+        if not ppv or not pu:
+            continue
+
+        marge_pct = round((1 - pu / ppv) * 100, 2)
+        ca = float(r.ca or 0)
+        qty = float(r.qty or 0)
+        margin_dh = round(qty * (ppv - pu), 2)
+
+        # Determine bracket
+        bracket_key = None
+        for key, bounds in brackets.items():
+            lo = bounds["min"]
+            hi = bounds["max"]
+            if lo is None and marge_pct < hi:
+                bracket_key = key
+                break
+            elif hi is None and marge_pct >= lo:
+                bracket_key = key
+                break
+            elif lo is not None and hi is not None and lo <= marge_pct < hi:
+                bracket_key = key
+                break
+        if bracket_key is None:
+            continue
+
+        bucket = result[bracket_key]
+        bucket["count"] += 1
+        bucket["total_ca"] += ca
+        bucket["total_margin_dh"] += margin_dh
+        bucket["products"].append({
+            "product": r.product or "—",
+            "marge_pct": marge_pct,
+            "ca": round(ca, 2),
+        })
+
+    # Keep only top 5 products per bracket (sorted by absolute margin desc)
+    for key in result:
+        bucket = result[key]
+        bucket["total_ca"] = round(bucket["total_ca"], 2)
+        bucket["total_margin_dh"] = round(bucket["total_margin_dh"], 2)
+        bucket["products"] = sorted(
+            bucket["products"],
+            key=lambda p: abs(p["marge_pct"]),
+            reverse=True,
+        )[:5]
+
+    return result

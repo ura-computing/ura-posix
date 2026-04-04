@@ -18,6 +18,32 @@ export function usePharmacyStats(
   return { stats, statsLoading };
 }
 
+export function useMarginAlerts(
+  dateFrom?: string,
+  dateTo?: string,
+  categoryType?: "all" | "pharmacie" | "parapharmacie",
+) {
+  const { data: marginAlerts, isLoading: marginAlertsLoading } = useQuery({
+    queryKey: ["margin-alerts", dateFrom, dateTo, categoryType],
+    queryFn: () =>
+      statsApi.getMarginAlerts(
+        dateFrom || undefined,
+        dateTo || undefined,
+        categoryType,
+      ),
+  });
+  return { marginAlerts, marginAlertsLoading };
+}
+
+export function useStockAbcd(dateFrom?: string, dateTo?: string) {
+  const { data: stockAbcd, isLoading: stockAbcdLoading } = useQuery({
+    queryKey: ["stock-abcd", dateFrom, dateTo],
+    queryFn: () =>
+      statsApi.getStockAbcd(dateFrom || undefined, dateTo || undefined),
+  });
+  return { stockAbcd, stockAbcdLoading };
+}
+
 export function useAnalyseMarge(
   dateFrom?: string,
   dateTo?: string,

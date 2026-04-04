@@ -20,8 +20,6 @@ Thumbs.db
 .env
 frontend/.env
 extension/.env
-# Prod env has real secrets — never commit
-env/prod/
 
 # Backend
 app/backend/screenshots/
@@ -40,3 +38,5 @@ build/
 **/__pycache__
 
 **/*.png
+**/*.jpeg
+

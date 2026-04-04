@@ -10,7 +10,8 @@ from models import Achat, CatalogRequest, Medicament, Pharmacy, PharmacyMedicame
 from routers.auth import get_current_user
 from utils.constants import Role, Status
 from .excel import _build_excel
-from .marge import _compute_analyse_marge
+from .marge import _compute_analyse_marge, _compute_margin_alerts
+from .stock import _compute_stock_abcd
 from .queries import (
     _compute_extra_stats,
     _fetch_med_rows,
@@ -129,6 +130,37 @@ def stats_analyse_marge(
         raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/analyse-marge")
     return _compute_analyse_marge(
         db, current_user.pharmacy_id, date_from or None, date_to or None, category_type, mode
+    )
+
+
+@router.get("/stats/margin-alerts")
+def stats_margin_alerts(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    category_type: str = Query("all"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/margin-alerts")
+    return _compute_margin_alerts(
+        db, current_user.pharmacy_id, date_from or None, date_to or None, category_type
+    )
+
+
+@router.get("/stats/stock-abcd")
+def stats_stock_abcd(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/stock-abcd")
+    if not current_user.pharmacy_id:
+        raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
+    return _compute_stock_abcd(
+        db, current_user.pharmacy_id, date_from or None, date_to or None
     )
 
 
@@ -369,6 +401,37 @@ def admin_analyse_marge(
         raise HTTPException(status_code=403, detail="Accès administrateur requis")
     return _compute_analyse_marge(
         db, pharmacy_id, date_from or None, date_to or None, category_type, mode
+    )
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/margin-alerts")
+def admin_margin_alerts(
+    pharmacy_id: int,
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    category_type: str = Query("all"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
+    return _compute_margin_alerts(
+        db, pharmacy_id, date_from or None, date_to or None, category_type
+    )
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/stock-abcd")
+def admin_stock_abcd(
+    pharmacy_id: int,
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
+    return _compute_stock_abcd(
+        db, pharmacy_id, date_from or None, date_to or None
     )
 
 

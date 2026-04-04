@@ -62,7 +62,7 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import CategorySuffix
 from schemas import CategorySuffixOut
-from routers import admin, auth, catalog_requests, data, owner, public, uploads
+from routers import accounting, admin, auth, catalog_requests, data, owner, public, uploads
 from routers.transactions import achat_router, vente_router
 from routers.stats import router as stats_router
 from routers.auth import get_current_user
@@ -112,6 +112,7 @@ app.include_router(admin.router)
 app.include_router(owner.router)
 app.include_router(catalog_requests.router)
 app.include_router(stats_router)
+app.include_router(accounting.router)
 
 
 _DEFAULTS = [

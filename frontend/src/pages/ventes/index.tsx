@@ -407,10 +407,29 @@ const VentesList = () => {
       />
 
       {rows.length > 0 && (
-        <div className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-2 flex items-center gap-4 text-sm">
-          <span className="text-muted-foreground">TVA encaissée (page courante) :</span>
-          <span className="font-semibold tabular-nums">{fmt(tvaPageTotal)} MAD</span>
-        </div>
+        <>
+          <div className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-2 flex items-center gap-4 text-sm">
+            <span className="text-muted-foreground">TVA encaissée (page courante) :</span>
+            <span className="font-semibold tabular-nums">{fmt(tvaPageTotal)} MAD</span>
+          </div>
+
+          {/* Quick filter tabs */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {[
+              { label: "Avec remise", color: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700", filter: () => rows.filter(r => (r.discount ?? 0) > 0).length },
+              { label: "Prix > PPV", color: "bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700", filter: () => rows.filter(r => r.unit_price != null && r.ppv != null && r.unit_price > r.ppv).length },
+            ].map(({ label, color, filter }) => {
+              const count = filter();
+              if (count === 0) return null;
+              return (
+                <span key={label} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", color)}>
+                  {label}
+                  <span className="font-bold">{count}</span>
+                </span>
+              );
+            })}
+          </div>
+        </>
       )}
     </ListView>
   );

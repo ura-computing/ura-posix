@@ -25,6 +25,8 @@ const PATH_LABELS: Record<string, string> = {
   "admin/catalog": "Catalogue",
   "owner/employees": "Mes employés",
   "catalog-requests": "Produits spéciaux",
+  analyse: "Analyse",
+  comptabilite: "Comptabilité",
 };
 
 export function Breadcrumb() {

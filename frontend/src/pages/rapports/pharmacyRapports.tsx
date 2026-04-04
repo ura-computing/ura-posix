@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
-import { usePharmacyStats, useAnalyseMarge } from "@/hooks/usePharmacyRapports";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
+import { usePharmacyStats, useAnalyseMarge, useMarginAlerts } from "@/hooks/usePharmacyRapports";
 import {
   AreaChart,
   Area,
@@ -14,6 +14,7 @@ import {
   Legend,
 } from "recharts";
 import {
+  AlertTriangle,
   BarChart3,
   CalendarCheck,
   CalendarX,
@@ -22,7 +23,9 @@ import {
   Plus,
   Receipt,
   Search,
+  ShieldCheck,
   ShoppingCart,
+  TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import * as statsApi from "@/api/stats";
+import type { MarginAlertBracket } from "@/api/stats";
 import { fmt } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
@@ -61,13 +65,35 @@ export function PharmacyRapports() {
 
   const { stats, statsLoading: isLoading } = usePharmacyStats(dateFrom, dateTo, categoryType);
   const { margeData, margeLoading } = useAnalyseMarge(dateFrom, dateTo, categoryType, margeMode);
+  const { marginAlerts, marginAlertsLoading } = useMarginAlerts(dateFrom, dateTo, categoryType);
 
   const kpis     = stats?.kpis;
   const advKpis  = stats?.advanced_kpis;
   const tva      = stats?.tva;
+  const marge    = stats?.marge;
+  const typeBreakdown = stats?.type_breakdown;
   const trend    = (stats?.monthly_trend ?? []).map((t) => ({ ...t, label: shortMonth(t.month) }));
   const topCats  = stats?.top_categories ?? [];
   const maxCatTotal = topCats[0]?.total ?? 1;
+
+  // Compute financial health grade from margin %
+  const margePct = marge?.marge_pct ?? 0;
+  const healthGrade = useMemo(() => {
+    if (margePct > 30) return { grade: "A+", color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30", border: "border-emerald-200 dark:border-emerald-800", desc: "Excellente rentabilite" };
+    if (margePct > 25) return { grade: "A", color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30", border: "border-emerald-200 dark:border-emerald-800", desc: "Tres bonne rentabilite" };
+    if (margePct > 20) return { grade: "B+", color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800", desc: "Bonne rentabilite" };
+    if (margePct > 15) return { grade: "B", color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800", desc: "Rentabilite correcte" };
+    if (margePct > 10) return { grade: "C", color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-800", desc: "Rentabilite faible" };
+    if (margePct > 5)  return { grade: "D", color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-orange-200 dark:border-orange-800", desc: "Rentabilite critique" };
+    return { grade: "F", color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800", desc: "Rentabilite insuffisante" };
+  }, [margePct]);
+
+  // Compute parapharmacie CA percentage
+  const paraPercent = useMemo(() => {
+    const total = kpis?.ventes_total ?? 0;
+    const paraTotal = typeBreakdown?.parapharmacie?.ventes_total ?? 0;
+    return total > 0 ? ((paraTotal / total) * 100).toFixed(1) : "0.0";
+  }, [kpis, typeBreakdown]);
 
   const handleExcel = async (type: eCategoryType) => {
     setExporting(type);
@@ -251,6 +277,37 @@ export function PharmacyRapports() {
       </div>
 
       <div className="space-y-8">
+      {/* ── Performance banner ── */}
+      <section>
+        {isLoading ? (
+          <Skeleton className="h-12 w-full rounded-lg" />
+        ) : (
+          <div className="flex items-center gap-4 overflow-x-auto rounded-lg border border-border bg-gradient-to-r from-primary/5 via-background to-primary/5 px-5 py-3">
+            <div className="flex items-center gap-2 shrink-0">
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-semibold text-foreground">
+                Marge moy. {margePct.toFixed(1)}%
+              </span>
+            </div>
+            <span className="h-4 w-px bg-border shrink-0" />
+            <span className="text-sm text-muted-foreground shrink-0">
+              Parapharmacie <span className="font-semibold text-foreground">{paraPercent}%</span> du CA
+            </span>
+            <span className="h-4 w-px bg-border shrink-0" />
+            <span className="text-sm text-muted-foreground shrink-0">
+              Marge brute <span className="font-semibold text-foreground">{fmt(marge?.marge_brute_dh ?? null)} MAD</span>
+            </span>
+            <span className="h-4 w-px bg-border shrink-0" />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <ShieldCheck className={cn("h-4 w-4", healthGrade.color)} />
+              <span className="text-sm text-muted-foreground">
+                Sante financiere: <span className={cn("font-bold", healthGrade.color)}>{healthGrade.grade}</span>
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* ── Indicateurs clés ── */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">
@@ -437,6 +494,143 @@ export function PharmacyRapports() {
         </div>
       </section>
 
+      {/* ── Répartition & Santé financière ── */}
+      <section>
+        <h2 className="text-lg font-semibold text-foreground mb-4">Repartition & Marges</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Donut chart — category distribution */}
+          <Card className="border border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Repartition par categorie</CardTitle>
+              <p className="text-xs text-muted-foreground">Part des ventes par categorie</p>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-48 w-full" />
+              ) : topCats.length === 0 ? (
+                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Aucune donnee</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={topCats} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="total" nameKey="category" paddingAngle={3}>
+                      {topCats.map((_, i) => (
+                        <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => [fmt(v) + " MAD", ""]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Santé financière card */}
+          <Card className={cn("border", healthGrade.border, healthGrade.bg)}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Sante financiere</CardTitle>
+              <p className="text-xs text-muted-foreground">Note globale basee sur la marge moyenne</p>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-48 w-full" />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-4 space-y-4">
+                  <div className={cn(
+                    "flex items-center justify-center h-28 w-28 rounded-full border-4",
+                    healthGrade.border,
+                    "bg-white dark:bg-gray-900"
+                  )}>
+                    <span className={cn("text-5xl font-black", healthGrade.color)}>{healthGrade.grade}</span>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className={cn("text-sm font-semibold", healthGrade.color)}>{healthGrade.desc}</p>
+                    <p className="text-xs text-muted-foreground">Marge moyenne: <span className="font-semibold">{margePct.toFixed(1)}%</span></p>
+                  </div>
+                  <div className="w-full space-y-2 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Marge brute</span>
+                      <span className="font-semibold">{fmt(marge?.marge_brute_dh ?? null)} MAD</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Marge nette</span>
+                      <span className="font-semibold">{fmt(marge?.marge_nette_dh ?? null)} MAD</span>
+                    </div>
+                    <div className="mt-3 rounded-md bg-muted/50 p-2.5">
+                      <p className="text-[10px] text-muted-foreground leading-relaxed font-mono">
+                        Echelle : A+ (&gt;30%) &middot; A (&gt;25%) &middot; B+ (&gt;20%) &middot; B (&gt;15%) &middot; C (&gt;10%) &middot; D (&gt;5%) &middot; F (&le;5%)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* ── Alertes Marges ── */}
+      <section>
+        <h2 className="text-lg font-semibold text-foreground mb-4">
+          <span className="inline-flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Alertes Marges
+          </span>
+        </h2>
+        {marginAlertsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-36 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : !marginAlerts ? (
+          <Card className="border border-border">
+            <CardContent className="p-8 text-center">
+              <p className="text-sm text-muted-foreground">Aucune donnee de marge disponible pour cette periode.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Marge négative — red */}
+            <MarginAlertCard
+              title="Marge negative"
+              bracket={marginAlerts.negative}
+              colorScheme="red"
+              icon={<TrendingDown className="h-5 w-5 text-red-500" />}
+              valueLabel="Perte totale"
+              valueKey="total_margin_dh"
+            />
+            {/* Marge 0%–10% — orange */}
+            <MarginAlertCard
+              title="Marge 0% a 10%"
+              bracket={marginAlerts.low}
+              colorScheme="orange"
+              icon={<AlertTriangle className="h-5 w-5 text-orange-500" />}
+              valueLabel="CA concerne"
+              valueKey="total_ca"
+            />
+            {/* Marge 60%–89.9% — yellow */}
+            <MarginAlertCard
+              title="Marge 60% a 89.9%"
+              bracket={marginAlerts.high}
+              colorScheme="yellow"
+              icon={<TrendingUp className="h-5 w-5 text-yellow-600" />}
+              valueLabel="CA concerne"
+              valueKey="total_ca"
+            />
+            {/* Marge > 90% — green */}
+            <MarginAlertCard
+              title="Marge > 90%"
+              bracket={marginAlerts.very_high}
+              colorScheme="green"
+              icon={<ShieldCheck className="h-5 w-5 text-emerald-500" />}
+              valueLabel="CA concerne"
+              valueKey="total_ca"
+            />
+          </div>
+        )}
+      </section>
+
       {/* ── TVA ── */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">Déclaration TVA</h2>
@@ -479,7 +673,12 @@ export function PharmacyRapports() {
           <h2 className="text-lg font-semibold text-foreground">Analyse de marge</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
-              {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
+              {(["produit", "categorie", "fournisseur", "bl", "laboratoire", "operateur", "mois"] as const).map((m) => {
+                const labels: Record<string, string> = {
+                  produit: "Produit", categorie: "Catégorie", fournisseur: "Fournisseur",
+                  bl: "BL", laboratoire: "Labo", operateur: "Opérateur", mois: "Mois",
+                };
+                return (
                 <Button
                   key={m}
                   size="sm"
@@ -487,9 +686,10 @@ export function PharmacyRapports() {
                   className={cn("h-8 text-xs", margeMode === m ? cn(typeTheme.primaryCard, "hover:opacity-90") : "")}
                   onClick={() => setMargeMode(m)}
                 >
-                  {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
+                  {labels[m]}
                 </Button>
-              ))}
+                );
+              })}
             </div>
             <Button
               size="sm"
@@ -829,5 +1029,99 @@ export function PharmacyRapports() {
       </section>
       </div>
     </div>
+  );
+}
+
+/* ── Margin alert card sub-component ── */
+
+const ALERT_COLORS = {
+  red: {
+    card: "border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-950/30",
+    title: "text-red-700 dark:text-red-300",
+    value: "text-red-800 dark:text-red-200",
+    count: "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300",
+    subtle: "text-red-600/70 dark:text-red-400/70",
+  },
+  orange: {
+    card: "border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-950/30",
+    title: "text-orange-700 dark:text-orange-300",
+    value: "text-orange-800 dark:text-orange-200",
+    count: "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300",
+    subtle: "text-orange-600/70 dark:text-orange-400/70",
+  },
+  yellow: {
+    card: "border-yellow-200 dark:border-yellow-800 bg-yellow-50/60 dark:bg-yellow-950/30",
+    title: "text-yellow-700 dark:text-yellow-300",
+    value: "text-yellow-800 dark:text-yellow-200",
+    count: "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300",
+    subtle: "text-yellow-600/70 dark:text-yellow-400/70",
+  },
+  green: {
+    card: "border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/30",
+    title: "text-emerald-700 dark:text-emerald-300",
+    value: "text-emerald-800 dark:text-emerald-200",
+    count: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+    subtle: "text-emerald-600/70 dark:text-emerald-400/70",
+  },
+} as const;
+
+function MarginAlertCard({
+  title,
+  bracket,
+  colorScheme,
+  icon,
+  valueLabel,
+  valueKey,
+}: {
+  title: string;
+  bracket: MarginAlertBracket;
+  colorScheme: keyof typeof ALERT_COLORS;
+  icon: ReactNode;
+  valueLabel: string;
+  valueKey: "total_ca" | "total_margin_dh";
+}) {
+  const colors = ALERT_COLORS[colorScheme];
+  const value = bracket[valueKey];
+
+  return (
+    <Card className={cn("border", colors.card)}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              {icon}
+              <p className={cn("text-sm font-semibold", colors.title)}>{title}</p>
+            </div>
+            <div>
+              <span className={cn(
+                "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold",
+                colors.count,
+              )}>
+                {bracket.count} produit{bracket.count !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div>
+              <p className={cn("text-xs", colors.subtle)}>{valueLabel}</p>
+              <p className={cn("text-lg font-bold", colors.value)}>
+                {fmt(Math.abs(value))} MAD
+              </p>
+            </div>
+            {bracket.products.length > 0 && (
+              <div className="space-y-1 pt-1 border-t border-border/50">
+                <p className={cn("text-[10px] font-medium uppercase tracking-wide", colors.subtle)}>
+                  Top produits
+                </p>
+                {bracket.products.slice(0, 3).map((p, i) => (
+                  <div key={i} className="flex items-center justify-between text-[11px]">
+                    <span className="truncate max-w-[60%] text-foreground">{p.product}</span>
+                    <span className={cn("font-medium tabular-nums", colors.value)}>{p.marge_pct.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
