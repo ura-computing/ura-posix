@@ -33,6 +33,20 @@ export type StatsResponse = {
   top_categories: TopCategory[];
 };
 
+export type MarginAlertBracket = {
+  count: number;
+  total_ca: number;
+  total_margin_dh: number;
+  products: { product: string; marge_pct: number; ca: number }[];
+};
+
+export type MarginAlertsResponse = {
+  negative: MarginAlertBracket;
+  low: MarginAlertBracket;
+  high: MarginAlertBracket;
+  very_high: MarginAlertBracket;
+};
+
 export type MargeKpiItem = { label: string; value: number; qty: number } | null;
 export type AnalyseMargeKpis = {
   total_ventes_dh: number;
@@ -48,6 +62,21 @@ export type AnalyseMargeKpis = {
 export type AnalyseMargeResponse = {
   kpis: AnalyseMargeKpis;
   rows: Record<string, unknown>[];
+};
+
+export type StockAbcdProduct = {
+  product: string;
+  category: string;
+  units_sold_12m: number;
+  stock_min: number;
+  stock_max: number;
+  current_stock: number | null;
+};
+
+export type StockAbcdResponse = {
+  distribution: Record<string, number>;
+  total_references: number;
+  products: StockAbcdProduct[];
 };
 
 function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): string {
@@ -100,6 +129,12 @@ export const exportExcelForPharmacy = (
   return fetchBlob(`/admin/pharmacy/${pharmacyId}/stats/export-excel?${p}`);
 };
 
+export const getMarginAlerts = (dateFrom?: string, dateTo?: string, categoryType?: string) =>
+  request<MarginAlertsResponse>(`/stats/margin-alerts${buildQs(dateFrom, dateTo, categoryType)}`);
+
+export const getPharmacyMarginAlerts = (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType?: string) =>
+  request<MarginAlertsResponse>(`/admin/pharmacy/${pharmacyId}/stats/margin-alerts${buildQs(dateFrom, dateTo, categoryType)}`);
+
 export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType?: string) => {
   const p = new URLSearchParams();
   if (dateFrom) p.set("date_from", dateFrom);
@@ -107,6 +142,22 @@ export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?:
   if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
   const qs = p.toString();
   return request<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs ? `?${qs}` : ""}`);
+};
+
+export const getStockAbcd = (dateFrom?: string, dateTo?: string) => {
+  const p = new URLSearchParams();
+  if (dateFrom) p.set("date_from", dateFrom);
+  if (dateTo) p.set("date_to", dateTo);
+  const qs = p.toString();
+  return request<StockAbcdResponse>(`/stats/stock-abcd${qs ? `?${qs}` : ""}`);
+};
+
+export const getPharmacyStockAbcd = (pharmacyId: number, dateFrom?: string, dateTo?: string) => {
+  const p = new URLSearchParams();
+  if (dateFrom) p.set("date_from", dateFrom);
+  if (dateTo) p.set("date_to", dateTo);
+  const qs = p.toString();
+  return request<StockAbcdResponse>(`/admin/pharmacy/${pharmacyId}/stats/stock-abcd${qs ? `?${qs}` : ""}`);
 };
 
 export const analyseMargeForPharmacy = (

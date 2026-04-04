@@ -77,11 +77,15 @@ if (window.location.origin === new URL(DASHBOARD_URL).origin) {
     }
   });
 
-  // Show upload banner on page load if jobs exist
+  // Show upload banner on page load if active jobs exist; clean stale ones from storage
   chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
     const jobs = toJobs(res[UPLOAD_STATUS_KEY]);
     if (jobs.length) {
       const active = cleanOldJobs(jobs);
+      // Remove stale jobs from storage so they don't reappear on next load
+      if (active.length < jobs.length) {
+        chrome.storage.local.set({ [UPLOAD_STATUS_KEY]: active });
+      }
       if (active.length) showUploadBanner(active, _bannerConfig);
     }
   });

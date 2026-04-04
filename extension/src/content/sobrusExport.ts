@@ -55,10 +55,16 @@ function sendMsg<T>(msg: object): Promise<T> {
 
 let _jobs: UploadJob[] = [];
 
-// Hydrate from storage once on load (in case page was refreshed mid-upload)
+// Hydrate from storage once on load — only keep active/recent jobs
 chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
   const raw = res[UPLOAD_STATUS_KEY];
-  if (Array.isArray(raw)) _jobs = raw;
+  if (Array.isArray(raw)) {
+    const now = Date.now();
+    _jobs = raw.filter((j: UploadJob) =>
+      j.state === "uploading" || j.state === "queued" || (now - j.timestamp < 60_000)
+    );
+    if (_jobs.length < raw.length) _syncToStorage();
+  }
 });
 
 function _syncToStorage() {

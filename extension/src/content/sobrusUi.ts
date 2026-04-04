@@ -26,6 +26,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 chrome.storage.local.get(UPLOAD_STATUS_KEY, (res) => {
-  const jobs = cleanOldJobs(toJobs(res[UPLOAD_STATUS_KEY]));
+  const raw = toJobs(res[UPLOAD_STATUS_KEY]);
+  const jobs = cleanOldJobs(raw);
+  if (jobs.length < raw.length) {
+    chrome.storage.local.set({ [UPLOAD_STATUS_KEY]: jobs });
+  }
   if (jobs.length) showUploadBanner(jobs, _bannerConfig);
 });

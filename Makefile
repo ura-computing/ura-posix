@@ -12,6 +12,7 @@ PIP  := $(VENV)/bin/python3 -m pip
 	back-install back-dev back-build back-prod back-seed back-db-clean \
 	front-install front-dev front-build front-serve \
 	ext-install ext-dev ext-build \
+	test test-back test-front test-ext test-db \
 	db db-ui down check-env install dev build serve seed db-clean start demo prod
 
 # ── Environment ──────────────────────────────────────────────────────────────
@@ -116,6 +117,22 @@ build: back-build front-build ext-build
 
 db-clean: back-db-clean
 seed: back-seed
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+test-db: db
+	@docker compose exec db psql -U apcm -d postgres -c "CREATE DATABASE apcm_test;" 2>/dev/null || true
+
+test-back: back-install test-db
+	cd $(BACKEND_DIR) && APP_ENV=test .venv/bin/python -m pytest -v $(ARGS)
+
+test-front: front-install
+	cd $(FRONTEND_DIR) && npx vitest run $(ARGS)
+
+test-ext: ext-install
+	cd $(EXTENSION_DIR) && npx vitest run $(ARGS)
+
+test: test-back test-front test-ext
 
 # ── Dev environment (local Vite dev servers + local DB) ───────────────────────
 
