@@ -1,54 +1,50 @@
-# APCM Pharma
+# PharmaGest -- Gestion avancee de votre Pharmacie
 
-A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Chrome extension automatically intercepts CSV exports from Sobrus and uploads them directly to the backend — no manual file handling required.
+Full-stack pharmacy management dashboard + Chrome extension for Moroccan pharmacies using the **Sobrus** POS system. Imports CSV exports from Sobrus, provides analytics, margin analysis, accounting tools, and stock management with ABCD classification.
 
 ---
 
-## System Architecture
+## Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, Vite, TypeScript, React Router v7, TanStack Query + Table, shadcn/ui, Tailwind CSS 4, Recharts, Zod, react-hook-form |
+| **Backend** | FastAPI, SQLAlchemy 2, PostgreSQL 16, Pydantic v2, JWT (python-jose), bcrypt, WhatsApp Cloud API (OTP) |
+| **Extension** | Chrome MV3, CRXJS Vite plugin, React 19, TanStack Query, Chrome Storage API |
+| **Testing** | pytest (187 tests), vitest (84 frontend + 27 extension) |
+
+---
+
+## Project Structure
 
 ```
-┌─────────────────────┐
-│   Sobrus Web UI     │  (app.pharma.sobrus.com)
-│                     │
-│  [Télécharger CSV]──┼──► content script intercepts click
-└─────────────────────┘
-           │
-           │ CSV fetched via same-domain Sobrus API
-           │ Split into 500-row chunks
-           ▼
-┌─────────────────────┐
-│  Chrome Extension   │  (Data Capture Layer)
-│                     │
-│  content/index.ts   │  • Auth token relay (dashboard → extension)
-│  sobrus-export.ts   │  • CSV intercept + chunked upload
-│  background/        │  • Upload orchestration (can reach localhost)
-│  popup/             │  • Auth status + import history panel
-│                     │
-│  ┌─────────────────┐│
-│  │  [A] APCM  ●    ││  ← Draggable status indicator on Sobrus
-│  └─────────────────┘│    (teal = connected, red = not connected)
-└──────────┬──────────┘
-           │
-           │ HTTP POST /uploads/achat  (CSV chunks, JWT auth)
-           │ Chunk progress synced via chrome.storage
-           ▼
-┌─────────────────────┐      HTTP/REST      ┌──────────────────┐
-│   React Dashboard   │ ◄─────────────────► │  FastAPI Backend │
-│   (localhost:5173)  │   JSON + JWT Auth   │  (localhost:8000)│
-│                     │                     │                  │
-│  Achats / Ventes    │                     │  /uploads/*      │
-│  Rapports / Stats   │                     │  /achat, /ventes │
-│  Catalog Requests   │                     │  /auth, /admin   │
-│  Employee Mgmt      │                     │  /owner, /stats  │
-│  Notification bell  │                     │  /catalog-requests│
-└─────────────────────┘                     └────────┬─────────┘
-           ▲                                         │
-           │ Notifications + upload progress         │ SQLAlchemy ORM
-           │ (chrome.storage → content script        ▼
-           │  → window.postMessage → React)  ┌──────────────────┐
-           └─────────────────────────────────│   PostgreSQL     │
-                                             │   Database       │
-                                             └──────────────────┘
+pharmagest/
+├── backend/          FastAPI server
+│   ├── main.py           App entry, CORS, router registration
+│   ├── models/           SQLAlchemy models (auth, catalog, transactions)
+│   ├── schemas/          Pydantic request/response schemas
+│   ├── routers/          API routers (auth, admin, owner, uploads, stats, ...)
+│   │   └── stats/        Analytics engine (queries, marge, stock, excel)
+│   └── utils/            JWT, permissions, email, string helpers
+├── frontend/         React dashboard (Vite)
+│   ├── api/              Typed API layer (one file per domain)
+│   ├── hooks/            TanStack Query/Mutation logic
+│   ├── pages/            Route pages
+│   ├── components/       UI components (layout, form, data-table, shared, ui)
+│   ├── schemas/          Zod validation schemas
+│   └── utils/            Formatting, session, CSV export
+├── extension/        Chrome extension (CRXJS)
+│   ├── background/       Token storage, upload orchestration
+│   ├── content/          Auth relay, CSV intercept, upload banner
+│   ├── popup/            Auth status + import history panel
+│   └── hooks/            Token, notifications, upload status
+├── env/              Environment configs
+│   ├── dev/              Development (docker.env, backend.env, frontend.env, extension.env)
+│   ├── demo/             Demo / Docker (docker.env, backend.env, frontend.env, extension.env)
+│   ├── test/             Test suite (backend.env)
+│   └── prod/             Production (docker.env, backend.env, frontend.env, extension.env)
+├── resources/        Sample CSVs, catalog, screenshots
+└── Makefile          All commands
 ```
 
 ---
@@ -62,11 +58,10 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 │ id          (PK)     │◄─────┐
 │ name                 │      │
 │ address              │      │
-│ phone                │      │
-│ email                │      │
+│ phone, email         │      │
+│ options     (JSON)   │  ← feature toggles (ceiling for users)
 │ created_at           │      │
 └──────────────────────┘      │
-           │                  │
            │ 1:N              │ 1:N
            ▼                  │
 ┌────────────────────────────┐│
@@ -80,51 +75,60 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 │ status                     │  ← pending | active | rejected
 │ name, phone                │
 │ pharmacy_name              │
-│ permissions (JSON)         │  ← { import, achat, ventes, rapports, stock }
+│ permissions (JSON)         │  ← { rapports, import, achat, ventes, stock }
+│ reset_token, reset_token_  │
+│   expires                  │  ← password reset (email link or WhatsApp OTP)
 │ created_at, updated_at     │
 └────────────────────────────┘
 
-
 ┌──────────────────────────────────────┐
-│         medicaments                  │  (Product Catalog — source of truth)
+│         medicaments                  │  (Catalogue produits)
 ├──────────────────────────────────────┤
 │ id           (PK)                    │
-│ pid          (UQ)                    │  ← Sobrus product ID (or barcode fallback)
-│ product                              │  ← Product name
-│ category                             │  ← e.g. "Medicaments (7.0%)"
+│ pid          (UQ)                    │  ← Sobrus product ID
+│ product                              │
+│ category                             │  ← e.g. "Medicament"
 │ product_type                         │  ← "pharmacie" | "parapharmacie" | null
-│ zone, laboratoire                    │
-│ pph, ppv, tva                        │  ← Prices + tax rate
+│ pph, ppv, tva                        │  ← Prix catalogue + TVA
+│ laboratoire, zone                    │
 │ barcode1, barcode2                   │
-│ created_at, updated_at               │
 └──────────┬───────────────────────────┘
-           │ 1
-           ├────────────────────────────────────────────────────┐
-           │ N                                                  │ N
-           ▼                                                    ▼
-┌────────────────────────────┐            ┌───────────────────────────────────┐
-│          achats            │            │            ventes                 │
-│       (Purchases)          │            │            (Sales)                │
-├────────────────────────────┤            ├───────────────────────────────────┤
-│ id              (PK)       │            │ id              (PK)              │
-│ pharmacy_id     (FK)       │            │ pharmacy_id     (FK)              │
-│ medicament_id   (FK)       │            │ medicament_id   (FK)              │
-│ delivery_date              │            │ date                              │
-│ delivery_ref               │            │ transaction_ref                   │
-│ delivery_ref_final         │            │ transaction_ref_final             │
-│ supplier                   │            │ client                            │
-│ quantity, unit_price       │            │ quantity, unit_price              │
-│ expiry_date, total         │            │ discount, total                   │
-│ uploaded_at                │            │ uploaded_at                       │
-└────────────────────────────┘            └───────────────────────────────────┘
-
+           │ 1:N                1:N
+           ▼                    ▼
+┌────────────────────────────┐  ┌───────────────────────────────────┐
+│          achats            │  │            ventes                 │
+│       (Achats)             │  │           (Ventes)                │
+├────────────────────────────┤  ├───────────────────────────────────┤
+│ id              (PK)       │  │ id              (PK)              │
+│ pharmacy_id     (FK)       │  │ pharmacy_id     (FK)              │
+│ medicament_id   (FK)       │  │ medicament_id   (FK)              │
+│ import_batch_id (FK)       │  │ import_batch_id (FK)              │
+│ delivery_date              │  │ date                              │
+│ delivery_ref               │  │ transaction_ref                   │
+│ supplier                   │  │ client                            │
+│ quantity, unit_price       │  │ quantity, unit_price              │
+│ expiry_date, total         │  │ discount, total                   │
+│ stock_min, stock_max       │  │ uploaded_at                       │
+│ uploaded_at                │  └───────────────────────────────────┘
+└────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│      catalog_requests                │  (Exclusion & annulation requests)
+│      import_batches                  │  (Suivi des imports CSV)
+├──────────────────────────────────────┤
+│ id              (PK)                 │
+│ pharmacy_id     (FK)                 │
+│ file_type                            │  ← "achat" | "vente"
+│ filename                             │  ← ex: "Sobrus - Achats 2025-03-29..."
+│ rows_inserted, rows_skipped          │
+│ imported_at                          │
+└──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│      catalog_requests                │  (Demandes d'exclusion/annulation)
 ├──────────────────────────────────────┤
 │ id              (PK)                 │
 │ requested_by    (FK → users)         │
-│ pharmacy_id     (FK → pharmacies)    │
+│ pharmacy_id     (FK)                 │
 │ request_type                         │  ← new_product | non_declare | annulation
 │ medicament_id   (FK, nullable)       │
 │ status                               │  ← pending | approved | rejected
@@ -134,140 +138,253 @@ A pharmacy management dashboard for Moroccan pharmacies using Sobrus POS. The Ch
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│  pharmacy_medicament_status          │  (Per-pharmacy product exclusions)
+│  pharmacy_medicament_status          │  (Exclusions par pharmacie)
 ├──────────────────────────────────────┤
 │ pharmacy_id + medicament_id (UQ)     │
-│ declared (bool)                      │  ← False = excluded from reports
+│ declared (bool)                      │  ← False = exclu des rapports
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│      category_suffixes               │  (Delivery ref suffix mappings)
+│      payment_entries                 │  (Saisie manuelle des paiements)
+├──────────────────────────────────────┤
+│ id              (PK)                 │
+│ pharmacy_id     (FK)                 │
+│ month                                │  ← "2026-03"
+│ method                               │  ← tpe | especes | cheques | virement
+│ pharmacie_amount                     │
+│ parapharmacie_amount                 │
+│ count                                │
+│ created_at, updated_at               │
+└──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│      category_suffixes               │  (Suffixes référence BL)
 ├──────────────────────────────────────┤
 │ category (UQ), suffix, color         │
 └──────────────────────────────────────┘
 
-Deduplication keys:
+Clés de déduplication :
   achats  → (delivery_ref, medicament_id, pharmacy_id)
   ventes  → (transaction_ref, medicament_id, pharmacy_id)
 ```
 
 ---
 
-## Technology Stack
+## Quick Start
 
-**Backend:** FastAPI, SQLAlchemy 2, PostgreSQL 16, Pydantic v2, python-jose, bcrypt
+### Requirements
 
-**Frontend:** React 19 + TypeScript, React Router 7, TanStack Query + Table, shadcn/ui, Tailwind CSS 4, Zod + react-hook-form, Recharts
+- Python 3.10+, Node.js 18+, Docker, Chrome
 
-**Extension:** Chrome MV3, React 19 + TypeScript, TanStack Query, Chrome Storage API
+### Commands
+
+```bash
+make start    # Full setup: install deps -> env -> db -> seed -> dev
+make dev      # Start backend + frontend
+make demo     # Docker demo (clean DB, auto-seed)
+make test     # Run all 298 tests
+make prod     # Production build + serve
+```
+
+Additional commands:
+
+```bash
+make install  # Install all dependencies (backend + frontend + extension)
+make db       # Start PostgreSQL container
+make seed     # Create default admin account
+make build    # Build frontend + extension for production
+```
+
+### Default Admin Account
+
+After running `make seed`:
+
+| Role  | Email           | Password  |
+|-------|-----------------|-----------|
+| Admin | admin@gmail.com | admin@123 |
+
+Owners register via `/signup`. The admin approves them from the Pharmacies panel.
 
 ---
 
-## Data Flows
+## Pages and Features
 
-### 1. Authentication
+### Authentication (public)
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/login` | Connexion | Email/password login |
+| `/signup` | Inscription | Register as owner or employee (select pharmacy from list) |
+| `/forgot-password` | Mot de passe oublie | Reset via email link or WhatsApp OTP (6-digit code) |
+| `/reset-password` | Nouveau mot de passe | Set new password using reset token |
+
+### Owner and Employee Pages (authenticated)
+
+| Route | Page | Access | Description |
+|-------|------|--------|-------------|
+| `/rapports` | Tableau de bord | Owner, Employee | Main dashboard: KPIs (CA, marge, ticket moyen), sante financiere grade, margin alerts, monthly trend charts, category breakdown |
+| `/analyse` | Analyse des marges | Owner, Employee | Margin analysis with 7 grouping modes: Produit, Categorie, Fournisseur, BL, Laboratoire, Operateur, Mois. Row selection, live KPI cards, CSV export |
+| `/comptabilite` | Comptabilite | Owner, Employee | Accounting: manual entry for payment methods (TPE, Especes, Cheques, Virement), bilan financier with date range filter |
+| `/achat` | Achats | Owner, Employee | Purchase ledger with Mixte/Pharmacie/Parapharmacie type filters, supplier summary, column visibility toggle, CSV export |
+| `/ventes` | Ventes | Owner, Employee | Sales ledger with same type filters, quick-access badges for remises and price anomalies |
+| `/stock` | Stock ABCD | Owner, Employee | Stock analysis: ABCD distribution chart, stock min/max recommendations, sortable product table with status badges |
+| `/dashboard/upload-file` | Import CSV | Owner, Employee | Manual CSV import wizard (drag-and-drop, file type selection) |
+| `/parametres` | Parametres | Owner, Employee | Profile settings + danger zone (view import history, batch deletion of data) |
+| `/catalog-requests` | Produits speciaux | Owner, Employee | Submit product exclusion (non-declare) or annulation requests |
+| `/owner/employees` | Employes | Owner only | Manage employees: approve/reject pending accounts, set feature permissions, revoke access |
+
+### Admin Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/admin/pharmacies` | Pharmacies | Pharmacy management with tabbed panel: Membres (user management), Produits speciaux (non-declared products), Options (feature toggles) |
+| `/admin/catalog-requests` | Demandes catalogue | Approve or reject product exclusion and annulation requests |
+| `/admin/catalog` | Catalogue | Product catalog CRUD + XLSM bulk import, category normalization, deduplication |
+
+---
+
+## Math Formulas
+
+### Revenue
+
+**CA (Chiffre d'affaires)** = `PPV x quantite vendue`
+
+> Example: PPV = 162.00 MAD, qty = 5 -> CA = 810.00 MAD
+
+### Purchase Price
+
+**PU (Prix Unitaire d'achat)** = weighted average of all purchases in the selected date range:
+
 ```
-User login → POST /auth/login
-           → bcrypt verify → JWT generated
-           → token stored in sessionStorage (dashboard)
-           → content script picks up postMessage(APCM_AUTH_TOKEN)
-           → token stored in chrome.storage.local (extension)
-           → Sobrus indicator updates to green ●
+PU = Sum(PU_achat x qty_achat) / Sum(qty_achat)
 ```
 
-### 2. Extension CSV Auto-Capture (Primary)
+> Example: 1 x 124.23 + 1 x 129.20 + 2 x 129.20 = 511.83, total qty = 4 -> PU = 127.96 MAD
+
+Falls back to PPH (catalog reference price) if no purchases exist in the selected period.
+
+### Margins
+
+**Marge %** = `(1 - PU / PPV) x 100`
+
+> Example: PU = 127.96, PPV = 162.00 -> (1 - 0.7899) x 100 = **21.0%**
+
+**Marge brute (DH)** = `PPV - PU`
+
+> Example: 162.00 - 127.96 = **34.04 MAD** per unit
+
+**Marge nette (DH)** = `PPV_HT - PU_HT` where HT = `/ (1 + taux_TVA)`
+
+> Example: TVA = 20% -> 162/1.2 - 127.96/1.2 = 135.00 - 106.63 = **28.37 MAD**
+
+**Marge moyenne** = quantity-weighted average:
+
 ```
-User clicks "Télécharger en CSV" on Sobrus
-→ content script intercepts click
-→ fetches CSV via same-domain Sobrus API (session cookies included)
-→ splits CSV into 500-row chunks
-→ sends each chunk to background service worker
-→ background uploads chunk → POST /uploads/achat or /uploads/vente
-→ updates chrome.storage (apcm_upload_status) after each chunk
-→ content script reads storage change → shows progress banner
-→ on completion → saves notification to chrome.storage
-→ opens / focuses dashboard tab on relevant page
+Marge moyenne = Sum(qty x marge%) / Sum(qty)
 ```
 
-### 3. Manual CSV Import (Dashboard)
-```
-User drops file on dashboard upload wizard
-→ POST /uploads/achat or /uploads/vente (multipart)
-→ backend parses CSV (semicolon-delimited, UTF-8 / Latin-1)
-→ for each row: upsert Medicament by PID → insert Achat/Vente
-→ returns { inserted: N, skipped: M }
-```
+### TVA
 
-### 4. Catalog Request Flow
-```
-Owner submits exclusion request (non_declare) for a product
-→ Admin approves → product marked as excluded (PharmacyMedicamentStatus.declared = false)
-→ Product excluded from reports and stats
+| Metric | Formula |
+|--------|---------|
+| TVA encaissee (ventes) | `Sum(PPV x qty x taux_TVA)` |
+| TVA payee (achats) | `Sum(PU x qty x taux_TVA)` |
+| TVA a declarer | `encaissee - payee` (estimation) |
 
-Owner wants to reverse → submits annulation request
-→ Admin approves → exclusion removed (product declared again)
-→ Admin rejects → product stays excluded
-```
+### KPIs
+
+| KPI | Formula |
+|-----|---------|
+| Ticket moyen | `CA total / nombre de transactions` |
+| Vente moyenne / jour | `CA total / nombre de jours avec ventes` |
+
+**Sante financiere** -- letter grade based on marge moyenne:
+
+| Grade | Marge moyenne |
+|-------|---------------|
+| A+ | > 30% |
+| A | > 25% |
+| B+ | > 20% |
+| B | > 15% |
+| C | > 10% |
+| D | > 5% |
+| F | <= 5% |
+
+### Stock ABCD Classification
+
+**Ratio** = `total_unites_vendues_12_mois / 300`
+
+| Class | Criteria |
+|-------|----------|
+| A | ratio >= 1.0 (300+ unites/an) |
+| A- | 0.833 -- 0.997 (250 -- 299 unites) |
+| B+ | 0.667 -- 0.833 (200 -- 249 unites) |
+| B | 0.16 -- 0.667 (48 -- 199 unites) |
+| C | 0.02 -- 0.157 (6 -- 47 unites) |
+| C- | 1 -- 5 unites en 12 mois |
+| C-N | 1 -- 5 unites uniquement sur les 4 derniers mois (nouveautes) |
+| D | 0 unite en 12 mois |
+
+**Stock MIN** = `floor(ratio x 14)` -- securite 2 semaines
+
+**Stock MAX** = `ceil(ratio x 15)`
+
+Exceptions:
+- C / C- / C-N: min = 0, max = 1
+- D: min = 0, max = 0
 
 ---
 
 ## API Reference
 
-### Auth
+### Auth (`/auth`) -- 8 endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/auth/signup` | Create account (owner/employee) |
-| POST | `/auth/login` | Get JWT token |
-| GET | `/auth/me` | Current user profile |
-| PUT | `/auth/me` | Update profile |
+| POST | `/auth/signup` | Create account (owner or employee) |
+| POST | `/auth/login` | Authenticate and get JWT token |
+| GET | `/auth/me` | Get current user profile |
+| PUT | `/auth/me` | Update profile (name, phone, password) |
 | POST | `/auth/forgot-password` | Send password reset email |
-| POST | `/auth/forgot-password-whatsapp` | Send OTP via WhatsApp |
-| POST | `/auth/verify-otp` | Verify WhatsApp OTP and reset password |
 | POST | `/auth/reset-password` | Reset password with email token |
+| POST | `/auth/forgot-password-whatsapp` | Send OTP via WhatsApp |
+| POST | `/auth/verify-otp` | Verify WhatsApp OTP |
 
-### Uploads
+### Admin (`/admin`) -- 28 endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/uploads/achat` | Sobrus purchase CSV (chunked from extension) |
-| POST | `/uploads/vente` | Sobrus sales CSV (chunked from extension) |
-| POST | `/uploads/achat-json` | Purchases from JSON array |
-| POST | `/uploads/vente-json` | Sales from JSON array |
-| POST | `/uploads/catalog` | Product catalog from XLSM |
-
-### Data Query
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/achat` | Purchases — paginated, filterable |
-| GET | `/achat/categories` | Distinct categories |
-| GET | `/achat/tva-rates` | Distinct TVA rates |
-| GET | `/ventes` | Sales — paginated, filterable |
-| GET | `/ventes/categories` | Distinct categories |
-| GET | `/ventes/tva-rates` | Distinct TVA rates |
-| DELETE | `/data/achats` | Clear purchase data (with filters) |
-| DELETE | `/data/ventes` | Clear sales data (with filters) |
-
-### Admin
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET/POST | `/admin/pharmacies` | List / create pharmacies |
-| PUT/DELETE | `/admin/pharmacies/{id}` | Update / delete pharmacy |
+| GET | `/admin/pharmacies` | List all pharmacies |
+| POST | `/admin/pharmacies` | Create pharmacy |
+| PUT | `/admin/pharmacies/{id}` | Update pharmacy |
+| DELETE | `/admin/pharmacies/{id}` | Delete pharmacy |
+| GET | `/admin/pharmacy/{id}/non-declared` | Non-declared products for a pharmacy |
+| GET | `/admin/pharmacies/{id}/options` | Get pharmacy feature options |
+| PUT | `/admin/pharmacies/{id}/options` | Update pharmacy feature options |
 | GET | `/admin/users` | List all users |
 | GET | `/admin/users/pending` | List pending owner accounts |
-| PUT | `/admin/users/{id}/approve` | Approve a pending account |
-| PUT | `/admin/users/{id}/reject` | Reject a pending account |
-| PUT | `/admin/users/{id}/revoke` | Revoke an active account |
+| GET | `/admin/notifications` | Pending users + pending catalog requests count |
+| PUT | `/admin/users/{id}/approve` | Approve pending account |
+| PUT | `/admin/users/{id}/reject` | Reject pending account |
+| PUT | `/admin/users/{id}/revoke` | Revoke active account |
 | PUT | `/admin/users/{id}/role` | Change user role |
-| PUT | `/admin/users/{id}/pharmacy` | Assign pharmacy |
-| PUT | `/admin/users/{id}/permissions` | Update feature permissions |
-| GET/POST | `/admin/catalog` | List / create catalog products |
-| PUT/DELETE | `/admin/catalog/{id}` | Update / delete product |
-| GET/POST | `/admin/category-suffixes` | Manage delivery ref suffixes |
-| PUT/DELETE | `/admin/category-suffixes/{id}` | Update / delete suffix |
-| GET | `/admin/notifications` | Pending users + pending catalog requests |
-| GET | `/admin/stats` | Platform-wide system stats |
-| GET | `/admin/pharmacy-stats/{id}` | Detailed stats for a pharmacy |
+| PUT | `/admin/users/{id}/pharmacy` | Assign user to pharmacy |
+| PUT | `/admin/users/{id}/permissions` | Update user feature permissions |
+| GET | `/admin/catalog/categories` | List distinct catalog categories |
+| POST | `/admin/catalog/deduplicate` | Remove duplicate catalog entries |
+| GET | `/admin/catalog` | List catalog products (paginated) |
+| POST | `/admin/catalog` | Create catalog product |
+| PUT | `/admin/catalog/{id}` | Update catalog product |
+| POST | `/admin/catalog/normalize-categories` | Normalize category strings |
+| DELETE | `/admin/catalog/{id}` | Delete catalog product |
+| GET | `/admin/category-suffixes` | List delivery ref suffixes |
+| POST | `/admin/category-suffixes` | Create suffix mapping |
+| PUT | `/admin/category-suffixes/{id}` | Update suffix mapping |
+| DELETE | `/admin/category-suffixes/{id}` | Delete suffix mapping |
+| GET | `/admin/analytics` | Platform-wide analytics |
 
-### Owner
+### Owner (`/owner`) -- 6 endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/owner/employees` | List pharmacy employees |
@@ -275,9 +392,62 @@ Owner wants to reverse → submits annulation request
 | PUT | `/owner/employees/{id}/reject` | Reject employee |
 | PUT | `/owner/employees/{id}/revoke` | Revoke employee access |
 | PUT | `/owner/employees/{id}/permissions` | Update employee permissions |
-| GET | `/owner/notifications` | Pending employees |
+| GET | `/owner/notifications` | Pending employee count |
 
-### Catalog Requests
+### Uploads (`/uploads`) -- 5 endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/uploads/achat` | Upload purchase CSV (supports chunked uploads with batch_id) |
+| POST | `/uploads/vente` | Upload sales CSV (supports chunked uploads with batch_id) |
+| POST | `/uploads/achat-json` | Upload purchases from JSON array |
+| POST | `/uploads/vente-json` | Upload sales from JSON array |
+| POST | `/uploads/catalog` | Upload product catalog from XLSM file |
+
+### Data (`/data`) -- 4 endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| DELETE | `/data/achats` | Clear purchase data (with optional date/category filters) |
+| DELETE | `/data/ventes` | Clear sales data (with optional date/category filters) |
+| GET | `/data/imports` | List import batches with metadata |
+| DELETE | `/data/imports/{batch_id}` | Delete a specific import batch |
+
+### Transactions -- 8 endpoints
+
+**Achats (`/achat`)** -- 4 endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/achat` | Purchases -- paginated, filterable, exportable |
+| GET | `/achat/categories` | Distinct purchase categories |
+| GET | `/achat/tva-rates` | Distinct purchase TVA rates |
+| GET | `/achat/suggestions` | Autocomplete suggestions for search |
+
+**Ventes (`/ventes`)** -- 4 endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/ventes` | Sales -- paginated, filterable, exportable |
+| GET | `/ventes/categories` | Distinct sales categories |
+| GET | `/ventes/tva-rates` | Distinct sales TVA rates |
+| GET | `/ventes/suggestions` | Autocomplete suggestions for search |
+
+**Common query parameters:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | int | Page number (default 1) |
+| `limit` | int | Items per page (default 10, max 200) |
+| `search` | string | Search product, supplier, ref |
+| `category` | string[] | Filter by category (multi-select) |
+| `tva` | string[] | Filter by TVA rate (multi-select) |
+| `date_from` | YYYY-MM-DD | Start date |
+| `date_to` | YYYY-MM-DD | End date |
+| `export` | bool | Return all rows (no pagination) |
+
+### Catalog Requests (`/catalog-requests`) -- 6 endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/catalog-requests` | List requests (filtered by role) |
@@ -287,280 +457,131 @@ Owner wants to reverse → submits annulation request
 | PUT | `/catalog-requests/{id}/approve` | Admin approves request |
 | PUT | `/catalog-requests/{id}/reject` | Admin rejects request |
 
-### Stats
+### Stats -- 12 endpoints
+
+**Pharmacy stats (`/stats`)**
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/stats` | Pharmacy stats (KPIs, TVA, marge, trends) |
-| GET | `/stats/products` | Pharmacy products with declared status |
-| GET | `/stats/analyse-marge` | Margin analysis by product |
+| GET | `/stats` | KPIs, TVA, marge, trends, category breakdown |
+| GET | `/stats/analyse-marge` | Margin analysis (7 grouping modes) |
+| GET | `/stats/margin-alerts` | Products with margin below threshold |
+| GET | `/stats/stock-abcd` | Stock ABCD classification |
 | GET | `/stats/export-excel` | Excel report export |
+| GET | `/stats/products` | Pharmacy products with declared status |
 
-### Public
+**Admin pharmacy stats (`/admin/pharmacy/{id}/stats`)**
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/public/pharmacies` | List pharmacies (unauthenticated, for signup) |
+| GET | `/admin/pharmacy/{id}/stats` | Stats for a specific pharmacy |
+| GET | `/admin/pharmacy/{id}/stats/export-excel` | Excel export for a pharmacy |
+| GET | `/admin/pharmacy/{id}/stats/analyse-marge` | Margin analysis for a pharmacy |
+| GET | `/admin/pharmacy/{id}/stats/margin-alerts` | Margin alerts for a pharmacy |
+| GET | `/admin/pharmacy/{id}/stats/stock-abcd` | Stock ABCD for a pharmacy |
 
-### Query Parameters (GET /achat, GET /ventes)
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | int | Page number (default 1) |
-| `limit` | int | Items per page (default 10, max 200) |
-| `search` | string | Search product, supplier, ref |
-| `category` | string[] | Filter by category (multi) |
-| `tva` | string[] | Filter by TVA rate (multi) |
-| `date_from` | YYYY-MM-DD | Start date |
-| `date_to` | YYYY-MM-DD | End date |
-| `export` | bool | Return all rows (no pagination) |
+**Platform stats**
 
----
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/admin/stats` | Platform-wide system statistics |
 
-## Project Structure
+### Accounting (`/accounting`) -- 3 endpoints
 
-```
-apcm-pharma/
-├── backend/
-│   ├── main.py                  # FastAPI app, CORS, router registration
-│   ├── database.py              # SQLAlchemy engine + session
-│   ├── seed.py                  # Admin account seeder
-│   ├── models/
-│   │   ├── auth.py              # User, Pharmacy
-│   │   ├── catalog.py           # Medicament, CatalogRequest, PharmacyMedicamentStatus, CategorySuffix
-│   │   └── transactions.py      # Achat, Vente
-│   ├── schemas/
-│   │   ├── auth.py              # UserSignup, UserLogin, ProfileUpdate
-│   │   ├── catalog.py           # MedicamentCreate/Out, CatalogRequestCreate/Out, NonDeclareRequestCreate
-│   │   └── pharmacy.py          # Pharmacy schemas
-│   ├── routers/
-│   │   ├── auth.py              # Login, signup, profile, password reset
-│   │   ├── uploads.py           # CSV/JSON/XLSM ingestion + upsert logic
-│   │   ├── transactions.py      # GET /achat, GET /ventes (paginated, filterable)
-│   │   ├── data.py              # DELETE /data/achats, DELETE /data/ventes
-│   │   ├── admin.py             # Pharmacy + user management, catalog CRUD, suffixes
-│   │   ├── owner.py             # Employee management + permissions
-│   │   ├── catalog_requests.py  # Non-declare + annulation request workflow
-│   │   ├── public.py            # Unauthenticated endpoints (pharmacy list for signup)
-│   │   └── stats/               # Analytics engine
-│   │       ├── router.py        # Stats endpoints
-│   │       ├── queries.py       # KPI, TVA, trend queries
-│   │       ├── marge.py         # Margin analysis
-│   │       └── excel.py         # Excel export generation
-│   └── utils/
-│       ├── auth.py              # JWT encode/decode, bcrypt helpers
-│       ├── permissions.py       # get_current_owner, get_current_admin
-│       ├── email.py             # Password reset email
-│       └── strings.py           # Accent stripping for categories
-│
-├── frontend/src/
-│   ├── App.tsx                  # Route guards (Protected, Guest, Pending, Role)
-│   ├── routes.tsx               # RouteConfig[] + ResourceConfig[] for sidebar
-│   ├── api/                     # Typed API layer (one file per domain)
-│   │   ├── client.ts            # Base request<T>(), uploadFile<T>(), fetchBlob()
-│   │   ├── auth.ts              # login, signup, me, updateMe, forgotPassword, resetPassword
-│   │   ├── admin.ts             # Admin API + CatalogRequestOut type
-│   │   ├── owner.ts             # Employee management
-│   │   ├── transactions.ts      # Achat/vente list, categories, export
-│   │   ├── catalogRequests.ts   # Non-declare + annulation requests
-│   │   ├── uploads.ts           # CSV upload
-│   │   ├── stats.ts             # Stats + Excel export
-│   │   └── public.ts            # Public pharmacy list
-│   ├── hooks/                   # All TanStack Query/Mutation logic (no TanStack in pages)
-│   │   ├── useAuthenticate.ts   # login, signup, logout, forgotPassword, resetPassword
-│   │   ├── useMe.ts             # Current user query
-│   │   ├── useUpdateMe.ts       # Profile update mutation
-│   │   ├── useAchatList.ts      # Paginated achat query
-│   │   ├── useVentesList.ts     # Paginated ventes query
-│   │   ├── useClearData.ts      # Clear achats/ventes mutations
-│   │   ├── useUpload.ts         # Upload mutations
-│   │   ├── useCatalogRequests.ts       # Owner catalog request hooks
-│   │   ├── useAdminCatalogRequests.ts  # Admin catalog request hooks
-│   │   ├── useAdminCatalog.ts          # Admin catalog CRUD hooks
-│   │   ├── useAdminPharmacies.ts       # Admin pharmacy management hooks
-│   │   ├── useAdminRapports.ts         # Admin report queries
-│   │   ├── usePharmacyRapports.ts      # Pharmacy report queries
-│   │   ├── useOwnerEmployees.ts        # Owner employee management hooks
-│   │   ├── useAdminOwnerNotifications.ts # Notification queries
-│   │   ├── useCategoryOptions.ts       # Catalog category list
-│   │   ├── useNotifications.ts         # Extension import notifications
-│   │   ├── useStatusPoller.ts          # Pending account status poller
-│   │   └── useMobile.ts               # Mobile breakpoint detection
-│   ├── schemas/                 # Zod schemas + useForm hooks
-│   │   ├── loginForm.ts
-│   │   ├── signupForm.ts
-│   │   ├── resetPassword.ts
-│   │   └── profile.ts
-│   ├── pages/
-│   │   ├── welcome.tsx          # Landing page (role-aware)
-│   │   ├── login/, signup/      # Auth pages
-│   │   ├── forgotPassword/, resetPassword/
-│   │   ├── pending.tsx          # Pending account screen
-│   │   ├── achat/, ventes/      # Paginated data tables with filters
-│   │   ├── rapports/            # Analytics (admin + pharmacy views)
-│   │   ├── dashboard/           # Upload wizard
-│   │   ├── stock/               # Stock alerts
-│   │   ├── parametres/          # Danger zone: clear data
-│   │   ├── profile/             # User profile
-│   │   ├── catalogRequests/     # Owner: product exclusion requests
-│   │   ├── owner/employees/     # Owner: employee management
-│   │   └── admin/               # Admin: pharmacies, catalog, catalog requests
-│   ├── components/
-│   │   ├── layout/              # header, sidebar, layout, breadcrumb, userAvatar
-│   │   ├── form/                # loginForm, signupForm, inputPassword
-│   │   ├── data-table/          # dataTable, dataTablePagination
-│   │   ├── theme/               # themeProvider, themeToggle, themeSelect
-│   │   ├── shared/              # listView, reusable UI pieces
-│   │   ├── tableToolbar.tsx     # 2-row filter toolbar (search, date, cat, TVA, type)
-│   │   ├── categoryMultiSelect.tsx
-│   │   ├── searchAutocomplete.tsx
-│   │   ├── columnVisibilityToggle.tsx
-│   │   ├── monthlyTrendChart.tsx
-│   │   └── suffixBadge.tsx
-│   ├── utils/                   # Helpers
-│   │   ├── session.ts           # Token storage (sessionStorage)
-│   │   ├── format.ts            # Number formatting (MAD currency)
-│   │   ├── table.ts             # CSV export helper
-│   │   └── cn.ts                # Tailwind class merger
-│   ├── types/index.ts           # User, eUserRole, payload types
-│   └── constants/index.ts       # TOKEN_KEY, API_URL, QUERY_KEYS, ENDPOINTS
-│
-└── extension/src/
-    ├── background/index.ts      # Token storage, CSV chunk upload, notifications
-    ├── content/index.ts         # Auth relay, notification bridge, draggable Sobrus indicator
-    ├── content/sobrus-export.ts # Intercepts CSV download click, chunks + uploads
-    ├── content/sobrus-ui.ts     # Upload progress banner on Sobrus
-    ├── content/upload-banner.ts # Upload banner component
-    ├── popup/app.tsx            # Auth status + recent import history
-    ├── hooks/
-    │   ├── use-token.ts         # Token read/write via chrome.storage
-    │   ├── use-notifications.ts # Import history from chrome.storage
-    │   └── use-upload-status.ts # Upload progress tracking
-    └── constants.ts             # ACTIONS, ENDPOINTS, keys
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/accounting/payments` | List payment entries for a date range |
+| POST | `/accounting/payments` | Create payment entry (TPE, Especes, Cheques, Virement) |
+| DELETE | `/accounting/payments/{id}` | Delete a payment entry |
+
+### Public (`/public`) -- 1 endpoint
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/public/pharmacies` | List pharmacies (unauthenticated, used in signup) |
+
+**Total: 81 endpoints across 10 routers**
 
 ---
 
-## Setup
+## Environment
 
-### Requirements
-- Python 3.10+, Node.js 18+, Docker, Chrome
+```
+env/
+├── dev/       docker.env, backend.env, frontend.env, extension.env
+├── demo/      docker.env, backend.env, frontend.env, extension.env
+├── test/      backend.env
+└── prod/      docker.env, backend.env, frontend.env, extension.env
+```
 
-### Install
+Key backend environment variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `SECRET_KEY` | Recommended | JWT signing key |
+| `MAIL_USERNAME` | Yes | SMTP username for password reset emails |
+| `MAIL_PASSWORD` | Yes | SMTP password |
+| `WHATSAPP_PHONE_NUMBER_ID` | Optional | Meta WhatsApp Business phone number ID |
+| `WHATSAPP_ACCESS_TOKEN` | Optional | Meta WhatsApp Business API token |
+| `FRONTEND_URL` | Optional | Frontend URL for CORS and email links |
+| `CORS_ORIGINS` | Recommended | Allowed origins (comma-separated) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Optional | JWT expiry (default: 10080 = 7 days) |
+
+---
+
+## Testing
+
 ```bash
-make          # install all deps, start DB, seed admin, start dev servers
-# — or step by step —
-make install  # install all deps
-make db       # start PostgreSQL container
-make seed     # create default admin account
-make dev      # start backend + frontend
+make test        # Run all 298 tests
+make test-back   # 187 pytest tests (9 files, covers all 81 endpoints)
+make test-front  # 84 vitest tests (5 files, all API modules)
+make test-ext    # 27 vitest tests (3 files, extension modules)
 ```
 
-### Default Account
-
-After running `make seed`:
-
-| Role  | Email              | Password   |
-|-------|--------------------|------------|
-| Admin | admin@gmail.com    | admin@123  |
-
-Owners register via `/signup`. The admin approves them from the Pharmacies panel.
-
-### Environment (`backend/.env`)
-```env
-DATABASE_URL=postgresql://apcm:apcm@localhost:5432/apcm
-SECRET_KEY=<generate-secure-key>
-ACCESS_TOKEN_EXPIRE_MINUTES=10080
-CORS_ORIGINS=http://localhost:5173
-```
-
-### Chrome Extension
-```bash
-cd extension && npm run build
-# Chrome → chrome://extensions/ → Load unpacked → select extension/dist/
-```
-
-### WhatsApp OTP Setup (Password Reset via WhatsApp)
-
-The app supports password reset via WhatsApp OTP using Meta's Cloud API.
-
-#### 1. Create Meta Business & Developer Accounts
-
-- Create a business account at [business.facebook.com](https://business.facebook.com)
-- Create a developer account at [developers.facebook.com](https://developers.facebook.com)
-
-#### 2. Create a Meta App
-
-1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps) → **Create App**
-2. Choose **"Business"** type
-3. Name it (e.g. "APCM Pharma"), select your business account
-4. On the app dashboard, find **WhatsApp** and click **Set Up**
-
-#### 3. Add a Phone Number
-
-1. In WhatsApp → **Getting Started**, Meta provides a test phone number (free)
-2. To use your own: go to **Phone Numbers** → **Add Phone Number** and verify via SMS/call
-3. Note your **Phone Number ID** (displayed on the page)
-
-#### 4. Create the Authentication Template
-
-1. Go to **WhatsApp** → **Message Templates** → **Create Template**
-2. Configure:
-   - **Category**: `Authentication`
-   - **Name**: `password_reset_otp`
-   - **Language**: `French (fr)`
-   - **OTP type**: Copy code
-   - **Security disclaimer**: Yes
-   - **Expiry warning**: 10 minutes
-3. Submit for review (usually approved within minutes)
-
-#### 5. Generate a Permanent Access Token
-
-1. Go to [business.facebook.com/settings/system-users](https://business.facebook.com/settings/system-users)
-2. Create a **System User** with Admin role
-3. Click **Generate Token** → select your app → grant `whatsapp_business_messaging` permission
-4. Copy the token (shown only once)
-
-#### 6. Set Environment Variables
-
-Add to `backend/.env`:
-
-```env
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-WHATSAPP_ACCESS_TOKEN=your_permanent_access_token
-```
-
-#### Important Notes
-
-- **Test mode**: The test phone number can only send to numbers manually added in WhatsApp → Getting Started → "To" field
-- **Production**: Verify your business and get your phone number approved to send to any number
-- **Phone format**: Numbers must be in E.164 format (e.g. `212600000000` for Morocco — country code + number without leading 0)
-- **Cost**: ~$0.03 per authentication message to Morocco
+- Backend tests use a separate test database (`apcm_test`)
+- Frontend and extension tests mock API calls via vitest
+- Test environment config in `env/test/backend.env`
 
 ---
 
-## Key Design Decisions
+## Chrome Extension
 
-| Decision | Reason |
-|----------|--------|
-| **Chunked CSV upload (500 rows)** | Prevents timeout and memory overflow on 10k+ row exports |
-| **Background SW handles uploads** | Content scripts can't reach localhost; background can |
-| **chrome.storage for sync** | Upload progress persists across tabs without WebSocket |
-| **Token relay via postMessage** | Extension can't read dashboard's sessionStorage; dashboard fires a message on login |
-| **Medicament upsert by PID** | Same product across multiple imports; PID is stable |
-| **All TanStack in hooks** | Pages/components never call useQuery/useMutation directly |
-| **Zod schemas in /schemas** | Form validation separate from UI; useForm in schema files |
-| **No Refine framework** | Removed in favor of plain React Router + custom hooks |
-| **PharmacyMedicamentStatus** | Per-pharmacy product exclusions without modifying the shared catalog |
-| **Annulation requests** | Owners can reverse approved exclusions through admin approval |
+The extension integrates with the Sobrus pharmacy management interface to automate data import.
 
----
+**How it works:**
 
-## Security Notes
-- JWT expires after 7 days (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
-- Passwords hashed with bcrypt (cost 12)
-- CORS `*` in development — restrict in production
-- SQL injection prevented by SQLAlchemy parameterized queries
-- Extension uses `chrome.storage.local` (encrypted at rest by Chrome)
-- 401 responses auto-logout via `auth:unauthorized` event
+1. User logs into the PharmaGest dashboard -- auth token is relayed to the extension via `postMessage`
+2. Extension injects a connection indicator on Sobrus pages (green = connected, red = not connected)
+3. When the user clicks "Telecharger en CSV" on Sobrus, the extension intercepts the download
+4. CSV is fetched via same-domain Sobrus API (session cookies included)
+5. Data is split into 500-row chunks and uploaded sequentially to the backend
+6. Progress banner shows per-chunk status on the Sobrus page
+7. On completion, a notification is saved and the dashboard tab is focused
+
+**Key features:**
+
+- Intercepts Sobrus CSV downloads automatically
+- Queues multiple exports for sequential processing
+- Upload progress banner with per-job status
+- Batch tracking: one import = one batch_id (not per chunk)
+- Cancel support during upload
 
 ---
 
-(c) 2026 APCM Pharma. All rights reserved.
+## Security
+
+- **JWT authentication** with configurable expiry (default 7 days)
+- **bcrypt password hashing** with cost factor 12
+- **Security headers**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Strict-Transport-Security
+- **CORS restricted** to configured origins (not wildcard in production)
+- **File upload size limit**: 10 MB
+- **Required env validation** on startup (DATABASE_URL, MAIL_USERNAME, MAIL_PASSWORD)
+- **SQL injection prevention** via SQLAlchemy parameterized queries
+- **Non-root Docker containers** in demo and production
+- **Extension token storage** in `chrome.storage.local` (encrypted at rest by Chrome)
+- **Auto-logout** on 401 responses via `auth:unauthorized` event
+
+---
+
+(c) 2026 PharmaGest. All rights reserved.
