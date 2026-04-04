@@ -74,7 +74,9 @@ back-db-clean: db
 
 back-dev: back-install
 	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env db
+	@APP_ENV=dev $(MAKE) check-env
+	@docker compose down -v 2>/dev/null || true
+	@docker compose up -d --wait db
 	cd $(BACKEND_DIR) && APP_ENV=dev .venv/bin/uvicorn main:app --reload --port 8000
 
 back-prod:
@@ -120,7 +122,10 @@ seed: back-seed
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-test-db: db
+test-db:
+	$(call _load-env,dev)
+	@docker compose down -v 2>/dev/null || true
+	@docker compose up -d --wait db
 	@docker compose exec db psql -U apcm -d postgres -c "CREATE DATABASE apcm_test;" 2>/dev/null || true
 
 test-back: back-install test-db
@@ -151,8 +156,10 @@ start: install
 demo:
 	$(call _load-env,demo)
 	@$(MAKE) ext-install ext-build
+	@cp resources/catalog.csv $(BACKEND_DIR)/catalog.csv 2>/dev/null || true
 	docker compose down -v
 	docker compose up --build
+	@rm -f $(BACKEND_DIR)/catalog.csv
 
 # ── Prod environment (optimised backend + pre-built frontend, local DB) ───────
 
