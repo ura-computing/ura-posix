@@ -495,7 +495,18 @@ const AchatList = () => {
         rightAddon={
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCategoryType(categoryType === eCategoryType.PHARMACIE ? eCategoryType.ALL : eCategoryType.PHARMACIE)}
+              onClick={() => setCategoryType(eCategoryType.ALL)}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                categoryType === eCategoryType.ALL
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-transparent text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              Mixte
+            </button>
+            <button
+              onClick={() => setCategoryType(eCategoryType.PHARMACIE)}
               className={cn(
                 "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
                 categoryType === eCategoryType.PHARMACIE
@@ -506,7 +517,7 @@ const AchatList = () => {
               Pharmacie
             </button>
             <button
-              onClick={() => setCategoryType(categoryType === eCategoryType.PARAPHARMACIE ? eCategoryType.ALL : eCategoryType.PARAPHARMACIE)}
+              onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}
               className={cn(
                 "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
                 categoryType === eCategoryType.PARAPHARMACIE

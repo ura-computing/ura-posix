@@ -58,7 +58,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
       <FloatingPills />
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-12">
         {children}
-        <p className="mt-12 text-xs text-muted-foreground">© 2025 APCM Pharma — Tous droits réservés</p>
+        <p className="mt-12 text-xs text-muted-foreground">© 2025 PharmaGest — Tous droits réservés</p>
       </div>
     </div>
   );
@@ -94,7 +94,7 @@ function UnauthenticatedView() {
 
       <div className="animate-in fade-in-0 slide-in-from-bottom-6 duration-700 space-y-3" style={{ animationDelay: "100ms", animationFillMode: "both" }}>
         <h1 className="text-5xl font-bold tracking-tight text-foreground">
-          APCM <span className="text-primary">Pharma</span>
+          Pharma<span className="text-primary">Gest</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
           La gestion pharmaceutique simplifiée pour les pharmacies marocaines

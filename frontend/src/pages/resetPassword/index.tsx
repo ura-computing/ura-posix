@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
     <div className="login">
       <div className="logo">
         <AppLogo />
-        <span className="brand-name">APCM Pharma</span>
+        <span className="brand-name">PharmaGest</span>
         <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 

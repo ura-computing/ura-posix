@@ -10,7 +10,7 @@
   --card-foreground: oklch(0.2046 0 0);
   --popover: oklch(0.9911 0 0);
   --popover-foreground: oklch(0.4386 0 0);
-  --primary: oklch(0.8348 0.1302 160.908);
+  --primary: oklch(0.75 0.14 195);
   --primary-foreground: oklch(0.2626 0.0147 166.4589);
   --secondary: oklch(0.994 0 0);
   --secondary-foreground: oklch(0.2046 0 0);
@@ -37,11 +37,11 @@
   --sidebar-border: oklch(0.8800 0.020 191);
   --sidebar-ring: oklch(0.8348 0.1302 160.908);
 
-  /* APCM Pharma sidebar (dark navy + teal) */
-  --apcm-sidebar: #071b2b;
-  --apcm-sidebar-foreground: #e2e8f0;
-  --apcm-sidebar-active: #14b8a6;
-  --apcm-sidebar-active-foreground: #fff;
+  /* PharmaGest sidebar (dark navy + cyan) */
+  --pg-sidebar: #071b2b;
+  --pg-sidebar-foreground: #e2e8f0;
+  --pg-sidebar-active: #0CC0DF;
+  --pg-sidebar-active-foreground: #fff;
   --font-sans: "Inter", sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: monospace;
@@ -76,7 +76,7 @@
   --card-foreground: oklch(0.9288 0.0126 255.5078);
   --popover: oklch(0.2603 0 0);
   --popover-foreground: oklch(0.7348 0 0);
-  --primary: oklch(0.4365 0.1044 156.7556);
+  --primary: oklch(0.65 0.14 195);
   --primary-foreground: oklch(0.9213 0.0135 167.1556);
   --secondary: oklch(0.2603 0 0);
   --secondary-foreground: oklch(0.9851 0 0);
@@ -191,14 +191,14 @@ body {
   letter-spacing: var(--tracking-normal);
 }
 
-/* APCM Pharma layout: dark sidebar */
-[data-apcm-sidebar] {
-  --sidebar: var(--apcm-sidebar);
-  --sidebar-foreground: var(--apcm-sidebar-foreground);
-  --sidebar-primary: var(--apcm-sidebar-active);
-  --sidebar-primary-foreground: var(--apcm-sidebar-active-foreground);
-  --sidebar-accent: rgba(20, 184, 166, 0.15);
-  --sidebar-accent-foreground: var(--apcm-sidebar-foreground);
+/* PharmaGest layout: dark sidebar */
+[data-pg-sidebar] {
+  --sidebar: var(--pg-sidebar);
+  --sidebar-foreground: var(--pg-sidebar-foreground);
+  --sidebar-primary: var(--pg-sidebar-active);
+  --sidebar-primary-foreground: var(--pg-sidebar-active-foreground);
+  --sidebar-accent: rgba(12, 192, 223, 0.15);
+  --sidebar-accent-foreground: var(--pg-sidebar-foreground);
   --sidebar-border: rgba(255, 255, 255, 0.08);
 }
 

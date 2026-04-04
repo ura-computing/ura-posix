@@ -70,7 +70,7 @@ export const Signup = () => {
     <div className="signup">
       <div className="logo">
         <AppLogo />
-        <span className="brand-name">APCM Pharma</span>
+        <span className="brand-name">PharmaGest</span>
         <span className="brand-sub">Gestion Pharmacie</span>
       </div>
 
@@ -78,7 +78,7 @@ export const Signup = () => {
         <CardHeader className="header">
           <CardTitle className="title">Créer un compte</CardTitle>
           <CardDescription className="description">
-            Commencez avec APCM Pharma
+            Commencez avec PharmaGest
           </CardDescription>
         </CardHeader>
 
