@@ -7,7 +7,7 @@ import {
   addNotification,
   dismissNotification,
   markAllRead,
-  ApcmNotification,
+  type ApcmNotification,
 } from "../../lib/storage";
 
 // Helper to reset chrome.storage.local between tests
