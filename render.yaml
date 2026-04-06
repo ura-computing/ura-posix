@@ -35,8 +35,9 @@ services:
         value: "3.12"
 
   # ── Frontend (React static site) ───────────────────────────────────────────
-  - type: static
+  - type: web
     name: pharmagest-web
+    runtime: static
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: dist
     rootDir: frontend
