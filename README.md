@@ -569,6 +569,41 @@ The extension integrates with the Sobrus pharmacy management interface to automa
 
 ---
 
+## Deployment (Render — Free)
+
+PharmaGest can be deployed to [Render](https://render.com) for free using the included `render.yaml` blueprint.
+
+### One-click deploy
+
+1. Push your code to GitHub
+2. Go to [render.com/new](https://render.com/new) → **Blueprint**
+3. Connect your GitHub repo
+4. Render auto-detects `render.yaml` and creates:
+   - **pharmagest-web** — static site (React frontend, free)
+   - **pharmagest-api** — web service (FastAPI backend, free 750h/month)
+   - **pharmagest-db** — PostgreSQL database (free 90 days)
+5. Click **Apply** — deployment starts automatically
+
+### After deployment
+
+1. **Seed the database**: go to pharmagest-api → Shell → run `python seed.py`
+2. **Update the extension**: set `VITE_DASHBOARD_URL` and `VITE_API_URL` in `extension/.env` to your Render URLs, rebuild with `make ext-build`
+3. **Set optional env vars** in Render dashboard:
+   - `MAIL_USERNAME`, `MAIL_PASSWORD` — for email password reset
+   - `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` — for WhatsApp OTP
+
+### Free tier limitations
+
+| Service | Limit |
+|---------|-------|
+| Frontend | Unlimited (static site) |
+| Backend | 750h/month, sleeps after 15min inactivity (~30s cold start) |
+| Database | Free for 90 days, then $7/month |
+
+For production with real users, consider a VPS (Hetzner €3.79/month) running `docker-compose.yml`.
+
+---
+
 ## Security
 
 - **JWT authentication** with configurable expiry (default 7 days)
