@@ -26,24 +26,17 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: FRONTEND_URL
-        fromService:
-          name: pharmagest-web
-          type: web
-          property: host
+        sync: false
       - key: CORS_ORIGINS
-        fromService:
-          name: pharmagest-web
-          type: web
-          property: host
+        sync: false
       - key: APP_ENV
         value: prod
       - key: PYTHON_VERSION
         value: "3.12"
 
   # ── Frontend (React static site) ───────────────────────────────────────────
-  - type: web
+  - type: static
     name: pharmagest-web
-    plan: static
     buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: dist
     rootDir: frontend
@@ -57,12 +50,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: pharmagest-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
       - key: VITE_BACKEND_BASE_URL
-        fromService:
-          name: pharmagest-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
