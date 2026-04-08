@@ -60,12 +60,14 @@ type VenteRow = {
   ppv: number | null;
   unit_price: number | null;
   total: number | null;
+  avg_pu: number | null;
 };
 
 const VENTE_COL_LABELS: Record<string, string> = {
   date: "Date", transaction_ref: "N° Transaction", transaction_ref_final: "N° Transaction Final",
   client: "Client", product: "Produit", category: "Catégorie", tva: "TVA",
   quantity: "Qté", discount: "Remise", ppv: "PPV", unit_price: "Prix unitaire", total: "Total",
+  marge_pct: "Marge %", marge_dh: "Marge DH",
 };
 
 const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> = {
@@ -81,6 +83,18 @@ const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
   ppv: (r) => String(r.ppv ?? ""),
   unit_price: (r) => String(r.unit_price ?? ""),
   total: (r) => String(r.total ?? ""),
+  marge_pct: (r) => {
+    const pu = r.avg_pu as number | null;
+    const ppv = r.ppv as number | null;
+    if (pu == null || ppv == null || ppv === 0) return "";
+    return ((1 - (pu / ppv)) * 100).toFixed(1);
+  },
+  marge_dh: (r) => {
+    const pu = r.avg_pu as number | null;
+    const ppv = r.ppv as number | null;
+    if (pu == null || ppv == null) return "";
+    return (ppv - pu).toFixed(2);
+  },
 };
 
 const VentesList = () => {
@@ -94,6 +108,7 @@ const VentesList = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
+  const [venteFilter, setVenteFilter] = useState<string>("all-flagged");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
@@ -115,8 +130,8 @@ const VentesList = () => {
     const typeCats = categoryType === eCategoryType.ALL
       ? allCategories
       : categoryType === eCategoryType.PHARMACIE
-        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
-        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
+        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("édicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
+        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("édicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
     if (selectedCats.length === 0) return categoryType === eCategoryType.ALL ? [] : typeCats;
     return selectedCats.filter(c => typeCats.includes(c));
   }, [allCategories, selectedCats, categoryType]);
@@ -129,6 +144,65 @@ const VentesList = () => {
     dateFrom, dateTo,
   });
   const rows = ventesRows as VenteRow[];
+
+  const venteFilterTabs = useMemo(() => {
+    const isMargeNegative = (r: VenteRow) =>
+      r.avg_pu != null && r.ppv != null && r.avg_pu > r.ppv;
+    const isLowMargin = (r: VenteRow) =>
+      r.avg_pu != null && r.ppv != null && r.ppv > 0 && (1 - r.avg_pu / r.ppv) * 100 < 10 && !(r.avg_pu > r.ppv);
+    const hasDiscount = (r: VenteRow) => (r.discount ?? 0) > 0;
+
+    const anyFlag = (r: VenteRow) => isMargeNegative(r) || isLowMargin(r) || hasDiscount(r);
+
+    return [
+      {
+        key: "all-flagged",
+        label: "Ventes à surveiller",
+        count: rows.filter(anyFlag).length,
+        filterFn: anyFlag,
+        activeClass: "bg-rose-600 text-white border-rose-600",
+        inactiveClass: "text-rose-700 border-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-700 dark:hover:bg-rose-950/30",
+        countActiveClass: "bg-white/20 text-white",
+        countInactiveClass: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400",
+      },
+      {
+        key: "marge-negative",
+        label: "Marge n\u00e9gative",
+        count: rows.filter(isMargeNegative).length,
+        filterFn: isMargeNegative,
+        activeClass: "bg-red-600 text-white border-red-600",
+        inactiveClass: "text-red-700 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-950/30",
+        countActiveClass: "bg-white/20 text-white",
+        countInactiveClass: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400",
+      },
+      {
+        key: "marge-low",
+        label: "Marge < 10%",
+        count: rows.filter(isLowMargin).length,
+        filterFn: isLowMargin,
+        activeClass: "bg-orange-600 text-white border-orange-600",
+        inactiveClass: "text-orange-700 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950/30",
+        countActiveClass: "bg-white/20 text-white",
+        countInactiveClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400",
+      },
+      {
+        key: "remises",
+        label: "Remises",
+        count: rows.filter(hasDiscount).length,
+        filterFn: hasDiscount,
+        activeClass: "bg-amber-600 text-white border-amber-600",
+        inactiveClass: "text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950/30",
+        countActiveClass: "bg-white/20 text-white",
+        countInactiveClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+      },
+    ] as const;
+  }, [rows]);
+
+  const activeTab = venteFilterTabs.find(t => t.key === venteFilter) ?? venteFilterTabs[0];
+  const surveillanceRows = useMemo(
+    () => rows.filter(activeTab.filterFn),
+    [rows, activeTab],
+  );
 
   const columns = useMemo<ColumnDef<VenteRow>[]>(
     () => [
@@ -215,7 +289,7 @@ const VentesList = () => {
         header: () => <p className="column-title">Type</p>,
         cell: ({ row }) => {
           const cat = (row.original.category ?? "").toLowerCase();
-          const isPharmacy = cat.includes("edicament") || cat.includes("oméopath") || cat.includes("omeopath");
+          const isPharmacy = cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath");
           if (!row.original.category) return <span className="text-muted-foreground">—</span>;
           return (
             <Badge variant="outline" className={isPharmacy
@@ -286,6 +360,38 @@ const VentesList = () => {
           </span>
         ),
       },
+      {
+        id: "marge_pct",
+        size: 100,
+        header: () => <p className="column-title">Marge %</p>,
+        cell: ({ row }) => {
+          const pu = row.original.avg_pu;
+          const ppv = row.original.ppv;
+          if (pu == null || ppv == null || ppv === 0) return <span className="text-muted-foreground">—</span>;
+          const pct = (1 - pu / ppv) * 100;
+          return (
+            <span className={cn("tabular-nums text-sm font-medium", pct < 0 ? "text-red-600" : pct < 10 ? "text-orange-600" : "text-emerald-600")}>
+              {pct.toFixed(1)}%
+            </span>
+          );
+        },
+      },
+      {
+        id: "marge_dh",
+        size: 110,
+        header: () => <p className="column-title">Marge DH</p>,
+        cell: ({ row }) => {
+          const pu = row.original.avg_pu;
+          const ppv = row.original.ppv;
+          if (pu == null || ppv == null) return <span className="text-muted-foreground">—</span>;
+          const val = ppv - pu;
+          return (
+            <span className={cn("tabular-nums text-sm font-medium", val < 0 ? "text-red-600" : "text-foreground")}>
+              {fmt(val)}
+            </span>
+          );
+        },
+      },
     ],
     [],
   );
@@ -296,6 +402,12 @@ const VentesList = () => {
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     pageCount,
+  });
+
+  const surveillanceTable = useReactTable({
+    data: surveillanceRows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
   });
 
   const handleExport = async () => {
@@ -419,26 +531,49 @@ const VentesList = () => {
 
       {rows.length > 0 && (
         <>
+          {/* Surveillance tabs */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {venteFilterTabs.map((tab) => {
+              const isActive = venteFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setVenteFilter(tab.key)}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                    isActive ? tab.activeClass : tab.inactiveClass,
+                  )}
+                >
+                  {tab.label}
+                  <span
+                    className={cn(
+                      "inline-flex items-center justify-center rounded-full px-1.5 min-w-[1.25rem] h-5 text-[11px] font-semibold tabular-nums",
+                      isActive ? tab.countActiveClass : tab.countInactiveClass,
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Surveillance table — red border */}
+          <div className="rounded-lg border-2 border-red-500 overflow-hidden">
+            <DataTable
+              table={surveillanceTable}
+              isLoading={isLoading}
+              emptyState={
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  Aucune vente à surveiller sur cette page.
+                </div>
+              }
+            />
+          </div>
+
           <div className="mt-2 rounded-lg border border-border bg-muted/40 px-4 py-2 flex items-center gap-4 text-sm">
             <span className="text-muted-foreground">TVA encaissée (page courante) :</span>
             <span className="font-semibold tabular-nums">{fmt(tvaPageTotal)} MAD</span>
-          </div>
-
-          {/* Quick filter tabs */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {[
-              { label: "Avec remise", color: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700", filter: () => rows.filter(r => (r.discount ?? 0) > 0).length },
-              { label: "Prix > PPV", color: "bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-700", filter: () => rows.filter(r => r.unit_price != null && r.ppv != null && r.unit_price > r.ppv).length },
-            ].map(({ label, color, filter }) => {
-              const count = filter();
-              if (count === 0) return null;
-              return (
-                <span key={label} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", color)}>
-                  {label}
-                  <span className="font-bold">{count}</span>
-                </span>
-              );
-            })}
           </div>
         </>
       )}

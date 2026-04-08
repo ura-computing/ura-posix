@@ -44,6 +44,15 @@ export function useStockAbcd(dateFrom?: string, dateTo?: string) {
   return { stockAbcd, stockAbcdLoading };
 }
 
+export function usePeremptions(dateFrom?: string, dateTo?: string) {
+  const { data: peremptions, isLoading: peremptionsLoading } = useQuery({
+    queryKey: ["peremptions", dateFrom, dateTo],
+    queryFn: () =>
+      statsApi.getPeremptions(dateFrom || undefined, dateTo || undefined),
+  });
+  return { peremptions, peremptionsLoading };
+}
+
 export function useAnalyseMarge(
   dateFrom?: string,
   dateTo?: string,

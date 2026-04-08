@@ -61,17 +61,15 @@ export function useAnalysePage() {
     const sel = allRows.filter((_, i) => selected.has(i));
     if (!sel.length) return;
     const cols = MARGE_COLS[margeMode];
-    const header = cols.map((c) => c.label).join(",");
-    const lines = sel.map((row) =>
-      cols
-        .map((c) => {
-          const v = row[c.key];
-          return v == null ? "" : String(v).includes(",") ? `"${v}"` : String(v);
-        })
-        .join(","),
-    );
+    const esc = (v: unknown) => {
+      if (v == null || typeof v === "object") return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = cols.map((c) => esc(c.label)).join(",");
+    const lines = sel.map((row) => cols.map((c) => esc(row[c.key])).join(","));
     const csv = [header, ...lines].join("\n");
-    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `analyse_${margeMode}_selection.csv`);
+    downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), `analyse_${margeMode}_selection.csv`);
   }, [allRows, selected, margeMode]);
 
   const resetSelection = useCallback(() => {

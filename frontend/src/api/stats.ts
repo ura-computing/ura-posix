@@ -8,7 +8,7 @@ export type StatsKpis = {
   achats_count: number;
 };
 export type MonthlyTrend = { month: string; ventes: number; achats: number };
-export type TopCategory = { category: string; total: number };
+export type TopCategory = { category: string; total: number; marge_pct: number | null };
 export type AdvancedKpis = {
   ticket_moyen: number;
   vente_moyenne_par_jour: number;
@@ -23,8 +23,13 @@ export type TypeBreakdown = {
   pharmacie: { ventes_total: number };
   parapharmacie: { ventes_total: number };
 };
+export type PreviousKpis = {
+  ventes_total: number;
+  achats_total: number;
+};
 export type StatsResponse = {
   kpis: StatsKpis;
+  previous_kpis: PreviousKpis;
   advanced_kpis: AdvancedKpis;
   tva: TvaStats;
   marge: MargeStats;
@@ -51,6 +56,9 @@ export type MargeKpiItem = { label: string; value: number; qty: number } | null;
 export type AnalyseMargeKpis = {
   total_ventes_dh: number;
   total_ventes_unites: number;
+  total_units_available: number;
+  total_pu_purchased: number;
+  ppv_total_available: number;
   marge_pct_avg: number | null;
   marge_pct_min: MargeKpiItem;
   marge_pct_max: MargeKpiItem;
@@ -71,12 +79,36 @@ export type StockAbcdProduct = {
   stock_min: number;
   stock_max: number;
   current_stock: number | null;
+  ppv: number | null;
+  avg_pu: number | null;
 };
 
 export type StockAbcdResponse = {
   distribution: Record<string, number>;
   total_references: number;
+  ppv_potentiel: number;
   products: StockAbcdProduct[];
+};
+
+export type PeremptionProduct = {
+  product: string;
+  expiry_date: string;
+  quantity: number;
+  ppv: number;
+};
+
+export type PeremptionBracket = {
+  count: number;
+  total_units: number;
+  purchase_value: number;
+  sale_value: number;
+  products: PeremptionProduct[];
+};
+
+export type PeremptionsResponse = {
+  expired: PeremptionBracket;
+  very_close: PeremptionBracket;
+  close: PeremptionBracket;
 };
 
 function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): string {
@@ -159,6 +191,12 @@ export const getPharmacyStockAbcd = (pharmacyId: number, dateFrom?: string, date
   const qs = p.toString();
   return request<StockAbcdResponse>(`/admin/pharmacy/${pharmacyId}/stats/stock-abcd${qs ? `?${qs}` : ""}`);
 };
+
+export const getPeremptions = (dateFrom?: string, dateTo?: string) =>
+  request<PeremptionsResponse>(`/stats/peremptions${buildQs(dateFrom, dateTo)}`);
+
+export const getPharmacyPeremptions = (pharmacyId: number, dateFrom?: string, dateTo?: string) =>
+  request<PeremptionsResponse>(`/admin/pharmacy/${pharmacyId}/stats/peremptions${buildQs(dateFrom, dateTo)}`);
 
 export const analyseMargeForPharmacy = (
   pharmacyId: number,

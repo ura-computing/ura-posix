@@ -5,7 +5,7 @@ Registered twice in main.py: prefix="/achat" and prefix="/ventes".
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import or_, func as sa_func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -179,11 +179,13 @@ def list_achats(
 
 # ── Vente ──────────────────────────────────────────────────────────────────────
 
-def _build_vente_row(v: Vente, suffixes_map: Dict[str, tuple]) -> dict:
+def _build_vente_row(v: Vente, suffixes_map: Dict[str, tuple], avg_pu_map: Dict[int, float] = {}) -> dict:
     category = v.medicament.category if v.medicament else None
     normalized = strip_percentage(category).lower() if category else ""
     suffix, color = suffixes_map.get(normalized, ("", None))
     ref = v.transaction_ref or ""
+    med_id = v.medicament_id
+    avg_pu = avg_pu_map.get(med_id) if med_id else None
     return {
         "id": v.id,
         "date": v.date,
@@ -200,6 +202,7 @@ def _build_vente_row(v: Vente, suffixes_map: Dict[str, tuple]) -> dict:
         "discount": v.discount,
         "unit_price": v.unit_price,
         "total": v.total,
+        "avg_pu": round(avg_pu, 4) if avg_pu is not None else None,
     }
 
 
@@ -306,9 +309,30 @@ def list_ventes(
     total = q.count()
     if export:
         rows = q.order_by(Vente.id.desc()).all()
-        return {"data": [_build_vente_row(v, suffixes_map) for v in rows], "total": total}
-    rows = q.order_by(Vente.id.desc()).offset((page - 1) * limit).limit(limit).all()
+    else:
+        rows = q.order_by(Vente.id.desc()).offset((page - 1) * limit).limit(limit).all()
+
+    # Compute weighted avg purchase price per medicament for these rows
+    med_ids = list({v.medicament_id for v in rows if v.medicament_id})
+    avg_pu_map: Dict[int, float] = {}
+    if med_ids:
+        pharmacy_id = current_user.pharmacy_id
+        pu_q = (
+            db.query(
+                Achat.medicament_id,
+                (sa_func.sum(Achat.unit_price * Achat.quantity) / sa_func.sum(Achat.quantity)).label("avg_pu"),
+            )
+            .filter(Achat.medicament_id.in_(med_ids), Achat.quantity > 0, Achat.unit_price.isnot(None))
+        )
+        if pharmacy_id:
+            pu_q = pu_q.filter(Achat.pharmacy_id == pharmacy_id)
+        pu_q = pu_q.group_by(Achat.medicament_id)
+        avg_pu_map = {row.medicament_id: float(row.avg_pu) for row in pu_q.all() if row.avg_pu}
+
+    data = [_build_vente_row(v, suffixes_map, avg_pu_map) for v in rows]
+    if export:
+        return {"data": data, "total": total}
     return {
-        "data": [_build_vente_row(v, suffixes_map) for v in rows],
+        "data": data,
         "pagination": {"page": page, "limit": limit, "total": total, "totalPages": (total + limit - 1) // limit},
     }

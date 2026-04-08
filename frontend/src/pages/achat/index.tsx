@@ -5,7 +5,7 @@ import { useAchatList } from "@/hooks/useAchatList";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
-import { ChevronDown, Package, TrendingUp, FileText, UploadCloud } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { eUserRole, eCategoryType } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,6 @@ import { downloadCSV } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { cn } from "@/utils/cn";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Progress } from "@/components/ui/progress";
 
 const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -77,139 +75,162 @@ type SupplierSummary = {
   blCount: number;
   unitCount: number;
   lineCount: number;
+  uniqueProducts: number;
+};
+
+type SupplierClassification = "grossiste" | "direct_labo";
+
+type ClassifiedGroup = {
+  totalMAD: number;
+  blCount: number;
+  unitCount: number;
+  margeSum: number;
+  lineCount: number;
+  suppliers: SupplierSummary[];
 };
 
 function computeSupplierSummaries(rows: AchatRow[]): SupplierSummary[] {
-  const map = new Map<string, { totalMAD: number; refs: Set<string>; unitCount: number; lineCount: number }>();
+  const map = new Map<string, { totalMAD: number; refs: Set<string>; products: Set<string>; unitCount: number; lineCount: number }>();
   for (const row of rows) {
     const name = (row.supplier ?? "").trim();
     if (!name) continue;
     let entry = map.get(name);
     if (!entry) {
-      entry = { totalMAD: 0, refs: new Set(), unitCount: 0, lineCount: 0 };
+      entry = { totalMAD: 0, refs: new Set(), products: new Set(), unitCount: 0, lineCount: 0 };
       map.set(name, entry);
     }
     entry.totalMAD += row.total ?? 0;
     if (row.delivery_ref) entry.refs.add(row.delivery_ref);
+    if (row.product) entry.products.add(row.product);
     entry.unitCount += row.quantity ?? 0;
     entry.lineCount += 1;
   }
   return Array.from(map.entries())
-    .map(([name, d]) => ({ name, totalMAD: d.totalMAD, blCount: d.refs.size, unitCount: d.unitCount, lineCount: d.lineCount }))
+    .map(([name, d]) => ({ name, totalMAD: d.totalMAD, blCount: d.refs.size, unitCount: d.unitCount, lineCount: d.lineCount, uniqueProducts: d.products.size }))
     .sort((a, b) => b.totalMAD - a.totalMAD);
 }
 
+/**
+ * Classify a supplier as grossiste or direct labo.
+ * Heuristic: suppliers with > 10 unique products are grossistes,
+ * plus suppliers whose name contains common grossiste keywords.
+ */
+function classifySupplier(s: SupplierSummary): SupplierClassification {
+  return s.name.toUpperCase().startsWith("GROSSISTE") ? "grossiste" : "direct_labo";
+}
+
+function computeClassifiedGroups(summaries: SupplierSummary[], rows: AchatRow[]): {
+  grossiste: ClassifiedGroup;
+  directLabo: ClassifiedGroup;
+} {
+  const grossisteSuppliers: SupplierSummary[] = [];
+  const directLaboSuppliers: SupplierSummary[] = [];
+
+  for (const s of summaries) {
+    if (classifySupplier(s) === "grossiste") {
+      grossisteSuppliers.push(s);
+    } else {
+      directLaboSuppliers.push(s);
+    }
+  }
+
+  const buildGroup = (suppliers: SupplierSummary[]): ClassifiedGroup => {
+    const supplierNames = new Set(suppliers.map((s) => s.name));
+    let margeSum = 0;
+    let margeCount = 0;
+    for (const row of rows) {
+      const name = (row.supplier ?? "").trim();
+      if (!supplierNames.has(name)) continue;
+      if (row.ppv != null && row.unit_price != null && row.unit_price > 0) {
+        margeSum += ((row.ppv - row.unit_price) / row.ppv) * 100;
+        margeCount += 1;
+      }
+    }
+    return {
+      totalMAD: suppliers.reduce((s, x) => s + x.totalMAD, 0),
+      blCount: suppliers.reduce((s, x) => s + x.blCount, 0),
+      unitCount: suppliers.reduce((s, x) => s + x.unitCount, 0),
+      margeSum: margeCount > 0 ? margeSum / margeCount : 0,
+      lineCount: suppliers.reduce((s, x) => s + x.lineCount, 0),
+      suppliers,
+    };
+  };
+
+  return {
+    grossiste: buildGroup(grossisteSuppliers),
+    directLabo: buildGroup(directLaboSuppliers),
+  };
+}
+
+function NeedleGauge({ grossistePct }: { grossistePct: number }) {
+  const clamped = Math.min(100, Math.max(0, grossistePct));
+  // Needle angle: 0% = -90° (left/green), 100% = +90° (right/red)
+  const angle = -90 + (clamped / 100) * 180;
+
+  return (
+    <div className="flex flex-col items-center">
+      <p className="text-xs font-medium text-muted-foreground mb-1">Jauge</p>
+      <svg viewBox="0 0 200 120" className="w-40 h-24">
+        {/* Green zone: 0-40% → -90° to -54° */}
+        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke="#16a34a" strokeWidth="16" strokeLinecap="round" />
+        {/* Yellow zone: 40-80% → -54° to +18° */}
+        <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke="#eab308" strokeWidth="16" />
+        {/* Red zone: 80-100% → +18° to +90° */}
+        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke="#ef4444" strokeWidth="16" strokeLinecap="round" />
+        {/* Needle */}
+        <g transform={`rotate(${angle}, 100, 100)`}>
+          <line x1="100" y1="100" x2="100" y2="30" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="100" cy="100" r="6" fill="#1e293b" />
+          <circle cx="100" cy="100" r="3" fill="white" />
+        </g>
+      </svg>
+      <p className="text-sm font-bold mt-1">{clamped.toFixed(0)}% grossistes</p>
+    </div>
+  );
+}
+
 const SupplierSummarySection = ({ rows }: { rows: AchatRow[] }) => {
-  const [open, setOpen] = useState(true);
-
   const summaries = useMemo(() => computeSupplierSummaries(rows), [rows]);
-  const top5 = summaries.slice(0, 5);
-  const maxMAD = top5.length > 0 ? top5[0].totalMAD : 1;
 
-  const grandTotal = useMemo(() => rows.reduce((s, r) => s + (r.total ?? 0), 0), [rows]);
-  const totalBLs = useMemo(() => {
-    const refs = new Set<string>();
-    for (const r of rows) if (r.delivery_ref) refs.add(r.delivery_ref);
-    return refs.size;
-  }, [rows]);
-  const totalUnits = useMemo(() => rows.reduce((s, r) => s + (r.quantity ?? 0), 0), [rows]);
+  const classified = useMemo(
+    () => computeClassifiedGroups(summaries, rows),
+    [summaries, rows],
+  );
+
+  const grossistePct = useMemo(() => {
+    const total = classified.grossiste.totalMAD + classified.directLabo.totalMAD;
+    return total > 0 ? (classified.grossiste.totalMAD / total) * 100 : 0;
+  }, [classified]);
 
   if (rows.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="rounded-lg border border-border bg-card shadow-sm">
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors rounded-t-lg">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Resume fournisseurs</span>
-            <Badge variant="secondary" className="text-xs ml-1">{summaries.length} fournisseurs</Badge>
-          </div>
-          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
-        </CollapsibleTrigger>
+    <div className="rounded-lg border border-border bg-card shadow-sm p-5">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-start">
+        {/* Grossistes (left) */}
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-muted-foreground mb-2">Grossistes</p>
+          <p className="text-xs text-muted-foreground">Achats</p>
+          <p className="text-lg font-bold tabular-nums">{fmt(classified.grossiste.totalMAD)} MAD</p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.blCount}</span> <span className="text-muted-foreground">BL</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.unitCount.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.margeSum.toFixed(2)}%</span> <span className="text-muted-foreground">marge moyenne</span></p>
+        </div>
 
-        <CollapsibleContent>
-          <div className="border-t border-border px-4 py-4">
-            {/* Global totals */}
-            <div className="grid grid-cols-3 gap-4 mb-5">
-              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total achats</p>
-                  <p className="text-base font-bold tabular-nums">{fmt(grandTotal)} MAD</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Bons de livraison</p>
-                  <p className="text-base font-bold tabular-nums">{totalBLs}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
-                  <Package className="h-4 w-4 text-violet-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Unites</p>
-                  <p className="text-base font-bold tabular-nums">{totalUnits.toLocaleString("fr-MA")}</p>
-                </div>
-              </div>
-            </div>
+        {/* Gauge (center) */}
+        <NeedleGauge grossistePct={grossistePct} />
 
-            {/* Top 5 suppliers */}
-            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Top 5 fournisseurs (page courante)</p>
-            <div className="space-y-3">
-              {top5.map((s, i) => {
-                const pct = maxMAD > 0 ? (s.totalMAD / maxMAD) * 100 : 0;
-                const shareOfTotal = grandTotal > 0 ? (s.totalMAD / grandTotal) * 100 : 0;
-                return (
-                  <div key={s.name} className="group">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
-                          {i + 1}
-                        </span>
-                        <span className="text-sm font-medium truncate">{s.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
-                        <span>{s.blCount} BL</span>
-                        <span>{s.unitCount.toLocaleString("fr-MA")} u.</span>
-                        <span className="font-semibold text-foreground tabular-nums">{fmt(s.totalMAD)} MAD</span>
-                        <Badge variant="outline" className="text-[10px] tabular-nums px-1.5">{shareOfTotal.toFixed(1)}%</Badge>
-                      </div>
-                    </div>
-                    <Progress
-                      value={pct}
-                      className="h-2"
-                      style={{
-                        "--progress-background": [
-                          "hsl(var(--chart-1, 142 71% 45%))",
-                          "hsl(var(--chart-2, 217 91% 60%))",
-                          "hsl(var(--chart-3, 262 83% 58%))",
-                          "hsl(var(--chart-4, 37 92% 50%))",
-                          "hsl(var(--chart-5, 0 72% 51%))",
-                        ][i],
-                      } as React.CSSProperties}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {summaries.length > 5 && (
-              <p className="text-xs text-muted-foreground mt-3">
-                + {summaries.length - 5} autre{summaries.length - 5 > 1 ? "s" : ""} fournisseur{summaries.length - 5 > 1 ? "s" : ""}
-              </p>
-            )}
-          </div>
-        </CollapsibleContent>
+        {/* Direct laboratoires (right) */}
+        <div className="space-y-1 text-right">
+          <p className="text-sm font-semibold text-muted-foreground mb-2">Direct laboratoires</p>
+          <p className="text-xs text-muted-foreground">Achats</p>
+          <p className="text-lg font-bold tabular-nums text-emerald-600">{fmt(classified.directLabo.totalMAD)} MAD</p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.blCount}</span> <span className="text-muted-foreground">BL</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.unitCount.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.margeSum.toFixed(2)}%</span> <span className="text-muted-foreground">marge moyenne</span></p>
+        </div>
       </div>
-    </Collapsible>
+    </div>
   );
 };
 
@@ -260,8 +281,8 @@ const AchatList = () => {
     const typeCats = categoryType === eCategoryType.ALL
       ? allCategories
       : categoryType === eCategoryType.PHARMACIE
-        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
-        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
+        ? allCategories.filter(c => c.toLowerCase().includes("edicament") || c.toLowerCase().includes("édicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath"))
+        : allCategories.filter(c => !(c.toLowerCase().includes("edicament") || c.toLowerCase().includes("édicament") || c.toLowerCase().includes("oméopath") || c.toLowerCase().includes("omeopath")));
     if (selectedCats.length === 0) return categoryType === eCategoryType.ALL ? [] : typeCats;
     return selectedCats.filter(c => typeCats.includes(c));
   }, [allCategories, selectedCats, categoryType]);
@@ -357,7 +378,7 @@ const AchatList = () => {
         header: () => <p className="column-title">Type</p>,
         cell: ({ row }) => {
           const cat = (row.original.category ?? "").toLowerCase();
-          const isPharmacy = cat.includes("edicament") || cat.includes("oméopath") || cat.includes("omeopath");
+          const isPharmacy = cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath");
           if (!row.original.category) return <span className="text-muted-foreground">—</span>;
           return (
             <Badge variant="outline" className={isPharmacy

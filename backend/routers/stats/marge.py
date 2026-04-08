@@ -49,6 +49,31 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             .group_by(Achat.medicament_id)
             .subquery()
         )
+
+        # Latest stock per medicament (stock_max from the most recent achat)
+        _latest_achat = (
+            db.query(
+                Achat.medicament_id,
+                Achat.stock_max.label("current_stock"),
+                func.row_number()
+                .over(
+                    partition_by=Achat.medicament_id,
+                    order_by=Achat.delivery_date.desc(),
+                )
+                .label("rn"),
+            )
+            .filter(*base_filter_a, Achat.medicament_id.isnot(None))
+            .subquery()
+        )
+        latest_stock_sub = (
+            db.query(
+                _latest_achat.c.medicament_id,
+                _latest_achat.c.current_stock,
+            )
+            .filter(_latest_achat.c.rn == 1)
+            .subquery()
+        )
+
         q = (
             db.query(
                 Medicament.product,
@@ -61,34 +86,85 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 func.max(Vente.unit_price).label("prix_max"),
                 func.min(Vente.unit_price).label("prix_min"),
                 func.avg(Vente.unit_price).label("prix_avg"),
+                latest_stock_sub.c.current_stock.label("stock_dispo"),
             )
             .join(Medicament, Vente.medicament_id == Medicament.id)
             .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
+            .outerjoin(latest_stock_sub, Medicament.id == latest_stock_sub.c.medicament_id)
             .filter(*base_filter_v, *cat_filter)
             .group_by(
                 Medicament.id, Medicament.product, Medicament.category,
                 Medicament.tva, Medicament.ppv, Medicament.pph, avg_pu_sub.c.avg_pu,
+                latest_stock_sub.c.current_stock,
             )
         )
+        # Build per-medicament rows first
+        raw_rows: list[dict] = []
         for r in q.all():
             ppv = float(r.ppv or 0)
             pu  = float(r.pu or 0)
+            stock_dispo = int(r.stock_dispo) if r.stock_dispo is not None else None
             marge_pct = round((1 - pu / ppv) * 100, 2) if ppv and pu else None
             marge_dh  = round(ppv - pu, 4) if ppv and pu else None
-            rows_out.append({
-                "product":   r.product or "—",
-                "category":  _strip_pct(r.category or ""),
-                "tva":       r.tva or "—",
-                "ppv":       round(ppv, 4) if ppv else None,
-                "pu":        round(pu, 4) if pu else None,
-                "prix_max":  round(float(r.prix_max or 0), 4),
-                "prix_min":  round(float(r.prix_min or 0), 4),
-                "prix_avg":  round(float(r.prix_avg or 0), 4),
-                "qty":       round(float(r.qty or 0), 2),
-                "ca":        round(float(r.ca or 0), 2),
-                "marge_pct": marge_pct,
-                "marge_dh":  marge_dh,
+            ppv_potentiel = round(ppv * stock_dispo, 2) if ppv > 0 and stock_dispo and stock_dispo > 0 else None
+            raw_rows.append({
+                "product":       r.product or "—",
+                "category":      _strip_pct(r.category or ""),
+                "tva":           r.tva or "—",
+                "ppv":           round(ppv, 4) if ppv else None,
+                "pu":            round(pu, 4) if pu else None,
+                "prix_max":      round(float(r.prix_max or 0), 4),
+                "prix_min":      round(float(r.prix_min or 0), 4),
+                "prix_avg":      round(float(r.prix_avg or 0), 4),
+                "qty":           round(float(r.qty or 0), 2),
+                "ca":            round(float(r.ca or 0), 2),
+                "marge_pct":     marge_pct,
+                "marge_dh":      marge_dh,
+                "stock_dispo":   stock_dispo,
+                "ppv_potentiel": ppv_potentiel,
             })
+
+        # Merge rows with the same product name
+        from collections import OrderedDict
+        merged: OrderedDict[str, list[dict]] = OrderedDict()
+        for row in raw_rows:
+            merged.setdefault(row["product"], []).append(row)
+
+        for product_name, group in merged.items():
+            if len(group) == 1:
+                rows_out.append(group[0])
+            else:
+                total_qty = sum(r["qty"] or 0 for r in group)
+                total_ca = sum(r["ca"] or 0 for r in group)
+                all_ppv = [r["ppv"] for r in group if r["ppv"]]
+                all_pu = [r["pu"] for r in group if r["pu"]]
+                all_stock = [r["stock_dispo"] for r in group if r["stock_dispo"] is not None]
+                ppv = all_ppv[0] if all_ppv else None
+                # Weighted avg PU across children
+                pu_num = sum((r["pu"] or 0) * (r["qty"] or 0) for r in group if r["pu"])
+                pu_den = sum(r["qty"] or 0 for r in group if r["pu"])
+                avg_pu = round(pu_num / pu_den, 4) if pu_den > 0 else (all_pu[0] if all_pu else None)
+                marge_pct = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else None
+                marge_dh = round(ppv - avg_pu, 4) if ppv and avg_pu else None
+                total_stock = sum(all_stock) if all_stock else None
+                ppv_pot = round(ppv * total_stock, 2) if ppv and total_stock and total_stock > 0 else None
+                rows_out.append({
+                    "product": product_name,
+                    "category": group[0]["category"],
+                    "tva": group[0]["tva"],
+                    "ppv": ppv,
+                    "pu": avg_pu,
+                    "prix_max": max(r["prix_max"] for r in group),
+                    "prix_min": min(r["prix_min"] for r in group),
+                    "prix_avg": round(sum(r["prix_avg"] * r["qty"] for r in group) / total_qty, 4) if total_qty > 0 else 0,
+                    "qty": round(total_qty, 2),
+                    "ca": round(total_ca, 2),
+                    "marge_pct": marge_pct,
+                    "marge_dh": marge_dh,
+                    "stock_dispo": total_stock,
+                    "ppv_potentiel": ppv_pot,
+                    "children": group,
+                })
 
     elif mode == "categorie":
         q = (
@@ -284,19 +360,27 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
     total_ventes_dh     = sum(r.get("ca", r.get("total", 0)) or 0 for r in rows_out)
     total_ventes_unites = sum(float(r.get("qty") or 0) for r in rows_out)
 
+    # Produit-mode stock KPIs
+    total_units_available = sum(float(r.get("stock_dispo") or 0) for r in rows_out)
+    total_pu_purchased    = sum(float(r.get("pu") or 0) * float(r.get("qty") or 0) for r in rows_out)
+    ppv_total_available   = sum(float(r.get("ppv_potentiel") or 0) for r in rows_out)
+
     marge_rows     = [r for r in rows_out if r.get("marge_pct") is not None]
     marge_avg_rows = [r for r in rows_out if r.get("marge_pct_avg") is not None]
 
     kpis: dict = {
-        "total_ventes_dh":     round(total_ventes_dh, 2),
-        "total_ventes_unites": round(total_ventes_unites, 2),
-        "marge_pct_avg":       None,
-        "marge_pct_min":       None,
-        "marge_pct_max":       None,
-        "marge_dh_avg":        None,
-        "marge_dh_min":        None,
-        "marge_dh_max":        None,
-        "difference_gain_dh":  None,
+        "total_ventes_dh":      round(total_ventes_dh, 2),
+        "total_ventes_unites":  round(total_ventes_unites, 2),
+        "total_units_available": round(total_units_available, 2),
+        "total_pu_purchased":   round(total_pu_purchased, 2),
+        "ppv_total_available":  round(ppv_total_available, 2),
+        "marge_pct_avg":        None,
+        "marge_pct_min":        None,
+        "marge_pct_max":        None,
+        "marge_dh_avg":         None,
+        "marge_dh_min":         None,
+        "marge_dh_max":         None,
+        "difference_gain_dh":   None,
     }
 
     if marge_rows:

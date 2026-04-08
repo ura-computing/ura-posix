@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { AnalyseMargeResponse } from "@/api/stats";
 import { DataTablePagination } from "@/components/DataTable/dataTablePagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,17 +16,18 @@ export const SIM_LABEL_KEY: Record<MargeMode, string> = {
 
 export const MARGE_COLS: Record<MargeMode, { key: string; label: string; numeric?: boolean }[]> = {
   produit:     [
-    { key: "product",   label: "Produit" },
-    { key: "category",  label: "Catégorie" },
-    { key: "tva",       label: "TVA" },
-    { key: "ppv",       label: "PPV", numeric: true },
-    { key: "prix_max",  label: "Prix max", numeric: true },
-    { key: "prix_min",  label: "Prix min", numeric: true },
-    { key: "prix_avg",  label: "Prix moy.", numeric: true },
-    { key: "marge_pct", label: "Marge %", numeric: true },
-    { key: "marge_dh",  label: "Marge DH", numeric: true },
-    { key: "qty",       label: "Qté", numeric: true },
-    { key: "ca",        label: "CA (MAD)", numeric: true },
+    { key: "product",       label: "Produit" },
+    { key: "stock_dispo",   label: "Stock dispo", numeric: true },
+    { key: "qty",           label: "Vente total unit", numeric: true },
+    { key: "ca",            label: "Vente total DH", numeric: true },
+    { key: "prix_max",      label: "Prix unit +", numeric: true },
+    { key: "prix_min",      label: "Prix unit -", numeric: true },
+    { key: "prix_avg",      label: "Prix unit X", numeric: true },
+    { key: "ppv",           label: "PPV", numeric: true },
+    { key: "marge_pct",     label: "Marge% X", numeric: true },
+    { key: "marge_dh",      label: "Marge DH X", numeric: true },
+    { key: "category",      label: "Catégorie" },
+    { key: "tva",           label: "TVA" },
   ],
   categorie:   [
     { key: "category",      label: "Catégorie" },
@@ -88,6 +90,7 @@ export function AnalyseMargeTable({ mode, data, loading, selectable, selected, o
   const [sort, setSort] = useState<SortState>({ key: "", dir: "asc" });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const cols = MARGE_COLS[mode];
   const rawRows = (data?.rows ?? []) as Record<string, unknown>[];
 
@@ -145,11 +148,14 @@ export function AnalyseMargeTable({ mode, data, loading, selectable, selected, o
             {rows.map((row, i) => {
               const globalIdx = (page - 1) * pageSize + i;
               const isSelected = selectable && selected?.has(globalIdx);
-              return (
+              const children = (row.children as Record<string, unknown>[] | undefined);
+              const hasChildren = mode === "produit" && children && children.length > 1;
+              const isExpanded = expanded.has(globalIdx);
+              return (<>
               <tr
                 key={i}
-                className={`border-b border-border last:border-0 hover:bg-muted/30 ${isSelected ? "bg-primary/5" : ""} ${selectable ? "cursor-pointer" : ""}`}
-                onClick={selectable && onToggle ? () => onToggle(globalIdx) : undefined}
+                className={`border-b border-border last:border-0 hover:bg-muted/30 ${isSelected ? "bg-primary/5" : ""} ${selectable || hasChildren ? "cursor-pointer" : ""}`}
+                onClick={hasChildren ? () => setExpanded((prev) => { const next = new Set(prev); next.has(globalIdx) ? next.delete(globalIdx) : next.add(globalIdx); return next; }) : selectable && onToggle ? () => onToggle(globalIdx) : undefined}
               >
                 {selectable && (
                   <td className="w-8 px-2 py-2 text-center">
@@ -162,12 +168,29 @@ export function AnalyseMargeTable({ mode, data, loading, selectable, selected, o
                     />
                   </td>
                 )}
-                {cols.map((col) => (
+                {cols.map((col, ci) => (
                   <td key={col.key} className={`px-3 py-2 text-[12px] ${col.numeric ? "text-right tabular-nums" : ""}`}>
-                    {fmtCell(row[col.key])}
+                    {ci === 0 && hasChildren ? (
+                      <span className="inline-flex items-center gap-1">
+                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                        {fmtCell(row[col.key])}
+                        <span className="text-[10px] text-muted-foreground ml-1">({children!.length})</span>
+                      </span>
+                    ) : fmtCell(row[col.key])}
                   </td>
                 ))}
-              </tr>);
+              </tr>
+              {hasChildren && isExpanded && children!.map((child, ci) => (
+                <tr key={`${i}-child-${ci}`} className="border-b border-border last:border-0 bg-muted/20">
+                  {selectable && <td className="w-8" />}
+                  {cols.map((col, colIdx) => (
+                    <td key={col.key} className={`px-3 py-1.5 text-[11px] text-muted-foreground ${col.numeric ? "text-right tabular-nums" : ""}`}>
+                      {colIdx === 0 ? <span className="pl-5">{fmtCell(child[col.key])}</span> : fmtCell(child[col.key])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              </>);
             })}
           </tbody>
         </table>

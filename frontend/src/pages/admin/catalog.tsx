@@ -472,7 +472,7 @@ export default function AdminCatalogPage() {
         cell: ({ row }) => {
           const pt = row.original.product_type;
           const cat = (row.original.category ?? "").toLowerCase();
-          const resolved = pt || (cat.includes("edicament") || cat.includes("oméopath") || cat.includes("omeopath") ? "pharmacie" : "parapharmacie");
+          const resolved = pt || (cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath") ? "pharmacie" : "parapharmacie");
           return (
             <Badge variant="outline" className={resolved === "pharmacie"
               ? "text-blue-700 border-blue-300 bg-blue-50 text-xs"

@@ -1,3 +1,4 @@
+import calendar
 import re
 from datetime import date, timedelta
 from typing import Optional
@@ -9,11 +10,23 @@ from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
 from utils.strings import strip_percentage as _strip_pct
 
 
+def _subtract_months(d: date, months: int) -> date:
+    """Subtract *months* calendar months from *d*, clamping to last day of month."""
+    month = d.month - months
+    year = d.year
+    while month < 1:
+        month += 12
+        year -= 1
+    max_day = calendar.monthrange(year, month)[1]
+    return date(year, month, min(d.day, max_day))
+
+
 def _pharma_expr():
     """SQLAlchemy expression: True = pharmacie, False = parapharmacie.
     Admin product_type override takes precedence; falls back to category keywords."""
     auto = sa_case(
         (func.lower(Medicament.category).contains("edicament"), True),
+        (func.lower(Medicament.category).contains("édicament"), True),
         (func.lower(Medicament.category).contains("oméopath"), True),
         (func.lower(Medicament.category).contains("omeopath"), True),
         else_=False,
@@ -25,17 +38,31 @@ def _pharma_expr():
     )
 
 
-def _merge_top_categories(rows, n: int = 5) -> list:
-    """Merge rows that share the same stripped category name, return top n by total."""
-    totals: dict[str, float] = {}
+def _merge_top_categories(rows) -> list:
+    """Merge rows that share the same stripped category name, return all sorted by total."""
+    merged: dict[str, dict] = {}
     for r in rows:
         key = _strip_pct(r.category)
-        totals[key] = totals.get(key, 0.0) + float(r.total or 0)
-    return sorted(
-        [{"category": k, "total": round(v, 2)} for k, v in totals.items()],
-        key=lambda x: x["total"],
-        reverse=True,
-    )[:n]
+        if key not in merged:
+            merged[key] = {"total": 0.0, "pu_sum": 0.0, "ppv_sum": 0.0, "qty_sum": 0.0}
+        m = merged[key]
+        m["total"] += float(r.total or 0)
+        qty = float(getattr(r, "qty", 0) or 0)
+        pu = float(getattr(r, "avg_pu", 0) or 0)
+        ppv = float(getattr(r, "avg_ppv", 0) or 0)
+        m["pu_sum"] += pu * qty
+        m["ppv_sum"] += ppv * qty
+        m["qty_sum"] += qty
+    result = []
+    for k, m in merged.items():
+        marge_pct = None
+        if m["qty_sum"] > 0 and m["ppv_sum"] > 0:
+            avg_pu = m["pu_sum"] / m["qty_sum"]
+            avg_ppv = m["ppv_sum"] / m["qty_sum"]
+            if avg_ppv > 0:
+                marge_pct = round((1 - avg_pu / avg_ppv) * 100, 2)
+        result.append({"category": k, "total": round(m["total"], 2), "marge_pct": marge_pct})
+    return sorted(result, key=lambda x: x["total"], reverse=True)
 
 
 def _month_label(d: date) -> str:
@@ -287,6 +314,81 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
         "tva": tva,
         "marge": marge,
         "type_breakdown": type_breakdown,
+    }
+
+
+def compute_previous_kpis(
+    db: Session,
+    pharmacy_id,
+    df: Optional[str],
+    dt: Optional[str],
+    cat_filter_v: list,
+    cat_filter_a: list,
+    non_declared_sub=None,
+) -> dict:
+    """Compute ventes_total and achats_total for the previous period of equal length.
+
+    When date filters are provided, the previous period has the same length and
+    ends the day before df.  When no dates are provided, compare current month
+    vs previous month.
+    """
+    today = date.today()
+
+    if df and dt:
+        d_from = date.fromisoformat(df)
+        d_to = date.fromisoformat(dt)
+        delta = d_to - d_from
+        prev_dt = d_from - timedelta(days=1)
+        prev_df = prev_dt - delta
+    elif df:
+        d_from = date.fromisoformat(df)
+        # No end date means "until today"; mirror that length backwards
+        delta = today - d_from
+        prev_dt = d_from - timedelta(days=1)
+        prev_df = prev_dt - delta
+    elif dt:
+        # Only end date — use 1 month window ending at dt
+        d_to = date.fromisoformat(dt)
+        prev_dt = _subtract_months(d_to, 1) - timedelta(days=1)
+        prev_df = _subtract_months(prev_dt, 1)
+    else:
+        # No dates — current month vs previous month
+        first_of_month = today.replace(day=1)
+        prev_first = _subtract_months(first_of_month, 1)
+        prev_df = prev_first
+        prev_dt = first_of_month - timedelta(days=1)
+
+    prev_df_str = prev_df.strftime("%Y-%m-%d")
+    prev_dt_str = prev_dt.strftime("%Y-%m-%d")
+
+    # Ventes total for previous period
+    vq = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    )
+    if cat_filter_v:
+        vq = vq.filter(*cat_filter_v)
+    if pharmacy_id:
+        vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
+    vq = vq.filter(Vente.date >= prev_df_str, Vente.date <= prev_dt_str)
+    prev_ventes = vq.scalar()
+
+    # Achats total for previous period
+    aq = db.query(func.sum(Achat.total))
+    if cat_filter_a:
+        aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
+    if pharmacy_id:
+        aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
+    aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
+    prev_achats = aq.scalar()
+
+    return {
+        "ventes_total": float(prev_ventes or 0),
+        "achats_total": float(prev_achats or 0),
     }
 
 
