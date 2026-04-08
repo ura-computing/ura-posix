@@ -309,10 +309,13 @@ def list_ventes(
     total = q.count()
     if export:
         rows = q.order_by(Vente.id.desc()).all()
-    else:
-        rows = q.order_by(Vente.id.desc()).offset((page - 1) * limit).limit(limit).all()
+        # Skip avg_pu on export to avoid OOM on large datasets
+        data = [_build_vente_row(v, suffixes_map) for v in rows]
+        return {"data": data, "total": total}
 
-    # Compute weighted avg purchase price per medicament for these rows
+    rows = q.order_by(Vente.id.desc()).offset((page - 1) * limit).limit(limit).all()
+
+    # Compute weighted avg purchase price only for current page (small batch)
     med_ids = list({v.medicament_id for v in rows if v.medicament_id})
     avg_pu_map: Dict[int, float] = {}
     if med_ids:
@@ -330,8 +333,6 @@ def list_ventes(
         avg_pu_map = {row.medicament_id: float(row.avg_pu) for row in pu_q.all() if row.avg_pu}
 
     data = [_build_vente_row(v, suffixes_map, avg_pu_map) for v in rows]
-    if export:
-        return {"data": data, "total": total}
     return {
         "data": data,
         "pagination": {"page": page, "limit": limit, "total": total, "totalPages": (total + limit - 1) // limit},
