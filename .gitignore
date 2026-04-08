@@ -37,6 +37,15 @@ build/
 **/.venv
 **/__pycache__
 
-**/*.png
-**/*.jpeg
+# Ignore all images
+*.png
+*.jpeg
+*.jpg
+*.gif
+*.svg
+*.ico
+*.webp
+
+# But keep images in public folders
+!**/public/**
 
