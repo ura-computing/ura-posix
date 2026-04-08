@@ -149,6 +149,66 @@ def get_achat_suggestions(
     return {"products": products, "suppliers": suppliers, "refs": refs}
 
 
+@achat_router.get("/supplier-summary")
+def achat_supplier_summary(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    search: str = Query(""),
+    category: List[str] = Query(default=[]),
+    tva: List[str] = Query(default=[]),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Compute grossiste vs direct labo summary across ALL achats."""
+    from sqlalchemy import case as sa_case, literal
+
+    q = (
+        db.query(
+            sa_case(
+                (sa_func.upper(Achat.supplier).like("GROSSISTE%"), literal("grossiste")),
+                else_=literal("direct_labo"),
+            ).label("type"),
+            sa_func.sum(Achat.total).label("total_mad"),
+            sa_func.count(sa_func.distinct(Achat.delivery_ref)).label("bl_count"),
+            sa_func.sum(Achat.quantity).label("unit_count"),
+        )
+        .join(Medicament, Achat.medicament_id == Medicament.id, isouter=True)
+        .filter(Achat.supplier.isnot(None), Achat.supplier != "")
+    )
+    if current_user.pharmacy_id:
+        q = q.filter(Achat.pharmacy_id == current_user.pharmacy_id)
+    if date_from:
+        q = q.filter(Achat.delivery_date >= date_from)
+    if date_to:
+        q = q.filter(Achat.delivery_date <= date_to)
+    if search:
+        term = f"%{search}%"
+        q = q.filter(
+            Medicament.product.ilike(term)
+            | Achat.supplier.ilike(term)
+            | Achat.delivery_ref.ilike(term)
+        )
+    if category:
+        q = q.filter(or_(*[Medicament.category.ilike(f"{cat}%") for cat in category]))
+    if tva:
+        q = q.filter(Medicament.tva.in_(tva))
+
+    results = q.group_by("type").all()
+
+    summary = {
+        "grossiste": {"total_mad": 0, "bl_count": 0, "unit_count": 0},
+        "direct_labo": {"total_mad": 0, "bl_count": 0, "unit_count": 0},
+    }
+    for r in results:
+        key = r.type
+        summary[key] = {
+            "total_mad": round(float(r.total_mad or 0), 2),
+            "bl_count": int(r.bl_count or 0),
+            "unit_count": int(r.unit_count or 0),
+        }
+    return summary
+
+
 @achat_router.get("")
 def list_achats(
     page: int = Query(1, ge=1),
@@ -289,6 +349,54 @@ def get_vente_suggestions(
     return {"products": products, "clients": clients, "refs": refs}
 
 
+@vente_router.get("/surveillance-counts")
+def vente_surveillance_counts(
+    search: str = Query(""),
+    category: List[str] = Query(default=[]),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    tva: List[str] = Query(default=[]),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Global counts for surveillance tabs (across ALL ventes, not just current page)."""
+    base = _base_vente_query(db, current_user, search, category, date_from, date_to, tva)
+    remises = base.filter(Vente.discount.isnot(None), Vente.discount > 0).count()
+    remises_high = base.filter(
+        Vente.discount.isnot(None), Vente.discount > 0,
+        Medicament.ppv.isnot(None), Medicament.ppv > 0,
+        (Vente.discount / Medicament.ppv) > 0.20,
+    ).count()
+    # For marge: join with avg PU from achats
+    _avg_pu = (
+        db.query(
+            Achat.medicament_id,
+            (sa_func.sum(Achat.unit_price * Achat.quantity) / sa_func.sum(Achat.quantity)).label("pu"),
+        )
+        .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
+    )
+    if current_user.pharmacy_id:
+        _avg_pu = _avg_pu.filter(Achat.pharmacy_id == current_user.pharmacy_id)
+    _avg_pu = _avg_pu.group_by(Achat.medicament_id).subquery()
+
+    marge_base = (
+        base.join(_avg_pu, Vente.medicament_id == _avg_pu.c.medicament_id)
+        .filter(Medicament.ppv.isnot(None), Medicament.ppv > 0, _avg_pu.c.pu.isnot(None))
+    )
+    marge_negative = marge_base.filter(_avg_pu.c.pu > Medicament.ppv).count()
+    marge_low = marge_base.filter(
+        _avg_pu.c.pu <= Medicament.ppv,
+        ((1.0 - _avg_pu.c.pu / Medicament.ppv) * 100) < 10,
+    ).count()
+    return {
+        "all": remises + marge_negative + marge_low + remises_high,
+        "remises": remises,
+        "remises_high": remises_high,
+        "marge_negative": marge_negative,
+        "marge_low": marge_low,
+    }
+
+
 @vente_router.get("")
 def list_ventes(
     page: int = Query(1, ge=1),
@@ -298,6 +406,7 @@ def list_ventes(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     tva: List[str] = Query(default=[]),
+    surveillance: Optional[str] = Query(None),
     export: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -306,6 +415,55 @@ def list_ventes(
         raise HTTPException(status_code=403, detail="Accès aux ventes refusé")
     suffixes_map = _get_suffixes_map(db)
     q = _base_vente_query(db, current_user, search, category, date_from, date_to, tva)
+
+    # Apply surveillance filter if set
+    if surveillance == "all":
+        # All flagged: remises OR marge issues
+        _avg_pu_all = (
+            db.query(
+                Achat.medicament_id,
+                (sa_func.sum(Achat.unit_price * Achat.quantity) / sa_func.sum(Achat.quantity)).label("pu"),
+            )
+            .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
+        )
+        if current_user.pharmacy_id:
+            _avg_pu_all = _avg_pu_all.filter(Achat.pharmacy_id == current_user.pharmacy_id)
+        _avg_pu_all = _avg_pu_all.group_by(Achat.medicament_id).subquery()
+        q = q.outerjoin(_avg_pu_all, Vente.medicament_id == _avg_pu_all.c.medicament_id)
+        q = q.filter(
+            or_(
+                (Vente.discount > 0),
+                (_avg_pu_all.c.pu > Medicament.ppv),
+                (((1.0 - _avg_pu_all.c.pu / Medicament.ppv) * 100) < 10),
+            )
+        )
+    elif surveillance == "remises":
+        q = q.filter(Vente.discount.isnot(None), Vente.discount > 0)
+    elif surveillance == "remises_high":
+        q = q.filter(
+            Vente.discount.isnot(None), Vente.discount > 0,
+            Medicament.ppv.isnot(None), Medicament.ppv > 0,
+            (Vente.discount / Medicament.ppv) > 0.20,
+        )
+    elif surveillance in ("marge_negative", "marge_low"):
+        _avg_pu_surv = (
+            db.query(
+                Achat.medicament_id,
+                (sa_func.sum(Achat.unit_price * Achat.quantity) / sa_func.sum(Achat.quantity)).label("pu"),
+            )
+            .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
+        )
+        if current_user.pharmacy_id:
+            _avg_pu_surv = _avg_pu_surv.filter(Achat.pharmacy_id == current_user.pharmacy_id)
+        _avg_pu_surv = _avg_pu_surv.group_by(Achat.medicament_id).subquery()
+        q = (
+            q.join(_avg_pu_surv, Vente.medicament_id == _avg_pu_surv.c.medicament_id)
+            .filter(Medicament.ppv.isnot(None), Medicament.ppv > 0, _avg_pu_surv.c.pu.isnot(None))
+        )
+        if surveillance == "marge_negative":
+            q = q.filter(_avg_pu_surv.c.pu > Medicament.ppv)
+        else:
+            q = q.filter(_avg_pu_surv.c.pu <= Medicament.ppv, ((1.0 - _avg_pu_surv.c.pu / Medicament.ppv) * 100) < 10)
     total = q.count()
     if export:
         rows = q.order_by(Vente.id.desc()).all()

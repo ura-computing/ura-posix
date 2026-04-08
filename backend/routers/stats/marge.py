@@ -40,15 +40,20 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
     rows_out = []
 
     if mode == "produit":
-        avg_pu_sub = (
+        # Achat price stats per medicament: weighted avg, max, min
+        achat_prices_sub = (
             db.query(
                 Achat.medicament_id,
                 (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+                func.max(Achat.unit_price).label("pu_max"),
+                func.min(Achat.unit_price).label("pu_min"),
+                func.sum(Achat.unit_price * Achat.quantity).label("total_achat_cost"),
             )
-            .filter(*base_filter_a)
+            .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
             .group_by(Achat.medicament_id)
             .subquery()
         )
+        avg_pu_sub = achat_prices_sub  # alias for backward compat
 
         # Latest stock per medicament (stock_max from the most recent achat)
         _latest_achat = (
@@ -83,9 +88,10 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
                 func.sum(Vente.quantity).label("qty"),
                 func.sum(Vente.total).label("ca"),
-                func.max(Vente.unit_price).label("prix_max"),
-                func.min(Vente.unit_price).label("prix_min"),
-                func.avg(Vente.unit_price).label("prix_avg"),
+                func.coalesce(achat_prices_sub.c.pu_max, Medicament.pph).label("prix_max"),
+                func.coalesce(achat_prices_sub.c.pu_min, Medicament.pph).label("prix_min"),
+                func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("prix_avg"),
+                achat_prices_sub.c.total_achat_cost.label("total_achat_cost"),
                 latest_stock_sub.c.current_stock.label("stock_dispo"),
             )
             .join(Medicament, Vente.medicament_id == Medicament.id)
@@ -94,7 +100,8 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             .filter(*base_filter_v, *cat_filter)
             .group_by(
                 Medicament.id, Medicament.product, Medicament.category,
-                Medicament.tva, Medicament.ppv, Medicament.pph, avg_pu_sub.c.avg_pu,
+                Medicament.tva, Medicament.ppv, Medicament.pph,
+                avg_pu_sub.c.avg_pu, achat_prices_sub.c.pu_max, achat_prices_sub.c.pu_min, achat_prices_sub.c.total_achat_cost,
                 latest_stock_sub.c.current_stock,
             )
         )
@@ -104,8 +111,15 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             ppv = float(r.ppv or 0)
             pu  = float(r.pu or 0)
             stock_dispo = int(r.stock_dispo) if r.stock_dispo is not None else None
+            prix_max = float(r.prix_max or 0)
+            prix_min = float(r.prix_min or 0)
             marge_pct = round((1 - pu / ppv) * 100, 2) if ppv and pu else None
             marge_dh  = round(ppv - pu, 4) if ppv and pu else None
+            # Best/worst margin within this product (from min/max purchase prices)
+            marge_pct_best  = round((1 - prix_min / ppv) * 100, 2) if ppv and prix_min else marge_pct
+            marge_pct_worst = round((1 - prix_max / ppv) * 100, 2) if ppv and prix_max else marge_pct
+            marge_dh_best   = round(ppv - prix_min, 4) if ppv and prix_min else marge_dh
+            marge_dh_worst  = round(ppv - prix_max, 4) if ppv and prix_max else marge_dh
             ppv_potentiel = round(ppv * stock_dispo, 2) if ppv > 0 and stock_dispo and stock_dispo > 0 else None
             raw_rows.append({
                 "product":       r.product or "—",
@@ -113,15 +127,20 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 "tva":           r.tva or "—",
                 "ppv":           round(ppv, 4) if ppv else None,
                 "pu":            round(pu, 4) if pu else None,
-                "prix_max":      round(float(r.prix_max or 0), 4),
-                "prix_min":      round(float(r.prix_min or 0), 4),
+                "prix_max":      round(prix_max, 4),
+                "prix_min":      round(prix_min, 4),
                 "prix_avg":      round(float(r.prix_avg or 0), 4),
                 "qty":           round(float(r.qty or 0), 2),
                 "ca":            round(float(r.ca or 0), 2),
                 "marge_pct":     marge_pct,
                 "marge_dh":      marge_dh,
+                "marge_pct_best": marge_pct_best,
+                "marge_pct_worst": marge_pct_worst,
+                "marge_dh_best":  marge_dh_best,
+                "marge_dh_worst": marge_dh_worst,
                 "stock_dispo":   stock_dispo,
                 "ppv_potentiel": ppv_potentiel,
+                "total_achat_cost": round(float(r.total_achat_cost or 0), 2) if r.total_achat_cost else None,
             })
 
         # Merge rows with the same product name
@@ -362,7 +381,7 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
 
     # Produit-mode stock KPIs
     total_units_available = sum(float(r.get("stock_dispo") or 0) for r in rows_out)
-    total_pu_purchased    = sum(float(r.get("pu") or 0) * float(r.get("qty") or 0) for r in rows_out)
+    total_pu_purchased    = sum(float(r.get("total_achat_cost") or 0) for r in rows_out)
     ppv_total_available   = sum(float(r.get("ppv_potentiel") or 0) for r in rows_out)
 
     marge_rows     = [r for r in rows_out if r.get("marge_pct") is not None]
@@ -392,15 +411,20 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             kpis["marge_dh_avg"] = round(
                 sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2
             )
-        best_pct  = max(marge_rows, key=lambda r: r["marge_pct"])
-        worst_pct = min(marge_rows, key=lambda r: r["marge_pct"])
-        best_dh   = max(marge_rows, key=lambda r: r["marge_dh"])
-        worst_dh  = min(marge_rows, key=lambda r: r["marge_dh"])
+        # Use best/worst per-product margins (based on min/max purchase prices)
+        best_pct_key  = "marge_pct_best" if "marge_pct_best" in marge_rows[0] else "marge_pct"
+        worst_pct_key = "marge_pct_worst" if "marge_pct_worst" in marge_rows[0] else "marge_pct"
+        best_dh_key   = "marge_dh_best" if "marge_dh_best" in marge_rows[0] else "marge_dh"
+        worst_dh_key  = "marge_dh_worst" if "marge_dh_worst" in marge_rows[0] else "marge_dh"
+        best_pct  = max(marge_rows, key=lambda r: float(r.get(best_pct_key) or r["marge_pct"]))
+        worst_pct = min(marge_rows, key=lambda r: float(r.get(worst_pct_key) or r["marge_pct"]))
+        best_dh   = max(marge_rows, key=lambda r: float(r.get(best_dh_key) or r["marge_dh"]))
+        worst_dh  = min(marge_rows, key=lambda r: float(r.get(worst_dh_key) or r["marge_dh"]))
         label_key = "product"
-        kpis["marge_pct_max"] = {"label": best_pct[label_key],  "value": best_pct["marge_pct"],  "qty": best_pct["qty"]}
-        kpis["marge_pct_min"] = {"label": worst_pct[label_key], "value": worst_pct["marge_pct"], "qty": worst_pct["qty"]}
-        kpis["marge_dh_max"]  = {"label": best_dh[label_key],   "value": best_dh["marge_dh"],   "qty": best_dh["qty"]}
-        kpis["marge_dh_min"]  = {"label": worst_dh[label_key],  "value": worst_dh["marge_dh"],  "qty": worst_dh["qty"]}
+        kpis["marge_pct_max"] = {"label": best_pct[label_key],  "value": float(best_pct.get(best_pct_key) or best_pct["marge_pct"]),  "qty": best_pct["qty"]}
+        kpis["marge_pct_min"] = {"label": worst_pct[label_key], "value": float(worst_pct.get(worst_pct_key) or worst_pct["marge_pct"]), "qty": worst_pct["qty"]}
+        kpis["marge_dh_max"]  = {"label": best_dh[label_key],   "value": float(best_dh.get(best_dh_key) or best_dh["marge_dh"]),   "qty": best_dh["qty"]}
+        kpis["marge_dh_min"]  = {"label": worst_dh[label_key],  "value": float(worst_dh.get(worst_dh_key) or worst_dh["marge_dh"]),  "qty": worst_dh["qty"]}
         kpis["difference_gain_dh"] = round(
             float(best_dh["qty"] or 0) * float(best_dh["marge_dh"] or 0) -
             float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh"] or 0),

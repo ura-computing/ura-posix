@@ -122,6 +122,20 @@ async function processQueue() {
   _processing = true;
 
   while (_queue.length > 0) {
+    // Check cancellation before starting next job
+    const cancelled = await new Promise<boolean>((resolve) => {
+      chrome.storage.local.get(CANCEL_UPLOAD_KEY, (res) => resolve(!!(res[CANCEL_UPLOAD_KEY])));
+    });
+    if (cancelled) {
+      // Cancel ALL queued jobs
+      chrome.storage.local.remove(CANCEL_UPLOAD_KEY);
+      for (const q of _queue) {
+        updateJob(q.jobId, { state: "cancelled" });
+      }
+      _queue.length = 0;
+      break;
+    }
+
     const item = _queue.shift()!;
     await handleExport(item.apiUrl, item.filename, item.jobId);
   }
@@ -182,6 +196,11 @@ async function handleExport(apiUrl: string, filename: string | undefined, jobId:
       if (cancelCheck) {
         chrome.storage.local.remove(CANCEL_UPLOAD_KEY);
         update({ state: "cancelled", inserted: totalInserted, skipped: totalSkipped });
+        // Cancel all remaining queued jobs too
+        for (const q of _queue) {
+          updateJob(q.jobId, { state: "cancelled" });
+        }
+        _queue.length = 0;
         return;
       }
 

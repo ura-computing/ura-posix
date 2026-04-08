@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import { useAchatList } from "@/hooks/useAchatList";
@@ -69,114 +70,23 @@ const ACHAT_COL_LABELS: Record<string, string> = {
   quantity: "Qté", pph: "PPH (catalogue)", unit_price: "PU (achat)", expiry_date: "Péremption", total: "Total",
 };
 
-type SupplierSummary = {
-  name: string;
-  totalMAD: number;
-  blCount: number;
-  unitCount: number;
-  lineCount: number;
-  uniqueProducts: number;
-};
-
-type SupplierClassification = "grossiste" | "direct_labo";
-
-type ClassifiedGroup = {
-  totalMAD: number;
-  blCount: number;
-  unitCount: number;
-  margeSum: number;
-  lineCount: number;
-  suppliers: SupplierSummary[];
-};
-
-function computeSupplierSummaries(rows: AchatRow[]): SupplierSummary[] {
-  const map = new Map<string, { totalMAD: number; refs: Set<string>; products: Set<string>; unitCount: number; lineCount: number }>();
-  for (const row of rows) {
-    const name = (row.supplier ?? "").trim();
-    if (!name) continue;
-    let entry = map.get(name);
-    if (!entry) {
-      entry = { totalMAD: 0, refs: new Set(), products: new Set(), unitCount: 0, lineCount: 0 };
-      map.set(name, entry);
-    }
-    entry.totalMAD += row.total ?? 0;
-    if (row.delivery_ref) entry.refs.add(row.delivery_ref);
-    if (row.product) entry.products.add(row.product);
-    entry.unitCount += row.quantity ?? 0;
-    entry.lineCount += 1;
-  }
-  return Array.from(map.entries())
-    .map(([name, d]) => ({ name, totalMAD: d.totalMAD, blCount: d.refs.size, unitCount: d.unitCount, lineCount: d.lineCount, uniqueProducts: d.products.size }))
-    .sort((a, b) => b.totalMAD - a.totalMAD);
-}
-
-/**
- * Classify a supplier as grossiste or direct labo.
- * Heuristic: suppliers with > 10 unique products are grossistes,
- * plus suppliers whose name contains common grossiste keywords.
- */
-function classifySupplier(s: SupplierSummary): SupplierClassification {
-  return s.name.toUpperCase().startsWith("GROSSISTE") ? "grossiste" : "direct_labo";
-}
-
-function computeClassifiedGroups(summaries: SupplierSummary[], rows: AchatRow[]): {
-  grossiste: ClassifiedGroup;
-  directLabo: ClassifiedGroup;
-} {
-  const grossisteSuppliers: SupplierSummary[] = [];
-  const directLaboSuppliers: SupplierSummary[] = [];
-
-  for (const s of summaries) {
-    if (classifySupplier(s) === "grossiste") {
-      grossisteSuppliers.push(s);
-    } else {
-      directLaboSuppliers.push(s);
-    }
-  }
-
-  const buildGroup = (suppliers: SupplierSummary[]): ClassifiedGroup => {
-    const supplierNames = new Set(suppliers.map((s) => s.name));
-    let margeSum = 0;
-    let margeCount = 0;
-    for (const row of rows) {
-      const name = (row.supplier ?? "").trim();
-      if (!supplierNames.has(name)) continue;
-      if (row.ppv != null && row.unit_price != null && row.unit_price > 0) {
-        margeSum += ((row.ppv - row.unit_price) / row.ppv) * 100;
-        margeCount += 1;
-      }
-    }
-    return {
-      totalMAD: suppliers.reduce((s, x) => s + x.totalMAD, 0),
-      blCount: suppliers.reduce((s, x) => s + x.blCount, 0),
-      unitCount: suppliers.reduce((s, x) => s + x.unitCount, 0),
-      margeSum: margeCount > 0 ? margeSum / margeCount : 0,
-      lineCount: suppliers.reduce((s, x) => s + x.lineCount, 0),
-      suppliers,
-    };
-  };
-
-  return {
-    grossiste: buildGroup(grossisteSuppliers),
-    directLabo: buildGroup(directLaboSuppliers),
-  };
-}
+/* ── Supplier summary types removed — now fetched from backend ── */
 
 function NeedleGauge({ grossistePct }: { grossistePct: number }) {
   const clamped = Math.min(100, Math.max(0, grossistePct));
-  // Needle angle: 0% = -90° (left/green), 100% = +90° (right/red)
-  const angle = -90 + (clamped / 100) * 180;
+  // Needle angle: 0% grossiste = +90° (right/green), 100% grossiste = -90° (left/red)
+  const angle = 90 - (clamped / 100) * 180;
 
   return (
     <div className="flex flex-col items-center">
       <p className="text-xs font-medium text-muted-foreground mb-1">Jauge</p>
       <svg viewBox="0 0 200 120" className="w-40 h-24">
-        {/* Green zone: 0-40% → -90° to -54° */}
-        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke="#16a34a" strokeWidth="16" strokeLinecap="round" />
-        {/* Yellow zone: 40-80% → -54° to +18° */}
+        {/* Red zone (left): 80-100% grossiste */}
+        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke="#ef4444" strokeWidth="16" strokeLinecap="round" />
+        {/* Yellow zone (middle): 40-80% grossiste */}
         <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke="#eab308" strokeWidth="16" />
-        {/* Red zone: 80-100% → +18° to +90° */}
-        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke="#ef4444" strokeWidth="16" strokeLinecap="round" />
+        {/* Green zone (right): 0-40% grossiste */}
+        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke="#16a34a" strokeWidth="16" strokeLinecap="round" />
         {/* Needle */}
         <g transform={`rotate(${angle}, 100, 100)`}>
           <line x1="100" y1="100" x2="100" y2="30" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
@@ -189,20 +99,22 @@ function NeedleGauge({ grossistePct }: { grossistePct: number }) {
   );
 }
 
-const SupplierSummarySection = ({ rows }: { rows: AchatRow[] }) => {
-  const summaries = useMemo(() => computeSupplierSummaries(rows), [rows]);
+const SupplierSummarySection = ({ dateFrom, dateTo, search, categories, tva }: {
+  dateFrom?: string; dateTo?: string; search?: string; categories?: string[]; tva?: string[];
+}) => {
+  const { data: summary } = useQuery({
+    queryKey: ["achat-supplier-summary", dateFrom, dateTo, search, categories, tva],
+    queryFn: () => transactionsApi.achatSupplierSummary(dateFrom, dateTo, search, categories, tva),
+  });
 
-  const classified = useMemo(
-    () => computeClassifiedGroups(summaries, rows),
-    [summaries, rows],
-  );
+  if (!summary) return null;
 
-  const grossistePct = useMemo(() => {
-    const total = classified.grossiste.totalMAD + classified.directLabo.totalMAD;
-    return total > 0 ? (classified.grossiste.totalMAD / total) * 100 : 0;
-  }, [classified]);
+  const g = summary.grossiste;
+  const l = summary.direct_labo;
+  const total = g.total_mad + l.total_mad;
+  const grossistePct = total > 0 ? (g.total_mad / total) * 100 : 0;
 
-  if (rows.length === 0) return null;
+  if (total === 0) return null;
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm p-5">
@@ -211,10 +123,9 @@ const SupplierSummarySection = ({ rows }: { rows: AchatRow[] }) => {
         <div className="space-y-1">
           <p className="text-sm font-semibold text-muted-foreground mb-2">Grossistes</p>
           <p className="text-xs text-muted-foreground">Achats</p>
-          <p className="text-lg font-bold tabular-nums">{fmt(classified.grossiste.totalMAD)} MAD</p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.blCount}</span> <span className="text-muted-foreground">BL</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.unitCount.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.grossiste.margeSum.toFixed(2)}%</span> <span className="text-muted-foreground">marge moyenne</span></p>
+          <p className="text-lg font-bold tabular-nums">{fmt(g.total_mad)} MAD</p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{g.bl_count}</span> <span className="text-muted-foreground">BL</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{g.unit_count.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
         </div>
 
         {/* Gauge (center) */}
@@ -224,10 +135,9 @@ const SupplierSummarySection = ({ rows }: { rows: AchatRow[] }) => {
         <div className="space-y-1 text-right">
           <p className="text-sm font-semibold text-muted-foreground mb-2">Direct laboratoires</p>
           <p className="text-xs text-muted-foreground">Achats</p>
-          <p className="text-lg font-bold tabular-nums text-emerald-600">{fmt(classified.directLabo.totalMAD)} MAD</p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.blCount}</span> <span className="text-muted-foreground">BL</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.unitCount.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{classified.directLabo.margeSum.toFixed(2)}%</span> <span className="text-muted-foreground">marge moyenne</span></p>
+          <p className="text-lg font-bold tabular-nums text-emerald-600">{fmt(l.total_mad)} MAD</p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{l.bl_count}</span> <span className="text-muted-foreground">BL</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{l.unit_count.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
         </div>
       </div>
     </div>
@@ -566,7 +476,7 @@ const AchatList = () => {
         }
       />
 
-      <SupplierSummarySection rows={rows} />
+      <SupplierSummarySection dateFrom={dateFrom} dateTo={dateTo} search={searchQuery} categories={effectiveCategories} tva={selectedTva} />
 
       <DataTable
         table={tableInstance}

@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigat
 import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/shared/toaster";
-import { ThemeProvider } from "./components/theme/themeProvider";
+
 import { Layout } from "./components/layout/layout";
 import { Login } from "./pages/login";
 import { routes } from "./routes";
@@ -84,7 +84,6 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ThemeProvider defaultTheme="light">
           <Routes>
             {/* Universal routes (accessible to all, no auth wrapper) */}
             {universalRoutes.map((route) => (
@@ -134,7 +133,6 @@ function App() {
           </Routes>
 
           <Toaster />
-        </ThemeProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

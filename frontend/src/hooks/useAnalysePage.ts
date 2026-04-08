@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useAnalyseMarge } from "@/hooks/usePharmacyRapports";
 import { eCategoryType } from "@/types";
-import { MARGE_COLS, SIM_LABEL_KEY, type MargeMode } from "@/pages/rapports/margeTable";
+import { MARGE_COLS, type MargeMode } from "@/pages/rapports/margeTable";
 import { downloadBlob } from "@/pages/rapports/shared";
 
 export function useAnalysePage() {
@@ -24,23 +24,50 @@ export function useAnalysePage() {
     const q = search.toLowerCase();
     return allRows
       .map((r, i) => ({ row: r, idx: i }))
-      .filter(({ row }) => String(row[SIM_LABEL_KEY[margeMode]] ?? "").toLowerCase().includes(q));
-  }, [allRows, search, margeMode]);
+      .filter(({ row }) => {
+        return Object.values(row).some((v) =>
+          typeof v === "string" && v.toLowerCase().includes(q)
+        );
+      });
+  }, [allRows, search]);
 
   const kpis = useMemo(() => {
-    const sel = allRows.filter((_, i) => selected.has(i));
+    // Priority: checked rows > search-filtered rows > all rows (global KPIs from backend)
+    const hasChecked = selected.size > 0;
+    const hasSearch = search.trim().length > 0;
+    const sel = hasChecked
+      ? allRows.filter((_, i) => selected.has(i))
+      : hasSearch
+        ? filteredRows.map((f) => f.row)
+        : [];
     const ca = sel.reduce((s, r) => s + (Number(r.ca ?? r.total) || 0), 0);
     const qty = sel.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-    const pcts = sel.map((r) => Number(r.marge_pct ?? r.marge_pct_avg ?? NaN)).filter((v) => !isNaN(v));
-    const dhs = sel.map((r) => Number(r.marge_dh ?? r.marge_dh_avg ?? NaN)).filter((v) => !isNaN(v));
+    const pcts = sel.map((r) => ({ v: Number(r.marge_pct ?? r.marge_pct_avg ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const dhs = sel.map((r) => ({ v: Number(r.marge_dh ?? r.marge_dh_avg ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const margePctAvg = pcts.length ? pcts.reduce((s, x) => s + x.v, 0) / pcts.length : null;
+    const margeDhAvg = dhs.length ? dhs.reduce((s, x) => s + x.v, 0) / dhs.length : null;
+    // Use best/worst margins (from min/max purchase prices per product)
+    const pctsWorst = sel.map((r) => ({ v: Number(r.marge_pct_worst ?? r.marge_pct ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const pctsBest = sel.map((r) => ({ v: Number(r.marge_pct_best ?? r.marge_pct ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const dhsWorst = sel.map((r) => ({ v: Number(r.marge_dh_worst ?? r.marge_dh ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const dhsBest = sel.map((r) => ({ v: Number(r.marge_dh_best ?? r.marge_dh ?? NaN), label: String(r.product ?? r.category ?? ""), qty: Number(r.qty ?? 0) })).filter((x) => !isNaN(x.v));
+    const margePctMin = pctsWorst.length ? pctsWorst.reduce((a, b) => a.v < b.v ? a : b) : null;
+    const margePctMax = pctsBest.length ? pctsBest.reduce((a, b) => a.v > b.v ? a : b) : null;
+    const margeDhMin = dhsWorst.length ? dhsWorst.reduce((a, b) => a.v < b.v ? a : b) : null;
+    const margeDhMax = dhsBest.length ? dhsBest.reduce((a, b) => a.v > b.v ? a : b) : null;
+    const unitsAvailable = sel.reduce((s, r) => s + (Number(r.stock_dispo) || 0), 0);
+    const totalPuPurchased = sel.reduce((s, r) => s + (Number(r.total_achat_cost) || 0), 0);
+    const ppvTotalAvailable = sel.reduce((s, r) => s + ((Number(r.ppv) || 0) * (Number(r.stock_dispo) || 0)), 0);
     return {
       count: sel.length,
-      ca,
-      qty,
-      margePctAvg: pcts.length ? pcts.reduce((s, v) => s + v, 0) / pcts.length : null,
-      margeDhAvg: dhs.length ? dhs.reduce((s, v) => s + v, 0) / dhs.length : null,
+      ca, qty, margePctAvg, margeDhAvg,
+      margePctMin: margePctMin ? { label: margePctMin.label, value: margePctMin.v, qty: margePctMin.qty } : null,
+      margePctMax: margePctMax ? { label: margePctMax.label, value: margePctMax.v, qty: margePctMax.qty } : null,
+      margeDhMin: margeDhMin ? { label: margeDhMin.label, value: margeDhMin.v, qty: margeDhMin.qty } : null,
+      margeDhMax: margeDhMax ? { label: margeDhMax.label, value: margeDhMax.v, qty: margeDhMax.qty } : null,
+      unitsAvailable, totalPuPurchased, ppvTotalAvailable,
     };
-  }, [allRows, selected]);
+  }, [allRows, selected, search, filteredRows]);
 
   const toggleRow = useCallback((idx: number) => {
     setSelected((prev) => {
@@ -77,6 +104,13 @@ export function useAnalysePage() {
     setSearch("");
   }, []);
 
+  // Build filtered margeData so table + KPIs use the same filtered rows
+  const filteredMargeData = useMemo(() => {
+    if (!margeData) return undefined;
+    if (!search.trim()) return margeData;
+    return { ...margeData, rows: filteredRows.map((f) => f.row) };
+  }, [margeData, search, filteredRows]);
+
   return {
     // Filters
     dateFrom, setDateFrom,
@@ -85,7 +119,7 @@ export function useAnalysePage() {
     margeMode, setMargeMode,
     search, setSearch,
     // Data
-    margeData, margeLoading, allRows, filteredRows,
+    margeData: filteredMargeData, margeLoading, allRows, filteredRows,
     // Selection
     selected, kpis,
     toggleRow, toggleAll, resetSelection,

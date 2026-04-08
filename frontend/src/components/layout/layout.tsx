@@ -1,7 +1,7 @@
 "use client";
 
 import { Header } from "@/components/layout/header";
-import { ThemeProvider } from "@/components/theme/themeProvider";
+
 import { TopLoadingBar } from "@/components/topLoadingBar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/utils/cn";
@@ -10,7 +10,7 @@ import { Sidebar } from "./sidebar";
 
 export function Layout({ children }: PropsWithChildren) {
   return (
-    <ThemeProvider>
+    <>
       <TopLoadingBar />
       <SidebarProvider data-pg-sidebar="">
         <Sidebar />
@@ -36,7 +36,7 @@ export function Layout({ children }: PropsWithChildren) {
           </main>
         </SidebarInset>
       </SidebarProvider>
-    </ThemeProvider>
+    </>
   );
 }
 

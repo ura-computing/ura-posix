@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { DataTable } from "@/components/DataTable/dataTable";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/datePicker";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
 import { eCategoryType } from "@/types";
@@ -158,11 +159,11 @@ export default function ComptabilitePage() {
       <div className="flex items-center gap-3 flex-wrap">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Du</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-40 text-sm" />
+          <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Au</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-40 text-sm" />
+          <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
         </div>
         {(dateFrom || dateTo) && (
           <Button variant="ghost" size="sm" className="h-9 text-muted-foreground mt-5" onClick={() => { setDateFrom(""); setDateTo(""); }}>

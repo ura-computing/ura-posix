@@ -10,4 +10,4 @@ COPY . .
 RUN useradd -m -r -u 1000 appuser
 USER appuser
 
-CMD ["sh", "-c", "python db_clean.py --force && python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python seed.py && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
