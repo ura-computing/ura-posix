@@ -12,12 +12,14 @@ from utils.constants import Role, Status
 from .excel import _build_excel
 from .marge import _compute_analyse_marge, _compute_margin_alerts
 from .stock import _compute_stock_abcd
+from .peremptions import _compute_peremptions
 from .queries import (
     _compute_extra_stats,
     _fetch_med_rows,
     _merge_top_categories,
     _pharma_expr,
     build_monthly_trend,
+    compute_previous_kpis,
 )
 
 router = APIRouter(tags=["stats"])
@@ -86,7 +88,13 @@ def get_stats(
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
     cat_q = (
-        db.query(Medicament.category.label("category"), func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"))
+        db.query(
+            Medicament.category.label("category"),
+            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
+            func.sum(Vente.quantity).label("qty"),
+            func.avg(Vente.unit_price).label("avg_pu"),
+            func.avg(Medicament.ppv).label("avg_ppv"),
+        )
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .filter(Medicament.category.isnot(None))
     )
@@ -104,6 +112,10 @@ def get_stats(
 
     extra = _compute_extra_stats(db, pharmacy_id, df, dt, category_type)
 
+    previous_kpis = compute_previous_kpis(
+        db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub
+    )
+
     return {
         "kpis": {
             "ventes_total": float(ventes_total or 0),
@@ -111,6 +123,7 @@ def get_stats(
             "ventes_count": ventes_count or 0,
             "achats_count": achats_count or 0,
         },
+        "previous_kpis": previous_kpis,
         **extra,
         "monthly_trend": monthly_trend,
         "top_categories": top_categories,
@@ -160,6 +173,22 @@ def stats_stock_abcd(
     if not current_user.pharmacy_id:
         raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
     return _compute_stock_abcd(
+        db, current_user.pharmacy_id, date_from or None, date_to or None
+    )
+
+
+@router.get("/stats/peremptions")
+def stats_peremptions(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/peremptions")
+    if not current_user.pharmacy_id:
+        raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
+    return _compute_peremptions(
         db, current_user.pharmacy_id, date_from or None, date_to or None
     )
 
@@ -290,7 +319,13 @@ def get_pharmacy_stats_for_admin(
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
     cat_q = (
-        db.query(Medicament.category.label("category"), func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"))
+        db.query(
+            Medicament.category.label("category"),
+            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
+            func.sum(Vente.quantity).label("qty"),
+            func.avg(Vente.unit_price).label("avg_pu"),
+            func.avg(Medicament.ppv).label("avg_ppv"),
+        )
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .filter(
             Vente.pharmacy_id == pharmacy_id,
@@ -308,6 +343,10 @@ def get_pharmacy_stats_for_admin(
 
     extra = _compute_extra_stats(db, pharmacy_id, df, dt, category_type)
 
+    previous_kpis = compute_previous_kpis(
+        db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub
+    )
+
     return {
         "kpis": {
             "ventes_total": float(ventes_total or 0),
@@ -315,6 +354,7 @@ def get_pharmacy_stats_for_admin(
             "ventes_count": ventes_count or 0,
             "achats_count": achats_count or 0,
         },
+        "previous_kpis": previous_kpis,
         **extra,
         "monthly_trend": monthly_trend,
         "top_categories": top_categories,
@@ -431,6 +471,21 @@ def admin_stock_abcd(
     if current_user.role != Role.ADMIN:
         raise HTTPException(status_code=403, detail="Accès administrateur requis")
     return _compute_stock_abcd(
+        db, pharmacy_id, date_from or None, date_to or None
+    )
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/peremptions")
+def admin_peremptions(
+    pharmacy_id: int,
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Accès administrateur requis")
+    return _compute_peremptions(
         db, pharmacy_id, date_from or None, date_to or None
     )
 

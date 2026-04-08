@@ -1,6 +1,7 @@
-"""Tests for stats endpoints (KPIs, analyse-marge, admin stats, products)."""
+"""Tests for stats endpoints (KPIs, analyse-marge, admin stats, products, peremptions)."""
 
 import pytest
+from datetime import date, timedelta
 from tests.factories import make_achat, make_medicament, make_vente
 
 
@@ -76,6 +77,7 @@ class TestGetStats:
         body = res.json()
 
         assert "kpis" in body
+        assert "previous_kpis" in body
         assert "monthly_trend" in body
         assert "top_categories" in body
         assert "advanced_kpis" in body
@@ -146,6 +148,52 @@ class TestGetStats:
     def test_requires_auth(self, client):
         res = client.get("/stats")
         assert res.status_code == 403  # HTTPBearer returns 403 for missing auth
+
+    def test_previous_kpis_shape(self, client, test_owner, stats_data):
+        """previous_kpis must contain ventes_total and achats_total."""
+        res = client.get("/stats", headers=test_owner["headers"])
+        assert res.status_code == 200
+        prev = res.json()["previous_kpis"]
+        assert "ventes_total" in prev
+        assert "achats_total" in prev
+        assert isinstance(prev["ventes_total"], (int, float))
+        assert isinstance(prev["achats_total"], (int, float))
+
+    def test_previous_kpis_with_date_range(self, client, db, test_owner, stats_data):
+        """When filtering March 10-15, previous period (March 4-9) should pick up
+        data we insert into that window."""
+        pharmacy_id = stats_data["pharmacy_id"]
+        med1 = stats_data["med1"]
+
+        # Add data in the previous period (March 4-9) for med1
+        make_vente(db, med1, pharmacy_id, quantity=3, unit_price=50.0, date="2026-03-05")
+        make_achat(db, med1, pharmacy_id, quantity=4, unit_price=40.0, delivery_date="2026-03-06")
+
+        res = client.get(
+            "/stats",
+            params={"date_from": "2026-03-10", "date_to": "2026-03-15"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        prev = res.json()["previous_kpis"]
+        # Previous period: March 4 - March 9 (5-day delta, same length)
+        # Ventes in that window: 3 * 50 (ppv) = 150
+        assert prev["ventes_total"] == 3 * 50.0
+        # Achats in that window: stats_data med2 (10*80=800) + our achat (4*40=160) = 960
+        assert prev["achats_total"] == (10 * 80.0) + (4 * 40.0)
+
+    def test_previous_kpis_empty_when_no_prior_data(self, client, test_owner, stats_data):
+        """When there is no data in the previous period, totals should be 0."""
+        res = client.get(
+            "/stats",
+            params={"date_from": "2026-03-01", "date_to": "2026-03-31"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        prev = res.json()["previous_kpis"]
+        # Previous period is Feb 1-28 — no data was inserted there
+        assert prev["ventes_total"] == 0
+        assert prev["achats_total"] == 0
 
 
 # ── GET /stats/analyse-marge ─────────────────────────────────────────────────
@@ -447,3 +495,210 @@ class TestStatsProducts:
         creme = next((p for p in products if "Creme" in p["product"]), None)
         assert creme is not None
         assert creme["declared"] is True
+
+
+# ── GET /stats/peremptions ──────────────────────────────────────────────────
+
+@pytest.fixture()
+def peremptions_data(db, test_owner):
+    """Create medicaments with various expiry dates for peremption testing.
+
+    med_expired: expiry 2025-01-01 (in the past) — expired
+    med_very_close: expiry today + 3 months — very close
+    med_close: expiry today + 9 months — close
+    med_safe: expiry today + 18 months — not in any bracket
+    """
+    pharmacy_id = test_owner["pharmacy"].id
+    today = date.today()
+
+    med_expired = make_medicament(
+        db,
+        pid="PERM-001",
+        product="Expired Drug",
+        ppv=50.0,
+        pph=40.0,
+    )
+    med_very_close = make_medicament(
+        db,
+        pid="PERM-002",
+        product="Very Close Drug",
+        ppv=80.0,
+        pph=60.0,
+    )
+    med_close = make_medicament(
+        db,
+        pid="PERM-003",
+        product="Close Drug",
+        ppv=120.0,
+        pph=90.0,
+    )
+    med_safe = make_medicament(
+        db,
+        pid="PERM-004",
+        product="Safe Drug",
+        ppv=200.0,
+        pph=150.0,
+    )
+
+    make_achat(
+        db, med_expired, pharmacy_id,
+        quantity=10, unit_price=40.0,
+        delivery_date="2024-12-01",
+        expiry_date="2025-01-01",
+    )
+    make_achat(
+        db, med_very_close, pharmacy_id,
+        quantity=20, unit_price=60.0,
+        delivery_date="2026-02-01",
+        expiry_date=(today + timedelta(days=90)).isoformat(),
+    )
+    make_achat(
+        db, med_close, pharmacy_id,
+        quantity=15, unit_price=90.0,
+        delivery_date="2026-02-15",
+        expiry_date=(today + timedelta(days=270)).isoformat(),
+    )
+    make_achat(
+        db, med_safe, pharmacy_id,
+        quantity=30, unit_price=150.0,
+        delivery_date="2026-03-01",
+        expiry_date=(today + timedelta(days=540)).isoformat(),
+    )
+
+    return {
+        "pharmacy_id": pharmacy_id,
+        "med_expired": med_expired,
+        "med_very_close": med_very_close,
+        "med_close": med_close,
+        "med_safe": med_safe,
+    }
+
+
+class TestPeremptions:
+    def test_response_shape(self, client, test_owner, peremptions_data):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        body = res.json()
+
+        for bracket_key in ("expired", "very_close", "close"):
+            assert bracket_key in body
+            bracket = body[bracket_key]
+            assert "count" in bracket
+            assert "total_units" in bracket
+            assert "purchase_value" in bracket
+            assert "sale_value" in bracket
+            assert "products" in bracket
+
+    def test_expired_bracket(self, client, test_owner, peremptions_data):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        expired = res.json()["expired"]
+
+        assert expired["count"] == 1
+        assert expired["total_units"] == 10
+        assert expired["purchase_value"] == 10 * 40.0
+        assert expired["sale_value"] == 10 * 50.0
+
+    def test_very_close_bracket(self, client, test_owner, peremptions_data):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        very_close = res.json()["very_close"]
+
+        assert very_close["count"] == 1
+        assert very_close["total_units"] == 20
+        assert very_close["purchase_value"] == 20 * 60.0
+        assert very_close["sale_value"] == 20 * 80.0
+
+    def test_close_bracket(self, client, test_owner, peremptions_data):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        close = res.json()["close"]
+
+        assert close["count"] == 1
+        assert close["total_units"] == 15
+        assert close["purchase_value"] == 15 * 90.0
+        assert close["sale_value"] == 15 * 120.0
+
+    def test_safe_not_included(self, client, test_owner, peremptions_data):
+        """Products with expiry > 12 months should not appear in any bracket."""
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        body = res.json()
+
+        all_products = []
+        for key in ("expired", "very_close", "close"):
+            all_products.extend(body[key]["products"])
+
+        product_names = [p["product"] for p in all_products]
+        assert "Safe Drug" not in product_names
+
+    def test_product_shape(self, client, test_owner, peremptions_data):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        expired_products = res.json()["expired"]["products"]
+        assert len(expired_products) >= 1
+
+        p = expired_products[0]
+        assert "product" in p
+        assert "expiry_date" in p
+        assert "quantity" in p
+        assert "ppv" in p
+
+    def test_admin_gets_403(self, client, test_admin):
+        res = client.get("/stats/peremptions", headers=test_admin["headers"])
+        assert res.status_code == 403
+
+    def test_requires_auth(self, client):
+        res = client.get("/stats/peremptions")
+        assert res.status_code == 403
+
+    def test_empty_when_no_data(self, client, test_owner):
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        body = res.json()
+        for key in ("expired", "very_close", "close"):
+            assert body[key]["count"] == 0
+            assert body[key]["total_units"] == 0
+
+    def test_latest_achat_used(self, client, db, test_owner, peremptions_data):
+        """When multiple achats exist for a product, use the latest delivery."""
+        pharmacy_id = peremptions_data["pharmacy_id"]
+        med = peremptions_data["med_expired"]
+        today = date.today()
+
+        # Add a newer achat with a safe expiry — should override the expired one
+        make_achat(
+            db, med, pharmacy_id,
+            quantity=5, unit_price=45.0,
+            delivery_date="2026-04-01",
+            expiry_date=(today + timedelta(days=540)).isoformat(),
+        )
+
+        res = client.get("/stats/peremptions", headers=test_owner["headers"])
+        assert res.status_code == 200
+        expired = res.json()["expired"]
+
+        # The expired product should no longer be in the expired bracket
+        expired_names = [p["product"] for p in expired["products"]]
+        assert "Expired Drug" not in expired_names
+
+
+class TestAdminPeremptions:
+    def test_admin_gets_peremptions(self, client, test_admin, test_owner, peremptions_data):
+        pharmacy_id = peremptions_data["pharmacy_id"]
+        res = client.get(
+            f"/admin/pharmacy/{pharmacy_id}/stats/peremptions",
+            headers=test_admin["headers"],
+        )
+        assert res.status_code == 200
+        body = res.json()
+        for key in ("expired", "very_close", "close"):
+            assert key in body
+
+    def test_non_admin_gets_403(self, client, test_owner, peremptions_data):
+        pharmacy_id = peremptions_data["pharmacy_id"]
+        res = client.get(
+            f"/admin/pharmacy/{pharmacy_id}/stats/peremptions",
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 403

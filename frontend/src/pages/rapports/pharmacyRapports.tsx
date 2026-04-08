@@ -19,7 +19,6 @@ import {
   CalendarCheck,
   CalendarX,
   Download,
-  Package,
   Plus,
   Receipt,
   Search,
@@ -68,6 +67,7 @@ export function PharmacyRapports() {
   const { marginAlerts, marginAlertsLoading } = useMarginAlerts(dateFrom, dateTo, categoryType);
 
   const kpis     = stats?.kpis;
+  const prevKpis = stats?.previous_kpis;
   const advKpis  = stats?.advanced_kpis;
   const tva      = stats?.tva;
   const marge    = stats?.marge;
@@ -88,12 +88,7 @@ export function PharmacyRapports() {
     return { grade: "F", color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800", desc: "Rentabilite insuffisante" };
   }, [margePct]);
 
-  // Compute parapharmacie CA percentage
-  const paraPercent = useMemo(() => {
-    const total = kpis?.ventes_total ?? 0;
-    const paraTotal = typeBreakdown?.parapharmacie?.ventes_total ?? 0;
-    return total > 0 ? ((paraTotal / total) * 100).toFixed(1) : "0.0";
-  }, [kpis, typeBreakdown]);
+
 
   const handleExcel = async (type: eCategoryType) => {
     setExporting(type);
@@ -196,6 +191,47 @@ export function PharmacyRapports() {
     downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `analyse_${margeMode}_selection.csv`);
   }, [allMargeRows, simSelected, margeMode]);
 
+  /** Compute % change between current and previous value. Returns null when no previous data. */
+  const pctChange = (current: number | undefined, previous: number | undefined): number | null => {
+    if (previous === undefined || previous === 0 || current === undefined) return null;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const ChangeBadge = ({ current, previous, invert = false, light = false }: {
+    current: number | undefined;
+    previous: number | undefined;
+    /** When true, a decrease is shown green (e.g. for costs) */
+    invert?: boolean;
+    /** Use lighter colors for badges on the primary-colored card */
+    light?: boolean;
+  }) => {
+    const change = pctChange(current, previous);
+    if (change === null) {
+      return (
+        <span className={cn(
+          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+          light ? "bg-white/20 text-white/70" : "bg-muted text-muted-foreground",
+        )}>
+          —
+        </span>
+      );
+    }
+    const isPositive = change > 0;
+    const isGood = invert ? !isPositive : isPositive;
+    return (
+      <span className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+        light
+          ? isGood ? "bg-white/20 text-white" : "bg-red-400/30 text-white"
+          : isGood
+            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+            : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+      )}>
+        {isPositive ? "\u2191" : "\u2193"}{Math.abs(change).toFixed(1)}%
+      </span>
+    );
+  };
+
   return (
     <div>
       {/* ── Sticky filter + export bar ── */}
@@ -277,38 +313,74 @@ export function PharmacyRapports() {
       </div>
 
       <div className="space-y-8">
-      {/* ── Performance banner ── */}
+      {/* ── Performance banner (grey strip) ── */}
       <section>
         {isLoading ? (
-          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-lg" />
         ) : (
-          <div className="flex items-center gap-4 overflow-x-auto rounded-lg border border-border bg-gradient-to-r from-primary/5 via-background to-primary/5 px-5 py-3">
-            <div className="flex items-center gap-2 shrink-0">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-semibold text-foreground">
-                Marge moy. {margePct.toFixed(1)}%
-              </span>
-            </div>
-            <span className="h-4 w-px bg-border shrink-0" />
-            <span className="text-sm text-muted-foreground shrink-0">
-              Parapharmacie <span className="font-semibold text-foreground">{paraPercent}%</span> du CA
+          <div className="flex items-center gap-3 overflow-x-auto rounded-lg bg-muted/60 border border-border px-4 py-2.5 text-xs">
+            {/* Performance % vs previous period */}
+            {/* Only show period comparison when user explicitly selected a date range */}
+            {dateFrom && dateTo && (() => {
+              const prev = prevKpis?.ventes_total ?? 0;
+              const curr = kpis?.ventes_total ?? 0;
+              if (prev > 0) {
+                const pct = ((curr - prev) / prev) * 100;
+                const isUp = pct >= 0;
+                return (
+                  <span className={cn("font-bold shrink-0", isUp ? "text-emerald-600" : "text-red-600")}>
+                    {isUp ? "+" : ""}{pct.toFixed(1)}% vs période préc.
+                  </span>
+                );
+              }
+              return null;
+            })()}
+            <span className="h-3.5 w-px bg-border shrink-0" />
+            {(() => {
+              const total = kpis?.ventes_total ?? 0;
+              const pharma = typeBreakdown?.pharmacie?.ventes_total ?? 0;
+              const para = typeBreakdown?.parapharmacie?.ventes_total ?? 0;
+              const pctPh = total > 0 ? (pharma / total * 100).toFixed(1) : "0.0";
+              const pctPa = total > 0 ? (para / total * 100).toFixed(1) : "0.0";
+              if (categoryType === eCategoryType.PHARMACIE) {
+                return <span className="text-muted-foreground shrink-0">Pharmacie <span className="font-semibold text-green-600">{pctPh}%</span> du CA</span>;
+              }
+              if (categoryType === eCategoryType.PARAPHARMACIE) {
+                return <span className="text-muted-foreground shrink-0">Parapharmacie <span className="font-semibold text-purple-600">{pctPa}%</span> du CA</span>;
+              }
+              return (
+                <span className="text-muted-foreground shrink-0">
+                  Pharmacie <span className="font-semibold text-green-600">{pctPh}%</span>
+                  {" · "}
+                  Parapharmacie <span className="font-semibold text-purple-600">{pctPa}%</span> du CA
+                </span>
+              );
+            })()}
+            <span className="h-3.5 w-px bg-border shrink-0" />
+            <span className="text-muted-foreground shrink-0">
+              Marge moy: <span className="font-semibold text-foreground">{margePct.toFixed(1)}%</span>
             </span>
-            <span className="h-4 w-px bg-border shrink-0" />
-            <span className="text-sm text-muted-foreground shrink-0">
-              Marge brute <span className="font-semibold text-foreground">{fmt(marge?.marge_brute_dh ?? null)} MAD</span>
-            </span>
-            <span className="h-4 w-px bg-border shrink-0" />
-            <div className="flex items-center gap-1.5 shrink-0">
-              <ShieldCheck className={cn("h-4 w-4", healthGrade.color)} />
-              <span className="text-sm text-muted-foreground">
-                Sante financiere: <span className={cn("font-bold", healthGrade.color)}>{healthGrade.grade}</span>
+            <span className="h-3.5 w-px bg-border shrink-0" />
+            {/* Péremption count */}
+            {marginAlerts && (
+              <>
+                <span className="text-muted-foreground shrink-0">
+                  <span className="font-semibold text-amber-600">{marginAlerts.negative?.count ?? 0}</span> produits en marge négative
+                </span>
+                <span className="h-3.5 w-px bg-border shrink-0" />
+              </>
+            )}
+            <div className="flex items-center gap-1 shrink-0">
+              <ShieldCheck className={cn("h-3.5 w-3.5", healthGrade.color)} />
+              <span className="text-muted-foreground">
+                Santé: <span className={cn("font-bold", healthGrade.color)}>{healthGrade.grade}</span>
               </span>
             </div>
           </div>
         )}
       </section>
 
-      {/* ── Indicateurs clés ── */}
+      {/* ── Row 1 — 4 KPI cards ── */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-4">
           Indicateurs clés
@@ -317,13 +389,17 @@ export function PharmacyRapports() {
           )}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* CA */}
           <Card className={cn(typeTheme.primaryCard)}>
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-medium opacity-85">Chiffre d'affaires</p>
                   {isLoading ? <KpiSkeleton primary /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
+                    <>
+                      <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
+                      <ChangeBadge current={kpis?.ventes_total} previous={prevKpis?.ventes_total} light />
+                    </>
                   )}
                   <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
                 </div>
@@ -332,13 +408,18 @@ export function PharmacyRapports() {
             </CardContent>
           </Card>
 
+          {/* Total achats */}
           <Card className="border border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Achats totaux</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total achats</p>
                   {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)} MAD</p>
+                    <>
+                      <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)} MAD</p>
+                      <ChangeBadge current={kpis?.achats_total} previous={prevKpis?.achats_total} invert />
+                      <p className="text-xs text-muted-foreground mt-0.5">{kpis?.achats_count ?? 0} unités</p>
+                    </>
                   )}
                 </div>
                 <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
@@ -346,149 +427,142 @@ export function PharmacyRapports() {
             </CardContent>
           </Card>
 
+          {/* Marge brute moyenne */}
           <Card className="border border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Transactions ventes</p>
+                  <p className="text-sm font-medium text-muted-foreground">Marge brute moyenne</p>
                   {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.ventes_count ?? 0}</p>
+                    <>
+                      <p className="text-3xl font-bold mt-1 leading-tight">{marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)}%` : "—"}</p>
+                      {(() => {
+                        const prevCA = prevKpis?.ventes_total ?? 0;
+                        const prevAchats = prevKpis?.achats_total ?? 0;
+                        const prevMarge = prevCA > 0 ? ((prevCA - prevAchats) / prevCA) * 100 : undefined;
+                        return <ChangeBadge current={marge?.marge_pct} previous={prevMarge} />;
+                      })()}
+                    </>
+                  )}
+                  <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">(1 − PU÷PPV) × 100</p>
+                </div>
+                <TrendingUp className={cn("h-8 w-8", typeTheme.icon)} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions */}
+          <Card className="border border-border">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Transactions</p>
+                  {isLoading ? <KpiSkeleton /> : (
+                    <>
+                      <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.ventes_count ?? 0}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">panier moy: {fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
+                    </>
                   )}
                 </div>
                 <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Transactions achats</p>
-                  {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.achats_count ?? 0}</p>
-                  )}
-                </div>
-                <Package className={cn("h-8 w-8", typeTheme.icon)} />
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </section>
 
-
-      {/* ── Indicateurs avancés ── */}
+      {/* ── Row 2 — 4 detail cards ── */}
       <section>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Indicateurs avancés</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Ticket moyen */}
           <Card className="border border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Ticket moyen</p>
-                  {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">CA ÷ nb transactions</p>
-                </div>
-                <Receipt className={cn("h-9 w-9", typeTheme.icon)} />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground">Ticket moyen ¥</p>
+                <Receipt className={cn("h-7 w-7", typeTheme.icon)} />
               </div>
+              {isLoading ? <KpiSkeleton /> : (
+                <>
+                  <p className="text-2xl font-bold leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary">Mixte {fmt(advKpis?.ticket_moyen ?? null)}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300">Ph {fmt(advKpis?.ticket_moyen ?? null)}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">Pa {fmt(advKpis?.ticket_moyen ?? null)}</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Vente moy/jour */}
+          {/* Moyenne / jour */}
           <Card className="border border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Vente moyenne / jour</p>
-                  {isLoading ? <KpiSkeleton /> : (
-                    <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>
-                  )}
-                </div>
-                <BarChart3 className={cn("h-9 w-9", typeTheme.icon)} />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-muted-foreground">Moyenne / jour</p>
+                <BarChart3 className={cn("h-7 w-7", typeTheme.icon)} />
               </div>
+              {isLoading ? <KpiSkeleton /> : (
+                <>
+                  <p className="text-2xl font-bold leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ventes: {kpis?.ventes_count ?? 0} · Opérations: {fmt(advKpis?.vente_moyenne_par_jour ?? null)}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Best day DH */}
+          {/* Meilleure journée (combined DH + opé) */}
           <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (DH)</p>
-                  {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                    <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
-                      {advKpis?.best_day_dh ? `${fmt(advKpis.best_day_dh.total)} MAD` : "—"}
-                    </p>
-                  )}
-                  <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
-                    {advKpis?.best_day_dh?.date ?? "—"}
-                  </p>
-                </div>
-                <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée</p>
+                <CalendarCheck className={cn("h-7 w-7", typeTheme.icon)} />
               </div>
+              {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
+                <>
+                  <p className={cn("text-2xl font-bold leading-tight", typeTheme.textValue)}>
+                    {advKpis?.best_day_dh ? `${fmt(advKpis.best_day_dh.total)} MAD` : "—"}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className={cn("text-[11px]", typeTheme.textSubtle)}>
+                      {advKpis?.best_day_dh?.date ?? "—"}
+                    </p>
+                    {advKpis?.best_day_count && (
+                      <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", typeTheme.bg, typeTheme.text)}>
+                        {advKpis.best_day_count.count} opé
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Best day ops */}
-          <Card className={cn("border", typeTheme.border, typeTheme.bg)}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className={cn("text-sm font-medium", typeTheme.text)}>Meilleure journée (opé)</p>
-                  {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-                    <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>
-                      {advKpis?.best_day_count ? `${advKpis.best_day_count.count} opé` : "—"}
-                    </p>
-                  )}
-                  <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
-                    {advKpis?.best_day_count?.date ?? "—"}
-                  </p>
-                </div>
-                <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Worst day DH */}
+          {/* Moins bonne journée (combined DH + opé) */}
           <Card className="border border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (DH)</p>
-                  {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
-                    <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
-                      {advKpis?.worst_day_dh ? `${fmt(advKpis.worst_day_dh.total)} MAD` : "—"}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
-                    {advKpis?.worst_day_dh?.date ?? "—"}
-                  </p>
-                </div>
-                <CalendarX className="h-9 w-9 text-rose-500" />
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée</p>
+                <CalendarX className="h-7 w-7 text-rose-500" />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Worst day ops */}
-          <Card className="border border-rose-200 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/20">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Moins bonne journée (opé)</p>
-                  {isLoading ? <Skeleton className="h-7 w-16 mt-1" /> : (
-                    <p className="text-2xl font-bold mt-1 text-rose-800 dark:text-rose-200">
-                      {advKpis?.worst_day_count ? `${advKpis.worst_day_count.count} opé` : "—"}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
-                    {advKpis?.worst_day_count?.date ?? "—"}
+              {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> : (
+                <>
+                  <p className="text-2xl font-bold leading-tight text-rose-800 dark:text-rose-200">
+                    {advKpis?.worst_day_dh ? `${fmt(advKpis.worst_day_dh.total)} MAD` : "—"}
                   </p>
-                </div>
-                <CalendarX className="h-9 w-9 text-rose-500" />
-              </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400">
+                      {advKpis?.worst_day_dh?.date ?? "—"}
+                    </p>
+                    {advKpis?.worst_day_count && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                        {advKpis.worst_day_count.count} opé
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -512,7 +586,7 @@ export function PharmacyRapports() {
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={topCats} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="total" nameKey="category" paddingAngle={3}>
+                    <Pie data={topCats} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="total" nameKey="category" paddingAngle={0}>
                       {topCats.map((_, i) => (
                         <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
                       ))}
@@ -521,6 +595,39 @@ export function PharmacyRapports() {
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
                 </ResponsiveContainer>
+              )}
+
+              {/* Category breakdown table */}
+              {!isLoading && topCats.length > 0 && (
+                <div className="mt-4 border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Catégorie</th>
+                        <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">CA (MAD)</th>
+                        <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Marge %</th>
+                        <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Part %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topCats.map((cat, i) => {
+                        const totalCA = kpis?.ventes_total ?? 0;
+                        const partPct = totalCA > 0 ? ((cat.total / totalCA) * 100) : 0;
+                        return (
+                          <tr key={i} className="border-t border-border">
+                            <td className="px-3 py-2 font-medium flex items-center gap-2">
+                              <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: CAT_COLORS[i % CAT_COLORS.length] }} />
+                              {cat.category}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{fmt(cat.total)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{cat.marge_pct != null ? `${cat.marge_pct.toFixed(1)}%` : "—"}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">{partPct.toFixed(1)}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -922,72 +1029,44 @@ export function PharmacyRapports() {
         />
       </section>
 
-      {/* ── Area chart + donut ── */}
+      {/* ── Tendance cumulée (full width) ── */}
       <section>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="border border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Tendance cumulée</CardTitle>
-              <p className="text-xs text-muted-foreground">Évolution des ventes et achats</p>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-48 w-full" />
-              ) : trend.length === 0 ? (
-                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Aucune donnée</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={192}>
-                  <AreaChart data={trend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gVentes" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={typeTheme.iconHex} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={typeTheme.iconHex} stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="gAchats" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={48}
-                      tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
-                    <Tooltip formatter={(v: number) => [fmt(v), ""]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                    <Area type="monotone" dataKey="ventes" name="Ventes" stroke={typeTheme.iconHex} strokeWidth={2} fill="url(#gVentes)" dot={false} />
-                    <Area type="monotone" dataKey="achats" name="Achats" stroke="#8b5cf6" strokeWidth={2} fill="url(#gAchats)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Répartition par catégorie</CardTitle>
-              <p className="text-xs text-muted-foreground">Part des ventes par catégorie</p>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-48 w-full" />
-              ) : topCats.length === 0 ? (
-                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Aucune donnée</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={192}>
-                  <PieChart>
-                    <Pie data={topCats} cx="50%" cy="50%" innerRadius={50} outerRadius={76} dataKey="total" nameKey="category" paddingAngle={3}>
-                      {topCats.map((_, i) => (
-                        <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [fmt(v) + " MAD", ""]} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Tendance cumulée</CardTitle>
+            <p className="text-xs text-muted-foreground">Évolution des ventes et achats</p>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-48 w-full" />
+            ) : trend.length === 0 ? (
+              <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Aucune donnée</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={trend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gVentes" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={typeTheme.iconHex} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={typeTheme.iconHex} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gAchats" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={48}
+                    tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
+                  <Tooltip formatter={(v: number) => [fmt(v), ""]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  <Area type="monotone" dataKey="ventes" name="Ventes" stroke={typeTheme.iconHex} strokeWidth={2} fill="url(#gVentes)" dot={false} />
+                  <Area type="monotone" dataKey="achats" name="Achats" stroke="#8b5cf6" strokeWidth={2} fill="url(#gAchats)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       </section>
 
       {/* ── Top categories ── */}

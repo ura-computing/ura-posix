@@ -14,7 +14,7 @@ import { Link, useLocation } from "react-router";
 const PATH_LABELS: Record<string, string> = {
   achat: "Achats",
   ventes: "Ventes",
-  stock: "Alertes Stock",
+  stock: "Stock",
   rapports: "Tableau de Bord",
   parametres: "Paramètres",
   profile: "Mon profil",

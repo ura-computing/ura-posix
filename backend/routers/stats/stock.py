@@ -125,6 +125,22 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         .subquery()
     )
 
+    # ── Weighted avg purchase price per medicament ───────────────────────────
+    avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+        )
+        .filter(
+            Achat.pharmacy_id == pharmacy_id,
+            Achat.medicament_id.isnot(None),
+            Achat.quantity > 0,
+            Achat.unit_price.isnot(None),
+        )
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
+
     # ── Collect all medicament IDs that either had sales or have stock ─────────
     sold_ids = (
         db.query(Vente.medicament_id)
@@ -152,6 +168,7 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         return {
             "distribution": {},
             "total_references": 0,
+            "ppv_potentiel": 0,
             "products": [],
         }
 
@@ -160,15 +177,18 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         db.query(
             Medicament.id,
             Medicament.product,
+            Medicament.ppv,
             func.coalesce(sales_12m.c.units_sold_12m, 0).label("units_sold_12m"),
             func.coalesce(sales_4m.c.units_sold_4m, 0).label("units_sold_4m"),
             func.coalesce(sales_before_4m.c.units_before_4m, 0).label("units_before_4m"),
             latest_stock.c.current_stock,
+            avg_pu_sub.c.avg_pu,
         )
         .outerjoin(sales_12m, Medicament.id == sales_12m.c.medicament_id)
         .outerjoin(sales_4m, Medicament.id == sales_4m.c.medicament_id)
         .outerjoin(sales_before_4m, Medicament.id == sales_before_4m.c.medicament_id)
         .outerjoin(latest_stock, Medicament.id == latest_stock.c.medicament_id)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
         .filter(Medicament.id.in_(all_med_ids))
         .all()
     )
@@ -177,6 +197,7 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
     CLASSES = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"]
     distribution: dict[str, int] = {c: 0 for c in CLASSES}
     products: list[dict] = []
+    ppv_potentiel: float = 0.0
 
     for r in rows:
         units = int(r.units_sold_12m or 0)
@@ -217,6 +238,10 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
 
         current_stock = int(r.current_stock) if r.current_stock is not None else None
 
+        # Accumulate PPV potentiel for products with stock > 0
+        if current_stock is not None and current_stock > 0 and r.ppv is not None:
+            ppv_potentiel += float(r.ppv) * current_stock
+
         distribution[cat] += 1
         products.append({
             "product": r.product or "---",
@@ -225,6 +250,8 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
             "stock_min": stock_min,
             "stock_max": stock_max,
             "current_stock": current_stock,
+            "ppv": round(float(r.ppv), 2) if r.ppv is not None else None,
+            "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
         })
 
     # Sort products by units_sold_12m descending
@@ -236,5 +263,6 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
     return {
         "distribution": distribution,
         "total_references": len(products),
+        "ppv_potentiel": round(ppv_potentiel, 2),
         "products": products,
     }

@@ -234,7 +234,7 @@ export const resources: ResourceConfig[] = [
     name: "stock",
     list: "/stock",
     meta: {
-      label: "Alertes Stock",
+      label: "Stock",
       icon: <TriangleAlert />,
       allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
       permission: "stock",
