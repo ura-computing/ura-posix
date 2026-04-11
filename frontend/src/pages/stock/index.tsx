@@ -15,19 +15,7 @@ import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
 import { useStockAbcd, usePeremptions } from "@/hooks/usePharmacyRapports";
 import type { StockAbcdProduct, PeremptionBracket } from "@/api/stats";
-
-/* ── ABCD colour map ───────────────────────────────────────────────────────── */
-
-const CLASS_COLORS: Record<string, string> = {
-  A: "#16a34a",
-  "A-": "#22c55e",
-  "B+": "#3b82f6",
-  B: "#60a5fa",
-  C: "#f97316",
-  "C-": "#fb923c",
-  "C-N": "#fbbf24",
-  D: "#ef4444",
-};
+import { GAUGE_COLORS, CLASS_COLORS } from "@/constants/theme";
 
 const CLASS_ORDER = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"];
 
@@ -66,17 +54,17 @@ function AbcdCircle({ cat, count, pct, active, onClick }: { cat: string; count: 
 function HealthGauge({ score }: { score: number }) {
   const clamped = Math.min(10, Math.max(0, score));
   const angle = -90 + (clamped / 10) * 180;
-  const color = clamped >= 7 ? "#16a34a" : clamped >= 4 ? "#eab308" : "#ef4444";
+  const color = clamped >= 7 ? GAUGE_COLORS.goodHex : clamped >= 4 ? GAUGE_COLORS.warnHex : GAUGE_COLORS.badHex;
 
   return (
     <div className="flex flex-col items-center">
       <svg viewBox="0 0 200 120" className="w-28 h-[70px]">
-        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke="#ef4444" strokeWidth="14" strokeLinecap="round" />
-        <path d="M 56 28 A 80 80 0 0 1 126 20" fill="none" stroke="#eab308" strokeWidth="14" />
-        <path d="M 126 20 A 80 80 0 0 1 180 100" fill="none" stroke="#16a34a" strokeWidth="14" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke={GAUGE_COLORS.badHex} strokeWidth="14" strokeLinecap="round" />
+        <path d="M 56 28 A 80 80 0 0 1 126 20" fill="none" stroke={GAUGE_COLORS.warnHex} strokeWidth="14" />
+        <path d="M 126 20 A 80 80 0 0 1 180 100" fill="none" stroke={GAUGE_COLORS.goodHex} strokeWidth="14" strokeLinecap="round" />
         <g transform={`rotate(${angle}, 100, 100)`}>
-          <line x1="100" y1="100" x2="100" y2="28" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="100" cy="100" r="5" fill="#1e293b" />
+          <line x1="100" y1="100" x2="100" y2="28" stroke={GAUGE_COLORS.needleHex} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="100" cy="100" r="5" fill={GAUGE_COLORS.needleHex} />
           <circle cx="100" cy="100" r="2" fill="white" />
         </g>
       </svg>
@@ -253,7 +241,7 @@ const StockList = () => {
       <h1 className="page-title">Stock</h1>
 
       {/* ── Date filter ── */}
-      <div className="sticky top-16 z-10 bg-background pb-4">
+      <div className="sticky top-16 z-10 bg-background">
         <Card className="border border-border shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-end gap-3">

@@ -156,20 +156,26 @@ export default function ComptabilitePage() {
       </p>
 
       {/* Date range filter */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Du</Label>
-          <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Au</Label>
-          <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
-        </div>
-        {(dateFrom || dateTo) && (
-          <Button variant="ghost" size="sm" className="h-9 text-muted-foreground mt-5" onClick={() => { setDateFrom(""); setDateTo(""); }}>
-            Réinitialiser
-          </Button>
-        )}
+      <div className="sticky top-16 z-10 bg-background">
+        <Card className="border border-border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Du</Label>
+                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Au</Label>
+                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
+              </div>
+              {(dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => { setDateFrom(""); setDateTo(""); }}>
+                  Réinitialiser
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Payment method cards */}
