@@ -35,7 +35,7 @@ const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
     </div>
     {canImport && (
       <Link
-        to="/dashboard/upload-file"
+        to="/dashboard/upload-file?type=achat"
         className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 transition-colors"
       >
         <UploadCloud className="h-4 w-4" />
@@ -465,7 +465,7 @@ const AchatList = () => {
             />
             {user?.permissions?.import !== false && (
               <Link
-                to="/dashboard/upload-file"
+                to="/dashboard/upload-file?type=achat"
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
                 <UploadCloud className="h-3.5 w-3.5" />

@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import {
   ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet,
   CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
@@ -332,6 +333,15 @@ export default function DashboardUploadFile() {
   const [step, setStep]       = useState<1 | 2 | 3>(1);
   const [dateStart, setDateStart] = useState("");
   const [dateEnd, setDateEnd]     = useState("");
+
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const t = searchParams.get("type");
+    if (t === "achat" || t === "vente") {
+      setDocType(t);
+      setStep(2);
+    }
+  }, [searchParams]);
 
   const { state, upload, cancel, reset: resetUpload } = useUploadCsvBatched();
 
