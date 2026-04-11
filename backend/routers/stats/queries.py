@@ -392,7 +392,7 @@ def compute_previous_kpis(
     }
 
 
-def build_monthly_trend(db: Session, pharmacy_id, df: Optional[str], dt: Optional[str], non_declared_sub=None) -> list:
+def build_monthly_trend(db: Session, pharmacy_id, df: Optional[str], dt: Optional[str], non_declared_sub=None, cat_filter_v=None, cat_filter_a=None) -> list:
     today = date.today()
     twelve_months_ago = (today.replace(day=1) - timedelta(days=335)).replace(day=1)
     trend_start = date.fromisoformat(df).replace(day=1) if df else twelve_months_ago
@@ -419,6 +419,10 @@ def build_monthly_trend(db: Session, pharmacy_id, df: Optional[str], dt: Optiona
         )
         .filter(Achat.delivery_date >= trend_start_str, Achat.delivery_date < trend_end_str)
     )
+    if cat_filter_v:
+        v_q = v_q.filter(*cat_filter_v)
+    if cat_filter_a:
+        a_q = a_q.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:
         v_q = v_q.filter(Vente.pharmacy_id == pharmacy_id)
         a_q = a_q.filter(Achat.pharmacy_id == pharmacy_id)

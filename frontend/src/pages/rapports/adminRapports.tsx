@@ -27,7 +27,8 @@ import * as statsApi from "@/api/stats";
 import { fmt } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
-import { CAT_COLORS, shortMonth, downloadBlob, KpiSkeleton } from "./shared";
+import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
+import { CAT_COLORS, getTypeTheme } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 
 export function AdminRapports() {
@@ -64,38 +65,7 @@ export function AdminRapports() {
     [margeData],
   );
 
-  const typeTheme = useMemo(() => {
-    if (categoryType === eCategoryType.PHARMACIE) return {
-      primaryCard:  "bg-green-600 text-white border-0",
-      border:       "border-green-200 dark:border-green-800",
-      bg:           "bg-green-50/50 dark:bg-green-950/20",
-      text:         "text-green-700 dark:text-green-300",
-      textValue:    "text-green-800 dark:text-green-200",
-      textSubtle:   "text-green-600 dark:text-green-400",
-      icon:         "text-green-500",
-      iconHex:      "#22c55e",
-    };
-    if (categoryType === eCategoryType.PARAPHARMACIE) return {
-      primaryCard:  "bg-purple-600 text-white border-0",
-      border:       "border-purple-200 dark:border-purple-800",
-      bg:           "bg-purple-50/50 dark:bg-purple-950/20",
-      text:         "text-purple-700 dark:text-purple-300",
-      textValue:    "text-purple-800 dark:text-purple-200",
-      textSubtle:   "text-purple-600 dark:text-purple-400",
-      icon:         "text-purple-500",
-      iconHex:      "#a855f7",
-    };
-    return {
-      primaryCard:  "bg-primary text-primary-foreground border-0",
-      border:       "border-emerald-200 dark:border-emerald-800",
-      bg:           "bg-emerald-50/50 dark:bg-emerald-950/20",
-      text:         "text-emerald-700 dark:text-emerald-300",
-      textValue:    "text-emerald-800 dark:text-emerald-200",
-      textSubtle:   "text-emerald-600 dark:text-emerald-400",
-      icon:         "text-emerald-500",
-      iconHex:      "#14b8a6",
-    };
-  }, [categoryType]);
+  const typeTheme = useMemo(() => getTypeTheme(categoryType), [categoryType]);
 
   const handleExcel = async () => {
     if (!selectedPharmacyId) return;

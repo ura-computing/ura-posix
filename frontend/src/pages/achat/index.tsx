@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { GAUGE_COLORS } from "@/constants/theme";
 import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import { useAchatList } from "@/hooks/useAchatList";
@@ -24,8 +25,8 @@ import { cn } from "@/utils/cn";
 
 const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
-    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
-      <UploadCloud className="h-7 w-7 text-violet-500" />
+    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10">
+      <UploadCloud className="h-7 w-7 text-blue-500" />
     </div>
     <div>
       <p className="text-base font-semibold text-foreground">Aucun achat importé</p>
@@ -36,7 +37,7 @@ const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
     {canImport && (
       <Link
         to="/dashboard/upload-file?type=achat"
-        className="inline-flex items-center gap-2 rounded-lg bg-violet-500 px-4 py-2 text-sm font-medium text-white hover:bg-violet-600 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors"
       >
         <UploadCloud className="h-4 w-4" />
         Importer les achats
@@ -82,15 +83,15 @@ function NeedleGauge({ grossistePct }: { grossistePct: number }) {
       <p className="text-xs font-medium text-muted-foreground mb-1">Jauge</p>
       <svg viewBox="0 0 200 120" className="w-40 h-24">
         {/* Red zone (left): 80-100% grossiste */}
-        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke="#ef4444" strokeWidth="16" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke={GAUGE_COLORS.badHex} strokeWidth="16" strokeLinecap="round" />
         {/* Yellow zone (middle): 40-80% grossiste */}
-        <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke="#eab308" strokeWidth="16" />
+        <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke={GAUGE_COLORS.warnHex} strokeWidth="16" />
         {/* Green zone (right): 0-40% grossiste */}
-        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke="#16a34a" strokeWidth="16" strokeLinecap="round" />
+        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke={GAUGE_COLORS.goodHex} strokeWidth="16" strokeLinecap="round" />
         {/* Needle */}
         <g transform={`rotate(${angle}, 100, 100)`}>
-          <line x1="100" y1="100" x2="100" y2="30" stroke="#1e293b" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="100" cy="100" r="6" fill="#1e293b" />
+          <line x1="100" y1="100" x2="100" y2="30" stroke={GAUGE_COLORS.needleHex} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="100" cy="100" r="6" fill={GAUGE_COLORS.needleHex} />
           <circle cx="100" cy="100" r="3" fill="white" />
         </g>
       </svg>

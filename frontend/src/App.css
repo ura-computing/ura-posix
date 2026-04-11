@@ -37,6 +37,21 @@
   --sidebar-border: oklch(0.8800 0.020 191);
   --sidebar-ring: oklch(0.8348 0.1302 160.908);
 
+  /* ── Chart / data-viz ── */
+  --chart-ventes: #14b8a6;
+  --chart-achats: #3b82f6;
+
+  /* ── Gauge zones ── */
+  --gauge-good: #16a34a;
+  --gauge-warn: #eab308;
+  --gauge-bad: #ef4444;
+  --gauge-needle: #1e293b;
+
+  /* ── Category type iconHex ── */
+  --type-mixte: #14b8a6;
+  --type-pharmacie: #22c55e;
+  --type-parapharmacie: #a855f7;
+
   /* PharmaGest sidebar (dark navy + cyan) */
   --pg-sidebar: #071b2b;
   --pg-sidebar-foreground: #e2e8f0;
@@ -160,6 +175,16 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-ventes: var(--chart-ventes);
+  --color-chart-achats: var(--chart-achats);
+  --color-gauge-good: var(--gauge-good);
+  --color-gauge-warn: var(--gauge-warn);
+  --color-gauge-bad: var(--gauge-bad);
+  --color-gauge-needle: var(--gauge-needle);
+  --color-type-mixte: var(--type-mixte);
+  --color-type-pharmacie: var(--type-pharmacie);
+  --color-type-parapharmacie: var(--type-parapharmacie);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);

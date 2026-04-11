@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
+import { GAUGE_COLORS } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
 import { AnalyseMargeTable } from "@/pages/rapports/margeTable";
@@ -33,21 +34,29 @@ const MODE_LABELS = {
 
 function OptimisationGauge({ gain }: { gain: number | null }) {
   const val = gain ?? 0;
-  const pct = Math.min(100, Math.max(0, val > 0 ? 70 : 30));
+  // Map gain to 0-100: negative = red (left), 0 = middle, positive = green (right)
+  const clamped = Math.min(100, Math.max(0, val > 0 ? Math.min(50 + val / 2, 100) : Math.max(50 + val / 2, 0)));
+  // Needle angle: 0 = -90° (left/red), 100 = +90° (right/green)
+  const angle = 90 - (clamped / 100) * 180;
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <p className="text-[10px] text-muted-foreground font-medium uppercase">Optimisation marge</p>
-      <div className="relative w-full h-5 rounded-full overflow-hidden bg-gradient-to-r from-red-500 via-yellow-400 to-green-500">
-        <div
-          className="absolute top-0 h-full w-1 bg-white border border-black/30 rounded-full"
-          style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
-        />
-      </div>
-      <div className="flex justify-between w-full text-[9px] text-muted-foreground">
-        <span>détériorer</span>
-        <span>grossièrement</span>
-      </div>
+    <div className="flex flex-col items-center">
+      <p className="text-xs font-medium text-muted-foreground mb-1">Optimisation marge</p>
+      <svg viewBox="0 0 200 120" className="w-40 h-24">
+        {/* Red zone (left): détériorer */}
+        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke={GAUGE_COLORS.badHex} strokeWidth="16" strokeLinecap="round" />
+        {/* Yellow zone (middle) */}
+        <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke={GAUGE_COLORS.warnHex} strokeWidth="16" />
+        {/* Green zone (right): optimal */}
+        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke={GAUGE_COLORS.goodHex} strokeWidth="16" strokeLinecap="round" />
+        {/* Needle */}
+        <g transform={`rotate(${angle}, 100, 100)`}>
+          <line x1="100" y1="100" x2="100" y2="30" stroke={GAUGE_COLORS.needleHex} strokeWidth="3" strokeLinecap="round" />
+          <circle cx="100" cy="100" r="6" fill={GAUGE_COLORS.needleHex} />
+          <circle cx="100" cy="100" r="3" fill="white" />
+        </g>
+      </svg>
+      <p className="text-sm font-bold mt-1">{val > 0 ? "+" : ""}{fmt(val)} MAD</p>
     </div>
   );
 }
@@ -125,7 +134,7 @@ export default function AnalysePage() {
       <h1 className="page-title">Analyses</h1>
 
       {/* ── Sticky filter bar ── */}
-      <div className="sticky top-16 z-10 bg-background pb-4">
+      <div className="sticky top-16 z-10 bg-background">
         <Card className="border border-border shadow-sm">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-end gap-3">

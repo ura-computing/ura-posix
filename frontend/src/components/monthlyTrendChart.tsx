@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { fmt } from "@/utils/format";
+import { CHART_COLORS } from "@/constants/theme";
 
 function fmtCompact(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -11,8 +12,8 @@ function fmtCompact(n: number): string {
 }
 
 const chartConfig = {
-  ventes: { label: "Ventes", color: "#14b8a6" },
-  achats: { label: "Achats", color: "#8b5cf6" },
+  ventes: { label: "Ventes", color: CHART_COLORS.ventesHex },
+  achats: { label: "Achats", color: CHART_COLORS.achatsHex },
 };
 
 type TrendItem = { month: string; ventes: number; achats: number; label: string };
@@ -64,8 +65,8 @@ export function MonthlyTrendChart({
                 />
                 <ChartTooltip content={<ChartTooltipContent formatter={(v) => fmt(v as number)} />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="ventes" fill="#14b8a6" radius={[4, 4, 0, 0]} maxBarSize={20} />
-                <Bar dataKey="achats" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar dataKey="ventes" fill={CHART_COLORS.ventesHex} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Bar dataKey="achats" fill={CHART_COLORS.achatsHex} radius={[4, 4, 0, 0]} maxBarSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>

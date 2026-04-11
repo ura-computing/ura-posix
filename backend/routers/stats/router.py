@@ -86,7 +86,7 @@ def get_stats(
     ventes_total, ventes_count = vq.one()
     achats_total, achats_count = aq.one()
 
-    monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
+    monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a)
 
     # Weighted avg purchase price per medicament (from Achat)
     _avg_pu_sub = (
@@ -468,7 +468,7 @@ def get_pharmacy_stats_for_admin(
     ventes_total, ventes_count = vq.one()
     achats_total, achats_count = aq.one()
 
-    monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
+    monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a)
 
     _avg_pu_sub2 = (
         db.query(
