@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/datePicker";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 
@@ -139,33 +140,13 @@ function DeleteDialog({
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Du
                 </label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className={cn(
-                    "h-9 text-sm",
-                    dateFrom &&
-                      "border-destructive/50 text-destructive focus-visible:ring-destructive/30",
-                  )}
-                />
+                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" className={cn(dateFrom && "border-destructive/50 text-destructive")} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Au
                 </label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className={cn(
-                    "h-9 text-sm",
-                    dateTo &&
-                      "border-destructive/50 text-destructive focus-visible:ring-destructive/30",
-                  )}
-                />
+                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" className={cn(dateTo && "border-destructive/50 text-destructive")} />
               </div>
             </div>
           </div>

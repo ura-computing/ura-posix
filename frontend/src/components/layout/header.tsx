@@ -1,5 +1,5 @@
 import { UserAvatar } from "@/components/layout/userAvatar";
-import { ThemeToggle } from "@/components/theme/themeToggle";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,7 +90,6 @@ function DesktopHeader() {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <NotificationBell />
-        <ThemeToggle className="border-border text-muted-foreground hover:text-foreground" />
         <UserDropdown />
       </div>
     </header>
@@ -117,7 +116,6 @@ function MobileHeader() {
         })}
       />
       <h1 className="text-base font-bold truncate flex-1 min-w-0">{title}</h1>
-      <ThemeToggle className="border-border text-muted-foreground" />
       <UserDropdown />
     </header>
   );

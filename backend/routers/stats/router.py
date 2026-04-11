@@ -1,7 +1,8 @@
-from typing import Optional
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -87,15 +88,28 @@ def get_stats(
 
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
+    # Weighted avg purchase price per medicament (from Achat)
+    _avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("pu"),
+        )
+        .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
+    )
+    if pharmacy_id:
+        _avg_pu_sub = _avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id)
+    _avg_pu_sub = _avg_pu_sub.group_by(Achat.medicament_id).subquery()
+
     cat_q = (
         db.query(
             Medicament.category.label("category"),
             func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
             func.sum(Vente.quantity).label("qty"),
-            func.avg(Vente.unit_price).label("avg_pu"),
+            func.avg(func.coalesce(_avg_pu_sub.c.pu, Medicament.pph)).label("avg_pu"),
             func.avg(Medicament.ppv).label("avg_ppv"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id)
+        .outerjoin(_avg_pu_sub, Medicament.id == _avg_pu_sub.c.medicament_id)
         .filter(Medicament.category.isnot(None))
     )
     if cat_filter_v:
@@ -144,6 +158,144 @@ def stats_analyse_marge(
     return _compute_analyse_marge(
         db, current_user.pharmacy_id, date_from or None, date_to or None, category_type, mode
     )
+
+
+class ListeRequest(BaseModel):
+    products: List[str]
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    category_type: str = "all"
+
+
+@router.post("/stats/analyse-liste")
+def stats_analyse_liste(
+    body: ListeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Match a list of product names against the pharmacy's data and return marge analysis."""
+    from utils.strings import strip_accents
+
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Non disponible pour les admins")
+
+    pharmacy_id = current_user.pharmacy_id
+    if not pharmacy_id:
+        raise HTTPException(status_code=400, detail="Pas de pharmacie associée")
+
+    # Fuzzy match: normalize CSV product names and find matching medicament IDs
+    normalized_inputs = {}
+    for name in body.products:
+        if name and name.strip():
+            normalized_inputs[strip_accents(name.strip().lower())] = name.strip()
+
+    if not normalized_inputs:
+        return {"kpis": {}, "rows": []}
+
+    # Load all medicament names for this pharmacy
+    med_rows = (
+        db.query(Medicament.id, Medicament.product)
+        .filter(Medicament.id.in_(
+            db.query(Vente.medicament_id).filter(Vente.pharmacy_id == pharmacy_id).distinct()
+            .union(
+                db.query(Achat.medicament_id).filter(Achat.pharmacy_id == pharmacy_id).distinct()
+            )
+        ))
+        .all()
+    )
+
+    matched_ids = set()
+    matched_names = {}  # med_id -> original CSV name
+    unmatched = []
+
+    med_lookup = {strip_accents((m.product or "").strip().lower()): m for m in med_rows}
+
+    for norm_name, original_name in normalized_inputs.items():
+        found = False
+        # Exact normalized match
+        if norm_name in med_lookup:
+            m = med_lookup[norm_name]
+            matched_ids.add(m.id)
+            matched_names[m.id] = original_name
+            found = True
+        else:
+            # Substring match (CSV name contains DB name or vice versa)
+            for db_norm, m in med_lookup.items():
+                if norm_name in db_norm or db_norm in norm_name:
+                    matched_ids.add(m.id)
+                    matched_names[m.id] = original_name
+                    found = True
+                    break
+        if not found:
+            unmatched.append(original_name)
+
+    # Run produit mode analysis but filtered to matched IDs only
+    result = _compute_analyse_marge(
+        db, pharmacy_id,
+        body.date_from, body.date_to,
+        body.category_type, "produit",
+    )
+
+    # Filter rows to only matched products
+    matched_rows = []
+    for row in result.get("rows", []):
+        product_name = row.get("product", "")
+        norm = strip_accents(product_name.strip().lower())
+        if any(norm == k or norm in k or k in norm for k in normalized_inputs):
+            row["match_status"] = "found"
+            matched_rows.append(row)
+
+    # Add unmatched products
+    for name in unmatched:
+        matched_rows.append({
+            "product": name,
+            "match_status": "not_found",
+            "category": None, "tva": None, "ppv": None, "pu": None,
+            "prix_max": None, "prix_min": None, "prix_avg": None,
+            "qty": 0, "ca": 0, "marge_pct": None, "marge_dh": None,
+            "stock_dispo": None, "ppv_potentiel": None, "total_achat_cost": None,
+        })
+
+    # Recompute KPIs from matched rows only (not global)
+    found_rows = [r for r in matched_rows if r.get("match_status") == "found"]
+    total_ventes_dh = sum(float(r.get("ca") or 0) for r in found_rows)
+    total_ventes_unites = sum(float(r.get("qty") or 0) for r in found_rows)
+    total_units_available = sum(float(r.get("stock_dispo") or 0) for r in found_rows)
+    total_pu_purchased = sum(float(r.get("total_achat_cost") or 0) for r in found_rows)
+    ppv_total_available = sum(float(r.get("ppv_potentiel") or 0) for r in found_rows)
+
+    marge_rows = [r for r in found_rows if r.get("marge_pct") is not None]
+    kpis = {
+        "total_ventes_dh": round(total_ventes_dh, 2),
+        "total_ventes_unites": round(total_ventes_unites, 2),
+        "total_units_available": round(total_units_available, 2),
+        "total_pu_purchased": round(total_pu_purchased, 2),
+        "ppv_total_available": round(ppv_total_available, 2),
+        "marge_pct_avg": None, "marge_pct_min": None, "marge_pct_max": None,
+        "marge_dh_avg": None, "marge_dh_min": None, "marge_dh_max": None,
+        "difference_gain_dh": None,
+    }
+    if marge_rows:
+        total_qty = sum(float(r["qty"] or 0) for r in marge_rows)
+        if total_qty:
+            kpis["marge_pct_avg"] = round(
+                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 2)
+            kpis["marge_dh_avg"] = round(
+                sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2)
+        best_pct_key = "marge_pct_best" if "marge_pct_best" in marge_rows[0] else "marge_pct"
+        worst_pct_key = "marge_pct_worst" if "marge_pct_worst" in marge_rows[0] else "marge_pct"
+        best_dh_key = "marge_dh_best" if "marge_dh_best" in marge_rows[0] else "marge_dh"
+        worst_dh_key = "marge_dh_worst" if "marge_dh_worst" in marge_rows[0] else "marge_dh"
+        best_pct = max(marge_rows, key=lambda r: float(r.get(best_pct_key) or r["marge_pct"]))
+        worst_pct = min(marge_rows, key=lambda r: float(r.get(worst_pct_key) or r["marge_pct"]))
+        best_dh = max(marge_rows, key=lambda r: float(r.get(best_dh_key) or r["marge_dh"]))
+        worst_dh = min(marge_rows, key=lambda r: float(r.get(worst_dh_key) or r["marge_dh"]))
+        kpis["marge_pct_max"] = {"label": best_pct["product"], "value": float(best_pct.get(best_pct_key) or best_pct["marge_pct"]), "qty": best_pct["qty"]}
+        kpis["marge_pct_min"] = {"label": worst_pct["product"], "value": float(worst_pct.get(worst_pct_key) or worst_pct["marge_pct"]), "qty": worst_pct["qty"]}
+        kpis["marge_dh_max"] = {"label": best_dh["product"], "value": float(best_dh.get(best_dh_key) or best_dh["marge_dh"]), "qty": best_dh["qty"]}
+        kpis["marge_dh_min"] = {"label": worst_dh["product"], "value": float(worst_dh.get(worst_dh_key) or worst_dh["marge_dh"]), "qty": worst_dh["qty"]}
+
+    return {"kpis": kpis, "rows": matched_rows}
 
 
 @router.get("/stats/margin-alerts")
@@ -318,15 +470,25 @@ def get_pharmacy_stats_for_admin(
 
     monthly_trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub)
 
+    _avg_pu_sub2 = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("pu"),
+        )
+        .filter(Achat.pharmacy_id == pharmacy_id, Achat.quantity > 0, Achat.unit_price.isnot(None))
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
     cat_q = (
         db.query(
             Medicament.category.label("category"),
             func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
             func.sum(Vente.quantity).label("qty"),
-            func.avg(Vente.unit_price).label("avg_pu"),
+            func.avg(func.coalesce(_avg_pu_sub2.c.pu, Medicament.pph)).label("avg_pu"),
             func.avg(Medicament.ppv).label("avg_ppv"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id)
+        .outerjoin(_avg_pu_sub2, Medicament.id == _avg_pu_sub2.c.medicament_id)
         .filter(
             Vente.pharmacy_id == pharmacy_id,
             Medicament.category.isnot(None),

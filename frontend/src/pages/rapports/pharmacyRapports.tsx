@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/datePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -241,21 +242,11 @@ export function PharmacyRapports() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Du</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-9 w-40 text-sm"
-                />
+                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Au</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="h-9 w-40 text-sm"
-                />
+                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
               </div>
               {(dateFrom || dateTo) && (
                 <Button

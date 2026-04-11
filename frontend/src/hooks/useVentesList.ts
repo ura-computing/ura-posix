@@ -9,12 +9,13 @@ type UseVentesListParams = {
   tva?: string[];
   dateFrom?: string;
   dateTo?: string;
+  surveillance?: string;
 };
 
 export function useVentesList(params: UseVentesListParams) {
-  const { page, limit, search, categories, tva, dateFrom, dateTo } = params;
+  const { page, limit, search, categories, tva, dateFrom, dateTo, surveillance } = params;
   const { data, isLoading: ventesLoading } = useQuery({
-    queryKey: ["ventes", page, limit, search, categories, tva, dateFrom, dateTo],
+    queryKey: ["ventes", page, limit, search, categories, tva, dateFrom, dateTo, surveillance],
     queryFn: () =>
       transactionsApi.listVentes({
         page,
@@ -24,6 +25,7 @@ export function useVentesList(params: UseVentesListParams) {
         tva: tva?.length ? tva : undefined,
         dateFrom,
         dateTo,
+        surveillance,
       }),
   });
 

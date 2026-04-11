@@ -138,6 +138,22 @@ export const analyseMarge = (
   return request<AnalyseMargeResponse>(`/stats/analyse-marge${qs ? `?${qs}` : ""}`);
 };
 
+export const analyseListe = (
+  products: string[],
+  dateFrom?: string,
+  dateTo?: string,
+  categoryType?: string,
+) =>
+  request<AnalyseMargeResponse>("/stats/analyse-liste", {
+    method: "POST",
+    body: JSON.stringify({
+      products,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+      category_type: categoryType || "all",
+    }),
+  });
+
 export const exportExcel = (
   dateFrom?: string,
   dateTo?: string,
