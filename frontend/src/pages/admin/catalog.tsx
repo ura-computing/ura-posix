@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState, useEffect } from "react";
-import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import {
   useAdminCatalogList,
@@ -49,7 +49,7 @@ import type { MedicamentOut, CategorySuffixOut } from "@/api/admin";
 import { CategoryCombobox } from "@/components/categoryCombobox";
 import { SuffixBadge, SUFFIX_COLORS, SWATCH_BG } from "@/components/suffixBadge";
 import { fmt } from "@/utils/format";
-import { downloadCSV } from "@/utils/table";
+import { downloadCSV, exportFilename } from "@/utils/table";
 import { eUserRole } from "@/types";
 
 const CATALOG_COL_LABELS: Record<string, string> = {
@@ -417,7 +417,7 @@ export default function AdminCatalogPage() {
           String(r.zone ?? ""),
         ],
         ["PID", "Produit", "Catégorie", "TVA", "PPH", "PPV", "Code-barres", "Laboratoire", "Zone"],
-        `catalogue_${new Date().toISOString().slice(0, 10)}.csv`,
+        exportFilename("CATALOGUE", "csv"),
       );
     } finally {
       setExporting(false);
@@ -555,6 +555,7 @@ export default function AdminCatalogPage() {
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     manualPagination: true,
     pageCount,
   });

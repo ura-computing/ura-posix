@@ -2,7 +2,7 @@
 
 import type { Table, Column } from "@tanstack/react-table";
 import { flexRender } from "@tanstack/react-table";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { DataTablePagination } from "@/components/DataTable/dataTablePagination";
@@ -77,18 +77,38 @@ export function DataTable<TData>({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
-                    style={getCommonStyles({ column: header.column, isOverflowing })}
-                  >
-                    {!header.isPlaceholder && (
-                      <div className={cn("flex", "items-center", "gap-1")}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                      </div>
-                    )}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const canSort = !header.isPlaceholder && header.column.getCanSort();
+                  const sorted = header.column.getIsSorted();
+                  const handleSort = () => {
+                    // 2-state cycle: unsorted → asc → desc → asc → desc ... (no unsort)
+                    header.column.toggleSorting(sorted === "asc");
+                  };
+                  return (
+                    <TableHead
+                      key={header.id}
+                      style={getCommonStyles({ column: header.column, isOverflowing })}
+                    >
+                      {!header.isPlaceholder && (
+                        <div
+                          className={cn(
+                            "flex items-center gap-1",
+                            canSort && "cursor-pointer select-none hover:text-foreground",
+                          )}
+                          onClick={canSort ? handleSort : undefined}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {canSort && (
+                            <span className="inline-flex flex-col leading-none ml-0.5">
+                              <ChevronUp className={cn("h-3 w-3 -mb-1", sorted === "asc" ? "opacity-100" : "opacity-30")} />
+                              <ChevronDown className={cn("h-3 w-3", sorted === "desc" ? "opacity-100" : "opacity-30")} />
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>

@@ -1,10 +1,12 @@
 import { useState, useMemo } from "react";
-import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { CreditCard, Banknote, Receipt, ArrowRightLeft, Loader2, Plus } from "lucide-react";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageFilter } from "@/components/pageFilter";
+import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +50,7 @@ function getCurrentMonth() {
 export default function ComptabilitePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMonth, setEditMonth] = useState(getCurrentMonth());
   const [editMethod, setEditMethod] = useState("tpe");
@@ -60,38 +63,12 @@ export default function ComptabilitePage() {
 
   const { payments, isLoading: paymentsLoading } = usePayments();
   const { savePayment, saving } = useSavePayment();
-  const { stats: statsMixte, statsLoading: loadingMixte } = usePharmacyStats(dateFrom, dateTo, eCategoryType.ALL);
-  const { stats: statsPharma, statsLoading: loadingPharma } = usePharmacyStats(dateFrom, dateTo, eCategoryType.PHARMACIE);
-  const { stats: statsPara, statsLoading: loadingPara } = usePharmacyStats(dateFrom, dateTo, eCategoryType.PARAPHARMACIE);
+  const { stats, statsLoading } = usePharmacyStats(dateFrom, dateTo, categoryType);
 
   const { ventesRows, ventesPagination, ventesPageCount, ventesLoading } = useVentesList({
     page: ventePage, limit: venteLimit,
     dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
   });
-
-  const bilanRows = [
-    {
-      label: "Mixte",
-      stats: statsMixte,
-      loading: loadingMixte,
-      accent: "border-l-primary",
-      badge: "bg-primary/10 text-primary",
-    },
-    {
-      label: "Pharmacie",
-      stats: statsPharma,
-      loading: loadingPharma,
-      accent: "border-l-green-500",
-      badge: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    },
-    {
-      label: "Parapharmacie",
-      stats: statsPara,
-      loading: loadingPara,
-      accent: "border-l-purple-500",
-      badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-    },
-  ] as const;
 
   const paymentsByMethod = useMemo(() => {
     const map: Record<string, { pharmacie: number; parapharmacie: number; count: number }> = {};
@@ -121,6 +98,7 @@ export default function ComptabilitePage() {
     data: ventesRows as VenteRow[],
     columns: venteColumns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     manualPagination: true,
     pageCount: ventesPageCount,
   });
@@ -155,28 +133,103 @@ export default function ComptabilitePage() {
         Saisissez vos encaissements par mode de paiement et consultez votre bilan.
       </p>
 
-      {/* Date range filter */}
-      <div className="sticky top-16 z-10 bg-background">
-        <Card className="border border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Du</Label>
-                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Au</Label>
-                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
-              </div>
-              {(dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => { setDateFrom(""); setDateTo(""); }}>
-                  Réinitialiser
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PageFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        categoryType={categoryType}
+        onCategoryTypeChange={setCategoryType}
+        rightSlot={
+          <ColumnVisibilityToggle
+            table={venteTable}
+            storageKey="comptabilite-ventes-cols"
+            columnLabels={{
+              date: "Date",
+              transaction_ref: "N° Transaction",
+              transaction_ref_final: "N° Transaction Final",
+              client: "Client",
+              product: "Produit",
+              category: "Catégorie",
+              type: "Type",
+              tva: "TVA",
+            }}
+          />
+        }
+      />
+
+      {/* Bilan financier — 3 cards driven by category filter */}
+      {statsLoading ? (
+        <Skeleton className="h-40 w-full rounded-xl" />
+      ) : (() => {
+        const kpis = stats?.kpis;
+        const tva = stats?.tva;
+        const marge = stats?.marge;
+        const bilan = (kpis?.ventes_total ?? 0) - (kpis?.achats_total ?? 0);
+        const achatsBg = categoryType === eCategoryType.PHARMACIE
+          ? "bg-blue-100 border-blue-300 dark:bg-blue-950/40 dark:border-blue-800"
+          : categoryType === eCategoryType.PARAPHARMACIE
+          ? "bg-purple-100 border-purple-300 dark:bg-purple-950/40 dark:border-purple-800"
+          : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800";
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border border-border">
+              <CardContent className="p-4 space-y-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Chiffre d'affaires</p>
+                  <p className="text-lg font-bold tabular-nums">{fmt(kpis?.ventes_total ?? 0)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X</p>
+                  <p className="text-sm font-semibold tabular-nums">{marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)} %` : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge brute en MAD</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(marge?.marge_brute_dh ?? 0)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA encaissée</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_encaissee ?? 0)} MAD</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={cn("border", achatsBg)}>
+              <CardContent className="p-4 space-y-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Achats</p>
+                  <p className="text-lg font-bold tabular-nums">{fmt(kpis?.achats_total ?? 0)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Opérations</p>
+                  <p className="text-sm font-semibold tabular-nums">{kpis?.achats_count ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA payée</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_payee ?? 0)} MAD</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800">
+              <CardContent className="p-4 space-y-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Bilan</p>
+                  <p className="text-lg font-bold tabular-nums">CA - Achats = {fmt(bilan)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA à déclarer (estimation)</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Solde TVA année {new Date().getFullYear()}</p>
+                  <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Payment method cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -229,81 +282,6 @@ export default function ComptabilitePage() {
         }}
         emptyState={<p className="text-sm text-muted-foreground text-center py-8">Aucune transaction de vente.</p>}
       />
-
-      {/* Bilan financier — 3 cards per row (Mixte / Pharmacie / Parapharmacie) */}
-      {bilanRows.map((row) => {
-        const kpis = row.stats?.kpis;
-        const tva = row.stats?.tva;
-        const marge = row.stats?.marge;
-        const bilan = (kpis?.ventes_total ?? 0) - (kpis?.achats_total ?? 0);
-
-        if (row.loading) return <Skeleton key={row.label} className="h-40 w-full rounded-xl" />;
-
-        return (
-          <div key={row.label}>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">{row.label}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Left: CA + Marge */}
-              <Card className="border border-border">
-                <CardContent className="p-4 space-y-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Chiffre d'affaires</p>
-                    <p className="text-lg font-bold tabular-nums">{fmt(kpis?.ventes_total ?? 0)} MAD</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X</p>
-                    <p className="text-sm font-semibold tabular-nums">{marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)} %` : "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge brute en MAD</p>
-                    <p className="text-sm font-semibold tabular-nums">{fmt(marge?.marge_brute_dh ?? 0)} MAD</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA encaissée</p>
-                    <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_encaissee ?? 0)} MAD</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Middle: Achats (blue/purple bg) */}
-              <Card className={cn("border", row.label === "Pharmacie" ? "bg-blue-100 border-blue-300 dark:bg-blue-950/40 dark:border-blue-800" : row.label === "Parapharmacie" ? "bg-purple-100 border-purple-300 dark:bg-purple-950/40 dark:border-purple-800" : "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800")}>
-                <CardContent className="p-4 space-y-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Achats</p>
-                    <p className="text-lg font-bold tabular-nums">{fmt(kpis?.achats_total ?? 0)} MAD</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Opérations</p>
-                    <p className="text-sm font-semibold tabular-nums">{kpis?.achats_count ?? 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA payée</p>
-                    <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_payee ?? 0)} MAD</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Right: Bilan (green bg) */}
-              <Card className="border bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800">
-                <CardContent className="p-4 space-y-2">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Bilan</p>
-                    <p className="text-lg font-bold tabular-nums">CA - Achats = {fmt(bilan)} MAD</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA à déclarer (estimation)</p>
-                    <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Solde TVA année {new Date().getFullYear()}</p>
-                    <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
-      })}
 
       {/* Payment edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

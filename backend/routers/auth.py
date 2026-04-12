@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from schemas import (
 from utils.auth import verify_password, hash_password, create_access_token, decode_token
 from utils.constants import FEATURE_FLAGS as ALL_FEATURES, Role, Status
 from utils.email import send_reset_email
+from utils.limiter import limiter
 from utils.whatsapp import send_whatsapp_otp
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -52,7 +53,8 @@ def get_current_user_any_status(
 
 
 @router.post("/signup", response_model=Token)
-def signup(body: UserSignup, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def signup(request: Request, body: UserSignup, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email déjà enregistré")
 
@@ -101,10 +103,13 @@ def signup(body: UserSignup, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(body: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
+    if user.status == Status.REJECTED:
+        raise HTTPException(status_code=403, detail="Compte rejeté")
     return {"access_token": create_access_token({"sub": str(user.id)}), "user": user}
 
 
@@ -163,7 +168,8 @@ def update_me(
 
 
 @router.post("/forgot-password", status_code=204)
-async def forgot_password(body: ForgotPasswordPayload, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, body: ForgotPasswordPayload, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user:
         return  # silent — don't reveal whether the email exists
@@ -175,7 +181,8 @@ async def forgot_password(body: ForgotPasswordPayload, db: Session = Depends(get
 
 
 @router.post("/reset-password", status_code=204)
-def reset_password(body: ResetPasswordPayload, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def reset_password(request: Request, body: ResetPasswordPayload, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.reset_token == body.token).first()
     if not user or not user.reset_token_expires:
         raise HTTPException(status_code=400, detail="Lien invalide ou expiré")

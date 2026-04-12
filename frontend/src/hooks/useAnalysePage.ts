@@ -3,6 +3,7 @@ import { useAnalyseMarge } from "@/hooks/usePharmacyRapports";
 import { eCategoryType } from "@/types";
 import { MARGE_COLS, type MargeMode } from "@/pages/rapports/margeTable";
 import { downloadBlob } from "@/pages/rapports/shared";
+import { exportFilename } from "@/utils/table";
 
 export function useAnalysePage() {
   const [dateFrom, setDateFrom] = useState("");
@@ -91,12 +92,12 @@ export function useAnalysePage() {
     const esc = (v: unknown) => {
       if (v == null || typeof v === "object") return "";
       const s = String(v);
-      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+      return s.includes(";") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = cols.map((c) => esc(c.label)).join(",");
-    const lines = sel.map((row) => cols.map((c) => esc(row[c.key])).join(","));
+    const header = cols.map((c) => esc(c.label)).join(";");
+    const lines = sel.map((row) => cols.map((c) => esc(row[c.key])).join(";"));
     const csv = [header, ...lines].join("\n");
-    downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), `analyse_${margeMode}_selection.csv`);
+    downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined));
   }, [allRows, selected, margeMode]);
 
   const resetSelection = useCallback(() => {

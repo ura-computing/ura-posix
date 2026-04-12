@@ -254,29 +254,32 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 "marge_dh_avg":  marge_dh_avg,
             })
 
-    elif mode == "fournisseur":
-        supplier_meds = (
+    elif mode == "grossiste":
+        # Group by grossiste supplier only (supplier name starts with "GROSSISTE").
+        # CA/qty are from ventes of medicaments bought through each grossiste.
+        grossiste_meds = (
             db.query(Achat.supplier, Achat.medicament_id)
             .filter(*base_filter_a)
+            .filter(func.upper(Achat.supplier).like("GROSSISTE%"))
             .distinct()
             .subquery()
         )
         q = (
             db.query(
-                supplier_meds.c.supplier,
+                grossiste_meds.c.supplier.label("grossiste"),
                 func.sum(Vente.quantity).label("qty"),
                 func.sum(Vente.total).label("ca"),
                 func.max(Vente.unit_price).label("prix_max"),
                 func.min(Vente.unit_price).label("prix_min"),
                 func.avg(Vente.unit_price).label("prix_avg"),
             )
-            .join(Vente, Vente.medicament_id == supplier_meds.c.medicament_id)
+            .join(Vente, Vente.medicament_id == grossiste_meds.c.medicament_id)
             .filter(*base_filter_v)
-            .group_by(supplier_meds.c.supplier)
+            .group_by(grossiste_meds.c.supplier)
         )
         for r in q.all():
             rows_out.append({
-                "supplier": r.supplier or "—",
+                "grossiste": r.grossiste or "—",
                 "prix_max": round(float(r.prix_max or 0), 4),
                 "prix_min": round(float(r.prix_min or 0), 4),
                 "prix_avg": round(float(r.prix_avg or 0), 4),
