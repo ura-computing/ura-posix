@@ -6,6 +6,7 @@ import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageFilter } from "@/components/pageFilter";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
@@ -295,26 +296,34 @@ function AlertCard({
   return (
     <Card className={cn("border", styles.card)}>
       <CardHeader className="pb-2">
-        <CardTitle className={cn("text-sm font-semibold", styles.title)}>{label}</CardTitle>
+        <CardTitle className={cn("text-base font-semibold", styles.title)}>{label}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Badge className={cn("h-6 px-2 text-xs font-bold border-0", styles.count)}>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <Badge className={cn("h-7 px-2.5 text-sm font-bold border-0", styles.count)}>
             {count} produit{count !== 1 ? "s" : ""}
           </Badge>
           <div className="text-right">
-            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{valueLabel}</p>
-            <p className={cn("text-sm font-bold tabular-nums", styles.value)}>{fmt(Math.abs(value))} MAD</p>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{valueLabel}</p>
+            <p className={cn("text-base font-bold tabular-nums", styles.value)}>{fmt(Math.abs(value))} MAD</p>
           </div>
         </div>
         {products.length > 0 && (
-          <div className="pt-2 border-t border-border/50 space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Top produits</p>
+          <div className="pt-3 border-t border-border/50 space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top produits</p>
             {products.map((p, i) => (
-              <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
-                <span className="truncate text-foreground">{p.name}</span>
-                <span className={cn("shrink-0 tabular-nums font-medium", styles.value)}>{p.detail}</span>
-              </div>
+              <Tooltip key={i}>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-between gap-2 text-sm cursor-default">
+                    <span className="truncate text-foreground">{p.name}</span>
+                    <span className={cn("shrink-0 tabular-nums font-medium", styles.value)}>{p.detail}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="start">
+                  <p className="font-medium">{p.name}</p>
+                  <p className="text-xs opacity-80">{p.detail}</p>
+                </TooltipContent>
+              </Tooltip>
             ))}
           </div>
         )}

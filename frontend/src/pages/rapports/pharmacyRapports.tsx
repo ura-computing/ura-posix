@@ -1,10 +1,6 @@
 import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { Link } from "react-router";
-import {
-  usePharmacyStats,
-  useAnalyseMarge,
-  useMarginAlerts,
-} from "@/hooks/usePharmacyRapports";
+import { usePharmacyStats, useAnalyseMarge, useMarginAlerts } from "@/hooks/usePharmacyRapports";
 import {
   AreaChart,
   Area,
@@ -23,15 +19,18 @@ import {
   BarChart3,
   CalendarCheck,
   CalendarX,
+  Coins,
   Download,
-  Plus,
+  Percent,
   Receipt,
-  Search,
   ShieldCheck,
   ShoppingCart,
   TrendingDown,
   TrendingUp,
+  UploadCloud,
+  Wallet,
 } from "lucide-react";
+import { OptimisationGauge } from "@/components/optimisationGauge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageFilter } from "@/components/pageFilter";
 import { Button } from "@/components/ui/button";
@@ -57,12 +56,6 @@ import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
 import { exportFilename } from "@/utils/table";
 import { CHART_COLORS, CAT_COLORS, getTypeTheme } from "@/constants/theme";
-import {
-  AnalyseMargeTable,
-  MARGE_COLS,
-  SIM_LABEL_KEY,
-  type MargeMode,
-} from "./margeTable";
 import { eCategoryType } from "@/types";
 
 export function PharmacyRapports() {
@@ -72,12 +65,6 @@ export function PharmacyRapports() {
   const [categoryType, setCategoryType] = useState<eCategoryType>(
     eCategoryType.ALL,
   );
-  const [margeMode, setMargeMode] = useState<MargeMode>("produit");
-
-  // Simulation dialog state
-  const [simOpen, setSimOpen] = useState(false);
-  const [simSelected, setSimSelected] = useState<Set<number>>(new Set());
-  const [simSearch, setSimSearch] = useState("");
 
   const { stats, statsLoading: isLoading } = usePharmacyStats(
     dateFrom,
@@ -88,8 +75,9 @@ export function PharmacyRapports() {
     dateFrom,
     dateTo,
     categoryType,
-    margeMode,
+    "produit",
   );
+  const analyseKpis = margeData?.kpis;
   const { marginAlerts, marginAlertsLoading } = useMarginAlerts(
     dateFrom,
     dateTo,
@@ -200,79 +188,6 @@ export function PharmacyRapports() {
 
   const typeTheme = useMemo(() => getTypeTheme(categoryType), [categoryType]);
 
-  const allMargeRows = useMemo(
-    () => (margeData?.rows ?? []) as Record<string, unknown>[],
-    [margeData],
-  );
-
-  const simFilteredRows = useMemo(() => {
-    if (!simSearch.trim())
-      return allMargeRows.map((r, i) => ({ row: r, idx: i }));
-    const q = simSearch.toLowerCase();
-    return allMargeRows
-      .map((r, i) => ({ row: r, idx: i }))
-      .filter(({ row }) =>
-        String(row[SIM_LABEL_KEY[margeMode]] ?? "")
-          .toLowerCase()
-          .includes(q),
-      );
-  }, [allMargeRows, simSearch, margeMode]);
-
-  const simKpis = useMemo(() => {
-    const selected = allMargeRows.filter((_, i) => simSelected.has(i));
-    const ca = selected.reduce((s, r) => s + (Number(r.ca ?? r.total) || 0), 0);
-    const qty = selected.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-    const pcts = selected
-      .map((r) => Number(r.marge_pct ?? r.marge_pct_avg ?? NaN))
-      .filter((v) => !isNaN(v));
-    const dhs = selected
-      .map((r) => Number(r.marge_dh ?? r.marge_dh_avg ?? NaN))
-      .filter((v) => !isNaN(v));
-    return {
-      ca,
-      qty,
-      margePctAvg: pcts.length
-        ? pcts.reduce((s, v) => s + v, 0) / pcts.length
-        : null,
-      margeDhAvg: dhs.length
-        ? dhs.reduce((s, v) => s + v, 0) / dhs.length
-        : null,
-    };
-  }, [allMargeRows, simSelected]);
-
-  const toggleSimRow = useCallback((idx: number) => {
-    setSimSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
-  }, []);
-
-  const exportSimCsv = useCallback(() => {
-    const selected = allMargeRows.filter((_, i) => simSelected.has(i));
-    if (!selected.length) return;
-    const cols = MARGE_COLS[margeMode];
-    const header = cols.map((c) => c.label).join(";");
-    const lines = selected.map((row) =>
-      cols
-        .map((c) => {
-          const v = row[c.key];
-          return v == null
-            ? ""
-            : String(v).includes(";") || String(v).includes('"') || String(v).includes("\n")
-            ? `"${String(v).replace(/"/g, '""')}"`
-            : String(v);
-        })
-        .join(";"),
-    );
-    const csv = [header, ...lines].join("\n");
-    downloadBlob(
-      new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
-      exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined),
-    );
-  }, [allMargeRows, simSelected, margeMode]);
-
   /** Compute % change between current and previous value. Returns null when no previous data. */
   const pctChange = (
     current: number | undefined,
@@ -342,16 +257,16 @@ export function PharmacyRapports() {
         categoryType={categoryType}
         onCategoryTypeChange={setCategoryType}
         rightSlot={
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-9 ml-1"
+          <button
+            type="button"
             disabled={!!exporting}
             title="Exporter Excel"
             onClick={() => handleExcel(categoryType)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Download className="h-4 w-4" />
-          </Button>
+            <Download className="h-3.5 w-3.5" />
+            Exporter
+          </button>
         }
       />
 
@@ -1070,380 +985,81 @@ export function PharmacyRapports() {
           </div>
         </section>
 
-        {/* ── Analyse de marge ── */}
+        {/* ── Analyse de marge (preview KPIs + CTA) ── */}
         <section>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <h2 className="text-lg font-semibold text-foreground">
-              Analyse de marge
-            </h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1">
-                {(
-                  [
-                    "produit",
-                    "categorie",
-                    "laboratoire",
-                    "grossiste",
-                    "bl",
-                    "operateur",
-                    "mois",
-                  ] as const
-                ).map((m) => {
-                  const labels: Record<string, string> = {
-                    produit: "Produit",
-                    categorie: "Catégorie",
-                    laboratoire: "Labo",
-                    grossiste: "Grossistes",
-                    bl: "BL",
-                    operateur: "Opérateur",
-                    mois: "Mois",
-                  };
-                  return (
-                    <Button
-                      key={m}
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        "h-8 text-xs",
-                        margeMode === m
-                          ? cn(typeTheme.primaryCard, "hover:opacity-90")
-                          : "",
-                      )}
-                      onClick={() => setMargeMode(m)}
-                    >
-                      {labels[m]}
-                    </Button>
-                  );
-                })}
+          <h2 className="text-lg font-semibold text-foreground mb-4">Analyse de marge</h2>
+
+          {/* Preview KPI cards */}
+          {margeLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
+            </div>
+          ) : analyseKpis && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <Card className="border border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
+                      <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(analyseKpis.total_ventes_dh)} MAD</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fmt(analyseKpis.total_ventes_unites)} unités vendues</p>
+                    </div>
+                    <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne</p>
+                      <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_pct_avg != null ? `${analyseKpis.marge_pct_avg.toFixed(1)}%` : "—"}</p>
+                    </div>
+                    <Percent className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
+                      <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_dh_avg != null ? fmt(analyseKpis.marge_dh_avg) : "—"}</p>
+                    </div>
+                    <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border border-border">
+                <CardContent className="p-6 flex items-center justify-center">
+                  <OptimisationGauge gain={analyseKpis.difference_gain_dh} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* CTA card */}
+          <Card className="border border-dashed border-border bg-muted/30">
+            <CardContent className="p-8 flex flex-col items-center text-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                <UploadCloud className="h-6 w-6 text-primary" />
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs gap-1.5"
-                onClick={() => {
-                  setSimOpen(true);
-                  setSimSelected(new Set());
-                  setSimSearch("");
-                }}
-                disabled={!allMargeRows.length}
+              <div>
+                <p className="text-base font-semibold">Analyse personnalisée</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Importez une liste de produits ou sélectionnez des éléments pour simuler vos marges.
+                </p>
+              </div>
+              <Link
+                to="/analyse"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <UploadCloud className="h-3.5 w-3.5" />
                 Créer une analyse
-              </Button>
-            </div>
-          </div>
-
-          {/* KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <Card className="border border-border">
-              <CardContent className="p-5">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Total ventes
-                </p>
-                {margeLoading ? (
-                  <Skeleton className="h-8 w-28 mt-1" />
-                ) : (
-                  <p className="text-2xl font-bold mt-1">
-                    {fmt(margeData?.kpis.total_ventes_dh ?? null)} MAD
-                  </p>
-                )}
-                {margeLoading ? (
-                  <Skeleton className="h-4 w-20 mt-2" />
-                ) : (
-                  <p className="text-sm font-semibold mt-2">
-                    {margeData?.kpis.total_ventes_unites?.toFixed(0) ?? "—"}{" "}
-                    unités
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border border-border">
-              <CardContent className="p-5">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Marge moyenne
-                </p>
-                {margeLoading ? (
-                  <Skeleton className="h-8 w-24 mt-1" />
-                ) : (
-                  <p className="text-2xl font-bold mt-1">
-                    {margeData?.kpis.marge_pct_avg != null
-                      ? `${margeData.kpis.marge_pct_avg.toFixed(1)} %`
-                      : "—"}
-                  </p>
-                )}
-                {!margeLoading && margeData?.kpis.marge_pct_min && (
-                  <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                    <p>
-                      Min:{" "}
-                      <span className="font-medium text-foreground">
-                        {margeData.kpis.marge_pct_min.label}
-                      </span>{" "}
-                      ({margeData.kpis.marge_pct_min.value?.toFixed(1)}%) —{" "}
-                      {margeData.kpis.marge_pct_min.qty} unités
-                    </p>
-                    <p>
-                      Max:{" "}
-                      <span className="font-medium text-foreground">
-                        {margeData?.kpis.marge_pct_max?.label}
-                      </span>{" "}
-                      ({margeData?.kpis.marge_pct_max?.value?.toFixed(1)}%) —{" "}
-                      {margeData?.kpis.marge_pct_max?.qty} unités
-                    </p>
-                  </div>
-                )}
-                <p className="text-[10px] text-muted-foreground/60 mt-2 leading-tight font-mono">
-                  (1 − PU÷PPV) × 100, pondérée par qté
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border border-border">
-              <CardContent className="p-5">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Marge moy. / unité
-                </p>
-                {margeLoading ? (
-                  <Skeleton className="h-8 w-28 mt-1" />
-                ) : (
-                  <p className="text-2xl font-bold mt-1">
-                    {margeData?.kpis.marge_dh_avg != null
-                      ? `${fmt(margeData.kpis.marge_dh_avg)} MAD`
-                      : "—"}
-                  </p>
-                )}
-                {!margeLoading && margeData?.kpis.marge_dh_min && (
-                  <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
-                    <p>
-                      Min:{" "}
-                      <span className="font-medium">
-                        {margeData.kpis.marge_dh_min.label}
-                      </span>{" "}
-                      ({fmt(margeData.kpis.marge_dh_min.value)} DH)
-                    </p>
-                    <p>
-                      Max:{" "}
-                      <span className="font-medium">
-                        {margeData?.kpis.marge_dh_max?.label}
-                      </span>{" "}
-                      ({fmt(margeData?.kpis.marge_dh_max?.value ?? null)} DH)
-                    </p>
-                  </div>
-                )}
-                {!margeLoading &&
-                  margeData?.kpis.difference_gain_dh != null && (
-                    <p
-                      className={`text-sm font-semibold mt-2 ${
-                        (margeData.kpis.difference_gain_dh ?? 0) >= 0
-                          ? "text-emerald-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      Écart gain: {fmt(margeData.kpis.difference_gain_dh)} DH
-                    </p>
-                  )}
-                <p className="text-[10px] text-muted-foreground/60 mt-2 leading-tight font-mono">
-                  PPV − PU, pondérée par qté
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <AnalyseMargeTable
-            mode={margeMode}
-            data={margeData}
-            loading={margeLoading}
-          />
+              </Link>
+            </CardContent>
+          </Card>
         </section>
-
-        {/* ── Simulation dialog ── */}
-        <Dialog
-          open={simOpen}
-          onOpenChange={(v) => {
-            if (!v) {
-              setSimOpen(false);
-              setSimSearch("");
-            }
-          }}
-        >
-          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Créer une analyse personnalisée</DialogTitle>
-              <DialogDescription>
-                Sélectionnez des éléments pour simuler leurs KPIs combinés.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden py-2">
-              {/* Search + select-all */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Filtrer les éléments..."
-                    className="pl-9 h-9"
-                    value={simSearch}
-                    onChange={(e) => setSimSearch(e.target.value)}
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 text-xs shrink-0"
-                  onClick={() => {
-                    if (simSelected.size === allMargeRows.length) {
-                      setSimSelected(new Set());
-                    } else {
-                      setSimSelected(new Set(allMargeRows.map((_, i) => i)));
-                    }
-                  }}
-                >
-                  {simSelected.size === allMargeRows.length
-                    ? "Désélectionner tout"
-                    : "Tout sélectionner"}
-                </Button>
-              </div>
-
-              {/* Live KPI preview */}
-              {simSelected.size > 0 && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-[11px] text-muted-foreground">
-                      CA sélectionné
-                    </p>
-                    <p className="text-lg font-bold mt-0.5">
-                      {fmt(simKpis.ca)}{" "}
-                      <span className="text-xs font-normal">MAD</span>
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {simKpis.qty.toFixed(0)} unités
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-[11px] text-muted-foreground">
-                      Marge % moy.
-                    </p>
-                    <p className="text-lg font-bold mt-0.5">
-                      {simKpis.margePctAvg != null
-                        ? `${simKpis.margePctAvg.toFixed(1)} %`
-                        : "—"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border p-3 bg-muted/30">
-                    <p className="text-[11px] text-muted-foreground">
-                      Marge DH moy.
-                    </p>
-                    <p className="text-lg font-bold mt-0.5">
-                      {simKpis.margeDhAvg != null
-                        ? `${fmt(simKpis.margeDhAvg)} MAD`
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Row list */}
-              <div className="flex-1 min-h-0 overflow-y-auto border rounded-lg">
-                {simFilteredRows.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    Aucun élément trouvé
-                  </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
-                      <tr>
-                        <th className="w-10 px-3 py-2.5" />
-                        <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                          {MARGE_COLS[margeMode][0].label}
-                        </th>
-                        {MARGE_COLS[margeMode].slice(1, 4).map((col) => (
-                          <th
-                            key={col.key}
-                            className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wide"
-                          >
-                            {col.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {simFilteredRows.map(({ row, idx }) => (
-                        <tr
-                          key={idx}
-                          className={cn(
-                            "border-t border-border cursor-pointer hover:bg-muted/30 transition-colors",
-                            simSelected.has(idx) && "bg-primary/5",
-                          )}
-                          onClick={() => toggleSimRow(idx)}
-                        >
-                          <td className="px-3 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              readOnly
-                              checked={simSelected.has(idx)}
-                              className="h-4 w-4 accent-primary"
-                            />
-                          </td>
-                          <td className="px-3 py-2 font-medium truncate max-w-[200px]">
-                            {String(row[SIM_LABEL_KEY[margeMode]] ?? "—")}
-                          </td>
-                          {MARGE_COLS[margeMode].slice(1, 4).map((col) => (
-                            <td
-                              key={col.key}
-                              className="px-3 py-2 text-right tabular-nums text-muted-foreground"
-                            >
-                              {row[col.key] == null
-                                ? "—"
-                                : typeof row[col.key] === "number"
-                                ? (row[col.key] as number).toFixed(2)
-                                : String(row[col.key])}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                {simSelected.size} élément{simSelected.size !== 1 ? "s" : ""}{" "}
-                sélectionné{simSelected.size !== 1 ? "s" : ""}
-                {simSelected.size > 0 &&
-                  " — cliquez sur une ligne pour désélectionner"}
-              </p>
-            </div>
-
-            <DialogFooter className="gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSimSelected(new Set())}
-              >
-                Réinitialiser
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                disabled={simSelected.size === 0}
-                onClick={exportSimCsv}
-              >
-                <Download className="h-3.5 w-3.5" />
-                Exporter CSV
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setSimOpen(false);
-                  setSimSearch("");
-                }}
-              >
-                Fermer
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* ── Monthly trend ── */}
         <section>

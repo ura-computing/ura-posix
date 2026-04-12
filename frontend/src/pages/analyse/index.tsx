@@ -1,21 +1,19 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, BarChart3, UploadCloud } from "lucide-react";
+import { Boxes, Coins, Download, BarChart3, Percent, ShoppingCart, TrendingDown, TrendingUp, UploadCloud, Wallet } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageFilter } from "@/components/pageFilter";
-import { DatePicker } from "@/components/ui/datePicker";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import * as statsApi from "@/api/stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
-import { GAUGE_COLORS } from "@/constants/theme";
-import { eCategoryType } from "@/types";
+import { OptimisationGauge } from "@/components/optimisationGauge";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
 import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
@@ -38,37 +36,6 @@ const MODE_SEARCH_KEY: Record<MargeMode, string> = {
   mois: "mois",
   bl: "delivery_ref",
 };
-
-/* ── Optimisation gauge ──────────────────────────────────────────────────── */
-
-function OptimisationGauge({ gain }: { gain: number | null }) {
-  const val = gain ?? 0;
-  // Map gain to 0-100: negative = red (left), 0 = middle, positive = green (right)
-  const clamped = Math.min(100, Math.max(0, val > 0 ? Math.min(50 + val / 2, 100) : Math.max(50 + val / 2, 0)));
-  // Needle angle: 0 = -90° (left/red), 100 = +90° (right/green)
-  const angle = 90 - (clamped / 100) * 180;
-
-  return (
-    <div className="flex flex-col items-center">
-      <p className="text-xs font-medium text-muted-foreground mb-1">Optimisation marge</p>
-      <svg viewBox="0 0 200 120" className="w-40 h-24">
-        {/* Red zone (left): détériorer */}
-        <path d="M 20 100 A 80 80 0 0 1 56 28" fill="none" stroke={GAUGE_COLORS.badHex} strokeWidth="16" strokeLinecap="round" />
-        {/* Yellow zone (middle) */}
-        <path d="M 56 28 A 80 80 0 0 1 144 28" fill="none" stroke={GAUGE_COLORS.warnHex} strokeWidth="16" />
-        {/* Green zone (right): optimal */}
-        <path d="M 144 28 A 80 80 0 0 1 180 100" fill="none" stroke={GAUGE_COLORS.goodHex} strokeWidth="16" strokeLinecap="round" />
-        {/* Needle */}
-        <g transform={`rotate(${angle}, 100, 100)`}>
-          <line x1="100" y1="100" x2="100" y2="30" stroke={GAUGE_COLORS.needleHex} strokeWidth="3" strokeLinecap="round" />
-          <circle cx="100" cy="100" r="6" fill={GAUGE_COLORS.needleHex} />
-          <circle cx="100" cy="100" r="3" fill="white" />
-        </g>
-      </svg>
-      <p className="text-sm font-bold mt-1">{val > 0 ? "+" : ""}{fmt(val)} MAD</p>
-    </div>
-  );
-}
 
 export default function AnalysePage() {
   const {
@@ -175,11 +142,19 @@ export default function AnalysePage() {
               {selected.size === allRows.length && allRows.length > 0 ? "Tout désélectionner" : "Tout sélectionner"}
             </Button>
             {kpis.count > 0 && (
-              <Button size="sm" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
+              <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
                 <Download className="h-3.5 w-3.5" />
                 Exporter CSV ({kpis.count})
               </Button>
             )}
+            <button
+              type="button"
+              onClick={() => { setMargeMode("bl"); setTimeout(() => fileInputRef.current?.click(), 0); }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Importer une liste
+            </button>
           </>
         }
       />
@@ -199,93 +174,155 @@ export default function AnalysePage() {
         ))}
       </div>
 
-      {/* ── KPI Section (matching screen8) ── */}
+      {/* ── KPI Section ── */}
       {k && !margeLoading && (
-        <Card className="border border-border">
-          <CardContent className="p-4">
-            <div className="grid grid-cols-4 gap-4">
-              {/* Column 1: Totals */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Total vente MAD</p>
-                  <p className="text-base font-bold tabular-nums">{fmt(k.total_ventes_dh)} MAD</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Chiffre d'affaires */}
+          <Card className="border border-border">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
+                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(k.total_ventes_dh)} MAD</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{fmt(k.total_ventes_unites)} unités vendues</p>
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Total vente unités</p>
-                  <p className="text-base font-bold tabular-nums">{fmt(k.total_ventes_unites)}</p>
-                </div>
+                <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Column 2: Marge % */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X en %</p>
-                  <p className="text-base font-bold tabular-nums">{k.marge_pct_avg != null ? `${k.marge_pct_avg.toFixed(1)}%` : "—"}</p>
+          {/* Marge moyenne % */}
+          <Card className="border border-border">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne</p>
+                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_pct_avg != null ? `${k.marge_pct_avg.toFixed(1)}%` : "—"}</p>
+                  <div className="mt-2 space-y-0.5 text-[11px]">
+                    {k.marge_pct_min && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="flex items-center gap-1 text-red-600 truncate cursor-default">
+                            <TrendingDown className="h-3 w-3 shrink-0" />
+                            <span className="font-semibold">{k.marge_pct_min.value.toFixed(1)}%</span>
+                            <span className="text-muted-foreground truncate">· {k.marge_pct_min.label}</span>
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>{k.marge_pct_min.label}</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {k.marge_pct_max && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="flex items-center gap-1 text-green-600 truncate cursor-default">
+                            <TrendingUp className="h-3 w-3 shrink-0" />
+                            <span className="font-semibold">{k.marge_pct_max.value.toFixed(1)}%</span>
+                            <span className="text-muted-foreground truncate">· {k.marge_pct_max.label}</span>
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>{k.marge_pct_max.label}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X plus faible %</p>
-                  <p className="text-sm font-semibold tabular-nums text-red-600">{k.marge_pct_min ? `${k.marge_pct_min.value.toFixed(1)}%` : "—"}</p>
-                  {k.marge_pct_min && <p className="text-[9px] text-muted-foreground truncate">{k.marge_pct_min.label}</p>}
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X plus forte %</p>
-                  <p className="text-sm font-semibold tabular-nums text-green-600">{k.marge_pct_max ? `${k.marge_pct_max.value.toFixed(1)}%` : "—"}</p>
-                  {k.marge_pct_max && <p className="text-[9px] text-muted-foreground truncate">{k.marge_pct_max.label}</p>}
-                </div>
+                <Percent className="h-8 w-8 opacity-60 shrink-0 text-primary" />
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Column 3: Marge DH */}
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X en MAD</p>
-                  <p className="text-base font-bold tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)} MAD` : "—"}</p>
+          {/* Marge moyenne MAD */}
+          <Card className="border border-border">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
+                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)}` : "—"}</p>
+                  <div className="mt-2 space-y-0.5 text-[11px]">
+                    {k.marge_dh_min && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="flex items-center gap-1 text-red-600 truncate cursor-default">
+                            <TrendingDown className="h-3 w-3 shrink-0" />
+                            <span className="font-semibold">{fmt(k.marge_dh_min.value)}</span>
+                            <span className="text-muted-foreground truncate">· {k.marge_dh_min.label}</span>
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>{k.marge_dh_min.label}</TooltipContent>
+                      </Tooltip>
+                    )}
+                    {k.marge_dh_max && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="flex items-center gap-1 text-green-600 truncate cursor-default">
+                            <TrendingUp className="h-3 w-3 shrink-0" />
+                            <span className="font-semibold">{fmt(k.marge_dh_max.value)}</span>
+                            <span className="text-muted-foreground truncate">· {k.marge_dh_max.label}</span>
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>{k.marge_dh_max.label}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X plus faible en MAD</p>
-                  <p className="text-sm font-semibold tabular-nums text-red-600">{k.marge_dh_min ? `${fmt(k.marge_dh_min.value)} MAD` : "—"}</p>
-                  {k.marge_dh_min && <p className="text-[9px] text-muted-foreground truncate">{k.marge_dh_min.label}</p>}
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X plus forte MAD</p>
-                  <p className="text-sm font-semibold tabular-nums text-green-600">{k.marge_dh_max ? `${fmt(k.marge_dh_max.value)} MAD` : "—"}</p>
-                  {k.marge_dh_max && <p className="text-[9px] text-muted-foreground truncate">{k.marge_dh_max.label}</p>}
-                </div>
+                <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Column 4: Optimisation gauge */}
-              <div className="flex items-center">
-                <OptimisationGauge gain={k.difference_gain_dh} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Optimisation gauge */}
+          <Card className="border border-border">
+            <CardContent className="p-6 flex items-center justify-center">
+              <OptimisationGauge gain={k.difference_gain_dh} />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* ── Sub-KPIs ── */}
       {k && !margeLoading && (
-        <div className="grid grid-cols-4 gap-2">
-          <Card className="border border-border bg-muted/30">
-            <CardContent className="p-3 text-center">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Unités total vendues</p>
-              <p className="text-sm font-semibold tabular-nums">{fmt(k.total_ventes_unites)}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités vendues</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_ventes_unites)}</p>
+                </div>
+                <ShoppingCart className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-border bg-muted/30">
-            <CardContent className="p-3 text-center">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Unités total disponibles</p>
-              <p className="text-sm font-semibold tabular-nums">{fmt(k.total_units_available)}</p>
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités disponibles</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_units_available)}</p>
+                </div>
+                <Boxes className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-border bg-muted/30">
-            <CardContent className="p-3 text-center">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">Prix unitaires total achetées</p>
-              <p className="text-sm font-semibold tabular-nums">{fmt(k.total_pu_purchased)} MAD</p>
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Prix unitaires achetés</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_pu_purchased)} MAD</p>
+                </div>
+                <Coins className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="border border-border bg-muted/30">
-            <CardContent className="p-3 text-center">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase">PPV total disponibles</p>
-              <p className="text-sm font-semibold tabular-nums">{fmt(k.ppv_total_available)} MAD</p>
+          <Card className="border border-border">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">PPV disponibles</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.ppv_total_available)} MAD</p>
+                </div>
+                <BarChart3 className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
+              </div>
             </CardContent>
           </Card>
         </div>

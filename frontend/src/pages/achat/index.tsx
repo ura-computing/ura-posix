@@ -9,7 +9,6 @@ import { Download, UploadCloud } from "lucide-react";
 import { eUserRole, eCategoryType } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { DataTable } from "@/components/DataTable/dataTable";
@@ -424,29 +423,32 @@ const AchatList = () => {
           suggestionGroupLabels: { products: "Produit", suppliers: "Fournisseur", refs: "Référence" },
         }}
         extraFilters={
-          <>
-            <CategoryMultiSelect allCategories={allCategories} selected={selectedCats} onChange={setSelectedCats} />
-            <TvaMultiSelect allRates={allTvaRates} selected={selectedTva} onChange={setSelectedTva} />
-          </>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <CategoryMultiSelect allCategories={allCategories} selected={selectedCats} onChange={setSelectedCats} />
+            </div>
+            <div>
+              <TvaMultiSelect allRates={allTvaRates} selected={selectedTva} onChange={setSelectedTva} />
+            </div>
+          </div>
         }
         rightSlot={
           <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-9 gap-1.5"
-              onClick={handleExport}
-              disabled={exporting}
-              title="Exporter CSV"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
             <ColumnVisibilityToggle
               table={tableInstance}
               storageKey="achats-cols"
               columnLabels={ACHAT_COL_LABELS}
             />
+            <button
+              type="button"
+              disabled={exporting}
+              title="Exporter CSV"
+              onClick={handleExport}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exporter
+            </button>
             {user?.permissions?.import !== false && (
               <Link
                 to="/dashboard/upload-file?type=achat"

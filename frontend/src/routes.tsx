@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 import {
   BarChart3,
-  BellRing,
   BookOpen,
+  Boxes,
   Building2,
   ClipboardCheck,
   PackageX,
@@ -245,7 +245,7 @@ export const resources: ResourceConfig[] = [
     list: "/stock",
     meta: {
       label: "Stock",
-      icon: <TriangleAlert />,
+      icon: <Boxes />,
       allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
       permission: "stock",
     },
@@ -255,7 +255,7 @@ export const resources: ResourceConfig[] = [
     list: "/alertes",
     meta: {
       label: "Alertes",
-      icon: <BellRing />,
+      icon: <TriangleAlert />,
       allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
       permission: "rapports",
     },
