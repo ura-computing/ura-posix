@@ -94,7 +94,6 @@ export function PageFilter({
                 Réinitialiser
               </Button>
             )}
-            {extraFilters}
             {(showCategory || rightSlot) && (
               <div className="flex items-center gap-1.5 ml-auto flex-wrap">
                 {showCategory && (
@@ -137,6 +136,9 @@ export function PageFilter({
               </div>
             )}
           </div>
+          {extraFilters && (
+            <div>{extraFilters}</div>
+          )}
         </CardContent>
       </Card>
     </div>

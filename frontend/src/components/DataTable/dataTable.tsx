@@ -69,11 +69,12 @@ export function DataTable<TData>({
   }, [table.getRowModel().rows.length, pageSize]);
 
   const hasRows = table.getRowModel().rows.length > 0;
+  const totalColWidth = leafColumns.reduce((sum, c) => sum + c.getSize(), 0);
 
   return (
     <div className={cn("flex", "flex-col", "flex-1", "gap-4")}>
       <div ref={tableContainerRef} className={cn("rounded-md", "border", "overflow-x-auto")}>
-        <TableUI ref={tableRef} style={{ tableLayout: "fixed", width: "100%" }}>
+        <TableUI ref={tableRef} style={{ tableLayout: "fixed", width: "100%", minWidth: `${totalColWidth}px` }}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

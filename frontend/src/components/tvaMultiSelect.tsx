@@ -31,11 +31,11 @@ export function TvaMultiSelect({ allRates, selected, onChange }: Props) {
           variant="outline"
           size="sm"
           className={cn(
-            "h-9 gap-1.5 text-xs font-normal",
+            "h-9 w-full justify-between text-xs font-normal",
             selected.length > 0 && "border-primary text-primary bg-primary/5",
           )}
         >
-          <span>{label}</span>
+          <span className="truncate">{label}</span>
           <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
         </Button>
       </PopoverTrigger>

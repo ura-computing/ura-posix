@@ -1,6 +1,10 @@
 import { useState, useMemo } from "react";
 import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
-import { CreditCard, Banknote, Receipt, ArrowRightLeft, Loader2, Plus } from "lucide-react";
+import { CreditCard, Banknote, Receipt, ArrowRightLeft, Download, Loader2, Plus } from "lucide-react";
+import { toast } from "sonner";
+import * as statsApi from "@/api/stats";
+import { downloadBlob } from "@/pages/rapports/shared";
+import { exportFilename } from "@/utils/table";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
@@ -27,7 +31,6 @@ import {
 } from "@/components/ui/select";
 import { DataTable } from "@/components/DataTable/dataTable";
 import { Badge } from "@/components/ui/badge";
-import { DatePicker } from "@/components/ui/datePicker";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
 import { eCategoryType } from "@/types";
@@ -60,6 +63,23 @@ export default function ComptabilitePage() {
 
   const [ventePage, setVentePage] = useState(1);
   const [venteLimit, setVenteLimit] = useState(20);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await statsApi.exportExcel(dateFrom || undefined, dateTo || undefined, categoryType);
+      downloadBlob(
+        blob,
+        exportFilename(`COMPTABILITE ${categoryType.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined),
+      );
+      toast.success("Rapport exporté");
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { payments, isLoading: paymentsLoading } = usePayments();
   const { savePayment, saving } = useSavePayment();
@@ -84,14 +104,14 @@ export default function ComptabilitePage() {
 
   type VenteRow = Record<string, unknown>;
   const venteColumns = useMemo<ColumnDef<VenteRow>[]>(() => [
-    { id: "date", accessorKey: "date", size: 110, header: () => <p className="column-title">Date</p>, cell: ({ getValue }) => <span className="text-sm tabular-nums">{(getValue<string>() ?? "—")}</span> },
-    { id: "transaction_ref", accessorKey: "transaction_ref", size: 130, header: () => <p className="column-title">N° Transaction</p>, cell: ({ getValue }) => getValue<string>() ? <Badge variant="outline" className="font-mono text-xs">{getValue<string>()}</Badge> : <span className="text-muted-foreground">—</span> },
-    { id: "transaction_ref_final", size: 150, header: () => <p className="column-title">N° Transaction Final</p>, cell: ({ row }) => { const r = row.original; return r.transaction_ref_final ? <Badge variant="outline" className="font-mono text-xs">{String(r.transaction_ref_final)}</Badge> : <span className="text-muted-foreground">—</span>; } },
-    { id: "client", accessorKey: "client", size: 150, header: () => <p className="column-title">Client</p>, cell: ({ getValue }) => { const v = getValue<string>(); return v ? <span className="text-sm">{v}</span> : <span className="text-muted-foreground text-xs italic">Anonyme</span>; } },
-    { id: "product", accessorKey: "product", size: 260, header: () => <p className="column-title">Produit</p>, cell: ({ row }) => <div className="flex flex-col min-w-0"><span className="truncate text-sm font-medium">{String(row.original.product ?? "—")}</span>{row.original.pid ? <span className="text-xs text-muted-foreground font-mono">PID {String(row.original.pid)}</span> : null}</div> },
-    { id: "category", accessorKey: "category", size: 170, header: () => <p className="column-title">Catégorie</p>, cell: ({ getValue }) => { const c = getValue<string>(); return c ? <Badge variant="secondary" className="text-xs max-w-[150px] truncate">{c.replace(/\s*\([\d.]+%\)/, "").trim()}</Badge> : <span className="text-muted-foreground">—</span>; } },
-    { id: "type", size: 110, header: () => <p className="column-title">Type</p>, cell: ({ row }) => { const cat = (String(row.original.category ?? "")).toLowerCase(); const isPh = cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath"); if (!row.original.category) return <span className="text-muted-foreground">—</span>; return <Badge variant="outline" className={isPh ? "text-blue-700 border-blue-300 bg-blue-50 text-xs" : "text-purple-700 border-purple-300 bg-purple-50 text-xs"}>{isPh ? "Pharmacie" : "Parapharmacie"}</Badge>; } },
-    { id: "tva", accessorKey: "tva", size: 80, header: () => <p className="column-title">TVA</p>, cell: ({ getValue }) => { const v = getValue<string | null>(); return v ? <Badge variant="outline" className="text-xs font-mono">{v}</Badge> : <span className="text-muted-foreground">—</span>; } },
+    { id: "date", accessorKey: "date", size: 120, header: () => <p className="column-title">Date</p>, cell: ({ getValue }) => <span className="text-sm tabular-nums">{(getValue<string>() ?? "—")}</span> },
+    { id: "transaction_ref", accessorKey: "transaction_ref", size: 160, header: () => <p className="column-title">N° Transaction</p>, cell: ({ getValue }) => getValue<string>() ? <Badge variant="outline" className="font-mono text-xs">{getValue<string>()}</Badge> : <span className="text-muted-foreground">—</span> },
+    { id: "transaction_ref_final", size: 180, header: () => <p className="column-title">N° Transaction Final</p>, cell: ({ row }) => { const r = row.original; return r.transaction_ref_final ? <Badge variant="outline" className="font-mono text-xs">{String(r.transaction_ref_final)}</Badge> : <span className="text-muted-foreground">—</span>; } },
+    { id: "client", accessorKey: "client", size: 120, header: () => <p className="column-title">Client</p>, cell: ({ getValue }) => { const v = getValue<string>(); return v ? <span className="text-sm">{v}</span> : <span className="text-muted-foreground text-xs italic">Anonyme</span>; } },
+    { id: "product", accessorKey: "product", size: 320, header: () => <p className="column-title">Produit</p>, cell: ({ row }) => <div className="flex flex-col min-w-0"><span className="truncate text-sm font-medium">{String(row.original.product ?? "—")}</span>{row.original.pid ? <span className="text-xs text-muted-foreground font-mono">PID {String(row.original.pid)}</span> : null}</div> },
+    { id: "category", accessorKey: "category", size: 200, header: () => <p className="column-title">Catégorie</p>, cell: ({ getValue }) => { const c = getValue<string>(); return c ? <Badge variant="secondary" className="text-xs max-w-[180px] truncate">{c.replace(/\s*\([\d.]+%\)/, "").trim()}</Badge> : <span className="text-muted-foreground">—</span>; } },
+    { id: "type", size: 140, header: () => <p className="column-title">Type</p>, cell: ({ row }) => { const cat = (String(row.original.category ?? "")).toLowerCase(); const isPh = cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath"); if (!row.original.category) return <span className="text-muted-foreground">—</span>; return <Badge variant="outline" className={isPh ? "text-blue-700 border-blue-300 bg-blue-50 text-xs" : "text-purple-700 border-purple-300 bg-purple-50 text-xs"}>{isPh ? "Pharmacie" : "Parapharmacie"}</Badge>; } },
+    { id: "tva", accessorKey: "tva", size: 200, header: () => <p className="column-title">TVA</p>, cell: ({ getValue }) => { const v = getValue<string | null>(); return v ? <Badge variant="outline" className="text-xs font-mono">{v}</Badge> : <span className="text-muted-foreground">—</span>; } },
   ], []);
 
   const venteTable = useReactTable({
@@ -141,20 +161,32 @@ export default function ComptabilitePage() {
         categoryType={categoryType}
         onCategoryTypeChange={setCategoryType}
         rightSlot={
-          <ColumnVisibilityToggle
-            table={venteTable}
-            storageKey="comptabilite-ventes-cols"
-            columnLabels={{
-              date: "Date",
-              transaction_ref: "N° Transaction",
-              transaction_ref_final: "N° Transaction Final",
-              client: "Client",
-              product: "Produit",
-              category: "Catégorie",
-              type: "Type",
-              tva: "TVA",
-            }}
-          />
+          <>
+            <ColumnVisibilityToggle
+              table={venteTable}
+              storageKey="comptabilite-ventes-cols"
+              columnLabels={{
+                date: "Date",
+                transaction_ref: "N° Transaction",
+                transaction_ref_final: "N° Transaction Final",
+                client: "Client",
+                product: "Produit",
+                category: "Catégorie",
+                type: "Type",
+                tva: "TVA",
+              }}
+            />
+            <button
+              type="button"
+              disabled={exporting}
+              title="Exporter Excel"
+              onClick={handleExport}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exporter
+            </button>
+          </>
         }
       />
 

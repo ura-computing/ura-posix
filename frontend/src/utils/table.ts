@@ -16,7 +16,9 @@ export function exportFilename(
   const today = new Date().toISOString().slice(0, 10);
   const from = dateFrom || today;
   const to = dateTo || today;
-  return `APCM - ${type} ${from} - ${to}.${ext}`;
+  // Strip trailing "ALL" suffix (used for the "mixte" category default)
+  const cleanType = type.replace(/\s+ALL$/i, "").trim();
+  return `APCM - ${cleanType} ${from} - ${to}.${ext}`;
 }
 
 export function getPharmacySuffix(

@@ -13,7 +13,7 @@ PIP  := $(VENV)/bin/python3 -m pip
 	front-install front-dev front-build front-serve \
 	ext-install ext-dev ext-build \
 	test test-back test-front test-ext test-db \
-	db db-ui down check-env install dev build serve seed db-clean start demo prod
+	db db-ui down check-env install dev build serve seed db-clean clean start demo prod
 
 # ── Environment ──────────────────────────────────────────────────────────────
 # Backend reads directly from env/{APP_ENV}/backend.env (no copy needed).
@@ -117,6 +117,7 @@ install: back-install front-install ext-install
 build: back-build front-build ext-build
 
 db-clean: back-db-clean
+clean: back-db-clean
 seed: back-seed
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
