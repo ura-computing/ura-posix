@@ -33,7 +33,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageFilter } from "@/components/pageFilter";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/datePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +55,7 @@ import { fmt } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
+import { exportFilename } from "@/utils/table";
 import { CHART_COLORS, CAT_COLORS, getTypeTheme } from "@/constants/theme";
 import {
   AnalyseMargeTable,
@@ -176,7 +179,7 @@ export function PharmacyRapports() {
       );
       downloadBlob(
         blob,
-        `rapport_${type}_${dateFrom || "all"}_${dateTo || "all"}.xlsx`,
+        exportFilename(`RAPPORT ${type.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined),
       );
       toast.success("Rapport exporté");
     } catch {
@@ -250,23 +253,23 @@ export function PharmacyRapports() {
     const selected = allMargeRows.filter((_, i) => simSelected.has(i));
     if (!selected.length) return;
     const cols = MARGE_COLS[margeMode];
-    const header = cols.map((c) => c.label).join(",");
+    const header = cols.map((c) => c.label).join(";");
     const lines = selected.map((row) =>
       cols
         .map((c) => {
           const v = row[c.key];
           return v == null
             ? ""
-            : String(v).includes(",")
-            ? `"${v}"`
+            : String(v).includes(";") || String(v).includes('"') || String(v).includes("\n")
+            ? `"${String(v).replace(/"/g, '""')}"`
             : String(v);
         })
-        .join(","),
+        .join(";"),
     );
     const csv = [header, ...lines].join("\n");
     downloadBlob(
-      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
-      `analyse_${margeMode}_selection.csv`,
+      new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+      exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined),
     );
   }, [allMargeRows, simSelected, margeMode]);
 
@@ -330,199 +333,107 @@ export function PharmacyRapports() {
   };
 
   return (
-    <div>
-      {/* ── Sticky filter + export bar ── */}
-      <div className="sticky top-16 z-10 bg-background">
-        <Card className="border border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Du</Label>
-                <DatePicker
-                  value={dateFrom}
-                  onChange={setDateFrom}
-                  placeholder="Début"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Au</Label>
-                <DatePicker
-                  value={dateTo}
-                  onChange={setDateTo}
-                  placeholder="Fin"
-                />
-              </div>
-              {(dateFrom || dateTo) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 text-muted-foreground"
-                  onClick={() => {
-                    setDateFrom("");
-                    setDateTo("");
-                  }}
-                >
-                  Réinitialiser
-                </Button>
-              )}
-              <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-                <Button
-                  size="sm"
-                  variant={
-                    categoryType === eCategoryType.ALL ? "default" : "outline"
-                  }
-                  className="h-9"
-                  onClick={() => setCategoryType(eCategoryType.ALL)}
-                >
-                  Mixte
-                </Button>
-                <Button
-                  size="sm"
-                  className={cn(
-                    "h-9 border",
-                    categoryType === eCategoryType.PHARMACIE
-                      ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                      : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30",
-                  )}
-                  onClick={() => setCategoryType(eCategoryType.PHARMACIE)}
-                >
-                  Pharmacie
-                </Button>
-                <Button
-                  size="sm"
-                  className={cn(
-                    "h-9 border",
-                    categoryType === eCategoryType.PARAPHARMACIE
-                      ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
-                      : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30",
-                  )}
-                  onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}
-                >
-                  Parapharmacie
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-9 ml-1"
-                  disabled={!!exporting}
-                  title="Exporter Excel"
-                  onClick={() => handleExcel(categoryType)}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-4">
+      <PageFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        categoryType={categoryType}
+        onCategoryTypeChange={setCategoryType}
+        rightSlot={
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-9 ml-1"
+            disabled={!!exporting}
+            title="Exporter Excel"
+            onClick={() => handleExcel(categoryType)}
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        }
+      />
 
       <div className="space-y-8">
-        {/* ── Performance banner (grey strip) ── */}
+        {/* ── Performance banner ── */}
         <section>
           {isLoading ? (
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-14 w-full rounded-xl" />
           ) : (
-            <div className="flex items-center gap-3 overflow-x-auto rounded-lg bg-muted/60 border border-border px-4 py-2.5 text-xs">
-              {/* Performance % vs previous period */}
-              {/* Only show period comparison when user explicitly selected a date range */}
-              {dateFrom &&
-                dateTo &&
-                (() => {
-                  const prev = prevKpis?.ventes_total ?? 0;
-                  const curr = kpis?.ventes_total ?? 0;
-                  if (prev > 0) {
+            <Card className="border border-border">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  {/* Performance % vs previous period */}
+                  {dateFrom && dateTo && (() => {
+                    const prev = prevKpis?.ventes_total ?? 0;
+                    const curr = kpis?.ventes_total ?? 0;
+                    if (prev <= 0) return null;
                     const pct = ((curr - prev) / prev) * 100;
                     const isUp = pct >= 0;
                     return (
-                      <span
-                        className={cn(
-                          "font-bold shrink-0",
-                          isUp ? "text-emerald-600" : "text-red-600",
-                        )}
-                      >
-                        {isUp ? "+" : ""}
-                        {pct.toFixed(1)}% vs période préc.
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">vs période préc.</span>
+                        <span className={cn("text-sm font-bold tabular-nums", isUp ? "text-emerald-600" : "text-red-600")}>
+                          {isUp ? "+" : ""}{pct.toFixed(1)}%
+                        </span>
+                      </div>
                     );
-                  }
-                  return null;
-                })()}
-              <span className="h-3.5 w-px bg-border shrink-0" />
-              {(() => {
-                const total = kpis?.ventes_total ?? 0;
-                const pharma = typeBreakdown?.pharmacie?.ventes_total ?? 0;
-                const para = typeBreakdown?.parapharmacie?.ventes_total ?? 0;
-                const pctPh =
-                  total > 0 ? ((pharma / total) * 100).toFixed(1) : "0.0";
-                const pctPa =
-                  total > 0 ? ((para / total) * 100).toFixed(1) : "0.0";
-                if (categoryType === eCategoryType.PHARMACIE) {
-                  return (
-                    <span className="text-muted-foreground shrink-0">
-                      Pharmacie{" "}
-                      <span className="font-semibold text-green-600">
-                        {pctPh}%
-                      </span>{" "}
-                      du CA
+                  })()}
+
+                  {/* CA split */}
+                  {(() => {
+                    const total = kpis?.ventes_total ?? 0;
+                    const pharma = typeBreakdown?.pharmacie?.ventes_total ?? 0;
+                    const para = typeBreakdown?.parapharmacie?.ventes_total ?? 0;
+                    const pctPh = total > 0 ? ((pharma / total) * 100).toFixed(1) : "0.0";
+                    const pctPa = total > 0 ? ((para / total) * 100).toFixed(1) : "0.0";
+                    return (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Répartition CA</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {(categoryType === eCategoryType.ALL || categoryType === eCategoryType.PHARMACIE) && (
+                            <Badge variant="outline" className="h-6 text-xs font-semibold text-green-700 border-green-300 bg-green-50 dark:text-green-300 dark:border-green-800 dark:bg-green-950/30">
+                              Pharmacie {pctPh}%
+                            </Badge>
+                          )}
+                          {(categoryType === eCategoryType.ALL || categoryType === eCategoryType.PARAPHARMACIE) && (
+                            <Badge variant="outline" className="h-6 text-xs font-semibold text-purple-700 border-purple-300 bg-purple-50 dark:text-purple-300 dark:border-purple-800 dark:bg-purple-950/30">
+                              Parapharmacie {pctPa}%
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Marge moyenne */}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moy.</span>
+                    <span className="text-sm font-bold tabular-nums text-foreground">{margePct.toFixed(1)}%</span>
+                  </div>
+
+                  {/* Produits en marge négative */}
+                  {marginAlerts && (
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge négative</span>
+                      <span className="text-sm font-bold tabular-nums text-amber-600">
+                        {marginAlerts.negative?.count ?? 0} produits
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Santé */}
+                  <div className="flex flex-col ml-auto">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Santé</span>
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className={cn("h-4 w-4", healthGrade.color)} />
+                      <span className={cn("text-sm font-bold", healthGrade.color)}>{healthGrade.grade}</span>
                     </span>
-                  );
-                }
-                if (categoryType === eCategoryType.PARAPHARMACIE) {
-                  return (
-                    <span className="text-muted-foreground shrink-0">
-                      Parapharmacie{" "}
-                      <span className="font-semibold text-purple-600">
-                        {pctPa}%
-                      </span>{" "}
-                      du CA
-                    </span>
-                  );
-                }
-                return (
-                  <span className="text-muted-foreground shrink-0">
-                    Pharmacie{" "}
-                    <span className="font-semibold text-green-600">
-                      {pctPh}%
-                    </span>
-                    {" · "}
-                    Parapharmacie{" "}
-                    <span className="font-semibold text-purple-600">
-                      {pctPa}%
-                    </span>{" "}
-                    du CA
-                  </span>
-                );
-              })()}
-              <span className="h-3.5 w-px bg-border shrink-0" />
-              <span className="text-muted-foreground shrink-0">
-                Marge moy:{" "}
-                <span className="font-semibold text-foreground">
-                  {margePct.toFixed(1)}%
-                </span>
-              </span>
-              <span className="h-3.5 w-px bg-border shrink-0" />
-              {/* Péremption count */}
-              {marginAlerts && (
-                <>
-                  <span className="text-muted-foreground shrink-0">
-                    <span className="font-semibold text-amber-600">
-                      {marginAlerts.negative?.count ?? 0}
-                    </span>{" "}
-                    produits en marge négative
-                  </span>
-                  <span className="h-3.5 w-px bg-border shrink-0" />
-                </>
-              )}
-              <div className="flex items-center gap-1 shrink-0">
-                <ShieldCheck className={cn("h-3.5 w-3.5", healthGrade.color)} />
-                <span className="text-muted-foreground">
-                  Santé:{" "}
-                  <span className={cn("font-bold", healthGrade.color)}>
-                    {healthGrade.grade}
-                  </span>
-                </span>
-              </div>
-            </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </section>
 
@@ -1171,9 +1082,9 @@ export function PharmacyRapports() {
                   [
                     "produit",
                     "categorie",
-                    "fournisseur",
-                    "bl",
                     "laboratoire",
+                    "grossiste",
+                    "bl",
                     "operateur",
                     "mois",
                   ] as const
@@ -1181,9 +1092,9 @@ export function PharmacyRapports() {
                   const labels: Record<string, string> = {
                     produit: "Produit",
                     categorie: "Catégorie",
-                    fournisseur: "Fournisseur",
-                    bl: "BL",
                     laboratoire: "Labo",
+                    grossiste: "Grossistes",
+                    bl: "BL",
                     operateur: "Opérateur",
                     mois: "Mois",
                   };

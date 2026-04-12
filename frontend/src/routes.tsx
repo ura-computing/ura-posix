@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import {
   BarChart3,
+  BellRing,
   BookOpen,
   Building2,
   ClipboardCheck,
@@ -30,6 +31,7 @@ import AdminCatalogPage from "./pages/admin/catalog";
 import OwnerEmployeesPage from "./pages/owner/employees";
 import CatalogRequestsPage from "./pages/owner/catalogRequests";
 import AnalysePage from "./pages/analyse";
+import AlertesPage from "./pages/alertes";
 import ComptabilitePage from "./pages/comptabilite";
 import WelcomePage from "./pages/welcome";
 import ForgotPasswordPage from "./pages/forgotPassword";
@@ -123,6 +125,14 @@ export const routes: RouteConfig[] = [
   {
     path: "/analyse",
     element: <AnalysePage />,
+    requireAuth: true,
+    layout: "sidebar",
+    allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+    permission: "rapports",
+  },
+  {
+    path: "/alertes",
+    element: <AlertesPage />,
     requireAuth: true,
     layout: "sidebar",
     allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
@@ -238,6 +248,16 @@ export const resources: ResourceConfig[] = [
       icon: <TriangleAlert />,
       allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
       permission: "stock",
+    },
+  },
+  {
+    name: "alertes",
+    list: "/alertes",
+    meta: {
+      label: "Alertes",
+      icon: <BellRing />,
+      allowed: [eUserRole.OWNER, eUserRole.EMPLOYEE],
+      permission: "rapports",
     },
   },
   {

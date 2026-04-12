@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ColumnDef, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import { useVentesList } from "@/hooks/useVentesList";
-import { format } from "date-fns";
-import type { DateRange } from "react-day-picker";
 import { Link, useNavigate } from "react-router";
-import { UploadCloud } from "lucide-react";
+import { Download, UploadCloud } from "lucide-react";
 import { eUserRole, eCategoryType } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { DataTable } from "@/components/DataTable/dataTable";
-import { TableToolbar } from "@/components/tableToolbar";
+import { PageFilter } from "@/components/pageFilter";
+import { CategoryMultiSelect } from "@/components/categoryMultiSelect";
+import { TvaMultiSelect } from "@/components/tvaMultiSelect";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
-import { downloadCSV } from "@/utils/table";
+import { downloadCSV, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { cn } from "@/utils/cn";
@@ -106,7 +107,8 @@ const VentesList = () => {
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
   const [venteFilter, setVenteFilter] = useState<string>("all-flagged");
@@ -122,10 +124,7 @@ const VentesList = () => {
     transactionsApi.venteTvaRates().then(setAllTvaRates).catch(() => {});
   }, []);
 
-  const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined;
-  const dateTo = dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined;
-
-  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateRange, categoryType]);
+  useEffect(() => { setPage(1); }, [searchQuery, selectedCats, selectedTva, dateFrom, dateTo, categoryType]);
 
   const effectiveCategories = useMemo(() => {
     const typeCats = categoryType === eCategoryType.ALL
@@ -142,7 +141,8 @@ const VentesList = () => {
     search: searchQuery,
     categories: effectiveCategories,
     tva: selectedTva,
-    dateFrom, dateTo,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   });
 
   // Separate query for surveillance table (filtered by selected tab)
@@ -154,7 +154,8 @@ const VentesList = () => {
     search: searchQuery,
     categories: effectiveCategories,
     tva: selectedTva,
-    dateFrom, dateTo,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
     surveillance: surveillanceParam,
   });
   const rows = ventesRows as VenteRow[];
@@ -162,7 +163,7 @@ const VentesList = () => {
   // Fetch global surveillance counts from backend
   const { data: survCounts } = useQuery({
     queryKey: ["vente-surveillance-counts", dateFrom, dateTo, searchQuery, effectiveCategories, selectedTva],
-    queryFn: () => transactionsApi.venteSurveillanceCounts(dateFrom, dateTo, searchQuery, effectiveCategories, selectedTva),
+    queryFn: () => transactionsApi.venteSurveillanceCounts(dateFrom || undefined, dateTo || undefined, searchQuery, effectiveCategories, selectedTva),
   });
 
   const venteFilterTabs = [
@@ -409,6 +410,7 @@ const VentesList = () => {
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     manualPagination: true,
     pageCount,
   });
@@ -417,6 +419,7 @@ const VentesList = () => {
     data: survRows as VenteRow[],
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     manualPagination: true,
     pageCount: survPageCount,
   });
@@ -424,7 +427,7 @@ const VentesList = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const res = await transactionsApi.exportVente(searchQuery, selectedCats, dateFrom, dateTo, selectedTva);
+      const res = await transactionsApi.exportVente(searchQuery, selectedCats, dateFrom || undefined, dateTo || undefined, selectedTva);
       const colValues: Record<string, (r: Record<string, unknown>) => string> = {
         ...VENTE_COL_VALUES,
         transaction_ref_final: (r) => String(r.transaction_ref_final ?? ""),
@@ -432,7 +435,7 @@ const VentesList = () => {
       const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
       const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
       const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, `ventes_export_${Date.now()}.csv`);
+      downloadCSV(res.data, rowMapper, headers, exportFilename("VENTE", "csv", dateFrom || undefined, dateTo || undefined));
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
@@ -457,57 +460,39 @@ const VentesList = () => {
       <h1 className="page-title">Ventes</h1>
 
       <p className="text-sm text-muted-foreground -mt-2">Historique des transactions de vente.</p>
-      <TableToolbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Produit, client, N° transaction…"
-        allCategories={allCategories}
-        selectedCats={selectedCats}
-        onCatsChange={setSelectedCats}
-        onExport={handleExport}
-        exporting={exporting}
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        allTvaRates={allTvaRates}
-        selectedTva={selectedTva}
-        onTvaChange={setSelectedTva}
-        fetchSuggestions={transactionsApi.venteSuggestions}
-        suggestionGroupLabels={{ products: "Produit", clients: "Client", refs: "N° Transaction" }}
-        rightAddon={
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCategoryType(eCategoryType.ALL)}
-              className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
-                categoryType === eCategoryType.ALL
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-transparent text-muted-foreground border-border hover:bg-muted"
-              )}
+      <PageFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        categoryType={categoryType}
+        onCategoryTypeChange={setCategoryType}
+        search={{
+          query: searchQuery,
+          onChange: setSearchQuery,
+          placeholder: "Produit, client, N° transaction…",
+          fetchSuggestions: transactionsApi.venteSuggestions,
+          suggestionGroupLabels: { products: "Produit", clients: "Client", refs: "N° Transaction" },
+        }}
+        extraFilters={
+          <>
+            <CategoryMultiSelect allCategories={allCategories} selected={selectedCats} onChange={setSelectedCats} />
+            <TvaMultiSelect allRates={allTvaRates} selected={selectedTva} onChange={setSelectedTva} />
+          </>
+        }
+        rightSlot={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 gap-1.5"
+              onClick={handleExport}
+              disabled={exporting}
+              title="Exporter CSV"
             >
-              Mixte
-            </button>
-            <button
-              onClick={() => setCategoryType(eCategoryType.PHARMACIE)}
-              className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
-                categoryType === eCategoryType.PHARMACIE
-                  ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                  : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30"
-              )}
-            >
-              Pharmacie
-            </button>
-            <button
-              onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}
-              className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
-                categoryType === eCategoryType.PARAPHARMACIE
-                  ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700"
-                  : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30"
-              )}
-            >
-              Parapharmacie
-            </button>
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
             <ColumnVisibilityToggle
               table={tableInstance}
               storageKey="ventes-cols"
@@ -522,7 +507,7 @@ const VentesList = () => {
                 Importer
               </Link>
             )}
-          </div>
+          </>
         }
       />
 

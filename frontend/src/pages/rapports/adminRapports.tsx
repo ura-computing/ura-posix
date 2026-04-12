@@ -28,6 +28,7 @@ import { fmt } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
+import { exportFilename } from "@/utils/table";
 import { CAT_COLORS, getTypeTheme } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 
@@ -72,7 +73,7 @@ export function AdminRapports() {
     setExporting(categoryType);
     try {
       const blob = await statsApi.exportExcelForPharmacy(selectedPharmacyId, dateFrom || undefined, dateTo || undefined, categoryType);
-      downloadBlob(blob, `rapport_pharmacie${selectedPharmacyId}_${categoryType}_${dateFrom || "all"}_${dateTo || "all"}.xlsx`);
+      downloadBlob(blob, exportFilename(`RAPPORT ${categoryType.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined));
       toast.success("Rapport exporté");
     } catch {
       toast.error("Erreur lors de l'export");
@@ -447,7 +448,7 @@ export function AdminRapports() {
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h2 className="text-lg font-semibold text-foreground">Analyse de marge</h2>
                 <div className="flex items-center gap-1">
-                  {(["produit", "categorie", "fournisseur", "bl"] as const).map((m) => (
+                  {(["produit", "categorie", "grossiste", "bl"] as const).map((m) => (
                     <Button
                       key={m}
                       size="sm"
@@ -455,7 +456,7 @@ export function AdminRapports() {
                       className={cn("h-8 text-xs", margeMode === m ? cn(typeTheme.primaryCard, "hover:opacity-90") : "")}
                       onClick={() => setMargeMode(m)}
                     >
-                      {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "fournisseur" ? "Par fournisseur" : "Par BL"}
+                      {m === "produit" ? "Par produit" : m === "categorie" ? "Par catégorie" : m === "grossiste" ? "Par grossiste" : "Par BL"}
                     </Button>
                   ))}
                 </div>

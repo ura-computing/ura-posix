@@ -1,3 +1,24 @@
+/**
+ * Build an export filename in the format:
+ *   "APCM - {TYPE} {dateFrom} - {dateTo}.{ext}"
+ *
+ * If a date is missing, falls back to today (YYYY-MM-DD).
+ * Examples:
+ *   exportFilename("RAPPORT", "csv", "2025-12-02", "2026-02-01") → "APCM - RAPPORT 2025-12-02 - 2026-02-01.csv"
+ *   exportFilename("ANALYSE", "csv") → "APCM - ANALYSE 2026-04-12 - 2026-04-12.csv"
+ */
+export function exportFilename(
+  type: string,
+  ext: string,
+  dateFrom?: string,
+  dateTo?: string,
+): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const from = dateFrom || today;
+  const to = dateTo || today;
+  return `APCM - ${type} ${from} - ${to}.${ext}`;
+}
+
 export function getPharmacySuffix(
   category: string | null,
   suffixes: { category: string; suffix: string }[],

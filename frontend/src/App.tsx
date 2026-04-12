@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigat
 import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/shared/toaster";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 import { Layout } from "./components/layout/layout";
 import { Login } from "./pages/login";
@@ -83,6 +84,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={0}>
       <BrowserRouter>
           <Routes>
             {/* Universal routes (accessible to all, no auth wrapper) */}
@@ -134,6 +136,7 @@ function App() {
 
           <Toaster />
       </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

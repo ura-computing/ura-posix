@@ -1,15 +1,14 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, BarChart3, UploadCloud } from "lucide-react";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageFilter } from "@/components/pageFilter";
 import { DatePicker } from "@/components/ui/datePicker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { SearchAutocomplete } from "@/components/searchAutocomplete";
-import * as transactionsApi from "@/api/transactions";
 import * as statsApi from "@/api/stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -18,17 +17,27 @@ import { fmt } from "@/utils/format";
 import { GAUGE_COLORS } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
-import { AnalyseMargeTable } from "@/pages/rapports/margeTable";
+import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
 const MODE_LABELS = {
   produit: "Produit",
-  fournisseur: "Fournisseur",
   operateur: "Opérateur",
   laboratoire: "Laboratoire",
+  grossiste: "Grossistes",
   mois: "Mois / année",
   categorie: "Catégorie",
   bl: "Liste",
 } as const;
+
+const MODE_SEARCH_KEY: Record<MargeMode, string> = {
+  produit: "product",
+  categorie: "category",
+  grossiste: "grossiste",
+  laboratoire: "laboratoire",
+  operateur: "client",
+  mois: "mois",
+  bl: "delivery_ref",
+};
 
 /* ── Optimisation gauge ──────────────────────────────────────────────────── */
 
@@ -77,6 +86,19 @@ export default function AnalysePage() {
   // Liste mode: store imported product names, re-query when filters change
   const [listeProducts, setListeProducts] = useState<string[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mode-aware search suggestions: pull distinct values from currently-loaded rows
+  // based on the selected mode's primary column.
+  const suggest = useCallback(async (q: string) => {
+    const key = MODE_SEARCH_KEY[margeMode];
+    const needle = q.toLowerCase();
+    const vals = Array.from(
+      new Set(allRows.map((r) => String(r[key] ?? "")).filter(Boolean)),
+    )
+      .filter((v) => v.toLowerCase().includes(needle))
+      .slice(0, 10);
+    return { results: vals };
+  }, [allRows, margeMode]);
 
   const handleListeFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,57 +155,34 @@ export default function AnalysePage() {
       <Breadcrumb />
       <h1 className="page-title">Analyses</h1>
 
-      {/* ── Sticky filter bar ── */}
-      <div className="sticky top-16 z-10 bg-background">
-        <Card className="border border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Du</Label>
-                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Au</Label>
-                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" />
-              </div>
-              {(dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => { setDateFrom(""); setDateTo(""); }}>
-                  Réinitialiser
-                </Button>
-              )}
-              <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-                <Button size="sm" variant={categoryType === eCategoryType.ALL ? "default" : "outline"} className="h-9" onClick={() => setCategoryType(eCategoryType.ALL)}>Mixte</Button>
-                <Button size="sm" className={cn("h-9 border", categoryType === eCategoryType.PHARMACIE ? "bg-green-600 text-white border-green-600 hover:bg-green-700" : "bg-transparent text-green-700 border-green-400 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30")} onClick={() => setCategoryType(eCategoryType.PHARMACIE)}>Pharmacie</Button>
-                <Button size="sm" className={cn("h-9 border", categoryType === eCategoryType.PARAPHARMACIE ? "bg-purple-600 text-white border-purple-600 hover:bg-purple-700" : "bg-transparent text-purple-700 border-purple-400 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-700 dark:hover:bg-purple-950/30")} onClick={() => setCategoryType(eCategoryType.PARAPHARMACIE)}>Parapharmacie</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Search + actions bar ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex-1 min-w-[200px]">
-          <SearchAutocomplete
-            value={search}
-            onChange={setSearch}
-            fetchSuggestions={transactionsApi.venteSuggestions}
-            placeholder="Rechercher un produit, catégorie, fournisseur..."
-            groupLabels={{ products: "Produit", clients: "Client", refs: "N° Transaction" }}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-9 text-xs" onClick={toggleAll}>
-            {selected.size === allRows.length && allRows.length > 0 ? "Tout désélectionner" : "Tout sélectionner"}
-          </Button>
-          {kpis.count > 0 && (
-            <Button size="sm" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
-              <Download className="h-3.5 w-3.5" />
-              Exporter CSV ({kpis.count})
+      <PageFilter
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        categoryType={categoryType}
+        onCategoryTypeChange={setCategoryType}
+        search={{
+          query: search,
+          onChange: setSearch,
+          placeholder: `Rechercher ${MODE_LABELS[margeMode]}...`,
+          fetchSuggestions: suggest,
+          suggestionGroupLabels: { results: MODE_LABELS[margeMode] },
+        }}
+        rightSlot={
+          <>
+            <Button size="sm" variant="outline" className="h-9 text-xs" onClick={toggleAll}>
+              {selected.size === allRows.length && allRows.length > 0 ? "Tout désélectionner" : "Tout sélectionner"}
             </Button>
-          )}
-        </div>
-      </div>
+            {kpis.count > 0 && (
+              <Button size="sm" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
+                <Download className="h-3.5 w-3.5" />
+                Exporter CSV ({kpis.count})
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* ── Mode tabs ── */}
       <div className="flex items-center gap-2 flex-wrap">

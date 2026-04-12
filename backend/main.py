@@ -55,6 +55,8 @@ from typing import List
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger("apcm")
 from sqlalchemy.orm import Session
@@ -66,11 +68,14 @@ from routers import accounting, admin, auth, catalog_requests, data, owner, publ
 from routers.transactions import achat_router, vente_router
 from routers.stats import router as stats_router
 from routers.auth import get_current_user
+from utils.limiter import limiter
 from models import User
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="APCM Pharma API", version="1.0.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
 _allow_origins = [o.strip() for o in _cors_origins.split(",")]
@@ -78,8 +83,8 @@ _allow_origins = [o.strip() for o in _cors_origins.split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allow_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 
@@ -90,6 +95,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if os.getenv("APP_ENV") == "prod":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 
