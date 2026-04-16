@@ -3,8 +3,9 @@ Test data factories — create test records with sensible defaults.
 """
 
 import io
+from datetime import date as _date
 from sqlalchemy.orm import Session
-from models import Achat, ImportBatch, Medicament, Vente
+from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
 
 
 def make_medicament(
@@ -75,6 +76,32 @@ def make_vente(
     db.add(vente)
     db.flush()
     return vente
+
+
+def make_pharmacy_stock(
+    db: Session,
+    medicament: Medicament,
+    pharmacy_id: int,
+    current_stock: int = 10,
+    stock_min: int | None = None,
+    stock_max: int | None = None,
+    expiry_date: str | _date | None = None,
+    zone: str | None = None,
+) -> PharmacyStock:
+    if isinstance(expiry_date, str):
+        expiry_date = _date.fromisoformat(expiry_date)
+    row = PharmacyStock(
+        pharmacy_id=pharmacy_id,
+        medicament_id=medicament.id,
+        current_stock=current_stock,
+        stock_min=stock_min,
+        stock_max=stock_max,
+        expiry_date=expiry_date,
+        zone=zone,
+    )
+    db.add(row)
+    db.flush()
+    return row
 
 
 def make_import_batch(

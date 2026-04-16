@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   // ── Upload a single CSV chunk (background can reach localhost, content script cannot) ─
   if (request.action === ACTIONS.UPLOAD_CHUNK) {
     const { csvChunk, fileType, filename, batchId } = request as {
-      csvChunk: string; fileType: "achat" | "vente"; filename?: string; batchId?: number;
+      csvChunk: string; fileType: "achat" | "vente" | "stock"; filename?: string; batchId?: number;
     };
     uploadCsv(fileType, csvChunk, filename, batchId)
       .then((data) => sendResponse({ success: true, ...data }))
@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   // ── Save notification after all chunks are done ────────────────────────────
   if (request.action === ACTIONS.SAVE_NOTIFICATION) {
     const { fileType, inserted, skipped } = request as {
-      fileType: "achat" | "vente";
+      fileType: "achat" | "vente" | "stock";
       inserted: number;
       skipped: number;
     };
@@ -57,7 +57,10 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       skipped,
       timestamp: Date.now(),
       read: false,
-    }).then(() => openOrFocusDashboard(fileType === "achat" ? "/achat" : "/ventes"));
+    }).then(() => {
+      const path = fileType === "achat" ? "/achat" : fileType === "vente" ? "/ventes" : "/stock";
+      return openOrFocusDashboard(path);
+    });
     return false; // no async response needed
   }
 

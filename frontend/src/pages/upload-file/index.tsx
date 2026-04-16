@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
-  ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet,
+  Boxes, ShoppingCart, ShoppingBasket, UploadCloud, FileSpreadsheet,
   CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
   Ban,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DocType = "achat" | "vente";
+type DocType = "achat" | "vente" | "stock";
 
 const DOC_CONFIG = {
   achat: {
@@ -40,6 +40,18 @@ const DOC_CONFIG = {
     badge: "bg-[#14b8a6]/15 text-[#0d9488]",
     columns: ["Date", "N° Transaction", "Client", "Produit", "Qté", "Remise", "PPV", "Total"],
     csvCols:  ["Date", "Numéro de transaction", "Client", "Produit", "Quantité", "Remise", "PPV", "Total"],
+  },
+  stock: {
+    label: "Stock",
+    description: "Snapshot du stock actuel (remplace l'existant)",
+    icon: Boxes,
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/40",
+    activeBorder: "border-blue-500",
+    badge: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+    columns: ["PID", "Produit", "Catégorie", "TVA", "PPV", "PPH", "Zone", "Stock", "Péremption", "Stock min/max", "Code barre"],
+    csvCols:  ["PID", "Produit", "Catégorie", "TVA", "PPV", "PPH", "Zone", "Stock", "Date de péremption", "Stock min", "Stock max", "Code barre 1", "Code barre 2"],
   },
 } as const;
 
@@ -120,11 +132,13 @@ function TypeCard({ type, selected, onClick }: { type: DocType; selected: boolea
 const SOBRUS_FILENAME_PATTERN: Record<DocType, RegExp> = {
   achat:  /^Sobrus - Achats \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i,
   vente:  /^Sobrus - Ventes \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i,
+  stock:  /^Sobrus - Stock \d{8}( \(\d+\))?\.csv$/i,
 };
 
 const SOBRUS_FILENAME_EXAMPLE: Record<DocType, string> = {
   achat:  "Sobrus - Achats YYYY-MM-DD - YYYY-MM-DD.csv",
   vente:  "Sobrus - Ventes YYYY-MM-DD - YYYY-MM-DD.csv",
+  stock:  "Sobrus - Stock YYYYMMDD.csv",
 };
 
 // ─── Step 2: file drop zone ───────────────────────────────────────────────────
@@ -402,9 +416,10 @@ export default function DashboardUploadFile() {
       {step === 1 && (
         <div className="space-y-4">
           <p className="text-sm font-medium text-foreground">Quel type de document souhaitez-vous importer ?</p>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <TypeCard type="achat" selected={docType === "achat"} onClick={() => setDocType("achat")} />
             <TypeCard type="vente" selected={docType === "vente"} onClick={() => setDocType("vente")} />
+            <TypeCard type="stock" selected={docType === "stock"} onClick={() => setDocType("stock")} />
           </div>
           <div className="flex justify-end pt-2">
             <Button

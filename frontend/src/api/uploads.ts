@@ -21,3 +21,12 @@ export const venteJson = (rows: Record<string, string>[]) =>
 
 export const catalog = (file: File) =>
   uploadFile<{ imported: number }>("/uploads/catalog", file);
+
+export type StockUploadResult = {
+  inserted: number;
+  skipped_unknown: { pid: string; product: string }[];
+  total_rows: number;
+};
+
+export const stock = (file: File) =>
+  uploadFile<StockUploadResult>(ENDPOINTS.uploads.stock, file);

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
+from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 
 
 def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str | None) -> dict:
@@ -96,32 +96,18 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         .subquery()
     )
 
-    # ── Latest stock level from achats (stock_max column = current stock from Sobrus) ──
-    # Use a window function to pick the latest achat per medicament
-    latest_achat = (
+    # ── Current stock from PharmacyStock (Sobrus stock snapshot) ──────────────
+    stock_sub = (
         db.query(
-            Achat.medicament_id,
-            Achat.stock_max.label("current_stock"),
-            func.row_number()
-            .over(
-                partition_by=Achat.medicament_id,
-                order_by=Achat.delivery_date.desc(),
-            )
-            .label("rn"),
+            PharmacyStock.medicament_id,
+            PharmacyStock.current_stock,
+            PharmacyStock.stock_min.label("sobrus_stock_min"),
+            PharmacyStock.stock_max.label("sobrus_stock_max"),
         )
         .filter(
-            Achat.pharmacy_id == pharmacy_id,
-            Achat.medicament_id.isnot(None),
-            Achat.medicament_id.notin_(non_declared_sub),
+            PharmacyStock.pharmacy_id == pharmacy_id,
+            PharmacyStock.medicament_id.notin_(non_declared_sub),
         )
-        .subquery()
-    )
-    latest_stock = (
-        db.query(
-            latest_achat.c.medicament_id,
-            latest_achat.c.current_stock,
-        )
-        .filter(latest_achat.c.rn == 1)
         .subquery()
     )
 
@@ -154,11 +140,10 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         .distinct()
     )
     stocked_ids = (
-        db.query(Achat.medicament_id)
+        db.query(PharmacyStock.medicament_id)
         .filter(
-            Achat.pharmacy_id == pharmacy_id,
-            Achat.medicament_id.isnot(None),
-            Achat.medicament_id.notin_(non_declared_sub),
+            PharmacyStock.pharmacy_id == pharmacy_id,
+            PharmacyStock.medicament_id.notin_(non_declared_sub),
         )
         .distinct()
     )
@@ -181,13 +166,15 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
             func.coalesce(sales_12m.c.units_sold_12m, 0).label("units_sold_12m"),
             func.coalesce(sales_4m.c.units_sold_4m, 0).label("units_sold_4m"),
             func.coalesce(sales_before_4m.c.units_before_4m, 0).label("units_before_4m"),
-            latest_stock.c.current_stock,
+            stock_sub.c.current_stock,
+            stock_sub.c.sobrus_stock_min,
+            stock_sub.c.sobrus_stock_max,
             avg_pu_sub.c.avg_pu,
         )
         .outerjoin(sales_12m, Medicament.id == sales_12m.c.medicament_id)
         .outerjoin(sales_4m, Medicament.id == sales_4m.c.medicament_id)
         .outerjoin(sales_before_4m, Medicament.id == sales_before_4m.c.medicament_id)
-        .outerjoin(latest_stock, Medicament.id == latest_stock.c.medicament_id)
+        .outerjoin(stock_sub, Medicament.id == stock_sub.c.medicament_id)
         .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
         .filter(Medicament.id.in_(all_med_ids))
         .all()
@@ -225,15 +212,23 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
         else:
             cat = "D"
 
-        # Compute stock_min and stock_max
-        if cat in ("C", "C-", "C-N"):
+        # Prefer Sobrus-provided thresholds when present; else compute
+        if r.sobrus_stock_min is not None:
+            stock_min = int(r.sobrus_stock_min)
+        elif cat in ("C", "C-", "C-N"):
             stock_min = 0
-            stock_max = 1
         elif cat == "D":
             stock_min = 0
-            stock_max = 0
         else:
             stock_min = math.floor(ratio * 14)
+
+        if r.sobrus_stock_max is not None:
+            stock_max = int(r.sobrus_stock_max)
+        elif cat in ("C", "C-", "C-N"):
+            stock_max = 1
+        elif cat == "D":
+            stock_max = 0
+        else:
             stock_max = math.ceil(ratio * 15)
 
         current_stock = int(r.current_stock) if r.current_stock is not None else None

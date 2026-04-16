@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import date, timedelta
-from tests.factories import make_achat, make_medicament, make_vente
+from tests.factories import make_achat, make_medicament, make_pharmacy_stock, make_vente
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -540,29 +540,22 @@ def peremptions_data(db, test_owner):
         pph=150.0,
     )
 
-    make_achat(
+    # Stock rows drive peremption now (not Achat.expiry_date)
+    make_pharmacy_stock(
         db, med_expired, pharmacy_id,
-        quantity=10, unit_price=40.0,
-        delivery_date="2024-12-01",
-        expiry_date="2025-01-01",
+        current_stock=10, expiry_date="2025-01-01",
     )
-    make_achat(
+    make_pharmacy_stock(
         db, med_very_close, pharmacy_id,
-        quantity=20, unit_price=60.0,
-        delivery_date="2026-02-01",
-        expiry_date=(today + timedelta(days=90)).isoformat(),
+        current_stock=20, expiry_date=(today + timedelta(days=90)).isoformat(),
     )
-    make_achat(
+    make_pharmacy_stock(
         db, med_close, pharmacy_id,
-        quantity=15, unit_price=90.0,
-        delivery_date="2026-02-15",
-        expiry_date=(today + timedelta(days=270)).isoformat(),
+        current_stock=15, expiry_date=(today + timedelta(days=270)).isoformat(),
     )
-    make_achat(
+    make_pharmacy_stock(
         db, med_safe, pharmacy_id,
-        quantity=30, unit_price=150.0,
-        delivery_date="2026-03-01",
-        expiry_date=(today + timedelta(days=540)).isoformat(),
+        current_stock=30, expiry_date=(today + timedelta(days=540)).isoformat(),
     )
 
     return {
@@ -659,28 +652,6 @@ class TestPeremptions:
         for key in ("expired", "very_close", "close"):
             assert body[key]["count"] == 0
             assert body[key]["total_units"] == 0
-
-    def test_latest_achat_used(self, client, db, test_owner, peremptions_data):
-        """When multiple achats exist for a product, use the latest delivery."""
-        pharmacy_id = peremptions_data["pharmacy_id"]
-        med = peremptions_data["med_expired"]
-        today = date.today()
-
-        # Add a newer achat with a safe expiry — should override the expired one
-        make_achat(
-            db, med, pharmacy_id,
-            quantity=5, unit_price=45.0,
-            delivery_date="2026-04-01",
-            expiry_date=(today + timedelta(days=540)).isoformat(),
-        )
-
-        res = client.get("/stats/peremptions", headers=test_owner["headers"])
-        assert res.status_code == 200
-        expired = res.json()["expired"]
-
-        # The expired product should no longer be in the expired bracket
-        expired_names = [p["product"] for p in expired["products"]]
-        assert "Expired Drug" not in expired_names
 
 
 class TestAdminPeremptions:

@@ -19,7 +19,7 @@ import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
 const MODE_LABELS = {
   produit: "Produit",
-  operateur: "Opérateur",
+  operateur: "Client",
   laboratoire: "Laboratoire",
   grossiste: "Grossistes",
   mois: "Mois / année",

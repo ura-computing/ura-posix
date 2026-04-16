@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { Package } from "lucide-react";
+import { Link } from "react-router";
+import { Download, Package, UploadCloud } from "lucide-react";
+import { downloadCSV, exportFilename } from "@/utils/table";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
@@ -246,6 +248,44 @@ const StockList = () => {
         dateTo={dateTo}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
+        rightSlot={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                const rows = (stockAbcd?.products ?? []) as unknown as Record<string, unknown>[];
+                if (!rows.length) return;
+                downloadCSV(
+                  rows,
+                  (r) => [
+                    String(r.product ?? ""),
+                    String(r.category ?? ""),
+                    String(r.units_sold_12m ?? 0),
+                    String(r.current_stock ?? ""),
+                    String(r.stock_min ?? ""),
+                    String(r.stock_max ?? ""),
+                    r.ppv != null ? fmt(r.ppv as number) : "",
+                    r.avg_pu != null ? fmt(r.avg_pu as number) : "",
+                  ],
+                  ["Produit", "Classe", "Ventes 12m", "Stock actuel", "Stock min", "Stock max", "PPV", "PU moyen"],
+                  exportFilename("STOCK", "csv", dateFrom || undefined, dateTo || undefined),
+                );
+              }}
+              disabled={!stockAbcd?.products?.length}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exporter
+            </button>
+            <Link
+              to="/dashboard/upload-file?type=stock"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <UploadCloud className="h-3.5 w-3.5" />
+              Importer stock
+            </Link>
+          </>
+        }
       />
 
       {/* ── ANALYSE ROTATION STOCK — ABCD (dark card) ── */}

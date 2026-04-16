@@ -38,12 +38,18 @@ const DOT = (c: string) => `<span style="
 const HOURGLASS = `<span style="font-size:12px;flex-shrink:0;opacity:0.6">⏳</span>`;
 
 function _renderJob(job: UploadJob /*, config: BannerConfig*/): string {
-  const label = job.fileType === "achat" ? "Achats" : "Ventes";
+  const label = job.fileType === "achat" ? "Achats" : job.fileType === "vente" ? "Ventes" : "Stock";
+  const badgeBg = job.fileType === "achat" ? "rgba(59,130,246,0.2)"
+    : job.fileType === "vente" ? "rgba(16,185,129,0.2)"
+    : "rgba(168,85,247,0.2)";
+  const badgeFg = job.fileType === "achat" ? "#93c5fd"
+    : job.fileType === "vente" ? "#6ee7b7"
+    : "#d8b4fe";
   const badge = `<span style="
     font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;
     padding:1px 6px;border-radius:4px;flex-shrink:0;
-    background:${job.fileType === "achat" ? "rgba(59,130,246,0.2)" : "rgba(16,185,129,0.2)"};
-    color:${job.fileType === "achat" ? "#93c5fd" : "#6ee7b7"};
+    background:${badgeBg};
+    color:${badgeFg};
   ">${label}</span>`;
 
   if (job.state === "queued") {
@@ -72,8 +78,8 @@ function _renderJob(job: UploadJob /*, config: BannerConfig*/): string {
   }
 
   if (job.state === "success") {
-    const section = job.fileType === "achat" ? "les achats" : "les ventes";
-    const path = job.fileType === "achat" ? "/achat" : "/ventes";
+    const section = job.fileType === "achat" ? "les achats" : job.fileType === "vente" ? "les ventes" : "le stock";
+    const path = job.fileType === "achat" ? "/achat" : job.fileType === "vente" ? "/ventes" : "/stock";
     const skipped = (job.skipped ?? 0) > 0
       ? ` · <span style="color:#94a3b8">${job.skipped} doublon(s)</span>` : "";
     return `

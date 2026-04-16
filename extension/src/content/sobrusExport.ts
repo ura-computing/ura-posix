@@ -12,7 +12,7 @@ const CHUNK_SIZE = 500;
 export type UploadJob = {
   id: string;
   state: "queued" | "uploading" | "success" | "error" | "cancelled";
-  fileType: "achat" | "vente";
+  fileType: "achat" | "vente" | "stock";
   filename?: string;
   current?: number;
   total?: number;
@@ -22,8 +22,12 @@ export type UploadJob = {
   timestamp: number;
 };
 
-function detectFileType(headerLine: string): "achat" | "vente" {
+function detectFileType(headerLine: string): "achat" | "vente" | "stock" {
   const h = headerLine.toLowerCase();
+  // Stock header has "stock min" and "stock max" and "date de péremption" but no "référence de livraison"
+  if ((h.includes("stock min") || h.includes("date de péremption")) && !h.includes("référence de livraison")) {
+    return "stock";
+  }
   if (h.includes("référence de livraison") || h.includes("bon de livraison") || h.includes("fournisseur")) {
     return "achat";
   }
@@ -98,7 +102,12 @@ document.addEventListener(
 
     const filename = anchor.download || anchor.textContent?.trim() || undefined;
     const jobId = crypto.randomUUID();
-    const fileType = filename?.toLowerCase().includes("achat") ? "achat" as const : "vente" as const;
+    // Initial guess from filename. Actual type confirmed later from CSV header.
+    const fn = filename?.toLowerCase() ?? "";
+    const fileType: "achat" | "vente" | "stock" =
+      fn.includes("achat") ? "achat"
+      : fn.includes("stock") ? "stock"
+      : "vente";
 
     // Add queued job to in-memory array + storage
     _jobs.push({
@@ -182,13 +191,15 @@ async function handleExport(apiUrl: string, filename: string | undefined, jobId:
       return;
     }
 
-    const totalChunks = Math.ceil(dataLines.length / CHUNK_SIZE);
+    // Stock uses replace-all semantics — must be a single request (no chunking).
+    const chunkSize = fileType === "stock" ? dataLines.length : CHUNK_SIZE;
+    const totalChunks = Math.ceil(dataLines.length / chunkSize);
     let totalInserted = 0;
     let totalSkipped = 0;
     let batchId: number | undefined;
 
     // 3. Send chunks one by one
-    for (let i = 0; i < dataLines.length; i += CHUNK_SIZE) {
+    for (let i = 0; i < dataLines.length; i += chunkSize) {
       // Check cancellation
       const cancelCheck = await new Promise<boolean>((resolve) => {
         chrome.storage.local.get(CANCEL_UPLOAD_KEY, (res) => resolve(!!(res[CANCEL_UPLOAD_KEY])));
@@ -204,10 +215,10 @@ async function handleExport(apiUrl: string, filename: string | undefined, jobId:
         return;
       }
 
-      const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
+      const chunkNum = Math.floor(i / chunkSize) + 1;
       update({ state: "uploading", current: chunkNum, total: totalChunks });
 
-      const csvChunk = [header, ...dataLines.slice(i, i + CHUNK_SIZE)].join("\n");
+      const csvChunk = [header, ...dataLines.slice(i, i + chunkSize)].join("\n");
 
       try {
         const res = await sendMsg<{ success: boolean; inserted?: number; skipped?: number; batch_id?: number; error?: string }>({
