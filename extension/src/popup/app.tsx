@@ -158,7 +158,7 @@ export default function App() {
                 <div className="upload-progress-header">
                   <div className="upload-progress-spinner" />
                   <span className="upload-progress-label">
-                    {activeJob.fileType === "achat" ? "Achats" : "Ventes"} — import en cours
+                    {activeJob.fileType === "achat" ? "Achats" : activeJob.fileType === "vente" ? "Ventes" : "Stock"} — import en cours
                   </span>
                 </div>
                 {(activeJob.total ?? 0) > 1 && (
@@ -196,7 +196,7 @@ export default function App() {
                 {notifications.slice(0, 8).map((n) => (
                   <div key={n.id} className={`notif-item ${!n.read ? "unread" : ""}`}>
                     <div className="notif-icon">
-                      {n.fileType === "achat" ? "📦" : "🧾"}
+                      {n.fileType === "achat" ? "📦" : n.fileType === "vente" ? "🧾" : "📊"}
                     </div>
                     <div className="notif-content">
                       <div className="notif-title">
@@ -204,12 +204,12 @@ export default function App() {
                         {n.skipped > 0 && <span className="notif-skipped"> · {n.skipped} ignorées</span>}
                       </div>
                       <div className="notif-meta">
-                        {n.fileType === "achat" ? "Achats" : "Ventes"} · {timeAgo(n.timestamp)}
+                        {n.fileType === "achat" ? "Achats" : n.fileType === "vente" ? "Ventes" : "Stock"} · {timeAgo(n.timestamp)}
                       </div>
                     </div>
                     <button
                       className="notif-view-btn"
-                      onClick={() => handleOpenDashboard(n.fileType === "achat" ? "/achat" : "/ventes")}
+                      onClick={() => handleOpenDashboard(n.fileType === "achat" ? "/achat" : n.fileType === "vente" ? "/ventes" : "/stock")}
                     >
                       Voir →
                     </button>

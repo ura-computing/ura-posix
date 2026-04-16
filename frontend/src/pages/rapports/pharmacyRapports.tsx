@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { Link } from "react-router";
-import { usePharmacyStats, useAnalyseMarge, useMarginAlerts } from "@/hooks/usePharmacyRapports";
+import { usePharmacyStats, useAnalyseMarge, useMarginAlerts, useStockAbcd } from "@/hooks/usePharmacyRapports";
 import {
   AreaChart,
   Area,
@@ -17,6 +17,7 @@ import {
 import {
   AlertTriangle,
   BarChart3,
+  Boxes,
   CalendarCheck,
   CalendarX,
   Coins,
@@ -83,6 +84,33 @@ export function PharmacyRapports() {
     dateTo,
     categoryType,
   );
+  const { stockAbcd, stockAbcdLoading } = useStockAbcd(dateFrom, dateTo);
+
+  // Stock summary metrics
+  const stockSummary = useMemo(() => {
+    const products = stockAbcd?.products ?? [];
+    const withStock = products.filter((p) => p.current_stock != null);
+    const sousStock = products.filter(
+      (p) => p.current_stock != null && p.current_stock < p.stock_min,
+    ).length;
+    const surStock = products.filter(
+      (p) => p.current_stock != null && p.current_stock > p.stock_max,
+    ).length;
+    const healthy = products.filter(
+      (p) =>
+        p.current_stock != null &&
+        p.current_stock >= p.stock_min &&
+        p.current_stock <= p.stock_max,
+    ).length;
+    const healthPct = withStock.length > 0 ? Math.round((healthy / withStock.length) * 100) : 0;
+    return {
+      totalRefs: stockAbcd?.total_references ?? 0,
+      ppvPotentiel: stockAbcd?.ppv_potentiel ?? 0,
+      sousStock,
+      surStock,
+      healthPct,
+    };
+  }, [stockAbcd]);
 
   const kpis = stats?.kpis;
   const prevKpis = stats?.previous_kpis;
@@ -1057,6 +1085,116 @@ export function PharmacyRapports() {
                 <UploadCloud className="h-3.5 w-3.5" />
                 Créer une analyse
               </Link>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* ── Stock CTA ── */}
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Stock</h2>
+
+          {/* Clickable preview cards → /stock */}
+          {stockAbcdLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 w-full rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <Link to="/stock" className="block">
+                <Card className="border border-border cursor-pointer hover:bg-muted/50 transition-colors h-full">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total références</p>
+                        <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(stockSummary.totalRefs)}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">produits suivis</p>
+                      </div>
+                      <Boxes className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link to="/stock" className="block">
+                <Card className="border border-border cursor-pointer hover:bg-muted/50 transition-colors h-full">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">PPV potentiel</p>
+                        <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(stockSummary.ppvPotentiel)}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">MAD en stock</p>
+                      </div>
+                      <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link to="/stock" className="block">
+                <Card className="border border-border cursor-pointer hover:bg-muted/50 transition-colors h-full">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Sous-stock / Sur-stock</p>
+                        <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">
+                          <span className="text-amber-600">{stockSummary.sousStock}</span>
+                          <span className="text-muted-foreground text-xl"> / </span>
+                          <span className="text-blue-600">{stockSummary.surStock}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">produits à ajuster</p>
+                      </div>
+                      <AlertTriangle className="h-8 w-8 opacity-60 shrink-0 text-amber-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+              <Link to="/stock" className="block">
+                <Card className="border border-border cursor-pointer hover:bg-muted/50 transition-colors h-full">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Santé du stock</p>
+                        <p className={cn(
+                          "text-3xl font-bold mt-1 leading-tight tabular-nums",
+                          stockSummary.healthPct >= 80 ? "text-emerald-600"
+                          : stockSummary.healthPct >= 60 ? "text-amber-600"
+                          : "text-red-600",
+                        )}>{stockSummary.healthPct}%</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">dans la fourchette min-max</p>
+                      </div>
+                      <ShieldCheck className="h-8 w-8 opacity-60 shrink-0 text-primary" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          )}
+
+          <Card className="border border-dashed border-border bg-muted/30">
+            <CardContent className="p-8 flex flex-col items-center text-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10">
+                <Boxes className="h-6 w-6 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-base font-semibold">Analyse du stock</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Consultez la classification ABCD, les alertes sous-stock/sur-stock et les péremptions.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <Link
+                  to="/stock"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  <Boxes className="h-3.5 w-3.5" />
+                  Voir le stock
+                </Link>
+                <Link
+                  to="/dashboard/upload-file?type=stock"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-4 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                >
+                  <UploadCloud className="h-3.5 w-3.5" />
+                  Importer stock
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </section>

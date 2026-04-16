@@ -3,12 +3,14 @@ import { getToken } from "./storage";
 
 export interface UploadResult {
   inserted: number;
-  skipped: number;
-  batch_id: number;
+  skipped?: number;
+  skipped_unknown?: { pid: string; product: string }[];
+  total_rows?: number;
+  batch_id?: number;
 }
 
 export async function uploadCsv(
-  fileType: "achat" | "vente",
+  fileType: "achat" | "vente" | "stock",
   csvText: string,
   filename?: string,
   batchId?: number,
@@ -16,7 +18,9 @@ export async function uploadCsv(
   const token = await getToken();
   if (!token) throw new Error("Non authentifié");
 
-  const endpoint = fileType === "achat" ? "/uploads/achat" : "/uploads/vente";
+  const endpoint = fileType === "achat" ? "/uploads/achat"
+    : fileType === "vente" ? "/uploads/vente"
+    : "/uploads/stock";
   const blob = new Blob([csvText], { type: "text/csv" });
   const formData = new FormData();
   formData.append("file", blob, filename || "export.csv");

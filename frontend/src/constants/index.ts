@@ -26,6 +26,7 @@ export const ENDPOINTS = {
     vente: "/uploads/vente",
     achatJson: "/uploads/achat-json",
     venteJson: "/uploads/vente-json",
+    stock: "/uploads/stock",
   },
   achat: {
     list: "/achat",

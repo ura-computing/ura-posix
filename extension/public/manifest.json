@@ -26,7 +26,8 @@
     {
       "matches": [
         "https://app.pharma.sobrus.com/reports/exportpurchases*",
-        "https://app.pharma.sobrus.com/reports/exportsales*"
+        "https://app.pharma.sobrus.com/reports/exportsales*",
+        "https://app.pharma.sobrus.com/reports/exportstock*"
       ],
       "js": ["src/content/sobrusExport.ts", "src/content/sobrusUi.ts"],
       "run_at": "document_idle"

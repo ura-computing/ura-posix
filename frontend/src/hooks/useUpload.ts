@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { achatJson, venteJson } from "@/api/uploads";
+import { achatJson, venteJson, stock as stockUpload } from "@/api/uploads";
 import { QUERY_KEYS } from "@/constants";
 
-type DocType = "achat" | "vente";
+type DocType = "achat" | "vente" | "stock";
 
 const CHUNK_SIZE = 500;
 
@@ -29,7 +29,7 @@ export type UploadProgress = { current: number; total: number };
 export type UploadState =
   | { status: "idle" }
   | { status: "uploading"; progress: UploadProgress }
-  | { status: "success"; inserted: number; skipped: number }
+  | { status: "success"; inserted: number; skipped: number; unknown?: { pid: string; product: string }[] }
   | { status: "cancelled"; inserted: number }
   | { status: "error"; message: string };
 
@@ -41,6 +41,24 @@ export function useUploadCsvBatched() {
   const upload = useCallback(async (file: File, docType: DocType) => {
     cancelRef.current = false;
     setState({ status: "uploading", progress: { current: 0, total: 1 } });
+
+    // Stock uses replace-all semantics — upload the file in one request, not chunked.
+    if (docType === "stock") {
+      try {
+        const res = await stockUpload(file);
+        queryClient.invalidateQueries({ queryKey: ["stock-abcd"] });
+        queryClient.invalidateQueries({ queryKey: ["peremptions"] });
+        setState({
+          status: "success",
+          inserted: res.inserted,
+          skipped: res.skipped_unknown?.length ?? 0,
+          unknown: res.skipped_unknown,
+        });
+      } catch (err) {
+        setState({ status: "error", message: (err as Error).message ?? "Erreur d'importation" });
+      }
+      return;
+    }
 
     let text: string;
     try {

@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
-from models import Achat, ImportBatch, Medicament, User, Vente
+from datetime import date as _date
+
+from models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
 from routers.auth import get_current_user
 from utils.strings import normalize_category, strip_accents
 
@@ -398,3 +400,106 @@ async def upload_catalog(
     db.bulk_save_objects(medicaments)
     db.commit()
     return {"imported": len(medicaments)}
+
+
+# ─── Stock ─────────────────────────────────────────────────────────────────────
+
+def _parse_date(val: str) -> _date | None:
+    if not val or not val.strip():
+        return None
+    try:
+        return _date.fromisoformat(val.strip())
+    except ValueError:
+        return None
+
+
+def _parse_int(val: str) -> int | None:
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return int(float(s.replace(",", ".")))
+    except ValueError:
+        return None
+
+
+@router.post("/stock")
+async def upload_stock(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_require_import),
+):
+    """Import a Sobrus stock CSV as a full snapshot for the current pharmacy.
+
+    Replaces all existing rows in `pharmacy_stock` for this pharmacy.
+    Unknown PIDs are skipped and returned so the user can request catalog additions.
+    """
+    if not current_user.pharmacy_id:
+        raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
+    rows = _parse_csv(content)
+    if not rows:
+        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
+
+    # Resolve all PIDs in one query
+    pids = [r.get("PID", "").strip() for r in rows if r.get("PID")]
+    meds = db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
+    pid_to_med = {m.pid: m for m in meds}
+
+    inserted_rows = []
+    skipped_unknown: list[dict] = []
+    seen_med_ids: set[int] = set()
+    for r in rows:
+        pid = (r.get("PID") or "").strip()
+        if not pid:
+            continue
+        med = pid_to_med.get(pid)
+        if not med:
+            skipped_unknown.append({"pid": pid, "product": (r.get("Produit") or "").strip()})
+            continue
+        if med.id in seen_med_ids:
+            continue
+        seen_med_ids.add(med.id)
+        inserted_rows.append({
+            "pharmacy_id": current_user.pharmacy_id,
+            "medicament_id": med.id,
+            "current_stock": _parse_int(r.get("Stock", "")) or 0,
+            "stock_min": _parse_int(r.get("Stock min", "")),
+            "stock_max": _parse_int(r.get("Stock max", "")),
+            "expiry_date": _parse_date(r.get("Date de péremption", "")),
+            "zone": (r.get("Zone") or "").strip() or None,
+        })
+
+    # Upsert semantics: Sobrus exports can be partial (filtered by zone/date/etc.),
+    # so we update existing rows and insert new ones, but don't wipe untouched stock.
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    upserted = 0
+    if inserted_rows:
+        stmt = pg_insert(PharmacyStock).values(inserted_rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["pharmacy_id", "medicament_id"],
+            set_={
+                "current_stock": stmt.excluded.current_stock,
+                "stock_min": stmt.excluded.stock_min,
+                "stock_max": stmt.excluded.stock_max,
+                "expiry_date": stmt.excluded.expiry_date,
+                "zone": stmt.excluded.zone,
+                "imported_at": func.now(),
+            },
+        )
+        db.execute(stmt)
+        db.commit()
+        upserted = len(inserted_rows)
+
+    return {
+        "inserted": upserted,
+        "skipped_unknown": skipped_unknown,
+        "total_rows": len(rows),
+    }

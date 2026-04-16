@@ -331,6 +331,8 @@ def get_vente_tva_rates(
     return [r[0] for r in q.distinct().order_by(Medicament.tva).all()]
 
 
+
+
 @vente_router.get("/suggestions")
 def get_vente_suggestions(
     q: str = Query(""),

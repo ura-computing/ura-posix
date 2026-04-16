@@ -2,7 +2,7 @@ import { NOTIFICATIONS_STORAGE_KEY, TOKEN_STORAGE_KEY } from "../constants";
 
 export interface ApcmNotification {
   id: string;
-  fileType: "achat" | "vente";
+  fileType: "achat" | "vente" | "stock";
   inserted: number;
   skipped: number;
   timestamp: number;
