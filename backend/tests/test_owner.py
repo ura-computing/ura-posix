@@ -323,3 +323,62 @@ class TestRevokeEmployee:
             headers=test_owner["headers"],
         )
         assert res.status_code == 403
+
+
+class TestInviteEmployee:
+    """POST /owner/employees/invite — owner creates an ACTIVE employee
+    without a password and the backend emails an invitation link."""
+
+    def test_owner_invites_new_employee(self, client, db, test_owner, monkeypatch):
+        sent: list = []
+
+        async def _fake(to_email, token, inviter_name, pharmacy_name):
+            sent.append((to_email, token))
+
+        monkeypatch.setattr("routers.owner.send_invite_email", _fake)
+
+        res = client.post(
+            "/owner/employees/invite",
+            json={"email": "new.emp@example.com", "name": "Karim"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 201
+        data = res.json()
+        assert data["email"] == "new.emp@example.com"
+        assert data["role"] == Role.EMPLOYEE
+        assert data["status"] == Status.ACTIVE
+        assert data["pharmacy_id"] == test_owner["pharmacy"].id
+
+        created = db.query(User).filter(User.email == "new.emp@example.com").first()
+        assert created is not None
+        # No password set yet — invitee will set one via the email link.
+        assert created.password_hash is None
+        assert created.reset_token is not None
+        assert created.reset_token_expires is not None
+
+    def test_invite_duplicate_email_400(self, client, test_owner, monkeypatch):
+        async def _noop(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr("routers.owner.send_invite_email", _noop)
+        client.post(
+            "/owner/employees/invite",
+            json={"email": "dup.invite@example.com"},
+            headers=test_owner["headers"],
+        )
+        res = client.post(
+            "/owner/employees/invite",
+            json={"email": "dup.invite@example.com"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 400
+        assert "déjà enregistré" in res.json()["detail"]
+
+    def test_employee_cannot_invite_403(self, client, test_employee):
+        res = client.post(
+            "/owner/employees/invite",
+            json={"email": "should.not@example.com"},
+            headers=test_employee["headers"],
+        )
+        # Ticket 4b: employees cannot create accounts.
+        assert res.status_code == 403

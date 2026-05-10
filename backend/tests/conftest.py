@@ -19,6 +19,10 @@ from models import Pharmacy, User
 from utils.auth import hash_password, create_access_token
 from utils.constants import Role, Status
 
+# Disable rate-limiting in tests — fast successive calls to /auth/signup etc.
+# would otherwise hit the per-IP limiter and break unrelated test cases.
+app.state.limiter.enabled = False
+
 # ── Engine + session factory for tests ────────────────────────────────────────
 
 _engine = create_engine(DATABASE_URL)

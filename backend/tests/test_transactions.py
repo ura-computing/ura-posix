@@ -341,3 +341,46 @@ class TestListVentes:
         body = res.json()
         assert body["pagination"]["total"] == 1
         assert body["data"][0]["tva"] == "TVA (7.00%)"
+
+
+# ── Fuzzy + barcode search ────────────────────────────────────────────────────
+
+class TestFuzzyAndBarcodeSearch:
+    @pytest.fixture()
+    def fuzzy_seed(self, db, test_owner):
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db,
+            pid="HELIO-001",
+            product="HELIOCARE 360°SPORT TRANSPARENT STICK SPF50+ 25G",
+            barcode1="8470002024434",
+        )
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=180.0, supplier="Cantabria")
+        make_vente(db, med, pharmacy_id, quantity=2, unit_price=300.0)
+        return med
+
+    def test_search_by_barcode_finds_product(self, client, test_owner, fuzzy_seed):
+        res = client.get("/achat", params={"search": "8470002024434"}, headers=test_owner["headers"])
+        assert res.status_code == 200
+        body = res.json()
+        assert body["pagination"]["total"] == 1
+        assert "HELIOCARE" in body["data"][0]["product"]
+
+    def test_fuzzy_match_typo_in_long_token(self, client, test_owner, fuzzy_seed):
+        # "TRANSPAENT" (typo) should still match "TRANSPARENT" via pg_trgm.
+        res = client.get(
+            "/ventes",
+            params={"search": "HELIOCARE TRANSPAENT"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["pagination"]["total"] == 1
+        assert "TRANSPARENT" in body["data"][0]["product"]
+
+    def test_short_typo_does_not_fuzzy_explode(self, client, test_owner, fuzzy_seed, seed_data):
+        # 3-char tokens skip fuzzy (would otherwise match too many products);
+        # gibberish like "zzz" must return zero rows.
+        res = client.get("/ventes", params={"search": "zzz"}, headers=test_owner["headers"])
+        assert res.status_code == 200
+        assert res.json()["pagination"]["total"] == 0

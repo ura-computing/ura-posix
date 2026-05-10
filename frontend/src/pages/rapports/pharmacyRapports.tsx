@@ -20,6 +20,7 @@ import {
   Boxes,
   CalendarCheck,
   CalendarX,
+  ChevronDown,
   Coins,
   Download,
   Percent,
@@ -31,12 +32,12 @@ import {
   UploadCloud,
   Wallet,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { OptimisationGauge } from "@/components/optimisationGauge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageFilter } from "@/components/pageFilter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DatePicker } from "@/components/ui/datePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,7 +52,8 @@ import {
 import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import * as statsApi from "@/api/stats";
 import type { MarginAlertBracket } from "@/api/stats";
-import { fmt } from "@/utils/format";
+import { fmt, fmtInt } from "@/utils/format";
+import { currentMonth } from "@/utils/dateRange";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
@@ -60,9 +62,21 @@ import { CHART_COLORS, CAT_COLORS, getTypeTheme } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 
 export function PharmacyRapports() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [exporting, setExporting] = useState<string | null>(null);
+  // Performance banner: collapsed by default, persisted per-user.
+  const [perfOpen, setPerfOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("apcm-rapports-perf-open") === "1";
+  });
+  const togglePerf = (o: boolean) => {
+    setPerfOpen(o);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("apcm-rapports-perf-open", o ? "1" : "0");
+    }
+  };
   const [categoryType, setCategoryType] = useState<eCategoryType>(
     eCategoryType.ALL,
   );
@@ -240,17 +254,19 @@ export function PharmacyRapports() {
     light?: boolean;
   }) => {
     const change = pctChange(current, previous);
+    const compareLabel = "vs même période N-1";
     if (change === null) {
       return (
         <span
+          title={compareLabel}
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1",
             light
               ? "bg-white/20 text-white/70"
               : "bg-muted text-muted-foreground",
           )}
         >
-          —
+          — <span className="opacity-70">N-1</span>
         </span>
       );
     }
@@ -258,8 +274,9 @@ export function PharmacyRapports() {
     const isGood = invert ? !isPositive : isPositive;
     return (
       <span
+        title={compareLabel}
         className={cn(
-          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-1",
+          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mt-1",
           light
             ? isGood
               ? "bg-white/20 text-white"
@@ -271,6 +288,7 @@ export function PharmacyRapports() {
       >
         {isPositive ? "\u2191" : "\u2193"}
         {Math.abs(change).toFixed(1)}%
+        <span className="opacity-70">N-1</span>
       </span>
     );
   };
@@ -299,14 +317,40 @@ export function PharmacyRapports() {
       />
 
       <div className="space-y-8">
-        {/* ── Performance banner ── */}
+        {/* ── Performance banner (collapsible — default closed) ── */}
         <section>
           {isLoading ? (
             <Skeleton className="h-14 w-full rounded-xl" />
           ) : (
-            <Card className="border border-border">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <Collapsible open={perfOpen} onOpenChange={togglePerf}>
+              <Card className="border border-border">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors cursor-pointer"
+                    aria-expanded={perfOpen}
+                  >
+                    <span className="flex items-center gap-2">
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-muted-foreground transition-transform",
+                          !perfOpen && "-rotate-90",
+                        )}
+                      />
+                      <span className="text-sm font-semibold">Vue d'ensemble</span>
+                    </span>
+                    {/* Compact teaser visible when closed */}
+                    {!perfOpen && (
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className={cn("h-4 w-4", healthGrade.color)} />
+                        <span className={cn("text-sm font-bold", healthGrade.color)}>{healthGrade.grade}</span>
+                      </span>
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-4 px-4">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3">
                   {/* Performance % vs previous period */}
                   {dateFrom && dateTo && (() => {
                     const prev = prevKpis?.ventes_total ?? 0;
@@ -374,9 +418,11 @@ export function PharmacyRapports() {
                       <span className={cn("text-sm font-bold", healthGrade.color)}>{healthGrade.grade}</span>
                     </span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           )}
         </section>
 
@@ -1030,7 +1076,7 @@ export function PharmacyRapports() {
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(analyseKpis.total_ventes_dh)} MAD</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{fmt(analyseKpis.total_ventes_unites)} unités vendues</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{fmtInt(analyseKpis.total_ventes_unites)} unités vendues</p>
                     </div>
                     <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1106,7 +1152,7 @@ export function PharmacyRapports() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total références</p>
-                        <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(stockSummary.totalRefs)}</p>
+                        <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmtInt(stockSummary.totalRefs)}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">produits suivis</p>
                       </div>
                       <Boxes className="h-8 w-8 opacity-60 shrink-0 text-primary" />
@@ -1440,10 +1486,10 @@ function MarginAlertCard({
   const value = bracket[valueKey];
 
   return (
-    <Card className={cn("border", colors.card)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-3 flex-1 min-w-0">
+    <Link to="/alertes" className="block">
+      <Card className={cn("border cursor-pointer transition-shadow hover:shadow-md", colors.card)}>
+        <CardContent className="p-5">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               {icon}
               <p className={cn("text-sm font-semibold", colors.title)}>
@@ -1466,36 +1512,9 @@ function MarginAlertCard({
                 {fmt(Math.abs(value))} MAD
               </p>
             </div>
-            {bracket.products.length > 0 && (
-              <div className="space-y-1 pt-1 border-t border-border/50">
-                <p
-                  className={cn(
-                    "text-[10px] font-medium uppercase tracking-wide",
-                    colors.subtle,
-                  )}
-                >
-                  Top produits
-                </p>
-                {bracket.products.slice(0, 3).map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-[11px]"
-                  >
-                    <span className="truncate max-w-[60%] text-foreground">
-                      {p.product}
-                    </span>
-                    <span
-                      className={cn("font-medium tabular-nums", colors.value)}
-                    >
-                      {p.marge_pct.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

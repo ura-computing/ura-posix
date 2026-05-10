@@ -5,7 +5,7 @@ import {
   CheckCircle2, X, ChevronRight, AlertCircle, RotateCcw, Calendar,
   Ban,
 } from "lucide-react";
-import { DatePicker } from "@/components/ui/datePicker";
+import { DateRangePicker } from "@/components/ui/dateRangePicker";
 import { cn } from "@/utils/cn";
 import { useUploadCsvBatched } from "@/hooks/useUpload";
 import { Button } from "@/components/ui/button";
@@ -311,9 +311,13 @@ function DateRangeIndicator({
     <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
       <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
       <span className="text-sm text-muted-foreground shrink-0">Période :</span>
-      <DatePicker value={start} onChange={onStartChange} placeholder="Début" />
-      <span className="text-muted-foreground text-sm">→</span>
-      <DatePicker value={end} onChange={onEndChange} placeholder="Fin" />
+      <DateRangePicker
+        from={start}
+        to={end}
+        onFromChange={onStartChange}
+        onToChange={onEndChange}
+        showPresets={false}
+      />
     </div>
   );
 }

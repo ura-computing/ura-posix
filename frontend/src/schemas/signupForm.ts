@@ -12,6 +12,7 @@ export const signupSchema = z
     confirmPassword: z.string(),
     role: z.enum([eUserRole.OWNER, eUserRole.EMPLOYEE]),
     pharmacy_name: z.string().optional(),
+    pharmacy_city: z.string().optional(),
     pharmacy_id: z.number().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -31,6 +32,13 @@ export const signupSchema = z
       return true;
     },
     { message: "Veuillez saisir le nom de votre pharmacie", path: ["pharmacy_name"] }
+  )
+  .refine(
+    (data) => {
+      if (data.role === eUserRole.OWNER && !data.pharmacy_id) return !!data.pharmacy_city?.trim();
+      return true;
+    },
+    { message: "Veuillez saisir la ville de votre pharmacie", path: ["pharmacy_city"] }
   );
 
 export type SignupFormValues = z.infer<typeof signupSchema>;

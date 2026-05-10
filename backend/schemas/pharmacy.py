@@ -6,6 +6,7 @@ from utils.constants import Role, Status
 
 class PharmacyCreate(BaseModel):
     name: str
+    city: str  # required — used to derive the auto-generated pharmacy code
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -13,6 +14,7 @@ class PharmacyCreate(BaseModel):
 
 class PharmacyUpdate(BaseModel):
     name: Optional[str] = None
+    city: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -30,6 +32,8 @@ class OwnerOut(BaseModel):
 class PharmacyOut(BaseModel):
     id: int
     name: str
+    city: Optional[str] = None
+    code: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -82,6 +86,25 @@ class UserAdminOut(BaseModel):
 
 class EmployeePermissionsUpdate(BaseModel):
     permissions: Dict[str, bool]
+
+
+class EmployeeInvite(BaseModel):
+    """Owner-driven invitation: backend creates an ACTIVE employee
+    (no password yet) and emails a /reset-password link."""
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    permissions: Dict[str, bool] = {}
+
+
+class UserInvite(BaseModel):
+    """Admin-driven invitation. Can target any role + pharmacy."""
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    role: str = Role.OWNER
+    pharmacy_id: Optional[int] = None
+    permissions: Dict[str, bool] = {}
 
 
 class EmployeeStatusUpdate(BaseModel):

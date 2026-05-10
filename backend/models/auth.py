@@ -11,6 +11,8 @@ class Pharmacy(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    city = Column(String, nullable=True)         # required for new rows; nullable to ease backfill
+    code = Column(String, unique=True, nullable=True, index=True)  # e.g. "BOU0001"
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)

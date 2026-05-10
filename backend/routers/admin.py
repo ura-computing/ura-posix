@@ -1,13 +1,17 @@
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from database import get_db
 from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
-from utils.strings import strip_accents
+from utils.strings import strip_accents, tokenize_search
+from utils.search import product_search_clauses
 from utils.constants import VALID_ROLES, Role, Status
+from utils.email import send_invite_email
 from routers.auth import get_current_user
 from utils.permissions import get_current_admin
 from schemas import (
@@ -23,10 +27,13 @@ from schemas import (
     PharmacyOut,
     PharmacyUpdate,
     UserAdminOut,
+    UserInvite,
     UserPharmacyUpdate,
     UserRejectBody,
     UserRoleUpdate,
 )
+
+_INVITE_TTL = timedelta(days=7)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -73,8 +80,11 @@ def create_pharmacy(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
+    from utils.pharmacy_code import generate_pharmacy_code
     pharmacy = Pharmacy(
         name=body.name,
+        city=body.city,
+        code=generate_pharmacy_code(db, body.city),
         address=body.address,
         phone=body.phone,
         email=body.email,
@@ -85,6 +95,8 @@ def create_pharmacy(
     return PharmacyOut(
         id=pharmacy.id,
         name=pharmacy.name,
+        city=pharmacy.city,
+        code=pharmacy.code,
         address=pharmacy.address,
         phone=pharmacy.phone,
         email=pharmacy.email,
@@ -214,6 +226,55 @@ def list_users(
     if pharmacy_id is not None:
         q = q.filter(User.pharmacy_id == pharmacy_id)
     return q.order_by(User.created_at.desc()).all()
+
+
+@router.post("/users/invite", response_model=UserAdminOut, status_code=201)
+async def invite_user(
+    body: UserInvite,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """Admin-driven invitation: create an ACTIVE user without a password and
+    email them a /reset-password link (7-day TTL) to set their initial
+    password. Can target owners or employees."""
+    if body.role not in (Role.OWNER, Role.EMPLOYEE):
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    email = body.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email déjà enregistré")
+    pharmacy = None
+    if body.pharmacy_id:
+        pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
+        if not pharmacy:
+            raise HTTPException(status_code=400, detail="Pharmacie introuvable")
+    if body.role == Role.EMPLOYEE and not body.pharmacy_id:
+        raise HTTPException(status_code=400, detail="Une pharmacie est requise pour un employé")
+
+    token = secrets.token_urlsafe(32)
+    user = User(
+        email=email,
+        name=body.name,
+        phone=body.phone,
+        role=body.role,
+        status=Status.ACTIVE,
+        pharmacy_id=body.pharmacy_id,
+        pharmacy_name=pharmacy.name if pharmacy else None,
+        permissions=body.permissions or {},
+        reset_token=token,
+        reset_token_expires=datetime.now(timezone.utc) + _INVITE_TTL,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    background.add_task(
+        send_invite_email,
+        email,
+        token,
+        current_admin.name,
+        pharmacy.name if pharmacy else None,
+    )
+    return user
 
 
 @router.get("/users/pending", response_model=List[UserAdminOut])
@@ -497,32 +558,55 @@ def deduplicate_catalog(
     return {"merged_groups": merged_groups, "deleted": deleted}
 
 
+_CATALOG_SORT_COLUMNS = {
+    "id": Medicament.id,
+    "pid": Medicament.pid,
+    "product": Medicament.product,
+    "category": Medicament.category,
+    "tva": Medicament.tva,
+    "pph": Medicament.pph,
+    "ppv": Medicament.ppv,
+    "laboratoire": Medicament.laboratoire,
+    "zone": Medicament.zone,
+}
+
+
 @router.get("/catalog")
 def list_catalog(
     search: str = Query(""),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
     export: bool = Query(False),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_admin),
 ):
     q = db.query(Medicament)
-    if search:
-        term = f"%{search}%"
-        norm = f"%{strip_accents(search.lower())}%"
+    tokens = tokenize_search(search)
+    # For each token, build the standard search OR-clause (product / pid /
+    # barcode1 / barcode2 / fuzzy) plus an accent-stripped contains so e.g.
+    # "categorie" matches "Catégorie".
+    base_clauses = product_search_clauses(tokens)
+    for tok, base_clause in zip(tokens, base_clauses):
+        norm = f"%{strip_accents(tok)}%"
         q = q.filter(
-            Medicament.product.ilike(term)
-            | Medicament.pid.ilike(term)
-            | func.lower(Medicament.product).ilike(norm)
+            base_clause
+            | func.lower(func.coalesce(Medicament.product, "")).ilike(norm)
         )
+    if sort_by and sort_by in _CATALOG_SORT_COLUMNS:
+        col = _CATALOG_SORT_COLUMNS[sort_by]
+        q = q.order_by(col.asc() if sort_order == "asc" else col.desc())
+    else:
+        q = q.order_by(Medicament.product)
     if export:
-        items = q.order_by(Medicament.product).all()
+        items = q.all()
         return {
             "data": [MedicamentOut.model_validate(m) for m in items],
             "pagination": {"total": len(items), "current": 1, "pageSize": len(items)},
         }
     total = q.count()
-    items = q.order_by(Medicament.product).offset((page - 1) * limit).limit(limit).all()
+    items = q.offset((page - 1) * limit).limit(limit).all()
     return {
         "data": [MedicamentOut.model_validate(m) for m in items],
         "pagination": {"total": total, "current": page, "pageSize": limit},

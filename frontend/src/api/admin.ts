@@ -145,9 +145,17 @@ export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?:
 
 // ── Catalog ───────────────────────────────────────────────────────────────────
 
-export const listCatalog = (search?: string, page = 1, limit = 50) => {
+export const listCatalog = (
+  search?: string,
+  page = 1,
+  limit = 50,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
+) => {
   const p = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (search) p.set("search", search);
+  if (sortBy) p.set("sort_by", sortBy);
+  if (sortOrder) p.set("sort_order", sortOrder);
   return request<{ data: MedicamentOut[]; pagination: { total: number; current: number; pageSize: number } }>(`/admin/catalog?${p}`);
 };
 

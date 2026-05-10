@@ -9,9 +9,10 @@ from sqlalchemy import or_, func as sa_func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Achat, CategorySuffix, Medicament, User, Vente
+from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
-from utils.strings import strip_percentage
+from utils.strings import strip_percentage, tokenize_search
+from utils.search import product_search_clauses
 
 achat_router = APIRouter(prefix="/achat", tags=["achat"])
 vente_router = APIRouter(prefix="/ventes", tags=["ventes"])
@@ -24,6 +25,48 @@ def _get_suffixes_map(db: Session) -> Dict[str, tuple]:
         strip_percentage(s.category).lower(): (s.suffix, s.color)
         for s in db.query(CategorySuffix).all()
     }
+
+
+def _apply_sort(q, sort_by: Optional[str], sort_order: Optional[str], whitelist: dict, default_col):
+    """Apply ORDER BY to *q* using a column whitelist. Falls back to *default_col* desc."""
+    if sort_by and sort_by in whitelist:
+        col = whitelist[sort_by]
+        return q.order_by(col.asc() if sort_order == "asc" else col.desc())
+    return q.order_by(default_col.desc())
+
+
+_ACHAT_SORT_COLUMNS = {
+    "id": Achat.id,
+    "delivery_date": Achat.delivery_date,
+    "delivery_ref": Achat.delivery_ref,
+    "supplier": Achat.supplier,
+    "expiry_date": Achat.expiry_date,
+    "quantity": Achat.quantity,
+    "unit_price": Achat.unit_price,
+    "total": Achat.total,
+    "product": Medicament.product,
+    "pid": Medicament.pid,
+    "category": Medicament.category,
+    "tva": Medicament.tva,
+    "pph": Medicament.pph,
+    "ppv": Medicament.ppv,
+}
+
+_VENTE_SORT_COLUMNS = {
+    "id": Vente.id,
+    "date": Vente.date,
+    "transaction_ref": Vente.transaction_ref,
+    "client": Vente.client,
+    "quantity": Vente.quantity,
+    "discount": Vente.discount,
+    "unit_price": Vente.unit_price,
+    "total": Vente.total,
+    "product": Medicament.product,
+    "pid": Medicament.pid,
+    "category": Medicament.category,
+    "tva": Medicament.tva,
+    "ppv": Medicament.ppv,
+}
 
 
 def _build_categories(rows) -> List[str]:
@@ -82,14 +125,9 @@ def _base_achat_query(
     )
     if current_user.pharmacy_id:
         q = q.filter(Achat.pharmacy_id == current_user.pharmacy_id)
-    if search:
-        term = f"%{search}%"
-        q = q.filter(
-            Medicament.product.ilike(term)
-            | Medicament.pid.ilike(term)
-            | Achat.supplier.ilike(term)
-            | Achat.delivery_ref.ilike(term)
-        )
+    tokens = tokenize_search(search)
+    for clause in product_search_clauses(tokens, extra_columns=[Achat.supplier, Achat.delivery_ref]):
+        q = q.filter(clause)
     if categories:
         q = q.filter(or_(*[Medicament.category.ilike(f"{cat}%") for cat in categories]))
     if tva:
@@ -218,6 +256,8 @@ def list_achats(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     tva: List[str] = Query(default=[]),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
     export: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -227,10 +267,11 @@ def list_achats(
     suffixes_map = _get_suffixes_map(db)
     q = _base_achat_query(db, current_user, search, category, date_from, date_to, tva)
     total = q.count()
+    q = _apply_sort(q, sort_by, sort_order, _ACHAT_SORT_COLUMNS, Achat.id)
     if export:
-        rows = q.order_by(Achat.id.desc()).all()
+        rows = q.all()
         return {"data": [_build_achat_row(a, suffixes_map) for a in rows], "total": total}
-    rows = q.order_by(Achat.id.desc()).offset((page - 1) * limit).limit(limit).all()
+    rows = q.offset((page - 1) * limit).limit(limit).all()
     return {
         "data": [_build_achat_row(a, suffixes_map) for a in rows],
         "pagination": {"page": page, "limit": limit, "total": total, "totalPages": (total + limit - 1) // limit},
@@ -274,6 +315,7 @@ def _base_vente_query(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     tva: Optional[List[str]] = None,
+    include_non_declared: bool = True,
 ):
     q = (
         db.query(Vente)
@@ -282,14 +324,19 @@ def _base_vente_query(
     )
     if current_user.pharmacy_id:
         q = q.filter(Vente.pharmacy_id == current_user.pharmacy_id)
-    if search:
-        term = f"%{search}%"
-        q = q.filter(
-            Medicament.product.ilike(term)
-            | Medicament.pid.ilike(term)
-            | Vente.client.ilike(term)
-            | Vente.transaction_ref.ilike(term)
+    if not include_non_declared and current_user.pharmacy_id:
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == current_user.pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
         )
+        q = q.filter(Vente.medicament_id.notin_(non_declared_sub))
+    tokens = tokenize_search(search)
+    for clause in product_search_clauses(tokens, extra_columns=[Vente.client, Vente.transaction_ref]):
+        q = q.filter(clause)
     if categories:
         q = q.filter(or_(*[Medicament.category.ilike(f"{cat}%") for cat in categories]))
     if tva:
@@ -409,6 +456,9 @@ def list_ventes(
     date_to: Optional[str] = Query(None),
     tva: List[str] = Query(default=[]),
     surveillance: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
+    include_non_declared: bool = Query(True),
     export: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -416,7 +466,7 @@ def list_ventes(
     if (current_user.permissions or {}).get("ventes") is False:
         raise HTTPException(status_code=403, detail="Accès aux ventes refusé")
     suffixes_map = _get_suffixes_map(db)
-    q = _base_vente_query(db, current_user, search, category, date_from, date_to, tva)
+    q = _base_vente_query(db, current_user, search, category, date_from, date_to, tva, include_non_declared=include_non_declared)
 
     # Apply surveillance filter if set
     if surveillance == "all":
@@ -467,13 +517,14 @@ def list_ventes(
         else:
             q = q.filter(_avg_pu_surv.c.pu <= Medicament.ppv, ((1.0 - _avg_pu_surv.c.pu / Medicament.ppv) * 100) < 10)
     total = q.count()
+    q = _apply_sort(q, sort_by, sort_order, _VENTE_SORT_COLUMNS, Vente.id)
     if export:
-        rows = q.order_by(Vente.id.desc()).all()
+        rows = q.all()
         # Skip avg_pu on export to avoid OOM on large datasets
         data = [_build_vente_row(v, suffixes_map) for v in rows]
         return {"data": data, "total": total}
 
-    rows = q.order_by(Vente.id.desc()).offset((page - 1) * limit).limit(limit).all()
+    rows = q.offset((page - 1) * limit).limit(limit).all()
 
     # Compute weighted avg purchase price only for current page (small batch)
     med_ids = list({v.medicament_id for v in rows if v.medicament_id})

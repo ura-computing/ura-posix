@@ -6,17 +6,27 @@ import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageFilter } from "@/components/pageFilter";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
+import { currentMonth } from "@/utils/dateRange";
 import { eCategoryType } from "@/types";
 import {
   useMarginAlerts,
   usePeremptions,
   useStockAbcd,
 } from "@/hooks/usePharmacyRapports";
-import type { StockAbcdProduct } from "@/api/stats";
+import type { MarginAlertBracket, PeremptionProduct, StockAbcdProduct } from "@/api/stats";
+import { AlertDetailDialog, type AlertColumn } from "./alertDetailDialog";
+
+type AlertKey =
+  | "marge-negative"
+  | "marge-low"
+  | "peremption-expired"
+  | "peremption-very-close"
+  | "peremption-close"
+  | "stock-sous"
+  | "stock-sur";
 
 function getStockStatus(p: StockAbcdProduct): "ok" | "sous-stock" | "sur-stock" | "inconnu" {
   if (p.current_stock == null) return "inconnu";
@@ -26,8 +36,9 @@ function getStockStatus(p: StockAbcdProduct): "ok" | "sous-stock" | "sur-stock" 
 }
 
 export default function AlertesPage() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
 
   const { marginAlerts, marginAlertsLoading } = useMarginAlerts(dateFrom, dateTo, categoryType);
@@ -43,6 +54,8 @@ export default function AlertesPage() {
   }, [stockAbcd]);
 
   const loading = marginAlertsLoading || peremptionsLoading || stockAbcdLoading;
+  const [openAlert, setOpenAlert] = useState<AlertKey | null>(null);
+  const closeAlert = () => setOpenAlert(null);
 
   const totalAlerts =
     (marginAlerts?.negative?.count ?? 0) +
@@ -131,10 +144,7 @@ export default function AlertesPage() {
           valueLabel="CA concerné"
           value={marginAlerts?.negative?.total_ca ?? 0}
           tone="red"
-          products={(marginAlerts?.negative?.products ?? []).slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.marge_pct.toFixed(1)}% · ${fmt(p.ca)} MAD`,
-          }))}
+          onClick={() => setOpenAlert("marge-negative")}
         />
         <AlertCard
           label="Marge faible (<10%)"
@@ -142,10 +152,7 @@ export default function AlertesPage() {
           valueLabel="CA concerné"
           value={marginAlerts?.low?.total_ca ?? 0}
           tone="amber"
-          products={(marginAlerts?.low?.products ?? []).slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.marge_pct.toFixed(1)}% · ${fmt(p.ca)} MAD`,
-          }))}
+          onClick={() => setOpenAlert("marge-low")}
         />
       </AlertSection>
 
@@ -162,10 +169,7 @@ export default function AlertesPage() {
           valueLabel="Valeur achat"
           value={peremptions?.expired?.purchase_value ?? 0}
           tone="red"
-          products={(peremptions?.expired?.products ?? []).slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.expiry_date} · ${p.quantity} unités`,
-          }))}
+          onClick={() => setOpenAlert("peremption-expired")}
         />
         <AlertCard
           label="Très proche (<30j)"
@@ -173,10 +177,7 @@ export default function AlertesPage() {
           valueLabel="Valeur achat"
           value={peremptions?.very_close?.purchase_value ?? 0}
           tone="orange"
-          products={(peremptions?.very_close?.products ?? []).slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.expiry_date} · ${p.quantity} unités`,
-          }))}
+          onClick={() => setOpenAlert("peremption-very-close")}
         />
         <AlertCard
           label="Proche (<90j)"
@@ -184,10 +185,7 @@ export default function AlertesPage() {
           valueLabel="Valeur achat"
           value={peremptions?.close?.purchase_value ?? 0}
           tone="amber"
-          products={(peremptions?.close?.products ?? []).slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.expiry_date} · ${p.quantity} unités`,
-          }))}
+          onClick={() => setOpenAlert("peremption-close")}
         />
       </AlertSection>
 
@@ -204,10 +202,7 @@ export default function AlertesPage() {
           valueLabel="PPV potentiel"
           value={stockBuckets.sousStock.reduce((s, p) => s + (p.ppv ?? 0) * Math.max(0, p.stock_min - (p.current_stock ?? 0)), 0)}
           tone="amber"
-          products={stockBuckets.sousStock.slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.current_stock ?? 0}/${p.stock_min} unités`,
-          }))}
+          onClick={() => setOpenAlert("stock-sous")}
         />
         <AlertCard
           label="Sur-stock"
@@ -215,12 +210,67 @@ export default function AlertesPage() {
           valueLabel="PPV immobilisé"
           value={stockBuckets.surStock.reduce((s, p) => s + (p.ppv ?? 0) * Math.max(0, (p.current_stock ?? 0) - p.stock_max), 0)}
           tone="blue"
-          products={stockBuckets.surStock.slice(0, 5).map((p) => ({
-            name: p.product,
-            detail: `${p.current_stock ?? 0}/${p.stock_max} unités`,
-          }))}
+          onClick={() => setOpenAlert("stock-sur")}
         />
       </AlertSection>
+
+      {/* ── Detail dialogs ── */}
+      <AlertDetailDialog
+        open={openAlert === "marge-negative"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Marge négative"
+        description="Produits vendus à perte sur la période sélectionnée."
+        products={marginAlerts?.negative?.products ?? []}
+        columns={MARGE_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "marge-low"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Marge faible (<10%)"
+        description="Produits avec une marge inférieure à 10%."
+        products={marginAlerts?.low?.products ?? []}
+        columns={MARGE_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "peremption-expired"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Produits expirés"
+        description="Produits dont la date de péremption est passée."
+        products={peremptions?.expired?.products ?? []}
+        columns={PEREMPTION_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "peremption-very-close"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Péremption très proche (<30j)"
+        description="Produits qui expirent dans moins de 30 jours."
+        products={peremptions?.very_close?.products ?? []}
+        columns={PEREMPTION_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "peremption-close"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Péremption proche (<90j)"
+        description="Produits qui expirent dans moins de 90 jours."
+        products={peremptions?.close?.products ?? []}
+        columns={PEREMPTION_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "stock-sous"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Sous-stock"
+        description="Produits dont le stock actuel est inférieur au minimum recommandé."
+        products={stockBuckets.sousStock}
+        columns={STOCK_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "stock-sur"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Sur-stock"
+        description="Produits dont le stock actuel dépasse le maximum recommandé."
+        products={stockBuckets.surStock}
+        columns={STOCK_COLUMNS}
+      />
 
       {!loading && totalAlerts === 0 && (
         <Card className="border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800">
@@ -283,51 +333,119 @@ function AlertCard({
   valueLabel,
   value,
   tone,
-  products,
+  onClick,
 }: {
   label: string;
   count: number;
   valueLabel: string;
   value: number;
   tone: keyof typeof TONE_STYLES;
-  products: { name: string; detail: string }[];
+  onClick: () => void;
 }) {
   const styles = TONE_STYLES[tone];
+  const disabled = count === 0;
   return (
-    <Card className={cn("border", styles.card)}>
-      <CardHeader className="pb-2">
-        <CardTitle className={cn("text-base font-semibold", styles.title)}>{label}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <Badge className={cn("h-7 px-2.5 text-sm font-bold border-0", styles.count)}>
-            {count} produit{count !== 1 ? "s" : ""}
-          </Badge>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{valueLabel}</p>
-            <p className={cn("text-base font-bold tabular-nums", styles.value)}>{fmt(Math.abs(value))} MAD</p>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "text-left w-full rounded-lg",
+        !disabled && "cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        disabled && "opacity-60 cursor-not-allowed",
+      )}
+    >
+      <Card className={cn("border", styles.card)}>
+        <CardHeader className="pb-2">
+          <CardTitle className={cn("text-base font-semibold", styles.title)}>{label}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-3">
+            <Badge className={cn("h-7 px-2.5 text-sm font-bold border-0", styles.count)}>
+              {count} produit{count !== 1 ? "s" : ""}
+            </Badge>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{valueLabel}</p>
+              <p className={cn("text-base font-bold tabular-nums", styles.value)}>{fmt(Math.abs(value))} MAD</p>
+            </div>
           </div>
-        </div>
-        {products.length > 0 && (
-          <div className="pt-3 border-t border-border/50 space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top produits</p>
-            {products.map((p, i) => (
-              <Tooltip key={i}>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center justify-between gap-2 text-sm cursor-default">
-                    <span className="truncate text-foreground">{p.name}</span>
-                    <span className={cn("shrink-0 tabular-nums font-medium", styles.value)}>{p.detail}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="start">
-                  <p className="font-medium">{p.name}</p>
-                  <p className="text-xs opacity-80">{p.detail}</p>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {!disabled && (
+            <p className="text-[11px] mt-3 font-medium text-muted-foreground">
+              Cliquer pour voir le détail →
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </button>
   );
 }
+
+// ── Column definitions ──────────────────────────────────────────────────────
+
+type MarginProduct = MarginAlertBracket["products"][number];
+
+const MARGE_COLUMNS: AlertColumn<MarginProduct>[] = [
+  { key: "product", header: "Produit", accessor: (r) => r.product },
+  {
+    key: "marge_pct",
+    header: "Marge %",
+    accessor: (r) => r.marge_pct,
+    align: "right",
+    format: (v) => `${(v as number).toFixed(1)}%`,
+  },
+  {
+    key: "ca",
+    header: "CA",
+    accessor: (r) => r.ca,
+    align: "right",
+    format: (v) => `${fmt(v as number)} MAD`,
+  },
+];
+
+const PEREMPTION_COLUMNS: AlertColumn<PeremptionProduct>[] = [
+  { key: "product", header: "Produit", accessor: (r) => r.product },
+  { key: "expiry_date", header: "Date d'expiration", accessor: (r) => r.expiry_date },
+  {
+    key: "quantity",
+    header: "Quantité",
+    accessor: (r) => r.quantity,
+    align: "right",
+  },
+  {
+    key: "ppv",
+    header: "PPV",
+    accessor: (r) => r.ppv,
+    align: "right",
+    format: (v) => `${fmt(v as number)} MAD`,
+  },
+];
+
+const STOCK_COLUMNS: AlertColumn<StockAbcdProduct>[] = [
+  { key: "product", header: "Produit", accessor: (r) => r.product },
+  { key: "category", header: "Catégorie", accessor: (r) => r.category },
+  {
+    key: "current_stock",
+    header: "Stock actuel",
+    accessor: (r) => r.current_stock,
+    align: "right",
+  },
+  {
+    key: "stock_min",
+    header: "Stock min",
+    accessor: (r) => r.stock_min,
+    align: "right",
+  },
+  {
+    key: "stock_max",
+    header: "Stock max",
+    accessor: (r) => r.stock_max,
+    align: "right",
+  },
+  {
+    key: "ppv",
+    header: "PPV",
+    accessor: (r) => r.ppv,
+    align: "right",
+    format: (v) => (v == null ? "—" : `${fmt(v as number)} MAD`),
+  },
+];

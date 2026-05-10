@@ -83,6 +83,9 @@ def submit_non_declare_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Owner-driven: flag a product as non-declared. Applied immediately —
+    no admin approval needed (the audit trail is still recorded as an
+    APPROVED CatalogRequest)."""
     if current_user.role not in (Role.OWNER, Role.EMPLOYEE):
         raise HTTPException(status_code=403, detail="Réservé aux propriétaires de pharmacie")
     med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
@@ -101,22 +104,30 @@ def submit_non_declare_request(
     )
     if not has_product:
         raise HTTPException(status_code=400, detail="Ce produit n'existe pas dans vos données")
-    # Avoid duplicate pending requests
-    existing = db.query(CatalogRequest).filter(
-        CatalogRequest.pharmacy_id == current_user.pharmacy_id,
-        CatalogRequest.medicament_id == body.medicament_id,
-        CatalogRequest.request_type == RequestType.NON_DECLARE,
-        CatalogRequest.status == Status.PENDING,
+    # Apply the side effect immediately: mark the product as non-declared.
+    status_row = db.query(PharmacyMedicamentStatus).filter(
+        PharmacyMedicamentStatus.pharmacy_id == current_user.pharmacy_id,
+        PharmacyMedicamentStatus.medicament_id == body.medicament_id,
     ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Une demande est déjà en cours pour ce produit")
+    if status_row:
+        if status_row.declared is False:
+            raise HTTPException(status_code=400, detail="Ce produit est déjà marqué comme spécial")
+        status_row.declared = False
+    else:
+        db.add(PharmacyMedicamentStatus(
+            pharmacy_id=current_user.pharmacy_id,
+            medicament_id=body.medicament_id,
+            declared=False,
+        ))
     req = CatalogRequest(
         requested_by=current_user.id,
         pharmacy_id=current_user.pharmacy_id,
         request_type=RequestType.NON_DECLARE,
         medicament_id=body.medicament_id,
         notes=body.notes,
-        product=med.product,  # store name for display
+        product=med.product,
+        status=RequestStatus.APPROVED,
+        reviewed_at=datetime.now(timezone.utc),
     )
     db.add(req)
     db.commit()
@@ -131,7 +142,8 @@ def submit_annulation_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Owner requests to cancel a previously approved non-declare exclusion."""
+    """Owner-driven: re-declare a previously-flagged product. Applied
+    immediately — no admin approval needed."""
     if current_user.role not in (Role.OWNER, Role.EMPLOYEE):
         raise HTTPException(status_code=403, detail="Réservé aux propriétaires de pharmacie")
     med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
@@ -145,15 +157,8 @@ def submit_annulation_request(
     ).first()
     if not status_row:
         raise HTTPException(status_code=400, detail="Ce produit n'est pas exclu de vos rapports")
-    # Avoid duplicate pending annulation
-    existing = db.query(CatalogRequest).filter(
-        CatalogRequest.pharmacy_id == current_user.pharmacy_id,
-        CatalogRequest.medicament_id == body.medicament_id,
-        CatalogRequest.request_type == RequestType.ANNULATION,
-        CatalogRequest.status == Status.PENDING,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Une demande d'annulation est déjà en cours pour ce produit")
+    # Apply the reversal immediately.
+    db.delete(status_row)
     req = CatalogRequest(
         requested_by=current_user.id,
         pharmacy_id=current_user.pharmacy_id,
@@ -161,6 +166,8 @@ def submit_annulation_request(
         medicament_id=body.medicament_id,
         notes=body.notes,
         product=med.product,
+        status=RequestStatus.APPROVED,
+        reviewed_at=datetime.now(timezone.utc),
     )
     db.add(req)
     db.commit()

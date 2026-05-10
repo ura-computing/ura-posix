@@ -41,7 +41,8 @@ export function useSubmitAnnulation() {
       catalogRequestsApi.submitAnnulation(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
-      toast.success("Demande d'annulation envoyée à l'administrateur");
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY });
+      toast.success("Produit réintégré dans vos rapports");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -82,11 +83,12 @@ export function useSubmitNonDeclareRequests(
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY });
       const count = selectedIds.size;
       toast.success(
         count === 1
-          ? "Demande envoyée à l'administrateur"
-          : `${count} demandes envoyées à l'administrateur`
+          ? "Produit marqué comme spécial"
+          : `${count} produits marqués comme spéciaux`
       );
       resetDialog();
     },

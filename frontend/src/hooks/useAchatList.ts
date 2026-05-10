@@ -9,12 +9,14 @@ type UseAchatListParams = {
   tva?: string[];
   dateFrom?: string;
   dateTo?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 };
 
 export function useAchatList(params: UseAchatListParams) {
-  const { page, limit, search, categories, tva, dateFrom, dateTo } = params;
+  const { page, limit, search, categories, tva, dateFrom, dateTo, sortBy, sortOrder } = params;
   const { data, isLoading: achatLoading } = useQuery({
-    queryKey: ["achat", page, limit, search, categories, tva, dateFrom, dateTo],
+    queryKey: ["achat", page, limit, search, categories, tva, dateFrom, dateTo, sortBy, sortOrder],
     queryFn: () =>
       transactionsApi.listAchats({
         page,
@@ -24,6 +26,8 @@ export function useAchatList(params: UseAchatListParams) {
         tva: tva?.length ? tva : undefined,
         dateFrom,
         dateTo,
+        sortBy,
+        sortOrder,
       }),
   });
 

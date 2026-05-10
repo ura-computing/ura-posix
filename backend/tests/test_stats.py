@@ -160,14 +160,14 @@ class TestGetStats:
         assert isinstance(prev["achats_total"], (int, float))
 
     def test_previous_kpis_with_date_range(self, client, db, test_owner, stats_data):
-        """When filtering March 10-15, previous period (March 4-9) should pick up
-        data we insert into that window."""
+        """When filtering March 10-15 2026, the previous period is the same dates
+        one year earlier (March 10-15 2025)."""
         pharmacy_id = stats_data["pharmacy_id"]
         med1 = stats_data["med1"]
 
-        # Add data in the previous period (March 4-9) for med1
-        make_vente(db, med1, pharmacy_id, quantity=3, unit_price=50.0, date="2026-03-05")
-        make_achat(db, med1, pharmacy_id, quantity=4, unit_price=40.0, delivery_date="2026-03-06")
+        # Add data in the year-ago window (March 10-15 2025) for med1
+        make_vente(db, med1, pharmacy_id, quantity=3, unit_price=50.0, date="2025-03-12")
+        make_achat(db, med1, pharmacy_id, quantity=4, unit_price=40.0, delivery_date="2025-03-13")
 
         res = client.get(
             "/stats",
@@ -176,14 +176,11 @@ class TestGetStats:
         )
         assert res.status_code == 200
         prev = res.json()["previous_kpis"]
-        # Previous period: March 4 - March 9 (5-day delta, same length)
-        # Ventes in that window: 3 * 50 (ppv) = 150
         assert prev["ventes_total"] == 3 * 50.0
-        # Achats in that window: stats_data med2 (10*80=800) + our achat (4*40=160) = 960
-        assert prev["achats_total"] == (10 * 80.0) + (4 * 40.0)
+        assert prev["achats_total"] == 4 * 40.0
 
     def test_previous_kpis_empty_when_no_prior_data(self, client, test_owner, stats_data):
-        """When there is no data in the previous period, totals should be 0."""
+        """When there is no data in the year-ago window, totals should be 0."""
         res = client.get(
             "/stats",
             params={"date_from": "2026-03-01", "date_to": "2026-03-31"},
@@ -191,7 +188,7 @@ class TestGetStats:
         )
         assert res.status_code == 200
         prev = res.json()["previous_kpis"]
-        # Previous period is Feb 1-28 — no data was inserted there
+        # Year-ago window is March 1-31 2025 — no data was inserted there
         assert prev["ventes_total"] == 0
         assert prev["achats_total"] == 0
 

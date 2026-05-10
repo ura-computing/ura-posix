@@ -21,6 +21,13 @@ def _subtract_months(d: date, months: int) -> date:
     return date(year, month, min(d.day, max_day))
 
 
+def _subtract_years(d: date, years: int) -> date:
+    """Subtract *years* from *d*, clamping Feb 29 to Feb 28 in non-leap years."""
+    year = d.year - years
+    max_day = calendar.monthrange(year, d.month)[1]
+    return date(year, d.month, min(d.day, max_day))
+
+
 def _pharma_expr():
     """SQLAlchemy expression: True = pharmacie, False = parapharmacie.
     Admin product_type override takes precedence; falls back to category keywords."""
@@ -326,37 +333,31 @@ def compute_previous_kpis(
     cat_filter_a: list,
     non_declared_sub=None,
 ) -> dict:
-    """Compute ventes_total and achats_total for the previous period of equal length.
+    """Compute ventes_total and achats_total for the same window one year earlier.
 
-    When date filters are provided, the previous period has the same length and
-    ends the day before df.  When no dates are provided, compare current month
-    vs previous month.
+    When date filters are provided, the previous period spans the same dates
+    minus one year (Feb 29 clamps to Feb 28).  When no dates are provided,
+    compare the current month vs the same month last year.
     """
     today = date.today()
 
     if df and dt:
         d_from = date.fromisoformat(df)
         d_to = date.fromisoformat(dt)
-        delta = d_to - d_from
-        prev_dt = d_from - timedelta(days=1)
-        prev_df = prev_dt - delta
+        prev_df = _subtract_years(d_from, 1)
+        prev_dt = _subtract_years(d_to, 1)
     elif df:
         d_from = date.fromisoformat(df)
-        # No end date means "until today"; mirror that length backwards
-        delta = today - d_from
-        prev_dt = d_from - timedelta(days=1)
-        prev_df = prev_dt - delta
+        prev_df = _subtract_years(d_from, 1)
+        prev_dt = _subtract_years(today, 1)
     elif dt:
-        # Only end date — use 1 month window ending at dt
         d_to = date.fromisoformat(dt)
-        prev_dt = _subtract_months(d_to, 1) - timedelta(days=1)
-        prev_df = _subtract_months(prev_dt, 1)
+        prev_df = _subtract_years(d_to.replace(day=1), 1)
+        prev_dt = _subtract_years(d_to, 1)
     else:
-        # No dates — current month vs previous month
         first_of_month = today.replace(day=1)
-        prev_first = _subtract_months(first_of_month, 1)
-        prev_df = prev_first
-        prev_dt = first_of_month - timedelta(days=1)
+        prev_df = _subtract_years(first_of_month, 1)
+        prev_dt = _subtract_years(today, 1)
 
     prev_df_str = prev_df.strftime("%Y-%m-%d")
     prev_dt_str = prev_dt.strftime("%Y-%m-%d")

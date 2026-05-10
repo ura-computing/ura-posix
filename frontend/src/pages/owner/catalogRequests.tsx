@@ -72,6 +72,16 @@ export default function CatalogRequestsPage() {
     });
   }, []);
 
+  const toggleAllVisible = useCallback((visibleIds: number[]) => {
+    setSelectedIds((prev) => {
+      const allSelected = visibleIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
   // Existing non-declare requests
   const { requests, requestsLoading } = useCatalogRequestsList(isOwner);
 
@@ -106,7 +116,7 @@ export default function CatalogRequestsPage() {
         <div>
           <h1 className="page-title">Produits spéciaux</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Demandez à l'administrateur d'exclure un produit de vos rapports.
+            Excluez un produit de vos rapports en un clic — aucune validation administrateur requise.
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
@@ -241,7 +251,7 @@ export default function CatalogRequestsPage() {
             <div className="relative shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un produit..."
+                placeholder="Rechercher par produit, fournisseur ou code-barres…"
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -251,6 +261,33 @@ export default function CatalogRequestsPage() {
                 spellCheck={false}
               />
             </div>
+
+            {/* Header bar with select-all toggle (shown once results are listed) */}
+            {hasSearch && !productsLoading && products.length > 0 && (() => {
+              const selectableIds = products
+                .filter((p) => !pendingMedIds.has(p.medicament_id))
+                .map((p) => p.medicament_id);
+              const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+              const someSelected = selectableIds.some((id) => selectedIds.has(id));
+              return (
+                <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+                  <span className="tabular-nums">
+                    {products.length} résultat{products.length > 1 ? "s" : ""}
+                    {someSelected && ` · ${selectableIds.filter((id) => selectedIds.has(id)).length} sélectionné${selectableIds.filter((id) => selectedIds.has(id)).length > 1 ? "s" : ""}`}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={selectableIds.length === 0}
+                    onClick={() => toggleAllVisible(selectableIds)}
+                  >
+                    {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                  </Button>
+                </div>
+              );
+            })()}
 
             {/* Product list */}
             <div className="flex-1 min-h-0 border rounded-lg overflow-y-auto">
@@ -322,7 +359,7 @@ export default function CatalogRequestsPage() {
             {selectedIds.size > 0 && (
               <div className="shrink-0 space-y-1.5">
                 <Label htmlFor="nd-notes" className="text-xs">
-                  Note pour l&apos;administrateur{" "}
+                  Note interne{" "}
                   <span className="text-muted-foreground font-normal">(optionnelle)</span>
                 </Label>
                 <Textarea

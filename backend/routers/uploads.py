@@ -13,7 +13,12 @@ from datetime import date as _date
 
 from models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
 from routers.auth import get_current_user
-from utils.strings import normalize_category, strip_accents
+from utils.strings import fix_mojibake, normalize_category, strip_accents
+
+# Header aliases applied AFTER mojibake fix. Keys/values are lowercased for matching.
+_HEADER_ALIASES = {
+    "caégorie": "Catégorie",  # missing 't' typo seen in some Sobrus exports
+}
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -39,13 +44,24 @@ def _parse_float(val: str) -> float | None:
         return None
 
 
+def _clean_header(h: str) -> str:
+    """Strip quotes/whitespace, fix mojibake, apply known aliases."""
+    cleaned = fix_mojibake(h.strip().strip('"')) or ""
+    return _HEADER_ALIASES.get(cleaned.lower(), cleaned)
+
+
+def _clean_value(v: str) -> str:
+    """Strip quotes/whitespace, fix mojibake."""
+    return fix_mojibake(v.strip().strip('"')) or ""
+
+
 def _parse_csv(content: bytes) -> list[dict]:
     text = _decode(content)
     reader = csv.DictReader(io.StringIO(text), delimiter=";")
     return [
-        {k.strip().strip('"'): v.strip().strip('"') for k, v in row.items()}
+        {_clean_header(k): _clean_value(v) for k, v in row.items() if k}
         for row in reader
-        if any(v.strip() for v in row.values())
+        if any((v or "").strip() for v in row.values())
     ]
 
 

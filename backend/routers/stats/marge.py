@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
+from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 from utils.strings import strip_percentage as _strip_pct
 from .queries import _pharma_expr
 
@@ -55,29 +55,14 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
         )
         avg_pu_sub = achat_prices_sub  # alias for backward compat
 
-        # Latest stock per medicament (stock_max from the most recent achat)
-        _latest_achat = (
-            db.query(
-                Achat.medicament_id,
-                Achat.stock_max.label("current_stock"),
-                func.row_number()
-                .over(
-                    partition_by=Achat.medicament_id,
-                    order_by=Achat.delivery_date.desc(),
-                )
-                .label("rn"),
-            )
-            .filter(*base_filter_a, Achat.medicament_id.isnot(None))
-            .subquery()
+        # Current stock from PharmacyStock (Sobrus stock snapshot, not derived from Achat)
+        _stock_q = db.query(
+            PharmacyStock.medicament_id,
+            PharmacyStock.current_stock.label("current_stock"),
         )
-        latest_stock_sub = (
-            db.query(
-                _latest_achat.c.medicament_id,
-                _latest_achat.c.current_stock,
-            )
-            .filter(_latest_achat.c.rn == 1)
-            .subquery()
-        )
+        if pharmacy_id:
+            _stock_q = _stock_q.filter(PharmacyStock.pharmacy_id == pharmacy_id)
+        latest_stock_sub = _stock_q.subquery()
 
         q = (
             db.query(
@@ -378,6 +363,44 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 "ca":              round(float(r.ca or 0), 2),
             })
 
+    elif mode == "annee":
+        # One row per year, columns = monthly CA + total. Used for the year-pivot
+        # view in /analyse so users can compare CA month-by-month across years.
+        from sqlalchemy import Date
+        q = (
+            db.query(
+                func.extract("year", func.cast(Vente.date, Date)).label("annee"),
+                func.extract("month", func.cast(Vente.date, Date)).label("mois"),
+                func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+                func.sum(Vente.quantity).label("qty"),
+            )
+            .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+            .filter(*base_filter_v, *cat_filter)
+            .group_by("annee", "mois")
+        )
+        bucket: dict[int, dict] = {}
+        _MONTH_KEYS = ["m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"]
+        for r in q.all():
+            yr = int(r.annee or 0)
+            if yr == 0:
+                continue
+            mo = int(r.mois or 0)
+            if not (1 <= mo <= 12):
+                continue
+            row = bucket.setdefault(yr, {
+                "annee": yr,
+                **dict.fromkeys(_MONTH_KEYS, 0.0),
+                "ca": 0.0,
+                "qty": 0.0,
+            })
+            row[_MONTH_KEYS[mo - 1]] = round(float(r.ca or 0), 2)
+            row["ca"] += float(r.ca or 0)
+            row["qty"] += float(r.qty or 0)
+        for row in bucket.values():
+            row["ca"] = round(row["ca"], 2)
+            row["qty"] = round(row["qty"], 2)
+        rows_out.extend(sorted(bucket.values(), key=lambda r: r["annee"], reverse=True))
+
     # ── KPI computation ────────────────────────────────────────────────────────
     total_ventes_dh     = sum(r.get("ca", r.get("total", 0)) or 0 for r in rows_out)
     total_ventes_unites = sum(float(r.get("qty") or 0) for r in rows_out)
@@ -572,7 +595,6 @@ def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str)
             "ca": round(ca, 2),
         })
 
-    # Keep only top 5 products per bracket (sorted by absolute margin desc)
     for key in result:
         bucket = result[key]
         bucket["total_ca"] = round(bucket["total_ca"], 2)
@@ -581,6 +603,6 @@ def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str)
             bucket["products"],
             key=lambda p: abs(p["marge_pct"]),
             reverse=True,
-        )[:5]
+        )
 
     return result

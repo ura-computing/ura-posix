@@ -81,10 +81,21 @@ def signup(request: Request, body: UserSignup, db: Session = Depends(get_db)):
             resolved_pharmacy_name = pharmacy.name
             resolved_pharmacy_id = pharmacy.id
         else:
-            # Creating a new pharmacy — name required
+            # Creating a new pharmacy — name + city required
             if not body.pharmacy_name:
                 raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour les nouveaux propriétaires")
-            resolved_pharmacy_name = body.pharmacy_name
+            if not body.pharmacy_city:
+                raise HTTPException(status_code=400, detail="Ville requise pour créer une nouvelle pharmacie")
+            from utils.pharmacy_code import generate_pharmacy_code
+            new_pharmacy = Pharmacy(
+                name=body.pharmacy_name,
+                city=body.pharmacy_city,
+                code=generate_pharmacy_code(db, body.pharmacy_city),
+            )
+            db.add(new_pharmacy)
+            db.flush()
+            resolved_pharmacy_name = new_pharmacy.name
+            resolved_pharmacy_id = new_pharmacy.id
 
     user = User(
         email=body.email,
