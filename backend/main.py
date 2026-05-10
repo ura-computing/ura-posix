@@ -96,6 +96,11 @@ with SessionLocal() as _db:
     _to_backfill = _db.query(Pharmacy).filter(Pharmacy.code.is_(None)).all()
     for _p in _to_backfill:
         _p.code = generate_pharmacy_code(_db, _p.city or _p.name)
+        # Flush after each assignment so the next call to
+        # generate_pharmacy_code sees the freshly-assigned code and picks
+        # the next slot for the same prefix (otherwise all rows that
+        # share a 3-letter prefix would collide on the unique index).
+        _db.flush()
     if _to_backfill:
         _db.commit()
 
