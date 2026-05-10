@@ -10,6 +10,10 @@ export type TransactionFilters = {
   dateFrom?: string;
   dateTo?: string;
   surveillance?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  /** When false, non-declared ("produits spéciaux") rows are excluded. Backend defaults true. */
+  includeNonDeclared?: boolean;
 };
 
 export type PaginatedResult<T> = {
@@ -31,6 +35,9 @@ function buildTransactionQs(p: TransactionFilters): URLSearchParams {
   p.tva?.forEach((t) => qs.append("tva", t));
   if (p.dateFrom) qs.set("date_from", p.dateFrom);
   if (p.dateTo) qs.set("date_to", p.dateTo);
+  if (p.sortBy) qs.set("sort_by", p.sortBy);
+  if (p.sortOrder) qs.set("sort_order", p.sortOrder);
+  if (p.includeNonDeclared === false) qs.set("include_non_declared", "false");
   return qs;
 }
 
@@ -78,6 +85,7 @@ export const exportVente = (
   dateFrom?: string,
   dateTo?: string,
   tva?: string[],
+  surveillance?: string,
 ) => {
   const p = new URLSearchParams({ export: "true" });
   if (search) p.set("search", search);
@@ -85,6 +93,7 @@ export const exportVente = (
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
   tva?.forEach((t) => p.append("tva", t));
+  if (surveillance) p.set("surveillance", surveillance);
   return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.ventes.list}?${p}`);
 };
 

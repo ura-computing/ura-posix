@@ -72,6 +72,8 @@ export type AnalyseMargeResponse = {
   rows: Record<string, unknown>[];
 };
 
+export type StockStatus = "negatif" | "sous-stock" | "ok" | "sur-stock" | "inconnu";
+
 export type StockAbcdProduct = {
   product: string;
   category: string;
@@ -81,6 +83,15 @@ export type StockAbcdProduct = {
   current_stock: number | null;
   ppv: number | null;
   avg_pu: number | null;
+  status: StockStatus;
+};
+
+export type StockAbcdParams = {
+  classFilter?: string;
+  status?: StockStatus | "all";
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 };
 
 export type StockAbcdResponse = {
@@ -120,8 +131,17 @@ function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): str
   return qs ? `?${qs}` : "";
 }
 
-export const getStats = (dateFrom?: string, dateTo?: string, categoryType?: string) =>
-  request<StatsResponse>(`/stats${buildQs(dateFrom, dateTo, categoryType)}`);
+export const getStats = (
+  dateFrom?: string,
+  dateTo?: string,
+  categoryType?: string,
+  includeNonDeclared?: boolean,
+) => {
+  const qs = buildQs(dateFrom, dateTo, categoryType);
+  const sep = qs ? "&" : "?";
+  const extra = includeNonDeclared ? `${sep}include_non_declared=true` : "";
+  return request<StatsResponse>(`/stats${qs}${extra}`);
+};
 
 export const analyseMarge = (
   dateFrom?: string,
@@ -138,8 +158,10 @@ export const analyseMarge = (
   return request<AnalyseMargeResponse>(`/stats/analyse-marge${qs ? `?${qs}` : ""}`);
 };
 
+export type ListeItem = { name: string; pid?: string; barcode1?: string; barcode2?: string };
+
 export const analyseListe = (
-  products: string[],
+  items: ListeItem[],
   dateFrom?: string,
   dateTo?: string,
   categoryType?: string,
@@ -147,7 +169,7 @@ export const analyseListe = (
   request<AnalyseMargeResponse>("/stats/analyse-liste", {
     method: "POST",
     body: JSON.stringify({
-      products,
+      items,
       date_from: dateFrom || null,
       date_to: dateTo || null,
       category_type: categoryType || "all",
@@ -158,10 +180,12 @@ export const exportExcel = (
   dateFrom?: string,
   dateTo?: string,
   categoryType: eCategoryType = eCategoryType.ALL,
+  includeNonDeclared?: boolean,
 ): Promise<Blob> => {
   const p = new URLSearchParams({ category_type: categoryType });
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
+  if (includeNonDeclared) p.set("include_non_declared", "true");
   return fetchBlob(`/stats/export-excel?${p}`);
 };
 
@@ -192,10 +216,19 @@ export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?:
   return request<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs ? `?${qs}` : ""}`);
 };
 
-export const getStockAbcd = (dateFrom?: string, dateTo?: string) => {
+export const getStockAbcd = (
+  dateFrom?: string,
+  dateTo?: string,
+  extra: StockAbcdParams = {},
+) => {
   const p = new URLSearchParams();
   if (dateFrom) p.set("date_from", dateFrom);
   if (dateTo) p.set("date_to", dateTo);
+  if (extra.classFilter) p.set("class_filter", extra.classFilter);
+  if (extra.status && extra.status !== "all") p.set("status", extra.status);
+  if (extra.search) p.set("search", extra.search);
+  if (extra.sortBy) p.set("sort_by", extra.sortBy);
+  if (extra.sortOrder) p.set("sort_order", extra.sortOrder);
   const qs = p.toString();
   return request<StockAbcdResponse>(`/stats/stock-abcd${qs ? `?${qs}` : ""}`);
 };

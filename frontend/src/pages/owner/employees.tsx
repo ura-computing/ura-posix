@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMe } from "@/hooks/useMe";
-import { useOwnerEmployees, useEmployeePermissions } from "@/hooks/useOwnerEmployees";
+import { useOwnerEmployees, useEmployeePermissions, useInviteEmployee } from "@/hooks/useOwnerEmployees";
 import {
   Users,
   UserCheck,
   UserX,
   Loader2,
+  Mail,
   ShieldOff,
   Clock,
   ShieldCheck,
@@ -30,6 +31,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { UserAdmin } from "@/types";
 import { eUserRole, eUserStatus } from "@/types";
 import { FEATURES } from "@/constants";
@@ -95,6 +106,7 @@ export default function OwnerEmployeesPage() {
   const { me: identity } = useMe();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const isEmployee = identity?.role !== eUserRole.OWNER;
 
@@ -118,12 +130,20 @@ export default function OwnerEmployeesPage() {
     <ListView>
       <Breadcrumb />
 
-      <div>
-        <h1 className="page-title">Mes employés</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Gérez les demandes d'accès et les permissions des membres de votre pharmacie.
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="page-title">Mes employés</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Gérez les demandes d'accès et les permissions des membres de votre pharmacie.
+          </p>
+        </div>
+        <Button onClick={() => setInviteOpen(true)} className="gap-2 shrink-0">
+          <Mail className="h-4 w-4" />
+          Inviter un employé
+        </Button>
       </div>
+
+      <InviteEmployeeDialog open={inviteOpen} onOpenChange={setInviteOpen} />
 
       {isLoading ? (
         <PageLoader />
@@ -302,5 +322,91 @@ export default function OwnerEmployeesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </ListView>
+  );
+}
+
+// ── Invite dialog ───────────────────────────────────────────────────────────
+
+function InviteEmployeeDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const { invite, inviting } = useInviteEmployee(() => {
+    onOpenChange(false);
+    setEmail("");
+    setName("");
+    setPhone("");
+  });
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    invite({
+      email: email.trim(),
+      name: name.trim() || undefined,
+      phone: phone.trim() || undefined,
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Inviter un employé</DialogTitle>
+          <DialogDescription>
+            Saisissez l'email de l'employé. Il recevra un lien pour définir son mot de passe (valide 7 jours).
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-email" className="text-xs">Email *</Label>
+            <Input
+              id="invite-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="employe@pharmacie.ma"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-name" className="text-xs">
+              Nom <span className="text-muted-foreground font-normal">(optionnel)</span>
+            </Label>
+            <Input
+              id="invite-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Karim El Amrani"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="invite-phone" className="text-xs">
+              Téléphone <span className="text-muted-foreground font-normal">(optionnel)</span>
+            </Label>
+            <Input
+              id="invite-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="06xx xx xx xx"
+            />
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={inviting}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={inviting || !email.trim()}>
+              {inviting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer l'invitation
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -5,14 +5,16 @@ export function usePharmacyStats(
   dateFrom?: string,
   dateTo?: string,
   categoryType?: "all" | "pharmacie" | "parapharmacie",
+  includeNonDeclared?: boolean,
 ) {
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ["stats", dateFrom, dateTo, categoryType],
+    queryKey: ["stats", dateFrom, dateTo, categoryType, includeNonDeclared],
     queryFn: () =>
       statsApi.getStats(
         dateFrom || undefined,
         dateTo || undefined,
         categoryType,
+        includeNonDeclared,
       ),
   });
   return { stats, statsLoading };
@@ -35,11 +37,18 @@ export function useMarginAlerts(
   return { marginAlerts, marginAlertsLoading };
 }
 
-export function useStockAbcd(dateFrom?: string, dateTo?: string) {
+export function useStockAbcd(
+  dateFrom?: string,
+  dateTo?: string,
+  extra: statsApi.StockAbcdParams = {},
+) {
+  const { classFilter, status, search, sortBy, sortOrder } = extra;
   const { data: stockAbcd, isLoading: stockAbcdLoading } = useQuery({
-    queryKey: ["stock-abcd", dateFrom, dateTo],
+    queryKey: ["stock-abcd", dateFrom, dateTo, classFilter, status, search, sortBy, sortOrder],
     queryFn: () =>
-      statsApi.getStockAbcd(dateFrom || undefined, dateTo || undefined),
+      statsApi.getStockAbcd(dateFrom || undefined, dateTo || undefined, {
+        classFilter, status, search, sortBy, sortOrder,
+      }),
   });
   return { stockAbcd, stockAbcdLoading };
 }

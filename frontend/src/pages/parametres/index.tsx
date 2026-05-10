@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { DatePicker } from "@/components/ui/datePicker";
+import { DateRangePicker } from "@/components/ui/dateRangePicker";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 
@@ -135,20 +135,13 @@ function DeleteDialog({
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-sm font-medium">Par période</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Du
-                </label>
-                <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Début" className={cn(dateFrom && "border-destructive/50 text-destructive")} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Au
-                </label>
-                <DatePicker value={dateTo} onChange={setDateTo} placeholder="Fin" className={cn(dateTo && "border-destructive/50 text-destructive")} />
-              </div>
-            </div>
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onFromChange={setDateFrom}
+              onToChange={setDateTo}
+              aria-invalid={!!(dateFrom || dateTo)}
+            />
           </div>
 
           {/* Scope summary */}

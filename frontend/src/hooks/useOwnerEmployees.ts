@@ -71,3 +71,18 @@ export function useOwnerEmployees(enabled: boolean) {
     revoking,
   };
 }
+
+export function useInviteEmployee(onDone?: () => void) {
+  const queryClient = useQueryClient();
+  const { mutate, isPending } = useMutation({
+    mutationFn: (payload: ownerApi.InviteEmployeePayload) =>
+      ownerApi.inviteEmployee(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast.success("Invitation envoyée par email");
+      onDone?.();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  return { invite: mutate, inviting: isPending };
+}

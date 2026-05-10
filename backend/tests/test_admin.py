@@ -28,18 +28,48 @@ def test_list_pharmacies_non_admin_403(client, test_owner):
 def test_create_pharmacy_success(client, test_admin):
     res = client.post("/admin/pharmacies", headers=test_admin["headers"], json={
         "name": "Pharmacie Nouvelle",
+        "city": "Bouskoura",
         "address": "456 Rue Neuve",
     })
     assert res.status_code == 200
     data = res.json()
     assert data["name"] == "Pharmacie Nouvelle"
+    assert data["city"] == "Bouskoura"
+    assert data["code"] == "BOU0001"
     assert data["address"] == "456 Rue Neuve"
     assert data["user_count"] == 0
+
+
+def test_create_pharmacy_codes_increment_per_city(client, test_admin):
+    """Two pharmacies in the same city → BOU0001 then BOU0002."""
+    r1 = client.post("/admin/pharmacies", headers=test_admin["headers"], json={
+        "name": "Pharmacie A", "city": "Bouskoura",
+    })
+    r2 = client.post("/admin/pharmacies", headers=test_admin["headers"], json={
+        "name": "Pharmacie B", "city": "Bouskoura",
+    })
+    assert r1.json()["code"] == "BOU0001"
+    assert r2.json()["code"] == "BOU0002"
+
+
+def test_create_pharmacy_strips_accents_for_code(client, test_admin):
+    res = client.post("/admin/pharmacies", headers=test_admin["headers"], json={
+        "name": "Pharmacie du Centre", "city": "Fès",
+    })
+    assert res.json()["code"] == "FES0001"
+
+
+def test_create_pharmacy_city_required_422(client, test_admin):
+    res = client.post("/admin/pharmacies", headers=test_admin["headers"], json={
+        "name": "Sans Ville",
+    })
+    assert res.status_code == 422
 
 
 def test_create_pharmacy_non_admin_403(client, test_owner):
     res = client.post("/admin/pharmacies", headers=test_owner["headers"], json={
         "name": "Should Fail",
+        "city": "Casablanca",
     })
     assert res.status_code == 403
 

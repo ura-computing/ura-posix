@@ -7,27 +7,78 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
+from utils.strings import tokenize_search
 
 
-def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str | None) -> dict:
+_SORT_KEYS = {
+    "product", "category", "units_sold_12m", "stock_min", "stock_max",
+    "current_stock", "ppv", "avg_pu", "status",
+}
+
+
+def stock_abcd_window(today: date) -> tuple[date, date]:
+    """Calendar-aligned analysis window used when no explicit du/au is set.
+
+    - Jan-Jun → full previous calendar year (Jan 1 → Dec 31 of Y-1)
+    - Jul-Dec → rolling Y-1 Jul 1 → Y Jun 30
+
+    Examples: on 2026-05-02 returns (2025-01-01, 2025-12-31);
+    on 2026-07-01 returns (2025-07-01, 2026-06-30).
+    """
+    year = today.year
+    if today.month <= 6:
+        return date(year - 1, 1, 1), date(year - 1, 12, 31)
+    return date(year - 1, 7, 1), date(year, 6, 30)
+
+
+def _stock_status(current_stock: int | None, stock_min: int, stock_max: int) -> str:
+    """Compute the human-readable stock status used by the products table."""
+    if current_stock is None:
+        return "inconnu"
+    if current_stock < 0:
+        return "negatif"
+    if current_stock < stock_min:
+        return "sous-stock"
+    if current_stock > stock_max:
+        return "sur-stock"
+    return "ok"
+
+
+def _compute_stock_abcd(
+    db: Session,
+    pharmacy_id: int,
+    df: str | None,
+    dt: str | None,
+    class_filter: str | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
+) -> dict:
     """
     For each medicament sold or stocked by this pharmacy in the last 12 months,
     compute the ABCD class, stock_min, stock_max and current_stock.
 
-    Returns { distribution, total_references, products }.
+    Distribution + global metrics reflect the full dataset; only `products` is
+    filtered/sorted by the optional parameters so the chart still shows the
+    big picture.
+
+    Returns { distribution, total_references, ppv_potentiel, products }.
     """
 
     # ── Determine 12-month and 4-month windows ────────────────────────────────
+    # When neither du nor au is supplied we use the calendar-aligned rule
+    # (`stock_abcd_window`). When only one bound is supplied we keep the
+    # legacy 365-day fallback so the user's partial input still works.
     today = date.today()
-    if dt:
-        end_date = date.fromisoformat(dt)
-    else:
-        end_date = today
-
-    if df:
+    if df and dt:
         start_12m = date.fromisoformat(df)
+        end_date = date.fromisoformat(dt)
+    elif not df and not dt:
+        start_12m, end_date = stock_abcd_window(today)
     else:
-        start_12m = end_date - timedelta(days=365)
+        end_date = date.fromisoformat(dt) if dt else today
+        start_12m = date.fromisoformat(df) if df else end_date - timedelta(days=365)
 
     start_4m = end_date - timedelta(days=120)
 
@@ -247,17 +298,37 @@ def _compute_stock_abcd(db: Session, pharmacy_id: int, df: str | None, dt: str |
             "current_stock": current_stock,
             "ppv": round(float(r.ppv), 2) if r.ppv is not None else None,
             "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
+            "status": _stock_status(current_stock, stock_min, stock_max),
         })
 
-    # Sort products by units_sold_12m descending
-    products.sort(key=lambda p: p["units_sold_12m"], reverse=True)
-
-    # Remove zero-count classes from distribution
+    total_references = len(products)
     distribution = {k: v for k, v in distribution.items() if v > 0}
+
+    # Apply optional filters
+    if class_filter:
+        products = [p for p in products if p["category"] == class_filter]
+    if status:
+        products = [p for p in products if p["status"] == status]
+    tokens = tokenize_search(search)
+    if tokens:
+        products = [
+            p for p in products
+            if all(tok in (p["product"] or "").lower() for tok in tokens)
+        ]
+
+    # Apply optional sort, falling back to units_sold_12m desc
+    if sort_by in _SORT_KEYS:
+        reverse = sort_order != "asc"
+        products.sort(
+            key=lambda p: (p[sort_by] is None, p[sort_by] if p[sort_by] is not None else 0),
+            reverse=reverse,
+        )
+    else:
+        products.sort(key=lambda p: p["units_sold_12m"], reverse=True)
 
     return {
         "distribution": distribution,
-        "total_references": len(products),
+        "total_references": total_references,
         "ppv_potentiel": round(ppv_potentiel, 2),
         "products": products,
     }

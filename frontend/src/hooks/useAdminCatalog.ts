@@ -14,10 +14,12 @@ export function useAdminCatalogList(
   searchQuery: string,
   page: number,
   limit: number,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
 ) {
   const { data: queryResult, isLoading } = useQuery({
-    queryKey: [...CATALOG_QUERY_KEY, page, limit, searchQuery],
-    queryFn: () => adminApi.listCatalog(searchQuery || undefined, page, limit),
+    queryKey: [...CATALOG_QUERY_KEY, page, limit, searchQuery, sortBy, sortOrder],
+    queryFn: () => adminApi.listCatalog(searchQuery || undefined, page, limit, sortBy, sortOrder),
   });
 
   const rows = queryResult?.data ?? [];

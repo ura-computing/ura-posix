@@ -14,11 +14,11 @@ import { DataTable } from "@/components/DataTable/dataTable";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type MargeMode = "produit" | "categorie" | "grossiste" | "bl" | "laboratoire" | "operateur" | "mois";
+export type MargeMode = "produit" | "categorie" | "grossiste" | "bl" | "laboratoire" | "operateur" | "mois" | "annee";
 
 export const SIM_LABEL_KEY: Record<MargeMode, string> = {
   produit: "product", categorie: "category", grossiste: "grossiste", bl: "delivery_ref",
-  laboratoire: "laboratoire", operateur: "client", mois: "mois",
+  laboratoire: "laboratoire", operateur: "client", mois: "mois", annee: "annee",
 };
 
 export const MARGE_COLS: Record<MargeMode, { key: string; label: string; numeric?: boolean }[]> = {
@@ -81,6 +81,22 @@ export const MARGE_COLS: Record<MargeMode, { key: string; label: string; numeric
     { key: "nb_transactions", label: "Transactions", numeric: true },
     { key: "qty",             label: "Qté", numeric: true },
     { key: "ca",              label: "CA (MAD)", numeric: true },
+  ],
+  annee: [
+    { key: "annee", label: "Année" },
+    { key: "m01",   label: "Jan", numeric: true },
+    { key: "m02",   label: "Fév", numeric: true },
+    { key: "m03",   label: "Mar", numeric: true },
+    { key: "m04",   label: "Avr", numeric: true },
+    { key: "m05",   label: "Mai", numeric: true },
+    { key: "m06",   label: "Juin", numeric: true },
+    { key: "m07",   label: "Juil", numeric: true },
+    { key: "m08",   label: "Août", numeric: true },
+    { key: "m09",   label: "Sep", numeric: true },
+    { key: "m10",   label: "Oct", numeric: true },
+    { key: "m11",   label: "Nov", numeric: true },
+    { key: "m12",   label: "Déc", numeric: true },
+    { key: "ca",    label: "Total", numeric: true },
   ],
 };
 

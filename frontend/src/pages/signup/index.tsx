@@ -56,6 +56,7 @@ export const Signup = () => {
         form.setValue("pharmacy_id", undefined);
       } else {
         form.setValue("pharmacy_name", undefined);
+        form.setValue("pharmacy_city", undefined);
       }
     }
   }, [role, ownerMode, form]);
@@ -220,19 +221,34 @@ export const Signup = () => {
                   </div>
 
                   {ownerMode === "new" ? (
-                    <FormField
-                      control={form.control}
-                      name="pharmacy_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nom de votre pharmacie</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Pharmacie Al Amal" {...field} value={field.value ?? ""} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="pharmacy_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Nom de votre pharmacie</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Pharmacie Al Amal" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="pharmacy_city"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Ville</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Bouskoura" {...field} value={field.value ?? ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   ) : (
                     <FormField
                       control={form.control}

@@ -114,7 +114,7 @@ class TestListCatalogRequests:
 # ── POST /catalog-requests/non-declare ───────────────────────────────────────
 
 class TestSubmitNonDeclare:
-    def test_owner_submits(self, client, test_owner, med):
+    def test_owner_submits(self, client, db, test_owner, med):
         payload = {"medicament_id": med.id, "notes": "Produit non pertinent"}
         res = client.post("/catalog-requests/non-declare", json=payload, headers=test_owner["headers"])
         assert res.status_code == 200
@@ -122,7 +122,15 @@ class TestSubmitNonDeclare:
         assert data["request_type"] == RequestType.NON_DECLARE
         assert data["medicament_id"] == med.id
         assert data["notes"] == "Produit non pertinent"
-        assert data["status"] == Status.PENDING
+        # No admin approval needed — the request is APPROVED on creation and
+        # the PharmacyMedicamentStatus row is written immediately.
+        assert data["status"] == RequestStatus.APPROVED
+        row = db.query(PharmacyMedicamentStatus).filter(
+            PharmacyMedicamentStatus.pharmacy_id == test_owner["pharmacy"].id,
+            PharmacyMedicamentStatus.medicament_id == med.id,
+        ).first()
+        assert row is not None
+        assert row.declared is False
 
     def test_employee_submits(self, client, test_employee, med):
         payload = {"medicament_id": med.id}
@@ -146,25 +154,32 @@ class TestSubmitNonDeclare:
         res = client.post("/catalog-requests/non-declare", json=payload, headers=test_owner["headers"])
         assert res.status_code == 400
 
-    def test_duplicate_pending_request_400(self, client, test_owner, med):
+    def test_resubmitting_already_flagged_400(self, client, test_owner, med):
+        """Once flagged, the same product cannot be flagged again."""
         payload = {"medicament_id": med.id}
         res1 = client.post("/catalog-requests/non-declare", json=payload, headers=test_owner["headers"])
         assert res1.status_code == 200
         res2 = client.post("/catalog-requests/non-declare", json=payload, headers=test_owner["headers"])
         assert res2.status_code == 400
-        assert "déjà en cours" in res2.json()["detail"]
+        assert "déjà" in res2.json()["detail"]
 
 
 # ── POST /catalog-requests/annulation ────────────────────────────────────────
 
 class TestSubmitAnnulation:
-    def test_owner_submits_annulation(self, client, test_owner, non_declared_med):
+    def test_owner_submits_annulation(self, client, db, test_owner, non_declared_med):
         payload = {"medicament_id": non_declared_med.id, "notes": "Remettre en rapports"}
         res = client.post("/catalog-requests/annulation", json=payload, headers=test_owner["headers"])
         assert res.status_code == 200
         data = res.json()
         assert data["request_type"] == RequestType.ANNULATION
-        assert data["status"] == Status.PENDING
+        # No admin approval needed — the request is APPROVED on creation and
+        # the PharmacyMedicamentStatus row is removed immediately.
+        assert data["status"] == RequestStatus.APPROVED
+        assert db.query(PharmacyMedicamentStatus).filter(
+            PharmacyMedicamentStatus.pharmacy_id == test_owner["pharmacy"].id,
+            PharmacyMedicamentStatus.medicament_id == non_declared_med.id,
+        ).first() is None
 
     def test_admin_gets_403(self, client, test_admin, non_declared_med):
         payload = {"medicament_id": non_declared_med.id}
@@ -183,13 +198,14 @@ class TestSubmitAnnulation:
         res = client.post("/catalog-requests/annulation", json=payload, headers=test_owner["headers"])
         assert res.status_code == 404
 
-    def test_duplicate_pending_annulation_400(self, client, test_owner, non_declared_med):
+    def test_double_annulation_400(self, client, test_owner, non_declared_med):
+        """Once re-declared, a second annulation finds nothing to undo."""
         payload = {"medicament_id": non_declared_med.id}
         res1 = client.post("/catalog-requests/annulation", json=payload, headers=test_owner["headers"])
         assert res1.status_code == 200
         res2 = client.post("/catalog-requests/annulation", json=payload, headers=test_owner["headers"])
         assert res2.status_code == 400
-        assert "déjà en cours" in res2.json()["detail"]
+        assert "pas exclu" in res2.json()["detail"]
 
 
 # ── PUT /catalog-requests/{id}/approve ───────────────────────────────────────
@@ -236,40 +252,9 @@ class TestApproveCatalogRequest:
         assert res.status_code == 400
         assert "pas en attente" in res.json()["detail"]
 
-    def test_approve_non_declare_creates_status(self, client, db, test_owner, test_admin, med):
-        payload = {"medicament_id": med.id}
-        create_res = client.post(
-            "/catalog-requests/non-declare", json=payload, headers=test_owner["headers"],
-        )
-        req_id = create_res.json()["id"]
-
-        res = client.put(f"/catalog-requests/{req_id}/approve", headers=test_admin["headers"])
-        assert res.status_code == 200
-
-        # Verify PharmacyMedicamentStatus row was created
-        status_row = db.query(PharmacyMedicamentStatus).filter(
-            PharmacyMedicamentStatus.pharmacy_id == test_owner["pharmacy"].id,
-            PharmacyMedicamentStatus.medicament_id == med.id,
-        ).first()
-        assert status_row is not None
-        assert status_row.declared is False
-
-    def test_approve_annulation_removes_status(self, client, db, test_owner, test_admin, non_declared_med):
-        payload = {"medicament_id": non_declared_med.id}
-        create_res = client.post(
-            "/catalog-requests/annulation", json=payload, headers=test_owner["headers"],
-        )
-        req_id = create_res.json()["id"]
-
-        res = client.put(f"/catalog-requests/{req_id}/approve", headers=test_admin["headers"])
-        assert res.status_code == 200
-
-        # Verify PharmacyMedicamentStatus row was deleted
-        status_row = db.query(PharmacyMedicamentStatus).filter(
-            PharmacyMedicamentStatus.pharmacy_id == test_owner["pharmacy"].id,
-            PharmacyMedicamentStatus.medicament_id == non_declared_med.id,
-        ).first()
-        assert status_row is None
+    # The non-declare / annulation approval tests were removed: these request
+    # types now auto-apply on submission (ticket 6a) so there is no admin
+    # approval step. Coverage moved to TestSubmitNonDeclare / TestSubmitAnnulation.
 
 
 # ── PUT /catalog-requests/{id}/reject ────────────────────────────────────────

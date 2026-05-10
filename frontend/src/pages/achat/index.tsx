@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GAUGE_COLORS } from "@/constants/theme";
-import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import { useAchatList } from "@/hooks/useAchatList";
 import { Link, useNavigate } from "react-router";
@@ -18,6 +18,7 @@ import { TvaMultiSelect } from "@/components/tvaMultiSelect";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
+import { currentMonth } from "@/utils/dateRange";
 import { downloadCSV, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
@@ -168,12 +169,18 @@ const AchatList = () => {
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const sortBy = sorting[0]?.id;
+  const sortOrder: "asc" | "desc" | undefined = sorting[0]
+    ? (sorting[0].desc ? "desc" : "asc")
+    : undefined;
 
   useEffect(() => {
     if (user?.role === eUserRole.ADMIN) navigate("/", { replace: true });
@@ -203,6 +210,8 @@ const AchatList = () => {
     tva: selectedTva,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    sortBy,
+    sortOrder,
   });
   const rows = achatRows as AchatRow[];
 
@@ -367,8 +376,10 @@ const AchatList = () => {
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting },
+    onSortingChange: setSorting,
     manualPagination: true,
+    manualSorting: true,
     pageCount,
   });
 

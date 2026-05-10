@@ -11,25 +11,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/DataTable/dataTable";
-import { DatePicker } from "@/components/ui/datePicker";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
+import { stockAbcdWindow } from "@/utils/dateRange";
 import { useStockAbcd, usePeremptions } from "@/hooks/usePharmacyRapports";
-import type { StockAbcdProduct, PeremptionBracket } from "@/api/stats";
+import type { StockAbcdProduct, PeremptionBracket, StockStatus } from "@/api/stats";
 import { GAUGE_COLORS, CLASS_COLORS } from "@/constants/theme";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const CLASS_ORDER = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"];
 
-/* ── Stock status helpers ──────────────────────────────────────────────────── */
-
-function getStockStatus(p: StockAbcdProduct): "ok" | "sous-stock" | "sur-stock" | "inconnu" {
-  if (p.current_stock == null) return "inconnu";
-  if (p.current_stock < p.stock_min) return "sous-stock";
-  if (p.current_stock > p.stock_max) return "sur-stock";
-  return "ok";
-}
+const STATUS_OPTIONS: { value: StockStatus | "all"; label: string }[] = [
+  { value: "all", label: "Tous statuts" },
+  { value: "negatif", label: "Stock négatif" },
+  { value: "sous-stock", label: "Sous-stock" },
+  { value: "ok", label: "OK" },
+  { value: "sur-stock", label: "Sur-stock" },
+  { value: "inconnu", label: "Inconnu" },
+];
 
 /* ── ABCD circle badge ─────────────────────────────────────────────────────── */
 
@@ -134,13 +135,37 @@ function useCardMetrics(products: StockAbcdProduct[]) {
 /* ── Main page component ───────────────────────────────────────────────────── */
 
 const StockList = () => {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = stockAbcdWindow();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [classFilter, setClassFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StockStatus | "all">("all");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const sortBy = sorting[0]?.id;
+  const sortOrder: "asc" | "desc" | undefined = sorting[0]
+    ? (sorting[0].desc ? "desc" : "asc")
+    : undefined;
 
+  const tableActive = classFilter !== null || statusFilter !== "all";
+
+  // Full dataset — feeds the distribution chart and the alert card metrics.
   const { stockAbcd, stockAbcdLoading } = useStockAbcd(
     dateFrom || undefined,
     dateTo || undefined,
+  );
+
+  // Filtered/sorted dataset — feeds the products table when a class or status
+  // filter is active.  Backend handles class+status+sort so pagination is
+  // accurate across the whole dataset, not just a 20-row slice.
+  const { stockAbcd: tableStock, stockAbcdLoading: tableLoading } = useStockAbcd(
+    dateFrom || undefined,
+    dateTo || undefined,
+    {
+      classFilter: classFilter ?? undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      sortBy,
+      sortOrder,
+    },
   );
 
   const { peremptions, peremptionsLoading } = usePeremptions(
@@ -161,23 +186,23 @@ const StockList = () => {
 
   const healthScore = useMemo(() => {
     if (!stockAbcd?.products || stockAbcd.products.length === 0) return 0;
-    const withStock = stockAbcd.products.filter((p) => p.current_stock != null);
+    const withStock = stockAbcd.products.filter((p) => p.status !== "inconnu");
     if (withStock.length === 0) return 0;
-    const ok = withStock.filter((p) => getStockStatus(p) === "ok").length;
+    const ok = withStock.filter((p) => p.status === "ok").length;
     return (ok / withStock.length) * 10;
   }, [stockAbcd]);
 
-  const stockNegatif = useMemo(() => {
-    if (!stockAbcd?.products) return [];
-    return stockAbcd.products.filter((p) => p.current_stock != null && p.current_stock < 0);
-  }, [stockAbcd]);
+  const stockNegatif = useMemo(
+    () => stockAbcd?.products?.filter((p) => p.status === "negatif") ?? [],
+    [stockAbcd],
+  );
 
-  const sousStockAA = useMemo(() => {
-    if (!stockAbcd?.products) return [];
-    return stockAbcd.products.filter(
-      (p) => (p.category === "A" || p.category === "A-") && p.current_stock != null && p.current_stock < p.stock_min,
-    );
-  }, [stockAbcd]);
+  const sousStockAA = useMemo(
+    () => stockAbcd?.products?.filter(
+      (p) => (p.category === "A" || p.category === "A-") && p.status === "sous-stock",
+    ) ?? [],
+    [stockAbcd],
+  );
 
   const surStock100 = useMemo(() => {
     if (!stockAbcd?.products) return [];
@@ -192,11 +217,6 @@ const StockList = () => {
   const negMetrics = useCardMetrics(stockNegatif);
   const sousMetrics = useCardMetrics(sousStockAA);
   const surMetrics = useCardMetrics(surStock100);
-
-  const filteredProducts = useMemo(() => {
-    if (!classFilter || !stockAbcd?.products) return [];
-    return stockAbcd.products.filter((p) => p.category === classFilter);
-  }, [classFilter, stockAbcd]);
 
   /* ── Render ── */
 
@@ -248,6 +268,24 @@ const StockList = () => {
         dateTo={dateTo}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
+        extraFilters={
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Statut</Label>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as StockStatus | "all")}
+            >
+              <SelectTrigger className="h-9 w-44 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
         rightSlot={
           <>
             <button
@@ -314,37 +352,44 @@ const StockList = () => {
         </div>
       </div>
 
-      {/* ── Product table for selected class ── */}
-      {classFilter && (
+      {/* ── Product table when a class or status filter is active ── */}
+      {tableActive && (
         <StockProductTable
           classFilter={classFilter}
-          products={filteredProducts}
-          onClose={() => setClassFilter(null)}
+          statusFilter={statusFilter}
+          products={tableStock?.products ?? []}
+          loading={tableLoading}
+          sorting={sorting}
+          onSortingChange={setSorting}
+          onClose={() => { setClassFilter(null); setStatusFilter("all"); }}
         />
       )}
 
-      {/* ── Stock alert cards ── */}
+      {/* ── Stock alert cards (click → /alertes) ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Stock négatif */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-3">
-          <p className="text-sm font-semibold">Stock négatif</p>
-          <MetricsGrid refs={negMetrics.refs} units={negMetrics.units} valAchat={negMetrics.valAchat} ppvPot={negMetrics.ppvPot} />
-        </div>
-
-        {/* Sous stock A & A- */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold">Sous stock Top références</p>
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">A & A-</span>
+        <Link to="/alertes" className="block">
+          <div className="rounded-xl bg-card border border-border p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md">
+            <p className="text-sm font-semibold">Stock négatif</p>
+            <MetricsGrid refs={negMetrics.refs} units={negMetrics.units} valAchat={negMetrics.valAchat} ppvPot={negMetrics.ppvPot} />
           </div>
-          <MetricsGrid refs={sousMetrics.refs} units={sousMetrics.units} valAchat={sousMetrics.valAchat} ppvPot={sousMetrics.ppvPot} />
-        </div>
+        </Link>
 
-        {/* Sur stock > 100 jours */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-3">
-          <p className="text-sm font-semibold">Sur stock &gt; 100 jours</p>
-          <MetricsGrid refs={surMetrics.refs} units={surMetrics.units} valAchat={surMetrics.valAchat} ppvPot={surMetrics.ppvPot} />
-        </div>
+        <Link to="/alertes" className="block">
+          <div className="rounded-xl bg-card border border-border p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold">Sous stock Top références</p>
+              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">A & A-</span>
+            </div>
+            <MetricsGrid refs={sousMetrics.refs} units={sousMetrics.units} valAchat={sousMetrics.valAchat} ppvPot={sousMetrics.ppvPot} />
+          </div>
+        </Link>
+
+        <Link to="/alertes" className="block">
+          <div className="rounded-xl bg-card border border-border p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md">
+            <p className="text-sm font-semibold">Sur stock &gt; 100 jours</p>
+            <MetricsGrid refs={surMetrics.refs} units={surMetrics.units} valAchat={surMetrics.valAchat} ppvPot={surMetrics.ppvPot} />
+          </div>
+        </Link>
       </div>
 
       {/* ── SURVEILLANCE PÉREMPTIONS ── */}
@@ -356,31 +401,37 @@ const StockList = () => {
         <>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mt-4">Surveillance Péremptions</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <PeremptionCard
-              title="Périmés en stock"
-              subtitle="Produits périmés encore présents dans le stock actuel"
-              urgent
-              bracket={peremptions.expired}
-              dotColor="#ef4444"
-              bgClass="bg-red-100 dark:bg-red-950/50"
-              borderClass="border-red-300 dark:border-red-800"
-            />
-            <PeremptionCard
-              title="Très proches périmés"
-              subtitle="Péremption dans moins de 6 mois"
-              bracket={peremptions.very_close}
-              dotColor="#f97316"
-              bgClass="bg-orange-50 dark:bg-orange-950/40"
-              borderClass="border-orange-300 dark:border-orange-800"
-            />
-            <PeremptionCard
-              title="Périmés en stock"
-              subtitle="Péremption dans 6 à 12 mois"
-              bracket={peremptions.close}
-              dotColor="#f59e0b"
-              bgClass="bg-amber-50 dark:bg-amber-950/40"
-              borderClass="border-amber-300 dark:border-amber-800"
-            />
+            <Link to="/alertes" className="block">
+              <PeremptionCard
+                title="Périmés en stock"
+                subtitle="Produits périmés encore présents dans le stock actuel"
+                urgent
+                bracket={peremptions.expired}
+                dotColor="#ef4444"
+                bgClass="bg-red-100 dark:bg-red-950/50"
+                borderClass="border-red-300 dark:border-red-800"
+              />
+            </Link>
+            <Link to="/alertes" className="block">
+              <PeremptionCard
+                title="Très proches périmés"
+                subtitle="Péremption dans moins de 6 mois"
+                bracket={peremptions.very_close}
+                dotColor="#f97316"
+                bgClass="bg-orange-50 dark:bg-orange-950/40"
+                borderClass="border-orange-300 dark:border-orange-800"
+              />
+            </Link>
+            <Link to="/alertes" className="block">
+              <PeremptionCard
+                title="Proches périmés"
+                subtitle="Péremption dans 6 à 12 mois"
+                bracket={peremptions.close}
+                dotColor="#f59e0b"
+                bgClass="bg-amber-50 dark:bg-amber-950/40"
+                borderClass="border-amber-300 dark:border-amber-800"
+              />
+            </Link>
           </div>
         </>
       ) : null}
@@ -410,7 +461,7 @@ function PeremptionCard({
   const fmtN = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 
   return (
-    <div className={cn("rounded-xl border-2 p-5 space-y-3", bgClass, borderClass)}>
+    <div className={cn("rounded-xl border-2 p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md", bgClass, borderClass)}>
       <div className="flex items-center gap-2">
         <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
         <p className="text-sm font-semibold">{title}</p>
@@ -447,6 +498,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   ok: { label: "OK", cls: "bg-green-100 text-green-700 border-green-200" },
   "sous-stock": { label: "Sous-stock", cls: "bg-amber-100 text-amber-700 border-amber-200" },
   "sur-stock": { label: "Sur-stock", cls: "bg-red-100 text-red-700 border-red-200" },
+  negatif: { label: "Négatif", cls: "bg-red-200 text-red-800 border-red-300" },
   inconnu: { label: "Inconnu", cls: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -505,20 +557,38 @@ const stockColumns: ColumnDef<StockAbcdProduct>[] = [
   },
   {
     id: "status",
+    accessorKey: "status",
     size: 110,
     header: () => <p className="column-title">Statut</p>,
     cell: ({ row }) => {
-      const s = STATUS_CFG[getStockStatus(row.original)];
+      const s = STATUS_CFG[row.original.status] ?? STATUS_CFG.inconnu;
       return <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", s.cls)}>{s.label}</span>;
     },
   },
 ];
 
-function StockProductTable({ classFilter, products, onClose }: { classFilter: string; products: StockAbcdProduct[]; onClose: () => void }) {
+function StockProductTable({
+  classFilter,
+  statusFilter,
+  products,
+  loading,
+  sorting,
+  onSortingChange,
+  onClose,
+}: {
+  classFilter: string | null;
+  statusFilter: StockStatus | "all";
+  products: StockAbcdProduct[];
+  loading: boolean;
+  sorting: SortingState;
+  onSortingChange: React.Dispatch<React.SetStateAction<SortingState>>;
+  onClose: () => void;
+}) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  const pageCount = Math.max(1, Math.ceil(products.length / pageSize));
+  const total = products.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const paginatedData = useMemo(
     () => products.slice((page - 1) * pageSize, page * pageSize),
     [products, page, pageSize],
@@ -528,35 +598,47 @@ function StockProductTable({ classFilter, products, onClose }: { classFilter: st
     data: paginatedData,
     columns: stockColumns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting },
+    onSortingChange,
+    manualPagination: true,
+    manualSorting: true,
+    pageCount,
   });
 
-  // Reset page when class changes
-  useMemo(() => { setPage(1); }, [classFilter]);
+  // Reset page when filters change.
+  useMemo(() => { setPage(1); }, [classFilter, statusFilter, sorting]);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-semibold">
-          Produits classe{" "}
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ backgroundColor: CLASS_COLORS[classFilter] }}>
-            {classFilter}
-          </span>
-          <span className="text-muted-foreground font-normal ml-2">({products.length} produit{products.length > 1 ? "s" : ""})</span>
-        </p>
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold">Produits filtrés</p>
+          {classFilter && (
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ backgroundColor: CLASS_COLORS[classFilter] }}>
+              Classe {classFilter}
+            </span>
+          )}
+          {statusFilter !== "all" && (
+            <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", STATUS_CFG[statusFilter]?.cls ?? STATUS_CFG.inconnu.cls)}>
+              {STATUS_CFG[statusFilter]?.label ?? statusFilter}
+            </span>
+          )}
+          <span className="text-muted-foreground font-normal text-xs tabular-nums">({total} produit{total > 1 ? "s" : ""})</span>
+        </div>
         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>Fermer</Button>
       </div>
       <DataTable
         table={table}
+        isLoading={loading}
         pagination={{
           currentPage: page,
           setCurrentPage: setPage,
           pageCount,
           pageSize,
           setPageSize: (size: number) => { setPageSize(size); setPage(1); },
-          total: products.length,
+          total,
         }}
-        emptyState={<p className="text-sm text-muted-foreground text-center py-8">Aucun produit dans cette classe.</p>}
+        emptyState={<p className="text-sm text-muted-foreground text-center py-8">Aucun produit ne correspond aux filtres.</p>}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import "./App.css";
 import { Toaster } from "./components/shared/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { ThemeProvider } from "./components/theme/themeProvider";
 
 import { Layout } from "./components/layout/layout";
 import { Login } from "./pages/login";
@@ -83,6 +84,7 @@ function App() {
   const authRoutesWithLayout = routes.filter((r) => r.requireAuth && r.layout === "sidebar");
 
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={0}>
       <BrowserRouter>
@@ -138,6 +140,7 @@ function App() {
       </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

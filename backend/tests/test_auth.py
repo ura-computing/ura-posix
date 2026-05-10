@@ -20,6 +20,7 @@ def test_signup_owner_success(client):
         "phone": "0611111111",
         "role": "owner",
         "pharmacy_name": "Pharmacie Nouvelle",
+        "pharmacy_city": "Bouskoura",
     })
     assert res.status_code == 200
     data = res.json()
@@ -27,6 +28,20 @@ def test_signup_owner_success(client):
     assert data["user"]["email"] == "newowner@example.com"
     assert data["user"]["role"] == Role.OWNER
     assert data["user"]["status"] == Status.PENDING
+    # The Pharmacy row should be created with an auto-generated code.
+    assert data["user"]["pharmacy_id"] is not None
+
+
+def test_signup_owner_missing_city_400(client):
+    res = client.post("/auth/signup", json={
+        "email": "owner-no-city@example.com",
+        "password": "secret123",
+        "name": "No City",
+        "role": "owner",
+        "pharmacy_name": "Pharma X",
+    })
+    assert res.status_code == 400
+    assert "ville" in res.json()["detail"].lower()
 
 
 def test_signup_employee_success(client, test_pharmacy):
@@ -50,6 +65,7 @@ def test_signup_duplicate_email_400(client):
         "name": "First",
         "role": "owner",
         "pharmacy_name": "Pharma A",
+        "pharmacy_city": "Casablanca",
     }
     client.post("/auth/signup", json=payload)
     res = client.post("/auth/signup", json=payload)

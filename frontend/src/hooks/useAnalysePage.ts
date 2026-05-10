@@ -4,10 +4,13 @@ import { eCategoryType } from "@/types";
 import { MARGE_COLS, type MargeMode } from "@/pages/rapports/margeTable";
 import { downloadBlob } from "@/pages/rapports/shared";
 import { exportFilename } from "@/utils/table";
+import { currentMonth } from "@/utils/dateRange";
+import { tokenizeSearch } from "@/utils/search";
 
 export function useAnalysePage() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [margeMode, setMargeMode] = useState<MargeMode>("produit");
   const [search, setSearch] = useState("");
@@ -21,14 +24,16 @@ export function useAnalysePage() {
   );
 
   const filteredRows = useMemo(() => {
-    if (!search.trim()) return allRows.map((r, i) => ({ row: r, idx: i }));
-    const q = search.toLowerCase();
+    const tokens = tokenizeSearch(search);
+    if (tokens.length === 0) return allRows.map((r, i) => ({ row: r, idx: i }));
     return allRows
       .map((r, i) => ({ row: r, idx: i }))
       .filter(({ row }) => {
-        return Object.values(row).some((v) =>
-          typeof v === "string" && v.toLowerCase().includes(q)
-        );
+        const haystack = Object.values(row)
+          .filter((v) => typeof v === "string")
+          .join("  ")
+          .toLowerCase();
+        return tokens.every((t) => haystack.includes(t));
       });
   }, [allRows, search]);
 
@@ -86,7 +91,11 @@ export function useAnalysePage() {
   }, [allRows]);
 
   const exportCsv = useCallback(() => {
-    const sel = allRows.filter((_, i) => selected.has(i));
+    // Priority: explicit selection > search-filtered > all rows.
+    // Honors the active search filter so the export matches what the user sees.
+    const sel = selected.size > 0
+      ? allRows.filter((_, i) => selected.has(i))
+      : filteredRows.map((f) => f.row);
     if (!sel.length) return;
     const cols = MARGE_COLS[margeMode];
     const esc = (v: unknown) => {
@@ -95,10 +104,12 @@ export function useAnalysePage() {
       return s.includes(";") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
     };
     const header = cols.map((c) => esc(c.label)).join(";");
+    // Strict: only emit cells declared in MARGE_COLS so suppliers/grossistes/etc.
+    // never leak into a CSV from a mode whose header doesn't list them.
     const lines = sel.map((row) => cols.map((c) => esc(row[c.key])).join(";"));
     const csv = [header, ...lines].join("\n");
     downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined));
-  }, [allRows, selected, margeMode]);
+  }, [allRows, filteredRows, selected, margeMode, dateFrom, dateTo]);
 
   const resetSelection = useCallback(() => {
     setSelected(new Set());

@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState, useEffect } from "react";
-import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import {
   useAdminCatalogList,
@@ -397,6 +397,11 @@ export default function AdminCatalogPage() {
   const [exporting, setExporting] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const sortBy = sorting[0]?.id;
+  const sortOrder: "asc" | "desc" | undefined = sorting[0]
+    ? (sorting[0].desc ? "desc" : "asc")
+    : undefined;
 
   async function handleExport() {
     setExporting(true);
@@ -424,7 +429,7 @@ export default function AdminCatalogPage() {
     }
   }
 
-  const { rows, paginationMeta, pageCount, isLoading } = useAdminCatalogList(searchQuery, page, limit);
+  const { rows, paginationMeta, pageCount, isLoading } = useAdminCatalogList(searchQuery, page, limit, sortBy, sortOrder);
 
   useEffect(() => {
     if (user && user.role !== eUserRole.ADMIN) navigate("/", { replace: true });
@@ -555,8 +560,10 @@ export default function AdminCatalogPage() {
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting },
+    onSortingChange: setSorting,
     manualPagination: true,
+    manualSorting: true,
     pageCount,
   });
 

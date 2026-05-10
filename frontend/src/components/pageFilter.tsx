@@ -2,9 +2,8 @@ import { ReactNode, useTransition } from "react";
 import { Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/datePicker";
+import { DateRangePicker } from "@/components/ui/dateRangePicker";
 import { SearchAutocomplete } from "@/components/searchAutocomplete";
 import { cn } from "@/utils/cn";
 import { eCategoryType } from "@/types";
@@ -72,15 +71,13 @@ export function PageFilter({
               </div>
             )
           )}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Du</Label>
-              <DatePicker value={dateFrom} onChange={onDateFromChange} placeholder="Début" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Au</Label>
-              <DatePicker value={dateTo} onChange={onDateToChange} placeholder="Fin" />
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onFromChange={onDateFromChange}
+              onToChange={onDateToChange}
+            />
             {showReset && (
               <Button
                 variant="ghost"

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Boxes, Coins, Download, BarChart3, Percent, ShoppingCart, TrendingDown, TrendingUp, UploadCloud, Wallet } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,8 +12,9 @@ import * as statsApi from "@/api/stats";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
-import { fmt } from "@/utils/format";
+import { fmt, fmtInt } from "@/utils/format";
 import { OptimisationGauge } from "@/components/optimisationGauge";
+import { cleanHeader, fixMojibake } from "@/utils/encoding";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
 import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
@@ -22,7 +23,8 @@ const MODE_LABELS = {
   operateur: "Client",
   laboratoire: "Laboratoire",
   grossiste: "Grossistes",
-  mois: "Mois / année",
+  mois: "Mois",
+  annee: "Année (pivot)",
   categorie: "Catégorie",
   bl: "Liste",
 } as const;
@@ -34,6 +36,7 @@ const MODE_SEARCH_KEY: Record<MargeMode, string> = {
   laboratoire: "laboratoire",
   operateur: "client",
   mois: "mois",
+  annee: "annee",
   bl: "delivery_ref",
 };
 
@@ -51,7 +54,7 @@ export default function AnalysePage() {
   } = useAnalysePage();
 
   // Liste mode: store imported product names, re-query when filters change
-  const [listeProducts, setListeProducts] = useState<string[] | null>(null);
+  const [listeProducts, setListeProducts] = useState<statsApi.ListeItem[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Mode-aware search suggestions: pull distinct values from currently-loaded rows
@@ -71,26 +74,57 @@ export default function AnalysePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text = await file.text();
+      // Sobrus exports are often windows-1252 — try UTF-8 first, fall back.
+      const buf = await file.arrayBuffer();
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+      } catch {
+        text = new TextDecoder("windows-1252").decode(buf);
+      }
       const lines = text.split("\n").filter((l) => l.trim());
       if (lines.length < 2) return;
       const sep = lines[0].includes(";") ? ";" : ",";
-      const headers = lines[0].split(sep).map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+      // Headers: clean mojibake + apply alias (Caégorie → Catégorie), then lowercase for matching.
+      const headers = lines[0].split(sep).map((h) => cleanHeader(h).toLowerCase());
       const prodIdx = headers.findIndex((h) => h.includes("produit") || h === "product");
       if (prodIdx === -1) { alert("Colonne 'Produit' introuvable dans le CSV"); return; }
-      const products = lines.slice(1)
-        .map((l) => l.split(sep).map((c) => c.trim().replace(/^"|"$/g, "")))
-        .map((cols) => cols[prodIdx])
-        .filter((p) => p && p.length > 0);
-      setListeProducts(products);
+      const pidIdx = headers.findIndex((h) => h === "pid" || h.includes("pid"));
+      // Locate optional barcode columns. Tolerant to "Code barre 1", "code-barre-1", "code_barre1", etc.
+      const findBcIdx = (suffix: "1" | "2") =>
+        headers.findIndex((h) => /code[\s\-_]?barre[\s\-_]?/i.test(h) && h.includes(suffix));
+      const bc1Idx = findBcIdx("1");
+      const bc2Idx = findBcIdx("2");
+
+      // Keep only digit-like strings of length >= 8 — discard "8,47E+12" Excel garbage
+      const sanitizeBarcode = (s: string | undefined): string | undefined => {
+        if (!s) return undefined;
+        const cleaned = s.replace(/[^\d]/g, "");
+        return cleaned.length >= 8 ? cleaned : undefined;
+      };
+
+      const items = lines.slice(1)
+        .map((l) => l.split(sep).map((c) => fixMojibake(c.trim().replace(/^"|"$/g, ""))))
+        .map((cols) => ({
+          name: cols[prodIdx] ?? "",
+          pid: pidIdx >= 0 ? (cols[pidIdx] || undefined) : undefined,
+          barcode1: bc1Idx >= 0 ? sanitizeBarcode(cols[bc1Idx]) : undefined,
+          barcode2: bc2Idx >= 0 ? sanitizeBarcode(cols[bc2Idx]) : undefined,
+        }))
+        .filter((it) => it.name.length > 0 || it.barcode1 || it.barcode2 || it.pid);
+      setListeProducts(items);
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }, []);
 
   const isListeMode = margeMode === "bl";
+  const listeKey = useMemo(
+    () => listeProducts ? listeProducts.map((it) => `${it.name}|${it.pid ?? ""}|${it.barcode1 ?? ""}|${it.barcode2 ?? ""}`).join(";") : "",
+    [listeProducts],
+  );
   const { data: listeData, isLoading: listeLoading } = useQuery({
-    queryKey: ["analyse-liste", listeProducts, dateFrom, dateTo, categoryType],
+    queryKey: ["analyse-liste", listeKey, dateFrom, dateTo, categoryType],
     queryFn: () => statsApi.analyseListe(listeProducts!, dateFrom || undefined, dateTo || undefined, categoryType),
     enabled: isListeMode && !!listeProducts && listeProducts.length > 0,
   });
@@ -184,7 +218,7 @@ export default function AnalysePage() {
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
                   <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(k.total_ventes_dh)} MAD</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{fmt(k.total_ventes_unites)} unités vendues</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{fmtInt(k.total_ventes_unites)} unités vendues</p>
                 </div>
                 <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
               </div>
@@ -286,7 +320,7 @@ export default function AnalysePage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités vendues</p>
-                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_ventes_unites)}</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmtInt(k.total_ventes_unites)}</p>
                 </div>
                 <ShoppingCart className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>
@@ -297,7 +331,7 @@ export default function AnalysePage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités disponibles</p>
-                  <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_units_available)}</p>
+                  <p className="text-xl font-bold mt-1 tabular-nums">{fmtInt(k.total_units_available)}</p>
                 </div>
                 <Boxes className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>
@@ -406,7 +440,7 @@ export default function AnalysePage() {
                           </td>
                           <td className="px-3 py-2 font-medium whitespace-nowrap">{String(row.product ?? "")}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{row.stock_dispo != null ? String(row.stock_dispo) : "—"}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{Number(row.qty) ? fmt(Number(row.qty)) : "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{Number(row.qty) ? fmtInt(Number(row.qty)) : "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{row.ppv != null ? fmt(Number(row.ppv)) : "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{row.pu != null ? fmt(Number(row.pu)) : "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{row.marge_pct != null ? `${Number(row.marge_pct).toFixed(1)}%` : "—"}</td>

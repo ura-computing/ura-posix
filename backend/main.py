@@ -73,6 +73,32 @@ from models import User
 
 Base.metadata.create_all(bind=engine)
 
+# Enable pg_trgm for fuzzy/similarity search (used by the product search helper).
+# Idempotent — safe to run on every boot.
+with engine.begin() as _conn:
+    _conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+    # Pharmacy.city + Pharmacy.code (Ticket 5). create_all() doesn't ALTER
+    # existing tables, so we add the columns + unique index here, then
+    # backfill codes for any rows that don't have one yet.
+    _conn.exec_driver_sql("ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS city VARCHAR;")
+    _conn.exec_driver_sql("ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS code VARCHAR;")
+    _conn.exec_driver_sql(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_pharmacies_code ON pharmacies (code);"
+    )
+
+# Backfill missing pharmacy codes — uses the name as the prefix source
+# (existing rows have no city).
+from models import Pharmacy  # noqa: E402
+from utils.pharmacy_code import generate_pharmacy_code  # noqa: E402
+from database import SessionLocal  # noqa: E402
+
+with SessionLocal() as _db:
+    _to_backfill = _db.query(Pharmacy).filter(Pharmacy.code.is_(None)).all()
+    for _p in _to_backfill:
+        _p.code = generate_pharmacy_code(_db, _p.city or _p.name)
+    if _to_backfill:
+        _db.commit()
+
 app = FastAPI(title="APCM Pharma API", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

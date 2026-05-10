@@ -31,6 +31,7 @@ def get_stats(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     category_type: str = Query("all"),
+    include_non_declared: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -51,7 +52,7 @@ def get_stats(
         cat_filter_a = [_pharma_expr() == False]
 
     non_declared_sub = None
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         non_declared_sub = (
             db.query(PharmacyMedicamentStatus.medicament_id)
             .filter(
@@ -160,11 +161,27 @@ def stats_analyse_marge(
     )
 
 
+class ListeItem(BaseModel):
+    name: Optional[str] = None
+    pid: Optional[str] = None
+    barcode1: Optional[str] = None
+    barcode2: Optional[str] = None
+
+
 class ListeRequest(BaseModel):
-    products: List[str]
+    items: Optional[List[ListeItem]] = None
+    products: Optional[List[str]] = None  # legacy
     date_from: Optional[str] = None
     date_to: Optional[str] = None
     category_type: str = "all"
+
+
+def _sanitize_barcode(s: Optional[str]) -> Optional[str]:
+    """Keep digit-only strings of length >= 8. Reject Excel-mangled garbage like '8,47E+12'."""
+    if not s:
+        return None
+    cleaned = "".join(ch for ch in str(s) if ch.isdigit())
+    return cleaned if len(cleaned) >= 8 else None
 
 
 @router.post("/stats/analyse-liste")
@@ -173,7 +190,7 @@ def stats_analyse_liste(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Match a list of product names against the pharmacy's data and return marge analysis."""
+    """Match a list of products (by name → barcode1 → barcode2) against the pharmacy's data."""
     from utils.strings import strip_accents
 
     if current_user.role == Role.ADMIN:
@@ -183,24 +200,40 @@ def stats_analyse_liste(
     if not pharmacy_id:
         raise HTTPException(status_code=400, detail="Pas de pharmacie associée")
 
-    # Fuzzy match: normalize CSV product names and find matching medicament IDs
-    normalized_inputs = {}
-    for name in body.products:
-        if name and name.strip():
-            normalized_inputs[strip_accents(name.strip().lower())] = name.strip()
+    # Build the canonical input list
+    if body.items is not None:
+        items = body.items
+    elif body.products:
+        items = [ListeItem(name=p) for p in body.products]
+    else:
+        items = []
 
-    if not normalized_inputs:
+    # Normalized inputs keyed by name; track original + barcodes per entry
+    normalized_inputs: dict[str, str] = {}
+    item_by_norm: dict[str, ListeItem] = {}
+    barcode_inputs: list[tuple[ListeItem, list[str]]] = []  # (item, sanitized_barcodes)
+    for it in items:
+        name = (it.name or "").strip()
+        bcs = [b for b in (_sanitize_barcode(it.barcode1), _sanitize_barcode(it.barcode2)) if b]
+        if name:
+            norm = strip_accents(name.lower())
+            normalized_inputs[norm] = name
+            item_by_norm[norm] = it
+        if bcs and not name:
+            # Anonymous-by-barcode: still need a placeholder display name
+            barcode_inputs.append((it, bcs))
+        elif bcs:
+            barcode_inputs.append((it, bcs))
+
+    if not normalized_inputs and not barcode_inputs:
         return {"kpis": {}, "rows": []}
 
-    # Load all medicament names for this pharmacy
+    # Pool = the entire medicament catalog. A product can be matched even if this
+    # pharmacy has no Vente/Achat/PharmacyStock yet — we'll synthesize a stub row.
     med_rows = (
-        db.query(Medicament.id, Medicament.product)
-        .filter(Medicament.id.in_(
-            db.query(Vente.medicament_id).filter(Vente.pharmacy_id == pharmacy_id).distinct()
-            .union(
-                db.query(Achat.medicament_id).filter(Achat.pharmacy_id == pharmacy_id).distinct()
-            )
-        ))
+        db.query(Medicament.id, Medicament.product, Medicament.pid,
+                 Medicament.barcode1, Medicament.barcode2,
+                 Medicament.category, Medicament.tva, Medicament.ppv, Medicament.pph)
         .all()
     )
 
@@ -210,23 +243,53 @@ def stats_analyse_liste(
 
     med_lookup = {strip_accents((m.product or "").strip().lower()): m for m in med_rows}
 
+    # Build PID → med and barcode → med lookups
+    pid_to_med: dict[str, object] = {}
+    barcode_to_med: dict[str, object] = {}
+    for m in med_rows:
+        if m.pid:
+            pid_to_med[str(m.pid).strip()] = m
+        for bc in (_sanitize_barcode(m.barcode1), _sanitize_barcode(m.barcode2)):
+            if bc:
+                barcode_to_med[bc] = m
+
+    matched_norms: set[str] = set()
     for norm_name, original_name in normalized_inputs.items():
         found = False
-        # Exact normalized match
+        # 1. Exact normalized name match
         if norm_name in med_lookup:
             m = med_lookup[norm_name]
             matched_ids.add(m.id)
             matched_names[m.id] = original_name
             found = True
         else:
-            # Substring match (CSV name contains DB name or vice versa)
+            # 2. Substring match (CSV name contains DB name or vice versa)
             for db_norm, m in med_lookup.items():
                 if norm_name in db_norm or db_norm in norm_name:
                     matched_ids.add(m.id)
                     matched_names[m.id] = original_name
                     found = True
                     break
-        if not found:
+        it = item_by_norm.get(norm_name)
+        if not found and it:
+            # 3. PID fallback
+            if it.pid and str(it.pid).strip() in pid_to_med:
+                m = pid_to_med[str(it.pid).strip()]
+                matched_ids.add(m.id)
+                matched_names[m.id] = original_name
+                found = True
+            else:
+                # 4. Barcode fallback for this row
+                for bc in (_sanitize_barcode(it.barcode1), _sanitize_barcode(it.barcode2)):
+                    if bc and bc in barcode_to_med:
+                        m = barcode_to_med[bc]
+                        matched_ids.add(m.id)
+                        matched_names[m.id] = original_name
+                        found = True
+                        break
+        if found:
+            matched_norms.add(norm_name)
+        else:
             unmatched.append(original_name)
 
     # Run produit mode analysis but filtered to matched IDs only
@@ -236,14 +299,54 @@ def stats_analyse_liste(
         body.category_type, "produit",
     )
 
-    # Filter rows to only matched products
+    # Build a set of normalized names + map for matched meds (incl. barcode-only matches)
+    matched_norms_db: set[str] = set()
+    matched_meds_by_id: dict[int, object] = {}
+    for m in med_rows:
+        if m.id in matched_ids:
+            matched_norms_db.add(strip_accents((m.product or "").strip().lower()))
+            matched_meds_by_id[m.id] = m
+
+    # Filter rows to only matched products + collect which med_ids were covered
     matched_rows = []
+    covered_norms: set[str] = set()
     for row in result.get("rows", []):
         product_name = row.get("product", "")
         norm = strip_accents(product_name.strip().lower())
-        if any(norm == k or norm in k or k in norm for k in normalized_inputs):
+        if norm in matched_norms_db or any(norm == k or norm in k or k in norm for k in normalized_inputs):
             row["match_status"] = "found"
             matched_rows.append(row)
+            covered_norms.add(norm)
+
+    # Synthesize rows for matched stock-only products (no Vente → not in result.rows).
+    # Pull stock figures directly from PharmacyStock.
+    uncovered_meds = [m for m in matched_meds_by_id.values()
+                      if strip_accents((m.product or "").strip().lower()) not in covered_norms]
+    if uncovered_meds:
+        from models import PharmacyStock as _PS2
+        stock_map = dict(
+            db.query(_PS2.medicament_id, _PS2.current_stock)
+            .filter(_PS2.pharmacy_id == pharmacy_id, _PS2.medicament_id.in_([m.id for m in uncovered_meds]))
+            .all()
+        )
+        for m in uncovered_meds:
+            stock_dispo = stock_map.get(m.id)
+            ppv = float(m.ppv or 0)
+            ppv_potentiel = round(ppv * stock_dispo, 2) if ppv and stock_dispo else None
+            matched_rows.append({
+                "product": m.product or "—",
+                "category": (m.category or "").replace(" (", " (") if m.category else None,
+                "tva": m.tva,
+                "ppv": round(ppv, 4) if ppv else None,
+                "pu": None,
+                "prix_max": None, "prix_min": None, "prix_avg": None,
+                "qty": 0, "ca": 0,
+                "marge_pct": None, "marge_dh": None,
+                "stock_dispo": stock_dispo,
+                "ppv_potentiel": ppv_potentiel,
+                "total_achat_cost": None,
+                "match_status": "found",
+            })
 
     # Add unmatched products
     for name in unmatched:
@@ -317,6 +420,11 @@ def stats_margin_alerts(
 def stats_stock_abcd(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    class_filter: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -325,7 +433,9 @@ def stats_stock_abcd(
     if not current_user.pharmacy_id:
         raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
     return _compute_stock_abcd(
-        db, current_user.pharmacy_id, date_from or None, date_to or None
+        db, current_user.pharmacy_id, date_from or None, date_to or None,
+        class_filter=class_filter, status=status, search=search,
+        sort_by=sort_by, sort_order=sort_order,
     )
 
 
@@ -345,36 +455,28 @@ def stats_peremptions(
     )
 
 
-@router.get("/stats/export-excel")
-def export_stats_excel(
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    category_type: str = Query("all"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.role == Role.ADMIN:
-        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/export-excel")
+def _compute_excel_section(db, pharmacy_id, df, dt, cat_type: str, nd_sub) -> dict:
+    """Compute (kpis, extra, med_rows) for one category section.
 
-    df, dt = date_from or None, date_to or None
-    pharmacy_id = current_user.pharmacy_id
-
-    nd_sub = None
-    if pharmacy_id:
-        nd_sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(
-                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                PharmacyMedicamentStatus.declared == False,
-            )
-            .subquery()
-        )
+    cat_type ∈ {"pharmacie", "parapharmacie", "all"}.
+    """
+    cat_filter = (
+        [_pharma_expr() == True]  if cat_type == "pharmacie"
+        else [_pharma_expr() == False] if cat_type == "parapharmacie"
+        else None
+    )
 
     vq = (
         db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
     )
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id))
+    aq = (
+        db.query(func.sum(Achat.total), func.count(Achat.id))
+        .join(Medicament, Achat.medicament_id == Medicament.id, isouter=True)
+    )
+    if cat_filter:
+        vq = vq.filter(*cat_filter)
+        aq = aq.filter(*cat_filter)
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
         aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
@@ -390,23 +492,58 @@ def export_stats_excel(
     ventes_total, ventes_count = vq.one()
     achats_total, achats_count = aq.one()
 
-    extra = _compute_extra_stats(db, pharmacy_id, df, dt, category_type)
+    return {
+        "kpis": {
+            "ventes_total": float(ventes_total or 0),
+            "achats_total": float(achats_total or 0),
+            "ventes_count": ventes_count or 0,
+            "achats_count": achats_count or 0,
+        },
+        "extra": _compute_extra_stats(db, pharmacy_id, df, dt, cat_type),
+        "med_rows": _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter, non_declared_sub=nd_sub),
+    }
+
+
+@router.get("/stats/export-excel")
+def export_stats_excel(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    category_type: str = Query("all"),
+    include_non_declared: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == Role.ADMIN:
+        raise HTTPException(status_code=403, detail="Les admins utilisent /admin/pharmacy/{id}/stats/export-excel")
+
+    df, dt = date_from or None, date_to or None
+    pharmacy_id = current_user.pharmacy_id
+
+    nd_sub = None
+    if pharmacy_id and not include_non_declared:
+        nd_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .subquery()
+        )
 
     titles = {"all": "Rapport Analytique", "pharmacie": "Rapport Pharmacie", "parapharmacie": "Rapport Parapharmacie"}
     title = titles.get(category_type, "Rapport Analytique")
     period = f"{df or 'Toutes dates'} → {dt or 'aujourd\'hui'}"
-    kpis = {
-        "ventes_total": float(ventes_total or 0),
-        "achats_total": float(achats_total or 0),
-        "ventes_count": ventes_count or 0,
-        "achats_count": achats_count or 0,
-    }
 
-    cat_filter = ([_pharma_expr() == True] if category_type == "pharmacie"
-                  else [_pharma_expr() == False] if category_type == "parapharmacie"
-                  else None)
-    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter, non_declared_sub=nd_sub)
-    buf = _build_excel(title, period, kpis, extra, med_rows)
+    # Mixte → two sections (Pharmacie + Parapharmacie); single category → one.
+    if category_type == "all":
+        sections = [
+            {"name": "Pharmacie",    **_compute_excel_section(db, pharmacy_id, df, dt, "pharmacie", nd_sub)},
+            {"name": "Parapharmacie", **_compute_excel_section(db, pharmacy_id, df, dt, "parapharmacie", nd_sub)},
+        ]
+    else:
+        sections = [{"name": category_type.capitalize(), **_compute_excel_section(db, pharmacy_id, df, dt, category_type, nd_sub)}]
+
+    buf = _build_excel(title, period, sections)
     filename = f"rapport_{category_type}_{df or 'all'}_{dt or 'all'}.xlsx"
     return StreamingResponse(
         buf,
@@ -546,41 +683,19 @@ def export_pharmacy_stats_excel(
         .subquery()
     )
 
-    vq = (
-        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)), func.count(Vente.id))
-        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
-        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.notin_(nd_sub))
-    )
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id)).filter(
-        Achat.pharmacy_id == pharmacy_id,
-        Achat.medicament_id.notin_(nd_sub),
-    )
-    if df:
-        vq = vq.filter(Vente.date >= df)
-        aq = aq.filter(Achat.delivery_date >= df)
-    if dt:
-        vq = vq.filter(Vente.date <= dt)
-        aq = aq.filter(Achat.delivery_date <= dt)
-    ventes_total, ventes_count = vq.one()
-    achats_total, achats_count = aq.one()
-
-    extra = _compute_extra_stats(db, pharmacy_id, df, dt, category_type)
-
     titles = {"all": "Rapport Analytique", "pharmacie": "Rapport Pharmacie", "parapharmacie": "Rapport Parapharmacie"}
     title = titles.get(category_type, "Rapport Analytique")
     period = f"{df or 'Toutes dates'} → {dt or 'aujourd\'hui'}"
-    kpis = {
-        "ventes_total": float(ventes_total or 0),
-        "achats_total": float(achats_total or 0),
-        "ventes_count": ventes_count or 0,
-        "achats_count": achats_count or 0,
-    }
 
-    cat_filter = ([_pharma_expr() == True] if category_type == "pharmacie"
-                  else [_pharma_expr() == False] if category_type == "parapharmacie"
-                  else None)
-    med_rows = _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter, non_declared_sub=nd_sub)
-    buf = _build_excel(title, period, kpis, extra, med_rows)
+    if category_type == "all":
+        sections = [
+            {"name": "Pharmacie",    **_compute_excel_section(db, pharmacy_id, df, dt, "pharmacie", nd_sub)},
+            {"name": "Parapharmacie", **_compute_excel_section(db, pharmacy_id, df, dt, "parapharmacie", nd_sub)},
+        ]
+    else:
+        sections = [{"name": category_type.capitalize(), **_compute_excel_section(db, pharmacy_id, df, dt, category_type, nd_sub)}]
+
+    buf = _build_excel(title, period, sections)
     filename = f"rapport_pharmacie{pharmacy_id}_{category_type}_{df or 'all'}_{dt or 'all'}.xlsx"
     return StreamingResponse(
         buf,
@@ -627,13 +742,20 @@ def admin_stock_abcd(
     pharmacy_id: int,
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    class_filter: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role != Role.ADMIN:
         raise HTTPException(status_code=403, detail="Accès administrateur requis")
     return _compute_stock_abcd(
-        db, pharmacy_id, date_from or None, date_to or None
+        db, pharmacy_id, date_from or None, date_to or None,
+        class_filter=class_filter, status=status, search=search,
+        sort_by=sort_by, sort_order=sort_order,
     )
 
 
@@ -701,9 +823,31 @@ def list_my_products(
     ).distinct()
     med_ids = {r[0] for r in vente_ids.all()} | {r[0] for r in achat_ids.all()}
 
+    from sqlalchemy import or_
+    from utils.strings import tokenize_search
+    from utils.search import product_search_clauses
+
+    tokens = tokenize_search(search)
     q = db.query(Medicament).filter(Medicament.id.in_(med_ids))
-    if search:
-        q = q.filter(Medicament.product.ilike(f"%{search}%"))
+    # Each token must match: product/pid/barcode/fuzzy OR a medicament
+    # whose achat supplier name contains the token (so typing "Cantabria"
+    # returns products bought from Cantabria).
+    for tok, base_clause in zip(tokens, product_search_clauses(tokens)):
+        supplier_med_ids = {
+            r[0]
+            for r in db.query(Achat.medicament_id)
+            .filter(
+                Achat.pharmacy_id == pharmacy_id,
+                Achat.medicament_id.isnot(None),
+                Achat.supplier.ilike(f"%{tok}%"),
+            )
+            .distinct()
+            .all()
+        }
+        if supplier_med_ids:
+            q = q.filter(or_(base_clause, Medicament.id.in_(supplier_med_ids)))
+        else:
+            q = q.filter(base_clause)
 
     meds = q.order_by(Medicament.product).limit(50).all()
 

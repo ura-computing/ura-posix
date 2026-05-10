@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { CreditCard, Banknote, Receipt, ArrowRightLeft, Download, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import * as statsApi from "@/api/stats";
@@ -33,6 +33,7 @@ import { DataTable } from "@/components/DataTable/dataTable";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
+import { currentMonth } from "@/utils/dateRange";
 import { eCategoryType } from "@/types";
 import { usePayments, useSavePayment } from "@/hooks/useAccounting";
 import { usePharmacyStats } from "@/hooks/usePharmacyRapports";
@@ -51,9 +52,11 @@ function getCurrentMonth() {
 }
 
 export default function ComptabilitePage() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
+  const [withSpecial, setWithSpecial] = useState(true); // include "produits spéciaux" by default
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMonth, setEditMonth] = useState(getCurrentMonth());
   const [editMethod, setEditMethod] = useState("tpe");
@@ -63,12 +66,17 @@ export default function ComptabilitePage() {
 
   const [ventePage, setVentePage] = useState(1);
   const [venteLimit, setVenteLimit] = useState(20);
+  const [venteSorting, setVenteSorting] = useState<SortingState>([]);
+  const venteSortBy = venteSorting[0]?.id;
+  const venteSortOrder: "asc" | "desc" | undefined = venteSorting[0]
+    ? (venteSorting[0].desc ? "desc" : "asc")
+    : undefined;
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const blob = await statsApi.exportExcel(dateFrom || undefined, dateTo || undefined, categoryType);
+      const blob = await statsApi.exportExcel(dateFrom || undefined, dateTo || undefined, categoryType, withSpecial);
       downloadBlob(
         blob,
         exportFilename(`COMPTABILITE ${categoryType.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined),
@@ -83,11 +91,14 @@ export default function ComptabilitePage() {
 
   const { payments, isLoading: paymentsLoading } = usePayments();
   const { savePayment, saving } = useSavePayment();
-  const { stats, statsLoading } = usePharmacyStats(dateFrom, dateTo, categoryType);
+  const { stats, statsLoading } = usePharmacyStats(dateFrom, dateTo, categoryType, withSpecial);
 
   const { ventesRows, ventesPagination, ventesPageCount, ventesLoading } = useVentesList({
     page: ventePage, limit: venteLimit,
     dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
+    sortBy: venteSortBy,
+    sortOrder: venteSortOrder,
+    includeNonDeclared: withSpecial,
   });
 
   const paymentsByMethod = useMemo(() => {
@@ -118,8 +129,10 @@ export default function ComptabilitePage() {
     data: ventesRows as VenteRow[],
     columns: venteColumns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting: venteSorting },
+    onSortingChange: setVenteSorting,
     manualPagination: true,
+    manualSorting: true,
     pageCount: ventesPageCount,
   });
 
@@ -160,6 +173,19 @@ export default function ComptabilitePage() {
         onDateToChange={setDateTo}
         categoryType={categoryType}
         onCategoryTypeChange={setCategoryType}
+        extraFilters={
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={withSpecial}
+              onChange={(e) => setWithSpecial(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+            />
+            <span className="text-xs text-muted-foreground">
+              {withSpecial ? "Avec" : "Sans"} produits spéciaux
+            </span>
+          </label>
+        }
         rightSlot={
           <>
             <ColumnVisibilityToggle

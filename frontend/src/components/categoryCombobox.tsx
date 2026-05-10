@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useCategoryOptions } from "@/hooks/useCategoryOptions";
+import { tokenizeSearch, matchesAllTokens } from "@/utils/search";
 
 type Props = {
   value: string;
@@ -39,9 +40,10 @@ export function CategoryCombobox({ value, onChange, placeholder = "Catégorie", 
     return () => document.removeEventListener("mousedown", handler);
   }, [query, onChange]);
 
-  const filtered = query
-    ? categories.filter((c) => c.toLowerCase().includes(query.toLowerCase()))
-    : categories;
+  const tokens = tokenizeSearch(query);
+  const filtered = tokens.length === 0
+    ? categories
+    : categories.filter((c) => matchesAllTokens(c, tokens));
 
   const handleSelect = (cat: string) => {
     setQuery(cat);

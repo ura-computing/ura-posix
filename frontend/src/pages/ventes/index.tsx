@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ColumnDef, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { useMe } from "@/hooks/useMe";
 import { useVentesList } from "@/hooks/useVentesList";
 import { Link, useNavigate } from "react-router";
@@ -17,6 +17,7 @@ import { TvaMultiSelect } from "@/components/tvaMultiSelect";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
+import { currentMonth } from "@/utils/dateRange";
 import { downloadCSV, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
@@ -106,13 +107,19 @@ const VentesList = () => {
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const _initial = currentMonth();
+  const [dateFrom, setDateFrom] = useState(_initial.from);
+  const [dateTo, setDateTo] = useState(_initial.to);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
   const [venteFilter, setVenteFilter] = useState<string>("all-flagged");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const sortBy = sorting[0]?.id;
+  const sortOrder: "asc" | "desc" | undefined = sorting[0]
+    ? (sorting[0].desc ? "desc" : "asc")
+    : undefined;
 
   useEffect(() => {
     if (user?.role === eUserRole.ADMIN) navigate("/", { replace: true });
@@ -142,12 +149,19 @@ const VentesList = () => {
     tva: selectedTva,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    sortBy,
+    sortOrder,
   });
 
   // Separate query for surveillance table (filtered by selected tab)
   const surveillanceParam = venteFilter === "all-flagged" ? "all" : venteFilter === "marge-negative" ? "marge_negative" : venteFilter === "marge-low" ? "marge_low" : venteFilter === "remises" ? "remises" : venteFilter === "remises-high" ? "remises_high" : undefined;
   const [survPage, setSurvPage] = useState(1);
   const [survLimit, setSurvLimit] = useState(20);
+  const [survSorting, setSurvSorting] = useState<SortingState>([]);
+  const survSortBy = survSorting[0]?.id;
+  const survSortOrder: "asc" | "desc" | undefined = survSorting[0]
+    ? (survSorting[0].desc ? "desc" : "asc")
+    : undefined;
   const { ventesRows: survRows, ventesPagination: survPagination, ventesPageCount: survPageCount, ventesLoading: survLoading } = useVentesList({
     page: survPage, limit: survLimit,
     search: searchQuery,
@@ -156,6 +170,8 @@ const VentesList = () => {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     surveillance: surveillanceParam,
+    sortBy: survSortBy,
+    sortOrder: survSortOrder,
   });
   const rows = ventesRows as VenteRow[];
 
@@ -409,8 +425,10 @@ const VentesList = () => {
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting },
+    onSortingChange: setSorting,
     manualPagination: true,
+    manualSorting: true,
     pageCount,
   });
 
@@ -418,8 +436,10 @@ const VentesList = () => {
     data: survRows as VenteRow[],
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    state: { sorting: survSorting },
+    onSortingChange: setSurvSorting,
     manualPagination: true,
+    manualSorting: true,
     pageCount: survPageCount,
   });
 
@@ -440,6 +460,35 @@ const VentesList = () => {
       toast.error("Erreur lors de l'export");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const [exportingSurv, setExportingSurv] = useState(false);
+  const handleExportSurveillance = async () => {
+    setExportingSurv(true);
+    try {
+      const res = await transactionsApi.exportVente(
+        searchQuery,
+        selectedCats,
+        dateFrom || undefined,
+        dateTo || undefined,
+        selectedTva,
+        surveillanceParam,
+      );
+      const colValues: Record<string, (r: Record<string, unknown>) => string> = {
+        ...VENTE_COL_VALUES,
+        transaction_ref_final: (r) => String(r.transaction_ref_final ?? ""),
+      };
+      const visibleCols = surveillanceTable.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
+      const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
+      const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
+      const tabLabel = venteFilterTabs.find((t) => t.key === venteFilter)?.label ?? "SURVEILLANCE";
+      downloadCSV(res.data, rowMapper, headers, exportFilename(`VENTE ${tabLabel.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined));
+      toast.success(`${res.data.length} lignes exportées`);
+    } catch {
+      toast.error("Erreur lors de l'export");
+    } finally {
+      setExportingSurv(false);
     }
   };
 
@@ -532,7 +581,7 @@ const VentesList = () => {
           {/* Surveillance tabs + red-bordered table */}
           {survCounts && (
             <>
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="flex flex-wrap items-center gap-2 mt-4">
                 {venteFilterTabs.map((tab) => {
                   const isActive = venteFilter === tab.key;
                   return (
@@ -556,6 +605,16 @@ const VentesList = () => {
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  disabled={exportingSurv || !survPagination?.total}
+                  title="Exporter le tableau de surveillance"
+                  onClick={handleExportSurveillance}
+                  className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Exporter
+                </button>
               </div>
 
               <div className="rounded-lg border-2 border-red-500 overflow-hidden">

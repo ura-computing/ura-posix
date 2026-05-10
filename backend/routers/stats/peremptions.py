@@ -93,7 +93,6 @@ def _compute_peremptions(db: Session, pharmacy_id: int, df: str | None, dt: str 
 
     for key in brackets:
         brackets[key]["products"].sort(key=lambda p: p["expiry_date"])
-        brackets[key]["products"] = brackets[key]["products"][:5]
         brackets[key]["purchase_value"] = round(brackets[key]["purchase_value"], 2)
         brackets[key]["sale_value"] = round(brackets[key]["sale_value"], 2)
 

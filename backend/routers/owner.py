@@ -1,15 +1,21 @@
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Pharmacy, User
 from utils.permissions import get_current_owner
 from utils.constants import Role, Status
-from schemas import EmployeePermissionsUpdate, UserAdminOut
+from utils.email import send_invite_email
+from schemas import EmployeeInvite, EmployeePermissionsUpdate, UserAdminOut
 
 router = APIRouter(prefix="/owner", tags=["owner"])
+
+# Invite tokens are good for 7 days.
+_INVITE_TTL = timedelta(days=7)
 
 
 @router.get("/employees", response_model=List[UserAdminOut])
@@ -139,4 +145,47 @@ def revoke_employee(
     user.status = Status.PENDING
     db.commit()
     db.refresh(user)
+    return user
+
+
+@router.post("/employees/invite", response_model=UserAdminOut, status_code=201)
+async def invite_employee(
+    body: EmployeeInvite,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Owner-driven invitation: create an ACTIVE employee without a password,
+    generate a 7-day reset token, and email the invitee a link to the
+    /reset-password page where they set their initial password."""
+    if not current_owner.pharmacy_id:
+        raise HTTPException(status_code=400, detail="Aucune pharmacie associée à votre compte")
+    email = body.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email déjà enregistré")
+
+    token = secrets.token_urlsafe(32)
+    pharmacy = db.query(Pharmacy).filter(Pharmacy.id == current_owner.pharmacy_id).first()
+    user = User(
+        email=email,
+        name=body.name,
+        phone=body.phone,
+        role=Role.EMPLOYEE,
+        status=Status.ACTIVE,
+        pharmacy_id=current_owner.pharmacy_id,
+        pharmacy_name=pharmacy.name if pharmacy else None,
+        permissions=body.permissions or {},
+        reset_token=token,
+        reset_token_expires=datetime.now(timezone.utc) + _INVITE_TTL,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    background.add_task(
+        send_invite_email,
+        email,
+        token,
+        current_owner.name,
+        pharmacy.name if pharmacy else None,
+    )
     return user

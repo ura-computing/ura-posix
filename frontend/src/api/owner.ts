@@ -20,3 +20,16 @@ export const revokeEmployee = (id: number) =>
 
 export const updateEmployeePermissions = (id: number, permissions: Record<string, boolean>) =>
   request<UserAdmin>(`/owner/employees/${id}/permissions`, { method: "PUT", body: JSON.stringify({ permissions }) });
+
+export type InviteEmployeePayload = {
+  email: string;
+  name?: string;
+  phone?: string;
+  permissions?: Record<string, boolean>;
+};
+
+export const inviteEmployee = (payload: InviteEmployeePayload) =>
+  request<UserAdmin>("/owner/employees/invite", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
