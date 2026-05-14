@@ -130,6 +130,24 @@ export const updateUserPharmacy = (userId: number, pharmacyId: number | null) =>
 export const updateUserPermissions = (userId: number, permissions: Record<string, boolean>) =>
   request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/permissions`, { method: "PUT", body: JSON.stringify({ permissions }) });
 
+export type InviteUserPayload = {
+  email: string;
+  name?: string;
+  phone?: string;
+  role: "owner" | "employee";
+  pharmacy_id?: number | null;
+  permissions?: Record<string, boolean>;
+};
+
+export const inviteUser = (payload: InviteUserPayload) =>
+  request<UserAdmin>(`${ENDPOINTS.admin.users}/invite`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const resendReset = (userId: number) =>
+  request<UserAdmin>(`${ENDPOINTS.admin.users}/${userId}/resend-reset`, { method: "POST" });
+
 export const getNotifications = () => request<AdminNotifications>("/admin/notifications");
 
 export const getStats = () => request<AdminStats>("/admin/stats");
@@ -194,9 +212,12 @@ export const deleteCategorySuffix = (id: number) =>
 
 // ── Catalog requests ──────────────────────────────────────────────────────────
 
-export const listCatalogRequests = (status?: string) => {
-  const qs = status ? `?status=${status}` : "";
-  return request<CatalogRequestOut[]>(`/catalog-requests${qs}`);
+export const listCatalogRequests = (status?: string, requestType?: string) => {
+  const p = new URLSearchParams();
+  if (status) p.set("status", status);
+  if (requestType) p.set("request_type", requestType);
+  const qs = p.toString();
+  return request<CatalogRequestOut[]>(`/catalog-requests${qs ? `?${qs}` : ""}`);
 };
 
 export const approveCatalogRequest = (id: number) =>

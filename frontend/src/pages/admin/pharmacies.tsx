@@ -7,6 +7,8 @@ import {
   useAllUsers,
   useNonDeclaredProducts,
   usePharmacyOptions,
+  useAdminInviteUser,
+  useAdminResendReset,
 } from "@/hooks/useAdminPharmacies";
 import {
   Building2,
@@ -24,6 +26,8 @@ import {
   ShieldOff,
   X,
   Clock,
+  Mail,
+  KeyRound,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -41,7 +45,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -255,38 +262,92 @@ function PharmacyPanel({ pharmacy, onClose, allPharmacies }: PharmacyPanelProps)
 function MembresTab({ pharmacy, allPharmacies }: { pharmacy: Pharmacy; allPharmacies: Pharmacy[] }) {
   const { users, isLoading, updateRole, updatePharmacy, updatePermissions, updatingPerms } =
     usePharmacyUsersList(pharmacy.id);
+  const { resendReset, resending } = useAdminResendReset();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<UserAdmin | null>(null);
   const pharmacyOptions = pharmacy.options ?? {};
 
   if (isLoading) return <PageLoader />;
 
-  if (users.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-10 text-center">
-        <Users className="h-8 w-8 text-muted-foreground/40" />
-        <p className="text-sm text-muted-foreground">Aucun membre assigné à cette pharmacie.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="divide-y">
-      {users.map((user: UserAdmin) => (
-        <div key={user.id} className="px-5 py-3">
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8 shrink-0">
-              <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                {initials(user.name, user.email)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
-              {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Select
-                value={user.role}
-                onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
-              >
+    <>
+      <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/20">
+        <span className="text-xs font-medium text-muted-foreground">
+          {users.length} membre{users.length !== 1 ? "s" : ""}
+        </span>
+        <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setInviteOpen(true)}>
+          <Mail className="h-3.5 w-3.5" />
+          Inviter un membre
+        </Button>
+      </div>
+
+      <InviteMemberDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        pharmacyId={pharmacy.id}
+        pharmacyName={pharmacy.name}
+      />
+
+      <AlertDialog open={!!resetTarget} onOpenChange={(v) => { if (!v) setResetTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Envoyer un lien de réinitialisation à "{resetTarget?.email}" ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              L'utilisateur recevra un email contenant un lien (valide 7 jours) pour définir un nouveau mot de passe.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resending}
+              onClick={() => resetTarget && resendReset(resetTarget.id, { onSuccess: () => setResetTarget(null) })}
+            >
+              {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer le lien
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {users.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-10 text-center">
+          <Users className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">Aucun membre assigné à cette pharmacie.</p>
+          <Button size="sm" variant="outline" className="mt-2 gap-1.5" onClick={() => setInviteOpen(true)}>
+            <Mail className="h-3.5 w-3.5" />
+            Inviter un premier membre
+          </Button>
+        </div>
+      ) : (
+        <div className="divide-y">
+          {users.map((user: UserAdmin) => (
+            <div key={user.id} className="px-5 py-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                    {initials(user.name, user.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{user.name ?? user.email}</p>
+                  {user.name && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    title="Réinitialiser le mot de passe"
+                    onClick={() => setResetTarget(user)}
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                  </Button>
+                  <Select
+                    value={user.role}
+                    onValueChange={(role) => updateRole({ userId: user.id, role: role as UserRole })}
+                  >
                 <SelectTrigger className="h-7 text-xs w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -342,9 +403,137 @@ function MembresTab({ pharmacy, allPharmacies }: { pharmacy: Pharmacy; allPharma
               {updatingPerms && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
             </div>
           )}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+    </>
+  );
+}
+
+// ── Invite member dialog ────────────────────────────────────────────────────
+
+function InviteMemberDialog({
+  open,
+  onOpenChange,
+  pharmacyId,
+  pharmacyName,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  pharmacyId: number;
+  pharmacyName: string;
+}) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<"owner" | "employee">("employee");
+  const reset = () => {
+    setEmail("");
+    setName("");
+    setPhone("");
+    setRole("employee");
+  };
+  const { invite, inviting } = useAdminInviteUser(pharmacyId, () => {
+    onOpenChange(false);
+    reset();
+  });
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    invite({
+      email: email.trim(),
+      name: name.trim() || undefined,
+      phone: phone.trim() || undefined,
+      role,
+      pharmacy_id: pharmacyId,
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Inviter un membre — {pharmacyName}</DialogTitle>
+          <DialogDescription>
+            L'invité recevra un email avec un lien (valide 7 jours) pour définir son mot de passe.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Rôle</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRole("employee")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                  role === "employee"
+                    ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                    : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+              >
+                Employé
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("owner")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                  role === "owner"
+                    ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                    : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+              >
+                Propriétaire
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-invite-email" className="text-xs">Email *</Label>
+            <Input
+              id="admin-invite-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="membre@pharmacie.ma"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-invite-name" className="text-xs">
+              Nom <span className="text-muted-foreground font-normal">(optionnel)</span>
+            </Label>
+            <Input
+              id="admin-invite-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Karim El Amrani"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="admin-invite-phone" className="text-xs">
+              Téléphone <span className="text-muted-foreground font-normal">(optionnel)</span>
+            </Label>
+            <Input
+              id="admin-invite-phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="06xx xx xx xx"
+            />
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={inviting}>
+              Annuler
+            </Button>
+            <Button type="submit" disabled={inviting || !email.trim()}>
+              {inviting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer l'invitation
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -45,7 +45,7 @@ export function useClearVentes() {
 
 export type ImportBatchOut = {
   id: number;
-  file_type: "achat" | "vente";
+  file_type: "achat" | "vente" | "stock";
   filename: string | null;
   rows_inserted: number;
   rows_skipped: number;

@@ -104,7 +104,7 @@ with SessionLocal() as _db:
     if _to_backfill:
         _db.commit()
 
-app = FastAPI(title="APCM Pharma API", version="1.0.0")
+app = FastAPI(title="APCM Pharma API", version="1.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

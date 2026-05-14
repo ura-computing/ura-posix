@@ -219,6 +219,7 @@ export default function AnalysePage() {
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
                   <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(k.total_ventes_dh)} MAD</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{fmtInt(k.total_ventes_unites)} unités vendues</p>
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
                 </div>
                 <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
               </div>
@@ -232,6 +233,7 @@ export default function AnalysePage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne</p>
                   <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_pct_avg != null ? `${k.marge_pct_avg.toFixed(1)}%` : "—"}</p>
+                  <p className="text-[10px] opacity-50 font-mono">moyenne pondérée (1 − PU÷PPV)</p>
                   <div className="mt-2 space-y-0.5 text-[11px]">
                     {k.marge_pct_min && (
                       <Tooltip>
@@ -271,6 +273,7 @@ export default function AnalysePage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
                   <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)}` : "—"}</p>
+                  <p className="text-[10px] opacity-50 font-mono">PPV − PU (moyen)</p>
                   <div className="mt-2 space-y-0.5 text-[11px]">
                     {k.marge_dh_min && (
                       <Tooltip>
@@ -321,6 +324,7 @@ export default function AnalysePage() {
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités vendues</p>
                   <p className="text-xl font-bold mt-1 tabular-nums">{fmtInt(k.total_ventes_unites)}</p>
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">Σ qté vendue</p>
                 </div>
                 <ShoppingCart className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>
@@ -332,6 +336,7 @@ export default function AnalysePage() {
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Unités disponibles</p>
                   <p className="text-xl font-bold mt-1 tabular-nums">{fmtInt(k.total_units_available)}</p>
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">Σ stock actuel</p>
                 </div>
                 <Boxes className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>
@@ -343,6 +348,7 @@ export default function AnalysePage() {
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Prix unitaires achetés</p>
                   <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.total_pu_purchased)} MAD</p>
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PU × qté achetée</p>
                 </div>
                 <Coins className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>
@@ -354,6 +360,7 @@ export default function AnalysePage() {
                 <div className="min-w-0">
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">PPV disponibles</p>
                   <p className="text-xl font-bold mt-1 tabular-nums">{fmt(k.ppv_total_available)} MAD</p>
+                  <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PPV × stock</p>
                 </div>
                 <BarChart3 className="h-6 w-6 opacity-60 shrink-0 text-muted-foreground" />
               </div>

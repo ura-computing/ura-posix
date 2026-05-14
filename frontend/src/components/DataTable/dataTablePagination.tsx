@@ -9,6 +9,7 @@ import {
 import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
+import { fmtInt } from "@/utils/format";
 import {
   Select,
   SelectContent,
@@ -104,7 +105,7 @@ export function DataTablePagination({
     <div className="flex items-center justify-between flex-wrap px-2 w-full gap-3">
       <p className="text-sm text-muted-foreground whitespace-nowrap">
         {typeof total === "number"
-          ? `${total.toLocaleString("fr-MA")} résultat${total !== 1 ? "s" : ""}`
+          ? `${fmtInt(total)} résultat${total !== 1 ? "s" : ""}`
           : null}
       </p>
 

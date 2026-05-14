@@ -6,11 +6,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Pharmacy, User
+from models import Achat, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from utils.permissions import get_current_owner
 from utils.constants import Role, Status
-from utils.email import send_invite_email
-from schemas import EmployeeInvite, EmployeePermissionsUpdate, UserAdminOut
+from utils.email import send_invite_email, send_reset_email
+from schemas import EmployeeInvite, EmployeePermissionsUpdate, SpecialProductsStats, UserAdminOut
 
 router = APIRouter(prefix="/owner", tags=["owner"])
 
@@ -188,4 +188,72 @@ async def invite_employee(
         current_owner.name,
         pharmacy.name if pharmacy else None,
     )
+    return user
+
+
+@router.get("/special-products/stats", response_model=SpecialProductsStats)
+def special_products_stats(
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Share of this pharmacy's used products that are flagged as spéciaux
+    (non-déclarés). Denominator: distinct medicament_ids appearing in this
+    pharmacy's Achat or Vente rows. Numerator: PharmacyMedicamentStatus rows
+    with declared=False."""
+    pharmacy_id = current_owner.pharmacy_id
+    if not pharmacy_id:
+        return SpecialProductsStats(total_products=0, special_count=0, percentage=0.0)
+    achat_ids = {
+        row[0]
+        for row in db.query(Achat.medicament_id)
+        .filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id.isnot(None))
+        .distinct()
+    }
+    vente_ids = {
+        row[0]
+        for row in db.query(Vente.medicament_id)
+        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.isnot(None))
+        .distinct()
+    }
+    total = len(achat_ids | vente_ids)
+    special = (
+        db.query(PharmacyMedicamentStatus)
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        )
+        .count()
+    )
+    pct = (special / total * 100.0) if total else 0.0
+    return SpecialProductsStats(
+        total_products=total,
+        special_count=special,
+        percentage=round(pct, 1),
+    )
+
+
+@router.post("/employees/{user_id}/resend-reset", response_model=UserAdminOut)
+async def resend_reset_employee(
+    user_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Owner-initiated password reactivation for one of their employees.
+    Issues a fresh 7-day reset token and emails a /reset-password link.
+    Owners can only reset employees in their own pharmacy — never another
+    owner or admin."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    if user.pharmacy_id != current_owner.pharmacy_id:
+        raise HTTPException(status_code=403, detail="Cet utilisateur n'appartient pas à votre pharmacie")
+    if user.role != Role.EMPLOYEE:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez réinitialiser que les mots de passe de vos employés")
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires = datetime.now(timezone.utc) + _INVITE_TTL
+    db.commit()
+    db.refresh(user)
+    background.add_task(send_reset_email, user.email, token)
     return user

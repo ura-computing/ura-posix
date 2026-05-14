@@ -295,3 +295,40 @@ def test_analytics_returns_counts(client, test_admin, test_owner, test_employee)
 def test_analytics_non_admin_403(client, test_owner):
     res = client.get("/admin/analytics", headers=test_owner["headers"])
     assert res.status_code == 403
+
+
+# ── POST /admin/users/{id}/resend-reset ──────────────────────────────────────
+
+
+def test_admin_resend_reset_success(client, db, test_admin, test_employee, monkeypatch):
+    sent: list = []
+
+    async def _fake(to_email, token):
+        sent.append((to_email, token))
+
+    monkeypatch.setattr("routers.admin.send_reset_email", _fake)
+
+    res = client.post(
+        f"/admin/users/{test_employee['user'].id}/resend-reset",
+        headers=test_admin["headers"],
+    )
+    assert res.status_code == 200
+    refreshed = db.query(User).filter(User.id == test_employee["user"].id).first()
+    assert refreshed.reset_token is not None
+    assert refreshed.reset_token_expires is not None
+
+
+def test_admin_resend_reset_nonexistent_404(client, test_admin):
+    res = client.post(
+        "/admin/users/999999/resend-reset",
+        headers=test_admin["headers"],
+    )
+    assert res.status_code == 404
+
+
+def test_admin_resend_reset_non_admin_403(client, test_owner):
+    res = client.post(
+        f"/admin/users/{test_owner['user'].id}/resend-reset",
+        headers=test_owner["headers"],
+    )
+    assert res.status_code == 403

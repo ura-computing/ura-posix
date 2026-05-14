@@ -96,36 +96,42 @@ export default function AlertesPage() {
                   {totalAlerts}
                 </span>
               )}
+              <span className="text-[9px] opacity-50 font-mono">Σ tous types</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge négative</span>
               <span className="text-sm font-bold tabular-nums text-red-600">
                 {loading ? "…" : marginAlerts?.negative?.count ?? 0}
               </span>
+              <span className="text-[9px] opacity-50 font-mono">marge &lt; 0</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge faible</span>
               <span className="text-sm font-bold tabular-nums text-amber-600">
                 {loading ? "…" : marginAlerts?.low?.count ?? 0}
               </span>
+              <span className="text-[9px] opacity-50 font-mono">0 ≤ marge &lt; 10%</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Produits expirés</span>
               <span className="text-sm font-bold tabular-nums text-red-600">
                 {loading ? "…" : peremptions?.expired?.count ?? 0}
               </span>
+              <span className="text-[9px] opacity-50 font-mono">expiré &lt; aujourd'hui</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Sous-stock</span>
               <span className="text-sm font-bold tabular-nums text-amber-600">
                 {loading ? "…" : stockBuckets.sousStock.length}
               </span>
+              <span className="text-[9px] opacity-50 font-mono">stock &lt; min</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Sur-stock</span>
               <span className="text-sm font-bold tabular-nums text-blue-600">
                 {loading ? "…" : stockBuckets.surStock.length}
               </span>
+              <span className="text-[9px] opacity-50 font-mono">stock &gt; max</span>
             </div>
           </div>
         </CardContent>

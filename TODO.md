@@ -135,4 +135,6 @@ l analyse du stock  montrera du 01-07-25 au 30-06-26
     + exemple je cherche un produit de la marque La Roche Posay de la gamme Anthelios:
         + *anthel
         + *roche*anthe
-    
+
+
+

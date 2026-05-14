@@ -44,7 +44,7 @@ def test_signup_owner_missing_city_400(client):
     assert "ville" in res.json()["detail"].lower()
 
 
-def test_signup_employee_success(client, test_pharmacy):
+def test_signup_employee_rejected_400(client, test_pharmacy):
     res = client.post("/auth/signup", json={
         "email": "newemp@example.com",
         "password": "secret123",
@@ -52,10 +52,8 @@ def test_signup_employee_success(client, test_pharmacy):
         "role": "employee",
         "pharmacy_id": test_pharmacy.id,
     })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["user"]["role"] == Role.EMPLOYEE
-    assert data["user"]["pharmacy_id"] == test_pharmacy.id
+    assert res.status_code == 400
+    assert "invit" in res.json()["detail"].lower()
 
 
 def test_signup_duplicate_email_400(client):

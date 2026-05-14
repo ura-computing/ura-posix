@@ -17,12 +17,11 @@ import { CategoryMultiSelect } from "@/components/categoryMultiSelect";
 import { TvaMultiSelect } from "@/components/tvaMultiSelect";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
-import { fmt } from "@/utils/format";
+import { fmt, fmtInt } from "@/utils/format";
 import { currentMonth } from "@/utils/dateRange";
 import { downloadCSV, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
-import { cn } from "@/utils/cn";
 
 const AchatEmptyState = ({ canImport }: { canImport: boolean }) => (
   <div className="flex flex-col items-center gap-4 px-6 py-4 text-center">
@@ -127,7 +126,7 @@ const SupplierSummarySection = ({ dateFrom, dateTo, search, categories, tva }: {
           <p className="text-xs text-muted-foreground">Achats</p>
           <p className="text-lg font-bold tabular-nums">{fmt(g.total_mad)} MAD</p>
           <p className="text-sm tabular-nums"><span className="font-semibold">{g.bl_count}</span> <span className="text-muted-foreground">BL</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{g.unit_count.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{fmtInt(g.unit_count)}</span> <span className="text-muted-foreground">unités</span></p>
         </div>
 
         {/* Gauge (center) */}
@@ -139,7 +138,7 @@ const SupplierSummarySection = ({ dateFrom, dateTo, search, categories, tva }: {
           <p className="text-xs text-muted-foreground">Achats</p>
           <p className="text-lg font-bold tabular-nums text-emerald-600">{fmt(l.total_mad)} MAD</p>
           <p className="text-sm tabular-nums"><span className="font-semibold">{l.bl_count}</span> <span className="text-muted-foreground">BL</span></p>
-          <p className="text-sm tabular-nums"><span className="font-semibold">{l.unit_count.toLocaleString("fr-MA")}</span> <span className="text-muted-foreground">unités</span></p>
+          <p className="text-sm tabular-nums"><span className="font-semibold">{fmtInt(l.unit_count)}</span> <span className="text-muted-foreground">unités</span></p>
         </div>
       </div>
     </div>

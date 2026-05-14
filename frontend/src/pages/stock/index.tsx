@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ColumnDef, getCoreRowModel, useReactTable, type SortingState } from "@tanstack/react-table";
 import { DataTable } from "@/components/DataTable/dataTable";
 import { cn } from "@/utils/cn";
-import { fmt } from "@/utils/format";
+import { fmt, fmtInt } from "@/utils/format";
 import { stockAbcdWindow } from "@/utils/dateRange";
 import { useStockAbcd, usePeremptions } from "@/hooks/usePharmacyRapports";
 import type { StockAbcdProduct, PeremptionBracket, StockStatus } from "@/api/stats";
@@ -102,7 +102,7 @@ function MetricsGrid({
       </div>
       <div>
         <p className={cn("text-[10px] font-medium uppercase", labelColor)}>Unités totales</p>
-        <p className={cn("text-sm font-bold tabular-nums", valueColor)}>{units.toLocaleString("fr-MA")}</p>
+        <p className={cn("text-sm font-bold tabular-nums", valueColor)}>{fmtInt(units)}</p>
       </div>
       <div>
         <p className={cn("text-[10px] font-medium uppercase", labelColor)}>Valeur achats</p>
@@ -346,7 +346,7 @@ const StockList = () => {
             </div>
           </div>
           <div className="flex flex-col items-center gap-1 shrink-0">
-            <p className="text-[11px] text-muted-foreground">Mixte : {stockAbcd.total_references.toLocaleString("fr-MA")} références</p>
+            <p className="text-[11px] text-muted-foreground">Mixte : {fmtInt(stockAbcd.total_references)} références</p>
             <HealthGauge score={healthScore} />
           </div>
         </div>
@@ -370,6 +370,7 @@ const StockList = () => {
         <Link to="/alertes" className="block">
           <div className="rounded-xl bg-card border border-border p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md">
             <p className="text-sm font-semibold">Stock négatif</p>
+            <p className="text-[10px] opacity-50 -mt-2 font-mono">stock actuel &lt; 0</p>
             <MetricsGrid refs={negMetrics.refs} units={negMetrics.units} valAchat={negMetrics.valAchat} ppvPot={negMetrics.ppvPot} />
           </div>
         </Link>
@@ -380,6 +381,7 @@ const StockList = () => {
               <p className="text-sm font-semibold">Sous stock Top références</p>
               <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">A & A-</span>
             </div>
+            <p className="text-[10px] opacity-50 -mt-2 font-mono">classe A/A- · stock &lt; min</p>
             <MetricsGrid refs={sousMetrics.refs} units={sousMetrics.units} valAchat={sousMetrics.valAchat} ppvPot={sousMetrics.ppvPot} />
           </div>
         </Link>
@@ -387,6 +389,7 @@ const StockList = () => {
         <Link to="/alertes" className="block">
           <div className="rounded-xl bg-card border border-border p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md">
             <p className="text-sm font-semibold">Sur stock &gt; 100 jours</p>
+            <p className="text-[10px] opacity-50 -mt-2 font-mono">stock ÷ (ventes ÷ 365) &gt; 100j</p>
             <MetricsGrid refs={surMetrics.refs} units={surMetrics.units} valAchat={surMetrics.valAchat} ppvPot={surMetrics.ppvPot} />
           </div>
         </Link>
@@ -458,7 +461,7 @@ function PeremptionCard({
   borderClass: string;
   urgent?: boolean;
 }) {
-  const fmtN = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+  const fmtN = (n: number) => fmtInt(n);
 
   return (
     <div className={cn("rounded-xl border-2 p-5 space-y-3 cursor-pointer transition-shadow hover:shadow-md", bgClass, borderClass)}>

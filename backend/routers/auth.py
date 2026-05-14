@@ -58,44 +58,37 @@ def signup(request: Request, body: UserSignup, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email déjà enregistré")
 
-    role = body.role if body.role in (Role.OWNER, Role.EMPLOYEE) else Role.OWNER
+    if body.role == Role.EMPLOYEE:
+        raise HTTPException(
+            status_code=400,
+            detail="Les employés ne peuvent pas créer de compte. Demandez à votre propriétaire de pharmacie de vous inviter.",
+        )
+    role = Role.OWNER
 
-    # Resolve pharmacy_name and pharmacy_id based on role
     resolved_pharmacy_name = None
     resolved_pharmacy_id = None
 
-    if role == Role.EMPLOYEE:
-        if not body.pharmacy_id:
-            raise HTTPException(status_code=400, detail="Veuillez sélectionner une pharmacie")
+    if body.pharmacy_id:
         pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
         if not pharmacy:
             raise HTTPException(status_code=400, detail="Pharmacie introuvable")
         resolved_pharmacy_name = pharmacy.name
         resolved_pharmacy_id = pharmacy.id
-    elif role == Role.OWNER:
-        if body.pharmacy_id:
-            # Joining an existing pharmacy
-            pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
-            if not pharmacy:
-                raise HTTPException(status_code=400, detail="Pharmacie introuvable")
-            resolved_pharmacy_name = pharmacy.name
-            resolved_pharmacy_id = pharmacy.id
-        else:
-            # Creating a new pharmacy — name + city required
-            if not body.pharmacy_name:
-                raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour les nouveaux propriétaires")
-            if not body.pharmacy_city:
-                raise HTTPException(status_code=400, detail="Ville requise pour créer une nouvelle pharmacie")
-            from utils.pharmacy_code import generate_pharmacy_code
-            new_pharmacy = Pharmacy(
-                name=body.pharmacy_name,
-                city=body.pharmacy_city,
-                code=generate_pharmacy_code(db, body.pharmacy_city),
-            )
-            db.add(new_pharmacy)
-            db.flush()
-            resolved_pharmacy_name = new_pharmacy.name
-            resolved_pharmacy_id = new_pharmacy.id
+    else:
+        if not body.pharmacy_name:
+            raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour les nouveaux propriétaires")
+        if not body.pharmacy_city:
+            raise HTTPException(status_code=400, detail="Ville requise pour créer une nouvelle pharmacie")
+        from utils.pharmacy_code import generate_pharmacy_code
+        new_pharmacy = Pharmacy(
+            name=body.pharmacy_name,
+            city=body.pharmacy_city,
+            code=generate_pharmacy_code(db, body.pharmacy_city),
+        )
+        db.add(new_pharmacy)
+        db.flush()
+        resolved_pharmacy_name = new_pharmacy.name
+        resolved_pharmacy_id = new_pharmacy.id
 
     user = User(
         email=body.email,

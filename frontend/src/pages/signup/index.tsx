@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useAuthenticate } from "@/hooks/useAuthenticate";
 import { useSignupForm } from "@/schemas/signupForm";
 import type { SignupFormValues } from "@/schemas/signupForm";
-import { Loader2, Building2, UserCog, PlusCircle, LogIn } from "lucide-react";
+import { Loader2, PlusCircle, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { AppLogo } from "@/components/shared/appLogo";
 import { Button } from "@/components/ui/button";
@@ -35,31 +35,26 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/utils/cn";
 import { listPharmacies as listPublicPharmacies } from "@/api/public";
 import type { PharmacyPublic } from "@/api/public";
-import { eUserRole } from "@/types";
 
 export const Signup = () => {
   const { signup: { submit: signup, signupPending } } = useAuthenticate();
   const [pharmacies, setPharmacies] = useState<PharmacyPublic[]>([]);
   const form = useSignupForm();
 
-  const role = form.watch("role");
   const [ownerMode, setOwnerMode] = useState<"new" | "join">("new");
 
   useEffect(() => {
     listPublicPharmacies().then(setPharmacies).catch(() => {});
   }, []);
 
-  // Clear stale pharmacy fields when mode or role changes
   useEffect(() => {
-    if (role === eUserRole.OWNER) {
-      if (ownerMode === "new") {
-        form.setValue("pharmacy_id", undefined);
-      } else {
-        form.setValue("pharmacy_name", undefined);
-        form.setValue("pharmacy_city", undefined);
-      }
+    if (ownerMode === "new") {
+      form.setValue("pharmacy_id", undefined);
+    } else {
+      form.setValue("pharmacy_name", undefined);
+      form.setValue("pharmacy_city", undefined);
     }
-  }, [role, ownerMode, form]);
+  }, [ownerMode, form]);
 
   const onSubmit = (values: SignupFormValues) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -77,9 +72,9 @@ export const Signup = () => {
 
       <Card className="card">
         <CardHeader className="header">
-          <CardTitle className="title">Créer un compte</CardTitle>
+          <CardTitle className="title">Créer un compte propriétaire</CardTitle>
           <CardDescription className="description">
-            Commencez avec PharmaGest
+            Inscrivez votre pharmacie sur PharmaGest. Les employés doivent être invités par un propriétaire.
           </CardDescription>
         </CardHeader>
 
@@ -87,33 +82,6 @@ export const Signup = () => {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="form">
 
-              {/* Role selector */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Je suis</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {([eUserRole.OWNER, eUserRole.EMPLOYEE] as const).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => form.setValue("role", r)}
-                      className={cn(
-                        "flex flex-col items-center gap-2 rounded-xl border p-4 text-sm font-medium transition-all",
-                        role === r
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30 text-primary"
-                          : "border-border bg-background text-muted-foreground hover:border-primary/30"
-                      )}
-                    >
-                      {r === eUserRole.OWNER
-                        ? <Building2 className="h-5 w-5" />
-                        : <UserCog className="h-5 w-5" />
-                      }
-                      {r === eUserRole.OWNER ? "Propriétaire" : "Employé"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Row: Nom + Téléphone */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -157,7 +125,6 @@ export const Signup = () => {
                 )}
               />
 
-              {/* Row: Mot de passe + Confirmer */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -187,131 +154,95 @@ export const Signup = () => {
                 />
               </div>
 
-              {/* Conditional field based on role */}
-              {role === eUserRole.OWNER ? (
-                <div className="space-y-3">
-                  {/* Owner mode toggle */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOwnerMode("new")}
-                      className={cn(
-                        "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
-                        ownerMode === "new"
-                          ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
-                          : "border-border text-muted-foreground hover:border-primary/30"
-                      )}
-                    >
-                      <PlusCircle className="h-3.5 w-3.5" />
-                      Nouvelle pharmacie
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOwnerMode("join")}
-                      className={cn(
-                        "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
-                        ownerMode === "join"
-                          ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
-                          : "border-border text-muted-foreground hover:border-primary/30"
-                      )}
-                    >
-                      <LogIn className="h-3.5 w-3.5" />
-                      Rejoindre existante
-                    </button>
-                  </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOwnerMode("new")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                      ownerMode === "new"
+                        ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                        : "border-border text-muted-foreground hover:border-primary/30"
+                    )}
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    Nouvelle pharmacie
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOwnerMode("join")}
+                    className={cn(
+                      "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                      ownerMode === "join"
+                        ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30"
+                        : "border-border text-muted-foreground hover:border-primary/30"
+                    )}
+                  >
+                    <LogIn className="h-3.5 w-3.5" />
+                    Rejoindre existante
+                  </button>
+                </div>
 
-                  {ownerMode === "new" ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <FormField
-                        control={form.control}
-                        name="pharmacy_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nom de votre pharmacie</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Pharmacie Al Amal" {...field} value={field.value ?? ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="pharmacy_city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Ville</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Bouskoura" {...field} value={field.value ?? ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  ) : (
+                {ownerMode === "new" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
-                      name="pharmacy_id"
+                      name="pharmacy_name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Pharmacie à rejoindre</FormLabel>
-                          <Select
-                            value={field.value?.toString() ?? ""}
-                            onValueChange={(v) => field.onChange(Number(v))}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sélectionnez une pharmacie" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {pharmacies.map((p) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>
-                                  {p.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Nom de votre pharmacie</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Pharmacie Al Amal" {...field} value={field.value ?? ""} />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  )}
-                </div>
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="pharmacy_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pharmacie où vous travaillez</FormLabel>
-                      <Select
-                        value={field.value?.toString() ?? ""}
-                        onValueChange={(v) => field.onChange(Number(v))}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionnez une pharmacie" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {pharmacies.length === 0 ? (
-                            <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-                              Aucune pharmacie disponible. Le propriétaire doit d'abord créer son compte.
-                            </div>
-                          ) : pharmacies.map((p) => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+                    <FormField
+                      control={form.control}
+                      name="pharmacy_city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ville</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Bouskoura" {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="pharmacy_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pharmacie à rejoindre</FormLabel>
+                        <Select
+                          value={field.value?.toString() ?? ""}
+                          onValueChange={(v) => field.onChange(Number(v))}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionnez une pharmacie" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {pharmacies.map((p) => (
+                              <SelectItem key={p.id} value={p.id.toString()}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
 
               <Button type="submit" size="lg" className="submit" disabled={signupPending}>
                 {signupPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
