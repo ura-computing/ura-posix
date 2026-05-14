@@ -121,3 +121,9 @@ class UserPharmacyUpdate(BaseModel):
 
 class UserRejectBody(BaseModel):
     reason: Optional[str] = None
+
+
+class SpecialProductsStats(BaseModel):
+    total_products: int
+    special_count: int
+    percentage: float

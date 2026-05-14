@@ -91,6 +91,35 @@ export function usePharmacyUsersList(pharmacyId: number) {
   return { users, isLoading, updateRole, updatePharmacy, updatePermissions, updatingPerms };
 }
 
+// ── Invite a member ─────────────────────────────────────────────────────────
+
+export function useAdminInviteUser(pharmacyId: number, onDone?: () => void) {
+  const queryClient = useQueryClient();
+  const panelQueryKey = [...QUERY_KEYS.adminUsers, pharmacyId];
+  const { mutate, isPending } = useMutation({
+    mutationFn: (payload: adminApi.InviteUserPayload) => adminApi.inviteUser(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: panelQueryKey });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminUsers });
+      toast.success("Invitation envoyée par email");
+      onDone?.();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  return { invite: mutate, inviting: isPending };
+}
+
+// ── Resend password reset link ──────────────────────────────────────────────
+
+export function useAdminResendReset() {
+  const { mutate, isPending } = useMutation({
+    mutationFn: (userId: number) => adminApi.resendReset(userId),
+    onSuccess: (user) => toast.success(`Lien envoyé à ${user.email}`),
+    onError: (err) => toast.error(err.message),
+  });
+  return { resendReset: mutate, resending: isPending };
+}
+
 // ── PharmacyList (main page) ────────────────────────────────────────────────
 
 export function usePharmacyList() {

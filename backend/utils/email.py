@@ -1,5 +1,8 @@
+import logging
 import os
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+
+_logger = logging.getLogger("apcm.email")
 
 _conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
@@ -12,6 +15,21 @@ _conf = ConnectionConfig(
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True,
 )
+
+
+async def _send(message: MessageSchema, to_email: str, kind: str) -> None:
+    if not os.getenv("MAIL_USERNAME") or not os.getenv("MAIL_PASSWORD"):
+        _logger.error(
+            "Email %s to %s NOT sent: MAIL_USERNAME/MAIL_PASSWORD missing from environment.",
+            kind, to_email,
+        )
+        return
+    try:
+        fm = FastMail(_conf)
+        await fm.send_message(message)
+        _logger.info("Email %s sent to %s", kind, to_email)
+    except Exception as exc:
+        _logger.exception("Email %s to %s failed: %s", kind, to_email, exc)
 
 
 async def send_reset_email(to_email: str, token: str) -> None:
@@ -31,8 +49,7 @@ async def send_reset_email(to_email: str, token: str) -> None:
         body=body,
         subtype=MessageType.plain,
     )
-    fm = FastMail(_conf)
-    await fm.send_message(message)
+    await _send(message, to_email, "reset")
 
 
 async def send_invite_email(
@@ -63,5 +80,4 @@ async def send_invite_email(
         body=body,
         subtype=MessageType.plain,
     )
-    fm = FastMail(_conf)
-    await fm.send_message(message)
+    await _send(message, to_email, "invite")

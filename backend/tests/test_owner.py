@@ -1,8 +1,11 @@
 """Tests for owner endpoints (routers/owner.py)."""
 
-from models import Pharmacy, User
+import pytest
+
+from models import Pharmacy, PharmacyMedicamentStatus, User
 from utils.auth import hash_password, create_access_token
 from utils.constants import Role, Status
+from tests.factories import make_achat, make_medicament, make_vente
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -381,4 +384,106 @@ class TestInviteEmployee:
             headers=test_employee["headers"],
         )
         # Ticket 4b: employees cannot create accounts.
+        assert res.status_code == 403
+
+
+class TestOwnerResendReset:
+    """POST /owner/employees/{id}/resend-reset — owner reissues a password
+    reset link for an employee in their pharmacy."""
+
+    def test_owner_resends_for_employee(self, client, db, test_owner, monkeypatch):
+        sent: list = []
+
+        async def _fake(to_email, token):
+            sent.append((to_email, token))
+
+        monkeypatch.setattr("routers.owner.send_reset_email", _fake)
+        emp = _make_employee(
+            db, test_owner["pharmacy"].id, "reset.target@example.com", status=Status.ACTIVE
+        )
+        db.commit()
+
+        res = client.post(
+            f"/owner/employees/{emp.id}/resend-reset",
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        refreshed = db.query(User).filter(User.id == emp.id).first()
+        assert refreshed.reset_token is not None
+        assert refreshed.reset_token_expires is not None
+
+    def test_owner_cannot_resend_for_other_pharmacy_employee(self, client, db, test_owner, monkeypatch):
+        async def _noop(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr("routers.owner.send_reset_email", _noop)
+        other_pharmacy = Pharmacy(name="Other Pharmacy", city="Casablanca", code="CAS9999")
+        db.add(other_pharmacy)
+        db.flush()
+        emp = _make_employee(db, other_pharmacy.id, "outside@example.com", status=Status.ACTIVE)
+        db.commit()
+
+        res = client.post(
+            f"/owner/employees/{emp.id}/resend-reset",
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 403
+
+    def test_owner_cannot_resend_for_admin(self, client, db, test_owner, test_admin, monkeypatch):
+        async def _noop(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr("routers.owner.send_reset_email", _noop)
+        res = client.post(
+            f"/owner/employees/{test_admin['user'].id}/resend-reset",
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 403
+
+    def test_resend_nonexistent_user_404(self, client, test_owner):
+        res = client.post(
+            "/owner/employees/999999/resend-reset",
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 404
+
+
+class TestSpecialProductsStats:
+    """GET /owner/special-products/stats — share of pharmacy products marked
+    as spéciaux (non-déclarés)."""
+
+    def test_zero_products(self, client, test_owner):
+        res = client.get("/owner/special-products/stats", headers=test_owner["headers"])
+        assert res.status_code == 200
+        data = res.json()
+        assert data == {"total_products": 0, "special_count": 0, "percentage": 0.0}
+
+    def test_percentage_computed(self, client, db, test_owner):
+        pharmacy_id = test_owner["pharmacy"].id
+        # Create 4 distinct products, this pharmacy uses 3 (one via achat, one
+        # via vente, one via both), mark 1 as spécial → 1/3 ≈ 33.3%.
+        m1 = make_medicament(db, pid="SP-001", product="Doliprane")
+        m2 = make_medicament(db, pid="SP-002", product="Efferalgan")
+        m3 = make_medicament(db, pid="SP-003", product="Aspégic")
+        make_medicament(db, pid="SP-004", product="Unused")
+        make_achat(db, m1, pharmacy_id)
+        make_vente(db, m2, pharmacy_id)
+        make_achat(db, m3, pharmacy_id)
+        make_vente(db, m3, pharmacy_id)
+        db.add(PharmacyMedicamentStatus(
+            pharmacy_id=pharmacy_id,
+            medicament_id=m1.id,
+            declared=False,
+        ))
+        db.commit()
+
+        res = client.get("/owner/special-products/stats", headers=test_owner["headers"])
+        assert res.status_code == 200
+        data = res.json()
+        assert data["total_products"] == 3
+        assert data["special_count"] == 1
+        assert data["percentage"] == pytest.approx(33.3)
+
+    def test_employee_forbidden(self, client, test_employee):
+        res = client.get("/owner/special-products/stats", headers=test_employee["headers"])
         assert res.status_code == 403

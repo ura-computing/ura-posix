@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMe } from "@/hooks/useMe";
-import { useOwnerEmployees, useEmployeePermissions, useInviteEmployee } from "@/hooks/useOwnerEmployees";
+import { useOwnerEmployees, useEmployeePermissions, useInviteEmployee, useOwnerResendReset } from "@/hooks/useOwnerEmployees";
 import {
   Users,
   UserCheck,
@@ -10,6 +10,7 @@ import {
   ShieldOff,
   Clock,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -106,7 +107,9 @@ export default function OwnerEmployeesPage() {
   const { me: identity } = useMe();
   const [rejectTarget, setRejectTarget] = useState<UserAdmin | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<UserAdmin | null>(null);
+  const [resetTarget, setResetTarget] = useState<UserAdmin | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const { resendReset, resending } = useOwnerResendReset();
 
   const isEmployee = identity?.role !== eUserRole.OWNER;
 
@@ -254,6 +257,16 @@ export default function OwnerEmployeesPage() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="h-7 gap-1.5 text-xs shrink-0"
+                          onClick={() => setResetTarget(emp)}
+                          title="Réinitialiser le mot de passe"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                          Réinitialiser
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
                           onClick={() => setRevokeTarget(emp)}
                         >
@@ -294,6 +307,30 @@ export default function OwnerEmployeesPage() {
             >
               {rejecting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Refuser
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset password dialog */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(v) => { if (!v) setResetTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Envoyer un lien de réinitialisation à "{resetTarget?.email}" ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              L'employé recevra un email contenant un lien (valide 7 jours) pour définir un nouveau mot de passe.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resending}
+              onClick={() => resetTarget && resendReset(resetTarget.id, { onSuccess: () => setResetTarget(null) })}
+            >
+              {resending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Envoyer le lien
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

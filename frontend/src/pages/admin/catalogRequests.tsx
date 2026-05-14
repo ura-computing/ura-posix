@@ -6,6 +6,7 @@ import {
 } from "@/hooks/useAdminCatalogRequests";
 import {
   ClipboardCheck,
+  History,
   Loader2,
   UserCheck,
   UserX,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { CatalogRequestOut } from "@/api/admin";
-import { eUserStatus, eRequestType, eRequestStatus } from "@/types";
+import { eRequestType, eRequestStatus } from "@/types";
 
 type StatusFilter = "all" | `${eRequestStatus}`;
 
@@ -44,185 +46,248 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: eRequestStatus.REJECTED, label: "Rejetés" },
 ];
 
+const HISTORY_TYPES = `${eRequestType.NON_DECLARE},${eRequestType.ANNULATION}`;
 
 export default function AdminCatalogRequestsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [rejectTarget, setRejectTarget] = useState<CatalogRequestOut | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { requests, requestsLoading: isLoading } = useAdminCatalogRequestsList(statusFilter);
+  const { requests: actionable, requestsLoading: actionableLoading } =
+    useAdminCatalogRequestsList(statusFilter, eRequestType.NEW_PRODUCT);
+  const { requests: history, requestsLoading: historyLoading } =
+    useAdminCatalogRequestsList(undefined, HISTORY_TYPES);
+
   const { approve, approving } = useApproveCatalogRequest();
   const { reject, rejecting } = useRejectCatalogRequest();
 
-  const pendingCount = requests.filter((r) => r.status === eRequestStatus.PENDING).length;
+  const pendingCount = actionable.filter((r) => r.status === eRequestStatus.PENDING).length;
 
   return (
     <ListView>
       <Breadcrumb />
 
       <div>
-        <h1 className="page-title">Demandes d'exclusion</h1>
+        <h1 className="page-title">Demandes de catalogue</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Examinez les demandes d'exclusion et d'annulation soumises par les pharmacies.
+          Examinez les nouvelles propositions de produits et consultez l'historique des produits spéciaux marqués par les pharmacies.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-center">
-        {/* Status filter */}
-        <div className="flex items-center gap-1 border rounded-xl p-1 bg-muted/30">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setStatusFilter(tab.key)}
-              className={cn(
-                "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
-                statusFilter === tab.key
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.label}
-              {tab.key === eRequestStatus.PENDING && pendingCount > 0 && statusFilter !== eRequestStatus.PENDING && (
-                <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
-                  {pendingCount}
-                </Badge>
-              )}
-            </button>
-          ))}
-        </div>
+      <Tabs defaultValue="actionable" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
+          <TabsTrigger
+            value="actionable"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
+          >
+            <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
+            Demandes à traiter
+            {pendingCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
+                {pendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger
+            value="history"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5 text-xs"
+          >
+            <History className="h-3.5 w-3.5 mr-1.5" />
+            Historique des produits spéciaux
+          </TabsTrigger>
+        </TabsList>
 
-      </div>
-
-      {/* Requests list */}
-      <div className="border rounded-xl overflow-hidden bg-card">
-        {isLoading ? (
-          <PageLoader />
-        ) : requests.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-14 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-              <ClipboardCheck className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Aucune demande</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {statusFilter === "all"
-                  ? "Aucune demande pour l'instant."
-                  : `Aucune demande avec le statut "${STATUS_TABS.find(t => t.key === statusFilter)?.label}".`}
-              </p>
-            </div>
+        {/* Actionable tab: NEW_PRODUCT requests */}
+        <TabsContent value="actionable" className="mt-4 space-y-4">
+          <div className="flex items-center gap-1 border rounded-xl p-1 bg-muted/30 w-fit">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStatusFilter(tab.key)}
+                className={cn(
+                  "px-3 py-1.5 text-sm rounded-lg font-medium transition-colors",
+                  statusFilter === tab.key
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+                {tab.key === eRequestStatus.PENDING && pendingCount > 0 && statusFilter !== eRequestStatus.PENDING && (
+                  <Badge variant="secondary" className="ml-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 text-xs px-1.5 py-0">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </button>
+            ))}
           </div>
-        ) : (
-          <div className="divide-y">
-            <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              <span>Produit</span>
-              <span className="w-36">Pharmacie / Demandeur</span>
-              <span className="w-24 text-center">Type</span>
-              <span className="w-24 text-center">Statut</span>
-              <span className="w-28 text-center">Date</span>
-              <span className="w-36 text-center">Actions</span>
-            </div>
-            {requests.map((req) => {
-              const isAnnulation = req.request_type === eRequestType.ANNULATION;
-              return (
-                <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
-                  {/* Product info */}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {req.medicament_name ?? req.product}
-                    </p>
-                    {req.notes && (
-                      <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
-                    )}
-                    {req.reject_reason && (
-                      <p className="text-xs text-destructive mt-0.5">Motif : {req.reject_reason}</p>
-                    )}
-                  </div>
 
-                  {/* Pharmacy / requester */}
-                  <div className="w-36 min-w-0">
-                    <p className="text-sm truncate">{req.pharmacy_name ?? "—"}</p>
-                    <p className="text-xs text-muted-foreground truncate">{req.requester_name ?? req.requester_email ?? "—"}</p>
-                  </div>
-
-                  {/* Type */}
-                  <div className="w-24 flex justify-center">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs",
-                        isAnnulation
-                          ? "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/30"
-                          : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/30"
-                      )}
-                    >
-                      {isAnnulation ? "Annulation" : "Exclusion"}
-                    </Badge>
-                  </div>
-
-                  {/* Status */}
-                  <div className="w-24 flex justify-center">
-                    <RequestStatusBadge status={req.status} />
-                  </div>
-
-                  {/* Date */}
-                  <span className="text-xs text-muted-foreground w-28 text-center">
-                    {req.created_at ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr }) : "—"}
-                  </span>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 w-36 justify-center">
-                    {req.status === eUserStatus.PENDING ? (
-                      <>
-                        <Button
-                          size="sm"
-                          className="h-7 gap-1.5 text-xs"
-                          disabled={approving}
-                          onClick={() => approve(req.id)}
-                        >
-                          <UserCheck className="h-3.5 w-3.5" />
-                          Approuver
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => { setRejectTarget(req); setRejectReason(""); }}
-                        >
-                          <UserX className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {req.reviewed_at ? format(new Date(req.reviewed_at), "d MMM", { locale: fr }) : "—"}
-                      </span>
-                    )}
-                  </div>
+          <div className="border rounded-xl overflow-hidden bg-card">
+            {actionableLoading ? (
+              <PageLoader />
+            ) : actionable.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-14 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                  <ClipboardCheck className="h-6 w-6 text-primary" />
                 </div>
-              );
-            })}
+                <div>
+                  <p className="text-sm font-medium">Aucune demande</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {statusFilter === "all"
+                      ? "Aucune proposition de nouveau produit pour l'instant."
+                      : `Aucune demande avec le statut "${STATUS_TABS.find(t => t.key === statusFilter)?.label}".`}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y">
+                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <span>Produit</span>
+                  <span className="w-36">Pharmacie / Demandeur</span>
+                  <span className="w-24 text-center">Statut</span>
+                  <span className="w-28 text-center">Date</span>
+                  <span className="w-36 text-center">Actions</span>
+                </div>
+                {actionable.map((req) => (
+                  <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{req.product}</p>
+                      {req.notes && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
+                      )}
+                      {req.reject_reason && (
+                        <p className="text-xs text-destructive mt-0.5">Motif : {req.reject_reason}</p>
+                      )}
+                    </div>
+                    <div className="w-36 min-w-0">
+                      <p className="text-sm truncate">{req.pharmacy_name ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{req.requester_name ?? req.requester_email ?? "—"}</p>
+                    </div>
+                    <div className="w-24 flex justify-center">
+                      <RequestStatusBadge status={req.status} />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-28 text-center">
+                      {req.created_at ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr }) : "—"}
+                    </span>
+                    <div className="flex items-center gap-2 w-36 justify-center">
+                      {req.status === eRequestStatus.PENDING ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs"
+                            disabled={approving}
+                            onClick={() => approve(req.id)}
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            Approuver
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => { setRejectTarget(req); setRejectReason(""); }}
+                          >
+                            <UserX className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {req.reviewed_at ? format(new Date(req.reviewed_at), "d MMM", { locale: fr }) : "—"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </TabsContent>
 
-      {/* Reject dialog */}
+        {/* History tab: NON_DECLARE + ANNULATION (auto-applied, read-only) */}
+        <TabsContent value="history" className="mt-4 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Les exclusions et annulations sont appliquées immédiatement lorsqu'une pharmacie les soumet — aucune validation n'est requise. Cette liste est consultative.
+          </p>
+
+          <div className="border rounded-xl overflow-hidden bg-card">
+            {historyLoading ? (
+              <PageLoader />
+            ) : history.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-14 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                  <History className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Aucun historique</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Aucune pharmacie n'a encore marqué de produit spécial.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y">
+                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <span>Produit</span>
+                  <span className="w-36">Pharmacie / Demandeur</span>
+                  <span className="w-24 text-center">Type</span>
+                  <span className="w-28 text-center">Date</span>
+                </div>
+                {history.map((req) => {
+                  const isAnnulation = req.request_type === eRequestType.ANNULATION;
+                  return (
+                    <div key={req.id} className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 sm:gap-4 px-5 py-3.5 items-start sm:items-center">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {req.medicament_name ?? req.product}
+                        </p>
+                        {req.notes && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Note : {req.notes}</p>
+                        )}
+                      </div>
+                      <div className="w-36 min-w-0">
+                        <p className="text-sm truncate">{req.pharmacy_name ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{req.requester_name ?? req.requester_email ?? "—"}</p>
+                      </div>
+                      <div className="w-24 flex justify-center">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs",
+                            isAnnulation
+                              ? "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/30"
+                              : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/30"
+                          )}
+                        >
+                          {isAnnulation ? "Annulation" : "Exclusion"}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground w-28 text-center">
+                        {req.created_at ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr }) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
       <AlertDialog open={!!rejectTarget} onOpenChange={(v) => { if (!v) setRejectTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Rejeter la demande {rejectTarget?.request_type === eRequestType.ANNULATION ? "d'annulation" : "d'exclusion"} de "{rejectTarget?.medicament_name ?? rejectTarget?.product}" ?
+              Rejeter la demande pour "{rejectTarget?.product}" ?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {rejectTarget?.request_type === eRequestType.ANNULATION
-                ? "Le produit restera exclu (non déclaré) des rapports de cette pharmacie."
-                : "Le produit restera déclaré dans les rapports de cette pharmacie."}
+              Le produit ne sera pas ajouté au catalogue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="px-6 pb-2 space-y-1.5">
             <Label htmlFor="reject-reason">Motif (optionnel)</Label>
             <Input
               id="reject-reason"
-              placeholder="Ex. : ce produit doit rester déclaré"
+              placeholder="Ex. : produit déjà présent au catalogue"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
             />

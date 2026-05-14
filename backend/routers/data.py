@@ -100,8 +100,13 @@ def delete_import_batch(
 
     if batch.file_type == "achat":
         deleted = db.query(Achat).filter(Achat.import_batch_id == batch_id).delete(synchronize_session=False)
-    else:
+    elif batch.file_type == "vente":
         deleted = db.query(Vente).filter(Vente.import_batch_id == batch_id).delete(synchronize_session=False)
+    else:
+        # Stock imports are snapshots — `PharmacyStock` doesn't link back to
+        # a batch, so deleting the history row alone is the safe behavior.
+        # The current snapshot rows are preserved (they remain the truth).
+        deleted = 0
 
     db.delete(batch)
     db.commit()

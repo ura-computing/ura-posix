@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Tag,
   UserRound,
+  Sparkles,
 } from "lucide-react";
 
 import { ListView } from "@/components/shared/listView";
@@ -26,6 +27,7 @@ import { useClearAchats, useClearVentes, useImports, useDeleteImport } from "@/h
 import { CategoryMultiSelect } from "@/components/categoryMultiSelect";
 import { useMe } from "@/hooks/useMe";
 import { useUpdateMe } from "@/hooks/useUpdateMe";
+import { useOwnerSpecialProductsStats } from "@/hooks/useOwnerStats";
 import { useProfileForm } from "@/schemas/profile";
 import type { ProfileFormValues } from "@/schemas/profile";
 import { eUserRole } from "@/types";
@@ -233,6 +235,26 @@ function formatImportDate(iso: string | null) {
     + " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+// One block per import type — driven by this config so the three sections
+// share rendering logic without duplication.
+const IMPORT_SECTIONS = [
+  {
+    type: "achat" as const,
+    label: "Achats",
+    badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  },
+  {
+    type: "vente" as const,
+    label: "Ventes",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  },
+  {
+    type: "stock" as const,
+    label: "Stock",
+    badgeClass: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  },
+];
+
 // ── Profile section ──────────────────────────────────────────────────────────
 
 function ProfileSection() {
@@ -367,6 +389,44 @@ function ProfileSection() {
   );
 }
 
+// ── Special products card ───────────────────────────────────────────────────
+
+function SpecialProductsCard() {
+  const { data, isLoading } = useOwnerSpecialProductsStats(true);
+  const pct = data?.percentage ?? 0;
+  const pctLabel = pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  const total = data?.total_products ?? 0;
+  const special = data?.special_count ?? 0;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Sparkles className="h-4 w-4" />
+          Produits spéciaux
+        </CardTitle>
+        <CardDescription>
+          Part de vos produits exclus des rapports.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        ) : (
+          <div>
+            <p className="text-3xl font-semibold tabular-nums">{pctLabel} %</p>
+            <p className="text-[10px] opacity-50 font-mono mt-1">
+              (spéciaux ÷ produits utilisés) × 100
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {special} spécia{special === 1 ? "l" : "ux"} sur {total} produit{total === 1 ? "" : "s"} utilisé{total === 1 ? "" : "s"}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const ParametresList = () => {
@@ -400,6 +460,8 @@ const ParametresList = () => {
       <div className="grid gap-4">
         <ProfileSection />
 
+        {!isAdmin && currentUser?.role === eUserRole.OWNER && <SpecialProductsCard />}
+
         {!isAdmin && <Card className="border-destructive/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base text-destructive">
@@ -419,78 +481,86 @@ const ParametresList = () => {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ) : imports.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center border-2 border-dashed rounded-lg">
-                <CalendarDays className="h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">Aucun import enregistré.</p>
-              </div>
             ) : (
-              <div className="space-y-2">
-                {imports.map((batch) => (
-                  <div key={batch.id} className="rounded-lg border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge
-                            variant="secondary"
-                            className={cn("text-xs shrink-0", batch.file_type === "achat"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            )}
-                          >
-                            {batch.file_type === "achat" ? "Achats" : "Ventes"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {formatImportDate(batch.imported_at)}
-                          </span>
-                        </div>
-                        {batch.filename && (
-                          <p className="text-sm font-medium truncate" title={batch.filename}>
-                            {batch.filename.replace(/\.csv$/i, "")}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {batch.rows_inserted} ligne{batch.rows_inserted !== 1 ? "s" : ""} importée{batch.rows_inserted !== 1 ? "s" : ""}
-                          {batch.rows_skipped > 0 && ` · ${batch.rows_skipped} doublon${batch.rows_skipped !== 1 ? "s" : ""} ignoré${batch.rows_skipped !== 1 ? "s" : ""}`}
-                        </p>
+              <div className="space-y-6">
+                {IMPORT_SECTIONS.map(({ type, label, badgeClass }) => {
+                  const rows = imports.filter((b) => b.file_type === type);
+                  return (
+                    <div key={type}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary" className={cn("text-xs shrink-0", badgeClass)}>
+                          {label}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {rows.length} import{rows.length !== 1 ? "s" : ""}
+                        </span>
                       </div>
-                      {deleteConfirm === batch.id ? (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="h-7 text-xs"
-                            disabled={deleting}
-                            onClick={() => {
-                              deleteImport(batch.id, { onSuccess: () => setDeleteConfirm(null) });
-                            }}
-                          >
-                            {deleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                            Confirmer
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs"
-                            onClick={() => setDeleteConfirm(null)}
-                          >
-                            Annuler
-                          </Button>
+                      {rows.length === 0 ? (
+                        <div className="flex items-center gap-2 py-3 px-4 text-xs text-muted-foreground border-2 border-dashed rounded-lg">
+                          <CalendarDays className="h-3.5 w-3.5 opacity-60" />
+                          Aucun import {label.toLowerCase()}.
                         </div>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0 h-7 text-xs"
-                          onClick={() => setDeleteConfirm(batch.id)}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Supprimer
-                        </Button>
+                        <div className="space-y-2">
+                          {rows.map((batch) => (
+                            <div key={batch.id} className="rounded-lg border p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    {formatImportDate(batch.imported_at)}
+                                  </p>
+                                  {batch.filename && (
+                                    <p className="text-sm font-medium truncate" title={batch.filename}>
+                                      {batch.filename.replace(/\.csv$/i, "")}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {batch.rows_inserted} ligne{batch.rows_inserted !== 1 ? "s" : ""} importée{batch.rows_inserted !== 1 ? "s" : ""}
+                                    {batch.rows_skipped > 0 && ` · ${batch.rows_skipped} doublon${batch.rows_skipped !== 1 ? "s" : ""} ignoré${batch.rows_skipped !== 1 ? "s" : ""}`}
+                                  </p>
+                                </div>
+                                {deleteConfirm === batch.id ? (
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="h-7 text-xs"
+                                      disabled={deleting}
+                                      onClick={() => {
+                                        deleteImport(batch.id, { onSuccess: () => setDeleteConfirm(null) });
+                                      }}
+                                    >
+                                      {deleting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                                      Confirmer
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs"
+                                      onClick={() => setDeleteConfirm(null)}
+                                    >
+                                      Annuler
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="cursor-pointer text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0 h-7 text-xs"
+                                    onClick={() => setDeleteConfirm(batch.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Supprimer
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

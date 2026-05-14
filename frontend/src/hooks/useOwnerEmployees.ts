@@ -72,6 +72,15 @@ export function useOwnerEmployees(enabled: boolean) {
   };
 }
 
+export function useOwnerResendReset() {
+  const { mutate, isPending } = useMutation({
+    mutationFn: (id: number) => ownerApi.resendReset(id),
+    onSuccess: (user) => toast.success(`Lien envoyé à ${user.email}`),
+    onError: (err) => toast.error(err.message),
+  });
+  return { resendReset: mutate, resending: isPending };
+}
+
 export function useInviteEmployee(onDone?: () => void) {
   const queryClient = useQueryClient();
   const { mutate, isPending } = useMutation({

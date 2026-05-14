@@ -30,6 +30,7 @@ from .pharmacy import (
     PharmacyOut,
     PharmacyPublic,
     PharmacyUpdate,
+    SpecialProductsStats,
     UserAdminOut,
     UserInvite,
     UserPharmacyUpdate,
@@ -46,6 +47,7 @@ __all__ = [
     "UserAdminOut", "EmployeePermissionsUpdate", "EmployeeStatusUpdate",
     "UserRoleUpdate", "UserPharmacyUpdate", "UserRejectBody",
     "EmployeeInvite", "UserInvite",
+    "SpecialProductsStats",
     # catalog
     "MedicamentCreate", "MedicamentUpdate", "MedicamentOut",
     "CategorySuffixCreate", "CategorySuffixUpdate", "CategorySuffixOut",

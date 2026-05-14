@@ -511,6 +511,16 @@ async def upload_stock(
             },
         )
         db.execute(stmt)
+        # Track the upload in the import history so it shows up under "Stock"
+        # in /parametres alongside achat/vente imports.
+        batch = ImportBatch(
+            pharmacy_id=current_user.pharmacy_id or 0,
+            file_type="stock",
+            filename=file.filename,
+            rows_inserted=len(inserted_rows),
+            rows_skipped=len(skipped_unknown),
+        )
+        db.add(batch)
         db.commit()
         upserted = len(inserted_rows)
 

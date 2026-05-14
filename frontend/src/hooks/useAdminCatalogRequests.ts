@@ -4,10 +4,13 @@ import * as adminApi from "@/api/admin";
 
 const QUERY_KEY = ["admin", "catalog-requests"] as const;
 
-export function useAdminCatalogRequestsList(statusFilter?: string) {
+export function useAdminCatalogRequestsList(statusFilter?: string, requestType?: string) {
   const { data: requests = [], isLoading: requestsLoading } = useQuery({
-    queryKey: [...QUERY_KEY, statusFilter],
-    queryFn: () => adminApi.listCatalogRequests(statusFilter === "all" ? undefined : statusFilter),
+    queryKey: [...QUERY_KEY, statusFilter, requestType],
+    queryFn: () => adminApi.listCatalogRequests(
+      statusFilter === "all" ? undefined : statusFilter,
+      requestType,
+    ),
   });
   return { requests, requestsLoading };
 }

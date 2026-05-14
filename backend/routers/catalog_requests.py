@@ -64,6 +64,7 @@ def submit_request(
 @router.get("", response_model=List[CatalogRequestOut])
 def list_requests(
     status: Optional[str] = Query(None),
+    request_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -73,6 +74,10 @@ def list_requests(
         q = q.filter(CatalogRequest.requested_by == current_user.id)
     if status:
         q = q.filter(CatalogRequest.status == status)
+    if request_type:
+        types = [t.strip() for t in request_type.split(",") if t.strip()]
+        if types:
+            q = q.filter(CatalogRequest.request_type.in_(types))
     reqs = q.order_by(CatalogRequest.created_at.desc()).all()
     return [_to_out(r) for r in reqs]
 

@@ -10,8 +10,8 @@ from database import get_db
 from models import Achat, CatalogRequest, CategorySuffix, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from utils.strings import strip_accents, tokenize_search
 from utils.search import product_search_clauses
-from utils.constants import VALID_ROLES, Role, Status
-from utils.email import send_invite_email
+from utils.constants import VALID_ROLES, RequestType, Role, Status
+from utils.email import send_invite_email, send_reset_email
 from routers.auth import get_current_user
 from utils.permissions import get_current_admin
 from schemas import (
@@ -277,6 +277,28 @@ async def invite_user(
     return user
 
 
+@router.post("/users/{user_id}/resend-reset", response_model=UserAdminOut)
+async def resend_reset(
+    user_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Admin-initiated password reactivation: issue a fresh 7-day reset token
+    and email the user a /reset-password link. Covers expired invites and
+    forgotten passwords."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires = datetime.now(timezone.utc) + _INVITE_TTL
+    db.commit()
+    db.refresh(user)
+    background.add_task(send_reset_email, user.email, token)
+    return user
+
+
 @router.get("/users/pending", response_model=List[UserAdminOut])
 def list_pending_owners(
     db: Session = Depends(get_db),
@@ -303,9 +325,15 @@ def get_admin_notifications(
         .order_by(User.created_at.desc())
         .all()
     )
+    # Only NEW_PRODUCT requests still require admin approval — NON_DECLARE
+    # and ANNULATION auto-apply on creation (ticket 6a), so they shouldn't
+    # nag the admin in the notification bell.
     pending_requests = (
         db.query(CatalogRequest)
-        .filter(CatalogRequest.status == Status.PENDING)
+        .filter(
+            CatalogRequest.status == Status.PENDING,
+            CatalogRequest.request_type == RequestType.NEW_PRODUCT,
+        )
         .order_by(CatalogRequest.created_at.desc())
         .all()
     )

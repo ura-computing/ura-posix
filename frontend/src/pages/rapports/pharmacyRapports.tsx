@@ -254,7 +254,7 @@ export function PharmacyRapports() {
     light?: boolean;
   }) => {
     const change = pctChange(current, previous);
-    const compareLabel = "vs même période N-1";
+    const compareLabel = "Comparé à la même période l'année dernière";
     if (change === null) {
       return (
         <span
@@ -266,7 +266,7 @@ export function PharmacyRapports() {
               : "bg-muted text-muted-foreground",
           )}
         >
-          — <span className="opacity-70">N-1</span>
+          — <span className="opacity-70 text-[10px]">vs an dernier</span>
         </span>
       );
     }
@@ -288,7 +288,7 @@ export function PharmacyRapports() {
       >
         {isPositive ? "\u2191" : "\u2193"}
         {Math.abs(change).toFixed(1)}%
-        <span className="opacity-70">N-1</span>
+        <span className="opacity-70 text-[10px]">vs an dernier</span>
       </span>
     );
   };
@@ -458,6 +458,11 @@ export function PharmacyRapports() {
                           <p className="text-3xl font-bold mt-1 leading-tight">
                             {fmt(kpis?.ventes_total ?? null)} MAD
                           </p>
+                          {/* Show the previous-year value explicitly so the user
+                              sees the magnitude of change, not just the % delta. */}
+                          <p className="text-xs opacity-70 mt-1">
+                            Année précédente : {prevKpis?.ventes_total ? `${fmt(prevKpis.ventes_total)} MAD` : "—"}
+                          </p>
                           <ChangeBadge
                             current={kpis?.ventes_total}
                             previous={prevKpis?.ventes_total}
@@ -501,6 +506,9 @@ export function PharmacyRapports() {
                           </p>
                         </>
                       )}
+                      <p className="text-[10px] opacity-50 mt-1 font-mono">
+                        Σ PU × qté achetée
+                      </p>
                     </div>
                     <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
                   </div>
@@ -570,6 +578,9 @@ export function PharmacyRapports() {
                         </p>
                       </>
                     )}
+                    <p className="text-[10px] opacity-50 mt-1 font-mono">
+                      COUNT(ventes)
+                    </p>
                   </div>
                   <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
                 </div>
@@ -610,6 +621,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
+                <p className="text-[10px] opacity-50 mt-2 font-mono">
+                  CA ÷ ventes
+                </p>
               </CardContent>
             </Card>
 
@@ -635,6 +649,9 @@ export function PharmacyRapports() {
                     </p>
                   </>
                 )}
+                <p className="text-[10px] opacity-50 mt-1 font-mono">
+                  CA ÷ jours
+                </p>
               </CardContent>
             </Card>
 
@@ -679,6 +696,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
+                <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>
+                  MAX(CA par jour)
+                </p>
               </CardContent>
             </Card>
 
@@ -712,6 +732,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
+                <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">
+                  MIN(CA par jour)
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -1077,6 +1100,7 @@ export function PharmacyRapports() {
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(analyseKpis.total_ventes_dh)} MAD</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{fmtInt(analyseKpis.total_ventes_unites)} unités vendues</p>
+                      <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
                     </div>
                     <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1088,6 +1112,7 @@ export function PharmacyRapports() {
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_pct_avg != null ? `${analyseKpis.marge_pct_avg.toFixed(1)}%` : "—"}</p>
+                      <p className="text-[10px] opacity-50 mt-1 font-mono">moyenne pondérée par qté</p>
                     </div>
                     <Percent className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1099,6 +1124,7 @@ export function PharmacyRapports() {
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_dh_avg != null ? fmt(analyseKpis.marge_dh_avg) : "—"}</p>
+                      <p className="text-[10px] opacity-50 mt-1 font-mono">PPV − PU (moyen)</p>
                     </div>
                     <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1154,6 +1180,7 @@ export function PharmacyRapports() {
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total références</p>
                         <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmtInt(stockSummary.totalRefs)}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">produits suivis</p>
+                        <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(produits)</p>
                       </div>
                       <Boxes className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>
@@ -1168,6 +1195,7 @@ export function PharmacyRapports() {
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">PPV potentiel</p>
                         <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(stockSummary.ppvPotentiel)}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">MAD en stock</p>
+                        <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PPV × stock</p>
                       </div>
                       <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>
@@ -1186,6 +1214,7 @@ export function PharmacyRapports() {
                           <span className="text-blue-600">{stockSummary.surStock}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">produits à ajuster</p>
+                        <p className="text-[10px] opacity-50 mt-1 font-mono">stock &lt; min / &gt; max</p>
                       </div>
                       <AlertTriangle className="h-8 w-8 opacity-60 shrink-0 text-amber-500" />
                     </div>
@@ -1205,6 +1234,7 @@ export function PharmacyRapports() {
                           : "text-red-600",
                         )}>{stockSummary.healthPct}%</p>
                         <p className="text-xs text-muted-foreground mt-0.5">dans la fourchette min-max</p>
+                        <p className="text-[10px] opacity-50 mt-1 font-mono">(OK ÷ total) × 100</p>
                       </div>
                       <ShieldCheck className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>

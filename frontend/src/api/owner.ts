@@ -33,3 +33,15 @@ export const inviteEmployee = (payload: InviteEmployeePayload) =>
     method: "POST",
     body: JSON.stringify(payload),
   });
+
+export const resendReset = (userId: number) =>
+  request<UserAdmin>(`/owner/employees/${userId}/resend-reset`, { method: "POST" });
+
+export type SpecialProductsStats = {
+  total_products: number;
+  special_count: number;
+  percentage: number;
+};
+
+export const getSpecialProductsStats = () =>
+  request<SpecialProductsStats>("/owner/special-products/stats");
