@@ -91,6 +91,14 @@ export type NonDeclaredProduct = {
   tva: string | null;
 };
 
+export type AdminSpecialProduct = {
+  pharmacy_id: number;
+  pharmacy_name: string | null;
+  medicament_id: number;
+  product: string;
+  created_at: string | null;
+};
+
 export const listNonDeclaredProducts = (pharmacyId: number) =>
   request<NonDeclaredProduct[]>(`/admin/pharmacy/${pharmacyId}/non-declared`);
 
@@ -212,16 +220,5 @@ export const deleteCategorySuffix = (id: number) =>
 
 // ── Catalog requests ──────────────────────────────────────────────────────────
 
-export const listCatalogRequests = (status?: string, requestType?: string) => {
-  const p = new URLSearchParams();
-  if (status) p.set("status", status);
-  if (requestType) p.set("request_type", requestType);
-  const qs = p.toString();
-  return request<CatalogRequestOut[]>(`/catalog-requests${qs ? `?${qs}` : ""}`);
-};
-
-export const approveCatalogRequest = (id: number) =>
-  request<CatalogRequestOut>(`/catalog-requests/${id}/approve`, { method: "PUT" });
-
-export const rejectCatalogRequest = (id: number, reason?: string) =>
-  request<CatalogRequestOut>(`/catalog-requests/${id}/reject`, { method: "PUT", body: JSON.stringify({ reason }) });
+export const listAllNonDeclared = () =>
+  request<AdminSpecialProduct[]>("/admin/non-declared");

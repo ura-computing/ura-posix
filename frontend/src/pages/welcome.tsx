@@ -6,7 +6,6 @@ import {
   BarChart3,
   BookOpen,
   Building2,
-  ClipboardCheck,
   Clock,
   PackageX,
   LayoutDashboard,
@@ -205,7 +204,7 @@ function AdminView({ name }: { name: string }) {
       <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700 grid grid-cols-1 sm:grid-cols-2 gap-4 text-left" style={{ animationDelay: "200ms", animationFillMode: "both" }}>
         <QuickLink to="/dashboard" icon={LayoutDashboard} label="Tableau de bord" desc="Vue système et statistiques globales" />
         <QuickLink to="/admin/pharmacies" icon={Building2} label="Pharmacies" desc="Gérer les comptes et les pharmacies" />
-        <QuickLink to="/admin/catalog-requests" icon={ClipboardCheck} label="Demandes d'exclusion" desc="Traiter les demandes en attente" />
+        <QuickLink to="/admin/catalog-requests" icon={PackageX} label="Produits spéciaux" desc="Consulter les produits exclus par les pharmacies" />
         <QuickLink to="/admin/catalog" icon={BookOpen} label="Catalogue" desc="Gérer le catalogue médicaments" />
         <QuickLink to="/rapports" icon={BarChart3} label="Rapports" desc="Statistiques et indicateurs clés" />
       </div>

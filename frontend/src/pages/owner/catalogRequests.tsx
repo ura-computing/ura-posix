@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useMe } from "@/hooks/useMe";
 import {
-  useCatalogRequestsList,
+  useOwnerSpecialProducts,
   useMyProducts,
   useSubmitNonDeclareRequests,
   useSubmitAnnulation,
@@ -34,8 +34,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { RequestStatusBadge } from "@/components/shared/statusBadge";
-import { eUserRole, eUserStatus, eRequestType, eRequestStatus } from "@/types";
+import { eUserRole } from "@/types";
 
 export default function CatalogRequestsPage() {
   const { me: identity } = useMe();
@@ -82,8 +81,8 @@ export default function CatalogRequestsPage() {
     });
   }, []);
 
-  // Existing non-declare requests
-  const { requests, requestsLoading } = useCatalogRequestsList(isOwner);
+  // Products this pharmacy currently excludes from its reports
+  const { products: exclusions, productsLoading: exclusionsLoading } = useOwnerSpecialProducts(isOwner);
 
   // Pharmacy products search
   const hasSearch = debouncedSearch.trim().length > 0;
@@ -93,20 +92,6 @@ export default function CatalogRequestsPage() {
   const { submitAnnulation, submittingAnnulation } = useSubmitAnnulation();
 
   if (!isOwner) return null;
-
-  // Product IDs that already have a pending request (non_declare or annulation)
-  const pendingMedIds = new Set(
-    requests
-      .filter((r) => r.status === eUserStatus.PENDING && r.medicament_id)
-      .map((r) => r.medicament_id!)
-  );
-
-  // Product IDs where cancel button should NOT show (pending or approved annulation)
-  const annulationMedIds = new Set(
-    requests
-      .filter((r) => r.request_type === eRequestType.ANNULATION && (r.status === eRequestStatus.PENDING || r.status === eRequestStatus.APPROVED) && r.medicament_id)
-      .map((r) => r.medicament_id!)
-  );
 
   return (
     <ListView>
@@ -121,114 +106,66 @@ export default function CatalogRequestsPage() {
         </div>
         <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
           <PackageX className="h-4 w-4" />
-          Nouvelle demande
+          Exclure des produits
         </Button>
       </div>
 
-      {/* Requests list */}
+      {/* Excluded products list */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-base font-semibold">Mes demandes</h2>
-          {!requestsLoading && <Badge variant="secondary">{requests.length}</Badge>}
+          <h2 className="text-base font-semibold">Produits exclus</h2>
+          {!exclusionsLoading && <Badge variant="secondary">{exclusions.length}</Badge>}
         </div>
 
         <div className="border rounded-xl overflow-hidden bg-card">
-          {requestsLoading ? (
+          {exclusionsLoading ? (
             <PageLoader />
-          ) : requests.length === 0 ? (
+          ) : exclusions.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-14 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
                 <FileX className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-medium">Aucune demande</p>
+                <p className="text-sm font-medium">Aucun produit exclu</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Cliquez sur "Nouvelle demande" pour exclure un produit de vos rapports.
+                  Cliquez sur « Exclure des produits » pour retirer un produit de vos rapports.
                 </p>
               </div>
             </div>
           ) : (
             <div className="divide-y">
-              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 <span>Produit</span>
-                <span className="w-24 text-center">Type</span>
-                <span className="w-24 text-center">Statut</span>
-                <span className="w-28 text-center">Date</span>
-                <span className="w-28 text-center">Traité le</span>
+                <span className="w-28 text-center">Exclu le</span>
                 <span className="w-28 text-center">Action</span>
               </div>
-              {requests.map((req) => {
-                const isAnnulation = req.request_type === eRequestType.ANNULATION;
-                const canCancel =
-                  !isAnnulation &&
-                  req.status === eRequestStatus.APPROVED &&
-                  req.medicament_id &&
-                  !annulationMedIds.has(req.medicament_id);
-                return (
-                  <div
-                    key={req.id}
-                    className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {req.medicament_name ?? req.product}
-                      </p>
-                      {req.notes && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          Note : {req.notes}
-                        </p>
-                      )}
-                      {req.reject_reason && (
-                        <p className="text-xs text-destructive mt-0.5 truncate">
-                          Motif de refus : {req.reject_reason}
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-24 flex justify-center">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          isAnnulation
-                            ? "border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:bg-amber-950/30"
-                            : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-950/30"
-                        )}
-                      >
-                        {isAnnulation ? "Annulation" : "Exclusion"}
-                      </Badge>
-                    </div>
-                    <div className="w-24 flex justify-center">
-                      <RequestStatusBadge status={req.status} />
-                    </div>
-                    <span className="text-xs text-muted-foreground w-28 text-center">
-                      {req.created_at
-                        ? format(new Date(req.created_at), "d MMM yyyy", { locale: fr })
-                        : "—"}
-                    </span>
-                    <span className="text-xs text-muted-foreground w-28 text-center">
-                      {req.reviewed_at
-                        ? format(new Date(req.reviewed_at), "d MMM yyyy", { locale: fr })
-                        : "—"}
-                    </span>
-                    <div className="w-28 flex justify-center">
-                      {canCancel ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 gap-1.5 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
-                          disabled={submittingAnnulation}
-                          onClick={() => submitAnnulation({ medicament_id: req.medicament_id! })}
-                        >
-                          <Undo2 className="h-3.5 w-3.5" />
-                          Annuler
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
+              {exclusions.map((p) => (
+                <div
+                  key={p.medicament_id}
+                  className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.product}</p>
                   </div>
-                );
-              })}
+                  <span className="text-xs text-muted-foreground w-28 text-center">
+                    {p.created_at
+                      ? format(new Date(p.created_at), "d MMM yyyy", { locale: fr })
+                      : "—"}
+                  </span>
+                  <div className="w-28 flex justify-center">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1.5 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                      disabled={submittingAnnulation}
+                      onClick={() => submitAnnulation({ medicament_id: p.medicament_id })}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Réintégrer
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -239,7 +176,7 @@ export default function CatalogRequestsPage() {
         <DialogContent className="max-w-[50vw] p-0 gap-0 flex flex-col max-h-[90vh] overflow-hidden">
           {/* Header */}
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-            <DialogTitle>Demander l'exclusion de produits</DialogTitle>
+            <DialogTitle>Exclure des produits</DialogTitle>
             <DialogDescription>
               Sélectionnez un ou plusieurs produits à exclure de vos rapports.
             </DialogDescription>
@@ -264,9 +201,7 @@ export default function CatalogRequestsPage() {
 
             {/* Header bar with select-all toggle (shown once results are listed) */}
             {hasSearch && !productsLoading && products.length > 0 && (() => {
-              const selectableIds = products
-                .filter((p) => !pendingMedIds.has(p.medicament_id))
-                .map((p) => p.medicament_id);
+              const selectableIds = products.map((p) => p.medicament_id);
               const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
               const someSelected = selectableIds.some((id) => selectedIds.has(id));
               return (
@@ -307,21 +242,18 @@ export default function CatalogRequestsPage() {
               ) : (
                 <div className="divide-y">
                   {products.map((p) => {
-                    const isPending = pendingMedIds.has(p.medicament_id);
                     const isSelected = selectedIds.has(p.medicament_id);
                     const cleanCategory = p.category?.replace(/\s*\(\d+\.?\d*%\)/, "").trim();
                     return (
                       <button
                         key={p.medicament_id}
                         type="button"
-                        disabled={isPending}
-                        onClick={() => !isPending && toggleProduct(p.medicament_id)}
+                        onClick={() => toggleProduct(p.medicament_id)}
                         className={cn(
                           "w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors",
                           isSelected
                             ? "bg-primary/10"
-                            : "hover:bg-muted/50",
-                          isPending && "opacity-50 cursor-not-allowed"
+                            : "hover:bg-muted/50"
                         )}
                       >
                         {/* Checkbox */}
@@ -342,12 +274,6 @@ export default function CatalogRequestsPage() {
                             <p className="text-xs text-muted-foreground truncate mt-0.5">{cleanCategory}</p>
                           )}
                         </div>
-
-                        {isPending && (
-                          <span className="shrink-0 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                            En attente
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -386,8 +312,8 @@ export default function CatalogRequestsPage() {
             >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {selectedIds.size > 1
-                ? `Envoyer ${selectedIds.size} demandes`
-                : "Envoyer la demande"}
+                ? `Exclure ${selectedIds.size} produits`
+                : "Exclure le produit"}
             </Button>
           </DialogFooter>
         </DialogContent>

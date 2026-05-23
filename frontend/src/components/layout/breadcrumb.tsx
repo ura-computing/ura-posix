@@ -21,7 +21,7 @@ const PATH_LABELS: Record<string, string> = {
   "dashboard": "Tableau de Bord",
   "dashboard/upload-file": "Importer",
   "admin/pharmacies": "Pharmacies",
-  "admin/catalog-requests": "Demandes d'exclusion",
+  "admin/catalog-requests": "Produits spéciaux",
   "admin/catalog": "Catalogue",
   "owner/employees": "Mes employés",
   "catalog-requests": "Produits spéciaux",
