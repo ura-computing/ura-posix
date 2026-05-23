@@ -470,9 +470,9 @@ export function PharmacyRapports() {
                           />
                         </>
                       )}
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">
                         PPV × qté vendue
-                      </p>
+                      </p> */}
                     </div>
                     <TrendingUp className="h-8 w-8 opacity-60 shrink-0" />
                   </div>
@@ -506,9 +506,9 @@ export function PharmacyRapports() {
                           </p>
                         </>
                       )}
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">
                         Σ PU × qté achetée
-                      </p>
+                      </p> */}
                     </div>
                     <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
                   </div>
@@ -549,9 +549,9 @@ export function PharmacyRapports() {
                         })()}
                       </>
                     )}
-                    <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">
+                    {/* <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">
                       (1 − PU÷PPV) × 100
-                    </p>
+                    </p> */}
                   </div>
                   <TrendingUp className={cn("h-8 w-8", typeTheme.icon)} />
                 </div>
@@ -578,9 +578,9 @@ export function PharmacyRapports() {
                         </p>
                       </>
                     )}
-                    <p className="text-[10px] opacity-50 mt-1 font-mono">
+                    {/* <p className="text-[10px] opacity-50 mt-1 font-mono">
                       COUNT(ventes)
-                    </p>
+                    </p> */}
                   </div>
                   <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
                 </div>
@@ -621,9 +621,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
-                <p className="text-[10px] opacity-50 mt-2 font-mono">
+                {/* <p className="text-[10px] opacity-50 mt-2 font-mono">
                   CA ÷ ventes
-                </p>
+                </p> */}
               </CardContent>
             </Card>
 
@@ -649,9 +649,9 @@ export function PharmacyRapports() {
                     </p>
                   </>
                 )}
-                <p className="text-[10px] opacity-50 mt-1 font-mono">
+                {/* <p className="text-[10px] opacity-50 mt-1 font-mono">
                   CA ÷ jours
-                </p>
+                </p> */}
               </CardContent>
             </Card>
 
@@ -696,9 +696,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
-                <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>
+                {/* <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>
                   MAX(CA par jour)
-                </p>
+                </p> */}
               </CardContent>
             </Card>
 
@@ -732,9 +732,9 @@ export function PharmacyRapports() {
                     </div>
                   </>
                 )}
-                <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">
+                {/* <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">
                   MIN(CA par jour)
-                </p>
+                </p> */}
               </CardContent>
             </Card>
           </div>
@@ -1022,7 +1022,7 @@ export function PharmacyRapports() {
                       {fmt(tva?.tva_encaissee ?? null)} MAD
                     </p>
                   )}
-                  <p
+                  {/* <p
                     className={cn(
                       "text-[10px] mt-1 font-mono",
                       typeTheme.textSubtle,
@@ -1030,7 +1030,7 @@ export function PharmacyRapports() {
                     )}
                   >
                     PPV × taux TVA
-                  </p>
+                  </p> */}
                 </CardContent>
               </Card>
             </Link>
@@ -1048,9 +1048,9 @@ export function PharmacyRapports() {
                       {fmt(tva?.tva_payee ?? null)} MAD
                     </p>
                   )}
-                  <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-mono">
+                  {/* <p className="text-[10px] text-amber-600/60 dark:text-amber-400/60 mt-1 font-mono">
                     PU × taux TVA
-                  </p>
+                  </p> */}
                 </CardContent>
               </Card>
             </Link>
@@ -1073,9 +1073,9 @@ export function PharmacyRapports() {
                       {fmt(tva?.tva_a_declarer ?? null)} MAD
                     </p>
                   )}
-                  <p className="text-[10px] opacity-50 mt-1 font-mono">
+                  {/* <p className="text-[10px] opacity-50 mt-1 font-mono">
                     encaissée − payée (estimation)
-                  </p>
+                  </p> */}
                 </CardContent>
               </Card>
             </Link>
@@ -1100,7 +1100,7 @@ export function PharmacyRapports() {
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Chiffre d'affaires</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(analyseKpis.total_ventes_dh)} MAD</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{fmtInt(analyseKpis.total_ventes_unites)} unités vendues</p>
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p> */}
                     </div>
                     <Wallet className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1112,7 +1112,7 @@ export function PharmacyRapports() {
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_pct_avg != null ? `${analyseKpis.marge_pct_avg.toFixed(1)}%` : "—"}</p>
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">moyenne pondérée par qté</p>
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">moyenne pondérée par qté</p> */}
                     </div>
                     <Percent className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1124,7 +1124,7 @@ export function PharmacyRapports() {
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
                       <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{analyseKpis.marge_dh_avg != null ? fmt(analyseKpis.marge_dh_avg) : "—"}</p>
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">PPV − PU (moyen)</p>
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">PPV − PU (moyen)</p> */}
                     </div>
                     <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                   </div>
@@ -1180,7 +1180,7 @@ export function PharmacyRapports() {
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total références</p>
                         <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmtInt(stockSummary.totalRefs)}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">produits suivis</p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(produits)</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(produits)</p> */}
                       </div>
                       <Boxes className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>
@@ -1195,7 +1195,7 @@ export function PharmacyRapports() {
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">PPV potentiel</p>
                         <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{fmt(stockSummary.ppvPotentiel)}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">MAD en stock</p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PPV × stock</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PPV × stock</p> */}
                       </div>
                       <Coins className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>
@@ -1214,7 +1214,7 @@ export function PharmacyRapports() {
                           <span className="text-blue-600">{stockSummary.surStock}</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">produits à ajuster</p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">stock &lt; min / &gt; max</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">stock &lt; min / &gt; max</p> */}
                       </div>
                       <AlertTriangle className="h-8 w-8 opacity-60 shrink-0 text-amber-500" />
                     </div>
@@ -1234,7 +1234,7 @@ export function PharmacyRapports() {
                           : "text-red-600",
                         )}>{stockSummary.healthPct}%</p>
                         <p className="text-xs text-muted-foreground mt-0.5">dans la fourchette min-max</p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">(OK ÷ total) × 100</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">(OK ÷ total) × 100</p> */}
                       </div>
                       <ShieldCheck className="h-8 w-8 opacity-60 shrink-0 text-primary" />
                     </div>

@@ -3,6 +3,9 @@ FRONTEND_DIR  := ./frontend
 EXTENSION_DIR := ./extension
 ENV_DIR       := ./env
 
+# Prefer a Python with prebuilt psycopg2-binary wheels. 3.14 has none yet, so
+# pip would compile from source and fail without pg_config. Override with `make PYTHON=...`.
+PYTHON := $(shell command -v python3.13 2>/dev/null || command -v python3.12 2>/dev/null || command -v python3)
 VENV := $(BACKEND_DIR)/.venv
 PIP  := $(VENV)/bin/python3 -m pip
 
@@ -63,7 +66,7 @@ down:
 # ── Backend ────────────────────────────────────────────────────────────────────
 
 back-install:
-	python3 -m venv $(VENV)
+	$(PYTHON) -m venv $(VENV)
 	$(PIP) install -r $(BACKEND_DIR)/requirements.txt
 
 back-seed: check-env db
