@@ -236,22 +236,22 @@ export default function ComptabilitePage() {
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Chiffre d'affaires</p>
                   <p className="text-lg font-bold tabular-nums">{fmt(kpis?.ventes_total ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">PPV × qté vendue</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">PPV × qté vendue</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge X</p>
                   <p className="text-sm font-semibold tabular-nums">{marge?.marge_pct != null ? `${marge.marge_pct.toFixed(1)} %` : "—"}</p>
-                  <p className="text-[9px] opacity-50 font-mono">(CA − Achats) ÷ CA</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">(CA − Achats) ÷ CA</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Marge brute en MAD</p>
                   <p className="text-sm font-semibold tabular-nums">{fmt(marge?.marge_brute_dh ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">CA − Achats</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">CA − Achats</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA encaissée</p>
                   <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_encaissee ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">PPV × taux TVA</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">PPV × taux TVA</p> */}
                 </div>
               </CardContent>
             </Card>
@@ -261,17 +261,17 @@ export default function ComptabilitePage() {
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Achats</p>
                   <p className="text-lg font-bold tabular-nums">{fmt(kpis?.achats_total ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">Σ PU × qté achetée</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">Σ PU × qté achetée</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Opérations</p>
                   <p className="text-sm font-semibold tabular-nums">{kpis?.achats_count ?? 0}</p>
-                  <p className="text-[9px] opacity-50 font-mono">COUNT(achats)</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">COUNT(achats)</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA payée</p>
                   <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_payee ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">PU × taux TVA</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">PU × taux TVA</p> */}
                 </div>
               </CardContent>
             </Card>
@@ -281,17 +281,17 @@ export default function ComptabilitePage() {
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Bilan</p>
                   <p className="text-lg font-bold tabular-nums">CA - Achats = {fmt(bilan)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">CA − Achats</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">CA − Achats</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">TVA à déclarer (estimation)</p>
                   <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">encaissée − payée</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">encaissée − payée</p> */}
                 </div>
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Solde TVA année {new Date().getFullYear()}</p>
                   <p className="text-sm font-semibold tabular-nums">{fmt(tva?.tva_a_declarer ?? 0)} MAD</p>
-                  <p className="text-[9px] opacity-50 font-mono">cumul depuis 01/01</p>
+                  {/* <p className="text-[9px] opacity-50 font-mono">cumul depuis 01/01</p> */}
                 </div>
               </CardContent>
             </Card>

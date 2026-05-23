@@ -108,7 +108,7 @@ export function AdminRapports() {
                       {systemLoading
                         ? <Skeleton className={`h-8 w-16 mt-1 ${isFirst ? "bg-white/20" : ""}`} />
                         : <p className="text-3xl font-bold mt-1 leading-tight">{card.value}</p>}
-                      <p className="text-[10px] opacity-50 mt-1 font-mono">{card.formula}</p>
+                      {/* <p className="text-[10px] opacity-50 mt-1 font-mono">{card.formula}</p> */}
                     </div>
                     <Icon className={`h-8 w-8 shrink-0 ${isFirst ? "opacity-60" : "text-primary"}`} />
                   </div>
@@ -229,7 +229,7 @@ export function AdminRapports() {
                         {pharmLoading ? <KpiSkeleton primary /> : (
                           <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.ventes_total ?? null)} MAD</p>
                         )}
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">PPV × qté vendue</p> */}
                       </div>
                       <TrendingUp className="h-8 w-8 opacity-60 shrink-0" />
                     </div>
@@ -244,7 +244,7 @@ export function AdminRapports() {
                         {pharmLoading ? <KpiSkeleton /> : (
                           <p className="text-3xl font-bold mt-1 leading-tight">{fmt(kpis?.achats_total ?? null)} MAD</p>
                         )}
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PU × qté achetée</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">Σ PU × qté achetée</p> */}
                       </div>
                       <ShoppingCart className={cn("h-8 w-8", typeTheme.icon)} />
                     </div>
@@ -259,7 +259,7 @@ export function AdminRapports() {
                         {pharmLoading ? <KpiSkeleton /> : (
                           <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.ventes_count ?? 0}</p>
                         )}
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(ventes)</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(ventes)</p> */}
                       </div>
                       <BarChart3 className={cn("h-8 w-8", typeTheme.icon)} />
                     </div>
@@ -274,7 +274,7 @@ export function AdminRapports() {
                         {pharmLoading ? <KpiSkeleton /> : (
                           <p className="text-3xl font-bold mt-1 leading-tight">{kpis?.achats_count ?? 0}</p>
                         )}
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(achats)</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">COUNT(achats)</p> */}
                       </div>
                       <Package className={cn("h-8 w-8", typeTheme.icon)} />
                     </div>
@@ -296,7 +296,7 @@ export function AdminRapports() {
                           <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.ticket_moyen ?? null)} MAD</p>
                         )}
                         <p className="text-[11px] text-muted-foreground mt-0.5">par transaction</p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">CA ÷ ventes</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">CA ÷ ventes</p> */}
                       </div>
                       <Receipt className={cn("h-9 w-9", typeTheme.icon)} />
                     </div>
@@ -311,7 +311,7 @@ export function AdminRapports() {
                         {pharmLoading ? <KpiSkeleton /> : (
                           <p className="text-2xl font-bold mt-1 leading-tight">{fmt(advKpis?.vente_moyenne_par_jour ?? null)} MAD</p>
                         )}
-                        <p className="text-[10px] opacity-50 mt-1 font-mono">CA ÷ jours</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono">CA ÷ jours</p> */}
                       </div>
                       <BarChart3 className={cn("h-9 w-9", typeTheme.icon)} />
                     </div>
@@ -331,7 +331,7 @@ export function AdminRapports() {
                         <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
                           {advKpis?.best_day_dh?.date ?? "—"}
                         </p>
-                        <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>MAX(CA par jour)</p>
+                        {/* <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>MAX(CA par jour)</p> */}
                       </div>
                       <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
                     </div>
@@ -351,7 +351,7 @@ export function AdminRapports() {
                         <p className={cn("text-[11px] mt-0.5", typeTheme.textSubtle)}>
                           {advKpis?.best_day_count?.date ?? "—"}
                         </p>
-                        <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>MAX(opérations par jour)</p>
+                        {/* <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>MAX(opérations par jour)</p> */}
                       </div>
                       <CalendarCheck className={cn("h-9 w-9", typeTheme.icon)} />
                     </div>
@@ -371,7 +371,7 @@ export function AdminRapports() {
                         <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
                           {advKpis?.worst_day_dh?.date ?? "—"}
                         </p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">MIN(CA par jour)</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">MIN(CA par jour)</p> */}
                       </div>
                       <CalendarX className="h-9 w-9 text-rose-500" />
                     </div>
@@ -391,7 +391,7 @@ export function AdminRapports() {
                         <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5">
                           {advKpis?.worst_day_count?.date ?? "—"}
                         </p>
-                        <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">MIN(opérations par jour)</p>
+                        {/* <p className="text-[10px] opacity-50 mt-1 font-mono text-rose-700/70 dark:text-rose-300/70">MIN(opérations par jour)</p> */}
                       </div>
                       <CalendarX className="h-9 w-9 text-rose-500" />
                     </div>
@@ -410,7 +410,7 @@ export function AdminRapports() {
                     {pharmLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
                       <p className={cn("text-2xl font-bold mt-1", typeTheme.textValue)}>{fmt(tva?.tva_encaissee ?? null)} MAD</p>
                     )}
-                    <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>PPV × taux TVA</p>
+                    {/* <p className={cn("text-[10px] opacity-50 mt-1 font-mono", typeTheme.textSubtle)}>PPV × taux TVA</p> */}
                   </CardContent>
                 </Card>
 
@@ -420,7 +420,7 @@ export function AdminRapports() {
                     {pharmLoading ? <Skeleton className="h-8 w-28 mt-1" /> : (
                       <p className="text-2xl font-bold mt-1 text-amber-800 dark:text-amber-200">{fmt(tva?.tva_payee ?? null)} MAD</p>
                     )}
-                    <p className="text-[10px] opacity-50 mt-1 font-mono text-amber-700/70 dark:text-amber-300/70">PU × taux TVA</p>
+                    {/* <p className="text-[10px] opacity-50 mt-1 font-mono text-amber-700/70 dark:text-amber-300/70">PU × taux TVA</p> */}
                   </CardContent>
                 </Card>
 
@@ -431,7 +431,7 @@ export function AdminRapports() {
                       <p className="text-2xl font-bold mt-1 leading-tight">{fmt(tva?.tva_a_declarer ?? null)} MAD</p>
                     )}
                     <p className="text-[11px] opacity-75 mt-0.5">estimation</p>
-                    <p className="text-[10px] opacity-50 mt-1 font-mono">encaissée − payée</p>
+                    {/* <p className="text-[10px] opacity-50 mt-1 font-mono">encaissée − payée</p> */}
                   </CardContent>
                 </Card>
               </div>
