@@ -8,16 +8,12 @@ export type PharmacyProductOut = {
   declared: boolean;
 };
 
-export const submit = (body: {
+export type OwnerSpecialProduct = {
+  medicament_id: number;
   product: string;
-  tva?: string;
-  pph?: number;
-  ppv?: number;
-  category?: string;
-  zone?: string;
-  barcode1?: string;
-  laboratoire?: string;
-}) => request<CatalogRequestOut>("/catalog-requests", { method: "POST", body: JSON.stringify(body) });
+  category: string | null;
+  created_at: string | null;
+};
 
 export const submitNonDeclare = (body: { medicament_id: number; notes?: string }) =>
   request<CatalogRequestOut>("/catalog-requests/non-declare", {
@@ -31,10 +27,8 @@ export const submitAnnulation = (body: { medicament_id: number; notes?: string }
     body: JSON.stringify(body),
   });
 
-export const list = (status?: string) => {
-  const qs = status ? `?status=${status}` : "";
-  return request<CatalogRequestOut[]>(`/catalog-requests${qs}`);
-};
+export const myExclusions = () =>
+  request<OwnerSpecialProduct[]>("/owner/special-products");
 
 export const myProducts = (search?: string) => {
   const p = new URLSearchParams();

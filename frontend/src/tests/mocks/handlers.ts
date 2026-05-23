@@ -229,15 +229,18 @@ export const handlers = [
   ),
   http.delete(`${BASE}/admin/category-suffixes/:id`, () => HttpResponse.json({ deleted: true })),
 
-  // Admin — catalog requests
-  http.get(`${BASE}/catalog-requests`, () =>
-    HttpResponse.json([{ id: 1, requested_by: 1, pharmacy_id: 1, status: "pending", request_type: "new_product", product: "New Drug" }]),
+  // Special products (current exclusions, read from PharmacyMedicamentStatus)
+  http.get(`${BASE}/admin/non-declared`, () =>
+    HttpResponse.json([{ pharmacy_id: 1, pharmacy_name: "Pharmacie Demo", medicament_id: 1, product: "New Drug", created_at: "2026-05-23T12:00:00Z" }]),
   ),
-  http.put(`${BASE}/catalog-requests/:id/approve`, () =>
-    HttpResponse.json({ id: 1, status: "approved", product: "New Drug" }),
+  http.get(`${BASE}/owner/special-products`, () =>
+    HttpResponse.json([{ medicament_id: 1, product: "New Drug", category: null, created_at: "2026-05-23T12:00:00Z" }]),
   ),
-  http.put(`${BASE}/catalog-requests/:id/reject`, () =>
-    HttpResponse.json({ id: 1, status: "rejected", product: "New Drug" }),
+  http.post(`${BASE}/catalog-requests/non-declare`, () =>
+    HttpResponse.json({ id: 1, status: "approved", request_type: "non_declare", product: "New Drug" }),
+  ),
+  http.post(`${BASE}/catalog-requests/annulation`, () =>
+    HttpResponse.json({ id: 1, status: "approved", request_type: "annulation", product: "New Drug" }),
   ),
 
   // Public

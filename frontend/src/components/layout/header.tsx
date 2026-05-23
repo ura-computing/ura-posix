@@ -15,7 +15,7 @@ import { cn } from "@/utils/cn";
 import { useAdminNotifications, useOwnerNotifications } from "@/hooks/useAdminOwnerNotifications";
 import { useAuthenticate } from "@/hooks/useAuthenticate";
 import { useMe } from "@/hooks/useMe";
-import { Bell, CheckCheck, ClipboardList, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound, UserPlus } from "lucide-react";
+import { Bell, CheckCheck, LogOutIcon, Package, Receipt, Trash2, UploadCloud, UserRound, UserPlus } from "lucide-react";
 import { eUserRole } from "@/types";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -184,8 +184,7 @@ function NotificationBell() {
   const { ownerNotifs } = useOwnerNotifications(isOwner);
 
   const pendingUsers = adminNotifs?.pending_users ?? [];
-  const pendingRequests = adminNotifs?.pending_requests ?? [];
-  const adminUnread = pendingUsers.length + pendingRequests.length;
+  const adminUnread = pendingUsers.length;
 
   const pendingEmployees = ownerNotifs?.pending_employees ?? [];
   const ownerUnread = pendingEmployees.length;
@@ -255,22 +254,6 @@ function NotificationBell() {
                   <p className="text-sm font-medium leading-snug">Nouvelle inscription propriétaire</p>
                   <p className="text-xs text-muted-foreground truncate">{u.name ?? u.email} — {u.pharmacy_name ?? "—"}</p>
                   {u.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(u.created_at).getTime())}</p>}
-                </div>
-              </button>
-            ))}
-            {/* Admin: pending catalog requests */}
-            {pendingRequests.map((r) => (
-              <button
-                key={`req-${r.id}`}
-                type="button"
-                onClick={() => { navigate("/admin/catalog-requests"); setOpen(false); }}
-                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left bg-blue-500/5"
-              >
-                <ClipboardList className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-snug">Demande d'exclusion</p>
-                  <p className="text-xs text-muted-foreground truncate">{r.product}{r.pharmacy_name ? ` — ${r.pharmacy_name}` : ""}</p>
-                  {r.created_at && <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(new Date(r.created_at).getTime())}</p>}
                 </div>
               </button>
             ))}

@@ -29,9 +29,7 @@ import {
   createCategorySuffix,
   updateCategorySuffix,
   deleteCategorySuffix,
-  listCatalogRequests,
-  approveCatalogRequest,
-  rejectCatalogRequest,
+  listAllNonDeclared,
 } from "@/api/admin";
 
 const BASE = "http://localhost:8000";
@@ -378,46 +376,13 @@ describe("admin API", () => {
     });
   });
 
-  // ── Catalog requests ───────────────────────────────────────────────────────
-  describe("listCatalogRequests()", () => {
-    it("returns array from GET /catalog-requests", async () => {
-      const result = await listCatalogRequests();
+  // ── Special products ───────────────────────────────────────────────────────
+  describe("listAllNonDeclared()", () => {
+    it("returns array from GET /admin/non-declared", async () => {
+      const result = await listAllNonDeclared();
       expect(Array.isArray(result)).toBe(true);
       expect(result[0]).toHaveProperty("product", "New Drug");
-    });
-
-    it("passes status query param", async () => {
-      let capturedUrl = "";
-      server.use(
-        http.get(`${BASE}/catalog-requests`, ({ request }) => {
-          capturedUrl = request.url;
-          return HttpResponse.json([]);
-        }),
-      );
-      await listCatalogRequests("pending");
-      const url = new URL(capturedUrl);
-      expect(url.searchParams.get("status")).toBe("pending");
-    });
-  });
-
-  describe("approveCatalogRequest()", () => {
-    it("sends PUT /catalog-requests/:id/approve", async () => {
-      const result = await approveCatalogRequest(1);
-      expect(result).toHaveProperty("status", "approved");
-    });
-  });
-
-  describe("rejectCatalogRequest()", () => {
-    it("sends PUT /catalog-requests/:id/reject with reason", async () => {
-      let capturedBody: Record<string, unknown> | null = null;
-      server.use(
-        http.put(`${BASE}/catalog-requests/:id/reject`, async ({ request }) => {
-          capturedBody = (await request.json()) as Record<string, unknown>;
-          return HttpResponse.json({ id: 1, status: "rejected", product: "Drug" });
-        }),
-      );
-      await rejectCatalogRequest(1, "Duplicate entry");
-      expect(capturedBody).toEqual({ reason: "Duplicate entry" });
+      expect(result[0]).toHaveProperty("pharmacy_name", "Pharmacie Demo");
     });
   });
 });

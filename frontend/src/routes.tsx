@@ -4,7 +4,6 @@ import {
   BookOpen,
   Boxes,
   Building2,
-  ClipboardCheck,
   PackageX,
   ShoppingCart,
   ShoppingBasket,
@@ -300,8 +299,8 @@ export const resources: ResourceConfig[] = [
     name: "admin-catalog-requests",
     list: "/admin/catalog-requests",
     meta: {
-      label: "Demandes d'exclusion",
-      icon: <ClipboardCheck />,
+      label: "Produits spéciaux",
+      icon: <PackageX />,
       // adminOnly: true,
       allowed: [eUserRole.ADMIN],
     },

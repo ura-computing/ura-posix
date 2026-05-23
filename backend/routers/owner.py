@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Achat, Pharmacy, PharmacyMedicamentStatus, User, Vente
+from models import Achat, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from utils.permissions import get_current_owner
 from utils.constants import Role, Status
 from utils.email import send_invite_email, send_reset_email
@@ -230,6 +230,37 @@ def special_products_stats(
         special_count=special,
         percentage=round(pct, 1),
     )
+
+
+@router.get("/special-products")
+def list_special_products(
+    db: Session = Depends(get_db),
+    current_owner: User = Depends(get_current_owner),
+):
+    """Products this pharmacy currently excludes from its reports (declared=False),
+    newest first. Read straight from PharmacyMedicamentStatus — the source of truth."""
+    pharmacy_id = current_owner.pharmacy_id
+    if not pharmacy_id:
+        return []
+    rows = (
+        db.query(Medicament, PharmacyMedicamentStatus.created_at)
+        .join(PharmacyMedicamentStatus, PharmacyMedicamentStatus.medicament_id == Medicament.id)
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.declared == False,
+        )
+        .order_by(PharmacyMedicamentStatus.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "medicament_id": m.id,
+            "product": m.product,
+            "category": m.category,
+            "created_at": created_at,
+        }
+        for m, created_at in rows
+    ]
 
 
 @router.post("/employees/{user_id}/resend-reset", response_model=UserAdminOut)

@@ -185,6 +185,33 @@ def list_non_declared_products(
     ]
 
 
+@router.get("/non-declared")
+def list_all_non_declared(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    """Products currently excluded from reports across all pharmacies (declared=False),
+    newest first. Read straight from PharmacyMedicamentStatus — the source of truth."""
+    rows = (
+        db.query(Medicament, Pharmacy.id, Pharmacy.name, PharmacyMedicamentStatus.created_at)
+        .join(PharmacyMedicamentStatus, PharmacyMedicamentStatus.medicament_id == Medicament.id)
+        .join(Pharmacy, Pharmacy.id == PharmacyMedicamentStatus.pharmacy_id)
+        .filter(PharmacyMedicamentStatus.declared == False)
+        .order_by(PharmacyMedicamentStatus.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "pharmacy_id": pid,
+            "pharmacy_name": pname,
+            "medicament_id": m.id,
+            "product": m.product,
+            "created_at": created_at,
+        }
+        for m, pid, pname, created_at in rows
+    ]
+
+
 @router.get("/pharmacies/{pharmacy_id}/options")
 def get_pharmacy_options(
     pharmacy_id: int,

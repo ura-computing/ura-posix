@@ -1,36 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as catalogRequestsApi from "@/api/catalogRequests";
-import { eRequestStatus, eRequestType } from "@/types";
 
-const REQUESTS_KEY = ["catalog-requests", "owner"] as const;
+const SPECIAL_KEY = ["owner", "special-products"] as const;
 const PRODUCTS_KEY = ["my-products"] as const;
 
-export function useCatalogRequestsList(enabled: boolean) {
-  const { data: requests = [], isLoading: requestsLoading } = useQuery({
-    queryKey: REQUESTS_KEY,
-    queryFn: () => catalogRequestsApi.list(),
+export function useOwnerSpecialProducts(enabled: boolean) {
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: SPECIAL_KEY,
+    queryFn: () => catalogRequestsApi.myExclusions(),
     enabled,
-    select: (data) => {
-      // Collect medicament IDs where annulation was approved (exclusion reversed)
-      const reversedMedIds = new Set(
-        data
-          .filter((r) => r.request_type === eRequestType.ANNULATION && r.status === eRequestStatus.APPROVED && r.medicament_id)
-          .map((r) => r.medicament_id!)
-      );
-      return data.filter((r) => {
-        if (r.request_type === eRequestType.ANNULATION) return r.status === eRequestStatus.PENDING || r.status === eRequestStatus.REJECTED;
-        if (r.request_type === eRequestType.NON_DECLARE) {
-          // Hide approved exclusions that were later reversed
-          if (r.status === eRequestStatus.APPROVED && r.medicament_id && reversedMedIds.has(r.medicament_id)) return false;
-          return true;
-        }
-        return false;
-      });
-    },
   });
 
-  return { requests, requestsLoading };
+  return { products, productsLoading };
 }
 
 export function useSubmitAnnulation() {
@@ -40,7 +22,7 @@ export function useSubmitAnnulation() {
     mutationFn: (params: { medicament_id: number; notes?: string }) =>
       catalogRequestsApi.submitAnnulation(params),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
+      queryClient.invalidateQueries({ queryKey: SPECIAL_KEY });
       queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY });
       toast.success("Produit réintégré dans vos rapports");
     },
@@ -82,7 +64,7 @@ export function useSubmitNonDeclareRequests(
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: REQUESTS_KEY });
+      queryClient.invalidateQueries({ queryKey: SPECIAL_KEY });
       queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY });
       const count = selectedIds.size;
       toast.success(
