@@ -74,7 +74,13 @@ export type AnalyseMargeResponse = {
   rows: Record<string, unknown>[];
 };
 
-export type StockStatus = "negatif" | "sous-stock" | "ok" | "sur-stock" | "inconnu";
+export type StockStatus =
+  | "sous-stock"
+  | "ideal"
+  | "a-surveiller"
+  | "sur-stock"
+  | "inconnu"
+  | "negatif";
 
 export type StockAbcdProduct = {
   product: string;
