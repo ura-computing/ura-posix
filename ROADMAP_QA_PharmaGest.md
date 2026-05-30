@@ -97,6 +97,15 @@ pass per ticket against this map.
   call sites (achat, ventes ×2, stock, admin/catalog, analyse-liste). Auto column widths,
   numeric cells stay numeric in Excel, dynamic import keeps the lib out of the initial bundle.
   No more CSV anywhere in the pharmacist UI.
+- **PG-018 + PG-019 ✅ shipped** — commit `128a3c3`. PG-018 was a data-scope non-bug after
+  PG-003's refactor — exportCsv (now downloadXlsx) is correctly scoped to MARGE_COLS[margeMode];
+  only the misleading "Exporter CSV" button label needed fixing → "Exporter Excel". PG-019 had
+  two real bugs in the Achat page Type column: the column id was `type` while the export key
+  was `category_type` (so the column never reached the export) and the Diététique→Pharmacie
+  reclassification from PG-020 only existed server-side (the client-side regex still showed
+  Diététique as Parapharmacie). Added `classify_pharma_type` helper in utils/strings.py that
+  mirrors `_pharma_expr` exactly; `_build_achat_row` now returns `category_type`; the table
+  column is rewired to read from the backend field; export includes the column.
 
 ---
 
@@ -467,9 +476,8 @@ Phase 1 (sequential, fastest-impact first):
   Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
 Phase 2:
-  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → PG-003 ✅ → PG-018 / PG-019 (small, can ride on the
-  client-side xlsx pipeline already shipping) → PG-007 (after client clarifies the
-  ventes-matching rule; ship BL-by-number exclusion alone first)
+  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → PG-003 ✅ → PG-018 ✅ → PG-019 ✅ → PG-007 (after client
+  clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
   PG-015 ✅ → PG-016 ✅ → PG-011 ✅ → PG-014 ✅ → PG-017 (needs client tab-order spec)
