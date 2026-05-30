@@ -19,7 +19,7 @@ import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt, fmtInt } from "@/utils/format";
 import { currentMonth } from "@/utils/dateRange";
-import { downloadCSV, exportFilename } from "@/utils/table";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 
@@ -412,7 +412,7 @@ const AchatList = () => {
       const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
       const headers = visibleCols.map(col => ACHAT_COL_LABELS[col.id] ?? col.id);
       const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, exportFilename("ACHAT", "csv", dateFrom || undefined, dateTo || undefined));
+      await downloadXlsx(res.data, rowMapper, headers, exportFilename("ACHAT", "xlsx", dateFrom || undefined, dateTo || undefined), "Achats");
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
