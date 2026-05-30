@@ -150,14 +150,41 @@ class TestGetStats:
         assert res.status_code == 403  # HTTPBearer returns 403 for missing auth
 
     def test_previous_kpis_shape(self, client, test_owner, stats_data):
-        """previous_kpis must contain ventes_total and achats_total."""
+        """previous_kpis must contain ventes_total, achats_total and marge_pct (PG-004)."""
         res = client.get("/stats", headers=test_owner["headers"])
         assert res.status_code == 200
         prev = res.json()["previous_kpis"]
         assert "ventes_total" in prev
         assert "achats_total" in prev
+        assert "marge_pct"    in prev
         assert isinstance(prev["ventes_total"], (int, float))
         assert isinstance(prev["achats_total"], (int, float))
+        assert isinstance(prev["marge_pct"],    (int, float))
+
+    def test_pg004_previous_marge_uses_per_product_formula(self, client, db, test_owner, stats_data):
+        """PG-004: previous_kpis.marge_pct must be computed by the same per-medicament weighted
+        formula as the current marge — not (prevCA - prevAchats) / prevCA which the old frontend
+        used (and which was apples-to-oranges with the current dashboard marge).
+
+        Set up a prior window where Achats >> Ventes so the OLD formula would yield a
+        nonsensical negative marge, but the per-product formula correctly returns 20 %."""
+        pharmacy_id = stats_data["pharmacy_id"]
+        med = stats_data["med1"]  # Doliprane PPV=50
+
+        # Prior window (Apr 2025): buy 10 at PU=40 (cost 400), sell 3 at PPV=50 (CA 150).
+        # OLD broken frontend formula: (150 - 400) / 150 * 100 = -166.67 %
+        # NEW per-product formula:     (1 - 40/50) * 100 = 20 %
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=40.0, delivery_date="2025-04-05")
+        make_vente(db, med, pharmacy_id, quantity=3, unit_price=50.0, date="2025-04-15")
+
+        res = client.get(
+            "/stats",
+            params={"date_from": "2026-04-01", "date_to": "2026-04-30"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        prev = res.json()["previous_kpis"]
+        assert prev["marge_pct"] == 20.0
 
     def test_previous_kpis_with_date_range(self, client, db, test_owner, stats_data):
         """When filtering March 10-15 2026, the previous period is the same dates

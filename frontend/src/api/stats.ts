@@ -26,6 +26,8 @@ export type TypeBreakdown = {
 export type PreviousKpis = {
   ventes_total: number;
   achats_total: number;
+  /** Same per-medicament weighted formula as kpis.marge — apples-to-apples for the variation badge. */
+  marge_pct: number;
 };
 export type StatsResponse = {
   kpis: StatsKpis;
