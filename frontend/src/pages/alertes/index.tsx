@@ -25,6 +25,7 @@ type AlertKey =
   | "peremption-expired"
   | "peremption-very-close"
   | "peremption-close"
+  | "peremption-no-date"
   | "stock-sous"
   | "stock-sur";
 
@@ -193,6 +194,14 @@ export default function AlertesPage() {
           tone="amber"
           onClick={() => setOpenAlert("peremption-close")}
         />
+        <AlertCard
+          label="Sans date"
+          count={peremptions?.no_date?.count ?? 0}
+          valueLabel="Valeur achat"
+          value={peremptions?.no_date?.purchase_value ?? 0}
+          tone="slate"
+          onClick={() => setOpenAlert("peremption-no-date")}
+        />
       </AlertSection>
 
       {/* ── Stock alerts ── */}
@@ -259,6 +268,14 @@ export default function AlertesPage() {
         title="Péremption proche (<90j)"
         description="Produits qui expirent dans moins de 90 jours."
         products={peremptions?.close?.products ?? []}
+        columns={PEREMPTION_COLUMNS}
+      />
+      <AlertDetailDialog
+        open={openAlert === "peremption-no-date"}
+        onOpenChange={(o) => !o && closeAlert()}
+        title="Produits sans date de péremption"
+        description="Produits en stock dont la date de péremption n'est pas renseignée."
+        products={peremptions?.no_date?.products ?? []}
         columns={PEREMPTION_COLUMNS}
       />
       <AlertDetailDialog
@@ -331,6 +348,7 @@ const TONE_STYLES = {
   orange: { card: "border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-800", title: "text-orange-700 dark:text-orange-300", count: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300", value: "text-orange-700 dark:text-orange-300" },
   amber:  { card: "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800",   title: "text-amber-700 dark:text-amber-300",   count: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",   value: "text-amber-700 dark:text-amber-300" },
   blue:   { card: "border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800",       title: "text-blue-700 dark:text-blue-300",     count: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",     value: "text-blue-700 dark:text-blue-300" },
+  slate:  { card: "border-border bg-muted/30",                                                    title: "text-foreground",                       count: "bg-muted text-muted-foreground",                                       value: "text-muted-foreground" },
 } as const;
 
 function AlertCard({
@@ -410,7 +428,7 @@ const MARGE_COLUMNS: AlertColumn<MarginProduct>[] = [
 
 const PEREMPTION_COLUMNS: AlertColumn<PeremptionProduct>[] = [
   { key: "product", header: "Produit", accessor: (r) => r.product },
-  { key: "expiry_date", header: "Date d'expiration", accessor: (r) => r.expiry_date },
+  { key: "expiry_date", header: "Date d'expiration", accessor: (r) => r.expiry_date ?? "—" },
   {
     key: "quantity",
     header: "Quantité",

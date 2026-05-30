@@ -111,7 +111,8 @@ export type StockAbcdResponse = {
 
 export type PeremptionProduct = {
   product: string;
-  expiry_date: string;
+  /** null for products in the no_date bracket (PG-008). */
+  expiry_date: string | null;
   quantity: number;
   ppv: number;
 };
@@ -128,6 +129,8 @@ export type PeremptionsResponse = {
   expired: PeremptionBracket;
   very_close: PeremptionBracket;
   close: PeremptionBracket;
+  /** Products in stock whose expiry_date is missing on the Sobrus snapshot. */
+  no_date: PeremptionBracket;
 };
 
 function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): string {
