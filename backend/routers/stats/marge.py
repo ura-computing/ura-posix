@@ -240,36 +240,95 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             })
 
     elif mode == "grossiste":
-        # Group by grossiste supplier only (supplier name starts with "GROSSISTE").
-        # CA/qty are from ventes of medicaments bought through each grossiste.
-        grossiste_meds = (
-            db.query(Achat.supplier, Achat.medicament_id)
-            .filter(*base_filter_a)
+        # Per (supplier, medicament): avg PU + total purchase cost — only achats from GROSSISTE suppliers.
+        # A medicament can be supplied by multiple grossistes; keep them distinct here.
+        grossiste_med_sub = (
+            db.query(
+                Achat.supplier.label("supplier"),
+                Achat.medicament_id.label("medicament_id"),
+                (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+                func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
+            )
+            .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
             .filter(func.upper(Achat.supplier).like("GROSSISTE%"))
-            .distinct()
+            .group_by(Achat.supplier, Achat.medicament_id)
             .subquery()
         )
+        # Sales aggregated per supplier through the medicaments they supplied.
         q = (
             db.query(
-                grossiste_meds.c.supplier.label("grossiste"),
+                grossiste_med_sub.c.supplier.label("grossiste"),
                 func.sum(Vente.quantity).label("qty"),
                 func.sum(Vente.total).label("ca"),
                 func.max(Vente.unit_price).label("prix_max"),
                 func.min(Vente.unit_price).label("prix_min"),
                 func.avg(Vente.unit_price).label("prix_avg"),
             )
-            .join(Vente, Vente.medicament_id == grossiste_meds.c.medicament_id)
+            .join(Vente, Vente.medicament_id == grossiste_med_sub.c.medicament_id)
             .filter(*base_filter_v)
-            .group_by(grossiste_meds.c.supplier)
+            .group_by(grossiste_med_sub.c.supplier)
         )
+
+        # Weighted marge per grossiste: (supplier, medicament) × ventes.qty.
+        med_marge_q = (
+            db.query(
+                grossiste_med_sub.c.supplier.label("grossiste"),
+                Medicament.ppv,
+                grossiste_med_sub.c.avg_pu.label("pu"),
+                func.sum(Vente.quantity).label("qty"),
+            )
+            .join(Medicament, Medicament.id == grossiste_med_sub.c.medicament_id)
+            .join(Vente, Vente.medicament_id == grossiste_med_sub.c.medicament_id)
+            .filter(*base_filter_v, Medicament.ppv.isnot(None))
+            .group_by(
+                grossiste_med_sub.c.supplier,
+                grossiste_med_sub.c.medicament_id,
+                Medicament.ppv,
+                grossiste_med_sub.c.avg_pu,
+            )
+        )
+        gross_margin: dict = {}
+        for m in med_marge_q.all():
+            if m.pu is None:
+                continue
+            key = m.grossiste
+            qty = float(m.qty or 0)
+            ppv = float(m.ppv or 0)
+            pu  = float(m.pu or 0)
+            if not ppv:
+                continue
+            bucket = gross_margin.setdefault(key, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
+            marge_pct = (1 - pu / ppv) * 100
+            bucket["sum_qty_pct"] += qty * marge_pct
+            bucket["sum_qty_dh"]  += qty * (ppv - pu)
+            bucket["total_qty"]   += qty
+
+        # Total purchased cost per grossiste (includes unsold inventory).
+        gross_cost_q = (
+            db.query(
+                grossiste_med_sub.c.supplier.label("grossiste"),
+                func.sum(grossiste_med_sub.c.total_cost).label("total_cost"),
+            )
+            .group_by(grossiste_med_sub.c.supplier)
+        )
+        gross_total_cost = {r.grossiste: float(r.total_cost or 0) for r in gross_cost_q.all()}
+
         for r in q.all():
+            name = r.grossiste or "—"
+            m = gross_margin.get(name)
+            total_qty = m["total_qty"] if m else 0
+            marge_pct_avg = round(m["sum_qty_pct"] / total_qty, 2) if m and total_qty else None
+            marge_dh_avg  = round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None
             rows_out.append({
-                "grossiste": r.grossiste or "—",
-                "prix_max": round(float(r.prix_max or 0), 4),
-                "prix_min": round(float(r.prix_min or 0), 4),
-                "prix_avg": round(float(r.prix_avg or 0), 4),
-                "qty":      round(float(r.qty or 0), 2),
-                "ca":       round(float(r.ca or 0), 2),
+                "grossiste":       name,
+                "prix_max":        round(float(r.prix_max or 0), 4),
+                "prix_min":        round(float(r.prix_min or 0), 4),
+                "prix_avg":        round(float(r.prix_avg or 0), 4),
+                "qty":             round(float(r.qty or 0), 2),
+                "ca":              round(float(r.ca or 0), 2),
+                "marge_pct_avg":   marge_pct_avg,
+                "marge_dh_avg":    marge_dh_avg,
+                "total_achat_cost": round(gross_total_cost.get(name, 0.0), 2),
             })
 
     elif mode == "bl":
@@ -297,6 +356,17 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             })
 
     elif mode == "laboratoire":
+        # Per-medicament avg PU from achats (laboratoire lives on Medicament).
+        avg_pu_sub_lab = (
+            db.query(
+                Achat.medicament_id,
+                (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+                func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
+            )
+            .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
+            .group_by(Achat.medicament_id)
+            .subquery()
+        )
         q = (
             db.query(
                 Medicament.laboratoire,
@@ -311,14 +381,66 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             .filter(Medicament.laboratoire.isnot(None))
             .group_by(Medicament.laboratoire)
         )
+
+        # Weighted marge per laboratoire (mirrors categorie mode).
+        med_marge_q = (
+            db.query(
+                Medicament.laboratoire,
+                Medicament.ppv,
+                avg_pu_sub_lab.c.avg_pu.label("pu"),
+                func.sum(Vente.quantity).label("qty"),
+            )
+            .join(Medicament, Vente.medicament_id == Medicament.id)
+            .outerjoin(avg_pu_sub_lab, Medicament.id == avg_pu_sub_lab.c.medicament_id)
+            .filter(*base_filter_v, *cat_filter,
+                    Medicament.ppv.isnot(None),
+                    Medicament.laboratoire.isnot(None))
+            .group_by(Medicament.id, Medicament.laboratoire, Medicament.ppv, avg_pu_sub_lab.c.avg_pu)
+        )
+        lab_margin: dict = {}
+        for m in med_marge_q.all():
+            if m.pu is None:
+                continue
+            key = m.laboratoire
+            qty = float(m.qty or 0)
+            ppv = float(m.ppv or 0)
+            pu  = float(m.pu or 0)
+            if not ppv:
+                continue
+            bucket = lab_margin.setdefault(key, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
+            marge_pct = (1 - pu / ppv) * 100
+            bucket["sum_qty_pct"] += qty * marge_pct
+            bucket["sum_qty_dh"]  += qty * (ppv - pu)
+            bucket["total_qty"]   += qty
+
+        # Total purchased cost per laboratoire (includes unsold inventory).
+        lab_cost_q = (
+            db.query(
+                Medicament.laboratoire,
+                func.sum(avg_pu_sub_lab.c.total_cost).label("total_cost"),
+            )
+            .join(avg_pu_sub_lab, Medicament.id == avg_pu_sub_lab.c.medicament_id)
+            .filter(Medicament.laboratoire.isnot(None))
+            .group_by(Medicament.laboratoire)
+        )
+        lab_total_cost = {r.laboratoire: float(r.total_cost or 0) for r in lab_cost_q.all()}
+
         for r in q.all():
+            name = r.laboratoire or "—"
+            m = lab_margin.get(name)
+            total_qty = m["total_qty"] if m else 0
+            marge_pct_avg = round(m["sum_qty_pct"] / total_qty, 2) if m and total_qty else None
+            marge_dh_avg  = round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None
             rows_out.append({
-                "laboratoire": r.laboratoire or "—",
-                "prix_max": round(float(r.prix_max or 0), 4),
-                "prix_min": round(float(r.prix_min or 0), 4),
-                "prix_avg": round(float(r.prix_avg or 0), 4),
-                "qty":      round(float(r.qty or 0), 2),
-                "ca":       round(float(r.ca or 0), 2),
+                "laboratoire":     name,
+                "prix_max":        round(float(r.prix_max or 0), 4),
+                "prix_min":        round(float(r.prix_min or 0), 4),
+                "prix_avg":        round(float(r.prix_avg or 0), 4),
+                "qty":             round(float(r.qty or 0), 2),
+                "ca":              round(float(r.ca or 0), 2),
+                "marge_pct_avg":   marge_pct_avg,
+                "marge_dh_avg":    marge_dh_avg,
+                "total_achat_cost": round(lab_total_cost.get(name, 0.0), 2),
             })
 
     elif mode == "operateur":
@@ -457,6 +579,9 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             2,
         )
     elif marge_avg_rows:
+        # Different aggregation modes label rows differently (category / grossiste / laboratoire).
+        sample = marge_avg_rows[0]
+        label_key = next((k for k in ("category", "grossiste", "laboratoire") if k in sample), "category")
         total_qty = sum(float(r["qty"] or 0) for r in marge_avg_rows)
         if total_qty:
             kpis["marge_pct_avg"] = round(
@@ -469,10 +594,10 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
         worst_pct = min(marge_avg_rows, key=lambda r: r["marge_pct_avg"])
         best_dh   = max(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
         worst_dh  = min(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
-        kpis["marge_pct_max"] = {"label": best_pct["category"],  "value": best_pct["marge_pct_avg"],  "qty": best_pct["qty"]}
-        kpis["marge_pct_min"] = {"label": worst_pct["category"], "value": worst_pct["marge_pct_avg"], "qty": worst_pct["qty"]}
-        kpis["marge_dh_max"]  = {"label": best_dh["category"],   "value": best_dh["marge_dh_avg"],   "qty": best_dh["qty"]}
-        kpis["marge_dh_min"]  = {"label": worst_dh["category"],  "value": worst_dh["marge_dh_avg"],  "qty": worst_dh["qty"]}
+        kpis["marge_pct_max"] = {"label": best_pct[label_key],  "value": best_pct["marge_pct_avg"],  "qty": best_pct["qty"]}
+        kpis["marge_pct_min"] = {"label": worst_pct[label_key], "value": worst_pct["marge_pct_avg"], "qty": worst_pct["qty"]}
+        kpis["marge_dh_max"]  = {"label": best_dh[label_key],   "value": best_dh["marge_dh_avg"],   "qty": best_dh["qty"]}
+        kpis["marge_dh_min"]  = {"label": worst_dh[label_key],  "value": worst_dh["marge_dh_avg"],  "qty": worst_dh["qty"]}
         kpis["difference_gain_dh"] = round(
             float(best_dh["qty"] or 0) * float(best_dh["marge_dh_avg"] or 0) -
             float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh_avg"] or 0),

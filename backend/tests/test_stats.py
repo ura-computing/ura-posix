@@ -281,6 +281,61 @@ class TestAnalyseMarge:
         # marge_dh = 50 - 40 = 10.0
         assert doliprane["marge_dh"] == 10.0
 
+    def test_pg010_grossiste_marge_computed(self, client, test_owner, stats_data):
+        """PG-010: Analyses → Grossistes must populate marge_pct_avg / marge_dh_avg / total_achat_cost
+        (the audit screenshot showed "—" / "0,00 MAD"). The default `stats_data` fixture buys
+        both Doliprane (PPV=50 PU=40, qty=15) and Creme Solaire (PPV=100 PU=80, qty=5) from
+        the default 'Grossiste A' supplier."""
+        res = client.get(
+            "/stats/analyse-marge",
+            params={"mode": "grossiste"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        body = res.json()
+        rows = body["rows"]
+        # Pull the Grossiste A row
+        row = next((r for r in rows if r["grossiste"] == "Grossiste A"), None)
+        assert row is not None, "Grossiste A should appear in grossiste mode"
+        # Both products have marge=20% (50→40 and 100→80), so weighted avg = 20%
+        assert row["marge_pct_avg"] == 20.0
+        # Weighted marge DH: (15*10 + 5*20) / (15+5) = 250 / 20 = 12.5
+        assert row["marge_dh_avg"] == 12.5
+        # Total achat cost = 20*40 + 10*80 = 1600
+        assert row["total_achat_cost"] == 1600.0
+        # KPIs should also reflect this and be addressable by 'grossiste' label
+        kpis = body["kpis"]
+        assert kpis["marge_pct_avg"] == 20.0
+        assert kpis["marge_dh_avg"] == 12.5
+        assert kpis["marge_pct_max"]["label"] == "Grossiste A"
+
+    def test_pg010_laboratoire_marge_computed(self, client, db, test_owner):
+        """PG-010 (labo branch): same fix shape — Analyses → Laboratoires must compute marge."""
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG010-LAB-001", product="MKL Cream 100ml",
+            category="Parapharmacie (7.00%)", tva="TVA (7.00%)",
+            pph=60.0, ppv=80.0, laboratoire="MKL",
+        )
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=60.0, delivery_date="2026-03-01")
+        make_vente(db, med, pharmacy_id, quantity=4, unit_price=80.0, date="2026-03-12")
+
+        res = client.get(
+            "/stats/analyse-marge",
+            params={"mode": "laboratoire"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        rows = res.json()["rows"]
+        row = next((r for r in rows if r["laboratoire"] == "MKL"), None)
+        assert row is not None
+        # marge_pct = (1 - 60/80) * 100 = 25
+        assert row["marge_pct_avg"] == 25.0
+        # marge_dh = 80 - 60 = 20
+        assert row["marge_dh_avg"] == 20.0
+        # total achat cost = 10 * 60 = 600
+        assert row["total_achat_cost"] == 600.0
+
     def test_pg013_no_pph_fallback_when_achat_missing(self, client, db, test_owner):
         """PG-013: a Sobrus fiche with PPH == PPV must not yield a fake 0 % margin
         when there is no Achat row. The audit found this happens because Sobrus often
