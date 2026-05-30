@@ -92,6 +92,11 @@ pass per ticket against this map.
   Analyses → Liste mode was the only outlier — a hand-rolled `<table>` with static `<th>` and
   no click handlers. Added per-column sort (asc/desc with ↑/↓ arrows + French-locale comparator,
   nulls-last) while preserving the not-found-first default ordering.
+- **PG-003 ✅ shipped** — commit `3aec11e`. `xlsx` (SheetJS) was already in package.json so the
+  deferral was wrong — just swapped `downloadCSV` for a new `downloadXlsx` and migrated all 6
+  call sites (achat, ventes ×2, stock, admin/catalog, analyse-liste). Auto column widths,
+  numeric cells stay numeric in Excel, dynamic import keeps the lib out of the initial bundle.
+  No more CSV anywhere in the pharmacist UI.
 
 ---
 
@@ -461,9 +466,10 @@ Phase 1 (sequential, fastest-impact first):
 
   Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
-Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
-  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → { PG-003 + PG-018 + PG-019 } → PG-007 (after client
-  clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
+Phase 2:
+  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → PG-003 ✅ → PG-018 / PG-019 (small, can ride on the
+  client-side xlsx pipeline already shipping) → PG-007 (after client clarifies the
+  ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
   PG-015 ✅ → PG-016 ✅ → PG-011 ✅ → PG-014 ✅ → PG-017 (needs client tab-order spec)
