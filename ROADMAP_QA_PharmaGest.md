@@ -54,6 +54,22 @@ pass per ticket against this map.
   `_pharma_expr()` so Diététique products now roll into Pharmacie aggregates everywhere (CA
   breakdown, marge, type_breakdown, marge brackets). Test covers both accent variants. 280
   backend tests pass.
+- **PG-013 follow-up ✅ shipped** — commit `5907fdf`. Dropped the residual PPH fallback in
+  `queries._marge_for_window` (the helper backing the dashboard marge tile + the PG-004 variation
+  badge); the existing `if r.pu is not None` guard now excludes pu-less rows from the aggregate.
+  Regression test pins the new behaviour. 281 backend tests pass.
+- **PG-021 ✅ shipped** — commit `1f807be`. Exposed the auto-generated `pharmacy_code` via a
+  `User.pharmacy_code` @property + `UserOut.pharmacy_code`, plumbed through the frontend
+  `User` type, and rendered the code as a monospace pill next to `pharmacy_name` on the welcome
+  page (both active and pending branches). `test_signup_owner_success` now asserts the code is
+  present and starts with the city prefix. 281 backend tests pass.
+- **PG-001 + PG-002 ✅ shipped** — commit `9f393f1`. Status now derived from
+  `current_stock × 365 / ventes_12m` with the 4 client-confirmed bands
+  (sous-stock ≤45 j · idéal 46-60 j · à surveiller 61-99 j · sur-stock ≥100 j);
+  displayed Stock Min/Max recomputed from the idéal band × ADS; Sobrus snapshot values dropped
+  from the read path. New `?status=` filter accepts comma-separated values. Frontend
+  `StockStatus` / `STATUS_OPTIONS` / `STATUS_CFG` palette refreshed; health gauge now counts
+  "ideal". 296 backend tests pass (+15 parametrised band tests including the DOLIPRANE repro).
 
 ---
 
@@ -418,11 +434,10 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
 
 ```
 Phase 1 (sequential, fastest-impact first):
-  PG-013 ✅ → PG-010 ✅ → PG-004 ✅ → PG-020 ✅ → PG-005/PG-012 (blocked on a real
-  client CSV) → PG-001/PG-002 (thresholds now confirmed by client)
+  PG-013 ✅ → PG-010 ✅ → PG-004 ✅ → PG-020 ✅ → PG-001/PG-002 ✅
+  → PG-005/PG-012 (blocked on a real client CSV showing the JUNIOR row)
 
-  PG-021 (owner-signup city + code) — already implemented end-to-end; verify code-visibility
-  gap (small UI add at most) and close.
+  Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
 Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
   PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
