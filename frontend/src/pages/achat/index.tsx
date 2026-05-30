@@ -56,6 +56,7 @@ type AchatRow = {
   pid: string | null;
   product: string | null;
   category: string | null;
+  category_type: "pharmacie" | "parapharmacie" | null;
   tva: string | null;
   quantity: number | null;
   pph: number | null;
@@ -67,7 +68,7 @@ type AchatRow = {
 
 const ACHAT_COL_LABELS: Record<string, string> = {
   delivery_date: "Date BL", delivery_ref: "Référence", delivery_ref_final: "Référence Finale",
-  supplier: "Fournisseur", product: "Produit", category: "Catégorie", tva: "TVA",
+  supplier: "Fournisseur", product: "Produit", category: "Catégorie", category_type: "Type", tva: "TVA",
   quantity: "Qté", pph: "PPH (catalogue)", unit_price: "PU (achat)", expiry_date: "Péremption", total: "Total",
 };
 
@@ -171,6 +172,9 @@ const ACHAT_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
   supplier: (r) => String(r.supplier ?? ""),
   product: (r) => String(r.product ?? ""),
   category: (r) => String(r.category ?? ""),
+  category_type: (r) => r.category_type === "pharmacie" ? "Pharmacie"
+                       : r.category_type === "parapharmacie" ? "Parapharmacie"
+                       : "",
   tva: (r) => String(r.tva ?? ""),
   quantity: (r) => String(r.quantity ?? ""),
   pph: (r) => String(r.pph ?? ""),
@@ -310,13 +314,17 @@ const AchatList = () => {
         },
       },
       {
-        id: "type",
+        // id matches ACHAT_COL_VALUES["category_type"] so the column flows into the
+        // export. The type itself is computed server-side (PG-019 / PG-020) so the
+        // table, the export and every aggregate use the same classification.
+        id: "category_type",
+        accessorKey: "category_type",
         size: 120,
         header: () => <p className="column-title">Type</p>,
         cell: ({ row }) => {
-          const cat = (row.original.category ?? "").toLowerCase();
-          const isPharmacy = cat.includes("edicament") || cat.includes("édicament") || cat.includes("oméopath") || cat.includes("omeopath");
-          if (!row.original.category) return <span className="text-muted-foreground">—</span>;
+          const t = row.original.category_type;
+          if (!t) return <span className="text-muted-foreground">—</span>;
+          const isPharmacy = t === "pharmacie";
           return (
             <Badge variant="outline" className={isPharmacy
               ? "text-blue-700 border-blue-300 bg-blue-50 text-xs"

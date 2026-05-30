@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
-from utils.strings import strip_percentage, tokenize_search
+from utils.strings import classify_pharma_type, strip_percentage, tokenize_search
 from utils.search import product_search_clauses, supplier_search_clauses
 
 achat_router = APIRouter(prefix="/achat", tags=["achat"])
@@ -99,6 +99,12 @@ def _build_achat_row(a: Achat, suffixes_map: Dict[str, tuple]) -> dict:
         "pid": a.medicament.pid if a.medicament else None,
         "product": a.medicament.product if a.medicament else None,
         "category": category,
+        # PG-019: explicit Pharmacie / Parapharmacie type so the user can pivot
+        # the Achat export by type without re-deriving it from the raw category.
+        "category_type": classify_pharma_type(
+            category,
+            a.medicament.product_type if a.medicament else None,
+        ),
         "tva": a.medicament.tva if a.medicament else None,
         "pph": a.medicament.pph if a.medicament else None,
         "ppv": a.medicament.ppv if a.medicament else None,

@@ -189,7 +189,7 @@ export default function AnalysePage() {
             {kpis.count > 0 && (
               <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
                 <Download className="h-3.5 w-3.5" />
-                Exporter CSV ({kpis.count})
+                Exporter Excel ({kpis.count})
               </Button>
             )}
             <button

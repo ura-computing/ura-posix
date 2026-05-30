@@ -1,4 +1,4 @@
-from utils.strings import fix_mojibake, tokenize_search
+from utils.strings import classify_pharma_type, fix_mojibake, tokenize_search
 
 
 class TestFixMojibake:
@@ -62,3 +62,30 @@ class TestTokenizeSearch:
 
     def test_lowercases_and_dedupes(self):
         assert tokenize_search("Roche ROCHE rocheford") == ["roche", "rocheford"]
+
+
+class TestClassifyPharmaType:
+    """PG-019: must stay in lockstep with _pharma_expr() in queries.py."""
+
+    def test_medicament_categories_are_pharmacie(self):
+        for cat in ("Medicament (20.00%)", "Médicament", "MEDICAMENT GENERIQUE"):
+            assert classify_pharma_type(cat) == "pharmacie", cat
+
+    def test_homeopathie_is_pharmacie(self):
+        for cat in ("Homéopathie", "Homeopathie (7.00%)"):
+            assert classify_pharma_type(cat) == "pharmacie", cat
+
+    def test_dietetique_is_pharmacie_pg020(self):
+        # PG-020 mirror — both accent variants.
+        assert classify_pharma_type("Dietetique") == "pharmacie"
+        assert classify_pharma_type("Diététique") == "pharmacie"
+
+    def test_other_categories_are_parapharmacie(self):
+        for cat in ("Parapharmacie (33.330%)", "Complement Alimentaire", "Cosmétique", None, ""):
+            assert classify_pharma_type(cat) == "parapharmacie", repr(cat)
+
+    def test_admin_product_type_override_wins(self):
+        # Even a parapharmacie-keyword category must yield pharmacie if the admin
+        # has explicitly overridden via Medicament.product_type.
+        assert classify_pharma_type("Parapharmacie", product_type="pharmacie") == "pharmacie"
+        assert classify_pharma_type("Medicament",    product_type="parapharmacie") == "parapharmacie"
