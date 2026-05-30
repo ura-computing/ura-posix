@@ -12,7 +12,7 @@ from database import get_db
 from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
 from utils.strings import strip_percentage, tokenize_search
-from utils.search import product_search_clauses
+from utils.search import product_search_clauses, supplier_search_clauses
 
 achat_router = APIRouter(prefix="/achat", tags=["achat"])
 vente_router = APIRouter(prefix="/ventes", tags=["ventes"])
@@ -175,15 +175,25 @@ def get_achat_suggestions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not q or len(q) < 2:
+    # PG-006: tokenise the query (whitespace + `*` separators) and AND-match each
+    # token via case- and accent-insensitive substring search. So "societe para"
+    # or "soc*cdp" or "Société PARA" all find "Société PARA LA CDP".
+    if not q or len(q.strip()) < 2:
         return {"products": [], "suppliers": [], "refs": []}
-    term = f"{q}%"
+    tokens = tokenize_search(q)
+    if not tokens:
+        return {"products": [], "suppliers": [], "refs": []}
+
     base = db.query(Achat).join(Medicament, Achat.medicament_id == Medicament.id, isouter=True)
     if current_user.pharmacy_id:
         base = base.filter(Achat.pharmacy_id == current_user.pharmacy_id)
-    products = [r[0] for r in base.filter(Medicament.product.ilike(term)).with_entities(Medicament.product).distinct().limit(6).all() if r[0]]
-    suppliers = [r[0] for r in base.filter(Achat.supplier.ilike(term)).with_entities(Achat.supplier).distinct().limit(6).all() if r[0]]
-    refs = [r[0] for r in base.filter(Achat.delivery_ref.ilike(term)).with_entities(Achat.delivery_ref).distinct().limit(6).all() if r[0]]
+
+    def _filter_on(column):
+        return base.filter(*supplier_search_clauses(tokens, [column]))
+
+    products  = [r[0] for r in _filter_on(Medicament.product).with_entities(Medicament.product).distinct().limit(6).all() if r[0]]
+    suppliers = [r[0] for r in _filter_on(Achat.supplier).with_entities(Achat.supplier).distinct().limit(6).all() if r[0]]
+    refs      = [r[0] for r in _filter_on(Achat.delivery_ref).with_entities(Achat.delivery_ref).distinct().limit(6).all() if r[0]]
     return {"products": products, "suppliers": suppliers, "refs": refs}
 
 
@@ -220,12 +230,13 @@ def achat_supplier_summary(
     if date_to:
         q = q.filter(Achat.delivery_date <= date_to)
     if search:
-        term = f"%{search}%"
-        q = q.filter(
-            Medicament.product.ilike(term)
-            | Achat.supplier.ilike(term)
-            | Achat.delivery_ref.ilike(term)
-        )
+        # PG-006: tolerant multi-token + accent + `*` wildcard match across all three
+        # columns. Each token must match SOMEWHERE; tokens are ANDed together.
+        tokens = tokenize_search(search)
+        if tokens:
+            q = q.filter(*supplier_search_clauses(
+                tokens, [Medicament.product, Achat.supplier, Achat.delivery_ref],
+            ))
     if category:
         q = q.filter(or_(*[Medicament.category.ilike(f"{cat}%") for cat in category]))
     if tva:

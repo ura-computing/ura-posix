@@ -77,6 +77,9 @@ Base.metadata.create_all(bind=engine)
 # Idempotent — safe to run on every boot.
 with engine.begin() as _conn:
     _conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+    # PG-006: unaccent powers accent-insensitive supplier/laboratoire search so
+    # `societe para` matches `Société PARA LA CDP` without the user typing the é.
+    _conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS unaccent;")
     # Pharmacy.city + Pharmacy.code (Ticket 5). create_all() doesn't ALTER
     # existing tables, so we add the columns + unique index here, then
     # backfill codes for any rows that don't have one yet.
