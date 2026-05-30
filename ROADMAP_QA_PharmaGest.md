@@ -83,6 +83,10 @@ pass per ticket against this map.
   `/achat/supplier-summary`; also unaccented `product_search_clauses` so the main /achat list
   search benefits too. Regression covers "CDP", "para", "societe para", "Société PARA",
   "soc*cdp" → all hit "Société PARA LA CDP". 297 backend tests pass.
+- **PG-011 ✅ shipped** — commit `3befe56`. DateRangePicker now renders two side-by-side framed
+  fields with "Date début" / "Date fin" labels above each (replacing the unified `[Du … → Au …]`
+  strip). Shared calendar popover icon stays. Existing tests updated to query by the new aria
+  labels; 112 frontend tests pass.
 
 ---
 
@@ -457,7 +461,7 @@ Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
   clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
-  PG-015 ✅ → PG-016 ✅ → PG-017 → PG-011 → PG-014
+  PG-015 ✅ → PG-016 ✅ → PG-011 ✅ → PG-014 → PG-017 (needs client tab-order spec)
 ```
 
 ## Per-ticket verification
