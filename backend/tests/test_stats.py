@@ -111,6 +111,38 @@ class TestGetStats:
         # Only Doliprane ventes: 15 * 50 = 750
         assert kpis["ventes_total"] == 15 * 50.0
 
+    def test_pg020_dietetique_classified_as_pharmacie(self, client, db, test_owner, stats_data):
+        """PG-020: 'Diététique' must roll into Pharmacie totals, not Parapharmacie.
+        Client: "Diététique c'est Pharmacie et non Parapharmacie."
+
+        Add a Dietetique product, sell some units. With the new _pharma_expr the
+        ?category_type=pharmacie filter should include this product's CA on top of Doliprane
+        (which is `Medicament` → pharmacie). 'Dietetique' (no accent) and 'Diététique' must
+        both match — pharmacies' product catalogues use either form."""
+        pharmacy_id = stats_data["pharmacy_id"]
+        med_no_accent = make_medicament(
+            db, pid="PG020-001", product="BIO LAIT PRIMEA 3EME AGE 800G",
+            category="Dietetique", tva="TVA (20.00%)", pph=80.0, ppv=100.0,
+        )
+        med_with_accent = make_medicament(
+            db, pid="PG020-002", product="ENFA BIO LAIT 2EME AGE 800G",
+            category="Diététique", tva="TVA (20.00%)", pph=60.0, ppv=80.0,
+        )
+        make_vente(db, med_no_accent,   pharmacy_id, quantity=4, unit_price=100.0, date="2026-03-10")
+        make_vente(db, med_with_accent, pharmacy_id, quantity=2, unit_price=80.0,  date="2026-03-10")
+
+        res = client.get(
+            "/stats",
+            params={"category_type": "pharmacie"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        kpis = res.json()["kpis"]
+        # Doliprane (already in stats_data): 15 * 50 = 750
+        # + Dietetique (no accent): 4 * 100 = 400
+        # + Diététique (with accent): 2 * 80 = 160
+        assert kpis["ventes_total"] == 750 + 400 + 160
+
     def test_date_range_filter(self, client, test_owner, stats_data):
         res = client.get(
             "/stats",

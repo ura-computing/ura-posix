@@ -36,6 +36,8 @@ def _pharma_expr():
         (func.lower(Medicament.category).contains("édicament"), True),
         (func.lower(Medicament.category).contains("oméopath"), True),
         (func.lower(Medicament.category).contains("omeopath"), True),
+        (func.lower(Medicament.category).contains("iététique"), True),
+        (func.lower(Medicament.category).contains("ietetique"), True),
         else_=False,
     )
     return sa_case(
