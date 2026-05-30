@@ -31,6 +31,7 @@ class UserOut(BaseModel):
     permissions: Dict[str, bool] = {}
     pharmacy_id: Optional[int] = None
     pharmacy_address: Optional[str] = None
+    pharmacy_code: Optional[str] = None
 
     @field_validator("permissions", mode="before")
     @classmethod

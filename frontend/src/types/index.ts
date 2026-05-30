@@ -44,6 +44,7 @@ export type User = {
   permissions?: Record<string, boolean>;
   pharmacy_id?: number;
   pharmacy_address?: string;
+  pharmacy_code?: string;
 };
 
 export type PharmacyOwner = {
