@@ -70,6 +70,13 @@ pass per ticket against this map.
   from the read path. New `?status=` filter accepts comma-separated values. Frontend
   `StockStatus` / `STATUS_OPTIONS` / `STATUS_CFG` palette refreshed; health gauge now counts
   "ideal". 296 backend tests pass (+15 parametrised band tests including the DOLIPRANE repro).
+- **PG-009 ✅ shipped** — commit `9aacf35`. 3-tile total summary (Somme commandée / BL / Unités)
+  under the Achats jauge, summing both supplier-type aggregates the backend already returns.
+  Reactivity is automatic via the existing supplier-summary query key.
+- **PG-008 ✅ shipped** — commit `12f93e8`. New "Sans date" péremption bracket on the backend
+  (`expiry_date IS NULL` rows) + 4th AlertCard / modal on the frontend; new slate tone for the
+  data-quality signal. `PEREMPTION_COLUMNS` renders "—" when no date is set. 296 backend tests
+  pass; 112 frontend tests pass.
 
 ---
 
@@ -440,7 +447,7 @@ Phase 1 (sequential, fastest-impact first):
   Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
 Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
-  PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
+  PG-009 ✅ → PG-008 ✅ → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
   the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
