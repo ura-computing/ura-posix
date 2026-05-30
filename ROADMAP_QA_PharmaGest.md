@@ -23,6 +23,13 @@ pass per ticket against this map.
 2. **PG-007 — "% d'achat" alternative.** What baseline? Per BL, per supplier, over the active
    period? And how do we match ventes to a specific BL (Vente has no `delivery_ref` link)?
 
+## Progress
+
+- **PG-013 ✅ shipped** — commit `9661172` (2026-05-30). All six `Medicament.pph` fallbacks
+  removed across produit / categorie / brackets modes of [marge.py](backend/routers/stats/marge.py);
+  regression test `test_pg013_no_pph_fallback_when_achat_missing` added; 276 backend tests pass,
+  frontend tsc clean.
+
 ---
 
 ## Cross-cutting rules (codify once, reuse everywhere)
@@ -40,13 +47,9 @@ unit-test them:
 
 ## Phase 1 — CRITIQUE (must ship before any client demo)
 
-### PG-013 — Drop PPH fallback for marge (do first — it's a 1-line fix that unblocks PG-005/012)
-- Code: [backend/routers/stats/marge.py:73](backend/routers/stats/marge.py#L73) — falls back to
-  `Medicament.pph` when no Achat data. Sobrus' fiche produit often has `PPH = PPV`, so this yields
-  fake 0 % margins.
-- Approach: remove the fallback. When no Achat row exists, return `null` PU and let the UI show
-  "—". Add a regression test with `PPH == PPV` to prove margin is no longer computed.
-- Effort: XS.
+### PG-013 — Drop PPH fallback for marge — ✅ DONE (commit `9661172`)
+Shipped 2026-05-30. See **Progress** section above. All later marge work (PG-005, PG-012, PG-010)
+inherits the corrected base.
 
 ### PG-005 + PG-012 — PU réel from BL after remise
 - Code: [backend/models/transactions.py:21-46](backend/models/transactions.py#L21-L46) — `Achat` has
@@ -59,13 +62,17 @@ unit-test them:
 - Acceptance (PG-012): on a BL with `PU=39.42`, `PPV=54` → marge ≈ 27 %.
 - Effort: M (depends on import audit).
 
-### PG-010 — Marge % + DH for grossistes
-- Code: [marge.py:242-273](backend/routers/stats/marge.py#L242-L273) (grossiste branch skips margin);
-  [frontend/src/pages/rapports/margeTable.tsx:49-56](frontend/src/pages/rapports/margeTable.tsx#L49-L56)
-  (columns missing).
-- Approach: apply the same weighted avg PU vs avg PPV computation already used in product mode;
-  add `marge_pct` / `marge_dh` to grossiste rows; add the two columns to the table config.
-- Effort: S.
+### PG-010 — Marge % + DH for grossistes **and laboratoires**
+- Code: [marge.py:242-273](backend/routers/stats/marge.py#L242-L273) (grossiste branch) and
+  [marge.py:299-322](backend/routers/stats/marge.py#L299-L322) (laboratoire branch). Both skip
+  margin AND skip the avg purchase price (PRIX UNITAIRES ACHETÉS shows 0,00 MAD in screenshot).
+  Frontend: [pages/rapports/margeTable.tsx:49-56](frontend/src/pages/rapports/margeTable.tsx#L49-L56)
+  missing margin columns for both modes.
+- Approach: in each branch, join an `avg_pu` subquery analogous to produit mode lines 44-55, add
+  `marge_pct` / `marge_dh` to row output, surface PU in the KPI tiles, add table columns.
+- Acceptance (client repro): selecting **Société PARA LA CDP** under Grossistes (or any
+  laboratoire) must populate Marge moyenne / Marge moyenne (DH) / Prix unitaires achetés — not "—".
+- Effort: S (one branch + a copy for the other).
 
 ### PG-004 — Variation marge arithmetic
 - Code: backend returns `previous_kpis` at
@@ -74,6 +81,8 @@ unit-test them:
 - Approach: verify the displayed % uses `(T1-T0)/T0×100` with 2-decimal rounding, not absolute
   difference. Centralize via shared util from the cross-cutting section.
 - Acceptance: Avril 2025 = 31.7 %, Avril 2026 = 32.6 % → **+2.84 %**.
+- Client repro: **MKL CREME DOUCHE DERMO-NOURRISSANTE BIO 100ML** (use this product in QA — the
+  client says its variation is wrong on the dashboard).
 - Effort: S.
 
 ### PG-001 + PG-002 — Stock Min/Max + Statut bands + filter
@@ -114,15 +123,18 @@ unit-test them:
   4th card alongside the three existing péremption cards, with a drill-down list.
 - Effort: S.
 
-### PG-006 — Tolerant supplier/laboratoire search
+### PG-006 — Tolerant supplier/laboratoire search (with `*` wildcard)
 - Code: [backend/routers/transactions.py:172-187](backend/routers/transactions.py#L172-L187) uses
   `ilike(f"{q}%")`; existing utils at `backend/utils/strings.py` (`strip_accents`) +
   `backend/utils/search.py` (`product_search_clauses` / `tokenize_search`) are already used for
   product search.
 - Approach: refactor `get_achat_suggestions` + `achat_supplier_summary` to reuse those utils
-  (multi-token, accent-insensitive, fragment match). Consider adding a normalized supplier column
-  for index performance once the query shape is settled.
-- Acceptance: "CDP", "para", "societe para", "Société PARA" all return `Société PARA LA CDP`.
+  (multi-token, accent-insensitive, fragment match). **Explicitly handle `*` as a wildcard**
+  inside a token (split on `*`, ALL fragments must be present anywhere) — the client called it
+  out twice as the way pharmacists already type. Apply the same to product/medicament search if
+  it doesn't already.
+- Acceptance: "CDP", "para", "societe para", "Société PARA", "soc*cdp" all return
+  `Société PARA LA CDP`.
 - Effort: S.
 
 ### PG-003 — Drop CSV; ship Excel + PDF
@@ -180,17 +192,69 @@ unit-test them:
 
 ---
 
+## Phase 4 — Net-new tickets from 2026-05-30 client batch
+
+### PG-016 — Add "DH" suffix to marge values (CRITIQUE for readability)
+- Code: dashboard tile at
+  [frontend/src/pages/analyse/index.tsx:275](frontend/src/pages/analyse/index.tsx#L275) renders
+  `{k.marge_dh_avg != null ? fmt(...) : "—"}` with **no unit**; column label at
+  [pages/rapports/margeTable.tsx:45](frontend/src/pages/rapports/margeTable.tsx#L45) reads
+  "Marge DH moy.".
+- Approach: append " DH" after every formatted marge_dh value (tiles + table cells); rename the
+  marge-DH tile title from "Marge moyenne (MAD)" to "Marge moyenne (DH)" for consistency with the
+  rest of the app — pharmacists read DH, not MAD.
+- Effort: XS. Bundle with PG-015.
+
+### PG-017 — Reorder Analyses tabs
+- Code: tab order hardcoded in `MODE_LABELS` at
+  [pages/analyse/index.tsx:21-30](frontend/src/pages/analyse/index.tsx#L21-L30); rendered via
+  `Object.keys(MODE_LABELS)` at line 198 (respects insertion order).
+- Approach: reorder the keys per the client-preferred order (confirm with client before changing).
+  Allow user-side reordering only if they ask for it — for now a single fixed sequence is fine.
+- Open: which order does the client want? Ask before merging.
+- Effort: XS.
+
+### PG-018 — Export from Analyses ships ALL achats instead of the analysed list
+- Code: export handler at
+  [frontend/src/hooks/useAnalysePage.ts:93-112](frontend/src/hooks/useAnalysePage.ts#L93-L112)
+  currently calls a client-side `exportCsv()` on the filtered `margeData` rows; there is **no**
+  `/stats/analyse-marge` export branch on the backend
+  ([backend/routers/stats/router.py:148-161](backend/routers/stats/router.py#L148-L161)).
+- Theory: there is probably a second Export entry point on the Analyses page (toolbar action)
+  that wires to `transactionsApi.exportAchat` instead. Reproduce first by clicking every export
+  surface on the Analyses page (Liste mode + each tab); identify which one shells out to the
+  achats export.
+- Approach: route Analyses exports through a new `?export=xlsx|pdf` branch on
+  `/stats/analyse-marge` that respects the active mode + filters and returns the same rows the
+  user sees. Bundle with PG-003 (Excel/PDF generation infrastructure).
+- Effort: M (couples with PG-003 backend work).
+
+### PG-019 — Achat export missing Pharmacie / Parapharmacie column
+- Code: row builder
+  [backend/routers/transactions.py:87-109](backend/routers/transactions.py#L87-L109)
+  (`_build_achat_row`) returns `category` (raw Medicament.category string) but no pharma-vs-para
+  flag. Existing classifier `_pharma_expr()` at
+  [backend/routers/stats/queries.py:31-45](backend/routers/stats/queries.py#L31-L45) gives a
+  SQLAlchemy expression that returns `True` for pharmacie / `False` for parapharmacie.
+- Approach: add a `category_type` field to `_build_achat_row` derived from `_pharma_expr` (or a
+  Python helper using the same regex), emit it on the JSON response, and surface it as a column
+  in the Excel/PDF exporter so the user can pivot achats by Pharmacie / Parapharmacie. Bundle
+  with PG-003.
+- Effort: S.
+
+---
+
 ## Recommended execution order
 
 ```
 Phase 1 (sequential, fastest-impact first):
-  PG-013 → PG-005/PG-012 → PG-010 → PG-004 → PG-001/PG-002
+  PG-013 ✅ → PG-005/PG-012 → PG-010 (now incl. labo) → PG-004 → PG-001/PG-002
 
-Phase 2 (in this order):
-  PG-009 → PG-008 → PG-006 → PG-003 → PG-007 (after client clarifies)
+Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
+  PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies)
 
-Phase 3 (any order):
-  PG-015 → PG-011 → PG-014
+Phase 3 — quick UX wins (any order, batch in one PR if possible):
+  PG-015 → PG-016 → PG-017 → PG-011 → PG-014
 ```
 
 ## Per-ticket verification
