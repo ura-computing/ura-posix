@@ -77,6 +77,12 @@ pass per ticket against this map.
   (`expiry_date IS NULL` rows) + 4th AlertCard / modal on the frontend; new slate tone for the
   data-quality signal. `PEREMPTION_COLUMNS` renders "—" when no date is set. 296 backend tests
   pass; 112 frontend tests pass.
+- **PG-006 ✅ shipped** — commit `12970c0`. `unaccent` PG extension enabled at boot; new
+  `supplier_search_clauses` helper does case + accent + multi-token + `*` wildcard match.
+  `tokenize_search` already split on `*` (free). Refactored `/achat/suggestions` and
+  `/achat/supplier-summary`; also unaccented `product_search_clauses` so the main /achat list
+  search benefits too. Regression covers "CDP", "para", "societe para", "Société PARA",
+  "soc*cdp" → all hit "Société PARA LA CDP". 297 backend tests pass.
 
 ---
 
@@ -447,8 +453,8 @@ Phase 1 (sequential, fastest-impact first):
   Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
 Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
-  PG-009 ✅ → PG-008 ✅ → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
-  the ventes-matching rule; ship BL-by-number exclusion alone first)
+  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → { PG-003 + PG-018 + PG-019 } → PG-007 (after client
+  clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
   PG-015 ✅ → PG-016 ✅ → PG-017 → PG-011 → PG-014
