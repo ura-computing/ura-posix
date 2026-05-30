@@ -117,6 +117,9 @@ const SupplierSummarySection = ({ dateFrom, dateTo, search, categories, tva }: {
 
   if (total === 0) return null;
 
+  const totalBl    = g.bl_count + l.bl_count;
+  const totalUnits = g.unit_count + l.unit_count;
+
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm p-5">
       <div className="grid grid-cols-[1fr_auto_1fr] gap-6 items-start">
@@ -139,6 +142,22 @@ const SupplierSummarySection = ({ dateFrom, dateTo, search, categories, tva }: {
           <p className="text-lg font-bold tabular-nums text-emerald-600">{fmt(l.total_mad)} MAD</p>
           <p className="text-sm tabular-nums"><span className="font-semibold">{l.bl_count}</span> <span className="text-muted-foreground">BL</span></p>
           <p className="text-sm tabular-nums"><span className="font-semibold">{fmtInt(l.unit_count)}</span> <span className="text-muted-foreground">unités</span></p>
+        </div>
+      </div>
+
+      {/* PG-009 — total summary under the gauge: somme commandée + nb BL + nb unités */}
+      <div className="mt-5 pt-4 border-t border-border grid grid-cols-3 gap-4">
+        <div className="text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Somme commandée</p>
+          <p className="text-xl font-bold tabular-nums mt-0.5">{fmt(total)} MAD</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">BL</p>
+          <p className="text-xl font-bold tabular-nums mt-0.5">{totalBl}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Unités</p>
+          <p className="text-xl font-bold tabular-nums mt-0.5">{fmtInt(totalUnits)}</p>
         </div>
       </div>
     </div>
