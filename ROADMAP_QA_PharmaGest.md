@@ -87,6 +87,11 @@ pass per ticket against this map.
   fields with "Date début" / "Date fin" labels above each (replacing the unified `[Du … → Au …]`
   strip). Shared calendar popover icon stays. Existing tests updated to query by the new aria
   labels; 112 frontend tests pass.
+- **PG-014 ✅ shipped** — commit `5ceb4f7`. Audit confirmed every DataTable-driven page (achat,
+  ventes, comptabilite, admin/catalog, stock, margeTable) already wires sort end-to-end. The
+  Analyses → Liste mode was the only outlier — a hand-rolled `<table>` with static `<th>` and
+  no click handlers. Added per-column sort (asc/desc with ↑/↓ arrows + French-locale comparator,
+  nulls-last) while preserving the not-found-first default ordering.
 
 ---
 
@@ -461,7 +466,7 @@ Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
   clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
-  PG-015 ✅ → PG-016 ✅ → PG-011 ✅ → PG-014 → PG-017 (needs client tab-order spec)
+  PG-015 ✅ → PG-016 ✅ → PG-011 ✅ → PG-014 ✅ → PG-017 (needs client tab-order spec)
 ```
 
 ## Per-ticket verification
