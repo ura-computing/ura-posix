@@ -76,16 +76,54 @@ unit-test them:
 Shipped 2026-05-30. See **Progress** section above. All later marge work (PG-005, PG-012, PG-010)
 inherits the corrected base.
 
-### PG-005 + PG-012 — PU réel from BL after remise
-- Code: [backend/models/transactions.py:21-46](backend/models/transactions.py#L21-L46) — `Achat` has
-  `unit_price` but **no per-line `discount`** (Vente has one at :64). Avg PU built at
-  [marge.py:44-55](backend/routers/stats/marge.py#L44-L55).
-- Question: does Sobrus expose the per-line PU **after** remise on the BL? Audit the import path
-  ([extension/src/content/sobrusExport.ts](extension/src/content/sobrusExport.ts) + the backend
-  ingestion endpoint that consumes those chunks) — if `unit_price` already reflects the discounted
-  PU, no schema change. If not, add `Achat.discount` and a backfill migration.
-- Acceptance (PG-012): on a BL with `PU=39.42`, `PPV=54` → marge ≈ 27 %.
-- Effort: M (depends on import audit).
+### PG-005 + PG-012 — PU réel from BL after remise (NEXT, client evidence confirmed)
+**Client repro (2026-05-30 batch).** Sobrus BL for `GUM BAIN DE BOUCHE JUNIOR 6+ 300ML REF 3022`:
+`Prix d'origine = 60.60` (= PPH), `R = 25 %`, `P.U = 45.45` (= post-remise), `PPV = 61.00`.
+- Expected marge: `(1 − 45.45/61) × 100 ≈ 25 %`.
+- App shows: `~0.7 %`, which is `(1 − 60.60/61) × 100` — i.e. the app currently computes marge
+  against the **pre-remise** price (PPH/Prix d'origine), not the post-remise P.U the client wants.
+
+**Why it happens.**
+- Extension at [extension/src/content/sobrusExport.ts:157-240](extension/src/content/sobrusExport.ts#L157-L240)
+  forwards Sobrus' raw CSV un-touched.
+- Backend ingestion at
+  [backend/routers/uploads.py:170](backend/routers/uploads.py#L170) maps the Sobrus column
+  `"Prix unitaire"` → `Achat.unit_price`.
+- The local sample CSV (`resources/Sobrus - Achats 2026-01-01 - 2026-05-02.csv`) shows
+  `Prix unitaire` *already* holding the post-remise value (e.g. PPH=135 → Prix unitaire=97.20 =
+  28 % remise) and **no separate Remise column**. So in that CSV, the import is correct.
+- For the JUNIOR row the client sees, `Achat.unit_price` evidently holds 60.60 (= PPH), implying
+  *Sobrus' CSV for that BL exported `Prix unitaire` = pre-remise* — different from the sample.
+  Sobrus' export shape is therefore inconsistent across BLs / pharmacy configurations.
+
+**Investigation step (blocking the implementation):**
+- Ask the client for a `Sobrus - Achats *.csv` from their pharmacy that contains the JUNIOR
+  product. Inspect the header + that row. Two outcomes:
+  - **(a) Their CSV has a separate "Remise" / "R" column** → patch the importer to compute
+    `unit_price = (Prix unitaire) × (1 − remise / 100)` when the column is present, fall back
+    to `Prix unitaire` as-is when it isn't. Add `Achat.discount` (Float) for traceability.
+  - **(b) Their CSV's "Prix unitaire" really is pre-remise without any remise column** → that's a
+    Sobrus issue we can't compute around from CSV alone. Options: switch the extension to DOM-
+    scrape the BL detail page (which exposes `P.U`), or add an admin tool to re-import that
+    pharmacy with a one-time discount-recovery script. Discuss with client.
+
+**Independent cleanup (do alongside, regardless of (a)/(b)):**
+- The PG-013 PPH-fallback purge missed
+  [queries.py:_marge_for_window](backend/routers/stats/queries.py) which still does
+  `func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph)`. Drop it for the same reasons as PG-013
+  (Sobrus fiche-produit has PPH==PPV → fake 0 % marge for products with no Achat).
+
+**Schema (when remise is captured):**
+- `ALTER TABLE achats ADD COLUMN discount FLOAT NULL` + `ADD COLUMN prix_origine FLOAT NULL`.
+  Existing rows: leave NULL (no way to reconstruct historical remise from current data); future
+  imports populate both columns.
+
+**Acceptance:**
+- After fix + re-import, the JUNIOR BL stores `Achat.unit_price = 45.45`. Dashboard marge tile
+  for this product reads ~25 %.
+- The PG-012 reference example (PU=39.42, PPV=54) → marge ≈ 27 % continues to hold.
+
+**Effort:** M-L, blocked on the client CSV inspection before code changes.
 
 ### PG-010 — Marge % + DH for grossistes **and laboratoires**
 - Code: [marge.py:242-273](backend/routers/stats/marge.py#L242-L273) (grossiste branch) and
@@ -310,6 +348,36 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
   user sees. Bundle with PG-003 (Excel/PDF generation infrastructure).
 - Effort: M (couples with PG-003 backend work).
 
+### PG-021 — Owner signup: required `city` + auto-generated pharmacy code (✅ already shipped)
+- Client spec: at signup the owner gives a city (required); the system derives a code like
+  `Bouskoura → BOU0001` (next free counter per city prefix).
+- **Already implemented end-to-end:**
+  - `Pharmacy.city` + `Pharmacy.code` columns ([backend/models/auth.py:9-22](backend/models/auth.py#L9-L22)).
+  - `generate_pharmacy_code(db, city)` utility in
+    [backend/utils/pharmacy_code.py](backend/utils/pharmacy_code.py) produces a unique
+    3-letter-prefix + 4-digit-counter code. Handles accents (`Fès → FES`), pads short names
+    (`X → XXX`), retries on collision.
+  - Signup endpoint POST `/auth/signup` at
+    [backend/routers/auth.py:55-106](backend/routers/auth.py#L55-L106) calls the generator
+    automatically (line 86) when creating a new Pharmacy.
+  - Schema [backend/schemas/auth.py:6-14](backend/schemas/auth.py#L6-L14) makes
+    `pharmacy_city` required when no `pharmacy_id` is provided.
+  - Frontend signup form at
+    [pages/signup/index.tsx:202-214](frontend/src/pages/signup/index.tsx#L202-L214) collects
+    the city with placeholder "Bouskoura", validated client-side at
+    [schemas/signupForm.ts:29-34](frontend/src/schemas/signupForm.ts#L29-L34).
+  - Tests pass at [tests/test_pharmacy_code.py](backend/tests/test_pharmacy_code.py).
+- **Possible gaps worth checking with the client (none are bugs per se):**
+  - Is the generated `code` displayed back to the owner anywhere (signup success screen,
+    profile, dashboard header)? If not, the owner won't know their identifier. Likely worth a
+    small UI addition.
+  - Free-text city input means typo variants (`Bouskoura` vs `BouskouRa` vs `Bou Skoura`)
+    could create distinct prefixes. Consider a dropdown of Moroccan cities once the spec for
+    accepted cities is agreed.
+- **Action:** verify (1) above in the live app before declaring this fully closed; if the code
+  isn't surfaced anywhere, add a one-line `<Badge>{pharmacy.code}</Badge>` to the dashboard
+  header. Otherwise no work needed.
+
 ### PG-020 — Reclassify "Diététique" as Pharmacie (not Parapharmacie)
 - Client says: "Diététique c'est Pharmacie et non Parapharmacie." The Excel screenshot in
   this batch shows lines like `BIO LAIT PRIMEA 3EME AGE 800G` with `Catégorie = Dietetique` and
@@ -350,8 +418,11 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
 
 ```
 Phase 1 (sequential, fastest-impact first):
-  PG-013 ✅ → PG-010 ✅ → PG-004 ✅ → PG-020 ✅ → PG-005/PG-012 → PG-001/PG-002 (thresholds
-  now confirmed by client)
+  PG-013 ✅ → PG-010 ✅ → PG-004 ✅ → PG-020 ✅ → PG-005/PG-012 (blocked on a real
+  client CSV) → PG-001/PG-002 (thresholds now confirmed by client)
+
+  PG-021 (owner-signup city + code) — already implemented end-to-end; verify code-visibility
+  gap (small UI add at most) and close.
 
 Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
   PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
