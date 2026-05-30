@@ -266,21 +266,20 @@ export default function AnalysePage() {
             </CardContent>
           </Card>
 
-          {/* Marge moyenne MAD */}
+          {/* Marge moyenne DH */}
           <Card className="border border-border">
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
-                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)}` : "—"}</p>
-                  {/* <p className="text-[10px] opacity-50 font-mono">PPV − PU (moyen)</p> */}
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (DH)</p>
+                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)} DH` : "—"}</p>
                   <div className="mt-2 space-y-0.5 text-[11px]">
                     {k.marge_dh_min && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <p className="flex items-center gap-1 text-red-600 truncate cursor-default">
                             <TrendingDown className="h-3 w-3 shrink-0" />
-                            <span className="font-semibold">{fmt(k.marge_dh_min.value)}</span>
+                            <span className="font-semibold">{fmt(k.marge_dh_min.value)} DH</span>
                             <span className="text-muted-foreground truncate">· {k.marge_dh_min.label}</span>
                           </p>
                         </TooltipTrigger>
@@ -292,7 +291,7 @@ export default function AnalysePage() {
                         <TooltipTrigger asChild>
                           <p className="flex items-center gap-1 text-green-600 truncate cursor-default">
                             <TrendingUp className="h-3 w-3 shrink-0" />
-                            <span className="font-semibold">{fmt(k.marge_dh_max.value)}</span>
+                            <span className="font-semibold">{fmt(k.marge_dh_max.value)} DH</span>
                             <span className="text-muted-foreground truncate">· {k.marge_dh_max.label}</span>
                           </p>
                         </TooltipTrigger>
