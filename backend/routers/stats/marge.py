@@ -70,12 +70,12 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
                 Medicament.category,
                 Medicament.tva,
                 Medicament.ppv,
-                func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
+                avg_pu_sub.c.avg_pu.label("pu"),
                 func.sum(Vente.quantity).label("qty"),
                 func.sum(Vente.total).label("ca"),
-                func.coalesce(achat_prices_sub.c.pu_max, Medicament.pph).label("prix_max"),
-                func.coalesce(achat_prices_sub.c.pu_min, Medicament.pph).label("prix_min"),
-                func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("prix_avg"),
+                achat_prices_sub.c.pu_max.label("prix_max"),
+                achat_prices_sub.c.pu_min.label("prix_min"),
+                avg_pu_sub.c.avg_pu.label("prix_avg"),
                 achat_prices_sub.c.total_achat_cost.label("total_achat_cost"),
                 latest_stock_sub.c.current_stock.label("stock_dispo"),
             )
@@ -85,7 +85,7 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             .filter(*base_filter_v, *cat_filter)
             .group_by(
                 Medicament.id, Medicament.product, Medicament.category,
-                Medicament.tva, Medicament.ppv, Medicament.pph,
+                Medicament.tva, Medicament.ppv,
                 avg_pu_sub.c.avg_pu, achat_prices_sub.c.pu_max, achat_prices_sub.c.pu_min, achat_prices_sub.c.total_achat_cost,
                 latest_stock_sub.c.current_stock,
             )
@@ -198,14 +198,14 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
             db.query(
                 Medicament.category,
                 Medicament.ppv,
-                func.coalesce(avg_pu_sub_cat.c.avg_pu, Medicament.pph).label("pu"),
+                avg_pu_sub_cat.c.avg_pu.label("pu"),
                 func.sum(Vente.quantity).label("qty"),
             )
             .join(Medicament, Vente.medicament_id == Medicament.id)
             .outerjoin(avg_pu_sub_cat, Medicament.id == avg_pu_sub_cat.c.medicament_id)
             .filter(*base_filter_v, *cat_filter,
                     Medicament.ppv.isnot(None))
-            .group_by(Medicament.id, Medicament.category, Medicament.ppv, Medicament.pph, avg_pu_sub_cat.c.avg_pu)
+            .group_by(Medicament.id, Medicament.category, Medicament.ppv, avg_pu_sub_cat.c.avg_pu)
         )
         cat_margin: dict = {}
         for m in med_marge_q.all():
@@ -530,7 +530,7 @@ def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str)
         db.query(
             Medicament.product,
             Medicament.ppv,
-            func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
+            avg_pu_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
             func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
         )
@@ -540,7 +540,7 @@ def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str)
         .filter(Medicament.ppv.isnot(None))
         .group_by(
             Medicament.id, Medicament.product, Medicament.ppv,
-            Medicament.pph, avg_pu_sub.c.avg_pu,
+            avg_pu_sub.c.avg_pu,
         )
     )
 

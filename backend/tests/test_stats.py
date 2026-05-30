@@ -281,6 +281,32 @@ class TestAnalyseMarge:
         # marge_dh = 50 - 40 = 10.0
         assert doliprane["marge_dh"] == 10.0
 
+    def test_pg013_no_pph_fallback_when_achat_missing(self, client, db, test_owner):
+        """PG-013: a Sobrus fiche with PPH == PPV must not yield a fake 0 % margin
+        when there is no Achat row. The audit found this happens because Sobrus often
+        copies PPV into PPH; falling back to PPH then makes marge_pct = 0 % which the
+        pharmacist reads as 'no margin' when it's really 'no purchase data'."""
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG013-001", product="SobrusOnly Cream 50ml",
+            category="Parapharmacie (7.00%)", tva="TVA (7.00%)",
+            pph=60.0, ppv=60.0,  # PPH == PPV (typical Sobrus fiche)
+        )
+        make_vente(db, med, pharmacy_id, quantity=2, unit_price=60.0, date="2026-03-12")
+        # No Achat row for this medicament — PG-013 says marge must NOT be computed.
+
+        res = client.get(
+            "/stats/analyse-marge",
+            params={"mode": "produit"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        row = next((r for r in res.json()["rows"] if r["product"] == med.product), None)
+        assert row is not None, "product with vente but no achat should still appear in the list"
+        assert row["pu"] is None, "pu must be null when no Achat — never the Sobrus PPH"
+        assert row["marge_pct"] is None
+        assert row["marge_dh"] is None
+
     def test_kpis_present(self, client, test_owner, stats_data):
         res = client.get(
             "/stats/analyse-marge",
