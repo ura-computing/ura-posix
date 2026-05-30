@@ -29,6 +29,20 @@ pass per ticket against this map.
   removed across produit / categorie / brackets modes of [marge.py](backend/routers/stats/marge.py);
   regression test `test_pg013_no_pph_fallback_when_achat_missing` added; 276 backend tests pass,
   frontend tsc clean.
+- **PG-010 ✅ shipped** — commit `7831151`. Grossiste branch (marge.py:242) and laboratoire branch
+  (marge.py:299) now compute weighted `marge_pct_avg` / `marge_dh_avg` + `total_achat_cost` from
+  per-`(supplier?, medicament)` avg-PU subqueries; KPI label_key picks dynamically from
+  category/grossiste/laboratoire; frontend table configs get the two new columns. 278 backend
+  tests pass.
+- **PG-016 ✅ shipped** — commit `2695ad4`. Marge moyenne tile on /analyse now labelled "(DH)" and
+  appends " DH" to value + min/max badges.
+- **PG-015 ✅ shipped** — commit `f5cfcf2`. Theme toggle replaced from a 3-option DropdownMenu with
+  a single-click sun/moon Button that flips light↔dark.
+- **PG-004 ✅ shipped** — commit `8a8d155`. Extracted `_marge_for_window` helper in queries.py;
+  `compute_previous_kpis` now returns `marge_pct` using the same per-medicament weighted formula
+  as the current value; frontend variation badge replaced the buggy CA/Achats reconstruction with
+  a direct comparison. Regression test asserts the OLD formula would have produced -166.67 %
+  where the NEW one correctly returns 20 %. 279 backend tests pass.
 
 ---
 
@@ -74,16 +88,55 @@ inherits the corrected base.
   laboratoire) must populate Marge moyenne / Marge moyenne (DH) / Prix unitaires achetés — not "—".
 - Effort: S (one branch + a copy for the other).
 
-### PG-004 — Variation marge arithmetic
-- Code: backend returns `previous_kpis` at
-  [stats/queries.py:327-393](backend/routers/stats/queries.py#L327-L393); frontend computes the
-  "vs an dernier" badge — grep `previous_kpis` in `pages/welcome.tsx` / `pages/rapports/*`.
-- Approach: verify the displayed % uses `(T1-T0)/T0×100` with 2-decimal rounding, not absolute
-  difference. Centralize via shared util from the cross-cutting section.
-- Acceptance: Avril 2025 = 31.7 %, Avril 2026 = 32.6 % → **+2.84 %**.
-- Client repro: **MKL CREME DOUCHE DERMO-NOURRISSANTE BIO 100ML** (use this product in QA — the
-  client says its variation is wrong on the dashboard).
-- Effort: S.
+### PG-004 — Variation marge arithmetic (NEXT)
+**Diagnosis (confirmed in code):** the `pctChange` helper at
+[pharmacyRapports.tsx:234-241](frontend/src/pages/rapports/pharmacyRapports.tsx#L234-L241) uses
+the right `(T1-T0)/T0×100` formula. The bug is the **inputs** passed to it on the marge tile at
+[pharmacyRapports.tsx:536-549](frontend/src/pages/rapports/pharmacyRapports.tsx#L536-L549):
+
+```ts
+const prevCA = prevKpis?.ventes_total ?? 0;
+const prevAchats = prevKpis?.achats_total ?? 0;
+const prevMarge = prevCA > 0 ? ((prevCA - prevAchats) / prevCA) * 100 : undefined;
+<ChangeBadge current={marge?.marge_pct} previous={prevMarge} />
+```
+
+`prevMarge` here is `(sumVente − sumAchat) / sumVente × 100` over the full window, while
+`marge.marge_pct` is computed completely differently at
+[queries.py:282-285](backend/routers/stats/queries.py#L282-L285) as
+`1 − Σ(qty·PU_per_med) / Σ(qty·PPV) × 100` — a weighted aggregation of per-medicament margins
+where `Achat.total` is **not** the cost basis (Σ qty·PU is). The two methods differ whenever
+purchase volume ≠ sale volume (typical), so the variation is junk.
+
+**Fix:**
+1. Extract a small helper `_marge_for_window(db, pharmacy_id, df, dt, cat_filter_v,
+   cat_filter_a, non_declared_sub) -> {marge_pct, marge_brute_dh, marge_nette_dh}` from
+   [queries.py:_compute_advanced_kpis](backend/routers/stats/queries.py) (currently inline around
+   lines 252-297). Same SQL, same formula.
+2. Call it twice — for the current window from `_compute_advanced_kpis` (replace inline block)
+   and for the previous window from [compute_previous_kpis at
+   :327-393](backend/routers/stats/queries.py#L327-L393). Add `marge_pct` to the
+   `previous_kpis` response shape.
+3. Update the TS type `PreviousKpis` in
+   [frontend/src/api/stats.ts](frontend/src/api/stats.ts) to include `marge_pct?: number | null`.
+4. Replace the buggy 4-line block at pharmacyRapports.tsx:536-549 with
+   `<ChangeBadge current={marge?.marge_pct} previous={prevKpis?.marge_pct} />`.
+
+**Regression tests:**
+- Backend: extend `stats_data` (or add a sibling fixture) to also create achats + ventes one
+  year earlier; assert `previous_kpis.marge_pct` is computed by the same per-product weighted
+  method.
+- Acceptance from report: Avril 2025 = 31.7 %, Avril 2026 = 32.6 % → variation **+2.84 %**.
+- Client repro: **MKL CREME DOUCHE DERMO-NOURRISSANTE BIO 100ML** — once the formula is fixed,
+  the dashboard variation for the period containing this product must match the math.
+
+**Critical files:**
+- `backend/routers/stats/queries.py` — extract helper, add `marge_pct` to `previous_kpis`.
+- `backend/tests/test_stats.py` — backfill test fixture for prior-year data; assert `marge_pct`.
+- `frontend/src/api/stats.ts` — extend `PreviousKpis` type.
+- `frontend/src/pages/rapports/pharmacyRapports.tsx` — replace buggy inline computation.
+
+**Effort:** S (extract helper + 4-line frontend replacement + tests).
 
 ### PG-001 + PG-002 — Stock Min/Max + Statut bands + filter
 - Code: status logic
