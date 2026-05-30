@@ -152,11 +152,11 @@ def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=N
 def _marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_filter_v: list) -> dict:
     """Weighted marge over (Vente, Achat) for the supplied filters.
 
-    Returns {'marge_pct', 'marge_brute_dh', 'marge_nette_dh'} using the same per-medicament
-    avg-PU aggregation as the dashboard tile, so 'previous' marge can be compared apples-to-
-    apples for the variation badge (PG-004). The PPH fallback on line `func.coalesce(...)`
-    mirrors the historical behaviour at this site; PG-013 cleanup of /stats/analyse-marge does
-    not extend here yet — track separately if/when desired."""
+    Returns {'marge_pct', 'marge_brute_dh', 'marge_nette_dh'} using the per-medicament avg-PU
+    from Achat rows in the window — the same formula used everywhere else (PG-013). Products
+    with sales but no purchases in the window are excluded from the aggregate (their PU would
+    be unknown). No PPH fallback: Sobrus' fiche-produit often stores PPH == PPV which would
+    yield a fake 0 % marge if used as a stand-in for missing purchase data."""
     avg_pu_sub = (
         db.query(
             Achat.medicament_id,
@@ -169,7 +169,7 @@ def _marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat
     marge_rows = (
         db.query(
             Vente.quantity, Medicament.ppv,
-            func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
+            avg_pu_sub.c.avg_pu.label("pu"),
             Medicament.tva,
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)

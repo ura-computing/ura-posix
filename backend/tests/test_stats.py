@@ -177,6 +177,25 @@ class TestGetStats:
         # marge should be positive
         assert marge["marge_brute_dh"] > 0
 
+    def test_pg013_followup_marge_skips_meds_with_no_achat(self, client, db, test_owner, stats_data):
+        """PG-013 follow-up: the dashboard marge tile (/stats) used to PPH-fall-back to fill in
+        PU for meds with sales but no purchases, which gave a fake 0 % margin when Sobrus stored
+        PPH == PPV. After the follow-up the residual fallback in queries._marge_for_window is
+        gone — a sales-only product is excluded from the aggregate rather than dragging marge
+        toward zero. Set up a third med (PPH==PPV, no achat); marge_pct must equal the value
+        from stats_data alone (no shift toward 0 % from the new product)."""
+        baseline = client.get("/stats", headers=test_owner["headers"]).json()["marge"]["marge_pct"]
+        pharmacy_id = stats_data["pharmacy_id"]
+        ghost = make_medicament(
+            db, pid="PG013-FOLLOWUP", product="SobrusOnly Cream",
+            category="Parapharmacie (7.00%)", tva="TVA (7.00%)",
+            pph=80.0, ppv=80.0,  # PPH == PPV — would yield fake 0 % marge under the old fallback
+        )
+        make_vente(db, ghost, pharmacy_id, quantity=5, unit_price=80.0, date="2026-03-18")
+        # No Achat for `ghost`.
+        after = client.get("/stats", headers=test_owner["headers"]).json()["marge"]["marge_pct"]
+        assert after == baseline, "sales-only product must NOT shift the dashboard marge"
+
     def test_requires_auth(self, client):
         res = client.get("/stats")
         assert res.status_code == 403  # HTTPBearer returns 403 for missing auth
