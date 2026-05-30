@@ -13,15 +13,22 @@ pass per ticket against this map.
 
 ---
 
-## Two clarifications to request from the client first
+## Open clarifications
 
-1. **PG-001 — Stock Min / Stock Max formula.** The report names buckets in days-of-coverage but
-   doesn't give the formula for the displayed `Stock Min` / `Stock Max` columns. Current code
-   ([stock.py:266-283](backend/routers/stats/stock.py#L266-L283)) does
-   `stock_min = floor(ventes12m/300 × 14)`, `stock_max = ceil(ventes12m/300 × 15)`. Likely target:
-   derive both from the OK band (60-70 days) × avg daily sales — needs explicit confirmation.
-2. **PG-007 — "% d'achat" alternative.** What baseline? Per BL, per supplier, over the active
-   period? And how do we match ventes to a specific BL (Vente has no `delivery_ref` link)?
+1. ✅ **PG-001 — Stock Min / Stock Max + status bands.** Resolved by the 2026-05-30(+1) client
+   message: **4 buckets keyed by days-of-coverage**, no "critique" bucket (the original PDF's
+   `<30j Critique` is dropped):
+   - `days ≤ 45` → **sous-stock**
+   - `46 ≤ days ≤ 60` → **idéal**
+   - `61 ≤ days ≤ 99` → **à surveiller**
+   - `days ≥ 100` → **sur-stock**
+
+   Displayed `Stock Min` = `round(ventes_12m × 45 / 365)` (boundary into idéal), `Stock Max` =
+   `round(ventes_12m × 60 / 365)` (top of idéal). See PG-001/PG-002 entry below.
+2. **PG-007 — "% d'achat" alternative.** Client repeated the BL-level exclusion ask ("pour la
+   compta") but hasn't yet specified the % variant baseline (per BL? per supplier?) nor how to
+   match ventes to a specific BL when Vente has no `delivery_ref`. Discuss before building the
+   ventes-matching half of PG-007 — the BL-by-number exclusion piece can ship without it.
 
 ## Progress
 
@@ -43,6 +50,10 @@ pass per ticket against this map.
   as the current value; frontend variation badge replaced the buggy CA/Achats reconstruction with
   a direct comparison. Regression test asserts the OLD formula would have produced -166.67 %
   where the NEW one correctly returns 20 %. 279 backend tests pass.
+- **PG-020 ✅ shipped** — commit `dff1caa`. Added "iététique" / "ietetique" branches to
+  `_pharma_expr()` so Diététique products now roll into Pharmacie aggregates everywhere (CA
+  breakdown, marge, type_breakdown, marge brackets). Test covers both accent variants. 280
+  backend tests pass.
 
 ---
 
@@ -144,15 +155,28 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
   computation [:266-283](backend/routers/stats/stock.py#L266-L283); frontend
   [pages/stock/index.tsx:26-33](frontend/src/pages/stock/index.tsx#L26-L33) STATUS_OPTIONS +
   [:296-301](frontend/src/pages/stock/index.tsx#L296-L301) columns.
+- Client repro (photo 3 of 2026-05-30(+1) batch): DOLIPRANE CO 1000MG B10 with
+  `ventes_12m=2359`, `stock_actuel=258`. Today the dashboard displays `stock_min=4`,
+  `stock_max=6`, status **Sur-stock** — wrong. By the new spec ADS = 2359/365 ≈ 6.46/day,
+  `days_of_coverage ≈ 258/6.46 ≈ 39.9` → **Sous-stock**. Displayed `Stock Min` ≈ 290,
+  `Stock Max` ≈ 388.
 - Approach:
-  1. Compute `days_of_coverage = current_stock / (ventes_12m / 365)` per (pharmacy, medicament).
-  2. New status from the 5 bands above (returns `critique | sous-stock | ok | a-surveiller |
-     sur-stock`).
-  3. Recompute displayed `stock_min` / `stock_max` from the OK band edges (60 × ADS, 70 × ADS) —
-     **pending client confirmation** (open clarification #1).
-  4. New `?status=` filter on the stock list endpoint.
-  5. Update frontend STATUS_OPTIONS labels + colors (orange for "à surveiller"); plug the filter.
-- Effort: M.
+  1. Compute `days_of_coverage = current_stock × 365 / ventes_12m` per (pharmacy, medicament).
+     Treat `ventes_12m == 0` as `inconnu`.
+  2. Status from the 4 client-confirmed bands:
+     `days ≤ 45 → sous-stock`, `46 ≤ days ≤ 60 → idéal`, `61 ≤ days ≤ 99 → à surveiller`,
+     `days ≥ 100 → sur-stock`. (Drops the original PDF's `critique <30j` bucket — superseded.)
+  3. Recompute displayed `Stock Min` = `round(ventes_12m × 45 / 365)`,
+     `Stock Max` = `round(ventes_12m × 60 / 365)`. Stop honouring
+     `PharmacyStock.sobrus_stock_min/max` — Sobrus' values don't match this spec and were a
+     source of confusion (the audit pinned the bug to these). Keep the columns for ingestion
+     but ignore at read time.
+  4. New `?status=` filter on the stock list endpoint (multi-value, comma-separated).
+  5. Update frontend `STATUS_OPTIONS` labels + colours: green = `idéal`, orange =
+     `à surveiller`, red-tinted = `sous-stock`, blue/grey = `sur-stock`, neutral = `inconnu`.
+- Tests: pin DOLIPRANE-style fixture (ventes_12m=2359, stock_actuel=258) → expect Sous-stock and
+  the new Stock Min/Max values; one fixture per band.
+- Effort: M (formula change + status enum migration + status filter wired through both pages).
 
 ---
 
@@ -201,20 +225,24 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
   menu/button across the three pages.
 - Effort: L (server-side generation is the new piece).
 
-### PG-007 — Exclusion par numéro de BL
+### PG-007 — Exclusion par numéro de BL (re-confirmed by client "pour la compta")
 - Code: `Achat.delivery_ref` exists ([models/transactions.py](backend/models/transactions.py)); no
   BL-exclusion table; the only exclusion lives in `PharmacyMedicamentStatus` (per-medicament).
+  Current dialog
+  [pages/owner/catalogRequests.tsx](frontend/src/pages/owner/catalogRequests.tsx) only searches by
+  produit / fournisseur / code-barres — no BL search.
 - Approach: new table `PharmacyBlExclusion(id, pharmacy_id, delivery_ref, notes, created_at,
   unique(pharmacy_id, delivery_ref))`. Add the exclusion filter to **every** achats/ventes/marges
   query path that already filters non-déclarés
   (e.g. [stats/marge.py](backend/routers/stats/marge.py),
   [routers/transactions.py](backend/routers/transactions.py),
-  [stats/peremptions.py:30-52](backend/routers/stats/peremptions.py#L30-L52)). UI: new tab under
-  "Produits spéciaux" with BL search/list + "Réintégrer".
+  [stats/peremptions.py:30-52](backend/routers/stats/peremptions.py#L30-L52)). UI: extend the
+  Exclure dialog with a second tab/search-mode "Par BL" (lookup by `delivery_ref`); existing list
+  view shows excluded BLs alongside excluded products with "Réintégrer".
 - **Blocker:** how do we match ventes to a specific BL? No invoice linkage in the schema — Vente
-  references the medicament but not the BL it came from. Discuss with client before building
-  (open clarification #2). Until then, this ticket should ship without the "remove equivalent
-  ventes" piece, or with an explicit approximation documented to the client.
+  references the medicament but not the BL it came from. Discuss with client (open clarification
+  #2). **Ship the BL-by-number exclusion path first** (achats only); add the ventes-matching half
+  in a follow-up once the matching rule is agreed.
 - Effort: L (3-5 days).
 
 ---
@@ -282,6 +310,27 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
   user sees. Bundle with PG-003 (Excel/PDF generation infrastructure).
 - Effort: M (couples with PG-003 backend work).
 
+### PG-020 — Reclassify "Diététique" as Pharmacie (not Parapharmacie)
+- Client says: "Diététique c'est Pharmacie et non Parapharmacie." The Excel screenshot in
+  this batch shows lines like `BIO LAIT PRIMEA 3EME AGE 800G` with `Catégorie = Dietetique` and
+  `Type = Parapharmacie` — that's the bug.
+- Code: the auto-classifier
+  [backend/routers/stats/queries.py:31-45](backend/routers/stats/queries.py#L31-L45)
+  `_pharma_expr()` matches `category` against `edicament / édicament / oméopath / omeopath`
+  and falls back to `else_=False` (Parapharmacie). Diététique falls through to False.
+- Approach: add two SQL `case` branches inside the `auto` block for `iététique` and
+  `ietetique` (accent + non-accent), returning `True`. One-line change with predictable
+  cascade — `_pharma_expr` is used by every endpoint that splits Pharmacie vs Parapharmacie:
+  `_compute_extra_stats` (CA breakdown + type_breakdown), `cat_filter_v/a` in queries.py,
+  marge analyse-marge mode filters, achat export (once PG-019 lands), the marge brackets
+  function. No frontend change required — classification is single-source-of-truth.
+- Admin overrides via `Medicament.product_type` still take precedence (`pharmacie` /
+  `parapharmacie` rows already win). Untouched.
+- Tests: add a `Dietetique` fixture in `tests/factories.py`-style helpers; assert it now
+  rolls into Pharmacie aggregates (CA breakdown, marge, type_breakdown counts).
+- Effort: XS code, S testing (numbers across the dashboard shift, so QA needs to re-check
+  Phase 1 marge / variation tests don't regress on the new classification).
+
 ### PG-019 — Achat export missing Pharmacie / Parapharmacie column
 - Code: row builder
   [backend/routers/transactions.py:87-109](backend/routers/transactions.py#L87-L109)
@@ -301,13 +350,15 @@ purchase volume ≠ sale volume (typical), so the variation is junk.
 
 ```
 Phase 1 (sequential, fastest-impact first):
-  PG-013 ✅ → PG-005/PG-012 → PG-010 (now incl. labo) → PG-004 → PG-001/PG-002
+  PG-013 ✅ → PG-010 ✅ → PG-004 ✅ → PG-020 ✅ → PG-005/PG-012 → PG-001/PG-002 (thresholds
+  now confirmed by client)
 
 Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
-  PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies)
+  PG-009 → PG-008 → PG-006 → { PG-003 + PG-018 + PG-019 } → PG-007 (after client clarifies
+  the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):
-  PG-015 → PG-016 → PG-017 → PG-011 → PG-014
+  PG-015 ✅ → PG-016 ✅ → PG-017 → PG-011 → PG-014
 ```
 
 ## Per-ticket verification
