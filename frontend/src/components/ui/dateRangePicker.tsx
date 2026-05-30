@@ -257,37 +257,55 @@ export function DateRangePicker({
 
   const frameInvalid = ariaInvalid || invalid.from || invalid.to;
 
+  // PG-011: render the two halves as separate labelled fields rather than a
+  // single unified [Du ... → Au ...] strip. Calendar popover stays shared.
+  const fieldFrameClass = (isInvalid: boolean) =>
+    cn(
+      "inline-flex items-center h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow]",
+      "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
+      "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+      isInvalid && "border-destructive",
+    );
+
   return (
     <div
       aria-invalid={frameInvalid || undefined}
-      className={cn(
-        "inline-flex items-center gap-2 h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs transition-[color,box-shadow]",
-        "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
-        "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
-        className,
-      )}
+      className={cn("inline-flex items-end gap-3", className)}
     >
-      <DateSegments
-        side="from"
-        label="Du"
-        segs={fromSegs}
-        invalid={invalid.from}
-        registerRef={(field, el) => { refs.current[idxOf("from", field)] = el; }}
-        onUpdate={updateSeg}
-        onKeyDown={handleKeyDown}
-        onBlur={() => handleBlur("from")}
-      />
-      <span className="text-muted-foreground select-none" aria-hidden="true">→</span>
-      <DateSegments
-        side="to"
-        label="Au"
-        segs={toSegs}
-        invalid={invalid.to}
-        registerRef={(field, el) => { refs.current[idxOf("to", field)] = el; }}
-        onUpdate={updateSeg}
-        onKeyDown={handleKeyDown}
-        onBlur={() => handleBlur("to")}
-      />
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Date début
+        </label>
+        <div aria-invalid={invalid.from || undefined} className={fieldFrameClass(invalid.from)}>
+          <DateSegments
+            side="from"
+            label=""
+            segs={fromSegs}
+            invalid={invalid.from}
+            registerRef={(field, el) => { refs.current[idxOf("from", field)] = el; }}
+            onUpdate={updateSeg}
+            onKeyDown={handleKeyDown}
+            onBlur={() => handleBlur("from")}
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          Date fin
+        </label>
+        <div aria-invalid={invalid.to || undefined} className={fieldFrameClass(invalid.to)}>
+          <DateSegments
+            side="to"
+            label=""
+            segs={toSegs}
+            invalid={invalid.to}
+            registerRef={(field, el) => { refs.current[idxOf("to", field)] = el; }}
+            onUpdate={updateSeg}
+            onKeyDown={handleKeyDown}
+            onBlur={() => handleBlur("to")}
+          />
+        </div>
+      </div>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -295,9 +313,9 @@ export function DateRangePicker({
             size="sm"
             type="button"
             aria-label="Ouvrir le calendrier"
-            className="h-7 w-7 p-0 -mr-1 text-muted-foreground hover:bg-transparent hover:text-foreground"
+            className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
           >
-            <CalendarIcon className="h-3.5 w-3.5" />
+            <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
@@ -357,9 +375,12 @@ function DateSegments({
       w,
       invalid && "text-destructive",
     );
+  // For accessibility: when no inline label is passed (split layout) fall back to
+  // the side name so screen readers still announce which field is being edited.
+  const a11yPrefix = label || (side === "from" ? "Date début" : "Date fin");
   return (
     <div className="inline-flex items-baseline gap-1.5">
-      <span className="text-xs text-muted-foreground select-none">{label}</span>
+      {label && <span className="text-xs text-muted-foreground select-none">{label}</span>}
       <div className="inline-flex items-baseline">
         <input
           ref={(el) => registerRef("d", el)}
@@ -371,7 +392,7 @@ function DateSegments({
           inputMode="numeric"
           maxLength={2}
           placeholder="JJ"
-          aria-label={`${label} jour`}
+          aria-label={`${a11yPrefix} jour`}
           className={segClass("w-[1.5em]")}
         />
         <span className={cn("text-muted-foreground select-none", invalid && "text-destructive")}>/</span>
@@ -385,7 +406,7 @@ function DateSegments({
           inputMode="numeric"
           maxLength={2}
           placeholder="MM"
-          aria-label={`${label} mois`}
+          aria-label={`${a11yPrefix} mois`}
           className={segClass("w-[1.5em]")}
         />
         <span className={cn("text-muted-foreground select-none", invalid && "text-destructive")}>/</span>
@@ -399,7 +420,7 @@ function DateSegments({
           inputMode="numeric"
           maxLength={4}
           placeholder="AAAA"
-          aria-label={`${label} année`}
+          aria-label={`${a11yPrefix} année`}
           className={segClass("w-[2.75em]")}
         />
       </div>

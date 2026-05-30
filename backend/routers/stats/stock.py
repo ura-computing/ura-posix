@@ -1,6 +1,5 @@
 """Stock ABCD analysis — classifies pharmacy products by sales velocity."""
 
-import math
 from datetime import date, timedelta
 
 from sqlalchemy import func
@@ -31,17 +30,43 @@ def stock_abcd_window(today: date) -> tuple[date, date]:
     return date(year - 1, 7, 1), date(year, 6, 30)
 
 
-def _stock_status(current_stock: int | None, stock_min: int, stock_max: int) -> str:
-    """Compute the human-readable stock status used by the products table."""
+# PG-001/PG-002: 4-band status keyed on days-of-coverage, plus "inconnu"/"negatif"
+# for missing-data / data-quality cases. Client-confirmed thresholds.
+STOCK_STATUS_KEYS = ("sous-stock", "ideal", "a-surveiller", "sur-stock", "inconnu", "negatif")
+
+
+def _stock_status_from_coverage(current_stock: int | None, units_sold_12m: int) -> str:
+    """Status based on `current_stock × 365 / ventes_12m` (days of coverage).
+    Bands: ≤45 sous-stock · 46-60 idéal · 61-99 à surveiller · ≥100 sur-stock."""
     if current_stock is None:
         return "inconnu"
     if current_stock < 0:
         return "negatif"
-    if current_stock < stock_min:
+    if not units_sold_12m or units_sold_12m <= 0:
+        # No sales history → can't compute coverage meaningfully.
+        return "inconnu"
+    days = current_stock * 365.0 / units_sold_12m
+    if days <= 45:
         return "sous-stock"
-    if current_stock > stock_max:
-        return "sur-stock"
-    return "ok"
+    if days <= 60:
+        return "ideal"
+    if days <= 99:
+        return "a-surveiller"
+    return "sur-stock"
+
+
+def _stock_min_for(units_sold_12m: int) -> int:
+    """Displayed `Stock Min` = round(ventes_12m × 45 / 365) — boundary into the idéal band."""
+    if not units_sold_12m or units_sold_12m <= 0:
+        return 0
+    return round(units_sold_12m * 45 / 365)
+
+
+def _stock_max_for(units_sold_12m: int) -> int:
+    """Displayed `Stock Max` = round(ventes_12m × 60 / 365) — top of the idéal band."""
+    if not units_sold_12m or units_sold_12m <= 0:
+        return 0
+    return round(units_sold_12m * 60 / 365)
 
 
 def _compute_stock_abcd(
@@ -148,12 +173,14 @@ def _compute_stock_abcd(
     )
 
     # ── Current stock from PharmacyStock (Sobrus stock snapshot) ──────────────
+    # PG-001/PG-002: Sobrus's snapshot `stock_min/max` values are intentionally NOT read
+    # here. Targets are derived from the client-confirmed idéal band × avg daily sales
+    # (see `_stock_min_for` / `_stock_max_for`). The PharmacyStock columns stay in the
+    # schema so ingestion keeps populating them.
     stock_sub = (
         db.query(
             PharmacyStock.medicament_id,
             PharmacyStock.current_stock,
-            PharmacyStock.stock_min.label("sobrus_stock_min"),
-            PharmacyStock.stock_max.label("sobrus_stock_max"),
         )
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
@@ -218,8 +245,6 @@ def _compute_stock_abcd(
             func.coalesce(sales_4m.c.units_sold_4m, 0).label("units_sold_4m"),
             func.coalesce(sales_before_4m.c.units_before_4m, 0).label("units_before_4m"),
             stock_sub.c.current_stock,
-            stock_sub.c.sobrus_stock_min,
-            stock_sub.c.sobrus_stock_max,
             avg_pu_sub.c.avg_pu,
         )
         .outerjoin(sales_12m, Medicament.id == sales_12m.c.medicament_id)
@@ -241,9 +266,8 @@ def _compute_stock_abcd(
         units = int(r.units_sold_12m or 0)
         units_4m = int(r.units_sold_4m or 0)
         units_before = int(r.units_before_4m or 0)
-        ratio = units / 300.0
 
-        # Classify
+        # Classify (ABCD class is independent from the new stock status)
         if units >= 300:
             cat = "A"
         elif units >= 250:
@@ -263,26 +287,11 @@ def _compute_stock_abcd(
         else:
             cat = "D"
 
-        # Prefer Sobrus-provided thresholds when present; else compute
-        if r.sobrus_stock_min is not None:
-            stock_min = int(r.sobrus_stock_min)
-        elif cat in ("C", "C-", "C-N"):
-            stock_min = 0
-        elif cat == "D":
-            stock_min = 0
-        else:
-            stock_min = math.floor(ratio * 14)
-
-        if r.sobrus_stock_max is not None:
-            stock_max = int(r.sobrus_stock_max)
-        elif cat in ("C", "C-", "C-N"):
-            stock_max = 1
-        elif cat == "D":
-            stock_max = 0
-        else:
-            stock_max = math.ceil(ratio * 15)
-
+        # Targets + status from days-of-coverage (PG-001 / PG-002).
+        stock_min = _stock_min_for(units)
+        stock_max = _stock_max_for(units)
         current_stock = int(r.current_stock) if r.current_stock is not None else None
+        status_val = _stock_status_from_coverage(current_stock, units)
 
         # Accumulate PPV potentiel for products with stock > 0
         if current_stock is not None and current_stock > 0 and r.ppv is not None:
@@ -298,7 +307,7 @@ def _compute_stock_abcd(
             "current_stock": current_stock,
             "ppv": round(float(r.ppv), 2) if r.ppv is not None else None,
             "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
-            "status": _stock_status(current_stock, stock_min, stock_max),
+            "status": status_val,
         })
 
     total_references = len(products)
@@ -308,7 +317,10 @@ def _compute_stock_abcd(
     if class_filter:
         products = [p for p in products if p["category"] == class_filter]
     if status:
-        products = [p for p in products if p["status"] == status]
+        # Comma-separated values supported, e.g. ?status=sous-stock,a-surveiller
+        wanted = {s.strip() for s in status.split(",") if s.strip()}
+        if wanted:
+            products = [p for p in products if p["status"] in wanted]
     tokens = tokenize_search(search)
     if tokens:
         products = [

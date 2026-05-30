@@ -30,7 +30,7 @@ const type = (input: HTMLInputElement, value: string) => {
 describe("DateRangePicker — segmented input", () => {
   it("typing day=2, month=6, year=2026 commits the ISO date", () => {
     const { onFromChange } = renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     type(du.d, "02");
     type(du.m, "06");
     type(du.y, "2026");
@@ -39,7 +39,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("auto-advances from day to month when single digit is 4-9", () => {
     renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     du.d.focus();
     type(du.d, "5");
     expect(document.activeElement).toBe(du.m);
@@ -48,7 +48,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("auto-advances from month to year when single digit is 2-9", () => {
     renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     du.m.focus();
     type(du.m, "3");
     expect(document.activeElement).toBe(du.y);
@@ -57,7 +57,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("does not commit invalid date (31/02/2026) and marks aria-invalid", () => {
     const { onFromChange } = renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     type(du.d, "31");
     type(du.m, "02");
     type(du.y, "2026");
@@ -67,7 +67,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("backspace on empty month moves focus to day", () => {
     renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     du.m.focus();
     fireEvent.keyDown(du.m, { key: "Backspace" });
     expect(document.activeElement).toBe(du.d);
@@ -75,7 +75,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("escape reverts to props", () => {
     const { rerender, onFromChange } = renderPicker({ from: "2025-05-10" });
-    const du = segs("Du");
+    const du = segs("Date début");
     expect(du.d.value).toBe("10");
     expect(du.m.value).toBe("05");
     expect(du.y.value).toBe("2025");
@@ -103,14 +103,14 @@ describe("DateRangePicker — segmented input", () => {
         onToChange={vi.fn()}
       />,
     );
-    expect(segs("Du").d.value).toBe("01");
-    expect(segs("Du").y.value).toBe("2026");
-    expect(segs("Au").d.value).toBe("31");
+    expect(segs("Date début").d.value).toBe("01");
+    expect(segs("Date début").y.value).toBe("2026");
+    expect(segs("Date fin").d.value).toBe("31");
   });
 
   it("ArrowUp increments the day", () => {
     const { onFromChange } = renderPicker({ from: "2026-06-15", to: "2026-06-20" });
-    const du = segs("Du");
+    const du = segs("Date début");
     du.d.focus();
     fireEvent.keyDown(du.d, { key: "ArrowUp" });
     expect(onFromChange).toHaveBeenLastCalledWith("2026-06-16");
@@ -118,7 +118,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("clears commit when all segments are emptied", () => {
     const { onFromChange } = renderPicker({ from: "2026-06-15" });
-    const du = segs("Du");
+    const du = segs("Date début");
     type(du.d, "");
     type(du.m, "");
     type(du.y, "");
@@ -127,7 +127,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("typing in Au commits to onToChange", () => {
     const { onToChange } = renderPicker({ from: "2026-06-01" });
-    const au = segs("Au");
+    const au = segs("Date fin");
     type(au.d, "30");
     type(au.m, "06");
     type(au.y, "2026");
@@ -136,7 +136,7 @@ describe("DateRangePicker — segmented input", () => {
 
   it("typing single 0 in day does not auto-advance (could be 0X)", () => {
     renderPicker();
-    const du = segs("Du");
+    const du = segs("Date début");
     du.d.focus();
     type(du.d, "0");
     expect(document.activeElement).toBe(du.d);

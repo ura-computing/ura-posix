@@ -111,6 +111,38 @@ class TestGetStats:
         # Only Doliprane ventes: 15 * 50 = 750
         assert kpis["ventes_total"] == 15 * 50.0
 
+    def test_pg020_dietetique_classified_as_pharmacie(self, client, db, test_owner, stats_data):
+        """PG-020: 'Diététique' must roll into Pharmacie totals, not Parapharmacie.
+        Client: "Diététique c'est Pharmacie et non Parapharmacie."
+
+        Add a Dietetique product, sell some units. With the new _pharma_expr the
+        ?category_type=pharmacie filter should include this product's CA on top of Doliprane
+        (which is `Medicament` → pharmacie). 'Dietetique' (no accent) and 'Diététique' must
+        both match — pharmacies' product catalogues use either form."""
+        pharmacy_id = stats_data["pharmacy_id"]
+        med_no_accent = make_medicament(
+            db, pid="PG020-001", product="BIO LAIT PRIMEA 3EME AGE 800G",
+            category="Dietetique", tva="TVA (20.00%)", pph=80.0, ppv=100.0,
+        )
+        med_with_accent = make_medicament(
+            db, pid="PG020-002", product="ENFA BIO LAIT 2EME AGE 800G",
+            category="Diététique", tva="TVA (20.00%)", pph=60.0, ppv=80.0,
+        )
+        make_vente(db, med_no_accent,   pharmacy_id, quantity=4, unit_price=100.0, date="2026-03-10")
+        make_vente(db, med_with_accent, pharmacy_id, quantity=2, unit_price=80.0,  date="2026-03-10")
+
+        res = client.get(
+            "/stats",
+            params={"category_type": "pharmacie"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        kpis = res.json()["kpis"]
+        # Doliprane (already in stats_data): 15 * 50 = 750
+        # + Dietetique (no accent): 4 * 100 = 400
+        # + Diététique (with accent): 2 * 80 = 160
+        assert kpis["ventes_total"] == 750 + 400 + 160
+
     def test_date_range_filter(self, client, test_owner, stats_data):
         res = client.get(
             "/stats",
@@ -145,19 +177,65 @@ class TestGetStats:
         # marge should be positive
         assert marge["marge_brute_dh"] > 0
 
+    def test_pg013_followup_marge_skips_meds_with_no_achat(self, client, db, test_owner, stats_data):
+        """PG-013 follow-up: the dashboard marge tile (/stats) used to PPH-fall-back to fill in
+        PU for meds with sales but no purchases, which gave a fake 0 % margin when Sobrus stored
+        PPH == PPV. After the follow-up the residual fallback in queries._marge_for_window is
+        gone — a sales-only product is excluded from the aggregate rather than dragging marge
+        toward zero. Set up a third med (PPH==PPV, no achat); marge_pct must equal the value
+        from stats_data alone (no shift toward 0 % from the new product)."""
+        baseline = client.get("/stats", headers=test_owner["headers"]).json()["marge"]["marge_pct"]
+        pharmacy_id = stats_data["pharmacy_id"]
+        ghost = make_medicament(
+            db, pid="PG013-FOLLOWUP", product="SobrusOnly Cream",
+            category="Parapharmacie (7.00%)", tva="TVA (7.00%)",
+            pph=80.0, ppv=80.0,  # PPH == PPV — would yield fake 0 % marge under the old fallback
+        )
+        make_vente(db, ghost, pharmacy_id, quantity=5, unit_price=80.0, date="2026-03-18")
+        # No Achat for `ghost`.
+        after = client.get("/stats", headers=test_owner["headers"]).json()["marge"]["marge_pct"]
+        assert after == baseline, "sales-only product must NOT shift the dashboard marge"
+
     def test_requires_auth(self, client):
         res = client.get("/stats")
         assert res.status_code == 403  # HTTPBearer returns 403 for missing auth
 
     def test_previous_kpis_shape(self, client, test_owner, stats_data):
-        """previous_kpis must contain ventes_total and achats_total."""
+        """previous_kpis must contain ventes_total, achats_total and marge_pct (PG-004)."""
         res = client.get("/stats", headers=test_owner["headers"])
         assert res.status_code == 200
         prev = res.json()["previous_kpis"]
         assert "ventes_total" in prev
         assert "achats_total" in prev
+        assert "marge_pct"    in prev
         assert isinstance(prev["ventes_total"], (int, float))
         assert isinstance(prev["achats_total"], (int, float))
+        assert isinstance(prev["marge_pct"],    (int, float))
+
+    def test_pg004_previous_marge_uses_per_product_formula(self, client, db, test_owner, stats_data):
+        """PG-004: previous_kpis.marge_pct must be computed by the same per-medicament weighted
+        formula as the current marge — not (prevCA - prevAchats) / prevCA which the old frontend
+        used (and which was apples-to-oranges with the current dashboard marge).
+
+        Set up a prior window where Achats >> Ventes so the OLD formula would yield a
+        nonsensical negative marge, but the per-product formula correctly returns 20 %."""
+        pharmacy_id = stats_data["pharmacy_id"]
+        med = stats_data["med1"]  # Doliprane PPV=50
+
+        # Prior window (Apr 2025): buy 10 at PU=40 (cost 400), sell 3 at PPV=50 (CA 150).
+        # OLD broken frontend formula: (150 - 400) / 150 * 100 = -166.67 %
+        # NEW per-product formula:     (1 - 40/50) * 100 = 20 %
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=40.0, delivery_date="2025-04-05")
+        make_vente(db, med, pharmacy_id, quantity=3, unit_price=50.0, date="2025-04-15")
+
+        res = client.get(
+            "/stats",
+            params={"date_from": "2026-04-01", "date_to": "2026-04-30"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        prev = res.json()["previous_kpis"]
+        assert prev["marge_pct"] == 20.0
 
     def test_previous_kpis_with_date_range(self, client, db, test_owner, stats_data):
         """When filtering March 10-15 2026, the previous period is the same dates
@@ -280,6 +358,61 @@ class TestAnalyseMarge:
         assert doliprane["marge_pct"] == 20.0
         # marge_dh = 50 - 40 = 10.0
         assert doliprane["marge_dh"] == 10.0
+
+    def test_pg010_grossiste_marge_computed(self, client, test_owner, stats_data):
+        """PG-010: Analyses → Grossistes must populate marge_pct_avg / marge_dh_avg / total_achat_cost
+        (the audit screenshot showed "—" / "0,00 MAD"). The default `stats_data` fixture buys
+        both Doliprane (PPV=50 PU=40, qty=15) and Creme Solaire (PPV=100 PU=80, qty=5) from
+        the default 'Grossiste A' supplier."""
+        res = client.get(
+            "/stats/analyse-marge",
+            params={"mode": "grossiste"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        body = res.json()
+        rows = body["rows"]
+        # Pull the Grossiste A row
+        row = next((r for r in rows if r["grossiste"] == "Grossiste A"), None)
+        assert row is not None, "Grossiste A should appear in grossiste mode"
+        # Both products have marge=20% (50→40 and 100→80), so weighted avg = 20%
+        assert row["marge_pct_avg"] == 20.0
+        # Weighted marge DH: (15*10 + 5*20) / (15+5) = 250 / 20 = 12.5
+        assert row["marge_dh_avg"] == 12.5
+        # Total achat cost = 20*40 + 10*80 = 1600
+        assert row["total_achat_cost"] == 1600.0
+        # KPIs should also reflect this and be addressable by 'grossiste' label
+        kpis = body["kpis"]
+        assert kpis["marge_pct_avg"] == 20.0
+        assert kpis["marge_dh_avg"] == 12.5
+        assert kpis["marge_pct_max"]["label"] == "Grossiste A"
+
+    def test_pg010_laboratoire_marge_computed(self, client, db, test_owner):
+        """PG-010 (labo branch): same fix shape — Analyses → Laboratoires must compute marge."""
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG010-LAB-001", product="MKL Cream 100ml",
+            category="Parapharmacie (7.00%)", tva="TVA (7.00%)",
+            pph=60.0, ppv=80.0, laboratoire="MKL",
+        )
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=60.0, delivery_date="2026-03-01")
+        make_vente(db, med, pharmacy_id, quantity=4, unit_price=80.0, date="2026-03-12")
+
+        res = client.get(
+            "/stats/analyse-marge",
+            params={"mode": "laboratoire"},
+            headers=test_owner["headers"],
+        )
+        assert res.status_code == 200
+        rows = res.json()["rows"]
+        row = next((r for r in rows if r["laboratoire"] == "MKL"), None)
+        assert row is not None
+        # marge_pct = (1 - 60/80) * 100 = 25
+        assert row["marge_pct_avg"] == 25.0
+        # marge_dh = 80 - 60 = 20
+        assert row["marge_dh_avg"] == 20.0
+        # total achat cost = 10 * 60 = 600
+        assert row["total_achat_cost"] == 600.0
 
     def test_pg013_no_pph_fallback_when_achat_missing(self, client, db, test_owner):
         """PG-013: a Sobrus fiche with PPH == PPV must not yield a fake 0 % margin

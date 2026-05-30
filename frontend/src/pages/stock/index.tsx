@@ -25,11 +25,12 @@ const CLASS_ORDER = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"];
 
 const STATUS_OPTIONS: { value: StockStatus | "all"; label: string }[] = [
   { value: "all", label: "Tous statuts" },
-  { value: "negatif", label: "Stock négatif" },
-  { value: "sous-stock", label: "Sous-stock" },
-  { value: "ok", label: "OK" },
-  { value: "sur-stock", label: "Sur-stock" },
+  { value: "sous-stock", label: "Sous-stock (≤45 j)" },
+  { value: "ideal", label: "Idéal (46-60 j)" },
+  { value: "a-surveiller", label: "À surveiller (61-99 j)" },
+  { value: "sur-stock", label: "Sur-stock (≥100 j)" },
   { value: "inconnu", label: "Inconnu" },
+  { value: "negatif", label: "Stock négatif" },
 ];
 
 /* ── ABCD circle badge ─────────────────────────────────────────────────────── */
@@ -188,8 +189,8 @@ const StockList = () => {
     if (!stockAbcd?.products || stockAbcd.products.length === 0) return 0;
     const withStock = stockAbcd.products.filter((p) => p.status !== "inconnu");
     if (withStock.length === 0) return 0;
-    const ok = withStock.filter((p) => p.status === "ok").length;
-    return (ok / withStock.length) * 10;
+    const healthy = withStock.filter((p) => p.status === "ideal").length;
+    return (healthy / withStock.length) * 10;
   }, [stockAbcd]);
 
   const stockNegatif = useMemo(
@@ -204,15 +205,10 @@ const StockList = () => {
     [stockAbcd],
   );
 
-  const surStock100 = useMemo(() => {
-    if (!stockAbcd?.products) return [];
-    return stockAbcd.products.filter((p) => {
-      if (p.current_stock == null || p.units_sold_12m <= 0) return false;
-      const dailyRate = p.units_sold_12m / 365;
-      const daysOfStock = p.current_stock / dailyRate;
-      return daysOfStock > 100;
-    });
-  }, [stockAbcd]);
+  const surStock100 = useMemo(
+    () => stockAbcd?.products?.filter((p) => p.status === "sur-stock") ?? [],
+    [stockAbcd],
+  );
 
   const negMetrics = useCardMetrics(stockNegatif);
   const sousMetrics = useCardMetrics(sousStockAA);
@@ -498,11 +494,12 @@ function PeremptionCard({
 /* ── Stock product table with pagination ─────────────────────────────────── */
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
-  ok: { label: "OK", cls: "bg-green-100 text-green-700 border-green-200" },
-  "sous-stock": { label: "Sous-stock", cls: "bg-amber-100 text-amber-700 border-amber-200" },
-  "sur-stock": { label: "Sur-stock", cls: "bg-red-100 text-red-700 border-red-200" },
-  negatif: { label: "Négatif", cls: "bg-red-200 text-red-800 border-red-300" },
-  inconnu: { label: "Inconnu", cls: "bg-muted text-muted-foreground border-border" },
+  "sous-stock":   { label: "Sous-stock",    cls: "bg-red-100 text-red-700 border-red-200" },
+  ideal:          { label: "Idéal",         cls: "bg-green-100 text-green-700 border-green-200" },
+  "a-surveiller": { label: "À surveiller",  cls: "bg-amber-100 text-amber-700 border-amber-200" },
+  "sur-stock":    { label: "Sur-stock",     cls: "bg-blue-100 text-blue-700 border-blue-200" },
+  inconnu:        { label: "Inconnu",       cls: "bg-muted text-muted-foreground border-border" },
+  negatif:        { label: "Négatif",       cls: "bg-red-200 text-red-800 border-red-300" },
 };
 
 const stockColumns: ColumnDef<StockAbcdProduct>[] = [

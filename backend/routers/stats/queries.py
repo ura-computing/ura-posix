@@ -36,6 +36,8 @@ def _pharma_expr():
         (func.lower(Medicament.category).contains("édicament"), True),
         (func.lower(Medicament.category).contains("oméopath"), True),
         (func.lower(Medicament.category).contains("omeopath"), True),
+        (func.lower(Medicament.category).contains("iététique"), True),
+        (func.lower(Medicament.category).contains("ietetique"), True),
         else_=False,
     )
     return sa_case(
@@ -147,6 +149,55 @@ def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=N
     )
 
 
+def _marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_filter_v: list) -> dict:
+    """Weighted marge over (Vente, Achat) for the supplied filters.
+
+    Returns {'marge_pct', 'marge_brute_dh', 'marge_nette_dh'} using the per-medicament avg-PU
+    from Achat rows in the window — the same formula used everywhere else (PG-013). Products
+    with sales but no purchases in the window are excluded from the aggregate (their PU would
+    be unknown). No PPH fallback: Sobrus' fiche-produit often stores PPH == PPV which would
+    yield a fake 0 % marge if used as a stand-in for missing purchase data."""
+    avg_pu_sub = (
+        db.query(
+            Achat.medicament_id,
+            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+        )
+        .filter(*base_filter_a)
+        .group_by(Achat.medicament_id)
+        .subquery()
+    )
+    marge_rows = (
+        db.query(
+            Vente.quantity, Medicament.ppv,
+            avg_pu_sub.c.avg_pu.label("pu"),
+            Medicament.tva,
+        )
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
+        .filter(*base_filter_v)
+        .filter(*cat_filter_v)
+        .filter(Medicament.ppv.isnot(None))
+        .all()
+    )
+    marge_rows = [r for r in marge_rows if r.pu is not None]
+    sum_ppv = sum((r.quantity or 0) * (r.ppv or 0) for r in marge_rows)
+    sum_pu  = sum((r.quantity or 0) * (r.pu or 0) for r in marge_rows)
+    marge_brute = sum_ppv - sum_pu
+    marge_pct   = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
+    marge_nette = sum(
+        (r.quantity or 0) * (
+            (r.ppv or 0) / (1 + _parse_tva_rate(r.tva)) -
+            (r.pu or 0) / (1 + _parse_tva_rate(r.tva))
+        )
+        for r in marge_rows
+    )
+    return {
+        "marge_pct":      round(marge_pct, 2),
+        "marge_brute_dh": round(marge_brute, 2),
+        "marge_nette_dh": round(marge_nette, 2),
+    }
+
+
 def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = "all") -> dict:
     """Returns advanced_kpis, tva, marge, type_breakdown."""
 
@@ -254,47 +305,7 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
     }
 
     # ── Marge (using avg actual purchase price from achats) ─────────────────
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(*base_filter_a)
-        .group_by(Achat.medicament_id)
-        .subquery()
-    )
-    # outerjoin: products with sales but no purchases in the range still appear
-    # fallback: if no avg_pu, use Medicament.pph as last resort
-    marge_rows = (
-        db.query(
-            Vente.quantity, Medicament.ppv,
-            func.coalesce(avg_pu_sub.c.avg_pu, Medicament.pph).label("pu"),
-            Medicament.tva,
-        )
-        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
-        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
-        .filter(*base_filter_v)
-        .filter(*cat_filter_v)
-        .filter(Medicament.ppv.isnot(None))
-        .all()
-    )
-    marge_rows = [r for r in marge_rows if r.pu is not None]
-    sum_ppv = sum((r.quantity or 0) * (r.ppv or 0) for r in marge_rows)
-    sum_pu  = sum((r.quantity or 0) * (r.pu or 0) for r in marge_rows)
-    marge_brute = sum_ppv - sum_pu
-    marge_pct   = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
-    marge_nette = sum(
-        (r.quantity or 0) * (
-            (r.ppv or 0) / (1 + _parse_tva_rate(r.tva)) -
-            (r.pu or 0) / (1 + _parse_tva_rate(r.tva))
-        )
-        for r in marge_rows
-    )
-    marge = {
-        "marge_pct":      round(marge_pct, 2),
-        "marge_brute_dh": round(marge_brute, 2),
-        "marge_nette_dh": round(marge_nette, 2),
-    }
+    marge = _marge_for_window(db, base_filter_v, base_filter_a, cat_filter_v)
 
     # ── CA breakdown: Pharmacie vs Parapharmacie ─────────────────────────────
     pharm_total = (
@@ -387,9 +398,31 @@ def compute_previous_kpis(
     aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
     prev_achats = aq.scalar()
 
+    # Marge for the previous window — computed by the SAME per-medicament weighted formula as
+    # the current marge (queries._marge_for_window) so the dashboard variation badge compares
+    # like-for-like. Before PG-004 the frontend reconstructed prev marge from sumVente/sumAchat
+    # which gave a different number; the variation was junk.
+    prev_base_filter_v: list = [
+        Vente.date >= prev_df_str,
+        Vente.date <= prev_dt_str,
+    ]
+    prev_base_filter_a: list = [
+        Achat.delivery_date >= prev_df_str,
+        Achat.delivery_date <= prev_dt_str,
+    ]
+    if pharmacy_id:
+        prev_base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
+        prev_base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
+    if non_declared_sub is not None:
+        prev_base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
+        prev_base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
+
+    prev_marge = _marge_for_window(db, prev_base_filter_v, prev_base_filter_a, cat_filter_v)
+
     return {
         "ventes_total": float(prev_ventes or 0),
         "achats_total": float(prev_achats or 0),
+        "marge_pct":    prev_marge["marge_pct"],
     }
 
 

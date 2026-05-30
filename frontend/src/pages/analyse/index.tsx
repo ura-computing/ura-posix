@@ -55,6 +55,17 @@ export default function AnalysePage() {
 
   // Liste mode: store imported product names, re-query when filters change
   const [listeProducts, setListeProducts] = useState<statsApi.ListeItem[] | null>(null);
+  // PG-014: per-column sort for the Liste mode table (hand-rolled — separate from
+  // the DataTable-driven margeTable). Null means default ordering (not_found first).
+  const [listeSort, setListeSort] = useState<{ key: string; order: "asc" | "desc" } | null>(null);
+  const toggleListeSort = useCallback((key: string) => {
+    setListeSort((prev) => {
+      if (prev?.key === key) {
+        return { key, order: prev.order === "asc" ? "desc" : "asc" };
+      }
+      return { key, order: "asc" };
+    });
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Mode-aware search suggestions: pull distinct values from currently-loaded rows
@@ -266,21 +277,20 @@ export default function AnalysePage() {
             </CardContent>
           </Card>
 
-          {/* Marge moyenne MAD */}
+          {/* Marge moyenne DH */}
           <Card className="border border-border">
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (MAD)</p>
-                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)}` : "—"}</p>
-                  {/* <p className="text-[10px] opacity-50 font-mono">PPV − PU (moyen)</p> */}
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Marge moyenne (DH)</p>
+                  <p className="text-3xl font-bold mt-1 leading-tight tabular-nums">{k.marge_dh_avg != null ? `${fmt(k.marge_dh_avg)} DH` : "—"}</p>
                   <div className="mt-2 space-y-0.5 text-[11px]">
                     {k.marge_dh_min && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <p className="flex items-center gap-1 text-red-600 truncate cursor-default">
                             <TrendingDown className="h-3 w-3 shrink-0" />
-                            <span className="font-semibold">{fmt(k.marge_dh_min.value)}</span>
+                            <span className="font-semibold">{fmt(k.marge_dh_min.value)} DH</span>
                             <span className="text-muted-foreground truncate">· {k.marge_dh_min.label}</span>
                           </p>
                         </TooltipTrigger>
@@ -292,7 +302,7 @@ export default function AnalysePage() {
                         <TooltipTrigger asChild>
                           <p className="flex items-center gap-1 text-green-600 truncate cursor-default">
                             <TrendingUp className="h-3 w-3 shrink-0" />
-                            <span className="font-semibold">{fmt(k.marge_dh_max.value)}</span>
+                            <span className="font-semibold">{fmt(k.marge_dh_max.value)} DH</span>
                             <span className="text-muted-foreground truncate">· {k.marge_dh_max.label}</span>
                           </p>
                         </TooltipTrigger>
@@ -420,19 +430,56 @@ export default function AnalysePage() {
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/40">
-                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase">Statut</th>
-                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase">Produit</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">Stock dispo</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">Ventes</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">PPV</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">PU moy.</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">Marge %</th>
-                      <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-muted-foreground uppercase">Marge DH</th>
-                      <th className="px-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground uppercase">Catégorie</th>
+                      {([
+                        { key: "match_status", label: "Statut",      align: "left"  },
+                        { key: "product",      label: "Produit",     align: "left"  },
+                        { key: "stock_dispo",  label: "Stock dispo", align: "right" },
+                        { key: "qty",          label: "Ventes",      align: "right" },
+                        { key: "ppv",          label: "PPV",         align: "right" },
+                        { key: "pu",           label: "PU moy.",     align: "right" },
+                        { key: "marge_pct",    label: "Marge %",     align: "right" },
+                        { key: "marge_dh",     label: "Marge DH",    align: "right" },
+                        { key: "category",     label: "Catégorie",   align: "left"  },
+                      ] as const).map((col) => {
+                        const active = listeSort?.key === col.key;
+                        const arrow = active ? (listeSort?.order === "asc" ? "↑" : "↓") : "";
+                        return (
+                          <th
+                            key={col.key}
+                            onClick={() => toggleListeSort(col.key)}
+                            className={cn(
+                              "px-3 py-2.5 text-[11px] font-semibold uppercase select-none cursor-pointer hover:text-foreground",
+                              active ? "text-foreground" : "text-muted-foreground",
+                              col.align === "right" ? "text-right" : "text-left",
+                            )}
+                          >
+                            <span className={cn(
+                              "inline-flex items-center gap-1",
+                              col.align === "right" && "justify-end w-full",
+                            )}>
+                              {col.label}
+                              {arrow && <span className="text-[10px] opacity-70">{arrow}</span>}
+                            </span>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {[...effectiveRows].sort((a, b) => {
+                      if (listeSort) {
+                        const va = a[listeSort.key as keyof typeof a];
+                        const vb = b[listeSort.key as keyof typeof b];
+                        // Nulls always last regardless of order.
+                        if (va == null && vb == null) return 0;
+                        if (va == null) return 1;
+                        if (vb == null) return -1;
+                        const cmp = typeof va === "number" && typeof vb === "number"
+                          ? va - vb
+                          : String(va).localeCompare(String(vb), "fr", { numeric: true });
+                        return listeSort.order === "asc" ? cmp : -cmp;
+                      }
+                      // Default: not-found rows first so they're visible at the top.
                       const aFound = a.match_status === "found" ? 1 : 0;
                       const bFound = b.match_status === "found" ? 1 : 0;
                       return aFound - bFound;

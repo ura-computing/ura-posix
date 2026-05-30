@@ -533,20 +533,11 @@ export function PharmacyRapports() {
                             ? `${marge.marge_pct.toFixed(1)}%`
                             : "—"}
                         </p>
-                        {(() => {
-                          const prevCA = prevKpis?.ventes_total ?? 0;
-                          const prevAchats = prevKpis?.achats_total ?? 0;
-                          const prevMarge =
-                            prevCA > 0
-                              ? ((prevCA - prevAchats) / prevCA) * 100
-                              : undefined;
-                          return (
-                            <ChangeBadge
-                              current={marge?.marge_pct}
-                              previous={prevMarge}
-                            />
-                          );
-                        })()}
+                        <ChangeBadge
+                          current={marge?.marge_pct}
+                          previous={prevKpis?.marge_pct}
+                        />
+
                       </>
                     )}
                     {/* <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">

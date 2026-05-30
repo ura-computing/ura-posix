@@ -26,6 +26,8 @@ export type TypeBreakdown = {
 export type PreviousKpis = {
   ventes_total: number;
   achats_total: number;
+  /** Same per-medicament weighted formula as kpis.marge — apples-to-apples for the variation badge. */
+  marge_pct: number;
 };
 export type StatsResponse = {
   kpis: StatsKpis;
@@ -72,7 +74,13 @@ export type AnalyseMargeResponse = {
   rows: Record<string, unknown>[];
 };
 
-export type StockStatus = "negatif" | "sous-stock" | "ok" | "sur-stock" | "inconnu";
+export type StockStatus =
+  | "sous-stock"
+  | "ideal"
+  | "a-surveiller"
+  | "sur-stock"
+  | "inconnu"
+  | "negatif";
 
 export type StockAbcdProduct = {
   product: string;
@@ -103,7 +111,8 @@ export type StockAbcdResponse = {
 
 export type PeremptionProduct = {
   product: string;
-  expiry_date: string;
+  /** null for products in the no_date bracket (PG-008). */
+  expiry_date: string | null;
   quantity: number;
   ppv: number;
 };
@@ -120,6 +129,8 @@ export type PeremptionsResponse = {
   expired: PeremptionBracket;
   very_close: PeremptionBracket;
   close: PeremptionBracket;
+  /** Products in stock whose expiry_date is missing on the Sobrus snapshot. */
+  no_date: PeremptionBracket;
 };
 
 function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): string {

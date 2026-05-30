@@ -47,3 +47,7 @@ class User(Base):
     @property
     def pharmacy_address(self):
         return self.pharmacy.address if self.pharmacy else None
+
+    @property
+    def pharmacy_code(self):
+        return self.pharmacy.code if self.pharmacy else None

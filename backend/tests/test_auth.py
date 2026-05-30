@@ -30,6 +30,12 @@ def test_signup_owner_success(client):
     assert data["user"]["status"] == Status.PENDING
     # The Pharmacy row should be created with an auto-generated code.
     assert data["user"]["pharmacy_id"] is not None
+    # PG-021: the generated pharmacy_code is now surfaced on UserOut so the UI can
+    # display it (e.g. "Bouskoura" → "BOU0001"). Without this the owner had no way
+    # to learn their identifiant — the code lived only in the DB.
+    assert data["user"]["pharmacy_code"], "signup response must include pharmacy_code"
+    assert data["user"]["pharmacy_code"].startswith("BOU"), \
+        f"code should start with city prefix BOU, got {data['user']['pharmacy_code']!r}"
 
 
 def test_signup_owner_missing_city_400(client):

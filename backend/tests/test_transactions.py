@@ -123,6 +123,31 @@ class TestAchatSuggestions:
         data = res.json()
         assert data == {"products": [], "suppliers": [], "refs": []}
 
+    def test_pg006_tolerant_supplier_search(self, client, db, test_owner):
+        """PG-006: the suggestions endpoint must match suppliers tolerantly —
+        accent-insensitive, case-insensitive, multi-token, and `*` as a
+        fragment separator (the way pharmacists already type).
+
+        Supplier name: "Société PARA LA CDP".
+        """
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG006-001", product="GUM JUNIOR 6+ 300ML",
+            category="Parapharmacie (33.330%)", tva="TVA (20.00%)",
+            pph=60.60, ppv=61.00,
+        )
+        make_achat(db, med, pharmacy_id, quantity=4, unit_price=45.45,
+                   supplier="Société PARA LA CDP", delivery_ref="BL-PG006")
+
+        for query in ("CDP", "para", "societe para", "Société PARA", "soc*cdp"):
+            res = client.get("/achat/suggestions", params={"q": query},
+                             headers=test_owner["headers"])
+            assert res.status_code == 200
+            suppliers = res.json()["suppliers"]
+            assert "Société PARA LA CDP" in suppliers, (
+                f"query {query!r} should find Société PARA LA CDP, got {suppliers!r}"
+            )
+
 
 # ── GET /achat ───────────────────────────────────────────────────────────────
 

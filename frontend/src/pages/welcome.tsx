@@ -226,7 +226,14 @@ function OwnerView({ identity }: { identity: User }) {
           Bonjour, <span className="text-primary">{name}</span>
         </h1>
         {identity.pharmacy_name && (
-          <p className="text-base text-muted-foreground">{identity.pharmacy_name}</p>
+          <p className="text-base text-muted-foreground">
+            {identity.pharmacy_name}
+            {identity.pharmacy_code && (
+              <span className="ml-2 inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-mono tracking-wide">
+                {identity.pharmacy_code}
+              </span>
+            )}
+          </p>
         )}
       </div>
 
@@ -264,7 +271,14 @@ function EmployeeView({ identity }: { identity: User }) {
           Bonjour, <span className="text-primary">{name}</span>
         </h1>
         {identity.pharmacy_name && (
-          <p className="text-base text-muted-foreground">{identity.pharmacy_name}</p>
+          <p className="text-base text-muted-foreground">
+            {identity.pharmacy_name}
+            {identity.pharmacy_code && (
+              <span className="ml-2 inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-mono tracking-wide">
+                {identity.pharmacy_code}
+              </span>
+            )}
+          </p>
         )}
       </div>
 
