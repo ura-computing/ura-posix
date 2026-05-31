@@ -50,7 +50,7 @@ export default function AnalysePage() {
     margeData, margeLoading, allRows,
     selected, kpis,
     toggleRow, toggleAll, resetSelection,
-    exportCsv,
+    exportXlsx,
   } = useAnalysePage();
 
   // Liste mode: store imported product names, re-query when filters change
@@ -187,7 +187,7 @@ export default function AnalysePage() {
               {selected.size === allRows.length && allRows.length > 0 ? "Tout désélectionner" : "Tout sélectionner"}
             </Button>
             {kpis.count > 0 && (
-              <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
+              <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportXlsx}>
                 <Download className="h-3.5 w-3.5" />
                 Exporter Excel ({kpis.count})
               </Button>

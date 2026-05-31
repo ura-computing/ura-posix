@@ -89,8 +89,7 @@ export function useAnalysePage() {
     );
   }, [allRows]);
 
-  const exportCsv = useCallback(async () => {
-    // PG-003: name kept for caller stability \u2014 what we actually emit is .xlsx.
+  const exportXlsx = useCallback(async () => {
     // Priority: explicit selection > search-filtered > all rows. Honors the
     // active search filter so the export matches what the user sees.
     const sel = selected.size > 0
@@ -141,6 +140,6 @@ export function useAnalysePage() {
     selected, kpis,
     toggleRow, toggleAll, resetSelection,
     // Export
-    exportCsv,
+    exportXlsx,
   };
 }
