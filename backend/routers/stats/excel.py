@@ -110,9 +110,13 @@ def _build_excel(
             total  = float(r.total or 0)
 
             ppv_ht     = round(ppv / (1 + tva_rate), 4) if tva_rate > 0 and ppv else ppv
+            # PG-022 — marge nette must compare HT to HT. The previous formula did
+            # (ppv_ht - avg_pu) which mixes HT sale with TTC purchase, flipping the row
+            # negative whenever (PPV - TVA share) < PU even though brute = PPV - PU > 0.
+            pu_ht      = avg_pu / (1 + tva_rate) if tva_rate > 0 and avg_pu else avg_pu
             marge_pct  = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else "—"
             marge_brut = round((ppv - avg_pu) * qty, 2)      if ppv and avg_pu else "—"
-            marge_net  = round((ppv_ht - avg_pu) * qty, 2)   if ppv and avg_pu else "—"
+            marge_net  = round((ppv_ht - pu_ht) * qty, 2)    if ppv and avg_pu else "—"
             tva_enc    = round(total * tva_rate, 2)
 
             ws2.append([
