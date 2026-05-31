@@ -107,6 +107,14 @@ pass per ticket against this map.
   mirrors `_pharma_expr` exactly; `_build_achat_row` now returns `category_type`; the table
   column is rewired to read from the backend field; export includes the column.
 
+## PG-017 ✅ shipped (2026-05-31)
+
+Reordered the Analyses tabs to follow pharmacy workflow: product-side analyses first
+(Produit, Catégorie), then supplier-side (Laboratoire, Grossistes), then Client, then
+time (Mois, Année), then Liste. `MODE_LABELS` insertion order drives the rendering at
+[pages/analyse/index.tsx:21-30](frontend/src/pages/analyse/index.tsx#L21-L30); 1-line
+change. Opinionated default — easy to flip if the client prefers a different sequence.
+
 ## PG-007 (achats half) ✅ shipped (2026-05-31)
 
 Achats-only BL exclusion: pharmacist excludes a delivery_ref → it drops out of every

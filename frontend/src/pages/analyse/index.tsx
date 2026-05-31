@@ -18,14 +18,17 @@ import { cleanHeader, fixMojibake } from "@/utils/encoding";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
 import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
+// PG-017 — order pharmacists actually work in: product-side analyses first
+// (Produit, Catégorie), then supplier-side (Laboratoire, Grossistes), then
+// Client, then time (Mois, Année), then the special Liste mode.
 const MODE_LABELS = {
   produit: "Produit",
-  operateur: "Client",
+  categorie: "Catégorie",
   laboratoire: "Laboratoire",
   grossiste: "Grossistes",
+  operateur: "Client",
   mois: "Mois",
   annee: "Année (pivot)",
-  categorie: "Catégorie",
   bl: "Liste",
 } as const;
 
