@@ -7,6 +7,7 @@ from sqlalchemy import Date, case as sa_case, func
 from sqlalchemy.orm import Session
 
 from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
+from utils.exclusions import bl_excluded_sub
 from utils.strings import strip_percentage as _strip_pct
 
 
@@ -106,6 +107,9 @@ def _fetch_med_rows(db, pharmacy_id, df, dt, cat_filter=None, non_declared_sub=N
         achat_filters.append(Achat.delivery_date <= dt)
     if non_declared_sub is not None:
         achat_filters.append(Achat.medicament_id.notin_(non_declared_sub))
+    if pharmacy_id:
+        # PG-007: exclude BL-numbers the pharmacist removed from accounting.
+        achat_filters.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
 
     avg_pu_sub = (
         db.query(
@@ -225,6 +229,8 @@ def _compute_extra_stats(db: Session, pharmacy_id, df, dt, category_type: str = 
         )
         base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
+        # PG-007: exclude pharmacist-excluded BL numbers from achats (ventes have no BL link).
+        base_filter_a.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
 
     cat_filter_v: list = []
     cat_filter_a: list = []
@@ -395,6 +401,9 @@ def compute_previous_kpis(
         aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
     if non_declared_sub is not None:
         aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
+    if pharmacy_id:
+        # PG-007
+        aq = aq.filter(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
     aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
     prev_achats = aq.scalar()
 
@@ -416,6 +425,9 @@ def compute_previous_kpis(
     if non_declared_sub is not None:
         prev_base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         prev_base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
+    if pharmacy_id:
+        # PG-007
+        prev_base_filter_a.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
 
     prev_marge = _marge_for_window(db, prev_base_filter_v, prev_base_filter_a, cat_filter_v)
 
@@ -463,6 +475,9 @@ def build_monthly_trend(db: Session, pharmacy_id, df: Optional[str], dt: Optiona
     if non_declared_sub is not None:
         v_q = v_q.filter(Vente.medicament_id.notin_(non_declared_sub))
         a_q = a_q.filter(Achat.medicament_id.notin_(non_declared_sub))
+    if pharmacy_id:
+        # PG-007
+        a_q = a_q.filter(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
 
     v_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in v_q.group_by("month").all()}
     a_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in a_q.group_by("month").all()}

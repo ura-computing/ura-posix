@@ -85,3 +85,19 @@ class PharmacyMedicamentStatus(Base):
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (UniqueConstraint("pharmacy_id", "medicament_id", name="uq_pharmacy_medicament"),)
+
+
+class PharmacyBlExclusion(Base):
+    """A delivery_ref (BL number) excluded from a pharmacy's stats / marges / accounting.
+    PG-007 (achats half only): the exclusion filters Achat rows everywhere the dashboard
+    already filters non-declared medicaments. Ventes are NOT linked to a specific BL in
+    the schema, so the ventes-matching half of PG-007 stays out of scope for now."""
+    __tablename__ = "pharmacy_bl_exclusions"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    pharmacy_id  = Column(Integer, ForeignKey("pharmacies.id"), nullable=False, index=True)
+    delivery_ref = Column(String, nullable=False, index=True)
+    notes        = Column(String, nullable=True)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("pharmacy_id", "delivery_ref", name="uq_pharmacy_bl"),)

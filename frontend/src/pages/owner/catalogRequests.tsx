@@ -7,12 +7,19 @@ import {
   useSubmitAnnulation,
 } from "@/hooks/useCatalogRequests";
 import {
+  useBlExclusions,
+  useBlSuggestions,
+  useCreateBlExclusion,
+  useDeleteBlExclusion,
+} from "@/hooks/useBlExclusions";
+import {
   PackageX,
   Loader2,
   CheckCircle2,
   Search,
   FileX,
   Undo2,
+  Receipt,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -91,6 +98,34 @@ export default function CatalogRequestsPage() {
   const { submitRequests, submitting } = useSubmitNonDeclareRequests(selectedIds, resetDialog);
   const { submitAnnulation, submittingAnnulation } = useSubmitAnnulation();
 
+  // ── PG-007 (achats half) — BL number exclusions ──────────────────────────
+  const [blDialogOpen, setBlDialogOpen] = useState(false);
+  const [blQuery, setBlQuery] = useState("");
+  const [blDebounced, setBlDebounced] = useState("");
+  const [blSelectedRef, setBlSelectedRef] = useState<string | null>(null);
+  const [blNotes, setBlNotes] = useState("");
+  const blTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetBlDialog = useCallback(() => {
+    setBlDialogOpen(false);
+    setBlQuery("");
+    setBlDebounced("");
+    setBlSelectedRef(null);
+    setBlNotes("");
+  }, []);
+
+  const handleBlSearchChange = useCallback((value: string) => {
+    setBlQuery(value);
+    setBlSelectedRef(null);
+    if (blTimerRef.current) clearTimeout(blTimerRef.current);
+    blTimerRef.current = setTimeout(() => setBlDebounced(value), 300);
+  }, []);
+
+  const { exclusions: blExclusions, exclusionsLoading: blExclusionsLoading } = useBlExclusions(isOwner);
+  const { suggestions: blSuggestions, suggestionsLoading: blSuggestionsLoading } = useBlSuggestions(blDebounced, blDialogOpen);
+  const { createExclusion, creating: blCreating } = useCreateBlExclusion(resetBlDialog);
+  const { deleteExclusion: deleteBlExclusion, deleting: blDeleting } = useDeleteBlExclusion();
+
   if (!isOwner) return null;
 
   return (
@@ -104,10 +139,16 @@ export default function CatalogRequestsPage() {
             Excluez un produit de vos rapports en un clic — aucune validation administrateur requise.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0">
-          <PackageX className="h-4 w-4" />
-          Exclure des produits
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" onClick={() => setBlDialogOpen(true)} className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Exclure un BL
+          </Button>
+          <Button onClick={() => setDialogOpen(true)} className="gap-2">
+            <PackageX className="h-4 w-4" />
+            Exclure des produits
+          </Button>
+        </div>
       </div>
 
       {/* Excluded products list */}
@@ -170,6 +211,192 @@ export default function CatalogRequestsPage() {
           )}
         </div>
       </div>
+
+      {/* PG-007 — BL exclusions list */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-base font-semibold">BL exclus de la comptabilité</h2>
+          {!blExclusionsLoading && <Badge variant="secondary">{blExclusions.length}</Badge>}
+        </div>
+
+        <div className="border rounded-xl overflow-hidden bg-card">
+          {blExclusionsLoading ? (
+            <PageLoader />
+          ) : blExclusions.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-14 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                <Receipt className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Aucun BL exclu</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Cliquez sur « Exclure un BL » pour retirer un bon de livraison de vos calculs comptables.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="divide-y">
+              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-2.5 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <span>BL / Fournisseur</span>
+                <span className="w-28 text-right">Total</span>
+                <span className="w-28 text-center">Exclu le</span>
+                <span className="w-28 text-center">Action</span>
+              </div>
+              {blExclusions.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-2 sm:gap-4 px-5 py-3 items-start sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium font-mono truncate">{b.delivery_ref}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {b.supplier ?? "Fournisseur inconnu"}
+                      {b.delivery_date && ` · ${b.delivery_date}`}
+                      {b.nb_lines != null && ` · ${b.nb_lines} ligne${b.nb_lines > 1 ? "s" : ""}`}
+                    </p>
+                    {b.notes && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">Note : {b.notes}</p>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium tabular-nums w-28 text-right">
+                    {b.total_mad != null ? `${b.total_mad.toFixed(2)} DH` : "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground w-28 text-center">
+                    {b.created_at
+                      ? format(new Date(b.created_at), "d MMM yyyy", { locale: fr })
+                      : "—"}
+                  </span>
+                  <div className="w-28 flex justify-center">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1.5 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
+                      disabled={blDeleting}
+                      onClick={() => deleteBlExclusion(b.delivery_ref)}
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Réintégrer
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* PG-007 — BL exclusion dialog */}
+      <Dialog open={blDialogOpen} onOpenChange={(v) => { if (!v) resetBlDialog(); }}>
+        <DialogContent className="max-w-[50vw] p-0 gap-0 flex flex-col max-h-[90vh] overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <DialogTitle>Exclure un bon de livraison</DialogTitle>
+            <DialogDescription>
+              Tapez un numéro de BL (ou un fragment) pour retirer ce bon de livraison de vos calculs comptables.
+              Les ventes correspondantes ne sont pas affectées.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 flex flex-col gap-4 px-6 py-4 overflow-hidden">
+            <div className="relative shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Numéro de BL (ex. BL-2026-447 ou 447)…"
+                className="pl-9 font-mono"
+                value={blQuery}
+                onChange={(e) => handleBlSearchChange(e.target.value)}
+                autoFocus
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+            </div>
+
+            <div className="flex-1 min-h-0 border rounded-lg overflow-y-auto">
+              {blDebounced.trim().length < 2 ? (
+                <div className="py-10 text-center">
+                  <Search className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">Tapez ≥ 2 caractères pour rechercher un BL</p>
+                </div>
+              ) : blSuggestionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : blSuggestions.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Aucun BL trouvé pour &ldquo;{blDebounced}&rdquo;
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {blSuggestions.map((s) => {
+                    const isSelected = blSelectedRef === s.delivery_ref;
+                    return (
+                      <button
+                        key={s.delivery_ref}
+                        type="button"
+                        onClick={() => setBlSelectedRef(s.delivery_ref)}
+                        className={cn(
+                          "w-full text-left px-4 py-2.5 flex items-center gap-3 transition-colors",
+                          isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                        )}
+                      >
+                        <div className={cn(
+                          "h-4 w-4 shrink-0 rounded border flex items-center justify-center transition-colors",
+                          isSelected ? "bg-primary border-primary" : "border-input bg-background",
+                        )}>
+                          {isSelected && <CheckCircle2 className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={cn("text-sm font-medium font-mono truncate", isSelected && "text-primary")}>
+                            {s.delivery_ref}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {s.supplier ?? "Fournisseur inconnu"}
+                            {s.delivery_date && ` · ${s.delivery_date}`}
+                            {` · ${s.nb_lines} ligne${s.nb_lines > 1 ? "s" : ""}`}
+                          </p>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums shrink-0">
+                          {s.total_mad.toFixed(2)} DH
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {blSelectedRef && (
+              <div className="shrink-0 space-y-1.5">
+                <Label htmlFor="bl-notes" className="text-xs">
+                  Note interne <span className="text-muted-foreground font-normal">(optionnelle)</span>
+                </Label>
+                <Textarea
+                  id="bl-notes"
+                  placeholder="Ex. : retour fournisseur, erreur de prix..."
+                  value={blNotes}
+                  onChange={(e) => setBlNotes(e.target.value)}
+                  rows={2}
+                  className="text-sm resize-none"
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
+            <Button variant="outline" onClick={resetBlDialog}>
+              Annuler
+            </Button>
+            <Button
+              disabled={!blSelectedRef || blCreating}
+              onClick={() => blSelectedRef && createExclusion({ delivery_ref: blSelectedRef, notes: blNotes.trim() || undefined })}
+              className="gap-2"
+            >
+              {blCreating && <Loader2 className="h-4 w-4 animate-spin" />}
+              Exclure le BL
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Product search dialog */}
       <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) resetDialog(); }}>

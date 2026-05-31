@@ -107,6 +107,55 @@ pass per ticket against this map.
   mirrors `_pharma_expr` exactly; `_build_achat_row` now returns `category_type`; the table
   column is rewired to read from the backend field; export includes the column.
 
+## PG-007 (achats half) ✅ shipped (2026-05-31)
+
+Achats-only BL exclusion: pharmacist excludes a delivery_ref → it drops out of every
+Achat-side aggregate everywhere the dashboard already filters non-declared products.
+
+**Backend.**
+- New model `PharmacyBlExclusion(pharmacy_id, delivery_ref, notes, created_at,
+  unique(pharmacy_id, delivery_ref))` in [models/catalog.py](backend/models/catalog.py);
+  table is bootstrapped by `Base.metadata.create_all` on next boot.
+- New shared helper `bl_excluded_sub(db, pharmacy_id)` in
+  [backend/utils/exclusions.py](backend/utils/exclusions.py) — returns the subquery of
+  excluded delivery_refs. Paired with the existing inline `non_declared_sub` at **9 Achat
+  filter sites** (queries.py × 5, router.py × 2, marge.py × 2). Vente filters are
+  intentionally untouched — schema has no Vente↔BL link (see "PG-007 ventes half" still
+  in roadmap).
+- New router [backend/routers/bl_exclusions.py](backend/routers/bl_exclusions.py),
+  registered at `/bl-exclusions` in main.py:
+  - `GET /bl-exclusions` — current pharmacy's excluded BLs, enriched with
+    supplier / delivery_date / total / nb_lines from Achat.
+  - `POST /bl-exclusions` — body `{delivery_ref, notes?}`; rejects unknown BLs and
+    duplicates.
+  - `DELETE /bl-exclusions/{delivery_ref}` — reintegrate.
+  - `GET /bl-exclusions/suggestions?q=…` — top 10 BL refs in this pharmacy's
+    achats matching `q` (ilike), with the same enriched per-BL summary so the
+    pharmacist can confirm before excluding.
+
+**Frontend.**
+- New `api/blExclusions.ts` + matching `hooks/useBlExclusions.ts` exposing
+  `useBlExclusions`, `useBlSuggestions`, `useCreateBlExclusion`, `useDeleteBlExclusion`.
+- The "Produits spéciaux" page
+  ([pages/owner/catalogRequests.tsx](frontend/src/pages/owner/catalogRequests.tsx))
+  gains a second header button "Exclure un BL" (Receipt icon), a second list section
+  "BL exclus de la comptabilité" with the same Réintégrer affordance as products, and a
+  second Dialog for BL search (autocomplete on delivery_ref → click suggestion → optional
+  note → Exclure).
+
+**Tests.**
+- 13 new tests in
+  [backend/tests/test_bl_exclusions.py](backend/tests/test_bl_exclusions.py):
+  CRUD coverage, suggestions search, admin 403, and three filter-integration tests
+  that prove (a) `achats_total` drops by exactly the excluded BL's value,
+  (b) `analyse-marge?mode=bl` no longer lists the excluded ref, and
+  (c) `ventes_total` is NOT affected (achats-only scope). **316 backend tests pass.**
+  Frontend tsc clean, 112 vitest tests pass.
+
+**Out of scope (ventes half).** No Vente↔BL link exists in the schema. The roadmap
+keeps "ship the ventes-matching half once the client picks a matching rule" as a
+follow-up.
+
 ## PG-022 ✅ shipped (2026-05-31) — commit `711706b`
 
 Fixed the per-product `Marge Nette` mismatch in `excel.py:107-115` by also dividing
