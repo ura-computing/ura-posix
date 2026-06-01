@@ -10,7 +10,7 @@ from database import get_db
 from models import Achat, CatalogRequest, Medicament, Pharmacy, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
 from utils.constants import Role, Status
-from utils.exclusions import bl_excluded_sub
+from utils.exclusions import achat_bl_filter
 from .excel import _build_excel
 from .marge import _compute_analyse_marge, _compute_margin_alerts
 from .stock import _compute_stock_abcd
@@ -81,7 +81,7 @@ def get_stats(
         aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
     if pharmacy_id:
         # PG-007
-        aq = aq.filter(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
+        aq = aq.filter(achat_bl_filter(db, pharmacy_id))
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)
@@ -601,7 +601,7 @@ def get_pharmacy_stats_for_admin(
     vq = vq.filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.notin_(non_declared_sub))
     aq = aq.filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id.notin_(non_declared_sub))
     # PG-007
-    aq = aq.filter(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
+    aq = aq.filter(achat_bl_filter(db, pharmacy_id))
     if df:
         vq = vq.filter(Vente.date >= df)
         aq = aq.filter(Achat.delivery_date >= df)

@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
-from utils.exclusions import bl_excluded_sub
+from utils.exclusions import achat_bl_filter
 from utils.strings import strip_percentage as _strip_pct
 from .queries import _pharma_expr
 
@@ -31,10 +31,8 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
         )
         base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
-        # PG-007
-        base_filter_a.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
         # PG-007: exclude pharmacist-excluded BL numbers from achats.
-        base_filter_a.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
+        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -639,7 +637,7 @@ def _compute_margin_alerts(db: Session, pharmacy_id, df, dt, category_type: str)
         base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
         # PG-007
-        base_filter_a.append(Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)))
+        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":

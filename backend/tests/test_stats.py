@@ -177,6 +177,33 @@ class TestGetStats:
         # marge should be positive
         assert marge["marge_brute_dh"] > 0
 
+    def test_pg007_null_delivery_ref_is_not_silently_excluded(self, client, db, test_owner):
+        """PG-007 regression: `Achat.delivery_ref` is nullable (Sobrus often omits the BL ref
+        on imports), and the naïve `Achat.delivery_ref.notin_(bl_excluded_sub)` filter
+        evaluates `NULL NOT IN (...)` to NULL — which the WHERE clause treats as false,
+        silently dropping rows with no BL ref from every dashboard tile / marge aggregate.
+
+        Insert two Achats with the same medicament — one with a BL ref, one without.
+        `achats_total` must include BOTH (and BOTH the corresponding marge contributions),
+        regardless of whether the pharmacist has any BL exclusions configured."""
+        from tests.factories import make_medicament, make_achat, make_vente
+
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG007-NULL", product="Imported Without BL Ref",
+            category="Medicament (20.00%)", tva="TVA (20.00%)",
+            pph=80.0, ppv=100.0,
+        )
+        # One with a BL ref, one without — both should contribute to /stats totals.
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=80.0, delivery_date="2026-03-01", delivery_ref="BL-WITH")
+        make_achat(db, med, pharmacy_id, quantity=10, unit_price=80.0, delivery_date="2026-03-02", delivery_ref=None)
+        make_vente(db, med, pharmacy_id, quantity=15, unit_price=100.0, date="2026-03-15")
+
+        body = client.get("/stats", headers=test_owner["headers"]).json()
+        # Both achats = 10×80 + 10×80 = 1600 MAD. If NULL-row was dropped we'd see only 800.
+        assert body["kpis"]["achats_total"] == 1600.0, \
+            f"NULL delivery_ref row was silently dropped; got achats_total={body['kpis']['achats_total']}"
+
     def test_pg013_followup_marge_skips_meds_with_no_achat(self, client, db, test_owner, stats_data):
         """PG-013 follow-up: the dashboard marge tile (/stats) used to PPH-fall-back to fill in
         PU for meds with sales but no purchases, which gave a fake 0 % margin when Sobrus stored
