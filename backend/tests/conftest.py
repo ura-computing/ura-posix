@@ -73,7 +73,13 @@ def client(db):
 
 @pytest.fixture()
 def test_pharmacy(db) -> Pharmacy:
-    pharmacy = Pharmacy(name="Pharmacie Test", address="123 Rue Test")
+    from utils.pharmacy_code import generate_pharmacy_code
+    pharmacy = Pharmacy(
+        name="Pharmacie Test",
+        address="123 Rue Test",
+        city="Casablanca",
+        code=generate_pharmacy_code(db, "Casablanca"),
+    )
     db.add(pharmacy)
     db.flush()
     return pharmacy

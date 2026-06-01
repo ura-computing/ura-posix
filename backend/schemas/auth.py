@@ -9,9 +9,10 @@ class UserSignup(BaseModel):
     name: str
     phone: Optional[str] = None
     role: str = Role.OWNER              # owner | employee
-    pharmacy_name: Optional[str] = None   # for owners creating a new pharmacy
-    pharmacy_city: Optional[str] = None   # required when owner creates a new pharmacy
-    pharmacy_id: Optional[int] = None    # for employees, or owners joining existing
+    pharmacy_name: Optional[str] = None   # owner creating a new pharmacy
+    pharmacy_city: Optional[str] = None   # owner creating a new pharmacy
+    pharmacy_code: Optional[str] = None   # owner joining existing OR employee joining
+    pharmacy_id: Optional[int] = None    # legacy: still accepted for backward compat
 
 
 class UserLogin(BaseModel):

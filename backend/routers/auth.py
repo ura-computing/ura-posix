@@ -58,25 +58,36 @@ def signup(request: Request, body: UserSignup, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email déjà enregistré")
 
-    if body.role == Role.EMPLOYEE:
-        raise HTTPException(
-            status_code=400,
-            detail="Les employés ne peuvent pas créer de compte. Demandez à votre propriétaire de pharmacie de vous inviter.",
-        )
-    role = Role.OWNER
+    role = body.role if body.role in (Role.OWNER, Role.EMPLOYEE) else Role.OWNER
 
     resolved_pharmacy_name = None
     resolved_pharmacy_id = None
 
-    if body.pharmacy_id:
+    # Resolution priority: pharmacy_code > pharmacy_id (legacy) > new pharmacy from name+city (owner only).
+    if body.pharmacy_code:
+        from sqlalchemy import func as _sa_func
+        code = body.pharmacy_code.strip().upper()
+        pharmacy = (
+            db.query(Pharmacy)
+            .filter(_sa_func.upper(Pharmacy.code) == code)
+            .first()
+        )
+        if not pharmacy:
+            raise HTTPException(status_code=400, detail=f"Code de pharmacie '{body.pharmacy_code}' introuvable")
+        resolved_pharmacy_name = pharmacy.name
+        resolved_pharmacy_id = pharmacy.id
+    elif body.pharmacy_id:
         pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
         if not pharmacy:
             raise HTTPException(status_code=400, detail="Pharmacie introuvable")
         resolved_pharmacy_name = pharmacy.name
         resolved_pharmacy_id = pharmacy.id
     else:
+        # No code / id → must be an OWNER creating a new pharmacy. Employees can't self-create.
+        if role != Role.OWNER:
+            raise HTTPException(status_code=400, detail="Code de pharmacie requis pour rejoindre une pharmacie existante")
         if not body.pharmacy_name:
-            raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour les nouveaux propriétaires")
+            raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour créer une nouvelle pharmacie")
         if not body.pharmacy_city:
             raise HTTPException(status_code=400, detail="Ville requise pour créer une nouvelle pharmacie")
         from utils.pharmacy_code import generate_pharmacy_code

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, type ReactNode } from "react";
 import { Link } from "react-router";
+import { useMe } from "@/hooks/useMe";
 import { usePharmacyStats, useAnalyseMarge, useMarginAlerts, useStockAbcd } from "@/hooks/usePharmacyRapports";
 import {
   AreaChart,
@@ -53,7 +54,6 @@ import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import * as statsApi from "@/api/stats";
 import type { MarginAlertBracket } from "@/api/stats";
 import { fmt, fmtInt } from "@/utils/format";
-import { currentMonth } from "@/utils/dateRange";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
@@ -62,9 +62,12 @@ import { CHART_COLORS, CAT_COLORS, getTypeTheme } from "@/constants/theme";
 import { eCategoryType } from "@/types";
 
 export function PharmacyRapports() {
-  const _initial = currentMonth();
-  const [dateFrom, setDateFrom] = useState(_initial.from);
-  const [dateTo, setDateTo] = useState(_initial.to);
+  const { me: identity } = useMe();
+  // Default to no date filter so freshly-imported data is visible without
+  // the user manually widening the range. Pharmacists can still narrow via
+  // the date picker.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
   // Performance banner: collapsed by default, persisted per-user.
   const [perfOpen, setPerfOpen] = useState<boolean>(() => {
@@ -295,6 +298,19 @@ export function PharmacyRapports() {
 
   return (
     <div className="space-y-4">
+      {(identity?.pharmacy_name || identity?.pharmacy_code) && (
+        <div className="flex items-center gap-2">
+          {identity.pharmacy_name && (
+            <h1 className="text-xl font-semibold tracking-tight">{identity.pharmacy_name}</h1>
+          )}
+          {identity.pharmacy_code && (
+            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-mono tracking-wide text-muted-foreground">
+              {identity.pharmacy_code}
+            </span>
+          )}
+        </div>
+      )}
+
       <PageFilter
         dateFrom={dateFrom}
         dateTo={dateTo}
