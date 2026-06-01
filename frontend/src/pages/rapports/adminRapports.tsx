@@ -25,7 +25,6 @@ import { MonthlyTrendChart } from "@/components/monthlyTrendChart";
 import { AnalyseMargeTable, type MargeMode } from "./margeTable";
 import * as statsApi from "@/api/stats";
 import { fmt } from "@/utils/format";
-import { currentMonth } from "@/utils/dateRange";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import { shortMonth, downloadBlob, KpiSkeleton } from "./shared";
@@ -35,9 +34,11 @@ import { eCategoryType } from "@/types";
 
 export function AdminRapports() {
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<number | null>(null);
-  const _initial = currentMonth();
-  const [dateFrom, setDateFrom] = useState(_initial.from);
-  const [dateTo, setDateTo] = useState(_initial.to);
+  // Default to no date filter so freshly-imported data is visible without
+  // the user manually widening the range. Pharmacists can still narrow via
+  // the date picker.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [margeMode, setMargeMode] = useState<MargeMode>("produit");

@@ -3,13 +3,14 @@ import { useAnalyseMarge } from "@/hooks/usePharmacyRapports";
 import { eCategoryType } from "@/types";
 import { MARGE_COLS, type MargeMode } from "@/pages/rapports/margeTable";
 import { downloadXlsx, exportFilename } from "@/utils/table";
-import { currentMonth } from "@/utils/dateRange";
 import { tokenizeSearch } from "@/utils/search";
 
 export function useAnalysePage() {
-  const _initial = currentMonth();
-  const [dateFrom, setDateFrom] = useState(_initial.from);
-  const [dateTo, setDateTo] = useState(_initial.to);
+  // Default to no date filter so freshly-imported data is visible without
+  // the user manually widening the range. Pharmacists can still narrow via
+  // the date picker.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [margeMode, setMargeMode] = useState<MargeMode>("produit");
   const [search, setSearch] = useState("");

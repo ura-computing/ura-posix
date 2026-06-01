@@ -33,7 +33,6 @@ import { DataTable } from "@/components/DataTable/dataTable";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/utils/cn";
 import { fmt } from "@/utils/format";
-import { currentMonth } from "@/utils/dateRange";
 import { eCategoryType } from "@/types";
 import { usePayments, useSavePayment } from "@/hooks/useAccounting";
 import { usePharmacyStats } from "@/hooks/usePharmacyRapports";
@@ -52,9 +51,11 @@ function getCurrentMonth() {
 }
 
 export default function ComptabilitePage() {
-  const _initial = currentMonth();
-  const [dateFrom, setDateFrom] = useState(_initial.from);
-  const [dateTo, setDateTo] = useState(_initial.to);
+  // Default to no date filter so freshly-imported data is visible without
+  // the user manually widening the range. Pharmacists can still narrow via
+  // the date picker.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [withSpecial, setWithSpecial] = useState(true); // include "produits spéciaux" by default
   const [dialogOpen, setDialogOpen] = useState(false);

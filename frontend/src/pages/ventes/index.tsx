@@ -17,7 +17,6 @@ import { TvaMultiSelect } from "@/components/tvaMultiSelect";
 import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
-import { currentMonth } from "@/utils/dateRange";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
@@ -107,9 +106,11 @@ const VentesList = () => {
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [selectedTva, setSelectedTva] = useState<string[]>([]);
   const [allTvaRates, setAllTvaRates] = useState<string[]>([]);
-  const _initial = currentMonth();
-  const [dateFrom, setDateFrom] = useState(_initial.from);
-  const [dateTo, setDateTo] = useState(_initial.to);
+  // Default to no date filter so freshly-imported data is visible without
+  // the user manually widening the range. Pharmacists can still narrow via
+  // the date picker.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [categoryType, setCategoryType] = useState<eCategoryType>(eCategoryType.ALL);
   const [exporting, setExporting] = useState(false);
   const [venteFilter, setVenteFilter] = useState<string>("all-flagged");
