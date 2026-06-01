@@ -97,6 +97,7 @@ export type SignupPayload = {
   role?: eUserRole.OWNER | eUserRole.EMPLOYEE;
   pharmacy_name?: string;
   pharmacy_city?: string;
+  pharmacy_code?: string;
   pharmacy_id?: number;
 };
 

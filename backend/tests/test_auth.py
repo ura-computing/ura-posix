@@ -50,16 +50,81 @@ def test_signup_owner_missing_city_400(client):
     assert "ville" in res.json()["detail"].lower()
 
 
-def test_signup_employee_rejected_400(client, test_pharmacy):
+def test_signup_employee_requires_pharmacy_code(client):
+    """Employees can self-signup but only via a pharmacy_code (PG-021 ext)."""
+    res = client.post("/auth/signup", json={
+        "email": "newemp-nocode@example.com",
+        "password": "secret123",
+        "name": "Employee Without Code",
+        "role": "employee",
+    })
+    assert res.status_code == 400
+    assert "code" in res.json()["detail"].lower()
+
+
+def test_signup_employee_with_pharmacy_code_succeeds(client, test_owner):
+    """Employee signup with a valid pharmacy_code joins that pharmacy (status PENDING)."""
+    code = test_owner["pharmacy"].code
+    assert code, "test_owner's pharmacy should have an auto-generated code"
     res = client.post("/auth/signup", json={
         "email": "newemp@example.com",
         "password": "secret123",
         "name": "New Employee",
+        "phone": "0611111122",
         "role": "employee",
-        "pharmacy_id": test_pharmacy.id,
+        "pharmacy_code": code,
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["user"]["role"] == Role.EMPLOYEE
+    assert data["user"]["status"] == Status.PENDING
+    assert data["user"]["pharmacy_id"] == test_owner["pharmacy"].id
+    assert data["user"]["pharmacy_code"] == code
+
+
+def test_signup_owner_join_via_pharmacy_code(client, test_owner):
+    """An owner can join an existing pharmacy by pasting its code (no dropdown)."""
+    code = test_owner["pharmacy"].code
+    res = client.post("/auth/signup", json={
+        "email": "co-owner@example.com",
+        "password": "secret123",
+        "name": "Co Owner",
+        "phone": "0611111133",
+        "role": "owner",
+        "pharmacy_code": code,
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["user"]["role"] == Role.OWNER
+    assert data["user"]["pharmacy_id"] == test_owner["pharmacy"].id
+    assert data["user"]["pharmacy_code"] == code
+
+
+def test_signup_pharmacy_code_unknown_400(client):
+    """Unknown pharmacy_code returns 400 with the offending code in the message."""
+    res = client.post("/auth/signup", json={
+        "email": "ghost@example.com",
+        "password": "secret123",
+        "name": "Ghost",
+        "role": "employee",
+        "pharmacy_code": "XYZ9999",
     })
     assert res.status_code == 400
-    assert "invit" in res.json()["detail"].lower()
+    assert "XYZ9999" in res.json()["detail"]
+
+
+def test_signup_pharmacy_code_is_case_insensitive(client, test_owner):
+    """`bou0001` and `BOU0001` should resolve to the same pharmacy."""
+    code = test_owner["pharmacy"].code
+    res = client.post("/auth/signup", json={
+        "email": "lowercase-code@example.com",
+        "password": "secret123",
+        "name": "Lowercase Code",
+        "role": "employee",
+        "pharmacy_code": code.lower(),
+    })
+    assert res.status_code == 200
+    assert res.json()["user"]["pharmacy_id"] == test_owner["pharmacy"].id
 
 
 def test_signup_duplicate_email_400(client):
