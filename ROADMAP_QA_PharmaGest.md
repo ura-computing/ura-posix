@@ -92,6 +92,234 @@ pass per ticket against this map.
   Analyses → Liste mode was the only outlier — a hand-rolled `<table>` with static `<th>` and
   no click handlers. Added per-column sort (asc/desc with ↑/↓ arrows + French-locale comparator,
   nulls-last) while preserving the not-found-first default ordering.
+- **PG-003 ✅ shipped** — commit `3aec11e`. `xlsx` (SheetJS) was already in package.json so the
+  deferral was wrong — just swapped `downloadCSV` for a new `downloadXlsx` and migrated all 6
+  call sites (achat, ventes ×2, stock, admin/catalog, analyse-liste). Auto column widths,
+  numeric cells stay numeric in Excel, dynamic import keeps the lib out of the initial bundle.
+  No more CSV anywhere in the pharmacist UI.
+- **PG-018 + PG-019 ✅ shipped** — commit `128a3c3`. PG-018 was a data-scope non-bug after
+  PG-003's refactor — exportCsv (now downloadXlsx) is correctly scoped to MARGE_COLS[margeMode];
+  only the misleading "Exporter CSV" button label needed fixing → "Exporter Excel". PG-019 had
+  two real bugs in the Achat page Type column: the column id was `type` while the export key
+  was `category_type` (so the column never reached the export) and the Diététique→Pharmacie
+  reclassification from PG-020 only existed server-side (the client-side regex still showed
+  Diététique as Parapharmacie). Added `classify_pharma_type` helper in utils/strings.py that
+  mirrors `_pharma_expr` exactly; `_build_achat_row` now returns `category_type`; the table
+  column is rewired to read from the backend field; export includes the column.
+
+## PG-017 ✅ shipped (2026-05-31)
+
+Reordered the Analyses tabs to follow pharmacy workflow: product-side analyses first
+(Produit, Catégorie), then supplier-side (Laboratoire, Grossistes), then Client, then
+time (Mois, Année), then Liste. `MODE_LABELS` insertion order drives the rendering at
+[pages/analyse/index.tsx:21-30](frontend/src/pages/analyse/index.tsx#L21-L30); 1-line
+change. Opinionated default — easy to flip if the client prefers a different sequence.
+
+## PG-007 (achats half) ✅ shipped (2026-05-31)
+
+Achats-only BL exclusion: pharmacist excludes a delivery_ref → it drops out of every
+Achat-side aggregate everywhere the dashboard already filters non-declared products.
+
+**Backend.**
+- New model `PharmacyBlExclusion(pharmacy_id, delivery_ref, notes, created_at,
+  unique(pharmacy_id, delivery_ref))` in [models/catalog.py](backend/models/catalog.py);
+  table is bootstrapped by `Base.metadata.create_all` on next boot.
+- New shared helper `bl_excluded_sub(db, pharmacy_id)` in
+  [backend/utils/exclusions.py](backend/utils/exclusions.py) — returns the subquery of
+  excluded delivery_refs. Paired with the existing inline `non_declared_sub` at **9 Achat
+  filter sites** (queries.py × 5, router.py × 2, marge.py × 2). Vente filters are
+  intentionally untouched — schema has no Vente↔BL link (see "PG-007 ventes half" still
+  in roadmap).
+- New router [backend/routers/bl_exclusions.py](backend/routers/bl_exclusions.py),
+  registered at `/bl-exclusions` in main.py:
+  - `GET /bl-exclusions` — current pharmacy's excluded BLs, enriched with
+    supplier / delivery_date / total / nb_lines from Achat.
+  - `POST /bl-exclusions` — body `{delivery_ref, notes?}`; rejects unknown BLs and
+    duplicates.
+  - `DELETE /bl-exclusions/{delivery_ref}` — reintegrate.
+  - `GET /bl-exclusions/suggestions?q=…` — top 10 BL refs in this pharmacy's
+    achats matching `q` (ilike), with the same enriched per-BL summary so the
+    pharmacist can confirm before excluding.
+
+**Frontend.**
+- New `api/blExclusions.ts` + matching `hooks/useBlExclusions.ts` exposing
+  `useBlExclusions`, `useBlSuggestions`, `useCreateBlExclusion`, `useDeleteBlExclusion`.
+- The "Produits spéciaux" page
+  ([pages/owner/catalogRequests.tsx](frontend/src/pages/owner/catalogRequests.tsx))
+  gains a second header button "Exclure un BL" (Receipt icon), a second list section
+  "BL exclus de la comptabilité" with the same Réintégrer affordance as products, and a
+  second Dialog for BL search (autocomplete on delivery_ref → click suggestion → optional
+  note → Exclure).
+
+**Tests.**
+- 13 new tests in
+  [backend/tests/test_bl_exclusions.py](backend/tests/test_bl_exclusions.py):
+  CRUD coverage, suggestions search, admin 403, and three filter-integration tests
+  that prove (a) `achats_total` drops by exactly the excluded BL's value,
+  (b) `analyse-marge?mode=bl` no longer lists the excluded ref, and
+  (c) `ventes_total` is NOT affected (achats-only scope). **316 backend tests pass.**
+  Frontend tsc clean, 112 vitest tests pass.
+
+**Out of scope (ventes half).** No Vente↔BL link exists in the schema. The roadmap
+keeps "ship the ventes-matching half once the client picks a matching rule" as a
+follow-up.
+
+## PG-022 ✅ shipped (2026-05-31) — commit `711706b`
+
+Fixed the per-product `Marge Nette` mismatch in `excel.py:107-115` by also dividing
+`avg_pu` by `(1 + tva_rate)` before subtracting. Aggregate `marge_nette_dh` from
+`queries._marge_for_window` was untouched — it was already HT-correct. Regression
+test `test_pg022_marge_net_per_product_uses_pu_ht` exports the worked example
+(PPV=61, PU=58, TVA=20 %, qty=1), opens the .xlsx with openpyxl, and asserts brut
+> 0, net > 0, and net ≈ brut / 1.20. 303 backend tests pass.
+
+## NEW — PG-022 — Negative Marge Nette per-product in the Excel export (2026-05-31)
+
+Client reports the Excel rapport has products where **Marge Brute is positive but Marge Nette
+is negative** — impossible if the formulas are right; makes monthly accounting unreliable.
+
+**Root cause (isolated, single line).**
+[backend/routers/stats/excel.py:107-115](backend/routers/stats/excel.py#L107-L115) per-product
+row builder:
+
+```python
+tva_rate   = _parse_tva_rate(r.tva)
+avg_pu     = float(r.avg_pu or 0)
+ppv        = float(r.ppv  or 0)
+qty        = float(r.qty  or 0)
+
+ppv_ht     = round(ppv / (1 + tva_rate), 4) if tva_rate > 0 and ppv else ppv
+marge_pct  = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else "—"
+marge_brut = round((ppv - avg_pu) * qty, 2)      if ppv and avg_pu else "—"
+marge_net  = round((ppv_ht - avg_pu) * qty, 2)   if ppv and avg_pu else "—"   # ← BUG
+```
+
+`marge_brut` correctly subtracts `avg_pu` (TTC) from `ppv` (TTC) → TTC margin.
+`marge_net` subtracts `avg_pu` (TTC) from `ppv_ht` (HT) — apples to oranges. Whenever
+`(PPV − TVA share) < PU`, the row flips negative even though the real economic margin is positive.
+
+**Worked example** (PPV=61, PU=58, TVA=20 %, qty=1):
+- `ppv_ht = 61 / 1.20 = 50.83`
+- `marge_brut = (61 − 58) × 1 = +3.00` ✅
+- `marge_net = (50.83 − 58) × 1 = −7.17` ❌ negative
+- **Correct** `marge_net = (50.83 − 58/1.20) × 1 = (50.83 − 48.33) × 1 = +2.50` ✅
+
+The aggregate `marge_nette_dh` from
+[queries._marge_for_window:187-193](backend/routers/stats/queries.py#L187-L193) is **already
+correct** (it divides BOTH `ppv` and `pu` by `(1+tva)` — that's why the top-line "Marge nette (HT)"
+in the rapport summary is fine). The bug only affects the per-row cells in each "Produits" sheet.
+
+**Fix.** One-line change in `excel.py`:
+
+```python
+ppv_ht     = round(ppv / (1 + tva_rate), 4) if tva_rate > 0 and ppv else ppv
+pu_ht      = avg_pu / (1 + tva_rate)        # NEW
+marge_pct  = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else "—"
+marge_brut = round((ppv - avg_pu) * qty, 2) if ppv and avg_pu else "—"
+marge_net  = round((ppv_ht - pu_ht) * qty, 2) if ppv and avg_pu else "—"   # was: (ppv_ht - avg_pu)
+```
+
+Equivalent and shorter: `marge_net = round(marge_brut / (1 + tva_rate), 2)` — same value, no extra
+variable needed. Use whichever reads clearer in context.
+
+**Regression test.** Add to `backend/tests/test_stats.py` (existing `TestExportExcel` class) a
+case that builds a product with PPV=61 TTC, PU=58 TTC, TVA=20 % (the worked example above), opens
+the produced .xlsx with openpyxl, walks the "Produits" sheet, finds the row, and asserts
+`marge_net > 0` and `marge_net ≈ marge_brut / 1.20`. Bonus: a mixed-TVA fixture asserting that the
+sum of per-product `marge_net` ≈ the aggregate `marge_nette_dh` from the summary sheet (within
+rounding).
+
+**Critical files.**
+- `backend/routers/stats/excel.py` — 2-line fix.
+- `backend/tests/test_stats.py` — extend `TestExportExcel`.
+
+**Effort:** XS code, S testing (need an openpyxl reader path in the test).
+
+**Insert into execution order.** Promote to Phase 1 (CRITIQUE — monthly accounting reliability)
+right after PG-005/PG-012 unblocks, since the two are conceptually related (real PU). Until
+PG-005 ships, this fix is *still* worth doing — the products that DO have a PU populated will
+have correct nette margins.
+
+---
+
+## Status of every other "remaining" item (client called these out, no plan changes needed)
+
+The 2026-05-31 client summary lists 3 other items besides the new bug above. **All three are
+already in the roadmap with the correct blockers documented and no action possible on our side
+yet:**
+
+1. **PG-005 + PG-012 — Real purchase price after discount.** Roadmap has the JUNIOR worked
+   example, the audit of the Sobrus CSV format (one sample = post-remise, the client's BL =
+   pre-remise), and both branches of the fix (with/without a Remise column). The client's
+   own summary confirms the same diagnosis ("Sobrus sometimes exports pre-discount, sometimes
+   post-discount — the developer needs a CSV from the pharmacy"). **Still blocking: a real
+   Sobrus CSV from this pharmacy that contains the JUNIOR row.** The user's additional
+   examples (DOLIPRANE 1000MG with CA=222.7 MAD no margin; CIALIS 5MG sold for 582 MAD no
+   margin) are products that have **sales but no `Achat.unit_price`** — that's a separate
+   downstream effect of PG-013 (no fake margin from PPH fallback), and is the correct
+   behaviour until the Achat data is reconciled. PG-005 will recover their margins.
+
+2. **PG-007 — BL exclusion.** Roadmap already says ship the achats half alone now and discuss
+   the ventes-matching rule with the client (no Vente↔BL FK exists). Same status; same
+   blocker.
+
+3. **PG-017 — Reorder Analyses tabs.** Trivial; needs the client's preferred order. Same
+   status.
+
+## Deploy gap (2026-05-31)
+
+User reports the deployed Analyse export still produces CSV. **It does — but not because of
+new code. The fix shipped but isn't deployed.**
+
+- `git log origin/main..origin/dev` shows **2 commits on `dev` that never reached `main`**:
+  - `3aec11e` `fix(PG-003): all pharmacist exports ship .xlsx — CSV is gone`
+  - `e49bdf7` `docs(roadmap): mark PG-003 ✅ shipped (CSV is gone)`
+- `git log origin/dev..dev` shows **2 commits local-only on `dev`**:
+  - `128a3c3` `fix(PG-018 + PG-019): label "Excel" + Pharmacie/Para in Achat export`
+  - `7c79abd` `docs(roadmap): mark PG-018 + PG-019 ✅ shipped`
+- `.do/app.yaml` doesn't pin a branch — the deploy follows whatever is configured in the DO
+  dashboard. The fact the user is still seeing CSV on `apcm-pharma-oz59r.ondigitalocean.app`
+  strongly implies the deploy tracks **`main`**, where PG-003 is missing.
+
+**Plan — close the loop in three steps (all require user authorization):**
+
+1. **Push the 2 local commits to `origin/dev`** so PG-018 (button label) joins PG-003:
+   ```
+   git push origin dev
+   ```
+2. **Fast-forward `main` to `dev`** to publish to the deployed build:
+   ```
+   git checkout main && git merge --ff-only dev && git push origin main && git checkout dev
+   ```
+   No conflicts possible because `dev` is strictly ahead of `main` (linear history).
+3. **Wait for the DigitalOcean App Platform autodeploy** (or trigger it manually in the
+   dashboard). Verify: open the Analyse page → click *Exporter Excel* → confirm the downloaded
+   filename ends in `.xlsx` and opens in Excel as a proper spreadsheet (not a CSV with `.xlsx`
+   extension).
+
+**Small cosmetic follow-up to ship in the same push (optional but worth it):**
+
+- Rename `exportCsv` → `exportXlsx` in
+  [hooks/useAnalysePage.ts:92](frontend/src/hooks/useAnalysePage.ts#L92) and update the import
+  in [pages/analyse/index.tsx:53](frontend/src/pages/analyse/index.tsx#L53). The function body
+  has shipped `downloadXlsx` since `3aec11e`; only the identifier (and a stale comment on
+  line 93) still says "csv". No behavior change, just removes the misleading name future-me
+  would grep for and waste 10 minutes on.
+
+**Verification that nothing else leaks CSV (already done):**
+
+```
+grep -rnE "\.csv|csv;charset|text/csv|downloadCSV\b" frontend/src --include='*.tsx' --include='*.ts'
+```
+
+Surviving hits are all benign:
+- `pages/upload-file/index.tsx:151,245` — Sobrus CSV **import** (upload to backend, unchanged).
+- `pages/parametres/index.tsx:514` — strips `.csv` suffix when displaying an imported batch
+  filename. Display-only.
+- `pages/analyse/index.tsx:102,395,403` — the **Liste-mode list importer** ("Importer un
+  fichier CSV") that takes a pharmacist's product list. **Import**, not export — and Sobrus
+  produces CSVs, so accepting CSV here is correct. (Could *additionally* accept `.xlsx` as a
+  later UX nicety; not in scope for this fix.)
 
 ---
 
@@ -461,8 +689,8 @@ Phase 1 (sequential, fastest-impact first):
 
   Side quests: PG-013 follow-up ✅ (commit 5907fdf), PG-021 ✅ (commit 1f807be).
 
-Phase 2 (bundle the export tickets together for one Excel/PDF infra change):
-  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → { PG-003 + PG-018 + PG-019 } → PG-007 (after client
+Phase 2:
+  PG-009 ✅ → PG-008 ✅ → PG-006 ✅ → PG-003 ✅ → PG-018 ✅ → PG-019 ✅ → PG-007 (after client
   clarifies the ventes-matching rule; ship BL-by-number exclusion alone first)
 
 Phase 3 — quick UX wins (any order, batch in one PR if possible):

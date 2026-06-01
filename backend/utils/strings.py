@@ -22,6 +22,28 @@ def strip_percentage(s: str) -> str:
     return _PCT_RE.sub("", s).strip()
 
 
+# Keywords matched against `Medicament.category` to classify Pharmacie vs Parapharmacie.
+# Must stay in sync with `_pharma_expr()` in backend/routers/stats/queries.py — the SQL
+# version is the source of truth used by aggregates; this Python helper is for per-row
+# serialisation (PG-019 / Achat export `category_type`).
+_PHARMA_CATEGORY_KEYWORDS = ("edicament", "édicament", "oméopath", "omeopath", "iététique", "ietetique")
+
+
+def classify_pharma_type(category: str | None, product_type: str | None = None) -> str:
+    """Return ``"pharmacie"`` or ``"parapharmacie"`` for a Medicament.
+
+    Admin override via `Medicament.product_type` ("pharmacie" / "parapharmacie")
+    wins; otherwise we keyword-match the category string (Médicament, Homéopathie,
+    Diététique → pharmacie; anything else → parapharmacie). Mirrors `_pharma_expr()`.
+    """
+    if product_type == "pharmacie":
+        return "pharmacie"
+    if product_type == "parapharmacie":
+        return "parapharmacie"
+    cat = (category or "").lower()
+    return "pharmacie" if any(kw in cat for kw in _PHARMA_CATEGORY_KEYWORDS) else "parapharmacie"
+
+
 # ── Mojibake fix ──────────────────────────────────────────────────────────────
 # Sobrus exports sometimes arrive double-encoded: original UTF-8 bytes were
 # decoded as MacRoman (or cp1252) and then re-saved as UTF-8. The result is

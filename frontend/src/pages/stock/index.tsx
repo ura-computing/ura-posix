@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router";
 import { Download, Package, UploadCloud } from "lucide-react";
-import { downloadCSV, exportFilename } from "@/utils/table";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 
 import { ListView } from "@/components/shared/listView";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
@@ -286,23 +286,24 @@ const StockList = () => {
           <>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const rows = (stockAbcd?.products ?? []) as unknown as Record<string, unknown>[];
                 if (!rows.length) return;
-                downloadCSV(
+                await downloadXlsx(
                   rows,
                   (r) => [
                     String(r.product ?? ""),
                     String(r.category ?? ""),
-                    String(r.units_sold_12m ?? 0),
-                    String(r.current_stock ?? ""),
-                    String(r.stock_min ?? ""),
-                    String(r.stock_max ?? ""),
-                    r.ppv != null ? fmt(r.ppv as number) : "",
-                    r.avg_pu != null ? fmt(r.avg_pu as number) : "",
+                    Number(r.units_sold_12m ?? 0),
+                    r.current_stock != null ? Number(r.current_stock) : "",
+                    r.stock_min != null ? Number(r.stock_min) : "",
+                    r.stock_max != null ? Number(r.stock_max) : "",
+                    r.ppv != null ? Number(r.ppv) : "",
+                    r.avg_pu != null ? Number(r.avg_pu) : "",
                   ],
                   ["Produit", "Classe", "Ventes 12m", "Stock actuel", "Stock min", "Stock max", "PPV", "PU moyen"],
-                  exportFilename("STOCK", "csv", dateFrom || undefined, dateTo || undefined),
+                  exportFilename("STOCK", "xlsx", dateFrom || undefined, dateTo || undefined),
+                  "Stock",
                 );
               }}
               disabled={!stockAbcd?.products?.length}

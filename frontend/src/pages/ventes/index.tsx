@@ -18,7 +18,7 @@ import * as transactionsApi from "@/api/transactions";
 import { toast } from "sonner";
 import { fmt } from "@/utils/format";
 import { currentMonth } from "@/utils/dateRange";
-import { downloadCSV, exportFilename } from "@/utils/table";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 import { SuffixBadge } from "@/components/suffixBadge";
 import { ColumnVisibilityToggle } from "@/components/columnVisibilityToggle";
 import { cn } from "@/utils/cn";
@@ -454,7 +454,7 @@ const VentesList = () => {
       const visibleCols = tableInstance.getAllColumns().filter(col => (!col.getCanHide() || col.getIsVisible()) && colValues[col.id]);
       const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
       const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
-      downloadCSV(res.data, rowMapper, headers, exportFilename("VENTE", "csv", dateFrom || undefined, dateTo || undefined));
+      await downloadXlsx(res.data, rowMapper, headers, exportFilename("VENTE", "xlsx", dateFrom || undefined, dateTo || undefined), "Ventes");
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");
@@ -483,7 +483,7 @@ const VentesList = () => {
       const headers = visibleCols.map(col => VENTE_COL_LABELS[col.id] ?? col.id);
       const rowMapper = (r: Record<string, unknown>) => visibleCols.map(col => colValues[col.id]!(r));
       const tabLabel = venteFilterTabs.find((t) => t.key === venteFilter)?.label ?? "SURVEILLANCE";
-      downloadCSV(res.data, rowMapper, headers, exportFilename(`VENTE ${tabLabel.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined));
+      await downloadXlsx(res.data, rowMapper, headers, exportFilename(`VENTE ${tabLabel.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined), "Ventes");
       toast.success(`${res.data.length} lignes exportées`);
     } catch {
       toast.error("Erreur lors de l'export");

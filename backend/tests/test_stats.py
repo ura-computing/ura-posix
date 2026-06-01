@@ -483,6 +483,52 @@ class TestExportExcel:
         assert res.status_code == 200
         assert len(res.content) > 100
 
+    def test_pg022_marge_net_per_product_uses_pu_ht(self, client, db, test_owner):
+        """PG-022: the per-product 'Marge Nette' column must compare HT to HT.
+
+        Worked example from the audit: PPV=61 TTC, PU=58 TTC, TVA=20 %, qty=1.
+            - marge_brut = (61 − 58) × 1 = +3.00
+            - Before the fix: marge_net = (PPV_HT − PU_TTC) × 1 = (50.83 − 58) × 1 = −7.17 ❌
+            - After  the fix: marge_net = (PPV_HT − PU_HT)  × 1 = (50.83 − 48.33) × 1 = +2.50 ✅
+            - which equals marge_brut / (1 + TVA) = 3.00 / 1.20 = 2.50.
+        """
+        import io
+        from openpyxl import load_workbook
+
+        pharmacy_id = test_owner["pharmacy"].id
+        med = make_medicament(
+            db, pid="PG022-TIGHT", product="Tight Margin Medicament 20pct",
+            category="Medicament (20.00%)", tva="TVA (20.00%)",
+            pph=58.0, ppv=61.0,
+        )
+        make_achat(db, med, pharmacy_id, quantity=1, unit_price=58.0, delivery_date="2026-03-01")
+        make_vente(db, med, pharmacy_id, quantity=1, unit_price=61.0, date="2026-03-15")
+
+        res = client.get("/stats/export-excel", headers=test_owner["headers"])
+        assert res.status_code == 200
+
+        wb = load_workbook(io.BytesIO(res.content), read_only=True, data_only=True)
+        # First sheet is "Résumé" (or similar summary); products live in "Produits"-prefixed sheets.
+        produits_sheet = next(
+            (wb[name] for name in wb.sheetnames if name.lower().startswith("produits")),
+            None,
+        )
+        assert produits_sheet is not None, f"no Produits sheet in {wb.sheetnames}"
+
+        rows = list(produits_sheet.iter_rows(values_only=True))
+        headers = list(rows[0])
+        idx_product = headers.index("Médicament")
+        idx_brut    = headers.index("Marge Brute (MAD)")
+        idx_net     = headers.index("Marge Nette (MAD)")
+        row = next((r for r in rows[1:] if r[idx_product] == med.product), None)
+        assert row is not None, f"product not found in Produits sheet; got rows: {rows[1:]}"
+
+        brut, net = row[idx_brut], row[idx_net]
+        assert isinstance(brut, (int, float)) and brut > 0, f"brut should be positive, got {brut!r}"
+        assert isinstance(net,  (int, float)) and net  > 0, f"PG-022: net must NOT be negative when brut > 0 (got brut={brut}, net={net})"
+        # net ≈ brut / 1.20 (TVA 20 %) — accept a 1-centime rounding window
+        assert abs(net - brut / 1.20) < 0.01, f"PG-022: net={net} should ≈ brut/1.20 = {brut/1.20}"
+
 
 # ── GET /admin/pharmacy/{id}/stats ───────────────────────────────────────────
 

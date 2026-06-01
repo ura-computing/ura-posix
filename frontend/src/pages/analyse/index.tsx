@@ -18,14 +18,17 @@ import { cleanHeader, fixMojibake } from "@/utils/encoding";
 import { useAnalysePage } from "@/hooks/useAnalysePage";
 import { AnalyseMargeTable, type MargeMode } from "@/pages/rapports/margeTable";
 
+// PG-017 — order pharmacists actually work in: product-side analyses first
+// (Produit, Catégorie), then supplier-side (Laboratoire, Grossistes), then
+// Client, then time (Mois, Année), then the special Liste mode.
 const MODE_LABELS = {
   produit: "Produit",
-  operateur: "Client",
+  categorie: "Catégorie",
   laboratoire: "Laboratoire",
   grossiste: "Grossistes",
+  operateur: "Client",
   mois: "Mois",
   annee: "Année (pivot)",
-  categorie: "Catégorie",
   bl: "Liste",
 } as const;
 
@@ -50,7 +53,7 @@ export default function AnalysePage() {
     margeData, margeLoading, allRows,
     selected, kpis,
     toggleRow, toggleAll, resetSelection,
-    exportCsv,
+    exportXlsx,
   } = useAnalysePage();
 
   // Liste mode: store imported product names, re-query when filters change
@@ -187,9 +190,9 @@ export default function AnalysePage() {
               {selected.size === allRows.length && allRows.length > 0 ? "Tout désélectionner" : "Tout sélectionner"}
             </Button>
             {kpis.count > 0 && (
-              <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportCsv}>
+              <Button size="sm" variant="outline" className="h-9 text-xs gap-1.5" onClick={exportXlsx}>
                 <Download className="h-3.5 w-3.5" />
-                Exporter CSV ({kpis.count})
+                Exporter Excel ({kpis.count})
               </Button>
             )}
             <button

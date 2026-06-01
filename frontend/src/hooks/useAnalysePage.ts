@@ -2,8 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useAnalyseMarge } from "@/hooks/usePharmacyRapports";
 import { eCategoryType } from "@/types";
 import { MARGE_COLS, type MargeMode } from "@/pages/rapports/margeTable";
-import { downloadBlob } from "@/pages/rapports/shared";
-import { exportFilename } from "@/utils/table";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 import { currentMonth } from "@/utils/dateRange";
 import { tokenizeSearch } from "@/utils/search";
 
@@ -90,25 +89,30 @@ export function useAnalysePage() {
     );
   }, [allRows]);
 
-  const exportCsv = useCallback(() => {
-    // Priority: explicit selection > search-filtered > all rows.
-    // Honors the active search filter so the export matches what the user sees.
+  const exportXlsx = useCallback(async () => {
+    // Priority: explicit selection > search-filtered > all rows. Honors the
+    // active search filter so the export matches what the user sees.
     const sel = selected.size > 0
       ? allRows.filter((_, i) => selected.has(i))
       : filteredRows.map((f) => f.row);
     if (!sel.length) return;
     const cols = MARGE_COLS[margeMode];
-    const esc = (v: unknown) => {
-      if (v == null || typeof v === "object") return "";
-      const s = String(v);
-      return s.includes(";") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const header = cols.map((c) => esc(c.label)).join(";");
     // Strict: only emit cells declared in MARGE_COLS so suppliers/grossistes/etc.
-    // never leak into a CSV from a mode whose header doesn't list them.
-    const lines = sel.map((row) => cols.map((c) => esc(row[c.key])).join(";"));
-    const csv = [header, ...lines].join("\n");
-    downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "csv", dateFrom || undefined, dateTo || undefined));
+    // never leak into an export from a mode whose header doesn't list them.
+    const headers = cols.map((c) => c.label);
+    const rowToValues = (row: Record<string, unknown>): (string | number)[] =>
+      cols.map((c) => {
+        const v = row[c.key];
+        if (v == null || typeof v === "object") return "";
+        return typeof v === "number" ? v : String(v);
+      });
+    await downloadXlsx(
+      sel,
+      rowToValues,
+      headers,
+      exportFilename(`ANALYSE ${margeMode.toUpperCase()}`, "xlsx", dateFrom || undefined, dateTo || undefined),
+      "Analyse",
+    );
   }, [allRows, filteredRows, selected, margeMode, dateFrom, dateTo]);
 
   const resetSelection = useCallback(() => {
@@ -136,6 +140,6 @@ export function useAnalysePage() {
     selected, kpis,
     toggleRow, toggleAll, resetSelection,
     // Export
-    exportCsv,
+    exportXlsx,
   };
 }

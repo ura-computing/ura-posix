@@ -49,7 +49,7 @@ import type { MedicamentOut, CategorySuffixOut } from "@/api/admin";
 import { CategoryCombobox } from "@/components/categoryCombobox";
 import { SuffixBadge, SUFFIX_COLORS, SWATCH_BG } from "@/components/suffixBadge";
 import { fmt } from "@/utils/format";
-import { downloadCSV, exportFilename } from "@/utils/table";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 import { eUserRole } from "@/types";
 
 const CATALOG_COL_LABELS: Record<string, string> = {
@@ -408,21 +408,22 @@ export default function AdminCatalogPage() {
     try {
       const res = await adminApi.exportCatalog(searchQuery || undefined);
       const rows = res.data ?? [];
-      downloadCSV(
+      await downloadXlsx(
         rows as unknown as Record<string, unknown>[],
         (r) => [
           String(r.pid ?? ""),
           String(r.product ?? ""),
           String(r.category ?? ""),
           String(r.tva ?? ""),
-          fmt(r.pph as number | null),
-          fmt(r.ppv as number | null),
+          r.pph != null ? Number(r.pph) : "",
+          r.ppv != null ? Number(r.ppv) : "",
           String(r.barcode1 ?? ""),
           String(r.laboratoire ?? ""),
           String(r.zone ?? ""),
         ],
         ["PID", "Produit", "Catégorie", "TVA", "PPH", "PPV", "Code-barres", "Laboratoire", "Zone"],
-        exportFilename("CATALOGUE", "csv"),
+        exportFilename("CATALOGUE", "xlsx"),
+        "Catalogue",
       );
     } finally {
       setExporting(false);
