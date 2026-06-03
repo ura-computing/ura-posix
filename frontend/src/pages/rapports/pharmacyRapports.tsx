@@ -546,19 +546,24 @@ export function PharmacyRapports() {
                       <>
                         <p className="text-3xl font-bold mt-1 leading-tight">
                           {marge?.marge_pct != null
-                            ? `${marge.marge_pct.toFixed(1)}%`
+                            ? `${marge.marge_pct.toFixed(2)}%`
+                            : "—"}
+                        </p>
+                        {/* Show the previous-year value so the badge math is
+                            reconcilable on paper. 2-decimal precision matches
+                            the backend's rounding so (current − previous) /
+                            previous reproduces the badge value exactly. */}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Année précédente : {prevKpis?.marge_pct != null
+                            ? `${prevKpis.marge_pct.toFixed(2)}%`
                             : "—"}
                         </p>
                         <ChangeBadge
                           current={marge?.marge_pct}
                           previous={prevKpis?.marge_pct}
                         />
-
                       </>
                     )}
-                    {/* <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">
-                      (1 − PU÷PPV) × 100
-                    </p> */}
                   </div>
                   <TrendingUp className={cn("h-8 w-8", typeTheme.icon)} />
                 </div>
