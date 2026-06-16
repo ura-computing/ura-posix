@@ -482,6 +482,37 @@ class TestAnalyseMarge:
         assert kpis["total_ventes_unites"] > 0
 
 
+class TestDashboardAnalyseParity:
+    """The Dashboard tile (/stats) and the Analyse tile (/stats/analyse-marge) must
+    return identical Total ventes (CA) and Marge mixte (%) for the same window.
+
+    User report 2026-06-17: year 2025 → Dashboard showed CA=16 079 365.89 / marge=30.7 %,
+    Analyse showed CA=16 012 489.87 / marge=34.4 %. The two pages used different formulas
+    (Analyse summed Vente.total; Dashboard summed qty × coalesce(PPV, unit_price); Analyse
+    weighted marge_pct by qty; Dashboard CA-weighted). Now both use the Dashboard formula."""
+
+    def test_ca_matches_dashboard(self, client, test_owner, stats_data):
+        params = {"date_from": "2026-01-01", "date_to": "2026-12-31"}
+        dash = client.get("/stats", params=params, headers=test_owner["headers"]).json()
+        ana  = client.get(
+            "/stats/analyse-marge",
+            params={**params, "mode": "produit"},
+            headers=test_owner["headers"],
+        ).json()
+        assert dash["kpis"]["ventes_total"] == pytest.approx(ana["kpis"]["total_ventes_dh"], abs=0.01)
+
+    def test_marge_pct_matches_dashboard(self, client, test_owner, stats_data):
+        params = {"date_from": "2026-01-01", "date_to": "2026-12-31"}
+        dash = client.get("/stats", params=params, headers=test_owner["headers"]).json()
+        ana  = client.get(
+            "/stats/analyse-marge",
+            params={**params, "mode": "produit"},
+            headers=test_owner["headers"],
+        ).json()
+        # Dashboard marge_pct lives under `marge.marge_pct`; Analyse under `kpis.marge_pct_avg`.
+        assert dash["marge"]["marge_pct"] == pytest.approx(ana["kpis"]["marge_pct_avg"], abs=0.01)
+
+
 # ── GET /stats/export-excel ──────────────────────────────────────────────────
 
 class TestExportExcel:
