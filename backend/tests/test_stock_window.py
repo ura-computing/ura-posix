@@ -79,18 +79,25 @@ class TestStockStatusBands:
 
 
 class TestStockMinMax:
-    """PG-001/PG-002: displayed Stock Min/Max derived from the idéal band × avg daily sales."""
+    """Client formula (2026-06-15): Stock Min = round(ventes_12m/300 × 14),
+    Stock Max = round(ventes_12m/300 × 15)."""
+
+    def test_min_max_for_rinomicine(self):
+        # Client repro: RINOMICINE ST B10 SACHETS, ventes_12m=557.
+        # round(557/300 × 14) = round(25.99) = 26.
+        # round(557/300 × 15) = round(27.85) = 28.
+        assert _stock_min_for(557) == 26
+        assert _stock_max_for(557) == 28
 
     def test_min_max_for_doliprane(self):
-        # ventes_12m = 2359 → Stock Min = round(2359×45/365) = 291,
-        #                      Stock Max = round(2359×60/365) = 388.
-        assert _stock_min_for(2359) == 291
-        assert _stock_max_for(2359) == 388
+        # ventes_12m = 2359 → round(2359/300 × 14) = 110, round(2359/300 × 15) = 118.
+        assert _stock_min_for(2359) == 110
+        assert _stock_max_for(2359) == 118
 
     def test_min_max_round_correctly_for_one_per_day(self):
-        # exactly one sale per day → min = 45, max = 60.
-        assert _stock_min_for(365) == 45
-        assert _stock_max_for(365) == 60
+        # 365 ventes/an → round(365/300 × 14) = 17, round(365/300 × 15) = 18.
+        assert _stock_min_for(365) == 17
+        assert _stock_max_for(365) == 18
 
     def test_zero_or_missing_sales_history_returns_zero(self):
         for units in (0, None):
