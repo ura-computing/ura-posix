@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, User, Vente
 from routers.auth import get_current_user
+from utils.exclusions import achat_bl_filter
 from utils.strings import classify_pharma_type, strip_percentage, tokenize_search
 from utils.search import product_search_clauses, supplier_search_clauses
 
@@ -304,6 +305,18 @@ def _build_vente_row(v: Vente, suffixes_map: Dict[str, tuple], avg_pu_map: Dict[
     ref = v.transaction_ref or ""
     med_id = v.medicament_id
     avg_pu = avg_pu_map.get(med_id) if med_id else None
+    ppv = v.medicament.ppv if v.medicament else None
+    # Catalog-derived line sub-total: PPV × qty × (1 − Remise %), where the
+    # Vente.discount field is treated as a percentage value (so 10 means 10 %).
+    # This intentionally diverges from Vente.total (which Sobrus computes its
+    # own way) — the user wants the sub-total recomputed from the catalog price
+    # and the displayed remise. Total column still shows Sobrus' value.
+    discount = v.discount or 0.0
+    subtotal = (
+        round(float(ppv) * float(v.quantity) * (1.0 - float(discount) / 100.0), 4)
+        if ppv is not None and v.quantity is not None
+        else None
+    )
     return {
         "id": v.id,
         "date": v.date,
@@ -315,10 +328,11 @@ def _build_vente_row(v: Vente, suffixes_map: Dict[str, tuple], avg_pu_map: Dict[
         "product": v.medicament.product if v.medicament else None,
         "category": category,
         "tva": v.medicament.tva if v.medicament else None,
-        "ppv": v.medicament.ppv if v.medicament else None,
+        "ppv": ppv,
         "quantity": v.quantity,
         "discount": v.discount,
         "unit_price": v.unit_price,
+        "subtotal": subtotal,
         "total": v.total,
         "avg_pu": round(avg_pu, 4) if avg_pu is not None else None,
     }
@@ -543,7 +557,11 @@ def list_ventes(
 
     rows = q.offset((page - 1) * limit).limit(limit).all()
 
-    # Compute weighted avg purchase price only for current page (small batch)
+    # Compute weighted avg purchase price only for current page (small batch).
+    # Filters mirror `/analyse`'s avg_pu_sub (backend/routers/stats/marge.py) so
+    # the Marge DH / Marge % cells displayed here reconcile with the Analyse
+    # view for the same date range and product: date-windowed achats only,
+    # non-declared products excluded, and PG-007 BL exclusions honoured.
     med_ids = list({v.medicament_id for v in rows if v.medicament_id})
     avg_pu_map: Dict[int, float] = {}
     if med_ids:
@@ -557,6 +575,25 @@ def list_ventes(
         )
         if pharmacy_id:
             pu_q = pu_q.filter(Achat.pharmacy_id == pharmacy_id)
+        # Date window — match the active /ventes filter so the PU reflects only
+        # achats inside the period the user is looking at (consistent with /analyse).
+        if date_from:
+            pu_q = pu_q.filter(Achat.delivery_date >= date_from)
+        if date_to:
+            pu_q = pu_q.filter(Achat.delivery_date <= date_to)
+        # Exclude non-declared products and pharmacist-excluded BLs the same way
+        # /analyse does — keeps Marge DH consistent across both surfaces.
+        if pharmacy_id:
+            non_declared_sub = (
+                db.query(PharmacyMedicamentStatus.medicament_id)
+                .filter(
+                    PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                    PharmacyMedicamentStatus.declared == False,
+                )
+                .subquery()
+            )
+            pu_q = pu_q.filter(Achat.medicament_id.notin_(non_declared_sub))
+            pu_q = pu_q.filter(achat_bl_filter(db, pharmacy_id))
         pu_q = pu_q.group_by(Achat.medicament_id)
         avg_pu_map = {row.medicament_id: float(row.avg_pu) for row in pu_q.all() if row.avg_pu}
 

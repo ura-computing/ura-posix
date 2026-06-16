@@ -56,17 +56,27 @@ def _stock_status_from_coverage(current_stock: int | None, units_sold_12m: int) 
 
 
 def _stock_min_for(units_sold_12m: int) -> int:
-    """Displayed `Stock Min` = round(ventes_12m × 45 / 365) — boundary into the idéal band."""
+    """Displayed `Stock Min` = round(ventes_12m / 300 × 14) — client formula
+    (2026-06-15): treats 300 as the effective working-day count per year and
+    14 as the target days of cover at the lower bound.
+
+    Example (RINOMICINE ST B10 SACHETS, ventes_12m=557): round(557/300 × 14) = 26.
+    """
     if not units_sold_12m or units_sold_12m <= 0:
         return 0
-    return round(units_sold_12m * 45 / 365)
+    return round(units_sold_12m / 300 * 14)
 
 
 def _stock_max_for(units_sold_12m: int) -> int:
-    """Displayed `Stock Max` = round(ventes_12m × 60 / 365) — top of the idéal band."""
+    """Displayed `Stock Max` = round(ventes_12m / 300 × 15) — client formula
+    (2026-06-15): one extra day of cover above the min, matching the operational
+    re-order window used by the pharmacist.
+
+    Example (RINOMICINE ST B10 SACHETS, ventes_12m=557): round(557/300 × 15) = 28.
+    """
     if not units_sold_12m or units_sold_12m <= 0:
         return 0
-    return round(units_sold_12m * 60 / 365)
+    return round(units_sold_12m / 300 * 15)
 
 
 def _compute_stock_abcd(

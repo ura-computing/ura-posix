@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 from utils.exclusions import achat_bl_filter
 from utils.strings import strip_percentage as _strip_pct
-from .queries import _pharma_expr
+from .queries import _marge_for_window, _pharma_expr
 
 
 def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str, mode: str) -> dict:
@@ -527,7 +527,16 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
         rows_out.extend(sorted(bucket.values(), key=lambda r: r["annee"], reverse=True))
 
     # ── KPI computation ────────────────────────────────────────────────────────
-    total_ventes_dh     = sum(r.get("ca", r.get("total", 0)) or 0 for r in rows_out)
+    # Parity with Dashboard /stats: same CA formula (qty × coalesce(PPV, unit_price)) so the
+    # "Total ventes" tile on /analyse matches the Dashboard tile for any given window.
+    # Per-product `ca` in rows_out stays as `Σ Vente.total` (Sobrus' invoiced amount); only the
+    # aggregate tile is realigned.
+    _ca_q = (
+        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .filter(*base_filter_v, *cat_filter)
+    )
+    total_ventes_dh     = float(_ca_q.scalar() or 0)
     total_ventes_unites = sum(float(r.get("qty") or 0) for r in rows_out)
 
     # Produit-mode stock KPIs
@@ -556,9 +565,14 @@ def _compute_analyse_marge(db: Session, pharmacy_id, df, dt, category_type: str,
     if marge_rows:
         total_qty = sum(float(r["qty"] or 0) for r in marge_rows)
         if total_qty:
-            kpis["marge_pct_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 2
-            )
+            # Marge moyenne (%) must match Dashboard's "marge mixte": (1 − Σqty·PU / Σqty·PPV) × 100.
+            # Previous simple qty-weighted average of per-product marge_pct biased the result toward
+            # low-PPV products and disagreed with the Dashboard tile for the same window.
+            sum_qty_ppv = sum(float(r["qty"] or 0) * float(r["ppv"] or 0) for r in marge_rows)
+            sum_qty_pu  = sum(float(r["qty"] or 0) * float(r["pu"]  or 0) for r in marge_rows)
+            kpis["marge_pct_avg"] = round((1 - sum_qty_pu / sum_qty_ppv) * 100, 2) if sum_qty_ppv else None
+            # Marge moyenne (DH) stays per-unit qty-weighted — different semantic from the
+            # Dashboard's total marge brute, intentionally retained for the Analyse tile.
             kpis["marge_dh_avg"] = round(
                 sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2
             )

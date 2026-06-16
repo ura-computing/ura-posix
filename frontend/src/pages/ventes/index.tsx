@@ -60,6 +60,8 @@ type VenteRow = {
   discount: number | null;
   ppv: number | null;
   unit_price: number | null;
+  /** PPV × qty × (1 − Remise %) — catalog-derived line sub-total. */
+  subtotal: number | null;
   total: number | null;
   avg_pu: number | null;
 };
@@ -67,7 +69,7 @@ type VenteRow = {
 const VENTE_COL_LABELS: Record<string, string> = {
   date: "Date", transaction_ref: "N° Transaction", transaction_ref_final: "N° Transaction Final",
   client: "Client", product: "Produit", category: "Catégorie", tva: "TVA",
-  quantity: "Qté", discount: "Remise", ppv: "PPV", unit_price: "Prix unitaire", total: "Total",
+  quantity: "Qté", discount: "Remise", ppv: "PPV", subtotal: "Sous-total", total: "Total",
   marge_pct: "Marge %", marge_dh: "Marge DH",
 };
 
@@ -82,7 +84,7 @@ const VENTE_COL_VALUES: Record<string, (r: Record<string, unknown>) => string> =
   quantity: (r) => String(r.quantity ?? ""),
   discount: (r) => String(r.discount ?? ""),
   ppv: (r) => String(r.ppv ?? ""),
-  unit_price: (r) => String(r.unit_price ?? ""),
+  subtotal: (r) => String(r.subtotal ?? ""),
   total: (r) => String(r.total ?? ""),
   marge_pct: (r) => {
     const pu = r.avg_pu as number | null;
@@ -367,10 +369,13 @@ const VentesList = () => {
         ),
       },
       {
-        id: "unit_price",
-        accessorKey: "unit_price",
+        // Catalog-derived line sub-total = PPV × qté × (1 − Remise %).
+        // Replaces the old "Prix unitaire" cell that surfaced Vente.unit_price
+        // directly from Sobrus — the user prefers the recomputed value.
+        id: "subtotal",
+        accessorKey: "subtotal",
         size: 110,
-        header: () => <p className="column-title">Prix unitaire</p>,
+        header: () => <p className="column-title">Sous-total</p>,
         cell: ({ getValue }) => (
           <span className="tabular-nums text-sm">{fmt(getValue<number | null>())}</span>
         ),
