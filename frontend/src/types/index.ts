@@ -1,0 +1,642 @@
+// Single source of truth: enums, query keys, route paths, and shared interfaces.
+
+export const ROLES = {
+  ADMIN: "admin",
+  OWNER: "owner",
+  EMPLOYEE: "employee",
+} as const;
+export type Role = (typeof ROLES)[keyof typeof ROLES];
+
+export const STATUSES = {
+  ACTIVE: "active",
+  REVOKED: "revoked",
+  PENDING: "pending",
+  REJECTED: "rejected",
+} as const;
+export type Status = (typeof STATUSES)[keyof typeof STATUSES];
+
+export const FEATURES = [
+  "rapports", "import", "achats", "ventes",
+  "stock", "analyse", "accounting", "bl_exclusions",
+] as const;
+export type Feature = (typeof FEATURES)[number];
+
+export const ROUTES = {
+  HOME:              "/",
+  LOGIN:             "/login",
+  FORGOT_PASSWORD:   "/auth/forgot-password",
+  SET_PASSWORD:      "/auth/set-password",
+  ME:                "/auth/me",
+  RAPPORT:           "/rapport",
+
+  // Data modules (placeholders — sidebar items render disabled via ready:false until pages exist)
+  ACHATS:            "/achats",
+  VENTES:            "/ventes",
+  STOCK:             "/stock",
+  UPLOAD_FILE:       "/upload-file",
+  ANALYSES:          "/analyses",
+  RAPPORTS:          "/rapports",
+  PEREMPTIONS:       "/peremptions",
+  ALERTES:           "/alertes",
+  COMPTABILITE:      "/comptabilite",
+  PRODUITS_SPECIAUX: "/produits-speciaux",
+  PARAMETRES:        "/parametres",
+
+  // Gestion
+  OWNER_EMPLOYEES:   "/owner/employees",
+
+  // Admin
+  ADMIN_PHARMACIES:  "/admin/pharmacies",
+  ADMIN_USERS:       "/admin/users",
+  ADMIN_CATALOGUE:   "/admin/catalogue",
+  ADMIN_CATEGORIES:  "/admin/categories",
+  ADMIN_STATS:       "/admin/stats",
+} as const;
+export type Route = (typeof ROUTES)[keyof typeof ROUTES];
+
+export const QUERY_KEYS = {
+  ME:             ["me"] as const,
+  DASHBOARD:      ["dashboard"] as const,
+  VALIDATE_TOKEN: (token: string) => ["validate-token", token] as const,
+  SESSIONS:       (userId: string) => ["sessions", userId] as const,
+  IMPORTS:        ["imports"] as const,
+
+  // Ventes (Page 3) — filter args part of key so each combo gets its own cache slot.
+  // VENTES uses the full filter set (sort + page included). Surveillance counts strip
+  // sort/page since they don't affect the count.
+  VENTES:               (f: VentesFilters)    => ["ventes", f] as const,
+  VENTES_CATEGORIES:    ["ventes-categories"] as const,
+  VENTES_TVA_RATES:     ["ventes-tva-rates"] as const,
+  VENTES_SURVEILLANCE:  (f: VentesFiltersKey) => ["ventes-surveillance", f] as const,
+  VENTES_SUGGESTIONS:   (q: string)           => ["ventes-suggestions", q] as const,
+
+  // Achats (Page 4)
+  ACHATS:                   (f: AchatsFilters) => ["achats", f] as const,
+  ACHATS_CATEGORIES:        ["achats-categories"] as const,
+  ACHATS_TVA_RATES:         ["achats-tva-rates"] as const,
+  ACHATS_SUPPLIER_SUMMARY:  (f: Omit<AchatsFilters, "page" | "limit" | "sort_by" | "sort_order">) => ["achats-supplier-summary", f] as const,
+  ACHATS_SUGGESTIONS:       (q: string) => ["achats-suggestions", q] as const,
+
+  // Stock (Page 6) — separate "full" + "filtered" keys per dual-fetch pattern.
+  STOCK_ABCD_FULL:     (df: string | null, dt: string | null) =>
+    ["stock-abcd-full", df ?? "", dt ?? ""] as const,
+  STOCK_ABCD_FILTERED: (f: StockFilters) => ["stock-abcd-filtered", f] as const,
+  PEREMPTIONS:         ["peremptions"] as const,
+
+  // Rapport — owner endpoints. Filter args are part of the key so each
+  // (window, category) combo gets its own cache slot.
+  STATS:          (df: string | null, dt: string | null, ct: string, nd: boolean) =>
+    ["stats", df ?? "", dt ?? "", ct, nd] as const,
+  MARGIN_ALERTS:  (df: string | null, dt: string | null, ct: string) =>
+    ["margin-alerts", df ?? "", dt ?? "", ct] as const,
+  STOCK_SUMMARY:  ["stock-summary"] as const,
+
+  // Rapport — admin endpoints.
+  ADMIN_STATS:        ["admin-stats"] as const,
+  ADMIN_PHARMACIES:   ["admin-pharmacies"] as const,
+  ADMIN_PHARM_STATS:  (id: number, df: string | null, dt: string | null, ct: string, nd: boolean) =>
+    ["admin-pharm-stats", id, df ?? "", dt ?? "", ct, nd] as const,
+  ADMIN_PHARM_MARGE:  (id: number, df: string | null, dt: string | null, ct: string) =>
+    ["admin-pharm-marge", id, df ?? "", dt ?? "", ct] as const,
+  ADMIN_PHARM_STOCK:  (id: number) =>
+    ["admin-pharm-stock", id] as const,
+
+  // Analyse de marge (Page 11) — 7 group-by modes + Liste CSV upload.
+  // Cache slot per (mode, window, categoryType). Liste keyed on items hash.
+  ANALYSE_MARGE: (mode: MargeMode, df: string | null, dt: string | null, ct: string) =>
+    ["analyse-marge", mode, df ?? "", dt ?? "", ct] as const,
+  ANALYSE_LISTE: (itemsKey: string, df: string | null, dt: string | null, ct: string) =>
+    ["analyse-liste", itemsKey, df ?? "", dt ?? "", ct] as const,
+} as const;
+
+// ── Domain objects ─────────────────────────────────────────────────────────
+
+export interface User {
+  id:            number;
+  email:         string;
+  name:          string | null;
+  phone:         string | null;
+  role:          Role;
+  status:        Status;
+  pharmacy_id:   number | null;
+  last_login_at: string | null;
+}
+
+export interface Pharmacy {
+  id:   number;
+  name: string;
+  code: string | null;
+}
+
+/** Backend response shape from GET /v1/auth/me. */
+export interface MeResponse {
+  user:        User;
+  pharmacy:    Pharmacy | null;
+  permissions: Feature[];
+}
+
+/**
+ * Flat shape exposed by useMe() to pages and components. Derived from
+ * MeResponse by collapsing user.* one level so pages can do me.name / me.role
+ * directly without the .user indirection.
+ */
+export interface Me {
+  id:          string;          // stringified user.id for stable cache keys
+  email:       string;
+  name:        string;          // never null in the flat shape (falls back to email)
+  phone?:      string;
+  role:        Role;
+  status:      Status;
+  pharmacy?:   { name: string; code: string | null };
+  permissions: Feature[];
+}
+
+export interface Session {
+  id:             string;
+  device_label:   string;
+  ip:             string;
+  last_active_at: string;       // ISO timestamp
+  is_current:     boolean;
+}
+
+// ── Request/response shapes for the API layer ──────────────────────────────
+
+export interface LoginRequest {
+  email:    string;
+  password: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ValidateTokenResponse {
+  is_setup:  boolean;
+  full_name: string;
+}
+
+export interface SetPasswordRequest {
+  token:    string;
+  password: string;
+}
+
+export interface UpdateProfileRequest {
+  name:  string;
+  phone: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password:     string;
+}
+
+export interface ApiError {
+  status: number;
+  detail: string;
+}
+
+// ── Rapport / Stats response shapes (mirrors backend/schemas/stats.py) ────
+
+export type CategoryType = "all" | "pharmacie" | "parapharmacie";
+
+export interface StatsKpis {
+  ventes_total: number;
+  achats_total: number;
+  ventes_count: number;
+  achats_count: number;
+}
+
+export interface PreviousKpis {
+  ventes_total: number;
+  achats_total: number;
+  marge_pct:    number;
+}
+
+export interface DayPoint  { date: string; total: number; }
+export interface DayCount  { date: string; count: number; }
+
+export interface AdvancedKpis {
+  ticket_moyen:           number;
+  vente_moyenne_par_jour: number;
+  best_day_dh:     DayPoint | null;
+  worst_day_dh:    DayPoint | null;
+  best_day_count:  DayCount | null;
+  worst_day_count: DayCount | null;
+}
+
+export interface TvaSummary  { tva_encaissee:  number; tva_payee:      number; tva_a_declarer: number; }
+export interface MargeSummary { marge_pct: number; marge_brute_dh: number; marge_nette_dh: number; }
+export interface TypeBreakdown {
+  pharmacie:     { ventes_total: number };
+  parapharmacie: { ventes_total: number };
+}
+export interface MonthlyTrendPoint { month: string; ventes: number; achats: number; }
+export interface TopCategoryRow    { category: string; total: number; marge_pct: number | null; }
+
+export interface StatsResponse {
+  kpis:           StatsKpis;
+  previous_kpis:  PreviousKpis;
+  advanced_kpis:  AdvancedKpis;
+  tva:            TvaSummary;
+  marge:          MargeSummary;
+  type_breakdown: TypeBreakdown;
+  monthly_trend:  MonthlyTrendPoint[];
+  top_categories: TopCategoryRow[];
+}
+
+export interface MarginAlertProduct { product: string; marge_pct: number; ca: number; }
+export interface MarginAlertBracket {
+  count: number; total_ca: number; total_margin_dh: number; products: MarginAlertProduct[];
+}
+export interface MarginAlertsResponse {
+  negative:  MarginAlertBracket;
+  low:       MarginAlertBracket;
+  medium:    MarginAlertBracket;
+  high:      MarginAlertBracket;
+  very_high: MarginAlertBracket;
+}
+
+export interface StockSummaryResponse {
+  total_references: number;
+  ppv_potentiel:    number;
+  sous_stock_count: number;
+  sur_stock_count:  number;
+  in_band_count:    number;
+  health_pct:       number;
+}
+
+export interface AdminStatsResponse {
+  total_pharmacies:         number;
+  total_active_users:       number;
+  total_catalog_items:      number;
+  pending_catalog_requests: number;
+}
+
+export interface AdminPharmacyRow { id: number; name: string; code: string | null; }
+
+
+// ── Upload-file types ────────────────────────────────────────────────────────
+
+export type DocType = "achat" | "vente" | "stock";
+
+export type ImportBatchStatus = "in_progress" | "success" | "cancelled" | "error";
+
+/** Response from /v1/uploads/{achat|vente}{,-json} */
+export interface UploadTxResult {
+  inserted: number;
+  skipped:  number;
+  batch_id: number;
+}
+
+/** Response from /v1/uploads/stock */
+export interface UploadStockResult {
+  inserted:        number;
+  skipped_unknown: { pid: string; product: string | null }[];
+  total_rows:      number;
+  batch_id:        number;
+}
+
+/** Response from PATCH /v1/uploads/batches/{id} */
+export interface BatchPatchResult {
+  id:             number;
+  status:         ImportBatchStatus;
+  error_message:  string | null;
+  /** Number of Achat/Vente rows the PATCH deleted (only on status='cancelled'). */
+  deleted_rows:   number;
+}
+
+/** A row from GET /v1/data/imports — drives the /parametres Imports tab. */
+export interface DataImport {
+  id:             number;
+  file_type:      DocType;
+  filename:       string | null;
+  rows_inserted:  number;
+  rows_skipped:   number;
+  status:         ImportBatchStatus;
+  error_message:  string | null;
+  imported_at:    string;
+}
+
+export interface DataImportsResponse {
+  data: DataImport[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export interface StatsFilters {
+  date_from:            string | null;
+  date_to:              string | null;
+  category_type:        CategoryType;
+  include_non_declared: boolean;
+}
+
+
+// ── Ventes (Page 3) ────────────────────────────────────────────────────────
+
+/** Surveillance tab keys. Backend predicate: see routers/transactions.py. */
+export const SURVEILLANCE_TABS = {
+  ALL_FLAGGED:    "all_flagged",
+  MARGE_NEGATIVE: "marge_negative",
+  MARGE_LOW:      "marge_low",
+  REMISES_HIGH:   "remises_high",
+} as const;
+export type SurveillanceTab = (typeof SURVEILLANCE_TABS)[keyof typeof SURVEILLANCE_TABS];
+
+/** SuffixBadge palette — kept in sync with backend ALLOWED_COLORS in category_suffixes.py */
+export const SUFFIX_COLORS = ["teal", "blue", "purple", "amber", "rose", "emerald", "orange", "pink"] as const;
+export type SuffixColor = (typeof SUFFIX_COLORS)[number];
+
+export interface VenteRow {
+  id:                     number;
+  date:                   string | null;
+  transaction_ref:        string | null;
+  transaction_ref_final:  string | null;
+  transaction_ref_color:  SuffixColor | null;
+  client:                 string | null;
+  pid:                    string | null;
+  product:                string | null;
+  category:               string | null;
+  tva:                    string | null;
+  ppv:                    number | null;
+  quantity:               number | null;
+  discount:               number | null;
+  unit_price:             number | null;
+  subtotal:               number | null;
+  total:                  number | null;
+  avg_pu:                 number | null;
+  import_batch_id:        number | null;
+}
+
+export interface VentesSummary {
+  rows_total:    number;
+  tva_collected: number;
+  grand_total:   number;
+}
+
+export interface VentesListResponse {
+  data:       VenteRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  summary:    VentesSummary;
+}
+
+export interface VentesSuggestions {
+  products: string[];
+  clients:  string[];
+  refs:     string[];
+}
+
+export interface VentesSurveillanceCounts {
+  all_flagged:    number;
+  marge_negative: number;
+  marge_low:      number;
+  remises_high:   number;
+}
+
+export interface VentesFilters {
+  page:                 number;
+  limit:                number;
+  date_from:            string | null;
+  date_to:              string | null;
+  search:               string;
+  category:             string[];
+  tva:                  string[];
+  surveillance:         SurveillanceTab | null;
+  include_non_declared: boolean;
+  sort_by:              string | null;
+  sort_order:           "asc" | "desc";
+}
+
+/** Stable serialization key used in QUERY_KEYS — excludes sort + pagination so a
+ *  sort change doesn't bust the same-page cache. */
+export type VentesFiltersKey = Omit<VentesFilters, "sort_by" | "sort_order">;
+
+
+// ── Stock (Page 6) ─────────────────────────────────────────────────────────
+
+export type AbcdClass   = "A" | "A-" | "B+" | "B" | "C" | "C-" | "C-N" | "D";
+export type StockStatus = "sous-stock" | "ideal" | "a-surveiller" | "sur-stock" | "inconnu" | "negatif";
+
+export interface StockRow {
+  product:         string;
+  category:        AbcdClass;
+  units_sold_12m:  number;
+  stock_min:       number;
+  stock_max:       number;
+  current_stock:   number | null;
+  ppv:             number | null;
+  avg_pu:          number | null;
+  status:          StockStatus;
+}
+
+export interface StockAbcdResponse {
+  distribution:     Partial<Record<AbcdClass, number>>;
+  total_references: number;
+  ppv_potentiel:    number;
+  products:         StockRow[];
+}
+
+export interface StockFilters {
+  date_from:    string | null;
+  date_to:      string | null;
+  class_filter: AbcdClass | null;
+  /** Empty string "" = no filter. Backend accepts the values listed in StockStatus. */
+  status:       string | null;
+  search:       string;
+  sort_by:      string | null;
+  sort_order:   "asc" | "desc";
+}
+
+export interface PeremptionProduct {
+  product:     string;
+  expiry_date: string | null;
+  quantity:    number;
+  ppv:         number;
+}
+
+export interface PeremptionBracket {
+  count:          number;
+  total_units:    number;
+  purchase_value: number;
+  sale_value:     number;
+  products:       PeremptionProduct[];
+}
+
+export interface PeremptionsResponse {
+  expired:    PeremptionBracket;
+  very_close: PeremptionBracket;
+  close:      PeremptionBracket;
+  no_date:    PeremptionBracket;
+}
+
+
+// ── Achats (Page 4) ────────────────────────────────────────────────────────
+
+export interface AchatRow {
+  id:                  number;
+  delivery_date:       string | null;
+  delivery_ref:        string | null;
+  delivery_ref_final:  string | null;
+  delivery_ref_color:  SuffixColor | null;
+  supplier:            string | null;
+  pid:                 string | null;
+  product:             string | null;
+  category:            string | null;
+  category_type:       "pharmacie" | "parapharmacie" | null;
+  tva:                 string | null;
+  quantity:            number | null;
+  pph:                 number | null;
+  unit_price:          number | null;
+  total:               number | null;
+  expiry_date:         string | null;
+  import_batch_id:     number | null;
+}
+
+export interface AchatsSummary {
+  rows_total:  number;
+  tva_payee:   number;
+  grand_total: number;
+}
+
+export interface AchatsListResponse {
+  data:       AchatRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  summary:    AchatsSummary;
+}
+
+export interface AchatsSuggestions {
+  products:  string[];
+  suppliers: string[];
+  refs:      string[];
+}
+
+export interface SupplierSummarySide {
+  total_mad:  number;
+  bl_count:   number;
+  unit_count: number;
+}
+
+export interface AchatsSupplierSummary {
+  grossiste:   SupplierSummarySide;
+  direct_labo: SupplierSummarySide;
+}
+
+export interface AchatsFilters {
+  page:       number;
+  limit:      number;
+  date_from:  string | null;
+  date_to:    string | null;
+  search:     string;
+  category:   string[];
+  tva:        string[];
+  sort_by:    string | null;
+  sort_order: "asc" | "desc";
+}
+
+
+// ── Analyse de marge (Page 11) ──────────────────────────────────────────────
+
+export const MARGE_MODES = [
+  "produit", "categorie", "laboratoire", "grossiste",
+  "operateur", "mois", "annee", "liste",
+] as const;
+export type MargeMode = (typeof MARGE_MODES)[number];
+
+/** UI labels in display order — locked from PG-017. */
+export const MARGE_MODE_LABELS: Record<MargeMode, string> = {
+  produit:     "Produit",
+  categorie:   "Catégorie",
+  laboratoire: "Laboratoire",
+  grossiste:   "Grossistes",
+  operateur:   "Client",
+  mois:        "Mois",
+  annee:       "Année",
+  liste:       "Liste",
+};
+
+export interface MargeKpiPoint {
+  label: string;
+  value: number;
+  qty:   number;
+}
+
+export interface AnalyseMargeKpis {
+  total_ventes_dh:       number;
+  total_ventes_unites:   number;
+  total_units_available: number | null;
+  total_pu_purchased:    number | null;
+  ppv_total_available:   number | null;
+  marge_pct_avg:         number | null;
+  marge_pct_min:         MargeKpiPoint | null;
+  marge_pct_max:         MargeKpiPoint | null;
+  marge_dh_avg:          number | null;
+  marge_dh_min:          MargeKpiPoint | null;
+  marge_dh_max:          MargeKpiPoint | null;
+  difference_gain_dh:    number | null;
+}
+
+/** Wide-row shape — every mode's columns are optional fields on the same row type.
+ *  Frontend renders only the columns relevant to the active mode. */
+export interface AnalyseMargeRow {
+  // produit
+  product?:          string;
+  pid?:              string;
+  stock_dispo?:      number | null;
+  qty?:              number;
+  ca?:               number;
+  ppv?:              number | null;
+  pu?:               number | null;
+  prix_max?:         number | null;
+  prix_min?:         number | null;
+  prix_avg?:         number | null;
+  marge_pct?:        number | null;
+  marge_dh?:         number | null;
+  marge_pct_best?:   number | null;
+  marge_pct_worst?:  number | null;
+  marge_dh_best?:    number | null;
+  marge_dh_worst?:   number | null;
+  ppv_potentiel?:    number | null;
+  // categorie / laboratoire / grossiste — weighted aggregates
+  category?:         string | null;
+  laboratoire?:      string;
+  grossiste?:        string;
+  marge_pct_avg?:    number | null;
+  marge_dh_avg?:     number | null;
+  total_achat_cost?: number | null;
+  // operateur / mois
+  client?:           string;
+  mois?:             string;
+  nb_transactions?:  number;
+  // annee (pivot)
+  annee?:            number;
+  m01?: number; m02?: number; m03?: number; m04?: number;
+  m05?: number; m06?: number; m07?: number; m08?: number;
+  m09?: number; m10?: number; m11?: number; m12?: number;
+  // liste
+  match_status?:     "found" | "not_found";
+  tva?:              string | null;
+}
+
+export interface AnalyseMargeResponse {
+  mode:  MargeMode;
+  kpis:  AnalyseMargeKpis;
+  rows:  AnalyseMargeRow[];
+}
+
+export interface ListeItem {
+  name:     string;
+  pid?:     string;
+  barcode1?: string;
+  barcode2?: string;
+}
+
+export interface ListeRequest {
+  items:         ListeItem[];
+  date_from?:    string | null;
+  date_to?:      string | null;
+  category_type: string;
+}
+
+export interface AnalyseFilters {
+  date_from:     string | null;
+  date_to:       string | null;
+  category_type: string;
+}

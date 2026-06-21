@@ -1,0 +1,4 @@
+PID;Produit;TVA;PPH;PPV;Catégorie;Zone;Date;Numéro de transaction;Client;Quantité;Remise;Prix unitaire;Total
+TEST001;DOLIPRANE TEST 500MG;TVA (20.00%);12.50;15.00;Médicaments (10%);Zone A;2026-06-22;CLI-VENTE-001;Comptoir;1;0;15.00;15.00
+TEST002;EFFERALGAN TEST 1000MG;TVA (10.00%);8.20;11.50;Médicaments (10%);Zone A;2026-06-22;CLI-VENTE-002;Comptoir;2;5;11.50;21.85
+TEST003;PARAPHARMA TEST CREME;TVA (20.00%);45.00;65.00;Parapharmacie (33.33%);Zone B;2026-06-22;CLI-VENTE-003;Mme TEST;1;10;65.00;58.50
