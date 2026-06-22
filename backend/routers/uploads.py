@@ -32,11 +32,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from csv_parse import (
-    col, parse_csv, parse_float, parse_int, parse_iso_date, upsert_medicament,
+    col, parse_catalog_csv, parse_csv, parse_float, parse_int, parse_iso_date,
+    upsert_medicament,
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
-from permissions import require_pharmacy_owner
+from permissions import require_admin, require_pharmacy_owner
+from schemas.catalog import CatalogImportResponse
 from security import CurrentUserDep
 
 
@@ -367,6 +369,53 @@ async def upload_stock(
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
     rows = await _read_csv_or_400(file)
     return _insert_stock(db, rows, pharmacy_id=pharmacy_id, filename=file.filename)
+
+
+@router.post("/uploads/catalog", response_model=CatalogImportResponse)
+async def upload_catalog(
+    user: CurrentUserDep,
+    db:   DbDep,
+    file: Annotated[UploadFile, File(description="Sobrus catalogue CSV (comma-delimited)")],
+) -> dict:
+    """Admin-only catalog import. Upsert by synthetic PID:
+       - INSERT new rows
+       - UPDATE mutable fields on existing rows (PRESERVE product_type — admin override)
+       - rows in DB that disappear from the CSV are kept (no destructive delete)
+
+    Mojibake fix runs automatically via `parse_csv()` → `clean_value()`."""
+    require_admin(user)
+    _check_csv(file)
+    content = await file.read()
+    _check_size(content)
+    parsed, errors = parse_catalog_csv(content)
+    if not parsed and not errors:
+        raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
+
+    pids = [r["pid"] for r in parsed]
+    existing = {
+        m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
+    }
+    inserted = updated = 0
+    mutable_cols = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
+    for row in parsed:
+        m = existing.get(row["pid"])
+        if m:
+            for c in mutable_cols:
+                v = row.get(c)
+                if v is not None:
+                    setattr(m, c, v)
+            updated += 1
+        else:
+            db.add(Medicament(**row, product_type=None))
+            inserted += 1
+    db.commit()
+    return {
+        "total_rows": len(parsed),
+        "inserted":   inserted,
+        "updated":    updated,
+        "skipped":    len(errors),
+        "errors":     errors[:10],
+    }
 
 
 # ─── JSON endpoints (Chrome extension) ───────────────────────────────────────

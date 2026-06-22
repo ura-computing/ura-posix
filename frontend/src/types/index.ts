@@ -107,6 +107,10 @@ export const QUERY_KEYS = {
     ["analyse-marge", mode, df ?? "", dt ?? "", ct] as const,
   ANALYSE_LISTE: (itemsKey: string, df: string | null, dt: string | null, ct: string) =>
     ["analyse-liste", itemsKey, df ?? "", dt ?? "", ct] as const,
+
+  // Admin catalog (F5) — Medicament CRUD + categories list.
+  CATALOG:             (f: CatalogFilters) => ["catalog", f] as const,
+  CATALOG_CATEGORIES:  ["catalog-categories"] as const,
 } as const;
 
 // ── Domain objects ─────────────────────────────────────────────────────────
@@ -639,4 +643,60 @@ export interface AnalyseFilters {
   date_from:     string | null;
   date_to:       string | null;
   category_type: string;
+}
+
+
+// ── Admin Catalog (F5 — Medicament CRUD + CSV import) ──────────────────────
+
+export type ProductType = "pharmacie" | "parapharmacie";
+
+export interface Medicament {
+  id:           number;
+  pid:          string;
+  product:      string;
+  tva:          string | null;
+  pph:          number | null;
+  ppv:          number | null;
+  category:     string | null;
+  barcode1:     string | null;
+  barcode2:     string | null;
+  laboratoire:  string | null;
+  product_type: ProductType | null;
+  created_at:   string;
+  updated_at:   string | null;
+}
+
+export interface MedicamentInput {
+  product:      string;
+  tva?:         string | null;
+  pph?:         number | null;
+  ppv?:         number | null;
+  category?:    string | null;
+  barcode1?:    string | null;
+  barcode2?:    string | null;
+  laboratoire?: string | null;
+  product_type?: ProductType | null;
+}
+
+export interface CatalogFilters {
+  search:     string;
+  category:   string[];
+  type:       ProductType | null;
+  sort_by:    string;
+  sort_order: "asc" | "desc";
+  page:       number;
+  limit:      number;
+}
+
+export interface CatalogListResponse {
+  data:       Medicament[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export interface CatalogImportResponse {
+  total_rows: number;
+  inserted:   number;
+  updated:    number;
+  skipped:    number;
+  errors:     string[];
 }

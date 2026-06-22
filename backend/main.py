@@ -4,7 +4,7 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from rate_limit import limiter, rate_limit_handler
-from routers import admin_stats, auth, category_suffixes, data, health, sessions, stats, transactions, uploads
+from routers import admin_catalog, admin_stats, auth, category_suffixes, data, health, sessions, stats, transactions, uploads
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")
@@ -27,8 +27,9 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.include_router(health.router,   prefix="/v1")
 app.include_router(auth.router,     prefix="/v1/auth")
 app.include_router(sessions.router, prefix="/v1/sessions")
-app.include_router(stats.router,       prefix="/v1")
-app.include_router(admin_stats.router, prefix="/v1")
+app.include_router(stats.router,         prefix="/v1")
+app.include_router(admin_stats.router,   prefix="/v1")
+app.include_router(admin_catalog.router, prefix="/v1")
 app.include_router(uploads.router,      prefix="/v1")
 app.include_router(transactions.router, prefix="/v1")
 app.include_router(data.router,             prefix="/v1")

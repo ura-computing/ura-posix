@@ -54,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Pharmacies",            to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN] },
       { label: "Utilisateurs",          to: ROUTES.ADMIN_USERS,      icon: Users,     roles: [ROLES.ADMIN] },
-      { label: "Catalogue",             to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN] },
+      { label: "Catalogue",             to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
       { label: "Catégories",            to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN] },
       { label: "Statistiques globales", to: ROUTES.ADMIN_STATS,      icon: Globe,     roles: [ROLES.ADMIN] },
     ],

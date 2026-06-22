@@ -117,10 +117,15 @@ def clean_value(v: str) -> str:
     return (fix_mojibake(v.strip().strip('"').strip("'")) or "")
 
 
-def parse_csv(content: bytes) -> list[dict[str, str]]:
-    """Sobrus CSVs use `;` as delimiter. Returns list of dicts keyed by cleaned header."""
+def parse_csv(content: bytes, delimiter: str = ";") -> list[dict[str, str]]:
+    """Single fan-in for ALL CSV reads. Handles encoding detection, mojibake fix,
+    and dict-shaped output keyed by cleaned headers.
+
+    Sobrus achat/vente/stock CSVs use `;`; the catalog CSV uses `,` — callers
+    pass the right delimiter explicitly. Mojibake fix is applied to every
+    header AND every cell value (via `clean_header` / `clean_value`)."""
     text = _decode(content)
-    reader = csv.reader(io.StringIO(text), delimiter=";")
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     rows = list(reader)
     if not rows:
         return []
@@ -129,6 +134,50 @@ def parse_csv(content: bytes) -> list[dict[str, str]]:
     for row in rows[1:]:
         out.append({headers[i]: clean_value(row[i]) for i in range(min(len(headers), len(row)))})
     return out
+
+
+def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[str]]:
+    """Parse a Sobrus catalog CSV (`Nom,Categorie,TVA,PPV,PPH,Code barre 1,
+    Code barre 2,Laboratoire`). Returns (rows, errors).
+
+    Goes through `parse_csv()` so mojibake fix + encoding detection are
+    handled identically to achat/vente/stock imports. Each output row is a
+    dict matching MedicamentCreate fields with a derived synthetic `pid`."""
+    rows = parse_csv(content, delimiter=",")
+    seen_pids: set[str] = set()
+    errors:    list[str] = []
+    out:       list[dict] = []
+    for i, raw in enumerate(rows, start=2):    # row 1 = header
+        name = (raw.get("Nom") or "").strip()
+        if not name:
+            errors.append(f"Ligne {i}: nom manquant")
+            continue
+        bc1 = (raw.get("Code barre 1") or "").strip() or None
+        bc2 = (raw.get("Code barre 2") or "").strip() or None
+        pid = _derive_pid(bc1, name, seen_pids)
+        seen_pids.add(pid)
+        out.append({
+            "pid":          pid,
+            "product":      name,
+            "category":     (raw.get("Categorie") or "").strip() or None,
+            "tva":          (raw.get("TVA") or "").strip() or None,
+            "ppv":          parse_float(raw.get("PPV")),
+            "pph":          parse_float(raw.get("PPH")),
+            "barcode1":     bc1,
+            "barcode2":     bc2,
+            "laboratoire":  (raw.get("Laboratoire") or "").strip() or None,
+        })
+    return out, errors
+
+
+def _derive_pid(barcode1: str | None, product: str, seen_pids: set[str]) -> str:
+    """Synthetic PID for the catalog import. Match ladder:
+       1. barcode1 if non-empty, ≥8 chars, AND not already seen this batch
+       2. normalized product name (accent-stripped + lowercased + single-spaced)"""
+    bc = (barcode1 or "").strip()
+    if bc and len(bc) >= 8 and bc not in seen_pids:
+        return bc
+    return re.sub(r"\s+", " ", strip_accents(product).lower().strip())
 
 
 # ─── Medicament upsert ────────────────────────────────────────────────────────
