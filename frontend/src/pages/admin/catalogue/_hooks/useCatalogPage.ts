@@ -60,7 +60,7 @@ export function useCatalogPage() {
   const reset = () => setFilters(DEFAULT_FILTERS);
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["catalog"] });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CATALOG_PREFIX });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CATALOG_CATEGORIES });
   };
 

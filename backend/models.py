@@ -15,6 +15,7 @@ FK_IMPORT_BATCHES_ID = "import_batches.id"
 ALLOWED_FEATURES = (
     "rapports", "import", "achats", "ventes",
     "stock", "analyse", "accounting", "bl_exclusions",
+    "special_products",
 )
 
 
@@ -206,8 +207,10 @@ class PharmacyStock(Base):
 
 
 class PharmacyMedicamentStatus(Base):
-    """Per-pharmacy non-declared flag. Row exists ⇒ medicament excluded from stats.
-    Absence ⇒ declared. Set by admin via the catalog-request approval flow."""
+    """Per-pharmacy non-declared (= 'spécial') flag. Row with declared=False
+    ⇒ medicament excluded from this pharmacy's stats. Absence of row ⇒ declared
+    (included). Owner-managed directly via /v1/special-products — no admin
+    approval needed (per 2026-06-23 product decision)."""
     __tablename__ = "pharmacy_medicament_status"
     __table_args__ = (UniqueConstraint("pharmacy_id", "medicament_id", name="uq_pharmacy_medicament"),)
 

@@ -110,7 +110,22 @@ export const QUERY_KEYS = {
 
   // Admin catalog (F5) — Medicament CRUD + categories list.
   CATALOG:             (f: CatalogFilters) => ["catalog", f] as const,
+  CATALOG_PREFIX:      ["catalog"] as const,                 // invalidation prefix
   CATALOG_CATEGORIES:  ["catalog-categories"] as const,
+
+  // Produits spéciaux (F17) — owner-managed product exclusions + autocomplete.
+  SPECIAL_PRODUCTS:        ["special-products"] as const,
+  MEDICAMENT_SUGGESTIONS:  (q: string) => ["medicament-suggestions", q] as const,
+
+  // Aggregate prefixes — used by produits-spéciaux to invalidate every cache
+  // that filters via non_declared_sub when an exclusion is added/removed.
+  STATS_PREFIX:           ["stats"] as const,
+  MARGIN_ALERTS_PREFIX:   ["margin-alerts"] as const,
+  ANALYSE_MARGE_PREFIX:   ["analyse-marge"] as const,
+  STOCK_ABCD_FULL_PREFIX: ["stock-abcd-full"] as const,
+  STOCK_ABCD_FILTERED_PREFIX: ["stock-abcd-filtered"] as const,
+  VENTES_PREFIX:          ["ventes"] as const,
+  ACHATS_PREFIX:          ["achats"] as const,
 } as const;
 
 // ── Domain objects ─────────────────────────────────────────────────────────
@@ -699,4 +714,23 @@ export interface CatalogImportResponse {
   updated:    number;
   skipped:    number;
   errors:     string[];
+}
+
+
+// ── Produits spéciaux (F17 — owner-managed product exclusions) ─────────────
+
+export interface SpecialProduct {
+  medicament_id: number;
+  product:       string;
+  pid:           string;
+  category:      string | null;
+  created_at:    string;
+}
+
+export interface MedicamentSuggestion {
+  id:        number;
+  pid:       string;
+  product:   string;
+  category:  string | null;
+  nb_ventes: number;
 }

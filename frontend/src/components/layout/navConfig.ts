@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Péremptions",        to: ROUTES.PEREMPTIONS,       icon: CalendarClock,  roles: DATA },
       { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA,         ready: true },
       { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA },
-      { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA },
+      { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA,         ready: true },
     ],
   },
   {

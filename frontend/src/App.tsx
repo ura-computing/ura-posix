@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { RequireGuest } from "@/components/layout/RequireGuest";
 import { RequireRole } from "@/components/layout/RequireRole";
 import CataloguePage from "@/pages/admin/catalogue";
+import ProduitsSpeciauxPage from "@/pages/produits-speciaux";
 import ForgotPasswordPage from "@/pages/auth/forgotPassword";
 import MePage from "@/pages/auth/me";
 import SetPasswordPage from "@/pages/auth/setPassword";
@@ -40,9 +41,10 @@ export default function App() {
         <Route path={ROUTES.VENTES}      element={<VentesPage />} />
         <Route path={ROUTES.STOCK}       element={<StockPage />} />
         <Route path={ROUTES.ALERTES}     element={<AlertesPage />} />
-        <Route path={ROUTES.ANALYSES}    element={<AnalysePage />} />
-        <Route path={ROUTES.PARAMETRES}  element={<ParametresPage />} />
-        <Route path={ROUTES.ME}          element={<MePage />} />
+        <Route path={ROUTES.ANALYSES}          element={<AnalysePage />} />
+        <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
+        <Route path={ROUTES.PARAMETRES}        element={<ParametresPage />} />
+        <Route path={ROUTES.ME}                element={<MePage />} />
 
         <Route element={<RequireRole role={ROLES.ADMIN} />}>
           <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />

@@ -49,7 +49,7 @@ export function AbcdAnalysisCard({
                 <span
                   className={cn(
                     "flex size-16 items-center justify-center rounded-full font-bold leading-none text-white transition-transform duration-150",
-                    "group-hover:scale-105",
+                    "group-hover:scale-105 cursor-pointer",
                     active && "scale-105 ring-2 ring-primary",
                   )}
                   style={{
