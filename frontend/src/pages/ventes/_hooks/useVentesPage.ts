@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import {
+  exportVentes,
   listVentes, listVentesCategories, listVentesSuggestions,
   listVentesSurveillanceCounts, listVentesTvaRates,
 } from "@/api/transactions";
 import { QUERY_KEYS } from "@/types";
 import type { SurveillanceTab, VentesFilters, VentesFiltersKey } from "@/types";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
 const DEFAULT_FILTERS: VentesFilters = {
@@ -86,11 +89,51 @@ export function useVentesPage() {
 
   const reset = () => setFilters(DEFAULT_FILTERS);
 
+  // ── Excel export ─────────────────────────────────────────────────────────
+  // Fetches the FULL filter-matching set (server-side, ignoring pagination)
+  // and writes an xlsx via the shared helper. 413 → user-facing toast.
+  const handleExport = useCallback(async () => {
+    try {
+      const { data } = await exportVentes(filters);
+      const header = [
+        "Date", "N° transaction", "Client", "Produit", "Catégorie",
+        "Type", "TVA", "PPV", "Qté", "Remise", "PU vente", "Sous-total",
+        "PU moyen", "Total",
+      ];
+      const body = data.map((r) => [
+        r.date ?? "",
+        r.transaction_ref_final ?? r.transaction_ref ?? "",
+        r.client ?? "",
+        r.product ?? "",
+        r.category ?? "",
+        r.category_type === "pharmacie" ? "Pharmacie"
+          : r.category_type === "parapharmacie" ? "Parapharmacie"
+          : "",
+        r.tva ?? "",
+        r.ppv ?? 0,
+        r.quantity ?? 0,
+        r.discount ?? 0,
+        r.unit_price ?? 0,
+        r.subtotal ?? 0,
+        r.avg_pu ?? 0,
+        r.total ?? 0,
+      ]);
+      await downloadXlsx(
+        [header, ...body],
+        exportFilename("VENTE", "xlsx", filters.date_from, filters.date_to),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "L'export a échoué.";
+      toast.error(msg);
+    }
+  }, [filters]);
+
   return {
     filters,
     setSearch, setDateRange, setCategories, setTva, setSurveillance, setIncludeND,
     setSort, setPage, setPageSize, reset,
     suggestQ, setSuggestQ,
+    handleExport,
     list:        list.data,
     isLoading:   list.isLoading,
     isError:     list.isError,

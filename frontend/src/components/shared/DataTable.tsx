@@ -7,8 +7,10 @@
  * Pattern matches the KpiTile / FilterBar / CategorySegment shared primitives.
  */
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 
@@ -87,6 +89,9 @@ export function DataTable<R, K extends string = string>({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {topBanner}
+      {/* Table card. Stays overflow-hidden so the rounded corners clip the
+          horizontal scrollbar cleanly. Pagination footer is a SIBLING (below)
+          so its sticky positioning resolves to <main>, not this card. */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -147,9 +152,9 @@ export function DataTable<R, K extends string = string>({
             </tbody>
           </table>
         </div>
-
-        {pagination && <PaginationFooter {...pagination} />}
       </div>
+
+      {pagination && <PaginationFooter {...pagination} />}
     </div>
   );
 }
@@ -159,37 +164,50 @@ function PaginationFooter({
   page, pageSize, total, onPage, onPageSize, pageSizes = [10, 25, 50],
 }: DataTablePagination) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageSizeOptions = pageSizes.map((n) => ({ value: String(n), label: `${n} / page` }));
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-subtle/40 px-4 py-2 text-xs">
+    // Mirrors the FilterBar at the top of the page: sticky-pinned to <main>,
+    // own card shell, same z-20 layer. Lives OUTSIDE the table card so its
+    // sticky positioning resolves to <main> directly (no clipping ancestor).
+    <div
+      className={cn(
+        "sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3",
+        "rounded-xl border border-border bg-card px-4 py-2 text-xs shadow-sm",
+      )}
+    >
       <span className="font-mono tabular-nums text-muted-foreground">
         {formatQty(total)} résultats
       </span>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
+        <AsyncButton
+          variant="ghost"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
-          className="inline-flex cursor-pointer items-center rounded-md border border-border bg-card px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+          className="!h-9 !px-3"
+          aria-label="Page précédente"
         >
-          ◀ Précédent
-        </button>
+          <ChevronLeft className="size-4" />
+          <span className="ml-1">Précédent</span>
+        </AsyncButton>
         <span className="text-muted-foreground">Page {page} / {pageCount}</span>
-        <button
-          type="button"
+        <AsyncButton
+          variant="ghost"
           disabled={page >= pageCount}
           onClick={() => onPage(page + 1)}
-          className="inline-flex cursor-pointer items-center rounded-md border border-border bg-card px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+          className="!h-9 !px-3"
+          aria-label="Page suivante"
         >
-          Suivant ▶
-        </button>
-        <select
-          aria-label="Lignes par page"
-          value={pageSize}
-          onChange={(e) => { onPageSize(Number(e.target.value)); onPage(1); }}
-          className="cursor-pointer rounded-md border border-border bg-card px-2 py-1 text-foreground"
-        >
-          {pageSizes.map((n) => <option key={n} value={n}>{n} / page</option>)}
-        </select>
+          <span className="mr-1">Suivant</span>
+          <ChevronRight className="size-4" />
+        </AsyncButton>
+        <SingleSelectPopover
+          label=""
+          options={pageSizeOptions}
+          value={String(pageSize)}
+          onChange={(v) => { onPageSize(Number(v)); onPage(1); }}
+          placement="top"
+          align="end"
+        />
       </div>
     </div>
   );

@@ -13,28 +13,25 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 from database import DbDep
 from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
 from permissions import require_pharmacy_owner
 from schemas.special_products import (
-    DeleteResult,
     MedicamentSuggestion,
+    SpecialProductBulkResult,
     SpecialProductCreate,
     SpecialProductOut,
+    SpecialProductReintegrate,
+    SpecialProductReintegrateResult,
 )
 from search import product_search_clauses, tokenize_search
 from security import CurrentUserDep
 
 
 router = APIRouter(tags=["special-products"])
-
-
-MedIdPath = Annotated[int, Path(ge=1, description="Medicament id")]
 
 
 def _to_out(status_row, med: Medicament) -> dict:
@@ -64,77 +61,91 @@ def list_special_products(user: CurrentUserDep, db: DbDep) -> list[dict]:
     return [_to_out(status, med) for status, med in rows]
 
 
-@router.post("/", response_model=SpecialProductOut, status_code=201)
-def create_special_product(
+@router.post("/", response_model=SpecialProductBulkResult, status_code=201)
+def exclude_products(
     body: SpecialProductCreate,
     user: CurrentUserDep,
     db:   DbDep,
 ) -> dict:
-    """Mark a medicament as spécial for this pharmacy. Idempotent: a second
-    request for the same medicament overwrites (flips declared back to False
-    if the owner had re-declared previously) — never returns 409."""
+    """Bulk-mark medicaments as spécial for this pharmacy. Idempotent —
+    medicament_ids already flagged are counted as `already_special` rather
+    than erroring. Atomic: if any id is bogus the whole request returns 404
+    with the offending ids surfaced; nothing is committed."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="special_products")
+    ids = list(dict.fromkeys(body.medicament_ids))      # dedupe, keep order
 
-    med = db.query(Medicament).filter(Medicament.id == body.medicament_id).first()
-    if not med:
-        raise HTTPException(status_code=404, detail="Médicament introuvable")
+    existing_meds = {m.id: m for m in
+        db.query(Medicament).filter(Medicament.id.in_(ids)).all()}
+    bad = [i for i in ids if i not in existing_meds]
+    if bad:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Médicament(s) introuvable(s) : {bad}",
+        )
 
-    existing = (
-        db.query(PharmacyMedicamentStatus)
-        .filter(
+    existing_status = {s.medicament_id: s for s in
+        db.query(PharmacyMedicamentStatus).filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-            PharmacyMedicamentStatus.medicament_id == body.medicament_id,
-        )
-        .first()
-    )
-    if existing:
-        existing.declared = False
-        status_row = existing
-    else:
-        status_row = PharmacyMedicamentStatus(
-            pharmacy_id=pharmacy_id,
-            medicament_id=body.medicament_id,
-            declared=False,
-        )
-        db.add(status_row)
-    try:
-        db.commit()
-    except IntegrityError:
-        # Race: another request inserted the row between our check + commit.
-        db.rollback()
-        status_row = (
-            db.query(PharmacyMedicamentStatus)
-            .filter(
-                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                PharmacyMedicamentStatus.medicament_id == body.medicament_id,
+            PharmacyMedicamentStatus.medicament_id.in_(ids),
+        ).all()}
+
+    inserted = already = 0
+    touched: list[PharmacyMedicamentStatus] = []
+    for med_id in ids:
+        s = existing_status.get(med_id)
+        if s:
+            if s.declared is False:
+                already += 1                # already spécial → no-op
+            else:
+                s.declared = False          # was re-declared previously → flip
+                inserted += 1
+            touched.append(s)
+        else:
+            s = PharmacyMedicamentStatus(
+                pharmacy_id=pharmacy_id, medicament_id=med_id, declared=False,
             )
-            .one()
-        )
-    db.refresh(status_row)
-    return _to_out(status_row, med)
+            db.add(s); touched.append(s); inserted += 1
+    db.commit()
+    for s in touched:
+        db.refresh(s)
+    return {
+        "inserted":        inserted,
+        "already_special": already,
+        "products":        [_to_out(s, existing_meds[s.medicament_id]) for s in touched],
+    }
 
 
-@router.delete("/{medicament_id}", response_model=DeleteResult)
-def delete_special_product(
-    medicament_id: MedIdPath,
+@router.post("/reintegrate", response_model=SpecialProductReintegrateResult)
+def reintegrate_products(
+    body: SpecialProductReintegrate,
     user: CurrentUserDep,
     db:   DbDep,
 ) -> dict:
-    """Réintégrer — remove the spécial flag. Product returns to every aggregate
-    on the next query. Idempotent: returns deleted=False if no row existed."""
+    """Bulk-réintégrer — remove the spécial flag on N medicaments at once.
+    Products return to every aggregate on the next query. Idempotent: ids
+    that aren't currently spécial are silently counted as `not_special`
+    (no 404 — owner might be acting on stale UI state)."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="special_products")
-    row = (
+    ids = list(dict.fromkeys(body.medicament_ids))      # dedupe, keep order
+
+    rows = (
         db.query(PharmacyMedicamentStatus)
         .filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-            PharmacyMedicamentStatus.medicament_id == medicament_id,
+            PharmacyMedicamentStatus.medicament_id.in_(ids),
+            PharmacyMedicamentStatus.declared == False,
         )
-        .first()
+        .all()
     )
-    if not row:
-        return {"deleted": False, "medicament_id": medicament_id}
-    db.delete(row); db.commit()
-    return {"deleted": True, "medicament_id": medicament_id}
+    found = {r.medicament_id for r in rows}
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {
+        "reintegrated":   len(rows),
+        "not_special":    len([i for i in ids if i not in found]),
+        "medicament_ids": ids,
+    }
 
 
 @router.get("/suggestions", response_model=list[MedicamentSuggestion])

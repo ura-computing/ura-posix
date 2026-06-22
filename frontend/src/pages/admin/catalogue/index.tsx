@@ -50,7 +50,7 @@ export default function CataloguePage() {
     } : null,
     p.filters.type ? {
       key: "type",
-      label: <>Type : {p.filters.type === "pharmacie" ? "Pharmacie" : "Parapharmacie"}</>,
+      label: <>Type : {p.filters.type === "pharmacie" ? "Pharmacie" : p.filters.type === "parapharmacie" ? "Parapharmacie" : "Non classés"}</>,
       onClear: () => p.setType(null),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -121,9 +121,10 @@ export default function CataloguePage() {
             { value: "",              label: "Tous types" },
             { value: "pharmacie",     label: "Pharmacie" },
             { value: "parapharmacie", label: "Parapharmacie" },
+            { value: "unclassified",  label: "Non classés" },
           ],
           value:    p.filters.type ?? "",
-          onChange: (v) => p.setType((v === "" ? null : v) as ProductType | null),
+          onChange: (v) => p.setType((v === "" ? null : v) as ProductType | "unclassified" | null),
         }}
         rightActions={[
           { label: "Importer CSV", icon: <UploadCloud className="size-4" />, variant: "outline", onClick: () => setImporting(true) },

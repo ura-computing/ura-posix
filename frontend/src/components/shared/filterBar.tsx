@@ -25,6 +25,42 @@ import {
   type SingleSelectOption,
 } from "./SingleSelectPopover";
 
+
+// ─── Shared popover styles ───────────────────────────────────────────────────
+// Single source of truth for the trigger / panel / option className strings.
+// Consumed by MultiSelectPopover (here), SingleSelectPopover, and the DataTable
+// pagination page-size selector. Keeps Catégorie / Type / page-size dropdowns
+// visually identical across the app — D2 of the F19 design-system cleanup.
+
+export const POPOVER_TRIGGER =
+  "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-surface-subtle px-3 text-sm hover:bg-muted/50";
+
+/** Visual styles ONLY — vertical positioning (POPOVER_POSITION) AND horizontal
+ *  anchoring (POPOVER_ALIGN) live in their own maps so the panel can adapt to
+ *  the trigger's position on screen. */
+export const POPOVER_PANEL =
+  "absolute z-30 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg";
+
+/** Vertical placement relative to the trigger. Use "top" when the trigger is
+ *  near the viewport bottom (sticky pagination footer); default "bottom". */
+export const POPOVER_POSITION = {
+  bottom: "top-full mt-1",
+  top:    "bottom-full mb-1",
+} as const;
+
+/** Horizontal anchor. "start" pins the panel's LEFT edge to the trigger's left
+ *  (default — panel grows rightward). "end" pins the panel's RIGHT edge to the
+ *  trigger's right (panel grows leftward) — use when the trigger sits near the
+ *  viewport's right edge so the panel doesn't clip off-screen. */
+export const POPOVER_ALIGN = {
+  start: "left-0",
+  end:   "right-0",
+} as const;
+
+export const POPOVER_OPTION =
+  "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle";
+
+
 // ─── SearchAutocomplete ──────────────────────────────────────────────────────
 
 interface SearchAutocompleteProps<G extends Record<string, string[]>> {
@@ -178,7 +214,7 @@ export function MultiSelectPopover({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-surface-subtle px-3 text-sm hover:bg-muted/50"
+        className={POPOVER_TRIGGER}
       >
         {label}
         {selected.length > 0 && (
@@ -189,7 +225,7 @@ export function MultiSelectPopover({
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+        <div className={cn(POPOVER_PANEL, POPOVER_POSITION.bottom, POPOVER_ALIGN.start)}>
           {options.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               Aucune option
@@ -198,10 +234,7 @@ export function MultiSelectPopover({
           {options.map((opt) => {
             const checked = selected.includes(opt);
             return (
-              <label
-                key={opt}
-                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-surface-subtle"
-              >
+              <label key={opt} className={POPOVER_OPTION}>
                 <input
                   type="checkbox"
                   checked={checked}

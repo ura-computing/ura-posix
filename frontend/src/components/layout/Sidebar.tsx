@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { PharmagestIcon } from "@/components/shared/PharmagestIcon";
 import { PharmagestWordmark } from "@/components/shared/PharmagestWordmark";
 import { Tooltip } from "@/components/shared/Tooltip";
+import { useUnclassifiedCount } from "@/hooks/adminCatalog";
 import { useLogout } from "@/hooks/useLogout";
 import { ROUTES } from "@/types";
 import type { Role } from "@/types";
@@ -30,7 +31,27 @@ function itemClasses(isActive: boolean, collapsed: boolean) {
   );
 }
 
-function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
+  if (n <= 0) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-[18px] items-center justify-center rounded-full bg-warning px-1.5 text-[10px] font-bold tabular-nums text-warning-foreground",
+        // When collapsed, dot floats top-right of the icon instead of inline.
+        collapsed
+          ? "absolute right-0 top-0 size-[14px] min-w-0 px-0 text-[9px]"
+          : "ml-auto",
+      )}
+      title={`${n} produit${n > 1 ? "s" : ""} en attente de classification`}
+      aria-label={`${n} non classés`}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
+  );
+}
+
+
+function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean; badge?: number }) {
   // Tooltip only fires when collapsed — labels are visible inline when expanded.
   // Mobile keeps native title since hover doesn't apply there.
   const tooltipLabel = collapsed ? (item.ready === false ? `${item.label} · Bientôt disponible` : item.label) : "";
@@ -47,10 +68,11 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
     <NavLink
       to={item.to}
       end={item.to === ROUTES.RAPPORT}
-      className={({ isActive }) => itemClasses(isActive, collapsed)}
+      className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
     >
       <item.icon className="size-[18px] shrink-0" aria-hidden />
       <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+      {badge != null && <CountBadge n={badge} collapsed={collapsed} />}
     </NavLink>
   );
 
@@ -62,6 +84,14 @@ export function Sidebar({
 }: SidebarProps) {
   const { handleLogout } = useLogout();
   const groups = visibleGroups(role);
+  const unclassifiedCount = useUnclassifiedCount(role);
+
+  /** Lookup: route path → badge number. Currently only the admin Catalogue row
+   *  has one (unclassified product count). Extend the map when more dynamic
+   *  badges land. */
+  const badges: Record<string, number> = {
+    [ROUTES.ADMIN_CATALOGUE]: unclassifiedCount,
+  };
 
   return (
     <>
@@ -117,7 +147,7 @@ export function Sidebar({
                 </span>
               )}
               {group.items.map((item) => (
-                <NavRow key={item.to} item={item} collapsed={collapsed} />
+                <NavRow key={item.to} item={item} collapsed={collapsed} badge={badges[item.to]} />
               ))}
             </div>
           ))}

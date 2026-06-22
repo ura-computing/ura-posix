@@ -1,20 +1,32 @@
 import { api } from "@/api/client";
-import type { MedicamentSuggestion, SpecialProduct } from "@/types";
+import type {
+  MedicamentSuggestion,
+  SpecialProduct,
+  SpecialProductBulkResult,
+  SpecialProductReintegrateResult,
+} from "@/types";
 
 
 export function listSpecialProducts(): Promise<SpecialProduct[]> {
   return api(`/special-products/`);
 }
 
-export function createSpecialProduct(medicamentId: number): Promise<SpecialProduct> {
+/** Bulk-exclude one or more medicaments. Atomic + idempotent — already-spécial
+ *  ids count toward `already_special` rather than erroring. */
+export function excludeProducts(medicamentIds: number[]): Promise<SpecialProductBulkResult> {
   return api(`/special-products/`, {
     method: "POST",
-    body:   { medicament_id: medicamentId },
+    body:   { medicament_ids: medicamentIds },
   });
 }
 
-export function deleteSpecialProduct(medicamentId: number): Promise<{ deleted: boolean; medicament_id: number }> {
-  return api(`/special-products/${medicamentId}`, { method: "DELETE" });
+/** Bulk-réintégrer one or more medicaments (drop the spécial flag). Idempotent —
+ *  ids that aren't currently spécial are silently counted as `not_special`. */
+export function reintegrateProducts(medicamentIds: number[]): Promise<SpecialProductReintegrateResult> {
+  return api(`/special-products/reintegrate`, {
+    method: "POST",
+    body:   { medicament_ids: medicamentIds },
+  });
 }
 
 export function suggestMedicaments(q: string): Promise<MedicamentSuggestion[]> {

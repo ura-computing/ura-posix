@@ -103,7 +103,6 @@ export function useUpload(initialDocType: DocType | null = null) {
 
   const startImport = useCallback(() => {
     if (!localDocType || !file || allRows.length === 0) return;
-    if (localDocType === "stock") return upload.uploadStock(file);
     return upload.uploadTx(localDocType, allRows, file.name);
   }, [localDocType, file, allRows, upload]);
 

@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import {
+  exportAchats,
   listAchats,
   listAchatsCategories,
   listAchatsSuggestions,
@@ -10,6 +12,7 @@ import {
 } from "@/api/transactions";
 import { QUERY_KEYS } from "@/types";
 import type { AchatsFilters } from "@/types";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
 const DEFAULT_FILTERS: AchatsFilters = {
@@ -81,10 +84,47 @@ export function useAchatsPage() {
 
   const reset = () => setFilters(DEFAULT_FILTERS);
 
+  // ── Excel export ─────────────────────────────────────────────────────────
+  // Fetches the FULL filter-matching set (server-side, ignoring pagination)
+  // and writes an xlsx via the shared helper. 413 → user-facing toast.
+  const handleExport = useCallback(async () => {
+    try {
+      const { data } = await exportAchats(filters);
+      const header = [
+        "Date BL", "Référence", "Fournisseur", "Produit", "Catégorie",
+        "Type", "TVA", "Qté", "PPH", "PU achat", "Péremption", "Total",
+      ];
+      const body = data.map((r) => [
+        r.delivery_date ?? "",
+        r.delivery_ref_final ?? r.delivery_ref ?? "",
+        r.supplier ?? "",
+        r.product ?? "",
+        r.category ?? "",
+        r.category_type === "pharmacie" ? "Pharmacie"
+          : r.category_type === "parapharmacie" ? "Parapharmacie"
+          : "",
+        r.tva ?? "",
+        r.quantity ?? 0,
+        r.pph ?? 0,
+        r.unit_price ?? 0,
+        r.expiry_date ?? "",
+        r.total ?? 0,
+      ]);
+      await downloadXlsx(
+        [header, ...body],
+        exportFilename("ACHAT", "xlsx", filters.date_from, filters.date_to),
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "L'export a échoué.";
+      toast.error(msg);
+    }
+  }, [filters]);
+
   return {
     filters,
     setSearch, setDateRange, setCategories, setTva, setSort, setPage, setPageSize, reset,
     suggestQ, setSuggestQ,
+    handleExport,
     list:               list.data,
     isLoading:          list.isLoading,
     isError:            list.isError,

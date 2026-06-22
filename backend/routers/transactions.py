@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import Float, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -66,22 +66,26 @@ SearchQ      = Annotated[str | None, Query(description="Substring search on prod
 BatchIdQ     = Annotated[int | None, Query(ge=1, description="Filter to a specific ImportBatch.id")]
 SortByQ      = Annotated[str | None, Query(description="Sort column whitelist per endpoint")]
 SortOrderQ   = Annotated[str,        Query(description="asc | desc")]
+ExportQ      = Annotated[bool,       Query(description="If true, return ALL filter-matching rows (skip pagination). Capped at MAX_EXPORT_ROWS.")]
+
+
+# Server-side cap on export size. Exporting more is almost always a sign the
+# user forgot a filter — we 413 rather than streaming a 200MB xlsx-bound payload.
+MAX_EXPORT_ROWS = 50_000
+
+
+def _check_export_cap(export: bool, total: int) -> None:
+    """Enforce MAX_EXPORT_ROWS when export=true. Shared by list_achats + list_ventes."""
+    if export and total > MAX_EXPORT_ROWS:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Trop de lignes ({total:,}) — affinez les filtres (max {MAX_EXPORT_ROWS:,}).",
+        )
 
 
 # Sort whitelists — narrow + explicit so no SQL injection vector via sort_by.
 ACHAT_SORT  = {"id", "delivery_date", "delivery_ref", "supplier", "quantity", "pph", "unit_price", "total", "expiry_date"}
 VENTE_SORT  = {"id", "date", "transaction_ref", "client", "quantity", "discount", "unit_price", "total"}
-
-
-_PHARMA_KEYWORDS = ("edicament", "édicament", "oméopath", "omeopath", "iététique", "ietetique")
-
-
-def _classify_pharma_type(category: str | None) -> str | None:
-    """Mirror of stats' _pharma_expr — used by Achats + Ventes row builders."""
-    if not category:
-        return None
-    cat = category.lower()
-    return "pharmacie" if any(kw in cat for kw in _PHARMA_KEYWORDS) else "parapharmacie"
 
 
 def _build_search_filter(search: str | None, *extra_text_cols):
@@ -252,6 +256,7 @@ def list_achats(
     tva:        TvaMultiQ      = None,
     sort_by:    SortByQ        = None,
     sort_order: SortOrderQ     = "desc",
+    export:     ExportQ        = False,
 ) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
     q = _apply_achat_filters(
@@ -272,17 +277,22 @@ def list_achats(
     ).one()
     total = int(agg.n or 0)
 
-    rows = (
-        _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id")
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    _check_export_cap(export, total)
+
+    sorted_q = _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id")
+    rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
+
+    # Bulk-load medicaments into the session identity map so _achat_to_row's
+    # per-row db.get() returns from cache instead of issuing N queries.
+    med_ids = {a.medicament_id for a in rows if a.medicament_id}
+    if med_ids:
+        db.query(Medicament).filter(Medicament.id.in_(med_ids)).all()
 
     suffixes = _suffix_map(db)
+    pagination_size = max(total, 1) if export else limit
     return {
         "data": [_achat_to_row(db, a, suffixes) for a in rows],
-        "pagination": paginate(total, page, limit),
+        "pagination": paginate(total, 1 if export else page, pagination_size),
         "summary": AchatsSummary(
             rows_total=total,
             tva_payee=float(agg.tva or 0.0),
@@ -306,7 +316,7 @@ def _achat_to_row(db: Session, a: Achat, suffixes: dict[str, tuple[str, str | No
         pid=med.pid if med else None,
         product=med.product if med else None,
         category=category,
-        category_type=_classify_pharma_type(category),
+        category_type=med.product_type if med else None,
         tva=med.tva if med else None,
         quantity=a.quantity,
         pph=med.pph if med else None,
@@ -444,6 +454,7 @@ def list_ventes(
     include_non_declared: IncludeNDQ     = True,
     sort_by:              SortByQ        = None,
     sort_order:           SortOrderQ     = "desc",
+    export:               ExportQ        = False,
 ) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
 
@@ -473,26 +484,27 @@ def list_ventes(
     ).one()
     total = int(agg.n or 0)
 
-    rows = (
-        _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id")
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    _check_export_cap(export, total)
 
-    # Compute avg_pu_map ONCE for the page's medicaments (avoids N+1)
+    sorted_q = _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id")
+    rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
+
+    # Bulk-load medicaments + compute avg_pu_map for the result set (covers
+    # both paginated and full-export paths — avoids N+1 in _vente_to_row).
     med_ids = [v.medicament_id for v in rows if v.medicament_id]
     avg_pu_map: dict[int, float] = {}
     if med_ids:
+        db.query(Medicament).filter(Medicament.id.in_(med_ids)).all()
         sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
         for row in db.query(sub.c.med_id, sub.c.avg_pu).filter(sub.c.med_id.in_(med_ids)).all():
             if row.avg_pu is not None:
                 avg_pu_map[row.med_id] = float(row.avg_pu)
 
     suffixes = _suffix_map(db)
+    pagination_size = max(total, 1) if export else limit
     return {
         "data": [_vente_to_row(db, v, suffixes, avg_pu_map) for v in rows],
-        "pagination": paginate(total, page, limit),
+        "pagination": paginate(total, 1 if export else page, pagination_size),
         "summary": VentesSummary(
             rows_total=total,
             tva_collected=float(agg.tva or 0.0),
@@ -528,6 +540,7 @@ def _vente_to_row(
         pid=med.pid if med else None,
         product=med.product if med else None,
         category=category,
+        category_type=med.product_type if med else None,
         tva=med.tva if med else None,
         ppv=ppv,
         quantity=v.quantity,

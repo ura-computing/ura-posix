@@ -40,6 +40,30 @@ def strip_percentage(s: str | None) -> str:
     return _PCT_RE.sub("", s).strip()
 
 
+# ─── Product-type classifier ──────────────────────────────────────────────────
+# Single Python-side source of truth for Pharmacie/Parapharmacie classification
+# at WRITE time (catalog import only). Same keyword set as stats_queries.pharma_expr()
+# uses in its SQL fallback. Catalogue is the source of truth — see F19 plan.
+
+_PHARMA_KEYWORDS = (
+    "edicament", "édicament", "oméopath", "omeopath", "iététique", "ietetique",
+)
+
+
+def classify_product_type(category: str | None) -> str:
+    """Auto-classify a Medicament as 'pharmacie' or 'parapharmacie' from its
+    category string. Called by the catalog CSV import handler only — achat/vente
+    imports do NOT classify (catalogue is the source of truth).
+
+    Categories without any pharma keyword default to 'parapharmacie' (matches
+    the SQL `else_=False` branch in pharma_expr()). Empty/None category also
+    defaults to parapharmacie — admin can override later via the catalog UI."""
+    if not category:
+        return "parapharmacie"
+    cat = category.lower()
+    return "pharmacie" if any(kw in cat for kw in _PHARMA_KEYWORDS) else "parapharmacie"
+
+
 _MOJIBAKE_FIXES = {
     "√©": "é", "√®": "è", "√à": "è", "√™": "ê", "√Æ": "î", "√è": "ï",
     "√Ø": "ï", "√†": "à", "√§": "ä", "√≥": "ó", "√µ": "õ", "√º": "ü",
@@ -191,18 +215,29 @@ def upsert_medicament(
     ppv: float | None = None,
     category: str | None = None,
     zone: str | None = None,
-) -> Medicament | None:
-    """Find or create a Medicament. Match ladder:
+) -> tuple[Medicament | None, bool]:
+    """Find or create a Medicament from an achat/vente import row.
+
+    Returns `(medicament, was_created)`:
+      - was_created=True  → row didn't exist; freshly inserted (admin queue signal)
+      - was_created=False → row existed (matched by PID or normalized name)
+      - medicament=None   → input was empty (no pid)
+
+    Match ladder:
        1. exact PID (the Sobrus product id)
        2. accent-stripped + case-insensitive product name
 
     On match: update tva/pph/ppv/zone if provided. NEVER overwrites an existing
     category — admins curate those.
     On miss: insert new row with all supplied fields.
-    Returns the Medicament, or None if neither pid nor product was provided.
-    """
+
+    IMPORTANT (F19 contract): new rows created here have product_type = NULL
+    by design. Catalogue is the source of truth — admin must classify via
+    /admin/catalogue. Owner imports DO NOT set the type by side-effect.
+    Do NOT add a classify_product_type() call here — that would defeat the
+    "admin queue" UX that depends on NULL product_type as the signal."""
     if not pid:
-        return None
+        return None, False
 
     med = db.query(Medicament).filter(Medicament.pid == pid).first()
     if med is None and product:
@@ -218,7 +253,7 @@ def upsert_medicament(
         if ppv is not None:               med.ppv      = ppv
         if zone     and not med.zone:     med.zone     = zone
         # Category intentionally NOT overwritten — admin-curated.
-        return med
+        return med, False
 
     med = Medicament(
         pid=pid, product=product or pid,
@@ -227,7 +262,7 @@ def upsert_medicament(
     )
     db.add(med)
     db.flush()      # populates med.id without committing the parent transaction
-    return med
+    return med, True
 
 
 # ─── Sobrus column lookup (tolerant of column reordering) ─────────────────────

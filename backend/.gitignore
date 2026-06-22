@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Runtime copy from `make demo` (sourced from ../resources/catalog.csv).
+# Tracked at the repo root; never commit the per-build copy.
+catalog.csv

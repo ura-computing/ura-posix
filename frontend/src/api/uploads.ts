@@ -1,4 +1,4 @@
-import { ApiErr, api } from "@/api/client";
+import { API_BASE, ApiErr, api } from "@/api/client";
 import type {
   BatchPatchResult,
   ImportBatchStatus,
@@ -7,11 +7,7 @@ import type {
 } from "@/types";
 
 
-/** Backend prefix mirrors api/client.ts. Multipart uploads bypass the JSON wrapper. */
-const BASE = "/v1";
-
-
-// ─── Multipart: single-shot file uploads (used when the file is < ~500 rows) ──
+// ─── Multipart: single-shot achat/vente uploads (used by the Chrome extension) ──
 
 // EXEMPTION: bypasses the api() wrapper because that helper JSON-encodes its body.
 // Multipart uploads need a raw FormData with the browser-supplied boundary header
@@ -22,7 +18,7 @@ async function postMultipart<T>(path: string, file: File, batchId?: number): Pro
   fd.append("file", file);
   if (batchId != null) fd.append("batch_id", String(batchId));
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     credentials: "include",
     headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -43,9 +39,6 @@ export const uploadAchatMultipart = (file: File, batchId?: number): Promise<Uplo
 export const uploadVenteMultipart = (file: File, batchId?: number): Promise<UploadTxResult> =>
   postMultipart("/uploads/vente", file, batchId);
 
-export const uploadStockMultipart = (file: File): Promise<UploadStockResult> =>
-  postMultipart("/uploads/stock", file);
-
 
 // ─── JSON: chunked uploads (page wizard) — same shape the Chrome extension uses ─
 
@@ -60,6 +53,9 @@ export const uploadAchatJson = (body: JsonBody): Promise<UploadTxResult> =>
 
 export const uploadVenteJson = (body: JsonBody): Promise<UploadTxResult> =>
   api<UploadTxResult>("/uploads/vente-json", { method: "POST", body });
+
+export const uploadStockJson = (body: JsonBody): Promise<UploadStockResult> =>
+  api<UploadStockResult>("/uploads/stock-json", { method: "POST", body });
 
 
 // ─── PATCH batch status (cancel or error) ────────────────────────────────────

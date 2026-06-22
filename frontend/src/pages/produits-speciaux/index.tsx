@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Plus, Undo2 } from "lucide-react";
 
-import { AsyncButton } from "@/components/shared/AsyncButton";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import type { SpecialProduct } from "@/types";
 
 import { ExcludeProductDialog } from "./_components/ExcludeProductDialog";
+import { ReintegrateProductsDialog } from "./_components/ReintegrateProductsDialog";
 import { useProduitsSpeciaux } from "./_hooks/useProduitsSpeciaux";
 
 
@@ -17,41 +17,33 @@ function formatRelative(iso: string): string {
 }
 
 
+const COLUMNS: ColumnDef<SpecialProduct>[] = [
+  { key: "product", label: "Produit", width: 320,
+    render: (sp) => (
+      <div className="flex flex-col">
+        <span className="truncate text-sm" title={sp.product}>{sp.product}</span>
+        <span className="truncate font-mono text-[10px] text-muted-foreground">{sp.pid}</span>
+      </div>
+    ) },
+  { key: "category", label: "Catégorie", width: 200, sortable: false,
+    render: (sp) => sp.category
+      ? <span className="block max-w-[190px] truncate text-xs text-muted-foreground">{sp.category}</span>
+      : <span className="text-muted-foreground">—</span> },
+  { key: "created_at", label: "Exclus le", width: 160, sortable: false,
+    render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span> },
+];
+
+
 export default function ProduitsSpeciauxPage() {
   const p = useProduitsSpeciaux();
   const [excluding, setExcluding] = useState(false);
+  const [reintegrating, setReintegrating] = useState(false);
 
   const activeFilters: ActiveFilter[] = p.search
     ? [{ key: "search", label: <>Recherche : {p.search}</>, onClear: () => p.setSearch("") }]
     : [];
 
-  const COLUMNS: ColumnDef<SpecialProduct>[] = [
-    { key: "product", label: "Produit", width: 320,
-      render: (sp) => (
-        <div className="flex flex-col">
-          <span className="truncate text-sm" title={sp.product}>{sp.product}</span>
-          <span className="truncate font-mono text-[10px] text-muted-foreground">{sp.pid}</span>
-        </div>
-      ) },
-    { key: "category", label: "Catégorie", width: 200, sortable: false,
-      render: (sp) => sp.category
-        ? <span className="block max-w-[190px] truncate text-xs text-muted-foreground">{sp.category}</span>
-        : <span className="text-muted-foreground">—</span> },
-    { key: "created_at", label: "Exclus le", width: 130, sortable: false,
-      render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span> },
-    { key: "actions", label: "", width: 130, align: "right", sortable: false,
-      render: (sp) => (
-        <AsyncButton
-          variant="ghost"
-          onClick={() => p.handleReintegrate(sp.medicament_id)}
-          isLoading={p.reintegrating}
-          loadingText="…"
-          className="!h-7 !px-2 !text-xs text-warning hover:!bg-warning/10"
-        >
-          <Undo2 className="mr-1 size-3.5" /> Réintégrer
-        </AsyncButton>
-      ) },
-  ];
+  const hasSpeciaux = p.specialProducts.length > 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -71,7 +63,14 @@ export default function ProduitsSpeciauxPage() {
         }}
         rightActions={[
           {
-            label:   "Exclure un produit",
+            label:    "Réintégrer des produits",
+            icon:     <Undo2 className="size-4" />,
+            variant:  "outline",
+            onClick:  () => setReintegrating(true),
+            disabled: !hasSpeciaux,
+          },
+          {
+            label:   "Exclure des produits",
             icon:    <Plus className="size-4" />,
             variant: "primary",
             onClick: () => setExcluding(true),
@@ -86,19 +85,27 @@ export default function ProduitsSpeciauxPage() {
         columns={COLUMNS}
         isLoading={p.isLoading}
         emptyTitle="Aucun produit exclu"
-        emptyHint={p.search ? "Aucun résultat pour cette recherche." : "Cliquez sur Exclure un produit pour commencer."}
+        emptyHint={p.search ? "Aucun résultat pour cette recherche." : "Cliquez sur Exclure des produits pour commencer."}
         rowKey={(sp) => sp.medicament_id}
       />
 
       <ExcludeProductDialog
         open={excluding}
         onClose={() => setExcluding(false)}
-        onSubmit={(id) => { p.handleExclude(id); setExcluding(false); }}
+        onSubmit={(ids) => { p.handleExclude(ids); setExcluding(false); }}
         isLoading={p.excluding}
         suggestions={p.suggestions}
         suggestionsLoading={p.suggestionsLoading}
         query={p.suggestQ}
         onQueryChange={p.setSuggestQ}
+      />
+
+      <ReintegrateProductsDialog
+        open={reintegrating}
+        onClose={() => setReintegrating(false)}
+        onSubmit={(ids) => { p.handleReintegrate(ids); setReintegrating(false); }}
+        isLoading={p.reintegrating}
+        specialProducts={p.specialProducts}
       />
     </div>
   );

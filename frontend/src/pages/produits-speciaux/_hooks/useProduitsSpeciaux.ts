@@ -5,9 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-  createSpecialProduct,
-  deleteSpecialProduct,
+  excludeProducts,
   listSpecialProducts,
+  reintegrateProducts,
   suggestMedicaments,
 } from "@/api/specialProducts";
 import { QUERY_KEYS } from "@/types";
@@ -45,9 +45,14 @@ export function useProduitsSpeciaux() {
   };
 
   const exclude = useMutation({
-    mutationFn: (medicamentId: number) => createSpecialProduct(medicamentId),
-    onSuccess:  () => {
-      toast.success("Produit exclu");
+    mutationFn: (ids: number[]) => excludeProducts(ids),
+    onSuccess:  (r) => {
+      const n    = r.inserted + r.already_special;
+      const verb = n === 1 ? "produit exclu" : "produits exclus";
+      const tail = r.already_special > 0
+        ? ` (${r.already_special} déjà spécial${r.already_special > 1 ? "iaux" : ""})`
+        : "";
+      toast.success(`${n} ${verb}${tail}`);
       setSuggestQ("");
       invalidate();
     },
@@ -55,9 +60,14 @@ export function useProduitsSpeciaux() {
   });
 
   const reintegrate = useMutation({
-    mutationFn: (medicamentId: number) => deleteSpecialProduct(medicamentId),
-    onSuccess:  () => { toast.success("Produit réintégré"); invalidate(); },
-    onError:    (e: Error) => toast.error(e.message),
+    mutationFn: (ids: number[]) => reintegrateProducts(ids),
+    onSuccess:  (r) => {
+      const n    = r.reintegrated;
+      const verb = n === 1 ? "produit réintégré" : "produits réintégrés";
+      toast.success(`${n} ${verb}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   // Local filter on the displayed table (case + accent insensitive).
@@ -84,8 +94,8 @@ export function useProduitsSpeciaux() {
     suggestionsLoading: suggestions.isFetching,
     suggestQ, setSuggestQ,
 
-    handleExclude:     (id: number) => exclude.mutate(id),
-    handleReintegrate: (id: number) => reintegrate.mutate(id),
+    handleExclude:     (ids: number[]) => exclude.mutate(ids),
+    handleReintegrate: (ids: number[]) => reintegrate.mutate(ids),
     excluding:    exclude.isPending,
     reintegrating: reintegrate.isPending,
   };

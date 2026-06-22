@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
-from sqlalchemy import asc, desc
+from sqlalchemy import asc, desc, func
 
 from csv_parse import strip_accents
 from database import DbDep
@@ -59,6 +59,15 @@ def _row(m: Medicament) -> dict:
     }
 
 
+@router.get("/admin/catalog/unclassified-count")
+def unclassified_count(user: CurrentUserDep, db: DbDep) -> dict:
+    """How many Medicaments still have product_type IS NULL — drives the
+    admin sidebar badge + owner alert."""
+    require_admin(user)
+    n = db.query(func.count(Medicament.id)).filter(Medicament.product_type.is_(None)).scalar()
+    return {"count": int(n or 0)}
+
+
 @router.get("/admin/catalog/categories", response_model=list[str])
 def list_catalog_categories(user: CurrentUserDep, db: DbDep) -> list[str]:
     """Distinct non-null categories (alphabetical). Powers the multi-select."""
@@ -96,7 +105,9 @@ def list_catalog(
     if category:
         q = q.filter(Medicament.category.in_(category))
 
-    if type in ("pharmacie", "parapharmacie"):
+    if type == "unclassified":
+        q = q.filter(Medicament.product_type.is_(None))
+    elif type in ("pharmacie", "parapharmacie"):
         q = q.filter(Medicament.product_type == type)
 
     col = _SORTABLE.get(sort_by, Medicament.product)

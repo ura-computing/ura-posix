@@ -1,0 +1,62 @@
+# Local demo stack for apcm-refactor.
+#
+# `make demo` brings this up. The named volume `postgres_data` matches the old
+# apcm-pharma compose file so when the client switches branches, their existing
+# `apcm_demo` database is mounted into this Postgres container. The backend's
+# entrypoint then runs `alembic upgrade head` (idempotent vs the old schema)
+# and seeds admin/owner/catalogue if not already present.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-apcm_demo}
+      POSTGRES_USER:     ${POSTGRES_USER:-apcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apcm}
+    # NOTE: no host port mapping. Backend reaches the DB via the docker network
+    # using hostname `db`. Avoids 5432 collisions with the client's other
+    # Postgres instances (e.g. an apcm-pharma demo still running).
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apcm} -d ${POSTGRES_DB:-apcm_demo}"]
+      interval: 5s
+      timeout:  5s
+      retries:  10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      # Driver explicitly named — refactor's config.py uses psycopg2.
+      DATABASE_URL:          postgresql+psycopg2://${POSTGRES_USER:-apcm}:${POSTGRES_PASSWORD:-apcm}@db:5432/${POSTGRES_DB:-apcm_demo}
+      JWT_SECRET:            ${JWT_SECRET:-demo-jwt-secret-not-for-prod-32chars-min!!}
+      JWT_ACCESS_EXPIRY_MIN: ${JWT_ACCESS_EXPIRY_MIN:-10080}
+      COOKIE_SECURE:         ${COOKIE_SECURE:-false}
+      FRONTEND_URL:          ${FRONTEND_URL:-http://localhost:4173}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:         ["CMD-SHELL", "curl -fsS http://localhost:8000/v1/health || exit 1"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the Vite bundle at build time — must point to where the
+        # browser will reach the backend (localhost from the host, not `db` or
+        # `backend` which are docker-network hostnames).
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:8000}
+    ports:
+      - "4173:4173"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

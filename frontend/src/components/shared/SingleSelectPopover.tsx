@@ -1,15 +1,24 @@
-/** Same visual shell as MultiSelectPopover but single-pick.
+/** Single-pick dropdown — the ONE shared primitive for every "pick one option"
+ *  selector in the app. Same trigger/panel/option className as MultiSelectPopover
+ *  (both pull from POPOVER_TRIGGER / POPOVER_PANEL / POPOVER_OPTION in filterBar.tsx).
  *
- *  Used for Stock's status filter (Tous / Sous-stock / Idéal / À surveiller /
- *  Sur-stock / Inconnu / Négatif). Selecting an option closes the popover.
+ *  Reused by:
+ *    - Stock status filter         (label="Statut", placement="bottom", align="start")
+ *    - Admin catalogue Type filter (label="Type",   placement="bottom", align="start")
+ *    - DataTable page-size picker  (label="",       placement="top",    align="end")
  *
- *  Trigger shows "Label : <selected>" when a value is set, or just "Label" when
- *  the placeholder/empty value is active.
+ *  Consumers only vary label / options / value / placement / align. If you find
+ *  yourself reaching for a NEW dropdown component, this one almost certainly fits.
+ *
+ *  Trigger shows "Label : <selected>" when a value is set. When label="" the
+ *  trigger shows the selected value alone (no leading colon).
  */
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/utils/cn";
+
+import { POPOVER_ALIGN, POPOVER_OPTION, POPOVER_PANEL, POPOVER_POSITION, POPOVER_TRIGGER } from "./filterBar";
 
 
 export interface SingleSelectOption {
@@ -26,11 +35,18 @@ export interface SingleSelectPopoverProps {
   /** The "no filter" sentinel — when value === emptyValue, the trigger shows
    *  just the label without ": …". Defaults to "" (empty string). */
   emptyValue?:  string;
+  /** Where the panel opens relative to the trigger. Use "top" when the trigger
+   *  is near the viewport bottom (e.g. sticky pagination footer). Default "bottom". */
+  placement?:   "top" | "bottom";
+  /** Horizontal anchor of the panel. "start" pins panel-left to trigger-left
+   *  (panel grows rightward — default). "end" pins panel-right to trigger-right
+   *  (panel grows leftward — use when trigger is near the viewport's right edge). */
+  align?:       "start" | "end";
 }
 
 
 export function SingleSelectPopover({
-  label, options, value, onChange, emptyValue = "",
+  label, options, value, onChange, emptyValue = "", placement = "bottom", align = "start",
 }: SingleSelectPopoverProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -56,16 +72,20 @@ export function SingleSelectPopover({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-surface-subtle px-3 text-sm hover:bg-muted/50"
+        className={POPOVER_TRIGGER}
       >
         <span>
           {label}
-          {isFiltering && <span className="ml-1 font-semibold text-foreground">: {selectedLabel}</span>}
+          {isFiltering && (
+            <span className={cn("font-semibold text-foreground", label && "ml-1")}>
+              {label ? `: ${selectedLabel}` : selectedLabel}
+            </span>
+          )}
         </span>
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-card p-1 shadow-lg">
+        <div className={cn(POPOVER_PANEL, POPOVER_POSITION[placement], POPOVER_ALIGN[align])}>
           {options.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">Aucune option</div>}
           {options.map((opt) => {
             const active = opt.value === value;
@@ -74,10 +94,7 @@ export function SingleSelectPopover({
                 key={opt.value}
                 type="button"
                 onClick={() => pick(opt.value)}
-                className={cn(
-                  "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle",
-                  active && "bg-surface-subtle font-semibold text-foreground",
-                )}
+                className={cn(POPOVER_OPTION, active && "bg-surface-subtle font-semibold text-foreground")}
               >
                 <span
                   className={cn(

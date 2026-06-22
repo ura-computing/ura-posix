@@ -1,4 +1,4 @@
-import { ApiErr, api } from "@/api/client";
+import { API_BASE, ApiErr, api } from "@/api/client";
 import type {
   CatalogFilters,
   CatalogImportResponse,
@@ -29,6 +29,12 @@ export function listCatalogCategories(): Promise<string[]> {
   return api(`/admin/catalog/categories`);
 }
 
+/** Count of Medicaments with product_type IS NULL. Drives the sidebar badge
+ *  on "Catalogue" — admin's queue of products needing classification. */
+export function getUnclassifiedCount(): Promise<{ count: number }> {
+  return api(`/admin/catalog/unclassified-count`);
+}
+
 export function createMedicament(body: MedicamentInput): Promise<Medicament> {
   return api(`/admin/catalog`, { method: "POST", body });
 }
@@ -45,11 +51,10 @@ export function deleteMedicament(id: number): Promise<void> {
 // Multipart CSV upload — same shape as the achat/vente/stock uploaders.
 // EXEMPTION: bypasses api() because that helper JSON-encodes its body. Multipart
 // needs raw FormData + the browser-supplied boundary header.
-const BASE = "/v1";
 export async function importCatalogCsv(file: File): Promise<CatalogImportResponse> {
   const fd = new FormData();
   fd.append("file", file);
-  const res = await fetch(`${BASE}/uploads/catalog`, {
+  const res = await fetch(`${API_BASE}/uploads/catalog`, {
     method: "POST",
     credentials: "include",
     headers: { "X-Requested-With": "XMLHttpRequest" },

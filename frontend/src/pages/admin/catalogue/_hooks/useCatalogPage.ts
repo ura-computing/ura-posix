@@ -45,7 +45,7 @@ export function useCatalogPage() {
   const patch = (next: Partial<CatalogFilters>) => setFilters((p) => ({ ...p, ...next, page: 1 }));
   const setSearch     = (search: string)              => patch({ search });
   const setCategories = (category: string[])          => patch({ category });
-  const setType       = (type: ProductType | null)    => patch({ type });
+  const setType       = (type: ProductType | "unclassified" | null) => patch({ type });
 
   // Sort: toggle order on same key, reset to "asc" on new key.
   const setSort = (key: string) =>

@@ -1,4 +1,4 @@
-import { AlertCircle, Ban, CheckCircle2, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertCircle, Ban, CheckCircle2, Info, Loader2, RotateCcw, X } from "lucide-react";
 
 import { formatQty } from "@/utils/format";
 import type { DocType, UploadStockResult } from "@/types";
@@ -81,6 +81,7 @@ function Success({
 }: { docType: DocType; progress: UploadProgress; filename: string; stockResult: UploadStockResult | null; onReset: () => void }) {
   const ring = `var(--color-doc-${docType})`;
   const unknownCount = stockResult?.skipped_unknown.length ?? progress.skipped;
+  const newMeds = progress.new_medicaments;
   return (
     <div
       className="flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
@@ -96,6 +97,21 @@ function Success({
         <p className="text-sm text-muted-foreground">
           {formatQty(unknownCount)} {stockResult ? "PID inconnus ignorés" : "doublons ignorés"}
         </p>
+      )}
+      {newMeds && newMeds.count > 0 && (
+        <div className="mt-1 flex w-full max-w-md flex-col gap-1.5 rounded-md border border-info-border bg-info-subtle px-4 py-3 text-left">
+          <div className="flex items-center gap-2 text-sm font-semibold text-info">
+            <Info className="size-4" aria-hidden />
+            {formatQty(newMeds.count)} nouveau{newMeds.count > 1 ? "x" : ""} produit{newMeds.count > 1 ? "s" : ""} détecté{newMeds.count > 1 ? "s" : ""}
+          </div>
+          <p className="text-xs text-info-subtle-foreground">
+            {newMeds.sample.slice(0, 3).join(" · ")}
+            {newMeds.count > 3 && ` · +${newMeds.count - 3} autre${newMeds.count - 3 > 1 ? "s" : ""}`}
+          </p>
+          <p className="text-xs text-info-subtle-foreground">
+            Ces produits sont absents du catalogue. L'administrateur sera notifié pour les classer (Pharmacie / Parapharmacie).
+          </p>
+        </div>
       )}
       <p className="font-mono text-[11px] text-muted-foreground">
         {filename}

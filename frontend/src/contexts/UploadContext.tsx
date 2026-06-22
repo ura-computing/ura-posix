@@ -7,11 +7,11 @@ import { ApiErr } from "@/api/client";
 import {
   patchBatchStatus,
   uploadAchatJson,
-  uploadStockMultipart,
+  uploadStockJson,
   uploadVenteJson,
 } from "@/api/uploads";
 import { chunk } from "@/utils/csv";
-import type { DocType, UploadStockResult } from "@/types";
+import type { DocType, UploadStockResult, UploadTxResult } from "@/types";
 
 
 /**
@@ -35,6 +35,10 @@ export interface UploadProgress {
   total:    number;   // total chunks
   inserted: number;
   skipped:  number;
+  /** F19: products created during this import that weren't in the catalogue.
+   *  Owner sees them in the Success card; admin classifies them via
+   *  /admin/catalogue → "Non classés". Accumulates across chunks. */
+  new_medicaments?: { count: number; sample: string[] };
 }
 
 
@@ -51,10 +55,10 @@ interface UploadCtxState {
 
 
 interface UploadCtxValue extends UploadCtxState {
-  /** Achat / Vente chunked POST. Rejects if an upload is already in flight. */
-  uploadTx:    (docType: "achat" | "vente", rows: Record<string, string>[], filename: string) => Promise<void>;
-  /** Single-shot multipart stock upload. */
-  uploadStock: (file: File) => Promise<void>;
+  /** Chunked POST for any doc type (achat / vente / stock). Rejects if an
+   *  upload is already in flight. Single entry point — the doc-type only
+   *  changes which JSON endpoint each chunk hits + how the result is summarized. */
+  uploadTx:    (docType: DocType, rows: Record<string, string>[], filename: string) => Promise<void>;
   /** Set cancel flag; the running loop catches it between chunks and PATCHes the batch. */
   cancel:      () => void;
   /** Reset the context to idle. Called by the wizard's "Nouvel import" / by the widget after success auto-dismiss. */
@@ -106,6 +110,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       let batchId: number | null = null;
       let inserted = 0;
       let skipped = 0;
+      let newMedCount = 0;
+      const newMedSample: string[] = [];                                // capped at 10 across all chunks
+      // Stock-only: accumulate the {pid, product} list across chunks (capped
+      // at 100 entries — enough for diagnosis without blowing up state).
+      const skippedUnknownAcc: { pid: string; product: string | null }[] = [];
 
       setState({
         ...INITIAL,
@@ -115,7 +124,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         filename,
       });
 
-      const post = docType === "achat" ? uploadAchatJson : uploadVenteJson;
+      const post: (body: { rows: Record<string, string>[]; filename: string; batch_id?: number }) => Promise<UploadTxResult | UploadStockResult> =
+        docType === "achat" ? uploadAchatJson
+        : docType === "vente" ? uploadVenteJson
+        : uploadStockJson;
 
       try {
         for (let i = 0; i < chunks.length; i++) {
@@ -134,19 +146,51 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           });
           if (batchId == null) batchId = result.batch_id;
           inserted += result.inserted;
-          skipped  += result.skipped;
+          // Stock returns skipped_unknown[]; achat/vente return skipped (count).
+          if ("skipped_unknown" in result) {
+            skipped += result.skipped_unknown.length;
+            for (const item of result.skipped_unknown) {
+              if (skippedUnknownAcc.length >= 100) break;
+              skippedUnknownAcc.push(item);
+            }
+          } else {
+            skipped += result.skipped;
+          }
+          // F19: accumulate new-medicament tally across chunks; cap sample at 10.
+          if (result.new_medicaments) {
+            newMedCount += result.new_medicaments.count;
+            for (const name of result.new_medicaments.sample) {
+              if (newMedSample.length >= 10) break;
+              if (!newMedSample.includes(name)) newMedSample.push(name);
+            }
+          }
           setState((s) => ({
             ...s,
             phase: "uploading",
-            progress: { current: i + 1, total, inserted, skipped },
+            progress: {
+              current: i + 1, total, inserted, skipped,
+              new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
+            },
             batchId,
           }));
         }
+        // Build the stock-shaped result for the Success card (only for docType="stock").
+        const stockResult: UploadStockResult | null = docType === "stock" && batchId != null ? {
+          inserted,
+          skipped_unknown: skippedUnknownAcc.slice(),
+          total_rows:      rows.length,
+          batch_id:        batchId,
+          new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
+        } : null;
         setState((s) => ({
           ...s,
           phase: "success",
-          progress: { current: total, total, inserted, skipped },
+          progress: {
+            current: total, total, inserted, skipped,
+            new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
+          },
           batchId,
+          stockResult,
         }));
       } catch (err) {
         const detail = err instanceof ApiErr ? err.detail : "Erreur inconnue lors de l'upload.";
@@ -161,41 +205,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const uploadStock = useCallback<UploadCtxValue["uploadStock"]>(
-    async (file) => {
-      if (inFlightRef.current) throw new Error("Un upload est déjà en cours.");
-      inFlightRef.current = true;
-      cancelRef.current = false;
-
-      setState({
-        ...INITIAL,
-        phase: "uploading",
-        progress: { current: 0, total: 1, inserted: 0, skipped: 0 },
-        docType: "stock",
-        filename: file.name,
-      });
-      try {
-        const result = await uploadStockMultipart(file);
-        setState((s) => ({
-          ...s,
-          phase: "success",
-          progress: { current: 1, total: 1, inserted: result.inserted, skipped: result.skipped_unknown.length },
-          batchId: result.batch_id,
-          stockResult: result,
-        }));
-      } catch (err) {
-        const detail = err instanceof ApiErr ? err.detail : "Erreur inconnue lors de l'upload.";
-        setState((s) => ({ ...s, phase: "error", error: detail }));
-      } finally {
-        inFlightRef.current = false;
-      }
-    },
-    [],
-  );
-
   const value = useMemo<UploadCtxValue>(
-    () => ({ ...state, uploadTx, uploadStock, cancel, reset }),
-    [state, uploadTx, uploadStock, cancel, reset],
+    () => ({ ...state, uploadTx, cancel, reset }),
+    [state, uploadTx, cancel, reset],
   );
 
   return <UploadContext.Provider value={value}>{children}</UploadContext.Provider>;

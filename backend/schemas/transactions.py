@@ -52,6 +52,9 @@ class VenteRow(BaseModel):
     pid:                    str | None
     product:                str | None
     category:               str | None
+    # Stored Medicament.product_type — "pharmacie" | "parapharmacie" | None.
+    # Source of truth: catalogue (set at catalog import, admin can override).
+    category_type:          str | None
     tva:                    str | None
     ppv:                    float | None
     quantity:               float | None

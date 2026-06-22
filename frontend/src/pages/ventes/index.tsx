@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { Download, Upload } from "lucide-react";
 
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
+import { ROUTES } from "@/types";
 import { formatMAD } from "@/utils/format";
 
 import { SurveillanceTabs } from "./_components/SurveillanceTabs";
@@ -65,6 +67,10 @@ export default function VentesPage() {
         multiSelects={[
           { label: "Catégorie", options: p.categories, selected: p.filters.category, onChange: p.setCategories },
           { label: "TVA",       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
+        ]}
+        rightActions={[
+          { label: "Exporter Excel", icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
+          { label: "Importer",       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=vente` },
         ]}
         activeFilters={activeFilters}
         onResetAll={p.reset}

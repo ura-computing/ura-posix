@@ -32,8 +32,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from csv_parse import (
-    col, parse_catalog_csv, parse_csv, parse_float, parse_int, parse_iso_date,
-    upsert_medicament,
+    classify_product_type, col, parse_catalog_csv, parse_csv, parse_float,
+    parse_int, parse_iso_date, upsert_medicament,
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
@@ -48,6 +48,7 @@ router = APIRouter(tags=["uploads"])
 MAX_FILE_BYTES = 10 * 1024 * 1024   # 10 MB
 ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
 EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
+EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
 
 # ─── Pydantic bodies (JSON variants + PATCH) ─────────────────────────────────
@@ -219,12 +220,13 @@ def _insert_transactions(
 
     inserted = 0
     skipped  = 0
+    new_medicaments: list[Medicament] = []  # F19: surface to owner so admin can classify
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
             skipped += 1
             continue
-        med = upsert_medicament(
+        med, was_created = upsert_medicament(
             db, pid=pid,
             product=col(row, COL_PRODUCT) or pid,
             tva=col(row, COL_TVA),
@@ -236,6 +238,8 @@ def _insert_transactions(
         if not med:
             skipped += 1
             continue
+        if was_created:
+            new_medicaments.append(med)
         ref = col(row, cfg.dedup_column)
         if ref and (ref, med.id) in existing:
             skipped += 1
@@ -249,26 +253,41 @@ def _insert_transactions(
     batch.rows_skipped  += skipped
     batch.status = "success"
     db.commit()
-    return {"inserted": inserted, "skipped": skipped, "batch_id": batch.id}
+    return {
+        "inserted":    inserted,
+        "skipped":     skipped,
+        "batch_id":    batch.id,
+        "new_medicaments": {
+            "count":  len(new_medicaments),
+            "sample": [m.product or m.pid for m in new_medicaments[:10]],
+        },
+    }
 
 
 def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
-                  filename: str | None) -> dict:
-    """Single-shot stock import. Postgres ON CONFLICT upsert by (pharmacy_id, medicament_id)
-    so re-uploading tomorrow's stock cleanly replaces today's snapshot. Within one CSV we
-    also dedup on medicament_id so multi-row Sobrus exports don't blow up the upsert."""
+                  filename: str | None, batch_id: int | None) -> dict:
+    """Chunked stock import. Postgres ON CONFLICT upsert by (pharmacy_id, medicament_id)
+    so re-uploading tomorrow's stock cleanly replaces today's snapshot. The UPSERT is
+    chunk-safe — re-applying the same row is idempotent. Within ONE chunk we still
+    dedup on medicament_id so a duplicate PID inside the chunk doesn't blow up the
+    values list (rare but cheap to guard against).
+
+    batch_id threading: first chunk passes None → creates an ImportBatch and returns
+    its id. Subsequent chunks pass that id → _get_or_create_batch reuses the row and
+    we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
     batch = _get_or_create_batch(db, pharmacy_id=pharmacy_id, file_type="stock",
-                                 filename=filename, batch_id=None)
+                                 filename=filename, batch_id=batch_id)
 
     seen_meds: set[int] = set()
     inserted_rows: list[dict] = []
     skipped_unknown: list[dict[str, str | None]] = []
+    new_medicaments: list[Medicament] = []  # F19: surface to owner
 
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
             continue
-        med = upsert_medicament(
+        med, was_created = upsert_medicament(
             db, pid=pid,
             product=col(row, COL_PRODUCT) or pid,
             tva=col(row, COL_TVA),
@@ -280,6 +299,8 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
         if not med:
             skipped_unknown.append({"pid": pid, "product": col(row, COL_PRODUCT)})
             continue
+        if was_created:
+            new_medicaments.append(med)
         if med.id in seen_meds:
             continue
         seen_meds.add(med.id)
@@ -307,8 +328,8 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
         )
         db.execute(stmt)
 
-    batch.rows_inserted = len(inserted_rows)
-    batch.rows_skipped  = len(skipped_unknown)
+    batch.rows_inserted += len(inserted_rows)
+    batch.rows_skipped  += len(skipped_unknown)
     batch.status = "success"
     db.commit()
     return {
@@ -316,6 +337,10 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
         "skipped_unknown": skipped_unknown,
         "total_rows":      len(rows),
         "batch_id":        batch.id,
+        "new_medicaments": {
+            "count":  len(new_medicaments),
+            "sample": [m.product or m.pid for m in new_medicaments[:10]],
+        },
     }
 
 
@@ -360,15 +385,27 @@ async def upload_vente(
                                 filename=file.filename, batch_id=batch_id, cfg=VENTE_CFG)
 
 
-@router.post("/uploads/stock")
-async def upload_stock(
-    user: CurrentUserDep,
-    db: DbDep,
-    file: Annotated[UploadFile, File(description="Sobrus Stock CSV")],
-) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    rows = await _read_csv_or_400(file)
-    return _insert_stock(db, rows, pharmacy_id=pharmacy_id, filename=file.filename)
+_CATALOG_MUTABLE_COLS = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
+
+
+def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> bool:
+    """Apply one parsed catalog row. Returns True if it updated an existing
+    Medicament, False if it inserted a new one. Catch-up: classifies NULL
+    product_type on existing rows (catalogue is the source of truth — see F19).
+    Admin-edited types stay untouched."""
+    if existing:
+        for c in _CATALOG_MUTABLE_COLS:
+            v = row.get(c)
+            if v is not None:
+                setattr(existing, c, v)
+        if existing.product_type is None:
+            existing.product_type = classify_product_type(row.get("category"))
+        return True
+    db.add(Medicament(
+        **row,
+        product_type=classify_product_type(row.get("category")),
+    ))
+    return False
 
 
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
@@ -396,17 +433,10 @@ async def upload_catalog(
         m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
     }
     inserted = updated = 0
-    mutable_cols = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
     for row in parsed:
-        m = existing.get(row["pid"])
-        if m:
-            for c in mutable_cols:
-                v = row.get(c)
-                if v is not None:
-                    setattr(m, c, v)
+        if _apply_catalog_row(db, existing.get(row["pid"]), row):
             updated += 1
         else:
-            db.add(Medicament(**row, product_type=None))
             inserted += 1
     db.commit()
     return {
@@ -424,7 +454,7 @@ async def upload_catalog(
 def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
     if not body.rows:
-        raise HTTPException(status_code=400, detail="Aucune ligne dans la requête.")
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
                                 filename=body.filename, batch_id=body.batch_id, cfg=ACHAT_CFG)
 
@@ -433,9 +463,21 @@ def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
 def upload_vente_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
     if not body.rows:
-        raise HTTPException(status_code=400, detail="Aucune ligne dans la requête.")
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
                                 filename=body.filename, batch_id=body.batch_id, cfg=VENTE_CFG)
+
+
+@router.post("/uploads/stock-json")
+def upload_stock_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
+    """Chunked stock import — same JSON shape as achat/vente. First chunk passes
+    batch_id=None (creates the ImportBatch); subsequent chunks reuse it via the
+    returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    if not body.rows:
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+    return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,
+                         filename=body.filename, batch_id=body.batch_id)
 
 
 # ─── PATCH batch status (cancel) ─────────────────────────────────────────────

@@ -30,10 +30,9 @@ function MargeCell({ row, mode }: { row: VenteRow; mode: "pct" | "dh" }) {
 }
 
 
-function TypeBadge({ category }: { category: string | null }) {
-  if (!category) return <span className="text-muted-foreground">—</span>;
-  const c = category.toLowerCase();
-  const isPharma = /edicament|édicament|oméopath|omeopath|iététique|ietetique/.test(c);
+function TypeBadge({ type }: { type: VenteRow["category_type"] }) {
+  if (!type) return <span className="text-muted-foreground">—</span>;
+  const isPharma = type === "pharmacie";
   return (
     <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
       isPharma
@@ -70,7 +69,7 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
   { key: "category", label: "Catégorie", width: 160, sortable: false,
     render: (r) => <span className="block max-w-[150px] truncate text-xs text-muted-foreground">{r.category ?? "—"}</span> },
   { key: "type", label: "Type", width: 110, sortable: false,
-    render: (r) => <TypeBadge category={r.category} /> },
+    render: (r) => <TypeBadge type={r.category_type} /> },
   { key: "tva", label: "TVA", width: 80, sortable: false,
     render: (r) => r.tva ? <span className="font-mono text-[11px] text-muted-foreground">{r.tva}</span> : <span className="text-muted-foreground">—</span> },
   { key: "quantity", label: "Qté", width: 70, align: "right",

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Boxes, BarChart3,
-  CalendarClock, Bell, Coins, Star, UsersRound, Building2, Users, BookOpen,
+  Bell, Coins, Star, UsersRound, Building2, Users, BookOpen,
   Tags, Globe, CircleUser, Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -37,7 +37,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Ventes",             to: ROUTES.VENTES,            icon: TrendingUp,     roles: DATA,         ready: true },
       { label: "Stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA,         ready: true },
       { label: "Analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA,         ready: true },
-      { label: "Péremptions",        to: ROUTES.PEREMPTIONS,       icon: CalendarClock,  roles: DATA },
       { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA,         ready: true },
       { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA },
       { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA,         ready: true },

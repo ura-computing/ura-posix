@@ -38,6 +38,15 @@ export function listVentesTvaRates(): Promise<string[]> {
 }
 
 
+/** Full filtered set for Excel export. Honors every filter EXCEPT pagination.
+ *  Backend caps at MAX_EXPORT_ROWS (50k) → throws ApiErr 413 if exceeded. */
+export function exportVentes(filters: Partial<VentesFilters>): Promise<VentesListResponse> {
+  const { page: _p, limit: _l, ...rest } = filters;
+  const qs = ventesQs(rest);
+  return api(`/ventes?${qs}${qs ? "&" : ""}export=true`);
+}
+
+
 export function listVentesSurveillanceCounts(filters: Partial<VentesFilters>): Promise<VentesSurveillanceCounts> {
   // Counts share the same filter shape but ignore surveillance/sort/pagination
   const { surveillance: _s, sort_by: _sb, sort_order: _so, page: _p, limit: _l, ...rest } = filters;
@@ -69,6 +78,14 @@ function achatsQs(f: Partial<AchatsFilters>): string {
 export function listAchats(filters: Partial<AchatsFilters>): Promise<AchatsListResponse> {
   return api(`/achats?${achatsQs(filters)}`);
 }
+
+/** Full filtered set for Excel export. Same contract as exportVentes. */
+export function exportAchats(filters: Partial<AchatsFilters>): Promise<AchatsListResponse> {
+  const { page: _p, limit: _l, ...rest } = filters;
+  const qs = achatsQs(rest);
+  return api(`/achats?${qs}${qs ? "&" : ""}export=true`);
+}
+
 
 export function listAchatsCategories(): Promise<string[]> {
   return api(`/achats/categories`);

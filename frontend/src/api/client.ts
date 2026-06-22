@@ -1,6 +1,15 @@
 import type { ApiError } from "@/types";
 
-const BASE = "/v1";
+/** Single source of truth for the API base URL.
+ *
+ *  - With VITE_BACKEND_URL set (production docker build, or dev w/ env file):
+ *    absolute URL → cross-origin fetch → backend CORS (allow_credentials=True
+ *    + FRONTEND_URL origin) handles the cookie flow.
+ *  - Without it (dev with no env): falls back to "/v1" → Vite dev-server proxy
+ *    forwards to VITE_BACKEND_URL.
+ *
+ *  Other api/* modules import this — don't re-declare BASE elsewhere. */
+export const API_BASE = `${import.meta.env.VITE_BACKEND_URL ?? ""}/v1`;
 
 export class ApiErr extends Error {
   status: number;
@@ -28,7 +37,7 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
 
 export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { body, headers, ...rest } = opts;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",

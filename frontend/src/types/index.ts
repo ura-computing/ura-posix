@@ -36,7 +36,6 @@ export const ROUTES = {
   UPLOAD_FILE:       "/upload-file",
   ANALYSES:          "/analyses",
   RAPPORTS:          "/rapports",
-  PEREMPTIONS:       "/peremptions",
   ALERTES:           "/alertes",
   COMPTABILITE:      "/comptabilite",
   PRODUITS_SPECIAUX: "/produits-speciaux",
@@ -305,14 +304,25 @@ export interface UploadTxResult {
   inserted: number;
   skipped:  number;
   batch_id: number;
+  /** F19: products that didn't exist in the catalogue and were created during
+   *  this import. Owner sees them as "needs admin classification" — they'll
+   *  appear in /admin/catalogue under the "Non classés" filter. */
+  new_medicaments: {
+    count:  number;
+    sample: string[];     // first 10 product names
+  };
 }
 
-/** Response from /v1/uploads/stock */
+/** Response from /v1/uploads/stock-json (per chunk). The frontend
+ *  accumulates these across chunks into the final UploadProgress state. */
 export interface UploadStockResult {
   inserted:        number;
   skipped_unknown: { pid: string; product: string | null }[];
   total_rows:      number;
   batch_id:        number;
+  /** F19: medicaments created during this chunk (PIDs not yet in catalogue).
+   *  Surfaced to the owner so admin can classify via /admin/catalogue. */
+  new_medicaments?: { count: number; sample: string[] };
 }
 
 /** Response from PATCH /v1/uploads/batches/{id} */
@@ -374,6 +384,8 @@ export interface VenteRow {
   pid:                    string | null;
   product:                string | null;
   category:               string | null;
+  /** Mirrors Medicament.product_type. Stored value — set at catalog import, admin override. */
+  category_type:          "pharmacie" | "parapharmacie" | null;
   tva:                    string | null;
   ppv:                    number | null;
   quantity:               number | null;
@@ -696,7 +708,8 @@ export interface MedicamentInput {
 export interface CatalogFilters {
   search:     string;
   category:   string[];
-  type:       ProductType | null;
+  /** "unclassified" surfaces rows where product_type IS NULL (admin queue). */
+  type:       ProductType | "unclassified" | null;
   sort_by:    string;
   sort_order: "asc" | "desc";
   page:       number;
@@ -733,4 +746,16 @@ export interface MedicamentSuggestion {
   product:   string;
   category:  string | null;
   nb_ventes: number;
+}
+
+export interface SpecialProductBulkResult {
+  inserted:        number;
+  already_special: number;
+  products:        SpecialProduct[];
+}
+
+export interface SpecialProductReintegrateResult {
+  reintegrated:   number;
+  not_special:    number;
+  medicament_ids: number[];
 }
