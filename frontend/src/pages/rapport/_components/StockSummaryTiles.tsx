@@ -23,24 +23,28 @@ export function StockSummaryTiles({ stock }: { stock: StockSummaryResponse }) {
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile
+          href={ROUTES.STOCK}
           label="Total références"
           value={formatQty(stock.total_references)}
           sub="produits suivis"
           icon={<Boxes className="size-5" />}
         />
         <KpiTile
+          href={ROUTES.STOCK}
           label="PPV potentiel"
           value={formatMAD(stock.ppv_potentiel)}
           sub="MAD en stock"
           icon={<Coins className="size-5" />}
         />
         <KpiTile
+          href={ROUTES.STOCK}
           label="Sous-stock / Sur-stock"
           value={<>{formatQty(stock.sous_stock_count)} / {formatQty(stock.sur_stock_count)}</>}
           sub="produits à ajuster"
           icon={<AlertTriangle className="size-5" />}
         />
         <KpiTile
+          href={ROUTES.STOCK}
           label="Santé du stock"
           value={<span className={cn(healthValueClass)}>{`${stock.health_pct.toFixed(1)} %`}</span>}
           sub="dans la fourchette idéale"

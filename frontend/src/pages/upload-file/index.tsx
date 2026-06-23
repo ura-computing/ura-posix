@@ -131,20 +131,25 @@ export default function UploadFilePage() {
         </section>
       )}
 
-      {/* ─── STEP 3 — Preview + import + state cards ─── */}
-      {u.step === 3 && u.docType && u.file && (
+      {/* ─── STEP 3 — Preview + import + state cards ─────────────────────
+           Renders when EITHER:
+            • user has a locally-parsed file (preview + Importer button), OR
+            • there's an existing job for this doc-type (queued / running /
+              done — show its state card so the wizard rehydrates correctly
+              on navigation even without local file state).
+      */}
+      {u.step === 3 && u.docType && (u.file || u.phase !== "idle") && (
         <section className="flex flex-col gap-4">
           <button
             type="button"
-            onClick={u.changeFile}
+            onClick={u.file ? u.changeFile : u.reset}
             className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
-            Choisir un autre fichier
+            {u.file ? "Choisir un autre fichier" : "Nouvel import"}
           </button>
 
-          {/* States supersede the preview after the user clicks Import */}
-          {u.phase === "idle" ? (
+          {u.file && u.phase === "idle" ? (
             <>
               <PreviewTable
                 headers={u.headers}
@@ -170,7 +175,7 @@ export default function UploadFilePage() {
               phase={u.phase}
               progress={u.progress}
               error={u.error}
-              filename={u.file.name}
+              filename={u.filename ?? u.file?.name ?? null}
               stockResult={u.stockResult}
               onCancel={u.cancel}
               onReset={u.reset}

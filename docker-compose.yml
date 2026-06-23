@@ -12,9 +12,13 @@ services:
       POSTGRES_DB:       ${POSTGRES_DB:-apcm_demo}
       POSTGRES_USER:     ${POSTGRES_USER:-apcm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apcm}
-    # NOTE: no host port mapping. Backend reaches the DB via the docker network
-    # using hostname `db`. Avoids 5432 collisions with the client's other
-    # Postgres instances (e.g. an apcm-pharma demo still running).
+    # Bound to 127.0.0.1 so `make backend` (host-side uvicorn) can connect
+    # using the dev DATABASE_URL (.../localhost:5432/apcm). Demo mode still
+    # uses the docker-network hostname `db` for the containerized backend.
+    # If a client also has apcm-pharma's stack running on 5432, they should
+    # `docker compose down` it before running this one.
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

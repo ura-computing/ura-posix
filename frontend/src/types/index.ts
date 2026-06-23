@@ -116,6 +116,10 @@ export const QUERY_KEYS = {
   SPECIAL_PRODUCTS:        ["special-products"] as const,
   MEDICAMENT_SUGGESTIONS:  (q: string) => ["medicament-suggestions", q] as const,
 
+  // Comptabilité — payment entries per (month, method).
+  PAYMENTS:                (month?: string) => ["payments", month ?? null] as const,
+  PAYMENTS_PREFIX:         ["payments"] as const,
+
   // Aggregate prefixes — used by produits-spéciaux to invalidate every cache
   // that filters via non_declared_sub when an exclusion is added/removed.
   STATS_PREFIX:           ["stats"] as const,
@@ -357,6 +361,22 @@ export interface StatsFilters {
   category_type:        CategoryType;
   include_non_declared: boolean;
 }
+
+
+// ── Comptabilité — manual monthly payment-method entries (Page 5) ──────────
+
+export const PAYMENT_METHODS = ["tpe", "especes", "cheques", "virement"] as const;
+export type  PaymentMethod   = (typeof PAYMENT_METHODS)[number];
+
+export interface PaymentEntryIn {
+  month:                string;          // "YYYY-MM"
+  method:               PaymentMethod;
+  pharmacie_amount:     number;
+  parapharmacie_amount: number;
+  count:                number;
+}
+
+export interface PaymentEntry extends PaymentEntryIn { id: number; }
 
 
 // ── Ventes (Page 3) ────────────────────────────────────────────────────────

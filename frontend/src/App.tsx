@@ -16,6 +16,7 @@ import RapportPage from "@/pages/rapport";
 import AchatsPage from "@/pages/achats";
 import AlertesPage from "@/pages/alertes";
 import AnalysePage from "@/pages/analyse";
+import ComptabilitePage from "@/pages/comptabilite";
 import StockPage from "@/pages/stock";
 import UploadFilePage from "@/pages/upload-file";
 import VentesPage from "@/pages/ventes";
@@ -42,6 +43,7 @@ export default function App() {
         <Route path={ROUTES.STOCK}       element={<StockPage />} />
         <Route path={ROUTES.ALERTES}     element={<AlertesPage />} />
         <Route path={ROUTES.ANALYSES}          element={<AnalysePage />} />
+        <Route path={ROUTES.COMPTABILITE}      element={<ComptabilitePage />} />
         <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
         <Route path={ROUTES.PARAMETRES}        element={<ParametresPage />} />
         <Route path={ROUTES.ME}                element={<MePage />} />

@@ -2,7 +2,7 @@ import { ShieldCheck, TrendingDown, TrendingUp, AlertTriangle } from "lucide-rea
 
 import { KpiTile, type IconTone } from "@/components/shared/KpiTile";
 import { formatMAD, formatQty } from "@/utils/format";
-import type { MarginAlertsResponse } from "@/types";
+import { ROUTES, type MarginAlertsResponse } from "@/types";
 
 
 interface BracketDef {
@@ -33,6 +33,7 @@ export function MarginAlertCards({ data }: { data: MarginAlertsResponse }) {
         return (
           <KpiTile
             key={b.key}
+            href={ROUTES.ALERTES}
             label={b.title}
             value={subValue}
             sub={subLabel}

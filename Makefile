@@ -1,17 +1,20 @@
 BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
+DEV_DB       := apcm
 
-.PHONY: help dev backend frontend cli migrate demo down clean logs
+.PHONY: help dev backend frontend cli migrate seed db demo down clean logs
 
 help:
 	@echo "PharmaGest commands:"
 	@echo ""
-	@echo "  Local dev (no docker):"
+	@echo "  Local dev (dockerized DB + host backend/frontend):"
 	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
-	@echo "    make backend   — only the backend (uvicorn :8000, hot reload)"
+	@echo "    make backend   — only the backend (auto-starts the DB; uvicorn :8000, hot reload)"
 	@echo "    make frontend  — only the frontend (Vite dev :5173)"
+	@echo "    make db        — start the Postgres container + create the dev DB if missing"
+	@echo "    make migrate   — apply Alembic migrations against the dev DB"
+	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
 	@echo "    make cli       — interactive Python CLI"
-	@echo "    make migrate   — apply Alembic migrations against your local DB"
 	@echo ""
 	@echo "  Docker demo (one-command setup for clients):"
 	@echo "    make demo      — build + run the full stack (postgres + backend + frontend)"
@@ -21,15 +24,30 @@ help:
 	@echo "    make logs      — tail container logs"
 	@echo "    make clean     — DESTRUCTIVE: stop + wipe the demo DB volume"
 
-# ── Local dev (no docker) ───────────────────────────────────────────────────
+# ── Local dev (dockerized Postgres + host-side backend/frontend) ────────────
 
-dev:
+dev: db
 	@trap 'kill 0' EXIT INT; \
 	  $(MAKE) backend & \
 	  $(MAKE) frontend & \
 	  wait
 
-backend:
+# `db` boots the Postgres container (idempotent — no-op if already up) and
+# ensures the dev database exists. The container's POSTGRES_DB env only
+# creates apcm_demo; we add `apcm` for dev on top of that.
+db:
+	@if [ -z "$$(docker compose ps -q db)" ] || [ -z "$$(docker compose ps -q --status running db)" ]; then \
+	  echo "▸ Starting Postgres container…"; \
+	  cp env/demo/docker.env .env 2>/dev/null || true; \
+	  docker compose up -d --wait db; \
+	fi
+	@docker compose exec -T db psql -U apcm -d postgres -tAc \
+	  "SELECT 1 FROM pg_database WHERE datname='$(DEV_DB)'" | grep -q 1 || { \
+	    echo "▸ Creating dev database '$(DEV_DB)'…"; \
+	    docker compose exec -T db psql -U apcm -d postgres -c "CREATE DATABASE $(DEV_DB);"; \
+	  }
+
+backend: db
 	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
 
 frontend:
@@ -38,8 +56,13 @@ frontend:
 cli:
 	cd $(BACKEND_DIR) && uv run python -m cli
 
-migrate:
-	cd $(BACKEND_DIR) && uv run alembic upgrade head
+migrate: db
+	cd $(BACKEND_DIR) && uv run python bootstrap.py
+
+# Run the same seed.py the docker entrypoint runs — but against the dev DB
+# (the backend's local .env / DATABASE_URL).
+seed: db migrate
+	cd $(BACKEND_DIR) && uv run python seed.py
 
 # ── Docker demo (client-shippable) ──────────────────────────────────────────
 # Boots postgres + backend + frontend via docker-compose. The backend's

@@ -1,7 +1,7 @@
 import { BarChart3, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 
 import { formatMAD, formatQty, pctChange } from "@/utils/format";
-import type { StatsResponse } from "@/types";
+import { ROUTES, type StatsResponse } from "@/types";
 
 import { KpiTile } from "@/components/shared/KpiTile";
 
@@ -36,6 +36,7 @@ export function IndicateursCles({ stats }: { stats: StatsResponse }) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiTile
         hero
+        href={ROUTES.COMPTABILITE}
         label="Chiffre d'affaires"
         value={formatMAD(ca)}
         delta={dCA != null ? { value: dCA } : null}
@@ -55,6 +56,7 @@ export function IndicateursCles({ stats }: { stats: StatsResponse }) {
         }
       />
       <KpiTile
+        href={ROUTES.ACHATS}
         label="Total achats"
         value={formatMAD(achats)}
         sub={<>{formatQty(stats.kpis.achats_count)} unités</>}

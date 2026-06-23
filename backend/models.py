@@ -12,6 +12,8 @@ FK_PHARMACIES_ID    = "pharmacies.id"
 FK_MEDICAMENTS_ID   = "medicaments.id"
 FK_IMPORT_BATCHES_ID = "import_batches.id"
 
+PAYMENT_METHODS = ("tpe", "especes", "cheques", "virement")
+
 ALLOWED_FEATURES = (
     "rapports", "import", "achats", "ventes",
     "stock", "analyse", "accounting", "bl_exclusions",
@@ -253,3 +255,25 @@ class PharmacyBlExclusion(Base):
     delivery_ref: Mapped[str]      = mapped_column(String, nullable=False, index=True)
     notes:        Mapped[str | None] = mapped_column(String, nullable=True)
     created_at:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PaymentEntry(Base):
+    """Manual monthly bookkeeping per payment method (TPE / Espèces / Chèques /
+    Virement). Doesn't come from Sobrus — owner enters totals + transaction
+    count for each (month, method) pair. Upsert by (pharmacy_id, month, method).
+    Surfaced on the /comptabilité page."""
+    __tablename__ = "payment_entries"
+    __table_args__ = (
+        UniqueConstraint("pharmacy_id", "month", "method", name="uq_payment_entries_pharmacy_month_method"),
+        Index("ix_payment_entries_pharmacy_month", "pharmacy_id", "month"),
+    )
+
+    id:                   Mapped[int]      = mapped_column(Integer, primary_key=True)
+    pharmacy_id:          Mapped[int]      = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    month:                Mapped[str]      = mapped_column(String, nullable=False)        # "YYYY-MM"
+    method:               Mapped[str]      = mapped_column(String, nullable=False)        # one of PAYMENT_METHODS
+    pharmacie_amount:     Mapped[float]    = mapped_column(Float, nullable=False, default=0.0)
+    parapharmacie_amount: Mapped[float]    = mapped_column(Float, nullable=False, default=0.0)
+    count:                Mapped[int]      = mapped_column(Integer, nullable=False, default=0)
+    created_at:           Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at:           Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

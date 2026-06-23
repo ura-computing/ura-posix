@@ -1,4 +1,4 @@
-import { AlertCircle, Ban, CheckCircle2, Info, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertCircle, Ban, CheckCircle2, Clock, Info, Loader2, RotateCcw, X } from "lucide-react";
 
 import { formatQty } from "@/utils/format";
 import type { DocType, UploadStockResult } from "@/types";
@@ -8,10 +8,12 @@ import type { UploadPhase, UploadProgress } from "@/contexts/UploadContext";
 
 interface ImportStateProps {
   docType:    DocType;
-  phase:      UploadPhase;
+  /** "idle" = no job → return null. Otherwise render the matching card. */
+  phase:      UploadPhase | "idle";
   progress:   UploadProgress;
   error:      string | null;
-  filename:   string;
+  /** May be null when phase="idle" (no job) — guarded by the early return. */
+  filename:   string | null;
   stockResult: UploadStockResult | null;
   onCancel:   () => void;
   onReset:    () => void;
@@ -19,7 +21,7 @@ interface ImportStateProps {
 
 
 /**
- * Renders the 4 import-state cards (uploading / success / cancelled / error).
+ * Renders the 5 import-state cards (queued / uploading / success / cancelled / error).
  * Each card is tinted with the active doc-type's color. Returns null on 'idle'.
  */
 
@@ -28,10 +30,42 @@ export function ImportState({
 }: ImportStateProps) {
   if (phase === "idle") return null;
 
-  if (phase === "uploading")   return <Uploading docType={docType} progress={progress} onCancel={onCancel} />;
-  if (phase === "success")     return <Success   docType={docType} progress={progress} filename={filename} stockResult={stockResult} onReset={onReset} />;
-  if (phase === "cancelled")   return <Cancelled progress={progress} onReset={onReset} />;
+  if (phase === "queued")      return <Queued     docType={docType} filename={filename ?? ""} onCancel={onCancel} />;
+  if (phase === "uploading")   return <Uploading  docType={docType} progress={progress} onCancel={onCancel} />;
+  if (phase === "success")     return <Success    docType={docType} progress={progress} filename={filename ?? ""} stockResult={stockResult} onReset={onReset} />;
+  if (phase === "cancelled")   return <Cancelled  progress={progress} onReset={onReset} />;
   return <Errored error={error} onDismiss={onReset} />;
+}
+
+
+function Queued({ docType, filename, onCancel }: { docType: DocType; filename: string; onCancel: () => void }) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-2xl border p-5"
+      style={{ borderColor: `var(--color-doc-${docType}-border)`, background: `var(--color-doc-${docType}-bg)` }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Clock className="size-4" style={{ color: `var(--color-doc-${docType})` }} />
+          En attente d'importation
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-destructive/30 bg-card px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/5"
+        >
+          <X className="size-3.5" />
+          Retirer de la file
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Démarrera automatiquement après les imports en cours.
+      </p>
+      {filename && (
+        <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
+      )}
+    </div>
+  );
 }
 
 

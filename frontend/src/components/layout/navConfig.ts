@@ -38,7 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA,         ready: true },
       { label: "Analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA,         ready: true },
       { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA,         ready: true },
-      { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA },
+      { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA,         ready: true },
       { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA,         ready: true },
     ],
   },
