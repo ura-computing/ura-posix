@@ -2,6 +2,7 @@
 import { useCallback, useMemo, useState } from "react";
 // Already shipped at @/hooks/stats:
 import { useMarginAlerts, usePeremptions, useStockAbcd } from "@/hooks/stats";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import type { AlertColumn } from "../_components/AlertDetailDialog";
 
 /** Same vocabulary as StatsFilters.category_type so the segmented selector
@@ -11,7 +12,7 @@ export type CategoryType = "all" | "pharmacie" | "parapharmacie";
 export interface DialogDescriptor {
   title: string;
   subtitle?: string;
-  products: any[];
+  products: unknown[];
   columns: AlertColumn[];
   defaultSortKey: string;
 }
@@ -26,8 +27,13 @@ export interface DialogDescriptor {
  * the FULL pharmacy.
  */
 export function useAlertesPage() {
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Date range lives in the cross-route global context — picking dates on
+  // /alertes carries them over to /achats, /ventes, /rapport, etc.
+  const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
+  const dateFrom = globalFrom ?? "";
+  const dateTo   = globalTo   ?? "";
+  const setDateFrom = (v: string) => setRange(v || null, globalTo);
+  const setDateTo   = (v: string) => setRange(globalFrom, v || null);
   const [category, setCategory] = useState<CategoryType>("all");
   const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
@@ -90,10 +96,9 @@ export function useAlertesPage() {
   }, [marginQuery, peremptionsQuery, stockQuery]);
 
   const resetAll = useCallback(() => {
-    setDateFrom("");
-    setDateTo("");
+    setRange(null, null);
     setCategory("all");
-  }, []);
+  }, [setRange]);
 
   return {
     // filter state

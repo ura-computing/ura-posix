@@ -52,9 +52,16 @@ export function PharmacyFormDialog({
             <span className="flex size-9 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
               <Building2 className="size-4" />
             </span>
-            <h3 className="text-[17px] font-semibold text-foreground">
-              {isCreate ? "Nouvelle pharmacie" : `Modifier ${pharmacyName ?? values.name}`}
-            </h3>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="text-[17px] font-semibold text-foreground">
+                {isCreate ? "Nouvelle pharmacie" : `Modifier ${pharmacyName ?? values.name}`}
+              </h3>
+              {!isCreate && values.code && (
+                <span className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
+                  {values.code}
+                </span>
+              )}
+            </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-4" />
@@ -69,14 +76,9 @@ export function PharmacyFormDialog({
             <Input value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
           </Field>
 
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label="Code">
-              <Input value={values.code ?? ""} onChange={(v) => set("code", v)} placeholder="BOU0001" className="font-mono" />
-            </Field>
-            <Field label="Ville">
-              <Input value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" />
-            </Field>
-          </div>
+          <Field label="Ville" required hint={isCreate ? "Le code de la pharmacie est généré automatiquement à partir de la ville (ex : Bouskoura → BOU0001)." : undefined}>
+            <Input value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
+          </Field>
 
           <Field label="Adresse">
             <Textarea value={values.address ?? ""} onChange={(v) => set("address", v)} placeholder="24 Bd Mohammed V…" />
@@ -120,7 +122,7 @@ export function PharmacyFormDialog({
 // Kept inline since they're only used by this dialog + CreateUserDialog. If a
 // third caller appears we can promote them to shared/.
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium text-foreground">
@@ -128,6 +130,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
         {required && <span className="ml-1 text-error">*</span>}
       </span>
       {children}
+      {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
     </label>
   );
 }

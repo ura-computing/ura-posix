@@ -17,11 +17,14 @@ the create-user / reset-password response; never stored cleartext.
 from __future__ import annotations
 
 import secrets
+import unicodedata
 from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
-from sqlalchemy import func
+from sqlalchemy import Integer, func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from database import DbDep
 from models import (
@@ -226,6 +229,15 @@ def get_pharmacy(
     )
     granted = _granted_permissions_map(db, [m.id for m in members])
 
+    # Union of active owners' enabled permissions — same definition the
+    # backend uses in effective_permissions for the employee ceiling.
+    # Powers the second ceiling pill in the admin's permission dialog for
+    # employees, so admin sees what would actually be effective.
+    owners_union: set[str] = set()
+    for m in members:
+        if m.role == "owner" and m.status == "active":
+            owners_union.update(granted.get(m.id, []))
+
     return PharmacyDetail(
         id=pharm.id,
         name=pharm.name,
@@ -237,22 +249,65 @@ def get_pharmacy(
         archived_at=pharm.archived_at.isoformat() if pharm.archived_at else None,
         enabled_features=_enabled_features(db, pharm.id),
         members=[_member_to_out(m, granted.get(m.id, [])) for m in members],
+        owners_union_permissions=sorted(owners_union),
     )
 
 
 # ── Create / update / soft-delete ────────────────────────────────────────────
 
+def _generate_pharmacy_code(db: Session, city: str) -> str:
+    """Build a deterministic pharmacy code from the city name.
+
+    Algorithm:
+      1. NFD-normalize + strip combining marks + uppercase + alpha-only.
+      2. Take the first 3 chars (right-pad with 'X' if shorter).
+      3. Find the highest existing sequence for this prefix and add 1.
+      4. Format as `{PREFIX}{N:04d}` — e.g. Bouskoura → BOU0001 → BOU0002 …
+
+    A concurrent create with the same prefix can race on the unique index;
+    `create_pharmacy` wraps this in a retry loop to handle that.
+    """
+    norm = "".join(
+        c for c in unicodedata.normalize("NFD", city)
+        if not unicodedata.combining(c)
+    ).upper()
+    prefix = "".join(c for c in norm if c.isalpha())[:3].ljust(3, "X")
+
+    max_seq = db.query(
+        func.max(func.cast(func.substr(Pharmacy.code, 4), Integer))
+    ).filter(Pharmacy.code.like(f"{prefix}%")).scalar() or 0
+    return f"{prefix}{max_seq + 1:04d}"
+
+
 @router.post("/admin/pharmacies", response_model=PharmacyDetail)
 def create_pharmacy(body: PharmacyIn, user: CurrentUserDep, db: DbDep) -> PharmacyDetail:
-    """Create + auto-enable DEFAULT_ENABLED_FEATURES. Admin can toggle the
-    remaining 5 features via Screen 2 afterwards."""
+    """Create + auto-enable DEFAULT_ENABLED_FEATURES. The pharmacy `code` is
+    auto-generated from `city` (e.g. Bouskoura → BOU0001); any client-sent
+    `body.code` is ignored on create. A small retry loop handles the rare
+    concurrent-insert race against the unique-on-code index."""
     require_admin(user)
-    pharm = Pharmacy(
-        name=body.name, code=body.code, city=body.city,
-        address=body.address, phone=body.phone, email=body.email,
-    )
-    db.add(pharm)
-    db.flush()
+
+    pharm: Pharmacy | None = None
+    for _ in range(5):
+        code = _generate_pharmacy_code(db, body.city)
+        pharm = Pharmacy(
+            name=body.name, code=code, city=body.city,
+            address=body.address, phone=body.phone, email=body.email,
+        )
+        db.add(pharm)
+        try:
+            db.flush()
+            break
+        except IntegrityError:
+            db.rollback()
+            pharm = None
+            continue
+    if pharm is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Impossible de générer un code unique pour cette ville. Réessayez.",
+        )
+
     for feat in DEFAULT_ENABLED_FEATURES:
         db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feat, enabled=True))
     db.commit()
@@ -321,19 +376,15 @@ def set_user_permissions(
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
-    """Admin sets one user's 9 permissions in bulk. Per the 3-layer model,
-    admin ONLY edits OWNER permissions; employee permissions are owner-
-    managed via /owner/employees. Returns 400 on attempting to edit an
-    employee through this endpoint."""
+    """Admin sets one user's 9 permissions in bulk — owners OR employees.
+    The 3-layer intersection at read time still applies, so an admin-granted
+    employee permission only becomes effective when the pharmacy AND at least
+    one active owner also have it (see effective_permissions in
+    backend/permissions.py)."""
     require_admin(user)
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
-    if target.role == "employee":
-        raise HTTPException(
-            status_code=400,
-            detail="Les permissions des employés sont gérées par le propriétaire de la pharmacie.",
-        )
     if target.role == "admin":
         raise HTTPException(
             status_code=400,

@@ -7,14 +7,18 @@ import { useQuery } from "@tanstack/react-query";
 import { getStats } from "@/api/stats";
 import { listVentes } from "@/api/transactions";
 import { usePayments } from "@/hooks/useAccounting";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
 import type { PaymentMethod, StatsFilters, VentesFilters } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
-const DEFAULT_FILTERS: StatsFilters = {
-  date_from:            null,
-  date_to:              null,
+// Local filter shape — date_from + date_to live in the cross-route global
+// context. Consumers still see the merged StatsFilters via the `filters`
+// + `setFilters` returned below (unchanged external API).
+type LocalFilters = Omit<StatsFilters, "date_from" | "date_to">;
+
+const DEFAULT_LOCAL: LocalFilters = {
   category_type:        "all",
   include_non_declared: false,
 };
@@ -29,7 +33,26 @@ function currentYearMonth(): string {
 
 
 export function useComptabilitePage() {
-  const [filters,      setFilters]      = useState<StatsFilters>(DEFAULT_FILTERS);
+  // Date range comes from the cross-route context (preserved when user
+  // navigates to /achats, /ventes, etc.). All other filter fields stay
+  // page-local.
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const [local, setLocal] = useState<LocalFilters>(DEFAULT_LOCAL);
+
+  const filters: StatsFilters = useMemo(
+    () => ({ ...local, date_from: dateFrom, date_to: dateTo }),
+    [local, dateFrom, dateTo],
+  );
+
+  // Backwards-compatible wrapper: consumers still call
+  // `setFilters({ ...filters, date_from, date_to, category_type, ... })`.
+  // We split the write so the dates flow to the global context.
+  const setFilters = (next: StatsFilters) => {
+    const { date_from, date_to, ...rest } = next;
+    setLocal(rest);
+    setRange(date_from, date_to);
+  };
+
   const [activeMonth,  setActiveMonth]  = useState<string>(currentYearMonth());
   const [openMethod,   setOpenMethod]   = useState<PaymentMethod | null>(null);   // dialog state
 

@@ -10,7 +10,9 @@
  *  roleLocked prop) and UserPermissionsDialog (generalized to N ceiling
  *  layers — we pass [Pharmacie, Vous]). */
 import { useState } from "react";
-import { MoreVertical, RefreshCw, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+import { RefreshCw, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+
+import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -33,7 +35,7 @@ import {
 
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
-const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "bl_exclusions", "special_products"] as const;
+const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
 
 
 export default function OwnerEmployeesPage() {
@@ -93,7 +95,7 @@ export default function OwnerEmployeesPage() {
   const pharmacyName = me?.pharmacy?.name ?? "votre pharmacie";
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-4 pb-30">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Gérer mon équipe</h1>
         <p className="text-sm text-muted-foreground">
@@ -295,49 +297,37 @@ function EmployeeKebab({
   onToggleStatus:  () => void;
   onRemove:        () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const toggleLabel = employee.status === "active" ? "Désactiver" : "Réactiver";
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label="Plus d'actions"
-        className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
-      >
-        <MoreVertical className="size-4" />
-      </button>
-      {open && (
+    <KebabMenu>
+      {(close) => (
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-border bg-card p-1 shadow-lg">
-            <button
-              type="button"
-              onClick={() => { onResetPassword(); setOpen(false); }}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-            >
-              <RefreshCw className="size-3.5" />
-              Réinitialiser le mot de passe
-            </button>
-            <button
-              type="button"
-              onClick={() => { onToggleStatus(); setOpen(false); }}
-              className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-            >
-              {toggleLabel}
-            </button>
-            <button
-              type="button"
-              onClick={() => { onRemove(); setOpen(false); }}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
-            >
-              <Trash2 className="size-3.5" />
-              Supprimer
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => { onResetPassword(); close(); }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
+          >
+            <RefreshCw className="size-3.5" />
+            Réinitialiser le mot de passe
+          </button>
+          <button
+            type="button"
+            onClick={() => { onToggleStatus(); close(); }}
+            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
+          >
+            {toggleLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => { onRemove(); close(); }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
+          >
+            <Trash2 className="size-3.5" />
+            Supprimer
+          </button>
         </>
       )}
-    </div>
+    </KebabMenu>
   );
 }
 

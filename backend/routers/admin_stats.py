@@ -12,19 +12,22 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from database import DbDep
 from models import Medicament, Pharmacy, User
 from schemas.stats import (
     AdminPharmacyRow,
     AdminStatsResponse,
+    AnalyseMargeResponse,
     MarginAlertsResponse,
+    MargeMode,
     StatsResponse,
     StockSummaryResponse,
 )
 from security import CurrentUserDep
 from stats_queries import compute_margin_alerts, compute_stock_summary
+from analyse_queries import compute_analyse_marge
 
 from .stats import (
     CategoryTypeQ,
@@ -47,11 +50,24 @@ def _require_admin(user) -> None:
 
 @router.get("/admin/stats", response_model=AdminStatsResponse)
 def admin_stats(user: CurrentUserDep, db: DbDep) -> dict:
-    """System overview (4 tiles for the Vue système section)."""
+    """System overview (4 tiles for the Vue système section).
+
+    Counts honor soft-delete (`Pharmacy.archived_at IS NULL`) and exclude
+    admins from `total_active_users` — admins are a system role, not an
+    end-user of the platform. Users tied to an archived pharmacy are
+    excluded too (their pharmacy no longer counts, so they shouldn't either)."""
     _require_admin(user)
+    active_pharm_ids = (
+        db.query(Pharmacy.id).filter(Pharmacy.archived_at.is_(None)).subquery().select()
+    )
     return {
-        "total_pharmacies":         db.query(func.count(Pharmacy.id)).scalar() or 0,
-        "total_active_users":       db.query(func.count(User.id)).filter(User.status == "active").scalar() or 0,
+        "total_pharmacies": db.query(func.count(Pharmacy.id))
+                              .filter(Pharmacy.archived_at.is_(None)).scalar() or 0,
+        "total_active_users": db.query(func.count(User.id)).filter(
+            User.status == "active",
+            User.role != "admin",
+            or_(User.pharmacy_id.is_(None), User.pharmacy_id.in_(active_pharm_ids)),
+        ).scalar() or 0,
         "total_catalog_items":      db.query(func.count(Medicament.id)).scalar() or 0,
         "pending_catalog_requests": 0,   # catalog-request feature lands later
     }
@@ -95,3 +111,22 @@ def admin_pharmacy_margin_alerts(
 def admin_pharmacy_stock_summary(pharmacy_id: PharmacyIdPath, user: CurrentUserDep, db: DbDep) -> dict:
     _require_admin(user)
     return compute_stock_summary(db, pharmacy_id)
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/analyse-marge", response_model=AnalyseMargeResponse)
+def admin_pharmacy_analyse_marge(
+    pharmacy_id:    PharmacyIdPath,
+    user:           CurrentUserDep,
+    db:             DbDep,
+    mode:           Annotated[MargeMode, Query(description="produit | categorie | grossiste | bl")],
+    date_from:      DateFromQ      = None,
+    date_to:        DateToQ        = None,
+    category_type:  CategoryTypeQ  = "all",
+) -> dict:
+    """Admin variant of /stats/analyse-marge. Same shape, pharmacy from path."""
+    _require_admin(user)
+    if mode == MargeMode.LISTE:
+        raise HTTPException(status_code=400, detail="Le mode liste n'est pas supporté en admin.")
+    payload = compute_analyse_marge(db, pharmacy_id, date_from or None, date_to or None,
+                                    category_type, mode.value)
+    return {"mode": mode.value, **payload}

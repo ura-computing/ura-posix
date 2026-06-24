@@ -18,6 +18,7 @@ import { useState } from "react";
 import { CheckCircle2, Copy, Loader2, Mail, UserPlus, X } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
+import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ROLE_LABEL } from "./constants";
 import type { CreateUserIn, CreateUserOut, MemberRole } from "@/types";
@@ -170,18 +171,15 @@ export function CreateUserDialog({
             )}
 
             <Field label="Pharmacie assignée" required hint={assignHint}>
-              <select
-                value={values.pharmacy_id}
-                onChange={(e) => set("pharmacy_id", Number(e.target.value))}
-                className="h-9 w-full cursor-pointer rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-                required
-              >
-                {pharmacies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {[p.name, p.city].filter(Boolean).join(" · ")}
-                  </option>
-                ))}
-              </select>
+              <SingleSelectPopover
+                label=""
+                options={pharmacies.map((p) => ({
+                  value: String(p.id),
+                  label: [p.name, p.city].filter(Boolean).join(" · "),
+                }))}
+                value={String(values.pharmacy_id)}
+                onChange={(v) => set("pharmacy_id", Number(v))}
+              />
             </Field>
 
             <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">

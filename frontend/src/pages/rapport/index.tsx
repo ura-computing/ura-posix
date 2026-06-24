@@ -5,21 +5,21 @@ import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { useMe } from "@/hooks/useMe";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { ROLES } from "@/types";
-import type { StatsFilters } from "@/types";
+import type { Feature, MargeMode, StatsFilters } from "@/types";
 
 import {
   useAdminPharmacies,
-  useAdminPharmacyMarginAlerts,
   useAdminPharmacyStats,
-  useAdminPharmacyStockSummary,
   useAdminStats,
   useMarginAlerts,
   useStats,
   useStockSummary,
 } from "./_hooks/useRapportData";
+import { useAdminPharmacyAnalyseMarge } from "./_hooks/useAdminAnalyseMarge";
 
-import { AdminContextStrip }    from "./_components/AdminContextStrip";
+import { AdminPharmacyBody }    from "./_components/AdminPharmacyBody";
 import { AdminSystemTiles }     from "./_components/AdminSystemTiles";
 import { AnalyseMargePreview }  from "./_components/AnalyseMargePreview";
 import { CategoriesDonut }      from "./_components/CategoriesDonut";
@@ -57,9 +57,12 @@ function buildActiveFilters(
 }
 
 
-const INITIAL: StatsFilters = {
-  date_from:            null,
-  date_to:              null,
+// Local-only filter slice — date fields come from the cross-route
+// GlobalDateRangeProvider so picking dates on /rapport carries over to
+// /achats, /ventes, /admin/stats, etc. The composed `StatsFilters` is built
+// per-view by merging this local slice with the global range.
+type LocalStatsFilters = Omit<StatsFilters, "date_from" | "date_to">;
+const INITIAL_LOCAL: LocalStatsFilters = {
   category_type:        "all",
   include_non_declared: false,
 };
@@ -77,7 +80,16 @@ export default function RapportPage() {
 // ────────────────────────────────────────────────────────────────────────────
 
 function OwnerView() {
-  const [filters, setFilters] = useState<StatsFilters>(INITIAL);
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
+  const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
+  // Backwards-compat wrapper so the existing buildActiveFilters/FilterBar
+  // call sites can keep doing `setFilters({ ...filters, date_from, date_to })`.
+  const setFilters = (next: StatsFilters) => {
+    const { date_from, date_to, ...rest } = next;
+    setLocal(rest);
+    setRange(date_from, date_to);
+  };
 
   const { stats,  isLoading: l1, isError: e1 } = useStats(filters);
   const { alerts, isLoading: l2 }              = useMarginAlerts(filters);
@@ -104,7 +116,7 @@ function OwnerView() {
           options:  CATEGORY_TYPE_OPTIONS,
         }}
         activeFilters={buildActiveFilters(filters, setFilters)}
-        onResetAll={() => setFilters(INITIAL)}
+        onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); }}
       />
 
       {loading && <RapportSkeleton />}
@@ -127,15 +139,27 @@ function OwnerView() {
 
 function AdminView() {
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
-  const [filters, setFilters]       = useState<StatsFilters>(INITIAL);
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
+  const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
+  const setFilters = (next: StatsFilters) => {
+    const { date_from, date_to, ...rest } = next;
+    setLocal(rest);
+    setRange(date_from, date_to);
+  };
+  const [marginMode, setMarginMode] = useState<MargeMode>("produit");
 
   const { systemStats, isLoading: ls }         = useAdminStats();
   const { pharmacies }                         = useAdminPharmacies();
   const { stats,  isLoading: l1, isError: e1 } = useAdminPharmacyStats(pharmacyId, filters);
-  const { alerts, isLoading: l2 }              = useAdminPharmacyMarginAlerts(pharmacyId, filters);
-  const { stock,  isLoading: l3 }              = useAdminPharmacyStockSummary(pharmacyId);
+  const analyse                                = useAdminPharmacyAnalyseMarge(pharmacyId, marginMode, {
+    date_from: dateFrom, date_to: dateTo, category_type: filters.category_type,
+  });
 
-  const loading = pharmacyId !== null && (l1 || l2 || l3);
+  const loading = pharmacyId !== null && l1;
+  const subtitleDates = dateFrom || dateTo
+    ? `Période : ${dateFrom ?? "…"} → ${dateTo ?? "…"}`
+    : "Ventes et achats sur les 12 derniers mois";
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,7 +220,7 @@ function AdminView() {
             }] : []),
             ...buildActiveFilters(filters, setFilters),
           ]}
-          onResetAll={() => { setFilters(INITIAL); setPharmacyId(null); }}
+          onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); setPharmacyId(null); }}
         />
 
         {pharmacyId === null && (
@@ -216,15 +240,22 @@ function AdminView() {
           </div>
         )}
 
-        {stats && pharmacyId !== null && !loading && (
-          <>
-            {(() => {
-              const selectedPharm = pharmacies.find((p) => p.id === pharmacyId);
-              return selectedPharm ? <AdminContextStrip pharmacy={selectedPharm} /> : null;
-            })()}
-            <RapportSections stats={stats} alerts={alerts} stock={stock} />
-          </>
-        )}
+        {stats && pharmacyId !== null && !loading && (() => {
+          const sel = pharmacies.find((p) => p.id === pharmacyId);
+          const pharmacyLabel = sel ? [sel.code, sel.name].filter(Boolean).join(" · ") : "";
+          return (
+            <AdminPharmacyBody
+              stats={stats}
+              pharmacyLabel={pharmacyLabel}
+              categoryType={filters.category_type}
+              marginMode={marginMode}
+              onMarginMode={setMarginMode}
+              marginRows={(analyse.data?.rows ?? []) as Record<string, unknown>[]}
+              marginLoading={analyse.isLoading}
+              subtitleDates={subtitleDates}
+            />
+          );
+        })()}
       </section>
     </div>
   );
@@ -242,6 +273,11 @@ interface SectionsProps {
 }
 
 function RapportSections({ stats, alerts, stock }: SectionsProps) {
+  const { me } = useMe();
+  // Admin bypass: see every section regardless of feature flags. Non-admin:
+  // hide sections whose backing feature isn't in their effective permissions.
+  const has = (f: Feature) => me?.role === ROLES.ADMIN || (me?.permissions.includes(f) ?? false);
+
   return (
     <>
       {/* Section 2 — Indicateurs clés (Bento hero with aurora + sparkline) */}
@@ -260,25 +296,27 @@ function RapportSections({ stats, alerts, stock }: SectionsProps) {
         <TrendChart points={stats.monthly_trend} />
       </div>
 
-      {/* Section 5 — Alertes marges */}
-      {alerts && (
+      {/* Section 5 — Alertes marges (feature: alertes) */}
+      {has("alertes") && alerts && (
         <section className="flex flex-col gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alertes marges</h2>
           <MarginAlertCards data={alerts} />
         </section>
       )}
 
-      {/* Section 6 — Déclaration TVA */}
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Déclaration TVA</h2>
-        <TvaTiles tva={stats.tva} />
-      </section>
+      {/* Section 6 — Déclaration TVA (feature: accounting) */}
+      {has("accounting") && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Déclaration TVA</h2>
+          <TvaTiles tva={stats.tva} />
+        </section>
+      )}
 
-      {/* Section 7 — Analyse de marge preview (3 tiles + gauge placeholder + CTA) */}
-      <AnalyseMargePreview stats={stats} />
+      {/* Section 7 — Analyse de marge preview (feature: analyse) */}
+      {has("analyse") && <AnalyseMargePreview stats={stats} />}
 
-      {/* Section 8 — Stock summary (4 tiles + info card + CTAs) */}
-      {stock && (
+      {/* Section 8 — Stock summary (feature: stock) */}
+      {has("stock") && stock && (
         <section className="flex flex-col gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stock</h2>
           <StockSummaryTiles stock={stock} />

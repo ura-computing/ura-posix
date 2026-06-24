@@ -1,8 +1,10 @@
 import { ArrowLeft, Boxes, ChevronRight, FileSpreadsheet, ShoppingBasket, ShoppingCart, UploadCloud } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import type { DocType } from "@/types";
+import { useMe } from "@/hooks/useMe";
+import { ROLES } from "@/types";
+import type { DocType, Feature } from "@/types";
 
 import { DropZone }     from "./_components/DropZone";
 import { ImportState }  from "./_components/ImportState";
@@ -41,12 +43,29 @@ const TYPE_META = {
 } satisfies Record<DocType, { title: string; description: string; icon: typeof Boxes; columns: string[] }>;
 
 
+/** Which per-type feature gates each DocType. The upload endpoint requires
+ *  BOTH `import` AND the doc-type feature, so the picker must hide types
+ *  the caller can't actually submit. */
+const TYPE_FEATURE: Record<DocType, Feature> = {
+  achat: "achats",
+  vente: "ventes",
+  stock: "stock",
+};
+
+
 export default function UploadFilePage() {
   const [searchParams] = useSearchParams();
   const typeFromUrl = parseTypeParam(searchParams.get("type"));
 
   const u = useUpload(typeFromUrl);
   const { pickType } = u;
+
+  const { me } = useMe();
+  const allowedTypes = useMemo<DocType[]>(() => {
+    const all: DocType[] = ["achat", "vente", "stock"];
+    if (me?.role === ROLES.ADMIN) return all;          // admin bypass
+    return all.filter((t) => me?.permissions.includes(TYPE_FEATURE[t]));
+  }, [me]);
 
   // Re-sync when the ?type=... param changes (user navigates from another tab card).
   // `pickType` is useCallback'd with [] in useUpload, so its identity is stable —
@@ -77,25 +96,31 @@ export default function UploadFilePage() {
       {/* ─── STEP 1 — Type ─── */}
       {u.step === 1 && (
         <section className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {(["achat", "vente", "stock"] as DocType[]).map((t) => {
-              const meta = TYPE_META[t];
-              const Icon = meta.icon;
-              return (
-                <TypeCard
-                  key={t}
-                  type={t}
-                  title={meta.title}
-                  description={meta.description}
-                  icon={<Icon className="size-5" />}
-                  columns={meta.columns}
-                  totalCols={meta.columns.length}
-                  selected={u.docType === t}
-                  onSelect={() => u.pickType(t)}
-                />
-              );
-            })}
-          </div>
+          {allowedTypes.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+              Aucun type d'import disponible pour votre compte. Contactez votre administrateur.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {allowedTypes.map((t) => {
+                const meta = TYPE_META[t];
+                const Icon = meta.icon;
+                return (
+                  <TypeCard
+                    key={t}
+                    type={t}
+                    title={meta.title}
+                    description={meta.description}
+                    icon={<Icon className="size-5" />}
+                    columns={meta.columns}
+                    totalCols={meta.columns.length}
+                    selected={u.docType === t}
+                    onSelect={() => u.pickType(t)}
+                  />
+                );
+              })}
+            </div>
+          )}
           <div className="flex justify-end">
             <button
               type="button"

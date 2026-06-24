@@ -8,7 +8,7 @@ import {
   Boxes,
   LineChart,
   Wallet,
-  FileMinus,
+  Bell,
   Star,
   type LucideIcon,
 } from "lucide-react";
@@ -22,7 +22,7 @@ export type FeatureKey =
   | "stock"
   | "analyse"
   | "accounting"
-  | "bl_exclusions"
+  | "alertes"
   | "special_products";
 
 
@@ -42,7 +42,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "stock",            label: "Stock",              description: "État du stock, classification ABCD, péremptions",               icon: Boxes },
   { key: "analyse",          label: "Analyse",            description: "Analyses de marge avancées",                                    icon: LineChart },
   { key: "accounting",       label: "Comptabilité",       description: "Paiements (TPE/Espèces/Chèques/Virement) + KPIs comptables",   icon: Wallet },
-  { key: "bl_exclusions",    label: "Exclusions BL",      description: "Exclure des bons de livraison de l'analyse",                    icon: FileMinus },
+  { key: "alertes",          label: "Alertes",            description: "Alertes de marge + notifications",                              icon: Bell },
   { key: "special_products", label: "Produits spéciaux",  description: "Exclure des produits du calcul des marges",                     icon: Star },
 ];
 

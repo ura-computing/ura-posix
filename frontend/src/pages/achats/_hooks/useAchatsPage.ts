@@ -10,16 +10,19 @@ import {
   listAchatsSupplierSummary,
   listAchatsTvaRates,
 } from "@/api/transactions";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
 import type { AchatsFilters } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
-const DEFAULT_FILTERS: AchatsFilters = {
+// Local filter state — same shape as AchatsFilters minus the two date fields
+// that now live in the cross-route GlobalDateRangeProvider.
+type LocalAchatsFilters = Omit<AchatsFilters, "date_from" | "date_to">;
+
+const DEFAULT_LOCAL: LocalAchatsFilters = {
   page:       1,
   limit:      20,
-  date_from:  null,
-  date_to:    null,
   search:     "",
   category:   [],
   tva:        [],
@@ -29,8 +32,16 @@ const DEFAULT_FILTERS: AchatsFilters = {
 
 
 export function useAchatsPage() {
-  const [filters, setFilters] = useState<AchatsFilters>(DEFAULT_FILTERS);
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const [localFilters, setLocal] = useState<LocalAchatsFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
+
+  // Merge global dates + local fields into the AchatsFilters payload the
+  // existing API + sub-components expect.
+  const filters: AchatsFilters = useMemo(
+    () => ({ ...localFilters, date_from: dateFrom, date_to: dateTo }),
+    [localFilters, dateFrom, dateTo],
+  );
 
   const list = useQuery({
     queryKey: QUERY_KEYS.ACHATS(filters),
@@ -64,25 +75,30 @@ export function useAchatsPage() {
     staleTime: 60_000,
   });
 
-  // Filter handlers reset pagination; sort + page do not.
-  const patch = (next: Partial<AchatsFilters>) => setFilters((p) => ({ ...p, ...next, page: 1 }));
+  // Local-filter patch resets pagination; sort + page do not. Date range
+  // is the only filter routed through the global context.
+  const patch = (next: Partial<LocalAchatsFilters>) =>
+    setLocal((p) => ({ ...p, ...next, page: 1 }));
 
   const setSearch     = (search: string) => patch({ search });
-  const setDateRange  = (date_from: string | null, date_to: string | null) => patch({ date_from, date_to });
+  const setDateRange  = (date_from: string | null, date_to: string | null) => setRange(date_from, date_to);
   const setCategories = (category: string[]) => patch({ category });
   const setTva        = (tva: string[]) => patch({ tva });
 
-  // Toggle order on same key; reset to "desc" on different key. Single source of truth.
+  // Toggle order on same key; reset to "desc" on different key.
   const setSort = (key: string) =>
-    setFilters((p) => ({
+    setLocal((p) => ({
       ...p,
       sort_by:    key,
       sort_order: p.sort_by === key ? (p.sort_order === "desc" ? "asc" : "desc") : "desc",
     }));
-  const setPage     = (page: number) => setFilters((p) => ({ ...p, page }));
-  const setPageSize = (limit: number) => setFilters((p) => ({ ...p, limit, page: 1 }));
+  const setPage     = (page: number) => setLocal((p) => ({ ...p, page }));
+  const setPageSize = (limit: number) => setLocal((p) => ({ ...p, limit, page: 1 }));
 
-  const reset = () => setFilters(DEFAULT_FILTERS);
+  const reset = () => {
+    setLocal(DEFAULT_LOCAL);
+    setRange(null, null);
+  };
 
   // ── Excel export ─────────────────────────────────────────────────────────
   // Fetches the FULL filter-matching set (server-side, ignoring pagination)

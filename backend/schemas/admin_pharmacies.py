@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Member-level ──────────────────────────────────────────────────────────────
@@ -49,27 +49,57 @@ class PharmacyListRow(BaseModel):
 class PharmacyDetail(BaseModel):
     """Full payload for Screen 2 (Pharmacy detail). One round-trip = info +
     features + members. Saves a second request on every page load."""
-    id:               int
-    name:             str
-    code:             str | None
-    city:             str | None
-    address:          str | None
-    phone:            str | None
-    email:            str | None
-    archived_at:      str | None
-    enabled_features: list[str]
-    members:          list[MemberOut]
+    id:                       int
+    name:                     str
+    code:                     str | None
+    city:                     str | None
+    address:                  str | None
+    phone:                    str | None
+    email:                    str | None
+    archived_at:              str | None
+    enabled_features:         list[str]
+    members:                  list[MemberOut]
+    # Union of every active owner's enabled permissions in this pharmacy.
+    # Powers the second ceiling pill in the admin's permission dialog when
+    # editing employees — so admin sees up-front whether their grant will
+    # be effective after the 3-layer intersection at read time.
+    owners_union_permissions: list[str]
 
 
 class PharmacyIn(BaseModel):
-    """Create or edit body. Only `name` is required; everything else is optional
-    and may be cleared by sending null/empty."""
+    """Create or edit body. `name` + `city` are required; others optional.
+
+    `city` is required because the backend derives the pharmacy `code` from
+    it (3-letter prefix + zero-padded sequence — see _generate_pharmacy_code
+    in routers/admin_pharmacies.py). On CREATE the client-sent `code` is
+    ignored; on EDIT it's allowed as a manual override (rare).
+
+    Empty-string coercion: the frontend posts "" (not null) for cleared
+    inputs. Coerce blanks to None on the other optional fields so the unique
+    constraint on `code` treats them as distinct NULLs."""
     name:    str           = Field(..., min_length=1, max_length=200)
+    city:    str           = Field(..., min_length=1, max_length=200)
     code:    str | None    = None
-    city:    str | None    = None
     address: str | None    = None
     phone:   str | None    = None
     email:   str | None    = None
+
+    @field_validator("code", "address", "phone", "email", mode="before")
+    @classmethod
+    def empty_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
+    @field_validator("city", mode="before")
+    @classmethod
+    def city_not_blank(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if stripped == "":
+                raise ValueError("La ville est requise.")
+            return stripped
+        return v
 
 
 # ── Bulk-set toggles ─────────────────────────────────────────────────────────

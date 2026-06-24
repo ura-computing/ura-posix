@@ -17,7 +17,7 @@ export type Status = (typeof STATUSES)[keyof typeof STATUSES];
 
 export const FEATURES = [
   "rapports", "import", "achats", "ventes",
-  "stock", "analyse", "accounting", "bl_exclusions",
+  "stock", "analyse", "accounting", "alertes",
   "special_products",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
@@ -48,10 +48,8 @@ export const ROUTES = {
   // Admin
   ADMIN_PHARMACIES:  "/admin/pharmacies",
   ADMIN_PHARMACY:    "/admin/pharmacies/:id",
-  ADMIN_USERS:       "/admin/users",
   ADMIN_CATALOGUE:   "/admin/catalogue",
   ADMIN_CATEGORIES:  "/admin/categories",
-  ADMIN_STATS:       "/admin/stats",
 } as const;
 export type Route = (typeof ROUTES)[keyof typeof ROUTES];
 
@@ -101,6 +99,11 @@ export const QUERY_KEYS = {
     ["admin-pharm-marge", id, df ?? "", dt ?? "", ct] as const,
   ADMIN_PHARM_STOCK:  (id: number) =>
     ["admin-pharm-stock", id] as const,
+  ADMIN_PHARM_ANALYSE: (id: number, mode: string, df: string | null, dt: string | null, ct: string) =>
+    ["admin-pharm-analyse", id, mode, df ?? "", dt ?? "", ct] as const,
+
+  // Admin /admin/categories — global category-suffix mappings
+  CATEGORY_SUFFIXES:  ["category-suffixes"] as const,
 
   // Analyse de marge (Page 11) — 7 group-by modes + Liste CSV upload.
   // Cache slot per (mode, window, categoryType). Liste keyed on items hash.
@@ -297,6 +300,24 @@ export interface AdminStatsResponse {
 }
 
 export interface AdminPharmacyRow { id: number; name: string; code: string | null; }
+
+
+// ── /admin/categories (category-suffixes) ────────────────────────────────────
+// Global table — admin-managed, NOT per-pharmacy. Reused by the Ventes ledger
+// to render the colored suffix pill on each row.
+
+export interface CategorySuffixOut {
+  id:       number;
+  category: string;
+  suffix:   string;
+  color:    SuffixColor | null;
+}
+
+export interface CategorySuffixIn {
+  category: string;
+  suffix:   string;
+  color:    SuffixColor | null;
+}
 
 
 // ── Upload-file types ────────────────────────────────────────────────────────
@@ -833,6 +854,9 @@ export interface PharmacyDetail {
   archived_at:      string | null;
   enabled_features: string[];
   members:          MemberOut[];
+  /** Union of active owners' enabled permissions. Used as the second
+   *  ceiling in the admin's permission dialog when editing an employee. */
+  owners_union_permissions: string[];
 }
 
 export interface PharmacyIn {

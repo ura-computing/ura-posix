@@ -10,7 +10,11 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     JWT_SECRET: str
-    JWT_ACCESS_EXPIRY_MIN: int = 60
+    # JWT access-token lifetime in minutes. 7 days by default so users aren't
+    # interrupted by "Session expirée" popups during normal work. Revocation
+    # still works on password reset / status flip via `token_version` rotation
+    # in `security.py`, so a longer TTL doesn't break those flows.
+    JWT_ACCESS_EXPIRY_MIN: int = 60 * 24 * 7
     COOKIE_SECURE: bool = False
     FRONTEND_URL: str
 

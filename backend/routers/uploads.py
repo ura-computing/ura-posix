@@ -37,7 +37,7 @@ from csv_parse import (
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
-from permissions import require_admin, require_pharmacy_owner
+from permissions import require_admin, require_feature, require_pharmacy_owner
 from schemas.catalog import CatalogImportResponse
 from security import CurrentUserDep
 
@@ -378,6 +378,7 @@ async def upload_achat(
     batch_id: Annotated[int | None, Form()] = None,
 ) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("achats", user, db)
     rows = await _read_csv_or_400(file)
     return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
                                 filename=file.filename, batch_id=batch_id,
@@ -392,6 +393,7 @@ async def upload_vente(
     batch_id: Annotated[int | None, Form()] = None,
 ) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("ventes", user, db)
     rows = await _read_csv_or_400(file)
     return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
                                 filename=file.filename, batch_id=batch_id,
@@ -466,6 +468,7 @@ async def upload_catalog(
 @router.post("/uploads/achat-json")
 def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("achats", user, db)
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
@@ -476,6 +479,7 @@ def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
 @router.post("/uploads/vente-json")
 def upload_vente_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("ventes", user, db)
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
@@ -489,6 +493,7 @@ def upload_stock_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
     batch_id=None (creates the ImportBatch); subsequent chunks reuse it via the
     returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("stock", user, db)
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,

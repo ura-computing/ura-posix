@@ -67,6 +67,19 @@ export function getAdminPharmacyStockSummary(pharmacyId: number): Promise<StockS
   return api<StockSummaryResponse>(`/admin/pharmacy/${pharmacyId}/stats/stock-summary`);
 }
 
+export function getAdminPharmacyAnalyseMarge(
+  pharmacyId: number,
+  mode: MargeMode,
+  filters: AnalyseFilters,
+): Promise<AnalyseMargeResponse> {
+  const params = new URLSearchParams();
+  params.set("mode", mode);
+  if (filters.date_from)     params.set("date_from",     filters.date_from);
+  if (filters.date_to)       params.set("date_to",       filters.date_to);
+  if (filters.category_type) params.set("category_type", filters.category_type);
+  return api<AnalyseMargeResponse>(`/admin/pharmacy/${pharmacyId}/stats/analyse-marge?${params.toString()}`);
+}
+
 // ── Stock (Page 6) ──────────────────────────────────────────────────────────
 
 function stockQs(f: Partial<StockFilters>): string {

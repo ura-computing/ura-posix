@@ -16,7 +16,7 @@ PAYMENT_METHODS = ("tpe", "especes", "cheques", "virement")
 
 ALLOWED_FEATURES = (
     "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
+    "stock", "analyse", "accounting", "alertes",
     "special_products",
 )
 

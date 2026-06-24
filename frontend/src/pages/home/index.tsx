@@ -83,14 +83,9 @@ export default function HomePage() {
                 Mon espace
               </Link>
             ) : (
-              <>
-                <Link to={ROUTES.LOGIN} className="text-sm font-semibold text-muted-foreground cursor-pointer transition-colors duration-fast hover:text-foreground">
-                  Se connecter
-                </Link>
-                <Link to={ROUTES.LOGIN} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                  Demander une démo
-                </Link>
-              </>
+              <Link to={ROUTES.LOGIN} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
+                Se connecter
+              </Link>
             )}
           </div>
         </div>
@@ -124,7 +119,7 @@ export default function HomePage() {
                   </Link>
                 ) : (
                   <Link to={ROUTES.LOGIN} className="rounded-lg bg-primary px-6 py-[13px] text-[15px] font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                    Demander une démo
+                    Se connecter
                   </Link>
                 )}
                 <a href="#cycle" className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-[13px] text-[15px] font-semibold text-foreground cursor-pointer" style={{ background: "color-mix(in srgb, var(--card) 75%, transparent)" }}>
@@ -266,14 +261,9 @@ export default function HomePage() {
                 Aller à mon espace
               </Link>
             ) : (
-              <>
-                <Link to={ROUTES.LOGIN} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
-                  Demander une démo
-                </Link>
-                <Link to={ROUTES.LOGIN} className="rounded-lg border border-white/30 bg-white/10 px-6 py-[13px] text-[15px] font-semibold text-white cursor-pointer">
-                  Se connecter
-                </Link>
-              </>
+              <Link to={ROUTES.LOGIN} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
+                Se connecter
+              </Link>
             )}
           </div>
           {!isAuthed && (

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Boxes, BarChart3,
-  Bell, Coins, Star, UsersRound, Building2, Users, BookOpen,
-  Tags, Globe, CircleUser, Settings,
+  Bell, Coins, Star, UsersRound, Building2, BookOpen,
+  Tags, CircleUser, Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,7 +31,7 @@ const DATA: Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 export const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: "Rapports", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true },
+      { label: "Rapports", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
     ],
   },
   {
@@ -41,7 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Ventes",             to: ROUTES.VENTES,            icon: TrendingUp,     roles: DATA, ready: true, feature: "ventes" },
       { label: "Stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA, ready: true, feature: "stock" },
       { label: "Analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA, ready: true, feature: "analyse" },
-      { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA, ready: true },
+      { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA, ready: true, feature: "alertes" },
       { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA, ready: true, feature: "accounting" },
       { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA, ready: true, feature: "special_products" },
     ],
@@ -56,10 +56,8 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Administration",
     items: [
       { label: "Pharmacies",            to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
-      { label: "Utilisateurs",          to: ROUTES.ADMIN_USERS,      icon: Users,     roles: [ROLES.ADMIN] },
       { label: "Catalogue",             to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
-      { label: "Catégories",            to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN] },
-      { label: "Statistiques globales", to: ROUTES.ADMIN_STATS,      icon: Globe,     roles: [ROLES.ADMIN] },
+      { label: "Catégories",            to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
     ],
   },
 ];

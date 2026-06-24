@@ -5,6 +5,7 @@ import { RequireFeature } from "@/components/layout/RequireFeature";
 import { RequireGuest } from "@/components/layout/RequireGuest";
 import { RequireRole } from "@/components/layout/RequireRole";
 import CataloguePage from "@/pages/admin/catalogue";
+import AdminCategoriesPage from "@/pages/admin/categories";
 import AdminPharmaciesIndex from "@/pages/admin/pharmacies";
 import AdminPharmacyDetail from "@/pages/admin/pharmacies/detail";
 import OwnerEmployeesPage from "@/pages/owner/employees";
@@ -40,12 +41,16 @@ export default function App() {
 
       {/* App routes: only accessible to AUTHENTICATED users */}
       <Route element={<AppLayout />}>
-        <Route path={ROUTES.RAPPORT}    element={<RapportPage />} />
-        <Route path={ROUTES.ALERTES}    element={<AlertesPage />} />
-        <Route path={ROUTES.ME}         element={<MePage />} />
+        <Route path={ROUTES.ME}          element={<MePage />} />
 
         {/* Feature-gated routes — admin bypasses; non-admin without the
             feature in their effective permission set redirects to /404. */}
+        <Route element={<RequireFeature feature="rapports" />}>
+          <Route path={ROUTES.RAPPORT}   element={<RapportPage />} />
+        </Route>
+        <Route element={<RequireFeature feature="alertes" />}>
+          <Route path={ROUTES.ALERTES}   element={<AlertesPage />} />
+        </Route>
         <Route element={<RequireFeature feature="import" />}>
           <Route path={ROUTES.IMPORTS}     element={<ImportsPage />} />
           <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
@@ -70,7 +75,8 @@ export default function App() {
         </Route>
 
         <Route element={<RequireRole role={ROLES.ADMIN} />}>
-          <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
+          <Route path={ROUTES.ADMIN_CATALOGUE}  element={<CataloguePage />} />
+          <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
           <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
           <Route path={ROUTES.ADMIN_PHARMACY}   element={<AdminPharmacyDetail />} />
         </Route>

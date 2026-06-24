@@ -14,4 +14,11 @@
 
 + create ai agent
 + website builder
-+ keep my session online forever
+
+
++ add a full test suite for all apis one by one all of them
++ add test suite for all forntend hooks one by one
+
+
+
++ migration script

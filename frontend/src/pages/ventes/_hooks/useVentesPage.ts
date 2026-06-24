@@ -7,16 +7,18 @@ import {
   listVentes, listVentesCategories, listVentesSuggestions,
   listVentesSurveillanceCounts, listVentesTvaRates,
 } from "@/api/transactions";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
 import type { SurveillanceTab, VentesFilters, VentesFiltersKey } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
-const DEFAULT_FILTERS: VentesFilters = {
+// Local filter state — date fields live in the cross-route global context.
+type LocalVentesFilters = Omit<VentesFilters, "date_from" | "date_to">;
+
+const DEFAULT_LOCAL: LocalVentesFilters = {
   page:                 1,
   limit:                20,
-  date_from:            null,
-  date_to:              null,
   search:               "",
   category:             [],
   tva:                  [],
@@ -36,8 +38,16 @@ function trimForKey(f: VentesFilters): VentesFiltersKey {
 
 
 export function useVentesPage() {
-  const [filters, setFilters] = useState<VentesFilters>(DEFAULT_FILTERS);
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const [localFilters, setLocal] = useState<LocalVentesFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
+
+  // Merge global dates + local fields into the VentesFilters payload the
+  // existing API + sub-components expect.
+  const filters: VentesFilters = useMemo(
+    () => ({ ...localFilters, date_from: dateFrom, date_to: dateTo }),
+    [localFilters, dateFrom, dateTo],
+  );
 
   const key = useMemo(() => trimForKey(filters), [filters]);
 
@@ -66,28 +76,33 @@ export function useVentesPage() {
     staleTime: 60_000,
   });
 
-  // ── Filter handlers — every one resets pagination to page 1 ──
-  const patch = (next: Partial<VentesFilters>) => setFilters((prev) => ({ ...prev, ...next, page: 1 }));
+  // Local-filter patch resets pagination; sort + page do not. Date range
+  // is the only filter routed through the global context.
+  const patch = (next: Partial<LocalVentesFilters>) =>
+    setLocal((prev) => ({ ...prev, ...next, page: 1 }));
 
   const setSearch        = (search: string)               => patch({ search });
-  const setDateRange     = (date_from: string | null, date_to: string | null) => patch({ date_from, date_to });
+  const setDateRange     = (date_from: string | null, date_to: string | null) => setRange(date_from, date_to);
   const setCategories    = (category: string[])           => patch({ category });
   const setTva           = (tva: string[])                => patch({ tva });
   const setSurveillance  = (surveillance: SurveillanceTab | null) => patch({ surveillance });
   const setIncludeND     = (include_non_declared: boolean) => patch({ include_non_declared });
 
   // Sort + page DON'T reset to page 1 → kept out of `patch`.
-  // setSort toggles order on same key, resets to "desc" on different key (single source of truth).
+  // setSort toggles order on same key, resets to "desc" on different key.
   const setSort = (key: string) =>
-    setFilters((prev) => ({
+    setLocal((prev) => ({
       ...prev,
       sort_by:    key,
       sort_order: prev.sort_by === key ? (prev.sort_order === "desc" ? "asc" : "desc") : "desc",
     }));
-  const setPage     = (page: number) => setFilters((prev) => ({ ...prev, page }));
-  const setPageSize = (limit: number) => setFilters((prev) => ({ ...prev, limit, page: 1 }));
+  const setPage     = (page: number) => setLocal((prev) => ({ ...prev, page }));
+  const setPageSize = (limit: number) => setLocal((prev) => ({ ...prev, limit, page: 1 }));
 
-  const reset = () => setFilters(DEFAULT_FILTERS);
+  const reset = () => {
+    setLocal(DEFAULT_LOCAL);
+    setRange(null, null);
+  };
 
   // ── Excel export ─────────────────────────────────────────────────────────
   // Fetches the FULL filter-matching set (server-side, ignoring pagination)

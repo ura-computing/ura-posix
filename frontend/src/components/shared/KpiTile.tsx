@@ -22,7 +22,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
 
 
-export type IconTone = "primary" | "error" | "warning" | "success" | "info" | "slate" | "muted";
+export type IconTone = "primary" | "error" | "warning" | "success" | "info" | "slate" | "muted" | "emerald" | "rose";
 
 
 const ICON_TONE: Record<IconTone, string> = {
@@ -33,6 +33,8 @@ const ICON_TONE: Record<IconTone, string> = {
   info:    "bg-info/15 text-info",
   slate:   "bg-muted text-muted-foreground",
   muted:   "bg-muted text-muted-foreground",
+  emerald: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  rose:    "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 const BADGE_TONE: Record<IconTone, string> = {
@@ -43,6 +45,8 @@ const BADGE_TONE: Record<IconTone, string> = {
   info:    "bg-info-subtle text-info",
   slate:   "bg-muted text-muted-foreground",
   muted:   "bg-muted text-muted-foreground",
+  emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  rose:    "bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 const SUB_TONE: Record<IconTone, string> = {
@@ -53,6 +57,8 @@ const SUB_TONE: Record<IconTone, string> = {
   info:    "text-info",
   slate:   "text-muted-foreground",
   muted:   "text-muted-foreground",
+  emerald: "text-emerald-700 dark:text-emerald-300",
+  rose:    "text-rose-700 dark:text-rose-300",
 };
 
 

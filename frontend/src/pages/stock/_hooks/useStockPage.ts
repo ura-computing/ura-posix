@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 //   useStockAbcd(filters[, options]) -> listStockAbcd(filters)
 //   usePeremptions()                 -> listPeremptions()
 import { useStockAbcd, usePeremptions } from "@/hooks/stats";
+import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
 
@@ -22,8 +23,13 @@ export type StockSortKey =
  */
 export function useStockPage() {
   // ---- filter + view state ----
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Date range comes from the cross-route global context. Other filters
+  // (class, status, search, sort, pagination) stay page-local.
+  const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
+  const dateFrom = globalFrom ?? "";
+  const dateTo   = globalTo   ?? "";
+  const setDateFrom = (v: string) => setRange(v || null, globalTo);
+  const setDateTo   = (v: string) => setRange(globalFrom, v || null);
   // Default class = "A" so pharmacists land on their best-sellers immediately.
   // "Tout réinitialiser" / "Fermer" still clear to null — the default only applies on first mount.
   const [classFilter, setClassFilter] = useState<AbcdClass | null>("A");
@@ -87,8 +93,7 @@ export function useStockPage() {
   }, []);
 
   const clearAll = useCallback(() => {
-    setDateFrom("");
-    setDateTo("");
+    setRange(null, null);
     setClassFilter(null);
     setStatus("");
     setSearch("");

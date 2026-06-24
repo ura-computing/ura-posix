@@ -1,18 +1,19 @@
 /** Screen 2 — admin pharmacy detail. Header + features grid + members table.
- *  Presentational shell; data wiring (useAdminPharmacy(id) + mutations) lands
- *  in chunk 3.
  *
- *  3-layer model: the "Gérer les permissions" button is DISABLED on employee
- *  rows with a tooltip ("Géré par le propriétaire") — admin can only set
- *  owner permissions through this dialog; employees are owner-managed via
- *  /owner/employees. */
+ *  Permission editing: admin can edit owners AND employees. The dialog renders
+ *  one ceiling pill per row for owners (Pharmacie) and two for employees
+ *  (Pharmacie + Propriétaires) — the 3-layer intersection at read time still
+ *  applies, so the second ceiling for employees is informational: it shows
+ *  whether admin's grant would actually be effective. Owner-union comes from
+ *  `detail.owners_union_permissions` in the GET response. */
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, MoreVertical, Pencil, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, Pencil, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+
+import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { Tooltip } from "@/components/shared/Tooltip";
 import { ROUTES, type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types";
 import { cn } from "@/utils/cn";
 
@@ -35,7 +36,7 @@ import {
 
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
-const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "bl_exclusions", "special_products"] as const;
+const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
 
 
 export default function AdminPharmacyDetail() {
@@ -117,7 +118,7 @@ export default function AdminPharmacyDetail() {
   const employees = detail.members.filter((m) => m.role === "employee");
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
+    <div className="mx-auto flex max-w-[1100px] flex-col gap-4 pb-20">
       {/* Prominent back button — easy to spot when admin lands deep in a
           pharmacy detail. Breadcrumb below confirms location. */}
       <Link
@@ -204,16 +205,11 @@ export default function AdminPharmacyDetail() {
             </thead>
             <tbody>
               {[...owners, ...employees].map((m) => {
-                const isEmployee = m.role === "employee";
                 const manageBtn = (
                   <button
                     type="button"
-                    disabled={isEmployee}
-                    onClick={() => !isEmployee && setPermDialogUser(m)}
-                    className={cn(
-                      "inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold",
-                      isEmployee ? "cursor-not-allowed text-muted-foreground opacity-60" : "cursor-pointer text-foreground hover:bg-surface-subtle",
-                    )}
+                    onClick={() => setPermDialogUser(m)}
+                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
                   >
                     <SlidersHorizontal className="size-3.5" />
                     Gérer les permissions
@@ -247,11 +243,7 @@ export default function AdminPharmacyDetail() {
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-end gap-1.5">
-                        {isEmployee ? (
-                          <Tooltip label="Géré par le propriétaire." placement="top">
-                            <span>{manageBtn}</span>
-                          </Tooltip>
-                        ) : manageBtn}
+                        {manageBtn}
                         <MemberKebab onResetPassword={() => handleResetPassword(m.id)} onRemove={() => handleRemoveMember(m.id)} />
                       </div>
                     </td>
@@ -288,12 +280,26 @@ export default function AdminPharmacyDetail() {
         onClose={() => setPermDialogUser(null)}
         user={permDialogUser}
         contextStrip={
-          <>
-            Cet utilisateur appartient à <strong>{detail.name}</strong>. Une permission n'est effective
-            que si la pharmacie l'a également activée.
-          </>
+          permDialogUser?.role === "employee" ? (
+            <>
+              Cet employé appartient à <strong>{detail.name}</strong>. Une permission n'est effective
+              que si la pharmacie ET au moins un propriétaire l'ont également activée.
+            </>
+          ) : (
+            <>
+              Cet utilisateur appartient à <strong>{detail.name}</strong>. Une permission n'est effective
+              que si la pharmacie l'a également activée.
+            </>
+          )
         }
-        ceilings={[{ label: "Pharmacie", values: serverFeatures }]}
+        ceilings={
+          permDialogUser?.role === "employee"
+            ? [
+                { label: "Pharmacie",     values: serverFeatures },
+                { label: "Propriétaires", values: permsArrayToRecord(detail.owners_union_permissions) },
+              ]
+            : [{ label: "Pharmacie", values: serverFeatures }]
+        }
         serverPermissions={memberPermsToRecord(permDialogUser)}
         isSaving={isSavingPerms}
         onSave={async (next) => {
@@ -315,11 +321,18 @@ export default function AdminPharmacyDetail() {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-// const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "bl_exclusions", "special_products"] as const;
+// const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
 
 function allTo(v: boolean): Record<FeatureKey, boolean> {
   const out = {} as Record<FeatureKey, boolean>;
   for (const k of FEATURE_KEYS) out[k] = v;
+  return out;
+}
+
+function permsArrayToRecord(perms: readonly string[]): Record<FeatureKey, boolean> {
+  const set = new Set(perms);
+  const out = {} as Record<FeatureKey, boolean>;
+  for (const k of FEATURE_KEYS) out[k] = set.has(k);
   return out;
 }
 
@@ -332,38 +345,26 @@ function memberPermsToRecord(m: MemberOut | null): Record<FeatureKey, boolean> {
 
 
 function MemberKebab({ onResetPassword, onRemove }: { onResetPassword: () => void; onRemove: () => void }) {
-  const [open, setOpen] = useState(false);
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label="Plus d'actions"
-        className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
-      >
-        <MoreVertical className="size-4" />
-      </button>
-      {open && (
+    <KebabMenu>
+      {(close) => (
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-30 mt-1 w-56 rounded-md border border-border bg-card p-1 shadow-lg">
-            <button
-              type="button"
-              onClick={() => { onResetPassword(); setOpen(false); }}
-              className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-            >
-              Réinitialiser le mot de passe
-            </button>
-            <button
-              type="button"
-              onClick={() => { onRemove(); setOpen(false); }}
-              className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
-            >
-              Supprimer
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => { onResetPassword(); close(); }}
+            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
+          >
+            Réinitialiser le mot de passe
+          </button>
+          <button
+            type="button"
+            onClick={() => { onRemove(); close(); }}
+            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
+          >
+            Supprimer
+          </button>
         </>
       )}
-    </div>
+    </KebabMenu>
   );
 }

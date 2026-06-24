@@ -169,12 +169,8 @@ def get_stats(
     include_non_declared: IncludeNonDeclQ = False,
 ) -> dict:
     """Owner dashboard payload. Admins use /v1/admin/pharmacy/{id}/stats."""
-    if user.role == "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Les admins utilisent /v1/admin/pharmacy/{id}/stats",
-        )
-    return build_stats_payload(db, user.pharmacy_id, date_from or None, date_to or None,
+    pharmacy_id = require_pharmacy_owner(user, db, feature="rapports")
+    return build_stats_payload(db, pharmacy_id, date_from or None, date_to or None,
                                category_type, include_non_declared)
 
 
@@ -187,26 +183,16 @@ def get_margin_alerts(
     category_type: CategoryTypeQ    = "all",
 ) -> dict:
     """4 brackets feeding Rapport Section 5 ('Alertes marges') + the /alertes drill-down."""
-    if user.role == "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Les admins utilisent /v1/admin/pharmacy/{id}/stats/margin-alerts",
-        )
-    return compute_margin_alerts(db, user.pharmacy_id, date_from or None, date_to or None, category_type)
+    pharmacy_id = require_pharmacy_owner(user, db, feature="alertes")
+    return compute_margin_alerts(db, pharmacy_id, date_from or None, date_to or None, category_type)
 
 
 @router.get("/stats/stock-summary", response_model=StockSummaryResponse)
 def get_stock_summary(user: CurrentUserDep, db: DbDep) -> dict:
     """Lightweight 4-tile summary for Rapport Section 8. Full ABCD classification
     ships when /stock page is built."""
-    if user.role == "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Les admins utilisent /v1/admin/pharmacy/{id}/stats/stock-summary",
-        )
-    if user.pharmacy_id is None:
-        raise HTTPException(status_code=400, detail="Aucune pharmacie associée à ce compte")
-    return compute_stock_summary(db, user.pharmacy_id)
+    pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
+    return compute_stock_summary(db, pharmacy_id)
 
 # ─── Stock ABCD + Peremptions (Page 6) ───────────────────────────────────────
 
