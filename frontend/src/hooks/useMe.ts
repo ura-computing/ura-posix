@@ -12,7 +12,7 @@ function toFlat(r: MeResponse): Me {
     phone:       r.user.phone ?? undefined,
     role:        r.user.role,
     status:      r.user.status,
-    pharmacy:    r.pharmacy ? { name: r.pharmacy.name, code: r.pharmacy.code } : undefined,
+    pharmacy:    r.pharmacy ? { id: r.pharmacy.id, name: r.pharmacy.name, code: r.pharmacy.code } : undefined,
     permissions: r.permissions,
   };
 }

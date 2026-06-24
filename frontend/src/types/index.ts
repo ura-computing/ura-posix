@@ -18,6 +18,7 @@ export type Status = (typeof STATUSES)[keyof typeof STATUSES];
 export const FEATURES = [
   "rapports", "import", "achats", "ventes",
   "stock", "analyse", "accounting", "bl_exclusions",
+  "special_products",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -46,6 +47,7 @@ export const ROUTES = {
 
   // Admin
   ADMIN_PHARMACIES:  "/admin/pharmacies",
+  ADMIN_PHARMACY:    "/admin/pharmacies/:id",
   ADMIN_USERS:       "/admin/users",
   ADMIN_CATALOGUE:   "/admin/catalogue",
   ADMIN_CATEGORIES:  "/admin/categories",
@@ -169,7 +171,7 @@ export interface Me {
   phone?:      string;
   role:        Role;
   status:      Status;
-  pharmacy?:   { name: string; code: string | null };
+  pharmacy?:   { id: number; name: string; code: string | null };
   permissions: Feature[];
 }
 
@@ -778,4 +780,83 @@ export interface SpecialProductReintegrateResult {
   reintegrated:   number;
   not_special:    number;
   medicament_ids: number[];
+}
+
+
+// ── Admin · permission management (/admin/pharmacies) ───────────────────────
+
+export type MemberRole   = "owner" | "employee";
+export type MemberStatus = "active" | "inactive";
+
+/** Subset of UserPermission rows + denormalized member info, returned in
+ *  PharmacyDetail.members and on user-mutation responses. */
+export interface MemberOut {
+  id:                  number;
+  full_name:           string | null;
+  email:               string;
+  role:                MemberRole;
+  status:              MemberStatus;
+  granted_permissions: string[];
+}
+
+export interface PharmacyListRow {
+  id:                number;
+  name:              string;
+  code:              string | null;
+  city:              string | null;
+  members_count:     number;
+  member_initials:   string[];
+  enabled_features:  string[];
+  archived_at:       string | null;
+}
+
+export interface PharmacyDetail {
+  id:               number;
+  name:             string;
+  code:             string | null;
+  city:             string | null;
+  address:          string | null;
+  phone:            string | null;
+  email:            string | null;
+  archived_at:      string | null;
+  enabled_features: string[];
+  members:          MemberOut[];
+}
+
+export interface PharmacyIn {
+  name:    string;
+  code?:   string | null;
+  city?:   string | null;
+  address?: string | null;
+  phone?:  string | null;
+  email?:  string | null;
+}
+
+export interface CreateUserIn {
+  full_name?:  string | null;
+  email:       string;
+  role:        MemberRole;
+  pharmacy_id: number;
+}
+
+/** Response from POST /admin/pharmacies/{id}/users — temp_password is one-time
+ *  cleartext for the admin's mailto handoff; never persisted server-side. */
+export interface CreateUserOut {
+  member:        MemberOut;
+  temp_password: string;
+}
+
+export interface ResetPasswordOut {
+  user_id:       number;
+  temp_password: string;
+}
+
+
+/** Owner-side /owner/employees one-shot fetch. Includes the contextual ceiling
+ *  info the EmployeePermissionsDialog needs (pharmacy features + owner's own
+ *  permissions) so it can render the 2-layer ceiling without a second call. */
+export interface OwnerEmployeesResponse {
+  employees:         MemberOut[];
+  pharmacy_features: string[];
+  my_permissions:    string[];
 }

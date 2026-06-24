@@ -4,7 +4,7 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from rate_limit import limiter, rate_limit_handler
-from routers import accounting, admin_catalog, admin_stats, auth, category_suffixes, data, health, sessions, special_products, stats, transactions, uploads
+from routers import accounting, admin_catalog, admin_pharmacies, admin_stats, auth, category_suffixes, data, health, owner_employees, sessions, special_products, stats, transactions, uploads
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")
@@ -15,7 +15,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-Requested-With"],
 )
 
@@ -30,6 +30,8 @@ app.include_router(sessions.router, prefix="/v1/sessions")
 app.include_router(stats.router,         prefix="/v1")
 app.include_router(admin_stats.router,   prefix="/v1")
 app.include_router(admin_catalog.router, prefix="/v1")
+app.include_router(admin_pharmacies.router, prefix="/v1")
+app.include_router(owner_employees.router, prefix="/v1")
 app.include_router(uploads.router,      prefix="/v1")
 app.include_router(transactions.router, prefix="/v1")
 app.include_router(data.router,             prefix="/v1")

@@ -33,3 +33,6 @@ yarn-debug.log*
 .coverage
 htmlcov/
 *.tmp
+
+# Design handoff files (presentational TSX — not wired)
+handoff/

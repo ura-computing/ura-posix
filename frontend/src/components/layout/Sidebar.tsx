@@ -15,6 +15,10 @@ import type { NavItem } from "./navConfig";
 
 interface SidebarProps {
   role:             Role;
+  /** User's effective permissions (3-layer intersection from /me). Drives the
+   *  feature-flag filter on nav items. Admin's bypass is handled inside
+   *  visibleGroups; this prop is still required (pass [] for admin). */
+  permissions:      readonly string[];
   collapsed:        boolean;
   onToggleCollapse: () => void;
   mobileOpen:       boolean;
@@ -80,10 +84,10 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
 }
 
 export function Sidebar({
-  role, collapsed, onToggleCollapse, mobileOpen, onCloseMobile,
+  role, permissions, collapsed, onToggleCollapse, mobileOpen, onCloseMobile,
 }: SidebarProps) {
   const { handleLogout } = useLogout();
-  const groups = visibleGroups(role);
+  const groups = visibleGroups(role, permissions);
   const unclassifiedCount = useUnclassifiedCount(role);
 
   /** Lookup: route path → badge number. Currently only the admin Catalogue row

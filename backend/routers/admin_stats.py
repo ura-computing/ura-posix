@@ -57,12 +57,9 @@ def admin_stats(user: CurrentUserDep, db: DbDep) -> dict:
     }
 
 
-@router.get("/admin/pharmacies", response_model=list[AdminPharmacyRow])
-def admin_pharmacies(user: CurrentUserDep, db: DbDep) -> list[dict]:
-    """Lightweight list for the pharmacy-picker dropdown — id, name, code only."""
-    _require_admin(user)
-    rows = db.query(Pharmacy.id, Pharmacy.name, Pharmacy.code).order_by(Pharmacy.name).all()
-    return [{"id": r.id, "name": r.name, "code": r.code} for r in rows]
+# NOTE: GET /admin/pharmacies moved to routers/admin_pharmacies.py — the new
+# endpoint returns a superset (id/name/code + members count + enabled features)
+# that the PharmacyPicker dropdown still consumes correctly via its narrow type.
 
 
 @router.get("/admin/pharmacy/{pharmacy_id}/stats", response_model=StatsResponse)

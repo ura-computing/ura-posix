@@ -3,7 +3,7 @@ import { Building2 } from "lucide-react";
 
 import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
-import { PharmacyPicker } from "@/components/shared/PharmacyPicker";
+import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { useMe } from "@/hooks/useMe";
 import { ROLES } from "@/types";
 import type { StatsFilters } from "@/types";
@@ -159,12 +159,21 @@ function AdminView() {
       {/* Per-pharmacy drill-down */}
       <section className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rapport par pharmacie</h2>
-        {/* Admin pharmacy picker — standalone control beside the unified FilterBar */}
+        {/* Admin pharmacy picker — uses the shared SingleSelectPopover so the
+            trigger + panel match every other dropdown in the app (Catégorie,
+            Type, Statut, page-size, etc.). */}
         <div className="flex flex-wrap items-center gap-3">
-          <PharmacyPicker
-            pharmacies={pharmacies}
-            selected={pharmacies.find((p) => p.id === pharmacyId) ?? null}
-            onChange={setPharmacyId}
+          <SingleSelectPopover
+            label="Pharmacie"
+            value={pharmacyId != null ? String(pharmacyId) : ""}
+            onChange={(v) => setPharmacyId(v ? Number(v) : null)}
+            options={[
+              { value: "", label: "Toutes les pharmacies" },
+              ...pharmacies.map((p) => ({
+                value: String(p.id),
+                label: [p.code, p.name].filter(Boolean).join(" · "),
+              })),
+            ]}
           />
         </div>
 

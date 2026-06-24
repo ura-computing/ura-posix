@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from csv_parse import classify_product_type, parse_catalog_csv
 from database import SessionLocal
-from models import ALLOWED_FEATURES, Medicament, Pharmacy, PharmacyFeature, User, UserPermission
+from models import Medicament, Pharmacy, User
 from security import hash_password
 
 
@@ -109,17 +109,6 @@ def seed_database() -> None:
             )
             db.add(owner)
             db.flush()
-
-            # ── TEMPORARY: grant the demo owner EVERY feature ───────────────
-            # Effective permissions = pharmacy_features ∩ user_permissions, so
-            # we have to enable BOTH layers for the owner to do anything.
-            #
-            # ⚠️  REMOVE THIS BLOCK once the admin "Gérer les permissions"
-            #     page lands — then the admin will grant permissions per-user
-            #     through the UI, not via the seed script.
-            for feature in ALLOWED_FEATURES:
-                db.add(PharmacyFeature(pharmacy_id=pharmacy.id, feature=feature, enabled=True))
-                db.add(UserPermission(user_id=owner.id, permission=feature, enabled=True))
 
         db.commit()
 

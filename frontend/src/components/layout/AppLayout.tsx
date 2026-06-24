@@ -31,6 +31,7 @@ export function AppLayout() {
     <div className="flex h-screen bg-background">
       <Sidebar
         role={me.role}
+        permissions={me.permissions}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}

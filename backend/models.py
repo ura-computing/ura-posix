@@ -32,6 +32,9 @@ class Pharmacy(Base):
     phone:   Mapped[str | None]     = mapped_column(String, nullable=True)
     email:   Mapped[str | None]     = mapped_column(String, nullable=True)
     version: Mapped[int]            = mapped_column(Integer, nullable=False, default=0)
+    # Soft-delete marker. NULL = active, timestamp = archived. Admin can restore
+    # by clearing the value. Related transactions/stock/payments stay linked.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     features: Mapped[list["PharmacyFeature"]] = relationship(back_populates="pharmacy", cascade="all, delete-orphan")
 

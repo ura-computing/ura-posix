@@ -1,9 +1,15 @@
 """Shared permission helpers. Resolves the effective feature set for a user and
 exposes a `require(feature)` dependency factory routers can use to gate endpoints.
 
-Admins implicitly have every feature in ALLOWED_FEATURES. Non-admins get the
-intersection of their pharmacy's enabled features and their own per-user
-permission rows.
+Three-layer permission model:
+  - admin:    bypasses everything (gets every feature in ALLOWED_FEATURES)
+  - owner:    pharmacy_features ∩ user_permissions
+  - employee: pharmacy_features ∩ user_permissions ∩ (union of active owners'
+              user_permissions in the same pharmacy). I.e. the owner ceiling —
+              an employee can only get a feature if AT LEAST ONE owner has it.
+              "Union of owners" because a pharmacy can have multiple owners
+              (per locked spec); an employee inheriting from "any owner has it"
+              matches the typical UX where the owner who hired you grants access.
 """
 from __future__ import annotations
 
@@ -13,21 +19,49 @@ from sqlalchemy.orm import Session
 from models import ALLOWED_FEATURES, PharmacyFeature, User, UserPermission
 
 
+def _user_enabled_perms(db: Session, user_ids: list[int]) -> set[str]:
+    """Set of permission strings any of the given users has enabled. Used both
+    for the single-user lookup and the owner-union lookup."""
+    if not user_ids:
+        return set()
+    rows = (
+        db.query(UserPermission.permission)
+        .filter(UserPermission.user_id.in_(user_ids), UserPermission.enabled.is_(True))
+        .all()
+    )
+    return {r[0] for r in rows}
+
+
 def effective_permissions(db: Session, user: User) -> list[str]:
     """Returns the sorted list of feature strings this user can access."""
     if user.role == "admin":
         return list(ALLOWED_FEATURES)
     if not user.pharmacy_id:
         return []
+
     pharm_set = {
         f.feature for f in db.query(PharmacyFeature)
         .filter(PharmacyFeature.pharmacy_id == user.pharmacy_id, PharmacyFeature.enabled.is_(True)).all()
     }
-    user_set = {
-        p.permission for p in db.query(UserPermission)
-        .filter(UserPermission.user_id == user.id, UserPermission.enabled.is_(True)).all()
-    }
-    return sorted(pharm_set & user_set)
+    user_set = _user_enabled_perms(db, [user.id])
+
+    if user.role == "owner":
+        return sorted(pharm_set & user_set)
+
+    # Employee: also intersect with the union of active owners' permissions.
+    owner_ids = [
+        u.id for u in db.query(User.id).filter(
+            User.pharmacy_id == user.pharmacy_id,
+            User.role == "owner",
+            User.status == "active",
+        ).all()
+    ]
+    if not owner_ids:
+        # An orphan employee (no active owner) sees nothing — defensive default
+        # that surfaces the misconfig instead of silently granting pharm ∩ user.
+        return []
+    owner_ceiling = _user_enabled_perms(db, owner_ids)
+    return sorted(pharm_set & user_set & owner_ceiling)
 
 
 def require_feature(feature: str, user: User, db: Session) -> None:
