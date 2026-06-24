@@ -141,14 +141,33 @@ def clean_value(v: str) -> str:
     return (fix_mojibake(v.strip().strip('"').strip("'")) or "")
 
 
-def parse_csv(content: bytes, delimiter: str = ";") -> list[dict[str, str]]:
+def _detect_delimiter(first_line: str) -> str:
+    """Pick `;` or `,` based on the header line. Counts separators outside
+    quoted regions (RFC 4180 double quotes). Tie or both-zero → fall back to
+    `;` since Sobrus exports use it; hand-crafted test files that use `,`
+    will out-count `;` and switch automatically."""
+    in_q = False
+    sc = cc = 0
+    for ch in first_line:
+        if ch == '"':
+            in_q = not in_q
+        elif not in_q:
+            if   ch == ';': sc += 1
+            elif ch == ',': cc += 1
+    return "," if cc > sc else ";"
+
+
+def parse_csv(content: bytes, delimiter: str | None = None) -> list[dict[str, str]]:
     """Single fan-in for ALL CSV reads. Handles encoding detection, mojibake fix,
     and dict-shaped output keyed by cleaned headers.
 
-    Sobrus achat/vente/stock CSVs use `;`; the catalog CSV uses `,` — callers
-    pass the right delimiter explicitly. Mojibake fix is applied to every
-    header AND every cell value (via `clean_header` / `clean_value`)."""
+    Sobrus achat/vente/stock CSVs use `;`; the catalog CSV uses `,`. Pass
+    `delimiter=` to lock the choice; otherwise the header line is sniffed
+    via `_detect_delimiter`. Mojibake fix is applied to every header AND
+    every cell value (via `clean_header` / `clean_value`)."""
     text = _decode(content)
+    if delimiter is None:
+        delimiter = _detect_delimiter(text.split("\n", 1)[0])
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     rows = list(reader)
     if not rows:

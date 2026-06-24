@@ -89,10 +89,13 @@ def _check_csv(file: UploadFile) -> None:
 
 
 def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filename: str | None,
-                        batch_id: int | None) -> ImportBatch:
+                        batch_id: int | None, user_id: int) -> ImportBatch:
     """Returns the existing batch if `batch_id` is given AND it belongs to this pharmacy.
     Otherwise creates a fresh `in_progress` batch and returns it. New batches start at
-    rows_inserted=0 / rows_skipped=0; chunked uploads accumulate on later calls."""
+    rows_inserted=0 / rows_skipped=0; chunked uploads accumulate on later calls.
+
+    `user_id` is recorded on NEW batches only — subsequent chunks that reuse an
+    existing batch preserve the original creator."""
     if batch_id is not None:
         batch = db.get(ImportBatch, batch_id)
         if batch and batch.pharmacy_id == pharmacy_id and batch.file_type == file_type:
@@ -101,6 +104,7 @@ def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filen
     batch = ImportBatch(
         pharmacy_id=pharmacy_id, file_type=file_type, filename=filename,
         rows_inserted=0, rows_skipped=0, status="in_progress",
+        created_by_user_id=user_id,
     )
     db.add(batch)
     db.flush()
@@ -208,23 +212,26 @@ def _insert_transactions(
     pharmacy_id: int,
     filename: str | None,
     batch_id: int | None,
+    user_id: int,
     cfg: TransactionConfig,
 ) -> dict:
     """Generic ingest for Achat or Vente rows. Differences captured by `cfg`."""
     batch = _get_or_create_batch(
         db, pharmacy_id=pharmacy_id, file_type=cfg.file_type,
-        filename=filename, batch_id=batch_id,
+        filename=filename, batch_id=batch_id, user_id=user_id,
     )
     refs = {r.get(cfg.dedup_column) for r in rows if r.get(cfg.dedup_column)}
     existing = _preload_existing_keys(db, cfg, pharmacy_id, refs)
 
     inserted = 0
-    skipped  = 0
+    skipped_no_pid = 0
+    skipped_no_med = 0
+    skipped_dup    = 0
     new_medicaments: list[Medicament] = []  # F19: surface to owner so admin can classify
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
-            skipped += 1
+            skipped_no_pid += 1
             continue
         med, was_created = upsert_medicament(
             db, pid=pid,
@@ -236,27 +243,31 @@ def _insert_transactions(
             zone=col(row, COL_ZONE),
         )
         if not med:
-            skipped += 1
+            skipped_no_med += 1
             continue
         if was_created:
             new_medicaments.append(med)
         ref = col(row, cfg.dedup_column)
         if ref and (ref, med.id) in existing:
-            skipped += 1
+            skipped_dup += 1
             continue
         db.add(cfg.build_row(row, pharmacy_id, med.id, batch.id))
         if ref:
             existing.add((ref, med.id))
         inserted += 1
 
+    skipped = skipped_no_pid + skipped_no_med + skipped_dup
     batch.rows_inserted += inserted
     batch.rows_skipped  += skipped
     batch.status = "success"
     db.commit()
     return {
-        "inserted":    inserted,
-        "skipped":     skipped,
-        "batch_id":    batch.id,
+        "inserted":              inserted,
+        "skipped":               skipped,
+        "skipped_no_pid":        skipped_no_pid,
+        "skipped_no_medicament": skipped_no_med,
+        "skipped_duplicate":     skipped_dup,
+        "batch_id":              batch.id,
         "new_medicaments": {
             "count":  len(new_medicaments),
             "sample": [m.product or m.pid for m in new_medicaments[:10]],
@@ -265,7 +276,7 @@ def _insert_transactions(
 
 
 def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
-                  filename: str | None, batch_id: int | None) -> dict:
+                  filename: str | None, batch_id: int | None, user_id: int) -> dict:
     """Chunked stock import. Postgres ON CONFLICT upsert by (pharmacy_id, medicament_id)
     so re-uploading tomorrow's stock cleanly replaces today's snapshot. The UPSERT is
     chunk-safe — re-applying the same row is idempotent. Within ONE chunk we still
@@ -276,7 +287,7 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
     its id. Subsequent chunks pass that id → _get_or_create_batch reuses the row and
     we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
     batch = _get_or_create_batch(db, pharmacy_id=pharmacy_id, file_type="stock",
-                                 filename=filename, batch_id=batch_id)
+                                 filename=filename, batch_id=batch_id, user_id=user_id)
 
     seen_meds: set[int] = set()
     inserted_rows: list[dict] = []
@@ -369,7 +380,8 @@ async def upload_achat(
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
     rows = await _read_csv_or_400(file)
     return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
-                                filename=file.filename, batch_id=batch_id, cfg=ACHAT_CFG)
+                                filename=file.filename, batch_id=batch_id,
+                                user_id=user.id, cfg=ACHAT_CFG)
 
 
 @router.post("/uploads/vente")
@@ -382,7 +394,8 @@ async def upload_vente(
     pharmacy_id = require_pharmacy_owner(user, db, feature="import")
     rows = await _read_csv_or_400(file)
     return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
-                                filename=file.filename, batch_id=batch_id, cfg=VENTE_CFG)
+                                filename=file.filename, batch_id=batch_id,
+                                user_id=user.id, cfg=VENTE_CFG)
 
 
 _CATALOG_MUTABLE_COLS = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
@@ -456,7 +469,8 @@ def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
-                                filename=body.filename, batch_id=body.batch_id, cfg=ACHAT_CFG)
+                                filename=body.filename, batch_id=body.batch_id,
+                                user_id=user.id, cfg=ACHAT_CFG)
 
 
 @router.post("/uploads/vente-json")
@@ -465,7 +479,8 @@ def upload_vente_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
-                                filename=body.filename, batch_id=body.batch_id, cfg=VENTE_CFG)
+                                filename=body.filename, batch_id=body.batch_id,
+                                user_id=user.id, cfg=VENTE_CFG)
 
 
 @router.post("/uploads/stock-json")
@@ -477,7 +492,8 @@ def upload_stock_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> 
     if not body.rows:
         raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
     return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,
-                         filename=body.filename, batch_id=body.batch_id)
+                         filename=body.filename, batch_id=body.batch_id,
+                         user_id=user.id)
 
 
 # ─── PATCH batch status (cancel) ─────────────────────────────────────────────

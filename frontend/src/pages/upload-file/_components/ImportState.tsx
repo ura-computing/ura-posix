@@ -114,8 +114,24 @@ function Success({
   docType, progress, filename, stockResult, onReset,
 }: { docType: DocType; progress: UploadProgress; filename: string; stockResult: UploadStockResult | null; onReset: () => void }) {
   const ring = `var(--color-doc-${docType})`;
-  const unknownCount = stockResult?.skipped_unknown.length ?? progress.skipped;
   const newMeds = progress.new_medicaments;
+
+  // Skip breakdown — stock surfaces unknowns via stockResult.skipped_unknown,
+  // achat/vente use the per-reason counters now populated by the backend.
+  const skipReasons: string[] = stockResult
+    ? (stockResult.skipped_unknown.length > 0
+        ? [`${formatQty(stockResult.skipped_unknown.length)} PID inconnus ignorés`]
+        : [])
+    : [
+        ...(progress.skipped_duplicate     ? [`${formatQty(progress.skipped_duplicate)} doublon(s) ignoré(s)`]            : []),
+        ...(progress.skipped_no_pid        ? [`${formatQty(progress.skipped_no_pid)} ligne(s) sans PID`]                  : []),
+        ...(progress.skipped_no_medicament ? [`${formatQty(progress.skipped_no_medicament)} médicament(s) introuvable(s)`] : []),
+      ];
+  // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
+  if (skipReasons.length === 0 && progress.skipped > 0) {
+    skipReasons.push(`${formatQty(progress.skipped)} ligne(s) ignorée(s)`);
+  }
+
   return (
     <div
       className="flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
@@ -127,10 +143,10 @@ function Success({
       <h3 className="text-xl font-semibold text-foreground">
         {formatQty(progress.inserted)} lignes importées
       </h3>
-      {unknownCount > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {formatQty(unknownCount)} {stockResult ? "PID inconnus ignorés" : "doublons ignorés"}
-        </p>
+      {skipReasons.length > 0 && (
+        <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground">
+          {skipReasons.map((r) => <li key={r}>{r}</li>)}
+        </ul>
       )}
       {newMeds && newMeds.count > 0 && (
         <div className="mt-1 flex w-full max-w-md flex-col gap-1.5 rounded-md border border-info-border bg-info-subtle px-4 py-3 text-left">

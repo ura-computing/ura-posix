@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, TriangleAlert } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TabBar } from "@/components/shared/TabBar";
@@ -22,14 +22,23 @@ const STATUS_TINT: Record<ImportBatchStatus, { bg: string; fg: string; label: st
 };
 
 
-export default function ParametresPage() {
+function relativeDate(iso: string): string {
+  const diffSec = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diffSec < 60)     return "à l'instant";
+  if (diffSec < 3600)   return `il y a ${Math.floor(diffSec / 60)} min`;
+  if (diffSec < 86_400) return `il y a ${Math.floor(diffSec / 3600)} h`;
+  return `il y a ${Math.floor(diffSec / 86_400)} j`;
+}
+
+
+export default function ImportsPage() {
   const [active, setActive] = useState("imports");
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Paramètres</h1>
-        <p className="text-sm text-muted-foreground">Gérez vos imports et préférences.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Gestion des imports</h1>
+        <p className="text-sm text-muted-foreground">Consultez et gérez l'historique de vos imports.</p>
       </header>
       <TabBar tabs={TABS} activeId={active} onChange={setActive} />
       <div>{active === "imports" && <ImportsTab />}</div>
@@ -55,6 +64,12 @@ function ImportsTab() {
     return <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">Aucun import pour l'instant.</div>;
   }
 
+  const confirmCopy = pendingRow
+    ? pendingRow.file_type === "stock"
+      ? `Marquer l'import « ${pendingRow.filename ?? "sans nom"} » comme supprimé ? Les niveaux de stock importés resteront en base — un import UPSERT ne peut pas être défait.`
+      : `Supprimer définitivement l'import « ${pendingRow.filename ?? "sans nom"} » ? Les ${pendingRow.rows_inserted} ligne(s) importée(s) seront retirées et l'entrée sera marquée comme supprimée.`
+    : "";
+
   return (
     <>
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -64,6 +79,7 @@ function ImportsTab() {
               <th className="px-4 py-2.5">Date</th>
               <th className="px-4 py-2.5">Type</th>
               <th className="px-4 py-2.5">Fichier</th>
+              <th className="px-4 py-2.5">Importé par</th>
               <th className="px-4 py-2.5 text-right">Lignes</th>
               <th className="px-4 py-2.5">Statut</th>
               <th className="px-4 py-2.5"></th>
@@ -71,9 +87,13 @@ function ImportsTab() {
           </thead>
           <tbody>
             {sorted.map((row) => {
+              const isDeleted = row.deleted_at !== null;
               const status = STATUS_TINT[row.status];
               return (
-                <tr key={row.id} className="border-b border-border last:border-0 hover:bg-surface-subtle/50">
+                <tr
+                  key={row.id}
+                  className={`border-b border-border last:border-0 ${isDeleted ? "bg-surface-subtle/40" : "hover:bg-surface-subtle/50"}`}
+                >
                   <td className="px-4 py-3 font-mono text-xs tabular-nums text-muted-foreground">
                     {new Date(row.imported_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
                   </td>
@@ -88,29 +108,53 @@ function ImportsTab() {
                       {TYPE_LABEL[row.file_type]}
                     </span>
                   </td>
-                  <td className="max-w-[280px] truncate px-4 py-3 text-foreground" title={row.filename ?? ""}>
+                  <td
+                    className={`max-w-[280px] truncate px-4 py-3 ${isDeleted ? "text-muted-foreground line-through" : "text-foreground"}`}
+                    title={row.filename ?? ""}
+                  >
                     {row.filename ?? <span className="italic text-muted-foreground">—</span>}
                   </td>
+                  <td className="px-4 py-3">
+                    {row.created_by_full_name || row.created_by_email ? (
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-foreground">{row.created_by_full_name ?? row.created_by_email}</span>
+                        {row.created_by_full_name && row.created_by_email && (
+                          <span className="text-xs text-muted-foreground">{row.created_by_email}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-xs tabular-nums">
-                    <span className="text-foreground">{formatQty(row.rows_inserted)}</span>
+                    <span className={isDeleted ? "text-muted-foreground" : "text-foreground"}>{formatQty(row.rows_inserted)}</span>
                     {row.rows_skipped > 0 && (
                       <span className="ml-1 text-muted-foreground">· {formatQty(row.rows_skipped)} ignorées</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${status.bg} ${status.fg}`}>
-                      {status.label}
-                    </span>
+                    {isDeleted ? (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">
+                        <TriangleAlert className="size-3" />
+                        Supprimé par {row.deleted_by_full_name ?? row.deleted_by_email ?? "—"} · {relativeDate(row.deleted_at!)}
+                      </span>
+                    ) : (
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${status.bg} ${status.fg}`}>
+                        {status.label}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setPendingRow(row)}
-                      className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
-                    >
-                      <Trash2 className="size-3.5" />
-                      Supprimer
-                    </button>
+                    {!isDeleted && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingRow(row)}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
+                      >
+                        <Trash2 className="size-3.5" />
+                        Supprimer
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
@@ -126,14 +170,10 @@ function ImportsTab() {
           if (!pendingRow) return;
           deleteImport(pendingRow.id, { onSuccess: () => setPendingRow(null) });
         }}
-        title="Supprimer cet import ?"
-        description={
-          pendingRow
-            ? `Cela supprimera l'audit + toutes les lignes (${TYPE_LABEL[pendingRow.file_type]}) importées par ce lot. Action irréversible.`
-            : ""
-        }
+        title={pendingRow?.file_type === "stock" ? "Marquer cet import comme supprimé ?" : "Supprimer cet import ?"}
+        description={confirmCopy}
         variant="destructive"
-        confirmLabel="Supprimer"
+        confirmLabel={pendingRow?.file_type === "stock" ? "Marquer supprimé" : "Supprimer"}
         loadingLabel="Suppression…"
         isLoading={isPending}
       />

@@ -42,6 +42,11 @@ export interface UploadProgress {
   total:    number;   // total chunks
   inserted: number;
   skipped:  number;
+  /** Per-reason skip breakdown for achat/vente (zero for stock — stock surfaces
+   *  unknowns via `UploadStockResult.skipped_unknown` already). */
+  skipped_no_pid?:        number;
+  skipped_no_medicament?: number;
+  skipped_duplicate?:     number;
   /** F19: products created during this import that weren't in the catalogue. */
   new_medicaments?: { count: number; sample: string[] };
 }
@@ -139,6 +144,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     let batchId: number | null = null;
     let inserted = 0;
     let skipped = 0;
+    let skippedNoPid = 0;
+    let skippedNoMed = 0;
+    let skippedDup   = 0;
     let newMedCount = 0;
     const newMedSample: string[] = [];
     const skippedUnknownAcc: { pid: string; product: string | null }[] = [];
@@ -177,7 +185,10 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             skippedUnknownAcc.push(item);
           }
         } else {
-          skipped += result.skipped;
+          skipped      += result.skipped;
+          skippedNoPid += result.skipped_no_pid;
+          skippedNoMed += result.skipped_no_medicament;
+          skippedDup   += result.skipped_duplicate;
         }
         if (result.new_medicaments) {
           newMedCount += result.new_medicaments.count;
@@ -190,6 +201,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           phase: "uploading",
           progress: {
             current: i + 1, total, inserted, skipped,
+            skipped_no_pid:        skippedNoPid,
+            skipped_no_medicament: skippedNoMed,
+            skipped_duplicate:     skippedDup,
             new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
           },
           batchId,
@@ -206,6 +220,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         phase: "success",
         progress: {
           current: total, total, inserted, skipped,
+          skipped_no_pid:        skippedNoPid,
+          skipped_no_medicament: skippedNoMed,
+          skipped_duplicate:     skippedDup,
           new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
         },
         batchId,

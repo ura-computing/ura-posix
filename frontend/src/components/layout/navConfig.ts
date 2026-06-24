@@ -65,7 +65,8 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const SETTINGS_ITEM: NavItem = {
-  label: "Paramètres", to: ROUTES.PARAMETRES, icon: Settings, roles: ALL, ready: true,
+  label: "Gestion des imports", to: ROUTES.IMPORTS, icon: Settings, roles: ALL, ready: true,
+  feature: "import",
 };
 
 export const ACCOUNT_ITEM: NavItem = {

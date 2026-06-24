@@ -40,7 +40,7 @@ export const ROUTES = {
   ALERTES:           "/alertes",
   COMPTABILITE:      "/comptabilite",
   PRODUITS_SPECIAUX: "/produits-speciaux",
-  PARAMETRES:        "/parametres",
+  IMPORTS:           "/imports",
 
   // Gestion
   OWNER_EMPLOYEES:   "/owner/employees",
@@ -308,7 +308,12 @@ export type ImportBatchStatus = "in_progress" | "success" | "cancelled" | "error
 /** Response from /v1/uploads/{achat|vente}{,-json} */
 export interface UploadTxResult {
   inserted: number;
-  skipped:  number;
+  skipped:  number;              // total = no_pid + no_medicament + duplicate
+  /** Per-reason breakdown so the post-upload card can show an honest cause
+   *  instead of blaming every skip on "doublons". */
+  skipped_no_pid:        number;
+  skipped_no_medicament: number;
+  skipped_duplicate:     number;
   batch_id: number;
   /** F19: products that didn't exist in the catalogue and were created during
    *  this import. Owner sees them as "needs admin classification" — they'll
@@ -340,16 +345,23 @@ export interface BatchPatchResult {
   deleted_rows:   number;
 }
 
-/** A row from GET /v1/data/imports — drives the /parametres Imports tab. */
+/** A row from GET /v1/data/imports — drives the /imports page. */
 export interface DataImport {
-  id:             number;
-  file_type:      DocType;
-  filename:       string | null;
-  rows_inserted:  number;
-  rows_skipped:   number;
-  status:         ImportBatchStatus;
-  error_message:  string | null;
-  imported_at:    string;
+  id:                    number;
+  file_type:             DocType;
+  filename:              string | null;
+  rows_inserted:         number;
+  rows_skipped:          number;
+  status:                ImportBatchStatus;
+  error_message:         string | null;
+  imported_at:           string;
+  /** Who did the import. NULL for pre-migration batches. */
+  created_by_full_name:  string | null;
+  created_by_email:      string | null;
+  /** Soft-delete audit. `deleted_at` set ⇒ the row renders as history. */
+  deleted_at:            string | null;
+  deleted_by_full_name:  string | null;
+  deleted_by_email:      string | null;
 }
 
 export interface DataImportsResponse {

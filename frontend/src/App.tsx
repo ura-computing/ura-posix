@@ -15,7 +15,7 @@ import SetPasswordPage from "@/pages/auth/setPassword";
 import HomePage from "@/pages/home";
 import LoginPage from "@/pages/login";
 import NotFoundPage from "@/pages/notFound";
-import ParametresPage from "@/pages/parametres";
+import ImportsPage from "@/pages/imports";
 import RapportPage from "@/pages/rapport";
 import AchatsPage from "@/pages/achats";
 import AlertesPage from "@/pages/alertes";
@@ -42,12 +42,12 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path={ROUTES.RAPPORT}    element={<RapportPage />} />
         <Route path={ROUTES.ALERTES}    element={<AlertesPage />} />
-        <Route path={ROUTES.PARAMETRES} element={<ParametresPage />} />
         <Route path={ROUTES.ME}         element={<MePage />} />
 
         {/* Feature-gated routes — admin bypasses; non-admin without the
             feature in their effective permission set redirects to /404. */}
         <Route element={<RequireFeature feature="import" />}>
+          <Route path={ROUTES.IMPORTS}     element={<ImportsPage />} />
           <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
         </Route>
         <Route element={<RequireFeature feature="achats" />}>

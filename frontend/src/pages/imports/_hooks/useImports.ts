@@ -28,8 +28,8 @@ export function useDeleteImport() {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.IMPORTS });
       toast.success(
         res.deleted_rows > 0
-          ? `Import supprimé · ${res.deleted_rows} ligne(s) effacée(s)`
-          : "Import supprimé",
+          ? `Import marqué supprimé · ${res.deleted_rows} ligne(s) effacée(s)`
+          : "Import marqué supprimé",
       );
     },
     onError: (err: ApiErr) => {

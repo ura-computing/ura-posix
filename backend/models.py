@@ -139,15 +139,20 @@ class ImportBatch(Base):
     """
     __tablename__ = "import_batches"
 
-    id:            Mapped[int]      = mapped_column(Integer, primary_key=True)
-    pharmacy_id:   Mapped[int]      = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
-    file_type:     Mapped[str]      = mapped_column(String, nullable=False)         # achat | vente | stock
-    filename:      Mapped[str | None] = mapped_column(String, nullable=True)
-    rows_inserted: Mapped[int]      = mapped_column(Integer, default=0, nullable=False)
-    rows_skipped:  Mapped[int]      = mapped_column(Integer, default=0, nullable=False)
-    status:        Mapped[str]      = mapped_column(String, nullable=False, default="success")
-    error_message: Mapped[str | None] = mapped_column(String, nullable=True)
-    imported_at:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    id:                 Mapped[int]            = mapped_column(Integer, primary_key=True)
+    pharmacy_id:        Mapped[int]            = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
+    file_type:          Mapped[str]            = mapped_column(String, nullable=False)         # achat | vente | stock
+    filename:           Mapped[str | None]     = mapped_column(String, nullable=True)
+    rows_inserted:      Mapped[int]            = mapped_column(Integer, default=0, nullable=False)
+    rows_skipped:       Mapped[int]            = mapped_column(Integer, default=0, nullable=False)
+    status:             Mapped[str]            = mapped_column(String, nullable=False, default="success")
+    error_message:      Mapped[str | None]     = mapped_column(String, nullable=True)
+    imported_at:        Mapped[datetime]       = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Audit columns added in migration 0014. Soft-delete: a non-NULL `deleted_at`
+    # marks the batch as removed but keeps the row visible on /imports as history.
+    created_by_user_id: Mapped[int | None]     = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True, index=True)
+    deleted_at:         Mapped[datetime | None]= mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by_user_id: Mapped[int | None]     = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
 
 
 class Achat(Base):

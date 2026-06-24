@@ -6,7 +6,7 @@ import { PharmagestWordmark } from "@/components/shared/PharmagestWordmark";
 import { Tooltip } from "@/components/shared/Tooltip";
 import { useUnclassifiedCount } from "@/hooks/adminCatalog";
 import { useLogout } from "@/hooks/useLogout";
-import { ROUTES } from "@/types";
+import { ROLES, ROUTES } from "@/types";
 import type { Role } from "@/types";
 import { cn } from "@/utils/cn";
 
@@ -158,7 +158,9 @@ export function Sidebar({
         </nav>
 
         <div className="flex shrink-0 flex-col gap-0.5 border-t border-border p-2.5">
-          <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
+          {(role === ROLES.ADMIN || !SETTINGS_ITEM.feature || permissions.includes(SETTINGS_ITEM.feature)) && (
+            <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
+          )}
           <NavRow item={ACCOUNT_ITEM} collapsed={collapsed} />
           <Tooltip label={collapsed ? "Déconnexion" : ""} placement="right" className="relative block">
             <button
