@@ -1,4 +1,0 @@
-PID;Produit;TVA;PPH;PPV;Catégorie;Zone;Stock;Stock min;Stock max;Date de péremption
-TEST001;DOLIPRANE TEST 500MG;TVA (20.00%);12.50;15.00;Médicaments (10%);Zone A;9;5;30;2027-12-31
-TEST002;EFFERALGAN TEST 1000MG;TVA (10.00%);8.20;11.50;Médicaments (10%);Zone A;3;3;20;2027-06-30
-TEST003;PARAPHARMA TEST CREME;TVA (20.00%);45.00;65.00;Parapharmacie (33.33%);Zone B;1;1;10;2028-01-31
