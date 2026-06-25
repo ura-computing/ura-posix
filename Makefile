@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help dev backend frontend cli migrate seed db demo down clean logs
+.PHONY: help dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks
 
 help:
 	@echo "PharmaGest commands:"
@@ -23,6 +23,13 @@ help:
 	@echo "    make down      — stop containers (DB volume survives)"
 	@echo "    make logs      — tail container logs"
 	@echo "    make clean     — DESTRUCTIVE: stop + wipe the demo DB volume"
+	@echo ""
+	@echo "  Tests + git hooks:"
+	@echo "    make test          — backend (pytest) + frontend (vitest) suites"
+	@echo "    make test-backend  — backend pytest only"
+	@echo "    make test-frontend — frontend vitest only"
+	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
+	@echo "                         (run once per clone; bypass with git push --no-verify)"
 
 # ── Local dev (dockerized Postgres + host-side backend/frontend) ────────────
 
@@ -89,3 +96,16 @@ logs:
 clean:
 	docker compose down -v
 	@echo "✓ Volume removed. Next `make demo` starts from an empty DB."
+
+# ── Tests + git hooks ──────────────────────────────────────────────────────
+
+test: test-backend test-frontend
+
+test-backend:
+	cd $(BACKEND_DIR) && uv run pytest
+
+test-frontend:
+	cd $(FRONTEND_DIR) && npm test -- --run
+
+install-hooks:
+	@bash scripts/install-hooks.sh
