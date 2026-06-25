@@ -28,10 +28,32 @@ PY
 #    `make migrate` — single source of truth in bootstrap.py.
 uv run python bootstrap.py
 
-# 4. Seed admin + owner + catalog. Idempotent — checks for admin email before
-#    inserting anything.
-echo "▸ Seeding accounts + catalogue…"
-uv run python seed.py
+# 4. Seed admin + owner + catalog. Idempotent: seed.py self-skips if the
+#    admin user already exists. We short-circuit here too so the container
+#    doesn't even open a session when there's clearly nothing to seed —
+#    bootstrap.py already touched the DB and proved tables exist.
+NEEDS_SEED=$(uv run python <<'PY'
+from sqlalchemy import inspect
+from database import engine, SessionLocal
+from models import User
+
+if not inspect(engine).has_table("users"):
+    print("yes")
+else:
+    db = SessionLocal()
+    try:
+        print("no" if db.query(User).filter(User.role == "admin").first() else "yes")
+    finally:
+        db.close()
+PY
+)
+
+if [ "$NEEDS_SEED" = "yes" ]; then
+  echo "▸ Seeding accounts + catalogue…"
+  uv run python seed.py
+else
+  echo "▸ Admin already present — skipping seed (data preserved)."
+fi
 
 # 5. Serve.
 echo "▸ Starting uvicorn on :${PORT:-8000}"

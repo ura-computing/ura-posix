@@ -1,16 +1,19 @@
 """Shared schema bootstrap — called by docker entrypoint AND `make migrate`.
 
-The 10 alembic migrations assume the base apcm-pharma tables already exist
+The 16 alembic migrations assume the base apcm-pharma tables already exist
 (0001 adds `pharmacies.version`, 0002 adds user columns, etc.). On a TRULY
-FRESH DB this fails — there's no `pharmacies` table to alter. Two paths:
+FRESH DB this fails — there's no `pharmacies` table to alter. Three paths:
 
-  • DB already has `pharmacies` (old apcm-pharma DB OR refactor DB) →
-    `alembic upgrade head` brings it to current head. Idempotent: existing
-    tables stay, add_column adds missing columns, has_table guards in 0006
-    skip already-created tables.
-  • Fresh empty DB → `Base.metadata.create_all()` creates everything at the
-    current model shape, then `alembic stamp head` marks the DB as up-to-date
-    so future migrations apply correctly.
+  • FRESH (no `pharmacies` table) → `Base.metadata.create_all()` creates
+    everything at the current model shape, then `alembic stamp head` marks
+    the DB as up-to-date so future migrations apply correctly.
+  • LEGACY (tables exist but no `alembic_version` table — old volumes from
+    before alembic was wired) → `create_all()` is idempotent for existing
+    tables; we use it to add any tables that are new in the current models,
+    then `alembic stamp head` to enroll the volume in the migration system.
+    No data loss.
+  • MANAGED (alembic_version present) → `alembic upgrade head` applies only
+    pending migrations. Idempotent. No data loss.
 
 Also CREATEs `pg_trgm` + `unaccent` extensions (idempotent — IF NOT EXISTS).
 Run from the `backend/` directory; relies on database/models imports."""
@@ -52,13 +55,31 @@ def main() -> None:
     print("▸ Bootstrapping schema…")
     _ensure_extensions()
 
-    if inspect(engine).has_table("pharmacies"):
-        print("  ↳ existing tables detected → alembic upgrade head")
-        _run_alembic("upgrade")
-    else:
+    insp = inspect(engine)
+    has_pharmacies = insp.has_table("pharmacies")
+    has_alembic    = insp.has_table("alembic_version")
+
+    # 3-way classification — all branches are NON-DESTRUCTIVE; data persists
+    # across container restarts.
+    if not has_pharmacies:
+        # FRESH DB. Create from current models then mark caught up so future
+        # migrations apply normally.
         print("  ↳ empty DB → create_all + stamp head")
         Base.metadata.create_all(bind=engine)
         _run_alembic("stamp")
+    elif not has_alembic:
+        # LEGACY DB — tables exist but alembic was never wired (or the volume
+        # predates alembic adoption). Aligning additively (create_all is a
+        # no-op for existing tables) + stamping head lets FUTURE migrations
+        # apply cleanly without re-running old ones. Data preserved.
+        print("  ↳ legacy DB (no alembic_version) → align + stamp head")
+        Base.metadata.create_all(bind=engine)
+        _run_alembic("stamp")
+    else:
+        # MANAGED DB — alembic_version present. Apply pending migrations only.
+        # Idempotent: alembic skips revisions already in alembic_version.
+        print("  ↳ managed DB → alembic upgrade head")
+        _run_alembic("upgrade")
 
 
 if __name__ == "__main__":

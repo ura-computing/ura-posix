@@ -72,14 +72,21 @@ seed: db migrate
 	cd $(BACKEND_DIR) && uv run python seed.py
 
 # ── Docker demo (client-shippable) ──────────────────────────────────────────
-# Boots postgres + backend + frontend via docker-compose. The backend's
-# entrypoint runs `alembic upgrade head` (idempotent against the old apcm-pharma
-# schema) + `seed.py` (idempotent — skips if admin already exists).
+# Boots postgres + backend + frontend via docker-compose. Re-runs are safe:
+# the backend's entrypoint inspects DB state and chooses the right path —
+#
+#   • empty volume        → create_all + alembic stamp head + seed
+#   • legacy volume       → align schema + alembic stamp head, seed skipped
+#                           (no alembic_version table yet — see bootstrap.py)
+#   • managed volume      → alembic upgrade head (pending migrations only),
+#                           seed skipped — DATA PRESERVED across the upgrade
+#
+# `make clean` is the only path that wipes data (drops the docker volume).
 
 demo:
 	@cp env/demo/docker.env .env
 	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend
-	@echo "▸ Building containers + applying migrations + seeding…"
+	@echo "▸ Building containers + bootstrapping schema (smart)…"
 	@docker compose up -d --build --wait
 	@echo ""
 	@echo "✓ Demo ready:"
