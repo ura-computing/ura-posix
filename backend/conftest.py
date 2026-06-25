@@ -101,6 +101,15 @@ def _bootstrap_test_db() -> Iterator[None]:
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit() -> None:
+    """slowapi's in-memory limiter persists across tests (same process). The
+    auth_owner / auth_employee fixtures each call /login; a few tests that
+    create multiple fixtures hit the 5/min cap. Reset between tests."""
+    from rate_limit import limiter
+    limiter.reset()
+
+
 # ── 3. Per-test DB session with SAVEPOINT rollback ─────────────────────────
 
 @pytest.fixture(scope="session")
