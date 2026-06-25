@@ -17,7 +17,10 @@ import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
 export function makeQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      // gcTime: Infinity — keep observer-less seeded queries alive long enough
+      // for invalidation assertions. Each test builds a fresh QueryClient, so
+      // there's no cross-test cache leak.
+      queries: { retry: false, gcTime: Infinity, staleTime: 0 },
       mutations: { retry: false },
     },
   });
