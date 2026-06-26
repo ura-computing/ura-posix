@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 //   usePeremptions()                 -> listPeremptions()
 import { useStockAbcd, usePeremptions } from "@/hooks/stats";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import type { DialogDescriptor } from "@/pages/alertes/_hooks/useAlertesPage";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
 
@@ -39,6 +40,9 @@ export function useStockPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // Peremption-card → product-list dialog. Same DialogDescriptor type as
+  // /alertes uses so the shared <AlertDetailDialog/> wires up identically.
+  const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
   /** Table renders only when at least one of these is active. */
   const hasTableFilter =
@@ -168,6 +172,10 @@ export function useStockPage() {
     clearAll,
     closeTable,
     handleExport,
+    // peremption dialog
+    dialog,
+    openDialog:  setDialog,
+    closeDialog: () => setDialog(null),
   };
 }
 

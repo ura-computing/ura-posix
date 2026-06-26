@@ -74,16 +74,17 @@ export function useAlertesPage() {
   const counts = {
     marginNeg: margin?.negative.count ?? 0,
     marginLow: margin?.low.count ?? 0,
-    expired: perem?.expired.count ?? 0,
-    veryClose: perem?.very_close.count ?? 0,
-    close: perem?.close.count ?? 0,
-    negatif: negatif.length,
+    expired:   perem?.expired.count ?? 0,
+    near2w:    perem?.near_2w.count  ?? 0,
+    near1m:    perem?.near_1m.count  ?? 0,
+    negatif:   negatif.length,
     sousStock: sousStock.length,
-    surStock: surStock.length,
+    surStock:  surStock.length,
   };
-  // total over the 8 ACTIONABLE brackets — no_date (data-quality) is excluded
+  // Total actionable alerts across the 8 brackets.
   const totalAlerts = Object.values(counts).reduce((a, b) => a + b, 0);
-  const peremptionCritical = counts.expired + counts.veryClose;
+  // Expired + within-2-weeks = the "act today" subset.
+  const peremptionCritical = counts.expired + counts.near2w;
 
   const isLoading = marginQuery.isLoading || peremptionsQuery.isLoading || stockQuery.isLoading;
   const isError = marginQuery.isError || peremptionsQuery.isError || stockQuery.isError;

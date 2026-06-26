@@ -23,7 +23,8 @@ function MiniStat({ label, value }: { label: string; value: ReactNode }) {
 }
 
 export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
-  // `no_date` (PG-008) is surfaced here (NOT on /stock); slate tone = data-quality, not urgency.
+  // 3 mutually-exclusive cards, most urgent first. Products with no expiry
+  // date in the Sobrus export are silently dropped backend-side.
   const cards: {
     key:         keyof PeremptionsResponse;
     tone:        IconTone;
@@ -32,10 +33,9 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
     dlgTitle:    string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired",    tone: "error",   title: "Périmés",              sub: "Action urgente", dlgTitle: "Produits expirés",                       dlgSubtitle: "Date de péremption dépassée" },
-    { key: "very_close", tone: "warning", title: "Très proches périmés", sub: "< 6 mois",       dlgTitle: "Péremption très proche (<6 mois)",       dlgSubtitle: "Expiration dans moins de 6 mois" },
-    { key: "close",      tone: "warning", title: "Proches périmés",      sub: "6-12 mois",      dlgTitle: "Péremption proche (6-12 mois)",          dlgSubtitle: "Expiration dans 6 à 12 mois" },
-    { key: "no_date",    tone: "slate",   title: "Sans date",            sub: "À renseigner",   dlgTitle: "Produits sans date de péremption",       dlgSubtitle: "Date de péremption non renseignée" },
+    { key: "expired", tone: "error",   title: "Périmés",      sub: "Action urgente",   dlgTitle: "Produits expirés",          dlgSubtitle: "Date de péremption dépassée" },
+    { key: "near_2w", tone: "warning", title: "≤ 2 semaines", sub: "Très urgent",      dlgTitle: "Péremption ≤ 2 semaines",   dlgSubtitle: "Expiration dans les 14 prochains jours" },
+    { key: "near_1m", tone: "warning", title: "≤ 1 mois",     sub: "À surveiller",     dlgTitle: "Péremption ≤ 1 mois",       dlgSubtitle: "Expiration entre 15 et 30 jours" },
   ];
 
   return (
@@ -48,7 +48,7 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => {
           const b: PeremptionBracket | undefined = data?.[c.key];
           const count = b?.count ?? 0;

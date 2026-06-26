@@ -153,11 +153,11 @@ class StockAbcdResponse(BaseModel):
     products:        list[StockRow]
 
 
-# ── Peremptions — 4 brackets by expiry proximity ────────────────────────────
+# ── Peremptions — 3 mutually-exclusive expiry-proximity buckets ─────────────
 
 class PeremptionProduct(BaseModel):
     product:     str
-    expiry_date: str | None
+    expiry_date: str
     quantity:    int
     ppv:         float
 
@@ -171,10 +171,11 @@ class PeremptionBracket(BaseModel):
 
 
 class PeremptionsResponse(BaseModel):
-    expired:    PeremptionBracket
-    very_close: PeremptionBracket
-    close:      PeremptionBracket
-    no_date:    PeremptionBracket
+    """Tightened pharmacy-ops horizon. NULL-expiry products are silently
+    skipped (Sobrus sometimes omits the date)."""
+    expired: PeremptionBracket    # expiry_date < today
+    near_2w: PeremptionBracket    # today ≤ expiry_date ≤ today + 14d
+    near_1m: PeremptionBracket    # today + 14d < expiry_date ≤ today + 30d
 
 
 # ── Analyse de marge — 8 modes (Page 11) ─────────────────────────────────────

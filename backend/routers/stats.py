@@ -224,8 +224,9 @@ def get_stock_abcd(
 
 @router.get("/stats/peremptions", response_model=PeremptionsResponse)
 def get_peremptions(user: CurrentUserDep, db: DbDep) -> dict:
-    """4 brackets by expiry proximity: expired / very_close (<6mo) / close (6-12mo)
-    / no_date (PG-008 — products without an expiry date)."""
+    """3 mutually-exclusive expiry-proximity buckets: expired / near_2w (≤14d)
+    / near_1m (>14d and ≤30d). Products with NULL expiry_date are skipped
+    silently — Sobrus sometimes omits the date in the stock export."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
     return compute_peremptions(db, pharmacy_id)
 

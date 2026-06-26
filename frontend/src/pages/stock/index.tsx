@@ -3,6 +3,7 @@ import { AlertCircle, Download, Package, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
+import { AlertDetailDialog } from "@/pages/alertes/_components/AlertDetailDialog";
 import { ROUTES } from "@/types";
 
 import { AbcdAnalysisCard } from "./_components/AbcdAnalysisCard";
@@ -135,9 +136,24 @@ export default function StockPage() {
 
           <AlertCardsGrid products={s.fullProducts} />
 
-          {s.peremptionsQuery.data && <PeremptionsSection data={s.peremptionsQuery.data} />}
+          {s.peremptionsQuery.data && (
+            <PeremptionsSection data={s.peremptionsQuery.data} onOpen={s.openDialog} />
+          )}
         </>
       )}
+
+      {/* shared detail dialog (portal) — same pattern as /alertes */}
+      <AlertDetailDialog
+        open={!!s.dialog}
+        onClose={s.closeDialog}
+        title={s.dialog?.title ?? ""}
+        subtitle={s.dialog?.subtitle}
+        products={s.dialog?.products ?? []}
+        columns={s.dialog?.columns ?? []}
+        defaultSortKey={s.dialog?.defaultSortKey ?? ""}
+        dateFrom={s.dateFrom}
+        dateTo={s.dateTo}
+      />
     </div>
   );
 }

@@ -537,7 +537,7 @@ export interface StockFilters {
 
 export interface PeremptionProduct {
   product:     string;
-  expiry_date: string | null;
+  expiry_date: string;
   quantity:    number;
   ppv:         number;
 }
@@ -550,11 +550,12 @@ export interface PeremptionBracket {
   products:       PeremptionProduct[];
 }
 
+/** 3 mutually-exclusive expiry-proximity buckets. NULL-expiry rows are
+ *  dropped by the backend — they don't appear here. */
 export interface PeremptionsResponse {
-  expired:    PeremptionBracket;
-  very_close: PeremptionBracket;
-  close:      PeremptionBracket;
-  no_date:    PeremptionBracket;
+  expired: PeremptionBracket;    // expiry_date < today
+  near_2w: PeremptionBracket;    // today ≤ expiry ≤ today + 14d
+  near_1m: PeremptionBracket;    // today + 14d < expiry ≤ today + 30d
 }
 
 

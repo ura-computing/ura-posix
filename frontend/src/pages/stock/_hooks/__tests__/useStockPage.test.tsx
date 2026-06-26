@@ -104,4 +104,21 @@ describe("useStockPage", () => {
     // 2 ideal / 3 with status (excluding "inconnu") × 10 = 6.66…
     expect(result.current.healthScore).toBeCloseTo((2 / 3) * 10);
   });
+
+  test("openDialog stores the descriptor", () => {
+    const { result } = renderHookWithProviders(() => useStockPage());
+    act(() => result.current.openDialog({
+      title: "Périmés", products: [], columns: [], defaultSortKey: "expiry_date",
+    }));
+    expect(result.current.dialog?.title).toBe("Périmés");
+  });
+
+  test("closeDialog resets the descriptor to null", () => {
+    const { result } = renderHookWithProviders(() => useStockPage());
+    act(() => result.current.openDialog({
+      title: "X", products: [], columns: [], defaultSortKey: "expiry_date",
+    }));
+    act(() => result.current.closeDialog());
+    expect(result.current.dialog).toBeNull();
+  });
 });
