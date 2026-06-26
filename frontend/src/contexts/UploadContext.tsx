@@ -305,12 +305,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   }, [patchJob]);
 
   const dismissJob = useCallback<UploadCtxValue["dismissJob"]>((id) => {
-    setJobs((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
+    if (!jobsRef.current.has(id)) return;
+    const next = new Map(jobsRef.current);
+    next.delete(id);
+    // Ref + state must stay in lockstep: `getJobByDocType` reads the ref, so
+    // skipping this line would leave the dismissed job visible to the
+    // upload wizard → "Nouvel import" wouldn't navigate.
+    jobsRef.current = next;
+    setJobs(next);
   }, []);
 
   const getJobByDocType = useCallback<UploadCtxValue["getJobByDocType"]>(

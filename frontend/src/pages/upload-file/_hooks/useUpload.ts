@@ -55,6 +55,15 @@ export function useUpload(initialDocType: DocType | null = null) {
   const [allRows,      setAllRows] = useState<Record<string, string>[]>([]);
   const [filenameError, setFilenameError] = useState<string | null>(null);
 
+  // One-shot "user clicked Nouvel import while the upload was running"
+  // marker. Suppresses the rehydration card *for this mount only* so the
+  // wizard goes back to the picker. Cleared when the user picks a type
+  // (entering the wizard for that type means they want to see its card).
+  // On next page mount (real navigation), this resets to false — the
+  // global UploadContext still tracks the running job and the indicator
+  // bubble in the layout keeps showing progress.
+  const [dismissedRunningCard, setDismissedRunningCard] = useState(false);
+
   // ── Per-doc-type rehydration ─────────────────────────────────────────────
   // The wizard for `type=achat` cares only about achat jobs; it must NOT
   // show a running stock job's state card (which would render blank because
@@ -63,9 +72,9 @@ export function useUpload(initialDocType: DocType | null = null) {
 
   // Render priority: local file-preview > active/recent job for this docType > wizard
   // - localStep=3 + file: user is on the confirmation step with a freshly-picked file
-  // - else if job:        show the rehydrated job's state card
+  // - else if job (and not session-dismissed): show the rehydrated job's state card
   // - else:               normal wizard step 1 or 2
-  const showJobCard = !file && job !== null;
+  const showJobCard = !file && job !== null && !dismissedRunningCard;
   const step:    Step           = showJobCard ? 3 : localStep;
   const docType: DocType | null = localDocType;
 
@@ -75,6 +84,9 @@ export function useUpload(initialDocType: DocType | null = null) {
   const pickType = useCallback((t: DocType) => {
     setDocType(t);
     setStep(2);
+    // Picking a type means "I want this type's wizard" — re-show its job
+    // card if one exists, so the user can monitor / dismiss / cancel it.
+    setDismissedRunningCard(false);
   }, []);
 
   const backToType = useCallback(() => {
@@ -128,10 +140,21 @@ export function useUpload(initialDocType: DocType | null = null) {
     if (job) upload.cancelUpload(job.id);
   }, [job, upload]);
 
-  /** Dismiss the rehydrated job's card and reset the wizard to step 1. Used
-   *  by the success card's "Nouvel import" button. */
+  /** "Nouvel import" — return to step 1, like any normal navigation.
+   *  • If the job is still in flight: leave it running in the global
+   *    UploadContext (the indicator bubble keeps showing it) and just
+   *    hide its card for this mount via `dismissedRunningCard`.
+   *  • If the job is finished (success / error / cancelled): dismiss its
+   *    card from the global state so navigating back doesn't keep
+   *    showing a stale outcome. */
   const reset = useCallback(() => {
-    if (job) upload.dismissJob(job.id);
+    if (job) {
+      if (job.phase === "queued" || job.phase === "uploading") {
+        setDismissedRunningCard(true);
+      } else {
+        upload.dismissJob(job.id);
+      }
+    }
     backToType();
   }, [job, upload, backToType]);
 

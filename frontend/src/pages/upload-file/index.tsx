@@ -54,11 +54,34 @@ const TYPE_FEATURE: Record<DocType, Feature> = {
 
 
 export default function UploadFilePage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const typeFromUrl = parseTypeParam(searchParams.get("type"));
 
   const u = useUpload(typeFromUrl);
   const { pickType } = u;
+
+  // Card-click handler: pick the type AND mirror it into ?type=... so the URL
+  // stays a shareable deep-link to the active step. `replace: true` avoids
+  // polluting the browser back-stack with every card toggle.
+  const handlePickType = (t: DocType) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("type", t);
+      return next;
+    }, { replace: true });
+    pickType(t);
+  };
+
+  // Back-to-step-1 also clears ?type= so the URL doesn't lie about the
+  // active step. Pairs with handlePickType to keep URL ↔ wizard in sync.
+  const handleBackToType = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("type");
+      return next;
+    }, { replace: true });
+    u.backToType();
+  };
 
   const { me } = useMe();
   const allowedTypes = useMemo<DocType[]>(() => {
@@ -115,7 +138,7 @@ export default function UploadFilePage() {
                     columns={meta.columns}
                     totalCols={meta.columns.length}
                     selected={u.docType === t}
-                    onSelect={() => u.pickType(t)}
+                    onSelect={() => handlePickType(t)}
                   />
                 );
               })}
@@ -124,7 +147,7 @@ export default function UploadFilePage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => u.docType && u.pickType(u.docType)}
+              onClick={() => u.docType && handlePickType(u.docType)}
               disabled={!u.docType}
               className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -140,7 +163,7 @@ export default function UploadFilePage() {
         <section className="flex flex-col gap-4">
           <button
             type="button"
-            onClick={u.backToType}
+            onClick={handleBackToType}
             className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" />
