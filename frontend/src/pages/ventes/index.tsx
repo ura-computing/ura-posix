@@ -5,6 +5,7 @@ import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import { ROUTES } from "@/types";
 import { formatMAD } from "@/utils/format";
 
+import { DiscountGauge }    from "./_components/DiscountGauge";
 import { SurveillanceTabs } from "./_components/SurveillanceTabs";
 import { VentesTable }      from "./_components/VentesTable";
 import { useVentesPage }    from "./_hooks/useVentesPage";
@@ -75,6 +76,8 @@ export default function VentesPage() {
         activeFilters={activeFilters}
         onResetAll={p.reset}
       />
+
+      <DiscountGauge data={p.discountSummary} />
 
       {/* Surveillance tabs */}
       <SurveillanceTabs active={p.filters.surveillance} counts={p.counts} onSelect={p.setSurveillance} />

@@ -4,8 +4,8 @@ import { toast } from "sonner";
 
 import {
   exportVentes,
-  listVentes, listVentesCategories, listVentesSuggestions,
-  listVentesSurveillanceCounts, listVentesTvaRates,
+  listVentes, listVentesCategories, listVentesDiscountSummary,
+  listVentesSuggestions, listVentesSurveillanceCounts, listVentesTvaRates,
 } from "@/api/transactions";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
@@ -73,6 +73,18 @@ export function useVentesPage() {
     queryKey: QUERY_KEYS.VENTES_SUGGESTIONS(suggestQ),
     queryFn:  () => listVentesSuggestions(suggestQ),
     enabled:  suggestQ.length >= 2,
+    staleTime: 60_000,
+  });
+
+  // Discount gauge: key on the filter axes the endpoint actually reads
+  // (pagination + sort + surveillance ignored). Same trim as the API client.
+  const discountKey = useMemo(() => {
+    const { page: _p, limit: _l, sort_by: _sb, sort_order: _so, surveillance: _s, ...rest } = filters;
+    return rest;
+  }, [filters]);
+  const discountSummaryQ = useQuery({
+    queryKey: QUERY_KEYS.VENTES_DISCOUNT_SUMMARY(discountKey),
+    queryFn:  () => listVentesDiscountSummary(filters),
     staleTime: 60_000,
   });
 
@@ -153,6 +165,7 @@ export function useVentesPage() {
     isLoading:   list.isLoading,
     isError:     list.isError,
     counts:      counts.data,
+    discountSummary: discountSummaryQ.data,
     categories:  categories.data ?? [],
     tvaRates:    tvaRates.data ?? [],
     suggestions: suggestions.data ?? null,

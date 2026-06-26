@@ -38,6 +38,7 @@ from schemas.transactions import (
     VentesListResponse,
     VentesSuggestions,
     VentesSummary,
+    VentesDiscountSummary,
     VentesSurveillanceCounts,
     paginate,
 )
@@ -664,4 +665,47 @@ def vente_surveillance_counts(
         "marge_negative": n_neg,
         "marge_low":      n_low,
         "remises_high":   n_rem,
+    }
+
+
+# ─── GET /ventes/discount-summary ────────────────────────────────────────────
+
+@router.get("/ventes/discount-summary", response_model=VentesDiscountSummary)
+def vente_discount_summary(
+    user: CurrentUserDep,
+    db:   DbDep,
+    date_from: DateFromQ      = None,
+    date_to:   DateToQ        = None,
+    search:    SearchQ        = None,
+    category:  CategoryMultiQ = None,
+    tva:       TvaMultiQ      = None,
+) -> dict:
+    """Split the filtered ventes set into discounted vs full-price aggregates.
+    Drives the /ventes remise-discipline gauge: high discounted share = the
+    team is giving away margin too often. Mirrors achat_supplier_summary
+    structure (MAD + count + units per side, NO surveillance filter)."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
+    base = _apply_vente_filters(
+        db.query(Vente), pharmacy_id,
+        date_from=date_from, date_to=date_to, search=search,
+        category=category, tva=tva, include_non_declared=True,
+    )
+
+    is_discounted = (Vente.discount.isnot(None)) & (Vente.discount > 0)
+
+    def _agg(filter_clause) -> dict:
+        row = base.with_entities(
+            func.coalesce(func.sum(Vente.total),    0.0).label("total"),
+            func.coalesce(func.sum(Vente.quantity), 0.0).label("units"),
+            func.count(Vente.id).label("lines"),
+        ).filter(filter_clause).one()
+        return {
+            "total_mad":  float(row.total or 0.0),
+            "unit_count": float(row.units or 0.0),
+            "count":      int(row.lines or 0),
+        }
+
+    return {
+        "discounted": _agg(is_discounted),
+        "full_price": _agg(~is_discounted),
     }

@@ -1,5 +1,6 @@
 /** Tests for useVentesPage — same shape as useAchatsPage tests with the
  *  surveillance + include_non_declared filter additions. */
+import { waitFor } from "@testing-library/react";
 import { act } from "react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, test } from "vitest";
@@ -16,6 +17,10 @@ beforeEach(() => {
     http.get("*/v1/ventes/tva-rates",             () => HttpResponse.json([])),
     http.get("*/v1/ventes/suggestions",           () => HttpResponse.json({ items: [] })),
     http.get("*/v1/ventes/surveillance-counts",   () => HttpResponse.json({})),
+    http.get("*/v1/ventes/discount-summary",      () => HttpResponse.json({
+      discounted: { total_mad: 0, count: 0, unit_count: 0 },
+      full_price: { total_mad: 0, count: 0, unit_count: 0 },
+    })),
   );
 });
 
@@ -50,6 +55,17 @@ describe("useVentesPage", () => {
     expect(result.current.filters.sort_order).toBe("desc");
     act(() => result.current.setSort("ppv"));
     expect(result.current.filters.sort_order).toBe("asc");
+  });
+
+  test("discount-summary surfaces on hook output", async () => {
+    server.use(http.get("*/v1/ventes/discount-summary", () => HttpResponse.json({
+      discounted: { total_mad: 120, count: 2, unit_count: 4 },
+      full_price: { total_mad: 380, count: 5, unit_count: 11 },
+    })));
+    const { result } = renderHookWithProviders(() => useVentesPage());
+    await waitFor(() => expect(result.current.discountSummary).toBeTruthy());
+    expect(result.current.discountSummary?.discounted.total_mad).toBe(120);
+    expect(result.current.discountSummary?.full_price.count).toBe(5);
   });
 
   test("reset clears local + global date range", () => {

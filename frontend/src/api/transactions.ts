@@ -1,6 +1,7 @@
 import { api } from "@/api/client";
 import type {
   AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary,
+  VentesDiscountSummary,
   VentesFilters, VentesListResponse, VentesSuggestions, VentesSurveillanceCounts,
 } from "@/types";
 
@@ -51,6 +52,15 @@ export function listVentesSurveillanceCounts(filters: Partial<VentesFilters>): P
   // Counts share the same filter shape but ignore surveillance/sort/pagination
   const { surveillance: _s, sort_by: _sb, sort_order: _so, page: _p, limit: _l, ...rest } = filters;
   return api(`/ventes/surveillance-counts?${ventesQs(rest)}`);
+}
+
+
+/** Discount-vs-full-price split for the /ventes remise-discipline gauge.
+ *  Same filter axes as surveillance-counts: ignores pagination/sort AND
+ *  the active surveillance tab so the gauge always reflects the full set. */
+export function listVentesDiscountSummary(filters: Partial<VentesFilters>): Promise<VentesDiscountSummary> {
+  const { surveillance: _s, sort_by: _sb, sort_order: _so, page: _p, limit: _l, ...rest } = filters;
+  return api(`/ventes/discount-summary?${ventesQs(rest)}`);
 }
 
 

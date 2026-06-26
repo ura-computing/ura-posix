@@ -77,11 +77,12 @@ def vente(db: Session, auth_owner, medicament):
             pharmacy_id=pharmacy.id,
             medicament_id=med.id,
             transaction_ref=extra.pop("transaction_ref", f"V-{med.id}"),
-            date="2026-01-20",
+            date=extra.pop("date", "2026-01-20"),
             client=client,
             quantity=1.0,
             unit_price=total,
             total=total,
+            **extra,    # forward any remaining column overrides (e.g. discount)
         )
         db.add(v)
         db.commit()
@@ -308,4 +309,78 @@ class TestVenteSurveillanceCounts:
         client, _, p = auth_owner
         set_pharmacy_features(p.id, ())
         r = client.get("/v1/ventes/surveillance-counts")
+        assert r.status_code == 403
+
+
+class TestVenteDiscountSummary:
+    """/ventes/discount-summary — splits the filtered set into discounted vs
+    full-price aggregates. Drives the remise-discipline gauge on /ventes."""
+
+    def test_empty_happy_path(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.get("/v1/ventes/discount-summary")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["discounted"] == {"total_mad": 0.0, "unit_count": 0.0, "count": 0}
+        assert body["full_price"] == {"total_mad": 0.0, "unit_count": 0.0, "count": 0}
+
+    def test_splits_discounted_vs_full_price(self, auth_owner, vente) -> None:
+        client, _, _ = auth_owner
+        vente(total=100.0, discount=10.0)   # discounted
+        vente(total=50.0,  discount=0.0)    # full-price (zero discount)
+        vente(total=80.0,  discount=None)   # full-price (NULL discount)
+        vente(total=20.0,  discount=5.0)    # discounted
+
+        r = client.get("/v1/ventes/discount-summary")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["discounted"]["total_mad"] == 120.0
+        assert body["discounted"]["count"]     == 2
+        assert body["full_price"]["total_mad"] == 130.0
+        assert body["full_price"]["count"]     == 2
+
+    def test_excludes_other_pharmacy(
+        self, auth_owner, vente, make_pharmacy, db, medicament,
+    ) -> None:
+        from models import Vente
+        client, _, _ = auth_owner
+        # ours
+        vente(total=100.0, discount=10.0)
+        # foreign pharmacy's discounted row — must not leak
+        other = make_pharmacy(name="OtherDisc")
+        med   = medicament()
+        db.add(Vente(
+            pharmacy_id=other.id, medicament_id=med.id,
+            transaction_ref="V-OTHER", date="2026-01-20", client="X",
+            quantity=1.0, unit_price=999.0, total=999.0, discount=50.0,
+        ))
+        db.commit()
+
+        body = client.get("/v1/ventes/discount-summary").json()
+        assert body["discounted"]["total_mad"] == 100.0     # foreign row excluded
+        assert body["discounted"]["count"]     == 1
+
+    def test_date_filter_applied(self, auth_owner, vente) -> None:
+        client, _, _ = auth_owner
+        vente(total=100.0, discount=10.0, date="2026-01-15")
+        vente(total=200.0, discount=20.0, date="2026-02-15")
+
+        r = client.get("/v1/ventes/discount-summary",
+                       params={"date_from": "2026-02-01"})
+        body = r.json()
+        assert body["discounted"]["total_mad"] == 200.0
+
+    def test_unauthenticated(self, client) -> None:
+        r = client.get("/v1/ventes/discount-summary")
+        assert r.status_code == 401
+
+    def test_admin_forbidden(self, auth_admin) -> None:
+        client, _ = auth_admin
+        r = client.get("/v1/ventes/discount-summary")
+        assert r.status_code == 403
+
+    def test_missing_feature(self, auth_owner, set_pharmacy_features) -> None:
+        client, _, p = auth_owner
+        set_pharmacy_features(p.id, ())
+        r = client.get("/v1/ventes/discount-summary")
         assert r.status_code == 403

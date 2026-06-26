@@ -114,6 +114,19 @@ class AchatsSupplierSummary(BaseModel):
     direct_labo: SupplierSummarySide
 
 
+class DiscountSummarySide(BaseModel):
+    total_mad:  float
+    count:      int
+    unit_count: float
+
+
+class VentesDiscountSummary(BaseModel):
+    """Split of the filtered ventes set into discounted vs full-price lines.
+    Drives the /ventes remise-discipline gauge."""
+    discounted: DiscountSummarySide
+    full_price: DiscountSummarySide
+
+
 class VentesSummary(BaseModel):
     """Aggregates over the FULL filtered set (pagination ignored). Drives the
     page footer ('TVA encaissée (filtres actifs)'). Computed in one extra SQL

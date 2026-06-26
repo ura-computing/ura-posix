@@ -68,6 +68,10 @@ export const QUERY_KEYS = {
   VENTES_TVA_RATES:     ["ventes-tva-rates"] as const,
   VENTES_SURVEILLANCE:  (f: VentesFiltersKey) => ["ventes-surveillance", f] as const,
   VENTES_SUGGESTIONS:   (q: string)           => ["ventes-suggestions", q] as const,
+  // Gauge ignores pagination, sort, AND surveillance — same filters as the
+  // achat supplier-summary minus the sort/page axis.
+  VENTES_DISCOUNT_SUMMARY: (f: Omit<VentesFilters, "page" | "limit" | "sort_by" | "sort_order" | "surveillance">) =>
+    ["ventes-discount-summary", f] as const,
 
   // Achats (Page 4)
   ACHATS:                   (f: AchatsFilters) => ["achats", f] as const,
@@ -603,6 +607,21 @@ export interface SupplierSummarySide {
 export interface AchatsSupplierSummary {
   grossiste:   SupplierSummarySide;
   direct_labo: SupplierSummarySide;
+}
+
+
+export interface DiscountSummarySide {
+  total_mad:  number;
+  count:      number;
+  unit_count: number;
+}
+
+
+/** Split of the /ventes filtered set into discounted (Vente.discount > 0)
+ *  vs full-price lines. Drives the remise-discipline gauge. */
+export interface VentesDiscountSummary {
+  discounted: DiscountSummarySide;
+  full_price: DiscountSummarySide;
 }
 
 export interface AchatsFilters {
