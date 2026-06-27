@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Boxes, BarChart3,
   Bell, Coins, Star, UsersRound, Building2, BookOpen,
-  Tags, CircleUser, Settings,
+  Tags, CircleUser, Settings, Globe, Code2, FolderDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -25,8 +25,9 @@ export interface NavGroup {
   items:  NavItem[];
 }
 
-const ALL:  Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE];
-const DATA: Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
+const ALL:       Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE];
+const ALL_HUMAN: Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE, ROLES.DEVELOPER];
+const DATA:      Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -49,15 +50,24 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Gestion",
     items: [
-      { label: "Gérer mon équipe", to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
+      { label: "Gérer mon équipe",  to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
+      { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe,      roles: [ROLES.OWNER], ready: true },
+    ],
+  },
+  {
+    title: "Espace développeur",
+    items: [
+      { label: "Demandes",   to: ROUTES.DEV_DASHBOARD, icon: Code2,      roles: [ROLES.DEVELOPER], ready: true },
+      { label: "Mes exports", to: ROUTES.DEV_EXPORTS,  icon: FolderDown, roles: [ROLES.DEVELOPER], ready: true },
     ],
   },
   {
     title: "Administration",
     items: [
-      { label: "Pharmacies",            to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
-      { label: "Catalogue",             to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
-      { label: "Catégories",            to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
+      { label: "Pharmacies",  to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
+      { label: "Catalogue",   to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
+      { label: "Catégories",  to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
+      { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2,    roles: [ROLES.ADMIN], ready: true },
     ],
   },
 ];
@@ -68,7 +78,7 @@ export const SETTINGS_ITEM: NavItem = {
 };
 
 export const ACCOUNT_ITEM: NavItem = {
-  label: "Mon compte", to: ROUTES.ME, icon: CircleUser, roles: ALL, ready: true,
+  label: "Mon compte", to: ROUTES.ME, icon: CircleUser, roles: ALL_HUMAN, ready: true,
 };
 
 /** Filter the nav for a given user. Admin sees every entry their role allows

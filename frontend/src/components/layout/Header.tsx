@@ -14,9 +14,10 @@ interface HeaderProps {
 }
 
 const ROLE_LABELS: Record<Role, string> = {
-  [ROLES.ADMIN]:    "Administrateur",
-  [ROLES.OWNER]:    "Propriétaire",
-  [ROLES.EMPLOYEE]: "Employé",
+  [ROLES.ADMIN]:     "Administrateur",
+  [ROLES.OWNER]:     "Propriétaire",
+  [ROLES.EMPLOYEE]:  "Employé",
+  [ROLES.DEVELOPER]: "Développeur",
 };
 
 export function Header({ onOpenMobile }: HeaderProps) {

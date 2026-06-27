@@ -1,9 +1,10 @@
 // Single source of truth: enums, query keys, route paths, and shared interfaces.
 
 export const ROLES = {
-  ADMIN: "admin",
-  OWNER: "owner",
-  EMPLOYEE: "employee",
+  ADMIN:     "admin",
+  OWNER:     "owner",
+  EMPLOYEE:  "employee",
+  DEVELOPER: "developer",
 } as const;
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
@@ -50,6 +51,21 @@ export const ROUTES = {
   ADMIN_PHARMACY:    "/admin/pharmacies/:id",
   ADMIN_CATALOGUE:   "/admin/catalogue",
   ADMIN_CATEGORIES:  "/admin/categories",
+  ADMIN_DEVELOPERS:  "/admin/developers",
+
+  // Owner — "Ma boutique en ligne" (3-tab page, gated by ?tab=)
+  STORE_WEBSITE:     "/store-website",
+  STORE_WEBSITE_NEW: "/store-website/new",
+
+  // Developer — sibling top-level routes (not nested under /dev) so
+  // "Demandes" and "Mes exports" feel independent in the URL too.
+  DEV_DASHBOARD:     "/requests",
+  DEV_REQUEST:       "/requests/:id",
+  DEV_EDITOR:        "/requests/:id/editor",
+  DEV_EXPORTS:       "/exports",
+
+  // Public store preview (no app chrome, no auth)
+  STORE_PREVIEW:     "/preview/:template/:page",
 } as const;
 export type Route = (typeof ROUTES)[keyof typeof ROUTES];
 

@@ -2,8 +2,11 @@
  *  redirects to ROUTES.HOME if the resolved role doesn't match.
  *
  *  Usage in App.tsx:
- *    <Route element={<RequireRole role={ROLES.ADMIN} />}>
+ *    <Route element={<RequireRole role={ROLES.ADMIN} />}>            // single
  *      <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
+ *    </Route>
+ *    <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>  // any-of
+ *      <Route path="/dev" element={<DevDashboard />} />
  *    </Route>
  */
 import { Navigate, Outlet } from "react-router-dom";
@@ -13,9 +16,10 @@ import { ROUTES } from "@/types";
 import type { Role } from "@/types";
 
 
-export function RequireRole({ role }: { role: Role }) {
+export function RequireRole({ role }: { role: Role | Role[] }) {
   const { me, isLoading } = useMe();
   if (isLoading) return null;       // AppLayout already renders the shell; brief blank is fine
-  if (!me || me.role !== role) return <Navigate to={ROUTES.HOME} replace />;
+  const allowed = Array.isArray(role) ? role : [role];
+  if (!me || !allowed.includes(me.role as Role)) return <Navigate to={ROUTES.HOME} replace />;
   return <Outlet />;
 }

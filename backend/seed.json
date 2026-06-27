@@ -11,5 +11,10 @@
     "phone":            "0600000001",
     "pharmacy_name":    "Pharmacie Demo",
     "pharmacy_address": "123 Rue Mohammed V, Casablanca"
+  },
+  "developer": {
+    "email":    "dev@gmail.com",
+    "name":     "Développeur Demo",
+    "password": "dev@123"
   }
 }

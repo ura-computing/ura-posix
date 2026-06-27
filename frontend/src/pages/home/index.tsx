@@ -7,7 +7,15 @@ import {
 import { PharmagestIcon } from "@/components/shared/PharmagestIcon";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useMe } from "@/hooks/useMe";
-import { ROUTES } from "@/types";
+import { ROLES, ROUTES, type Role } from "@/types";
+
+
+/** Pick the post-login landing route for a role. Developers don't have
+ *  /rapport (it's feature-gated on `rapports` which they never get), so we
+ *  send them to their queue at /dev. Everyone else lands on /rapport. */
+function landingRouteFor(role: Role): string {
+  return role === ROLES.DEVELOPER ? ROUTES.DEV_DASHBOARD : ROUTES.RAPPORT;
+}
 
 const cycle = [
   { title: "Achats",  desc: "Importez vos bons et suivez vos entrées de stock.",  Icon: ShoppingCart, bg: "bg-info-subtle",         fg: "text-info-subtle-foreground" },
@@ -29,9 +37,10 @@ const stats = [
 ];
 
 const roleLabels = {
-  admin:    "Administrateur",
-  owner:    "Propriétaire",
-  employee: "Employé",
+  admin:     "Administrateur",
+  owner:     "Propriétaire",
+  employee:  "Employé",
+  developer: "Développeur",
 } as const;
 
 function firstName(full: string | null | undefined, fallback: string): string {
@@ -41,7 +50,8 @@ function firstName(full: string | null | undefined, fallback: string): string {
 
 export default function HomePage() {
   const { me } = useMe();
-  const isAuthed = !!me;
+  const isAuthed   = !!me;
+  const myLanding  = isAuthed ? landingRouteFor(me!.role as Role) : ROUTES.LOGIN;
   return (
     <div className="bg-background text-foreground">
       <style>{`
@@ -79,7 +89,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             {isAuthed ? (
-              <Link to={ROUTES.RAPPORT} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
+              <Link to={myLanding} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
                 Mon espace
               </Link>
             ) : (
@@ -114,7 +124,7 @@ export default function HomePage() {
               </p>
               <div className="mt-1.5 flex flex-wrap gap-3">
                 {isAuthed ? (
-                  <Link to={ROUTES.RAPPORT} className="rounded-lg bg-primary px-6 py-[13px] text-[15px] font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
+                  <Link to={myLanding} className="rounded-lg bg-primary px-6 py-[13px] text-[15px] font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
                     Aller à mon espace
                   </Link>
                 ) : (
@@ -257,7 +267,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             {isAuthed ? (
-              <Link to={ROUTES.RAPPORT} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
+              <Link to={myLanding} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
                 Aller à mon espace
               </Link>
             ) : (

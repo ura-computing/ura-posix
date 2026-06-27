@@ -24,9 +24,10 @@ from models import Medicament, Pharmacy, User
 from security import hash_password
 
 
-ROLE_ADMIN  = "admin"
-ROLE_OWNER  = "owner"
-STATUS_OK   = "active"
+ROLE_ADMIN     = "admin"
+ROLE_OWNER     = "owner"
+ROLE_DEVELOPER = "developer"
+STATUS_OK      = "active"
 
 SEED_FILE = Path(__file__).parent / "seed.json"
 # Two known locations: bundled in the image at backend/catalog.csv, or in the
@@ -64,51 +65,68 @@ def _import_catalog(db: Session, csv_path: Path) -> int:
     return inserted
 
 
+def _user_exists(db: Session, email: str) -> bool:
+    return db.query(User).filter(User.email == email).first() is not None
+
+
+def _seed_simple_user(db: Session, cfg: dict | None, role: str) -> str | None:
+    """Insert a pharmacy-less user (admin or developer) if absent."""
+    if not cfg or _user_exists(db, cfg["email"]):
+        return None
+    db.add(User(
+        email=cfg["email"],
+        name=cfg["name"],
+        phone=cfg.get("phone"),
+        password_hash=hash_password(cfg["password"]),
+        role=role,
+        status=STATUS_OK,
+    ))
+    db.flush()
+    return cfg["email"]
+
+
+def _seed_owner_with_pharmacy(db: Session, cfg: dict | None) -> tuple[str, str] | None:
+    """Insert an owner + their pharmacy if the owner is absent."""
+    if not cfg or _user_exists(db, cfg["email"]):
+        return None
+    pharmacy = Pharmacy(name=cfg["pharmacy_name"], address=cfg.get("pharmacy_address"))
+    db.add(pharmacy)
+    db.flush()
+    db.add(User(
+        email=cfg["email"],
+        name=cfg["name"],
+        phone=cfg.get("phone"),
+        password_hash=hash_password(cfg["password"]),
+        role=ROLE_OWNER,
+        status=STATUS_OK,
+        pharmacy_id=pharmacy.id,
+    ))
+    db.flush()
+    return cfg["email"], cfg["pharmacy_name"]
+
+
 def seed_database() -> None:
     if not SEED_FILE.exists():
         print(f"✗ seed.json introuvable : {SEED_FILE}")
         sys.exit(1)
 
     cfg = json.loads(SEED_FILE.read_text())
-    admin_cfg = cfg["admin"]
-    owner_cfg = cfg.get("owner")
-
     db: Session = SessionLocal()
     try:
-        if db.query(User).filter(User.email == admin_cfg["email"]).first():
-            print("✓ Déjà initialisé, rien à faire.")
-            return
+        inserted: list[str] = []
 
-        # ── Admin ────────────────────────────────────────────────────────────
-        db.add(User(
-            email=admin_cfg["email"],
-            name=admin_cfg["name"],
-            password_hash=hash_password(admin_cfg["password"]),
-            role=ROLE_ADMIN,
-            status=STATUS_OK,
-        ))
-        db.flush()
+        admin_email = _seed_simple_user(db, cfg.get("admin"), ROLE_ADMIN)
+        if admin_email:
+            inserted.append(f"Admin     : {admin_email}")
 
-        # ── Owner + Pharmacy ─────────────────────────────────────────────────
-        if owner_cfg:
-            pharmacy = Pharmacy(
-                name=owner_cfg["pharmacy_name"],
-                address=owner_cfg.get("pharmacy_address"),
-            )
-            db.add(pharmacy)
-            db.flush()
+        owner_pair = _seed_owner_with_pharmacy(db, cfg.get("owner"))
+        if owner_pair:
+            inserted.append(f"Owner     : {owner_pair[0]}")
+            inserted.append(f"Pharmacie : {owner_pair[1]}")
 
-            owner = User(
-                email=owner_cfg["email"],
-                name=owner_cfg["name"],
-                phone=owner_cfg.get("phone"),
-                password_hash=hash_password(owner_cfg["password"]),
-                role=ROLE_OWNER,
-                status=STATUS_OK,
-                pharmacy_id=pharmacy.id,
-            )
-            db.add(owner)
-            db.flush()
+        dev_email = _seed_simple_user(db, cfg.get("developer"), ROLE_DEVELOPER)
+        if dev_email:
+            inserted.append(f"Developer : {dev_email}")
 
         db.commit()
 
@@ -120,13 +138,14 @@ def seed_database() -> None:
             catalog_count = _import_catalog(db, catalog_path)
 
         print("=" * 60)
-        print("Initialisation terminée.")
-        print(f"  Admin     : {admin_cfg['email']}  (mot de passe dans seed.json)")
-        if owner_cfg:
-            print(f"  Owner     : {owner_cfg['email']}  (mot de passe dans seed.json)")
-            print(f"  Pharmacie : {owner_cfg['pharmacy_name']}")
-        if catalog_count:
-            print(f"  Catalogue : {catalog_count} médicaments importés")
+        if not inserted and not catalog_count:
+            print("Aucune insertion (utilisateurs déjà présents).")
+        else:
+            print("Initialisation:")
+            for line in inserted:
+                print(f"  {line}  (mot de passe dans seed.json)")
+            if catalog_count:
+                print(f"  Catalogue : {catalog_count} médicaments importés")
         print("=" * 60)
 
     except Exception:

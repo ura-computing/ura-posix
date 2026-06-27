@@ -48,7 +48,7 @@ class UserOut(BaseModel):
     email:         EmailStr
     name:          str | None
     phone:         str | None
-    role:          Literal["admin", "owner", "employee"]
+    role:          Literal["admin", "owner", "employee", "developer"]
     status:        Literal["active", "revoked", "pending", "rejected"]
     pharmacy_id:   int | None
     last_login_at: datetime | None
