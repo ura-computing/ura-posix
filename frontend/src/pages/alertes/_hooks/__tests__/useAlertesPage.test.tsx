@@ -22,6 +22,7 @@ const emptyPeremptions = {
   expired: { count: 0, items: [] },
   near_2w: { count: 0, items: [] },
   near_1m: { count: 0, items: [] },
+  no_date: { count: 0, items: [] },
 };
 
 const emptyStock = {

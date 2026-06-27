@@ -54,8 +54,10 @@ function PeremptionCard({
 
 
 export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
-  // Same 3-bucket scheme as /alertes — clicking opens the shared AlertDetailDialog
-  // with the per-bucket product list (sortable + Excel export).
+  // Same 4-bucket scheme as /alertes — clicking opens the shared
+  // AlertDetailDialog with the per-bucket product list (sortable + Excel
+  // export). The fourth bucket (`no_date`) is data-quality: products
+  // whose Sobrus export had no expiry date.
   const cards: {
     key:         keyof PeremptionsResponse;
     tone:        IconTone;
@@ -67,6 +69,7 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
     { key: "expired", tone: "error",   title: "Périmés en stock", sub: "Action urgente", dlgTitle: "Produits expirés",        dlgSubtitle: "Date de péremption dépassée" },
     { key: "near_2w", tone: "warning", title: "≤ 2 semaines",     sub: "Très urgent",    dlgTitle: "Péremption ≤ 2 semaines", dlgSubtitle: "Expiration dans les 14 prochains jours" },
     { key: "near_1m", tone: "warning", title: "≤ 1 mois",         sub: "À surveiller",   dlgTitle: "Péremption ≤ 1 mois",     dlgSubtitle: "Expiration entre 15 et 30 jours" },
+    { key: "no_date", tone: "muted",   title: "Sans date",        sub: "À renseigner",   dlgTitle: "Produits sans date de péremption", dlgSubtitle: "Date de péremption non renseignée dans l'export Sobrus" },
   ];
 
   return (
@@ -74,7 +77,7 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
       <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
         Surveillance Péremptions
       </h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => {
           const bracket = data[c.key];
           return (

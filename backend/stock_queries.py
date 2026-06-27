@@ -293,17 +293,17 @@ def compute_stock_abcd(
 # ── Peremptions ──────────────────────────────────────────────────────────────
 
 def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
-    """3 mutually exclusive buckets keyed on expiry proximity, tightened to
-    the pharmacy-ops horizon the manager flagged:
+    """4 mutually exclusive buckets keyed on expiry proximity:
 
       expired : expiry_date < today           (already past, regulatory disposal)
       near_2w : today ≤ expiry_date ≤ today + 14 days
       near_1m : today + 14d < expiry_date ≤ today + 30 days
+      no_date : expiry_date IS NULL           (data-quality bucket so products
+                                               without a Sobrus expiry date
+                                               aren't silently dropped)
 
-    Rows with NULL expiry_date are SKIPPED entirely (per product owner: the
-    Sobrus export sometimes omits the date — we silently ignore those rather
-    than surface a noisy data-quality card). Products further out than 1
-    month are also skipped — not urgent enough to track here."""
+    Products further out than 1 month are still skipped — not urgent enough
+    to surface here."""
     today        = date.today()
     boundary_2w  = today + timedelta(days=14)
     boundary_1m  = today + timedelta(days=30)
@@ -331,12 +331,13 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
         "expired": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
         "near_2w": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
         "near_1m": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
+        "no_date": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
     }
 
     for product_name, expiry, qty, ppv, pph in rows:
         if expiry is None:
-            continue
-        if expiry < today:
+            key = "no_date"
+        elif expiry < today:
             key = "expired"
         elif expiry <= boundary_2w:
             key = "near_2w"
@@ -356,13 +357,16 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
         b["sale_value"]     += ppv_val * qty_int
         b["products"].append({
             "product":     product_name or "---",
-            "expiry_date": expiry.isoformat(),
+            "expiry_date": expiry.isoformat() if expiry else None,
             "quantity":    qty_int,
             "ppv":         ppv_val,
         })
 
-    for key in brackets:
+    # date-bucketed lists sort by expiry asc; no_date sorts by product name
+    for key in ("expired", "near_2w", "near_1m"):
         brackets[key]["products"].sort(key=lambda p: p["expiry_date"])
+    brackets["no_date"]["products"].sort(key=lambda p: p["product"])
+    for key in brackets:
         brackets[key]["purchase_value"] = round(brackets[key]["purchase_value"], 2)
         brackets[key]["sale_value"]     = round(brackets[key]["sale_value"],     2)
 

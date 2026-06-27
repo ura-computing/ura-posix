@@ -92,23 +92,23 @@ class TestStockAbcd:
 
 
 class TestPeremptions:
-    def test_empty_returns_3_buckets(self, auth_owner) -> None:
+    def test_empty_returns_4_buckets(self, auth_owner) -> None:
         client, _, _ = auth_owner
         r = client.get("/v1/stats/peremptions")
         assert r.status_code == 200
         body = r.json()
-        # 3 mutually-exclusive buckets, no_date dropped on purpose
-        assert set(body.keys()) == {"expired", "near_2w", "near_1m"}
+        # 4 mutually-exclusive buckets including the data-quality no_date one
+        assert set(body.keys()) == {"expired", "near_2w", "near_1m", "no_date"}
         for k in body:
             assert body[k]["count"] == 0
             assert body[k]["products"] == []
 
-    def test_classifies_rows_into_3_buckets(
+    def test_classifies_rows_into_4_buckets(
         self, auth_owner, db,
     ) -> None:
-        """Insert stock rows spread across the 3 bands + 1 NULL expiry + 1
-        out-of-range (> 30d). Confirm bucket counts + that NULL/far rows
-        are silently skipped."""
+        """Insert stock rows spread across the 3 date bands + 1 NULL expiry +
+        1 out-of-range (> 30d). NULL rows land in `no_date`; > 30d still
+        skipped."""
         from datetime import date, timedelta
 
         from models import Medicament, PharmacyStock
@@ -132,16 +132,17 @@ class TestPeremptions:
         _mk("W2B",  14)    # near_2w (last day of 2-week window)
         _mk("M1",   25)    # near_1m
         _mk("FAR",  90)    # > 30d → skipped entirely
-        _mk("NUL", None)   # NULL expiry → skipped entirely
+        _mk("NUL", None)   # NULL expiry → lands in no_date
         db.commit()
 
         body = client.get("/v1/stats/peremptions").json()
         assert body["expired"]["count"] == 1
         assert body["near_2w"]["count"] == 2
         assert body["near_1m"]["count"] == 1
-        # Far + NULL must NOT leak into any bucket.
+        assert body["no_date"]["count"] == 1
+        # FAR (> 30d) must NOT leak into any bucket; everyone else does.
         total = sum(b["count"] for b in body.values())
-        assert total == 4
+        assert total == 5
 
     def test_excludes_zero_stock(self, auth_owner, db) -> None:
         from datetime import date, timedelta

@@ -553,7 +553,7 @@ export interface StockFilters {
 
 export interface PeremptionProduct {
   product:     string;
-  expiry_date: string;
+  expiry_date: string | null;   // null for the no_date bucket
   quantity:    number;
   ppv:         number;
 }
@@ -566,12 +566,14 @@ export interface PeremptionBracket {
   products:       PeremptionProduct[];
 }
 
-/** 3 mutually-exclusive expiry-proximity buckets. NULL-expiry rows are
- *  dropped by the backend — they don't appear here. */
+/** 4 mutually-exclusive expiry-proximity buckets. NULL-expiry rows surface
+ *  in their own `no_date` data-quality bucket so the team can chase
+ *  missing Sobrus dates. */
 export interface PeremptionsResponse {
   expired: PeremptionBracket;    // expiry_date < today
   near_2w: PeremptionBracket;    // today ≤ expiry ≤ today + 14d
   near_1m: PeremptionBracket;    // today + 14d < expiry ≤ today + 30d
+  no_date: PeremptionBracket;    // expiry_date IS NULL
 }
 
 
