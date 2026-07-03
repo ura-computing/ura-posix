@@ -11,10 +11,12 @@ import { ROLES, ROUTES, type Role } from "@/types";
 
 
 /** Pick the post-login landing route for a role. Developers don't have
- *  /rapport (it's feature-gated on `rapports` which they never get), so we
- *  send them to their queue at /dev. Everyone else lands on /rapport. */
+ *  /rapport (it's feature-gated on `rapports` which they never get); while
+ *  the developer surfaces are HIDDEN 2026-07-03 we fall them back to /me so
+ *  they land somewhere valid. Restore the DEV_DASHBOARD target when the
+ *  developer feature ships. */
 function landingRouteFor(role: Role): string {
-  return role === ROLES.DEVELOPER ? ROUTES.DEV_DASHBOARD : ROUTES.RAPPORT;
+  return role === ROLES.DEVELOPER ? ROUTES.ME : ROUTES.RAPPORT;
 }
 
 const cycle = [

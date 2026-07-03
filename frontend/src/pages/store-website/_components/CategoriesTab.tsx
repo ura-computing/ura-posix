@@ -1,5 +1,5 @@
 import type { HTMLAttributes, Ref } from "react";
-import { Plus, GripVertical, Sparkles, FolderPlus } from "lucide-react";
+import { Plus, GripVertical, Sparkles, FolderPlus, Star } from "lucide-react";
 
 import {
   DndContext, KeyboardSensor, PointerSensor,
@@ -32,19 +32,24 @@ import { CategoryIcon } from "./categoryIcons";
  *  - "Mis à jour par votre développeur" badge stays for 7 days */
 
 export interface CategoriesTabProps {
-  categories: StoreCategory[];
-  isLoading?: boolean;
-  onCreate:   () => void;
-  onEdit:     (id: string) => void;
-  onDelete:   (id: string) => void;
+  categories:       StoreCategory[];
+  /** Set of category ids that the owner has marked "vedette" — persisted on
+   *  the active request's customization. Empty when there's no active
+   *  request; toggling in that case just shows an info toast. */
+  featuredIds?:     string[];
+  isLoading?:       boolean;
+  onCreate:         () => void;
+  onEdit:           (id: string) => void;
+  onDelete:         (id: string) => void;
   /** Fires after a drag settles with the new ordered id list (including
    *  the pinned default at index 0). */
-  onReorder:  (orderedIds: string[]) => void;
+  onReorder:        (orderedIds: string[]) => void;
+  onToggleFeatured?: (categoryId: string) => void;
 }
 
 
 export function CategoriesTab({
-  categories, isLoading, onCreate, onEdit, onDelete, onReorder,
+  categories, featuredIds = [], isLoading, onCreate, onEdit, onDelete, onReorder, onToggleFeatured,
 }: CategoriesTabProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -117,10 +122,23 @@ export function CategoriesTab({
         <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {defaultCategory && (
-              <CategoryCard category={defaultCategory} onEdit={onEdit} onDelete={onDelete} />
+              <CategoryCard
+                category={defaultCategory}
+                featured={featuredIds.includes(defaultCategory.id)}
+                onToggleFeatured={onToggleFeatured}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
             )}
             {sortable.map((c) => (
-              <SortableCategoryCard key={c.id} category={c} onEdit={onEdit} onDelete={onDelete} />
+              <SortableCategoryCard
+                key={c.id}
+                category={c}
+                featured={featuredIds.includes(c.id)}
+                onToggleFeatured={onToggleFeatured}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
             ))}
           </div>
         </SortableContext>
@@ -133,16 +151,20 @@ export function CategoriesTab({
 // ── Cards ──────────────────────────────────────────────────────────────────
 
 interface CategoryCardProps {
-  category:         StoreCategory;
-  onEdit:           (id: string) => void;
-  onDelete:         (id: string) => void;
+  category:          StoreCategory;
+  featured?:         boolean;
+  onToggleFeatured?: (categoryId: string) => void;
+  onEdit:            (id: string) => void;
+  onDelete:          (id: string) => void;
   /** Spread onto the grip handle when this card is wrapped by
    *  `SortableCategoryCard`. Undefined for the pinned "Autres" card. */
-  dragHandleProps?: HTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> };
+  dragHandleProps?:  HTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement> };
 }
 
 
-function CategoryCard({ category, onEdit, onDelete, dragHandleProps }: CategoryCardProps) {
+function CategoryCard({
+  category, featured, onToggleFeatured, onEdit, onDelete, dragHandleProps,
+}: CategoryCardProps) {
   const draggable = !category.isDefault && dragHandleProps;
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:bg-surface-subtle/50">
@@ -165,28 +187,43 @@ function CategoryCard({ category, onEdit, onDelete, dragHandleProps }: CategoryC
             </button>
           )}
         </div>
-        {!category.isDefault && (
-          <KebabMenu>
-            {(close) => (
-              <>
-                <button
-                  type="button"
-                  onClick={() => { onEdit(category.id); close(); }}
-                  className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
-                >
-                  Modifier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { onDelete(category.id); close(); }}
-                  className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-error-subtle-foreground hover:bg-error-subtle"
-                >
-                  Supprimer
-                </button>
-              </>
-            )}
-          </KebabMenu>
-        )}
+        <div className="flex items-center gap-1">
+          {!category.isDefault && onToggleFeatured && (
+            <button
+              type="button"
+              onClick={() => onToggleFeatured(category.id)}
+              aria-pressed={featured}
+              aria-label={featured ? "Retirer de la vedette" : "Mettre en vedette"}
+              title={featured ? "Retirer de la vedette" : "Mettre en vedette sur la page d'accueil"}
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-subtle hover:text-foreground data-[on=true]:text-amber-500"
+              data-on={featured}
+            >
+              <Star className={featured ? "size-4 fill-current" : "size-4"} />
+            </button>
+          )}
+          {!category.isDefault && (
+            <KebabMenu>
+              {(close) => (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { onEdit(category.id); close(); }}
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { onDelete(category.id); close(); }}
+                    className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-error-subtle-foreground hover:bg-error-subtle"
+                  >
+                    Supprimer
+                  </button>
+                </>
+              )}
+            </KebabMenu>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-0.5">

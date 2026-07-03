@@ -1,36 +1,57 @@
-/** Route container for /admin/developers. */
-import { useState } from "react";
+/** Route container for /admin/developers.
+ *
+ *  Lists APCM developer users via `GET /v1/store-website/admin/developers`.
+ *  Actions (invite, reset password, activate/deactivate) rely on endpoints
+ *  that haven't been implemented yet — they toast a "à venir" message
+ *  until the backend catches up. */
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { MOCK_DEVELOPER_ACCOUNTS } from "@/fixtures/storeWebsite";
+import { listDevelopers, type DeveloperAccountOut } from "@/api/storeWebsite";
 import type { DeveloperAccount } from "@/types/storeWebsite";
 
 import { DevelopersPage } from "./_components/DevelopersPage";
 
 
+function toAccount(api: DeveloperAccountOut): DeveloperAccount {
+  return {
+    id:             api.id,
+    name:           api.name,
+    email:          api.email,
+    status:         api.status,
+    activeRequests: api.active_requests,
+    lastActiveAt:   api.last_active_at,
+  };
+}
+
+
 export default function AdminDevelopersRoute() {
-  const [devs, setDevs]   = useState<DeveloperAccount[]>(MOCK_DEVELOPER_ACCOUNTS);
   const [search, setSearch] = useState("");
 
-  const filtered = devs.filter((d) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return d.name.toLowerCase().includes(q) || d.email.toLowerCase().includes(q);
+  const q = useQuery({
+    queryKey: ["admin", "developers"],
+    queryFn:  listDevelopers,
   });
+
+  const filtered = useMemo(() => {
+    const all = (q.data ?? []).map(toAccount);
+    const term = search.trim().toLowerCase();
+    if (!term) return all;
+    return all.filter(
+      (d) => d.name.toLowerCase().includes(term) || d.email.toLowerCase().includes(term),
+    );
+  }, [q.data, search]);
 
   return (
     <DevelopersPage
       developers={filtered}
       search={search}
+      isLoading={q.isLoading}
       onSearch={setSearch}
-      onInvite={() => toast.info("Invitation simulée — backend à venir")}
-      onResetPassword={() => toast.success("Lien de réinitialisation envoyé (simulé)")}
-      onToggleActive={(id, activate) => {
-        setDevs((ds) =>
-          ds.map((d) => d.id === id ? { ...d, status: activate ? "actif" : "desactive" } : d),
-        );
-        toast.success(activate ? "Compte activé" : "Compte désactivé");
-      }}
+      onInvite={() => toast.info("Invitation d'un développeur — endpoint à venir")}
+      onResetPassword={() => toast.info("Réinitialisation du mot de passe — endpoint à venir")}
+      onToggleActive={() => toast.info("Activer/désactiver un compte — endpoint à venir")}
     />
   );
 }

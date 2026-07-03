@@ -82,10 +82,22 @@ def require_admin(user: User) -> None:
         )
 
 
+def require_developer(user: User) -> None:
+    """Raise 403 unless the caller is an APCM developer. Backs the
+    /v1/store-website developer-side endpoints (list requests, claim,
+    edit customization, mark delivered)."""
+    if user.role != "developer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Réservé aux développeurs.",
+        )
+
+
 def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = None) -> int:
     """For pharmacy-scoped non-admin endpoints. Returns the user's pharmacy_id.
 
     - Rejects admins (they use /v1/admin/... mirror routes — deferred).
+    - Rejects roles that don't belong to a pharmacy (e.g. developer).
     - Rejects users without a pharmacy.
     - Optionally enforces a feature gate ("import", "achats", "ventes", …).
     """
@@ -93,6 +105,11 @@ def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = Non
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Les admins utilisent /v1/admin/... (à venir).",
+        )
+    if user.role not in ("owner", "employee"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ce compte n'a pas accès à cette ressource.",
         )
     if user.pharmacy_id is None:
         raise HTTPException(status_code=400, detail="Aucune pharmacie associée à ce compte.")

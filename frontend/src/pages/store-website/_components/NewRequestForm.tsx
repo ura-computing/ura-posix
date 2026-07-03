@@ -32,6 +32,8 @@ export interface NewRequestFormProps {
   /** Pre-fill (profile phone, or values copied from a past request via "refaire"). */
   initialValues?: Partial<NewRequestValues>;
   isSubmitting?:  boolean;
+  /** Server-side error to display below the submit buttons (e.g. 409 conflict). */
+  submitError?:   string | null;
   onSubmit:       (values: NewRequestValues) => void;
   onCancel:       () => void;
 }
@@ -45,7 +47,7 @@ const MA_PHONE = /^(?:\+212|0)\s?[5-7](?:[\s.-]?\d){8}$/;
 
 
 export function NewRequestForm({
-  initialValues, isSubmitting, onSubmit, onCancel,
+  initialValues, isSubmitting, submitError, onSubmit, onCancel,
 }: NewRequestFormProps) {
   const [v, setV] = useState<NewRequestValues>({
     storeName:    "",
@@ -237,6 +239,12 @@ export function NewRequestForm({
           />
         </Field>
       </div>
+
+      {submitError && (
+        <p className="rounded-lg border border-error-border bg-error-subtle px-3 py-2 text-sm font-medium text-error-subtle-foreground">
+          {submitError}
+        </p>
+      )}
 
       <div className="flex items-center justify-end gap-2.5">
         <Button type="button" variant="outline" onClick={onCancel}>

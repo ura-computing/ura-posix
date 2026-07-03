@@ -6,23 +6,29 @@ import { RequireGuest } from "@/components/layout/RequireGuest";
 import { RequireRole } from "@/components/layout/RequireRole";
 import CataloguePage from "@/pages/admin/catalogue";
 import AdminCategoriesPage from "@/pages/admin/categories";
-import AdminDevelopersPage from "@/pages/admin/developers";
 import AdminPharmaciesIndex from "@/pages/admin/pharmacies";
 import AdminPharmacyDetail from "@/pages/admin/pharmacies/detail";
-import DevDashboardPage from "@/pages/dev";
-import DevExportsPage from "@/pages/dev/exports";
-import DevEditorPage from "@/pages/dev/requests/$id.editor";
-import DevRequestDetailPage from "@/pages/dev/requests/$id";
 import OwnerEmployeesPage from "@/pages/owner/employees";
-import StoreWebsitePage from "@/pages/store-website";
-import StoreWebsiteNewPage from "@/pages/store-website/new";
 import ProduitsSpeciauxPage from "@/pages/produits-speciaux";
+// HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
+// admin/developers surfaces are wired end-to-end but not ready to ship. Restore
+// these imports and the matching Route blocks below when the feature is done.
+// import AdminDevelopersPage from "@/pages/admin/developers";
+// import DevDashboardPage from "@/pages/dev";
+// import DevExportsPage from "@/pages/dev/exports";
+// import DevEditorPage from "@/pages/dev/requests/$id.editor";
+// import DevRequestDetailPage from "@/pages/dev/requests/$id";
+// import StoreWebsitePage from "@/pages/store-website";
+// import StoreWebsiteNewPage from "@/pages/store-website/new";
 import ForgotPasswordPage from "@/pages/auth/forgotPassword";
 import MePage from "@/pages/auth/me";
 import SetPasswordPage from "@/pages/auth/setPassword";
 import HomePage from "@/pages/home";
 import LoginPage from "@/pages/login";
 import NotFoundPage from "@/pages/notFound";
+// HIDDEN 2026-07-03 — public preview page renders customization data from the
+// hidden feature. Restore alongside the block below.
+// import StorePreviewPage from "@/pages/preview";
 import ImportsPage from "@/pages/imports";
 import RapportPage from "@/pages/rapport";
 import AchatsPage from "@/pages/achats";
@@ -38,6 +44,11 @@ export default function App() {
   return (
     <Routes>
       <Route path={ROUTES.HOME} element={<HomePage />} />
+
+      {/* HIDDEN 2026-07-03 — public template preview belongs to the hidden
+          store-website feature. Restore when the feature ships.
+      <Route path={ROUTES.STORE_PREVIEW} element={<StorePreviewPage />} />
+      */}
 
       {/* Auth routes: only accessible to UNauthenticated visitors */}
       <Route element={<RequireGuest />}>
@@ -86,22 +97,28 @@ export default function App() {
           <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
           <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
           <Route path={ROUTES.ADMIN_PHARMACY}   element={<AdminPharmacyDetail />} />
+          {/* HIDDEN 2026-07-03 — admin/developers panel.
           <Route path={ROUTES.ADMIN_DEVELOPERS} element={<AdminDevelopersPage />} />
+          */}
         </Route>
 
         <Route element={<RequireRole role={ROLES.OWNER} />}>
           <Route path={ROUTES.OWNER_EMPLOYEES}   element={<OwnerEmployeesPage />} />
+          {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
           <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
           <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />
+          */}
         </Route>
 
-        {/* Developer-only routes — admin can also access for support. */}
+        {/* HIDDEN 2026-07-03 — developer-only routes (queue + request detail +
+            editor + exports). Restore when the feature is complete.
         <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>
           <Route path={ROUTES.DEV_DASHBOARD} element={<DevDashboardPage />} />
           <Route path={ROUTES.DEV_REQUEST}   element={<DevRequestDetailPage />} />
           <Route path={ROUTES.DEV_EDITOR}    element={<DevEditorPage />} />
           <Route path={ROUTES.DEV_EXPORTS}   element={<DevExportsPage />} />
         </Route>
+        */}
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

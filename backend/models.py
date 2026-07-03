@@ -1,7 +1,9 @@
 from datetime import datetime, date
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+import uuid
 
 from database import Base
 
@@ -285,3 +287,63 @@ class PaymentEntry(Base):
     count:                Mapped[int]      = mapped_column(Integer, nullable=False, default=0)
     created_at:           Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at:           Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ─── "Ma boutique en ligne" — store website request + customization ─────────
+
+STORE_REQUEST_STATES = ("soumise", "prise_en_charge", "en_cours", "livree", "cloturee")
+STORE_URGENCIES      = ("asap", "ce_mois", "flexible")
+
+
+class StoreWebsiteRequest(Base):
+    """Owner's landing-page brief. Constraint at DB level: one active (non
+    cloturee) request per pharmacy — enforced by a partial unique index in
+    the migration."""
+    __tablename__ = "store_website_requests"
+
+    id:            Mapped[uuid.UUID]        = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pharmacy_id:   Mapped[int]              = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
+    owner_id:      Mapped[int]              = mapped_column(Integer, ForeignKey(FK_USERS_ID), nullable=False, index=True)
+
+    # Brief content (owner-authored)
+    store_name:    Mapped[str]              = mapped_column(String, nullable=False)
+    slogan:        Mapped[str | None]       = mapped_column(String, nullable=True)
+    brand_palette: Mapped[list]             = mapped_column(JSON, nullable=False, default=list)   # ["#hex", ...] 2-3
+    phone:         Mapped[str]              = mapped_column(String, nullable=False)
+    custom_domain: Mapped[str | None]       = mapped_column(String, nullable=True)
+    urgency:       Mapped[str]              = mapped_column(String, nullable=False)               # STORE_URGENCIES
+    vision:        Mapped[str | None]       = mapped_column(String, nullable=True)
+
+    # Lifecycle
+    state:         Mapped[str]              = mapped_column(String, nullable=False, default="soumise", index=True)
+    claimed_by_id: Mapped[int | None]       = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True, index=True)
+    claimed_at:    Mapped[datetime | None]  = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at:    Mapped[datetime]         = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at:    Mapped[datetime]         = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    customization: Mapped["StoreCustomization | None"] = relationship(
+        back_populates="request", uselist=False, cascade="all, delete-orphan",
+    )
+
+
+class StoreCustomization(Base):
+    """Developer-authored styling state, 1:1 with a request. Created in the
+    same transaction as the request with defaults derived from the picked
+    palette."""
+    __tablename__ = "store_customizations"
+
+    request_id:            Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("store_website_requests.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    template:              Mapped[str]      = mapped_column(String, nullable=False, default="lumiere")
+    sections:              Mapped[dict]     = mapped_column(JSON, nullable=False, default=dict)   # { hero:{visible:true}, ... }
+    brand_colors:          Mapped[dict]     = mapped_column(JSON, nullable=False, default=dict)   # { primary, secondary, accent }
+    logo_url:              Mapped[str | None] = mapped_column(String, nullable=True)
+    font_pairing:          Mapped[str]      = mapped_column(String, nullable=False, default="moderne")
+    featured_category_ids: Mapped[list]     = mapped_column(JSON, nullable=False, default=list)   # owner-managed later
+    updated_at:            Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    request: Mapped[StoreWebsiteRequest] = relationship(back_populates="customization")

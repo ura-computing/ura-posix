@@ -1,7 +1,10 @@
 import {
   LayoutDashboard, ShoppingCart, TrendingUp, Boxes, BarChart3,
   Bell, Coins, Star, UsersRound, Building2, BookOpen,
-  Tags, CircleUser, Settings, Globe, Code2, FolderDown,
+  Tags, CircleUser, Settings,
+  // HIDDEN 2026-07-03 — icons for the hidden store-website / developer nav
+  // entries. Restore alongside those entries.
+  // Globe, Code2, FolderDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -51,23 +54,27 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Gestion",
     items: [
       { label: "Gérer mon équipe",  to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
-      { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe,      roles: [ROLES.OWNER], ready: true },
+      // HIDDEN 2026-07-03 — restore when the store-website feature ships.
+      // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],
   },
-  {
-    title: "Espace développeur",
-    items: [
-      { label: "Demandes",   to: ROUTES.DEV_DASHBOARD, icon: Code2,      roles: [ROLES.DEVELOPER], ready: true },
-      { label: "Mes exports", to: ROUTES.DEV_EXPORTS,  icon: FolderDown, roles: [ROLES.DEVELOPER], ready: true },
-    ],
-  },
+  // HIDDEN 2026-07-03 — the whole "Espace développeur" group. Restore when the
+  // developer editor + exports pipeline are ready to ship.
+  // {
+  //   title: "Espace développeur",
+  //   items: [
+  //     { label: "Demandes",   to: ROUTES.DEV_DASHBOARD, icon: Code2,      roles: [ROLES.DEVELOPER], ready: true },
+  //     { label: "Mes exports", to: ROUTES.DEV_EXPORTS,  icon: FolderDown, roles: [ROLES.DEVELOPER], ready: true },
+  //   ],
+  // },
   {
     title: "Administration",
     items: [
       { label: "Pharmacies",  to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
       { label: "Catalogue",   to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
       { label: "Catégories",  to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
-      { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2,    roles: [ROLES.ADMIN], ready: true },
+      // HIDDEN 2026-07-03 — admin/developers panel.
+      // { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2, roles: [ROLES.ADMIN], ready: true },
     ],
   },
 ];

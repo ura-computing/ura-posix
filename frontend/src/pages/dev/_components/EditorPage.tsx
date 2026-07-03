@@ -1,427 +1,379 @@
 import { useState, type ReactNode } from "react";
 import {
-  Maximize, Download, Monitor, Tablet, Smartphone, Sun, Moon,
-  GripVertical, Eye, EyeOff, MoreHorizontal, Loader2, Upload, FolderCog,
+  CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  EDITOR_SECTION_LABEL, FONT_PAIRINGS,
-  TEMPLATE_LABEL, TEMPLATES,
-  type DeviceMode, type EditorSection, type EditorSectionKey,
-  type StoreTemplate,
+  EDITOR_SECTION_LABEL, FONT_PAIRINGS, TEMPLATES,
+  type EditorSectionKey, type StoreTemplate,
 } from "@/types/storeWebsite";
+import { cn } from "@/utils/cn";
+
+import { TemplateCard } from "./TemplateCard";
 
 
-/** Screen 17 — /dev/requests/:id/editor. THREE-PANE editor.
+/** /requests/:id/editor — developer editor, redesigned 2026-06-27.
  *
- *  Left rail (320px): template picker + sections (drag-reorder + visibility).
- *  Center: device toggle + light/dark + responsive preview frame. Templates
- *    don't exist until Chunk E — until then, the frame holds a styled
- *    placeholder. When Chunk E lands, swap the placeholder for the real
- *    template render.
- *  Right rail (360px): per-section properties when a section is selected,
- *    otherwise global controls (brand colors, logo, typography, featured
- *    categories, "Gérer les catégories" shortcut).
+ *  Single scrollable column of settings, sticky top bar for actions. No
+ *  more 3-pane rail layout (nothing worth splitting into). Fully
+ *  responsive: 5-col template row on md+, 2-col on sm, stacked below.
  *
- *  Top bar: Aperçu plein écran · Exporter le projet (re-clickable any number
- *  of times) · Marquer comme livrée (disabled until ≥1 export).
- *
- *  react-grid-layout LIVES INSIDE the templates (Chunk E), not in this editor —
- *  per the user-locked decision (Webflow-style 2D canvas on the public-store
- *  Home page, NOT on the editor's section list). */
+ *  Save flow:
+ *    - Auto-save toggle in the top bar (persisted in localStorage).
+ *    - Explicit "Enregistrer" button. Always available while there are
+ *      unsaved edits.
+ *    - Three-state indicator next to the breadcrumb:
+ *        * `Enregistrement…` while a mutation is in flight.
+ *        * `Modifications non enregistrées` when the buffer is dirty
+ *          and auto-save is OFF.
+ *        * `Enregistré` (briefly) after a successful flush. */
 
 export interface EditorPageProps {
-  pharmacyName:         string;
-  template:             StoreTemplate;
-  sections:             EditorSection[];
-  selectedSection:      EditorSectionKey | null;
-  device:               DeviceMode;
-  dark:                 boolean;
-  brandPalette:         string[];
-  fontPairing:          string;
-  featuredCategoryIds:  string[];
-  allCategories:        { id: string; name: string }[];
-  exporting?:           boolean;
-  hasExport?:           boolean;
-  onSelectTemplate:     (t: StoreTemplate) => void;
-  onSelectSection:      (key: EditorSectionKey | null) => void;
-  onToggleSection:      (key: EditorSectionKey, visible: boolean) => void;
-  onReorderSections:    (orderedKeys: EditorSectionKey[]) => void;
-  onDevice:             (d: DeviceMode) => void;
-  onToggleDark:         () => void;
-  onBrandColor:         (index: number, hex: string) => void;
-  onLogoUpload:         (file: File) => void;
-  onFontPairing:        (id: string) => void;
-  onFeaturedCategories: (ids: string[]) => void;
-  onManageCategories:   () => void;
-  onFullscreen:         () => void;
-  onExport:             () => void;
-  onMarkDelivered:      () => void;
+  pharmacyName:      string;
+  template:          StoreTemplate;
+  sections:          { key: EditorSectionKey; visible: boolean }[];
+  brandColors:       { primary: string; secondary: string; accent: string };
+  fontPairing:       string;
+  logoUrl:           string | null;
+
+  autoSave:          boolean;
+  hasUnsaved:        boolean;
+  isSaving?:         boolean;
+  isUploading?:      boolean;
+  isResetting?:      boolean;
+  exporting?:        boolean;
+  hasExport?:        boolean;
+
+  onSelectTemplate:  (t: StoreTemplate) => void;
+  onToggleSection:   (key: EditorSectionKey, visible: boolean) => void;
+  onBrandColor:      (which: "primary" | "secondary" | "accent", hex: string) => void;
+  onFontPairing:     (id: string) => void;
+  onLogoUpload:      (file: File) => void;
+  onSetAutoSave:     (on: boolean) => void;
+  onSave:            () => void;
+  onReset:           () => void;
+  onOpenPreview:     () => void;
+  onExport:          () => void;
+  onMarkDelivered:   () => void;
 }
-
-
-const DEVICE_W: Record<DeviceMode, string> = {
-  desktop: "100%",
-  tablet:  "768px",
-  mobile:  "390px",
-};
 
 
 export function EditorPage(props: EditorPageProps) {
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* Top bar */}
-      <header className="flex h-14 flex-none items-center gap-3 border-b border-border bg-card px-4">
-        <span className="truncate text-sm text-muted-foreground">
-          Demande <span className="px-1">/</span> Éditeur —{" "}
+    <div className="flex min-h-screen flex-col bg-background">
+      <TopBar {...props} />
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 sm:px-6">
+        <TemplateSection    {...props} />
+        <SectionsSection    {...props} />
+        <BrandColorsSection {...props} />
+        <LogoSection        {...props} />
+        <TypographySection  {...props} />
+      </main>
+    </div>
+  );
+}
+
+
+// ── TOP BAR ─────────────────────────────────────────────────────────────────
+
+function TopBar(props: EditorPageProps) {
+  const canSave = props.hasUnsaved && !props.isSaving;
+
+  const handleReset = () => {
+    if (props.isResetting) return;
+    const ok = window.confirm(
+      "Réinitialiser la personnalisation ?\n\n"
+      + "Toutes les modifications (modèle, sections, couleurs, logo, typographie) "
+      + "seront restaurées aux valeurs par défaut. Cette action est irréversible.",
+    );
+    if (ok) props.onReset();
+  };
+
+  return (
+    <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur sm:gap-3 sm:px-4">
+      {/* Breadcrumb + save state indicator */}
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0 truncate text-sm text-muted-foreground">
+          Éditeur <span className="px-1">·</span>
           <span className="font-semibold text-foreground">{props.pharmacyName}</span>
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={props.onFullscreen}>
-            <Maximize className="size-4" />
-            Aperçu plein écran
-          </Button>
-          <Button variant="outline" size="sm" onClick={props.onExport} disabled={props.exporting}>
-            {props.exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-            {props.exporting ? "Génération en cours…" : "Exporter le projet"}
-          </Button>
-          <Button size="sm" onClick={props.onMarkDelivered} disabled={!props.hasExport}>
-            Marquer comme livrée
-          </Button>
         </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
-        <LeftRail {...props} />
-        <CenterPreview {...props} />
-        <RightRail {...props} />
-      </div>
-    </div>
-  );
-}
-
-
-// ── LEFT RAIL ──────────────────────────────────────────────────────────────
-
-function LeftRail(props: EditorPageProps) {
-  return (
-    <aside className="flex w-80 flex-none flex-col overflow-y-auto border-r border-border bg-card">
-      <div className="flex flex-col gap-2 border-b border-border p-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Modèle</span>
-        <div className="flex flex-col gap-1.5">
-          {TEMPLATES.map((t) => {
-            const on = props.template === t;
-            return (
-              <button
-                key={t}
-                onClick={() => props.onSelectTemplate(t)}
-                data-on={on}
-                className="flex items-center gap-3 rounded-lg border border-border p-2.5 text-left text-sm transition-colors hover:bg-surface-subtle/50 data-[on=true]:border-primary data-[on=true]:bg-surface-subtle"
-              >
-                <span
-                  data-on={on}
-                  className="flex size-4 items-center justify-center rounded-full border-2 data-[on=true]:border-primary"
-                >
-                  {on && <span className="size-2 rounded-full bg-primary" />}
-                </span>
-                <span className="font-medium">{TEMPLATE_LABEL[t]}</span>
-              </button>
-            );
-          })}
-        </div>
+        <SaveIndicator hasUnsaved={props.hasUnsaved} isSaving={props.isSaving} autoSave={props.autoSave} />
       </div>
 
-      <div className="flex flex-col gap-2 p-4">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sections</span>
-        <p className="text-xs text-muted-foreground">
-          Glissez pour réordonner. Masquez ce qui ne doit pas apparaître.
-        </p>
-        <div className="mt-1 flex flex-col gap-1">
-          {props.sections.map((sec) => {
-            const on = props.selectedSection === sec.key;
-            return (
-              <div
-                key={sec.key}
-                data-on={on}
-                className="group flex items-center gap-2 rounded-lg border border-transparent px-2 py-2 transition-colors hover:bg-surface-subtle/50 data-[on=true]:border-border data-[on=true]:bg-surface-subtle"
-              >
-                <button
-                  className="cursor-grab text-muted-foreground opacity-40 group-hover:opacity-100"
-                  aria-label="Réordonner"
-                >
-                  <GripVertical className="size-4" />
-                </button>
-                <button
-                  onClick={() => props.onSelectSection(sec.key)}
-                  className="flex-1 text-left text-sm font-medium"
-                >
-                  {EDITOR_SECTION_LABEL[sec.key]}
-                </button>
-                <button
-                  onClick={() => props.onToggleSection(sec.key, !sec.visible)}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label={sec.visible ? "Masquer" : "Afficher"}
-                >
-                  {sec.visible ? <Eye className="size-4" /> : <EyeOff className="size-4 opacity-50" />}
-                </button>
-                <button className="text-muted-foreground hover:text-foreground" aria-label="Options">
-                  <MoreHorizontal className="size-4" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </aside>
-  );
-}
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AutoSaveToggle checked={props.autoSave} onChange={props.onSetAutoSave} />
 
+        <Button size="sm" onClick={props.onSave} disabled={!canSave} title="Enregistrer">
+          <Save className="size-4" />
+          <span className="hidden sm:inline">Enregistrer</span>
+        </Button>
 
-// ── CENTER (responsive preview frame) ──────────────────────────────────────
-
-function CenterPreview(props: EditorPageProps) {
-  return (
-    <main className="flex min-w-0 flex-1 flex-col bg-surface-subtle/40">
-      <div className="flex h-12 flex-none items-center justify-center gap-2 border-b border-border bg-card">
-        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
-          {(["desktop", "tablet", "mobile"] as DeviceMode[]).map((d) => {
-            const Icon = d === "desktop" ? Monitor : d === "tablet" ? Tablet : Smartphone;
-            const on = props.device === d;
-            return (
-              <button
-                key={d}
-                onClick={() => props.onDevice(d)}
-                data-on={on}
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors data-[on=true]:bg-primary data-[on=true]:text-primary-foreground"
-                aria-label={d}
-              >
-                <Icon className="size-4" />
-              </button>
-            );
-          })}
-        </div>
-        <button
-          onClick={props.onToggleDark}
-          className="flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-surface-subtle hover:text-foreground"
-          aria-label="Thème"
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReset}
+          disabled={props.isResetting}
+          title="Réinitialiser la personnalisation"
         >
-          {props.dark ? <Moon className="size-4" /> : <Sun className="size-4" />}
-        </button>
-      </div>
+          {props.isResetting
+            ? <Loader2 className="size-4 animate-spin" />
+            : <RotateCcw className="size-4" />}
+          <span className="hidden sm:inline">
+            {props.isResetting ? "Réinitialisation…" : "Réinitialiser"}
+          </span>
+        </Button>
 
-      <div className="flex flex-1 items-start justify-center overflow-auto p-6">
-        <div
-          className="h-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all"
-          style={{ width: DEVICE_W[props.device], maxWidth: "100%" }}
+        <Button variant="outline" size="sm" onClick={props.onOpenPreview} title="Ouvrir l'aperçu">
+          <ExternalLink className="size-4" />
+          <span className="hidden sm:inline">Aperçu</span>
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={props.onExport}
+          disabled={props.exporting}
+          title="Exporter le projet"
         >
-          {/* Placeholder until Chunk E lands the real template renders.
-              When templates exist, this will mount the chosen
-              <TemplateHome customization={...} editMode={true} /> directly
-              so brand-color / typography / section edits update in real
-              time (no iframe reload). */}
-          <PreviewPlaceholder
-            template={props.template}
-            dark={props.dark}
-            brandPalette={props.brandPalette}
-          />
-        </div>
+          {props.exporting
+            ? <Loader2 className="size-4 animate-spin" />
+            : <Download className="size-4" />}
+          <span className="hidden sm:inline">
+            {props.exporting ? "Génération…" : "Exporter"}
+          </span>
+        </Button>
+
+        <Button
+          size="sm"
+          onClick={props.onMarkDelivered}
+          disabled={!props.hasExport}
+          title="Marquer comme livrée"
+        >
+          <CheckCircle2 className="size-4" />
+          <span className="hidden sm:inline">Livrée</span>
+        </Button>
       </div>
-    </main>
+    </header>
   );
 }
 
 
-function PreviewPlaceholder({
-  template, dark, brandPalette,
-}: { template: StoreTemplate; dark: boolean; brandPalette: string[] }) {
-  const primary = brandPalette[0] ?? "#0E9E8C";
-  return (
-    <div
-      className="flex h-full flex-col"
-      style={{
-        background: dark ? "#0a0a0a" : "#ffffff",
-        color:      dark ? "#fafafa" : "#0a0a0a",
-      }}
-    >
-      <div
-        className="flex items-center justify-between border-b px-6 py-4"
-        style={{ borderColor: dark ? "#262626" : "#e5e5e5" }}
-      >
-        <span className="text-sm font-semibold tracking-tight" style={{ color: primary }}>
-          {TEMPLATE_LABEL[template]}
-        </span>
-        <div className="flex gap-1">
-          {brandPalette.map((c) => (
-            <span key={c} className="size-3 rounded-full" style={{ background: c }} />
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        <span
-          className="rounded-2xl px-4 py-2 text-xs font-semibold uppercase tracking-wider"
-          style={{ background: `${primary}22`, color: primary }}
-        >
-          Aperçu du modèle
-        </span>
-        <p className="max-w-xs text-sm opacity-70">
-          Le rendu interactif du modèle {TEMPLATE_LABEL[template]} sera disponible
-          après l'arrivée des composants de templates.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-
-// ── RIGHT RAIL (properties) ────────────────────────────────────────────────
-
-function RightRail(props: EditorPageProps) {
-  if (props.selectedSection) {
+function SaveIndicator({
+  hasUnsaved, isSaving, autoSave,
+}: { hasUnsaved: boolean; isSaving?: boolean; autoSave: boolean }) {
+  if (isSaving) {
     return (
-      <aside className="flex w-[360px] flex-none flex-col gap-4 overflow-y-auto border-l border-border bg-card p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground">{EDITOR_SECTION_LABEL[props.selectedSection]}</span>
-          <Button variant="ghost" size="sm" onClick={() => props.onSelectSection(null)}>
-            Réglages globaux
-          </Button>
-        </div>
-        {/* Per-section property fields (copy, color overrides, image swaps)
-            are stubbed structurally. Wire each section's editable fields
-            behind props when the template components land in Chunk E. */}
-        <Field label="Titre de la section">
-          <input
-            className="w-full rounded-lg border border-border bg-surface-subtle px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-            placeholder="Texte…"
-          />
-        </Field>
-        <Field label="Sous-titre">
-          <textarea
-            rows={3}
-            className="w-full rounded-lg border border-border bg-surface-subtle px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-            placeholder="Texte…"
-          />
-        </Field>
-        <Field label="Image">
-          <UploadBox label="Remplacer l'image" onFile={() => undefined} />
-        </Field>
-        <Field label="Couleur d'accent (surcharge)">
-          <input type="color" className="h-9 w-16 cursor-pointer rounded-md border border-border bg-transparent p-0.5" />
-        </Field>
-      </aside>
+      <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        Enregistrement…
+      </span>
     );
   }
+  if (hasUnsaved && !autoSave) {
+    return (
+      <span className="whitespace-nowrap rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning-subtle-foreground">
+        Modifications non enregistrées
+      </span>
+    );
+  }
+  return null;
+}
 
-  // Nothing selected → global controls.
+
+function AutoSaveToggle({
+  checked, onChange,
+}: { checked: boolean; onChange: (on: boolean) => void }) {
   return (
-    <aside className="flex w-[360px] flex-none flex-col gap-5 overflow-y-auto border-l border-border bg-card p-4">
-      <span className="text-sm font-semibold text-foreground">Réglages globaux</span>
+    <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-3.5 cursor-pointer accent-primary"
+      />
+      <span className="hidden sm:inline">Auto-save</span>
+    </label>
+  );
+}
 
-      <Field label="Couleurs de marque">
-        <div className="flex items-center gap-2">
-          {props.brandPalette.map((hex, i) => (
+
+// ── SECTIONS ────────────────────────────────────────────────────────────────
+
+function TemplateSection(props: EditorPageProps) {
+  return (
+    <SectionShell title="Modèle">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+        {TEMPLATES.map((t) => (
+          <TemplateCard
+            key={t}
+            template={t}
+            active={props.template === t}
+            onClick={() => props.onSelectTemplate(t)}
+          />
+        ))}
+      </div>
+    </SectionShell>
+  );
+}
+
+
+function SectionsSection(props: EditorPageProps) {
+  return (
+    <SectionShell title="Sections">
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        {props.sections.map((sec) => (
+          <div
+            key={sec.key}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:bg-surface-subtle/50"
+          >
+            <span className="flex-1 truncate text-sm font-medium text-foreground">
+              {EDITOR_SECTION_LABEL[sec.key]}
+            </span>
+            <button
+              type="button"
+              onClick={() => props.onToggleSection(sec.key, !sec.visible)}
+              className={cn(
+                "text-muted-foreground transition-colors hover:text-foreground",
+                sec.visible ? "opacity-100" : "opacity-50",
+              )}
+              aria-label={sec.visible ? "Masquer" : "Afficher"}
+              aria-pressed={sec.visible}
+            >
+              {sec.visible ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+            </button>
+          </div>
+        ))}
+      </div>
+    </SectionShell>
+  );
+}
+
+
+function BrandColorsSection(props: EditorPageProps) {
+  return (
+    <SectionShell title="Couleurs de marque">
+      <div className="flex flex-wrap items-center gap-3">
+        {(["primary", "secondary", "accent"] as const).map((k) => (
+          <label key={k} className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
             <input
-              key={i}
               type="color"
-              value={hex}
-              onChange={(e) => props.onBrandColor(i, e.target.value)}
-              className="h-9 w-14 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
-              aria-label={`Couleur ${i + 1}`}
+              value={props.brandColors[k]}
+              onChange={(e) => props.onBrandColor(k, e.target.value)}
+              className="h-7 w-10 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
+              aria-label={COLOR_LABELS[k]}
             />
-          ))}
-        </div>
-      </Field>
+            <span className="text-xs font-medium text-foreground">{COLOR_LABELS[k]}</span>
+            <span className="font-mono text-xs text-muted-foreground">{props.brandColors[k]}</span>
+          </label>
+        ))}
+      </div>
+    </SectionShell>
+  );
+}
 
-      <Field label="Logo">
-        <UploadBox label="Téléverser un logo" onFile={props.onLogoUpload} />
-      </Field>
 
-      <Field label="Typographie">
-        <div className="flex flex-col gap-2">
-          {FONT_PAIRINGS.map((f) => {
-            const on = props.fontPairing === f.id;
-            return (
-              <button
-                key={f.id}
-                onClick={() => props.onFontPairing(f.id)}
-                data-on={on}
-                className="flex flex-col items-start gap-0.5 rounded-lg border border-border p-3 text-left transition-colors hover:bg-surface-subtle/50 data-[on=true]:border-primary data-[on=true]:bg-surface-subtle"
-              >
-                <span className="text-sm font-semibold text-foreground">{f.label}</span>
-                <span className="text-xs text-muted-foreground">{f.sample}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Field>
+function LogoSection(props: EditorPageProps) {
+  return (
+    <SectionShell title="Logo">
+      <LogoRow
+        currentUrl={props.logoUrl}
+        isUploading={props.isUploading}
+        onFile={props.onLogoUpload}
+      />
+    </SectionShell>
+  );
+}
 
-      <Field label="Catégories à mettre en avant">
-        <div className="flex flex-col gap-1.5">
-          {props.allCategories.map((c) => {
-            const on = props.featuredCategoryIds.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                onClick={() =>
-                  props.onFeaturedCategories(
-                    on ? props.featuredCategoryIds.filter((x) => x !== c.id) : [...props.featuredCategoryIds, c.id],
-                  )
-                }
-                className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-subtle"
-              >
-                <span
-                  data-on={on}
-                  className="flex size-4 items-center justify-center rounded border-2 border-border data-[on=true]:border-primary data-[on=true]:bg-primary"
-                >
-                  {on && <span className="text-[10px] font-semibold text-primary-foreground">✓</span>}
-                </span>
-                <span className="text-sm text-foreground">{c.name}</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Alimente la section « Catégories en vedette » de l'accueil.
-        </p>
-      </Field>
 
-      <Button variant="outline" className="w-full" onClick={props.onManageCategories}>
-        <FolderCog className="size-4" />
-        Gérer les catégories
-      </Button>
-    </aside>
+function TypographySection(props: EditorPageProps) {
+  return (
+    <SectionShell title="Typographie">
+      <div className="flex flex-wrap gap-2">
+        {FONT_PAIRINGS.map((f) => {
+          const on = props.fontPairing === f.id;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => props.onFontPairing(f.id)}
+              data-on={on}
+              className="flex flex-col items-start gap-0.5 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:bg-surface-subtle/50 data-[on=true]:border-primary data-[on=true]:bg-surface-subtle"
+            >
+              <span className="text-sm font-semibold text-foreground">{f.label}</span>
+              <span className="text-xs text-muted-foreground">{f.sample}</span>
+            </button>
+          );
+        })}
+      </div>
+    </SectionShell>
   );
 }
 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+const COLOR_LABELS = {
+  primary:   "Principale",
+  secondary: "Secondaire",
+  accent:    "Accent",
+} as const;
+
+
+function SectionShell({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</label>
+    <section className="flex flex-col gap-3">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h2>
       {children}
-    </div>
+    </section>
   );
 }
 
 
-function UploadBox({ label, onFile }: { label: string; onFile: (f: File) => void }) {
+function LogoRow({
+  currentUrl, isUploading, onFile,
+}: {
+  currentUrl:  string | null;
+  isUploading?: boolean;
+  onFile:      (file: File) => void;
+}) {
   const [hover, setHover] = useState(false);
   return (
     <label
       data-hover={hover}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-surface-subtle px-3 py-4 text-center text-sm text-muted-foreground transition-colors data-[hover=true]:border-primary data-[hover=true]:text-foreground"
+      className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-surface-subtle/50 data-[hover=true]:border-primary"
     >
-      <Upload className="size-4" />
-      {label}
+      {currentUrl && (
+        <img
+          src={currentUrl}
+          alt="Logo actuel"
+          className="size-10 shrink-0 rounded-md border border-border object-contain"
+        />
+      )}
+      <span className="flex flex-1 items-center gap-2 text-muted-foreground data-[hover=true]:text-foreground">
+        {isUploading
+          ? <Loader2 className="size-4 animate-spin" />
+          : <Upload  className="size-4" />}
+        {isUploading
+          ? "Téléversement…"
+          : currentUrl ? "Remplacer le logo" : "Téléverser un logo"}
+      </span>
+      <span className="hidden text-xs text-muted-foreground sm:inline">
+        PNG · JPG · SVG · WEBP · 2 Mo max
+      </span>
       <input
         type="file"
-        accept=".png,.svg,.jpg,.jpeg"
+        accept="image/png,image/jpeg,image/svg+xml,image/webp"
         className="hidden"
-        onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+        }}
       />
     </label>
   );

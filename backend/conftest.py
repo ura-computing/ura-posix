@@ -213,8 +213,8 @@ def make_user(db: Session, make_pharmacy):
         counter["i"] += 1
         if email is None:
             email = f"u{counter['i']}@example.com"
-        # Admin has no pharmacy; owner/employee need one (auto-create on demand).
-        if role != "admin" and pharmacy is None:
+        # Admin + developer have no pharmacy; owner/employee need one (auto-create on demand).
+        if role in ("owner", "employee") and pharmacy is None:
             pharmacy = make_pharmacy(name=f"Pharmacie {counter['i']}")
         u = User(
             email=email,
@@ -281,6 +281,23 @@ def auth_employee(client, make_user, auth_owner, db):
     db.commit()
     _login(fresh, employee.email, password)
     return fresh, employee, pharmacy
+
+
+@pytest.fixture
+def auth_developer(client, make_user):
+    """APCM developer — no pharmacy, no feature flags. Returns (client, user).
+
+    Uses a fresh TestClient so tests that also request `auth_owner` don't
+    have their owner cookies overwritten by the dev's login (both fixtures
+    would otherwise share the same `client`). Depends on `client` to pull
+    the `db` dependency override into the test's session scope."""
+    from fastapi.testclient import TestClient
+    from main import app
+    _ = client   # ensure the get_db override is active in app.dependency_overrides
+    fresh = TestClient(app)
+    user, password = make_user(role="developer")
+    _login(fresh, user.email, password)
+    return fresh, user
 
 
 @pytest.fixture
