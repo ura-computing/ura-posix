@@ -36,3 +36,4 @@ htmlcov/
 
 # Design handoff files (presentational TSX — not wired)
 handoff/
+.claude/
