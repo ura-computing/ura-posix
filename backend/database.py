@@ -1,46 +1,26 @@
-import os
-from pathlib import Path
+from typing import Annotated, Iterator
 
-from dotenv import load_dotenv
+from fastapi import Depends
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-_env_name = os.getenv("APP_ENV", "dev")
-_env_file = Path(__file__).resolve().parent.parent / "env" / _env_name / "backend.env"
-if _env_file.exists():
-    load_dotenv(_env_file)
+from config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set in backend/.env")
-# Render uses postgres:// but SQLAlchemy requires postgresql://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-connect_args = {}
-
-# Pool sizing — keep total below DO managed-DB limits (Dev tier caps at ~22 connections).
-# pool_pre_ping checks each connection before use (avoids using stale ones DO has dropped).
-# pool_recycle drops connections older than 300s so DO's idle-timeout never bites us.
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args,
-    pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "5")),
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_timeout=30,
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
 class Base(DeclarativeBase):
     pass
 
 
-def get_db():
+def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+DbDep = Annotated[Session, Depends(get_db)]

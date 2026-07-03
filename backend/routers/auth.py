@@ -1,240 +1,233 @@
-import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from sqlalchemy.orm import Session as DbSession
 
-from database import get_db
-from models import User, Pharmacy
-from schemas import (
-    UserSignup, UserLogin, UserOut, Token, ProfileUpdate,
-    ForgotPasswordPayload, ForgotPasswordWhatsAppPayload,
-    ResetPasswordPayload, VerifyOtpPayload,
+from config import settings
+from database import DbDep
+from models import Session as UserSession, User
+from permissions import effective_permissions
+from schemas.auth import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    LoginRequest,
+    MeResponse,
+    PharmacyOut,
+    SetPasswordRequest,
+    UpdateProfileRequest,
+    UserOut,
+    ValidateTokenResponse,
 )
-
-from utils.auth import verify_password, hash_password, create_access_token, decode_token
-from utils.constants import FEATURE_FLAGS as ALL_FEATURES, Role, Status
-from utils.email import send_reset_email
-from utils.limiter import limiter
-from utils.whatsapp import send_whatsapp_otp
-
-router = APIRouter(prefix="/auth", tags=["auth"])
-security = HTTPBearer()
-
-
-def _get_user_from_token(credentials: HTTPAuthorizationCredentials, db: Session) -> User:
-    """Decode token and return user — does NOT check account status."""
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Session invalide ou expirée")
-    user = db.query(User).filter(User.id == int(payload["sub"])).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Utilisateur introuvable")
-    return user
+from security import (
+    CurrentUserDep,
+    SESSION_COOKIE_NAME,
+    SESSION_EXPIRY_DAYS,
+    SessionCookieDep,
+    create_access_token,
+    hash_password,
+    verify_password,
+)
+from utils import generate_reset_token, generate_token, hash_reset_token, hash_token, parse_user_agent
+from email_service import send_magic_link
+from rate_limit import limiter
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> User:
-    user = _get_user_from_token(credentials, db)
-    if user.status != Status.ACTIVE:
-        raise HTTPException(status_code=403, detail="account_pending")
-    return user
+router = APIRouter()
+
+RESET_TOKEN_EXPIRY_MIN = 60     # decision #4
+INVALID_TOKEN_DETAIL = "Lien invalide ou expiré"
+BAD_CREDS_DETAIL = "Email ou mot de passe incorrect"
 
 
-def get_current_user_any_status(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> User:
-    """For endpoints accessible while account is pending (e.g. /auth/me)."""
-    return _get_user_from_token(credentials, db)
-
-
-@router.post("/signup", response_model=Token)
-@limiter.limit("5/minute")
-def signup(request: Request, body: UserSignup, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(status_code=400, detail="Email déjà enregistré")
-
-    role = body.role if body.role in (Role.OWNER, Role.EMPLOYEE) else Role.OWNER
-
-    resolved_pharmacy_name = None
-    resolved_pharmacy_id = None
-
-    # Resolution priority: pharmacy_code > pharmacy_id (legacy) > new pharmacy from name+city (owner only).
-    if body.pharmacy_code:
-        from sqlalchemy import func as _sa_func
-        code = body.pharmacy_code.strip().upper()
-        pharmacy = (
-            db.query(Pharmacy)
-            .filter(_sa_func.upper(Pharmacy.code) == code)
-            .first()
-        )
-        if not pharmacy:
-            raise HTTPException(status_code=400, detail=f"Code de pharmacie '{body.pharmacy_code}' introuvable")
-        resolved_pharmacy_name = pharmacy.name
-        resolved_pharmacy_id = pharmacy.id
-    elif body.pharmacy_id:
-        pharmacy = db.query(Pharmacy).filter(Pharmacy.id == body.pharmacy_id).first()
-        if not pharmacy:
-            raise HTTPException(status_code=400, detail="Pharmacie introuvable")
-        resolved_pharmacy_name = pharmacy.name
-        resolved_pharmacy_id = pharmacy.id
-    else:
-        # No code / id → must be an OWNER creating a new pharmacy. Employees can't self-create.
-        if role != Role.OWNER:
-            raise HTTPException(status_code=400, detail="Code de pharmacie requis pour rejoindre une pharmacie existante")
-        if not body.pharmacy_name:
-            raise HTTPException(status_code=400, detail="Nom de pharmacie requis pour créer une nouvelle pharmacie")
-        if not body.pharmacy_city:
-            raise HTTPException(status_code=400, detail="Ville requise pour créer une nouvelle pharmacie")
-        from utils.pharmacy_code import generate_pharmacy_code
-        new_pharmacy = Pharmacy(
-            name=body.pharmacy_name,
-            city=body.pharmacy_city,
-            code=generate_pharmacy_code(db, body.pharmacy_city),
-        )
-        db.add(new_pharmacy)
-        db.flush()
-        resolved_pharmacy_name = new_pharmacy.name
-        resolved_pharmacy_id = new_pharmacy.id
-
-    user = User(
-        email=body.email,
-        name=body.name,
-        phone=body.phone,
-        password_hash=hash_password(body.password),
-        role=role,
-        status=Status.PENDING,
-        pharmacy_name=resolved_pharmacy_name,
-        pharmacy_id=resolved_pharmacy_id,
+def _me_response(db: DbSession, user: User) -> MeResponse:
+    return MeResponse(
+        user=UserOut.model_validate(user),
+        pharmacy=PharmacyOut.model_validate(user.pharmacy) if user.pharmacy else None,
+        permissions=effective_permissions(db, user),
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return {"access_token": create_access_token({"sub": str(user.id)}), "user": user}
 
 
-@router.post("/login", response_model=Token)
-@limiter.limit("10/minute")
-def login(request: Request, body: UserLogin, db: Session = Depends(get_db)):
+def _set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        max_age=settings.JWT_ACCESS_EXPIRY_MIN * 60,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+    )
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=SESSION_EXPIRY_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+    )
+
+
+def _clear_cookies(response: Response) -> None:
+    for key in ("access_token", SESSION_COOKIE_NAME):
+        response.delete_cookie(key=key, httponly=True, secure=settings.COOKIE_SECURE, samesite="lax")
+
+
+def _lookup_valid_reset(db: DbSession, raw_token: str) -> User | None:
+    """Returns the user whose reset_token hash matches, only if not expired."""
+    if not raw_token:
+        return None
+    hashed = hash_reset_token(raw_token)
+    user = db.query(User).filter(User.reset_token == hashed).first()
+    if not user or not user.reset_token_expires:
+        return None
+    if user.reset_token_expires < datetime.now(timezone.utc):
+        return None
+    return user
+
+
+@router.post("/login")
+@limiter.limit("5/minute")
+def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -> MeResponse:
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    if user.status == Status.REJECTED:
-        raise HTTPException(status_code=403, detail="Compte rejeté")
-    return {"access_token": create_access_token({"sub": str(user.id)}), "user": user}
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=BAD_CREDS_DETAIL)
+    if user.status != "active":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Votre compte a été désactivé. Contactez votre administrateur.")
+
+    now = datetime.now(timezone.utc)
+    user.last_login_at = now
+
+    # Create a session row so this device shows up in /v1/sessions.
+    raw_session_token = generate_token()
+    session_row = UserSession(
+        user_id=user.id,
+        refresh_token_hash=hash_token(raw_session_token),
+        device_label=parse_user_agent(request.headers.get("user-agent")),
+        ip=request.client.host if request.client else None,
+        created_at=now,
+        last_used_at=now,
+        expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
+    )
+    db.add(session_row)
+    db.commit()      # commit so session_row.id is populated before signing the JWT
+    db.refresh(user)
+
+    _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
+    _set_session_cookie(response, raw_session_token)
+    return _me_response(db, user)
 
 
-@router.get("/me", response_model=UserOut)
-def get_me(
-    current_user: User = Depends(get_current_user_any_status),
-    db: Session = Depends(get_db),
-):
-    """Always accessible regardless of account status.
-    For employees, computes effective permissions by intersecting with the owner's permissions."""
-    if current_user.role == Role.EMPLOYEE and current_user.pharmacy_id:
-        owner = (
-            db.query(User)
-            .filter(User.pharmacy_id == current_user.pharmacy_id, User.role == Role.OWNER)
-            .first()
-        )
-        owner_perms = (owner.permissions or {}) if owner else {}
-        emp_perms = current_user.permissions or {}
-        effective = {
-            f: emp_perms.get(f, True) and owner_perms.get(f, True)
-            for f in ALL_FEATURES
-        }
-        response = UserOut.model_validate(current_user)
-        response.permissions = effective
-        return response
-    return current_user
+@router.get("/me")
+def me(user: CurrentUserDep, db: DbDep) -> MeResponse:
+    return _me_response(db, user)
 
 
-@router.put("/me", response_model=UserOut)
-def update_me(
-    body: ProfileUpdate,
-    current_user: User = Depends(get_current_user_any_status),
-    db: Session = Depends(get_db),
-):
-    if body.name is not None:
-        current_user.name = body.name
-    if body.phone is not None:
-        current_user.phone = body.phone
-    if body.email is not None and body.email != current_user.email:
-        if db.query(User).filter(User.email == body.email, User.id != current_user.id).first():
-            raise HTTPException(status_code=400, detail="Email déjà utilisé")
-        current_user.email = body.email
-    if body.pharmacy_name is not None:
-        current_user.pharmacy_name = body.pharmacy_name
-        if current_user.role == Role.OWNER and current_user.pharmacy:
-            current_user.pharmacy.name = body.pharmacy_name
-    if body.pharmacy_address is not None and current_user.role == Role.OWNER and current_user.pharmacy:
-        current_user.pharmacy.address = body.pharmacy_address
-
-    if current_user.name and current_user.phone:
-        current_user.profile_complete = True
-
+@router.patch("/me")
+def update_me(body: UpdateProfileRequest, user: CurrentUserDep, db: DbDep) -> MeResponse:
+    user.name = body.name
+    user.phone = body.phone
     db.commit()
-    db.refresh(current_user)
-    return current_user
+    db.refresh(user)
+    return _me_response(db, user)
 
 
-@router.post("/forgot-password", status_code=204)
-@limiter.limit("3/minute")
-async def forgot_password(request: Request, body: ForgotPasswordPayload, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == body.email).first()
-    if not user:
-        return  # silent — don't reveal whether the email exists
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
-    db.commit()
-    await send_reset_email(user.email, token)
+@router.post("/change-password", status_code=204)
+def change_password(
+    body: ChangePasswordRequest,
+    user: CurrentUserDep,
+    request: Request,
+    response: Response,
+    db: DbDep,
+) -> None:
+    """Verifies current password, sets the new one, AND invalidates every existing
+    session for this user (bumps token_version + wipes session rows). Then re-issues
+    cookies for THIS device so the caller stays logged in. Other devices must log in
+    again — protects against a compromised JWT outliving the password it was issued
+    against."""
+    if not user.password_hash or not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mot de passe actuel incorrect")
 
-
-@router.post("/reset-password", status_code=204)
-@limiter.limit("5/minute")
-def reset_password(request: Request, body: ResetPasswordPayload, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.reset_token == body.token).first()
-    if not user or not user.reset_token_expires:
-        raise HTTPException(status_code=400, detail="Lien invalide ou expiré")
-    if user.reset_token_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Lien expiré")
     user.password_hash = hash_password(body.new_password)
+    user.token_version += 1
+    db.query(UserSession).filter(UserSession.user_id == user.id).delete()
+    db.commit()
+    db.refresh(user)
+
+    # Re-issue session + cookies for the current device so this caller stays logged in.
+    now = datetime.now(timezone.utc)
+    raw_session_token = generate_token()
+    session_row = UserSession(
+        user_id=user.id,
+        refresh_token_hash=hash_token(raw_session_token),
+        device_label=parse_user_agent(request.headers.get("user-agent")),
+        ip=request.client.host if request.client else None,
+        created_at=now,
+        last_used_at=now,
+        expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
+    )
+    db.add(session_row)
+    db.commit()
+    _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
+    _set_session_cookie(response, raw_session_token)
+
+
+@router.post("/logout", status_code=204)
+def logout(response: Response, db: DbDep, session_token: SessionCookieDep = None) -> None:
+    if session_token:
+        db.query(UserSession).filter(UserSession.refresh_token_hash == hash_token(session_token)).delete()
+        db.commit()
+    _clear_cookies(response)
+
+
+@router.post("/forgot-password", status_code=200)
+@limiter.limit("3/hour")
+def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) -> dict:
+    """Always returns 200 with a generic message. Don't leak whether the email exists.
+    If the account is active, generates a new reset token (overwrites any prior one)
+    and dispatches the magic-link email. SMTP failures are swallowed for the same
+    enumeration reason — admin notices via logs."""
+    user = db.query(User).filter(User.email == body.email).first()
+    if user and user.status == "active":
+        raw = generate_reset_token()
+        user.reset_token = hash_reset_token(raw)
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRY_MIN)
+        db.commit()
+        magic_link = f"{settings.FRONTEND_URL}/auth/set-password?token={raw}"
+        is_setup = user.password_hash is None
+        # email_service.send_magic_link prints to stdout ONLY when MAIL_USERNAME
+        # is empty (no SMTP configured). In prod with SMTP set, nothing leaks to
+        # logs — the link only travels through email.
+        send_magic_link(
+            to=user.email,
+            name=user.name or user.email,
+            magic_link=magic_link,
+            is_setup=is_setup,
+        )
+    return {"detail": "Si votre compte existe, un email a été envoyé"}
+
+
+@router.get("/validate-token")
+def validate_token(token: str, db: DbDep) -> ValidateTokenResponse:
+    user = _lookup_valid_reset(db, token)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_TOKEN_DETAIL)
+    return ValidateTokenResponse(
+        is_setup=user.password_hash is None,
+        full_name=user.name or user.email,
+    )
+
+
+@router.post("/set-password", status_code=204)
+def set_password(body: SetPasswordRequest, db: DbDep) -> None:
+    user = _lookup_valid_reset(db, body.token)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_TOKEN_DETAIL)
+    user.password_hash = hash_password(body.password)
     user.reset_token = None
     user.reset_token_expires = None
+    user.token_version += 1     # kills any pre-existing sessions defensively (decision #105)
+    # Wipe zombie session rows whose JWTs were just invalidated above.
+    db.query(UserSession).filter(UserSession.user_id == user.id).delete()
     db.commit()
-
-
-@router.post("/forgot-password-whatsapp", status_code=204)
-async def forgot_password_whatsapp(body: ForgotPasswordWhatsAppPayload, db: Session = Depends(get_db)):
-    """Send a 6-digit OTP via WhatsApp for password reset."""
-    phone = body.phone.strip().replace(" ", "")
-    user = db.query(User).filter(User.phone == phone).first()
-    if not user:
-        return  # silent — don't reveal whether the phone exists
-    otp = f"{secrets.randbelow(900000) + 100000}"
-    user.reset_token = otp
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=10)
-    db.commit()
-    await send_whatsapp_otp(phone, otp)
-
-
-@router.post("/verify-otp")
-def verify_otp(body: VerifyOtpPayload, db: Session = Depends(get_db)):
-    """Verify OTP and return a reset token for the standard reset-password flow."""
-    phone = body.phone.strip().replace(" ", "")
-    user = db.query(User).filter(User.phone == phone).first()
-    if not user or not user.reset_token or user.reset_token != body.otp:
-        raise HTTPException(status_code=400, detail="Code invalide")
-    if not user.reset_token_expires or user.reset_token_expires.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Code expiré")
-    # Generate a standard reset token so the user can reuse /auth/reset-password
-    reset_token = secrets.token_urlsafe(32)
-    user.reset_token = reset_token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=10)
-    db.commit()
-    return {"reset_token": reset_token}

@@ -1,115 +1,62 @@
-from datetime import datetime
-from typing import Optional
+"""Admin catalog (Medicament) schemas. Mirrors the Medicament model — every
+write endpoint shapes Create / Update separately so Pydantic can do its own
+validation (PATCH-like Update where every field is optional)."""
+from __future__ import annotations
+
 from pydantic import BaseModel
+
+from schemas.transactions import Pagination
+
+
+class MedicamentRow(BaseModel):
+    id:           int
+    pid:          str
+    product:      str
+    tva:          str | None = None
+    pph:          float | None = None
+    ppv:          float | None = None
+    category:     str | None = None
+    barcode1:     str | None = None
+    barcode2:     str | None = None
+    laboratoire:  str | None = None
+    product_type: str | None = None     # "pharmacie" | "parapharmacie" | None (auto)
+    created_at:   str
+    updated_at:   str | None = None
 
 
 class MedicamentCreate(BaseModel):
-    pid: str
-    product: str
-    tva: Optional[str] = None
-    pph: Optional[float] = None
-    ppv: Optional[float] = None
-    category: Optional[str] = None
-    zone: Optional[str] = None
-    barcode1: Optional[str] = None
-    barcode2: Optional[str] = None
-    laboratoire: Optional[str] = None
-    product_type: Optional[str] = None
+    product:      str
+    tva:          str | None = None
+    pph:          float | None = None
+    ppv:          float | None = None
+    category:     str | None = None
+    barcode1:     str | None = None
+    barcode2:     str | None = None
+    laboratoire:  str | None = None
+    product_type: str | None = None     # null → auto-classified from category
 
 
 class MedicamentUpdate(BaseModel):
-    product: Optional[str] = None
-    tva: Optional[str] = None
-    pph: Optional[float] = None
-    ppv: Optional[float] = None
-    category: Optional[str] = None
-    zone: Optional[str] = None
-    barcode1: Optional[str] = None
-    barcode2: Optional[str] = None
-    laboratoire: Optional[str] = None
-    product_type: Optional[str] = None
+    """PATCH-like — every field optional; only provided keys overwrite."""
+    product:      str | None = None
+    tva:          str | None = None
+    pph:          float | None = None
+    ppv:          float | None = None
+    category:     str | None = None
+    barcode1:     str | None = None
+    barcode2:     str | None = None
+    laboratoire:  str | None = None
+    product_type: str | None = None
 
 
-class MedicamentOut(BaseModel):
-    id: int
-    pid: str
-    product: str
-    tva: Optional[str] = None
-    pph: Optional[float] = None
-    ppv: Optional[float] = None
-    category: Optional[str] = None
-    zone: Optional[str] = None
-    barcode1: Optional[str] = None
-    barcode2: Optional[str] = None
-    laboratoire: Optional[str] = None
-    product_type: Optional[str] = None
-
-    model_config = {"from_attributes": True}
+class CatalogListResponse(BaseModel):
+    data:       list[MedicamentRow]
+    pagination: Pagination
 
 
-class CategorySuffixOut(BaseModel):
-    id: int
-    category: str
-    suffix: str
-    color: Optional[str] = None
-
-    model_config = {"from_attributes": True}
-
-
-class CategorySuffixCreate(BaseModel):
-    category: str
-    suffix: str
-    color: Optional[str] = None
-
-
-class CategorySuffixUpdate(BaseModel):
-    category: Optional[str] = None
-    suffix: Optional[str] = None
-    color: Optional[str] = None
-
-
-class CatalogRequestCreate(BaseModel):
-    product: str
-    tva: Optional[str] = None
-    pph: Optional[float] = None
-    ppv: Optional[float] = None
-    category: Optional[str] = None
-    zone: Optional[str] = None
-    barcode1: Optional[str] = None
-    laboratoire: Optional[str] = None
-
-
-class NonDeclareRequestCreate(BaseModel):
-    medicament_id: int
-    notes: Optional[str] = None
-
-
-class CatalogRequestOut(BaseModel):
-    id: int
-    requested_by: int
-    pharmacy_id: Optional[int] = None
-    status: str
-    reject_reason: Optional[str] = None
-    request_type: str = "new_product"
-    medicament_id: Optional[int] = None
-    medicament_name: Optional[str] = None
-    notes: Optional[str] = None
-    product: str
-    tva: Optional[str] = None
-    pph: Optional[float] = None
-    ppv: Optional[float] = None
-    category: Optional[str] = None
-    zone: Optional[str] = None
-    barcode1: Optional[str] = None
-    laboratoire: Optional[str] = None
-    created_at: Optional[datetime] = None
-    reviewed_at: Optional[datetime] = None
-    requester_name: Optional[str] = None
-    requester_email: Optional[str] = None
-    pharmacy_name: Optional[str] = None
-
-    model_config = {"from_attributes": True}
-
-
-class CatalogRejectBody(BaseModel):
-    reason: Optional[str] = None
+class CatalogImportResponse(BaseModel):
+    total_rows: int
+    inserted:   int
+    updated:    int
+    skipped:    int
+    errors:     list[str]    # first 10 row-level errors for the admin toast

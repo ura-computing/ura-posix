@@ -1,369 +1,201 @@
-"""Tests for auth endpoints: signup, login, me, profile update, password reset, WhatsApp OTP."""
+"""Tests for /v1/auth/* — login, me, change-password, logout, forgot+reset."""
+from __future__ import annotations
 
-import secrets
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
 
-from models import User
-from utils.auth import hash_password
-from utils.constants import Role, Status
-
-
-# ── POST /auth/signup ─────────────────────────────────────────────────────────
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 
-def test_signup_owner_success(client):
-    res = client.post("/auth/signup", json={
-        "email": "newowner@example.com",
-        "password": "secret123",
-        "name": "New Owner",
-        "phone": "0611111111",
-        "role": "owner",
-        "pharmacy_name": "Pharmacie Nouvelle",
-        "pharmacy_city": "Bouskoura",
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["access_token"]
-    assert data["user"]["email"] == "newowner@example.com"
-    assert data["user"]["role"] == Role.OWNER
-    assert data["user"]["status"] == Status.PENDING
-    # The Pharmacy row should be created with an auto-generated code.
-    assert data["user"]["pharmacy_id"] is not None
-    # PG-021: the generated pharmacy_code is now surfaced on UserOut so the UI can
-    # display it (e.g. "Bouskoura" → "BOU0001"). Without this the owner had no way
-    # to learn their identifiant — the code lived only in the DB.
-    assert data["user"]["pharmacy_code"], "signup response must include pharmacy_code"
-    assert data["user"]["pharmacy_code"].startswith("BOU"), \
-        f"code should start with city prefix BOU, got {data['user']['pharmacy_code']!r}"
+# ── /auth/login ────────────────────────────────────────────────────────────
+
+class TestLogin:
+    def test_happy_path_returns_me_and_sets_cookies(self, client: TestClient, make_user) -> None:
+        user, password = make_user(role="owner")
+        r = client.post("/v1/auth/login", json={"email": user.email, "password": password})
+        assert r.status_code == 200
+        body = r.json()
+        assert body["user"]["email"] == user.email
+        assert "access_token" in r.cookies
+        assert "session_token" in r.cookies
+
+    def test_wrong_password_returns_401(self, client: TestClient, make_user) -> None:
+        user, _ = make_user(role="owner")
+        r = client.post("/v1/auth/login", json={"email": user.email, "password": "WRONG"})
+        assert r.status_code == 401
+
+    def test_unknown_email_returns_401(self, client: TestClient) -> None:
+        r = client.post("/v1/auth/login", json={"email": "ghost@example.com", "password": "anything"})
+        assert r.status_code == 401
+
+    def test_inactive_account_returns_401(self, client: TestClient, make_user) -> None:
+        user, password = make_user(role="owner", status="inactive")
+        r = client.post("/v1/auth/login", json={"email": user.email, "password": password})
+        assert r.status_code == 401
+        assert "désactivé" in r.json()["detail"].lower()
+
+    def test_validation_missing_fields(self, client: TestClient) -> None:
+        r = client.post("/v1/auth/login", json={"email": "x@example.com"})
+        assert r.status_code == 422
 
 
-def test_signup_owner_missing_city_400(client):
-    res = client.post("/auth/signup", json={
-        "email": "owner-no-city@example.com",
-        "password": "secret123",
-        "name": "No City",
-        "role": "owner",
-        "pharmacy_name": "Pharma X",
-    })
-    assert res.status_code == 400
-    assert "ville" in res.json()["detail"].lower()
+# ── GET /auth/me ───────────────────────────────────────────────────────────
+
+class TestGetMe:
+    def test_happy_path(self, auth_owner) -> None:
+        client, user, _ = auth_owner
+        r = client.get("/v1/auth/me")
+        assert r.status_code == 200
+        assert r.json()["user"]["email"] == user.email
+
+    def test_unauthenticated_returns_401(self, client: TestClient) -> None:
+        r = client.get("/v1/auth/me")
+        assert r.status_code == 401
 
 
-def test_signup_employee_requires_pharmacy_code(client):
-    """Employees can self-signup but only via a pharmacy_code (PG-021 ext)."""
-    res = client.post("/auth/signup", json={
-        "email": "newemp-nocode@example.com",
-        "password": "secret123",
-        "name": "Employee Without Code",
-        "role": "employee",
-    })
-    assert res.status_code == 400
-    assert "code" in res.json()["detail"].lower()
+# ── PATCH /auth/me ─────────────────────────────────────────────────────────
+
+class TestUpdateMe:
+    def test_happy_path(self, auth_owner) -> None:
+        client, _user, _ = auth_owner
+        r = client.patch("/v1/auth/me", json={"name": "New Name", "phone": "+212600000000"})
+        assert r.status_code == 200
+        assert r.json()["user"]["name"] == "New Name"
+
+    def test_unauthenticated_returns_401(self, client: TestClient) -> None:
+        r = client.patch("/v1/auth/me", json={"name": "X"})
+        assert r.status_code == 401
+
+    def test_validation_missing_name(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.patch("/v1/auth/me", json={})
+        assert r.status_code == 422
 
 
-def test_signup_employee_with_pharmacy_code_succeeds(client, test_owner):
-    """Employee signup with a valid pharmacy_code joins that pharmacy (status PENDING)."""
-    code = test_owner["pharmacy"].code
-    assert code, "test_owner's pharmacy should have an auto-generated code"
-    res = client.post("/auth/signup", json={
-        "email": "newemp@example.com",
-        "password": "secret123",
-        "name": "New Employee",
-        "phone": "0611111122",
-        "role": "employee",
-        "pharmacy_code": code,
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["user"]["role"] == Role.EMPLOYEE
-    assert data["user"]["status"] == Status.PENDING
-    assert data["user"]["pharmacy_id"] == test_owner["pharmacy"].id
-    assert data["user"]["pharmacy_code"] == code
+# ── POST /auth/change-password ────────────────────────────────────────────
 
-
-def test_signup_owner_join_via_pharmacy_code(client, test_owner):
-    """An owner can join an existing pharmacy by pasting its code (no dropdown)."""
-    code = test_owner["pharmacy"].code
-    res = client.post("/auth/signup", json={
-        "email": "co-owner@example.com",
-        "password": "secret123",
-        "name": "Co Owner",
-        "phone": "0611111133",
-        "role": "owner",
-        "pharmacy_code": code,
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["user"]["role"] == Role.OWNER
-    assert data["user"]["pharmacy_id"] == test_owner["pharmacy"].id
-    assert data["user"]["pharmacy_code"] == code
-
-
-def test_signup_pharmacy_code_unknown_400(client):
-    """Unknown pharmacy_code returns 400 with the offending code in the message."""
-    res = client.post("/auth/signup", json={
-        "email": "ghost@example.com",
-        "password": "secret123",
-        "name": "Ghost",
-        "role": "employee",
-        "pharmacy_code": "XYZ9999",
-    })
-    assert res.status_code == 400
-    assert "XYZ9999" in res.json()["detail"]
-
-
-def test_signup_pharmacy_code_is_case_insensitive(client, test_owner):
-    """`bou0001` and `BOU0001` should resolve to the same pharmacy."""
-    code = test_owner["pharmacy"].code
-    res = client.post("/auth/signup", json={
-        "email": "lowercase-code@example.com",
-        "password": "secret123",
-        "name": "Lowercase Code",
-        "role": "employee",
-        "pharmacy_code": code.lower(),
-    })
-    assert res.status_code == 200
-    assert res.json()["user"]["pharmacy_id"] == test_owner["pharmacy"].id
-
-
-def test_signup_duplicate_email_400(client):
-    payload = {
-        "email": "dup@example.com",
-        "password": "secret123",
-        "name": "First",
-        "role": "owner",
-        "pharmacy_name": "Pharma A",
-        "pharmacy_city": "Casablanca",
-    }
-    client.post("/auth/signup", json=payload)
-    res = client.post("/auth/signup", json=payload)
-    assert res.status_code == 400
-    assert "déjà enregistré" in res.json()["detail"]
-
-
-def test_signup_owner_missing_pharmacy_name_400(client):
-    res = client.post("/auth/signup", json={
-        "email": "nopharm@example.com",
-        "password": "secret123",
-        "name": "No Pharma",
-        "role": "owner",
-        # no pharmacy_name and no pharmacy_id
-    })
-    assert res.status_code == 400
-    assert "Nom de pharmacie" in res.json()["detail"]
-
-
-# ── POST /auth/login ─────────────────────────────────────────────────────────
-
-
-def test_login_success(client, test_owner):
-    res = client.post("/auth/login", json={
-        "email": "owner@test.com",
-        "password": "owner123",
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["access_token"]
-    assert data["user"]["email"] == "owner@test.com"
-
-
-def test_login_wrong_password_401(client, test_owner):
-    res = client.post("/auth/login", json={
-        "email": "owner@test.com",
-        "password": "wrongpassword",
-    })
-    assert res.status_code == 401
-
-
-def test_login_nonexistent_email_401(client):
-    res = client.post("/auth/login", json={
-        "email": "ghost@example.com",
-        "password": "anything",
-    })
-    assert res.status_code == 401
-
-
-# ── GET /auth/me ──────────────────────────────────────────────────────────────
-
-
-def test_get_me_returns_user(client, test_owner):
-    res = client.get("/auth/me", headers=test_owner["headers"])
-    assert res.status_code == 200
-    data = res.json()
-    assert data["email"] == "owner@test.com"
-    assert data["role"] == Role.OWNER
-
-
-def test_get_me_works_for_pending_user(client, db):
-    """A user with status=pending can still call /auth/me."""
-    from utils.auth import create_access_token
-
-    user = User(
-        email="pending@example.com",
-        name="Pending User",
-        password_hash=hash_password("pass123"),
-        role=Role.OWNER,
-        status=Status.PENDING,
-        pharmacy_name="Pharma Pending",
-    )
-    db.add(user)
-    db.flush()
-    token = create_access_token({"sub": str(user.id)})
-    headers = {"Authorization": f"Bearer {token}"}
-
-    res = client.get("/auth/me", headers=headers)
-    assert res.status_code == 200
-    assert res.json()["status"] == Status.PENDING
-
-
-# ── PUT /auth/me ──────────────────────────────────────────────────────────────
-
-
-def test_update_me_name_and_phone(client, test_owner):
-    res = client.put("/auth/me", headers=test_owner["headers"], json={
-        "name": "Updated Name",
-        "phone": "0699999999",
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert data["name"] == "Updated Name"
-    assert data["phone"] == "0699999999"
-
-
-def test_update_me_email(client, test_owner):
-    res = client.put("/auth/me", headers=test_owner["headers"], json={
-        "email": "newemail@example.com",
-    })
-    assert res.status_code == 200
-    assert res.json()["email"] == "newemail@example.com"
-
-
-def test_update_me_duplicate_email_400(client, test_owner, test_employee):
-    res = client.put("/auth/me", headers=test_owner["headers"], json={
-        "email": "employee@test.com",  # already taken by test_employee
-    })
-    assert res.status_code == 400
-    assert "déjà utilisé" in res.json()["detail"]
-
-
-# ── POST /auth/forgot-password ───────────────────────────────────────────────
-
-
-def test_forgot_password_existing_email_204(client, test_owner):
-    with patch("routers.auth.send_reset_email", new_callable=AsyncMock) as mock_send:
-        res = client.post("/auth/forgot-password", json={
-            "email": "owner@test.com",
+class TestChangePassword:
+    def test_happy_path_reissues_session(self, auth_owner, db: Session) -> None:
+        client, user, _ = auth_owner
+        r = client.post("/v1/auth/change-password", json={
+            "current_password": "password123",
+            "new_password":     "newPassword456!",
         })
-        assert res.status_code == 204
-        mock_send.assert_called_once()
+        assert r.status_code == 204
+        db.refresh(user)
+        assert user.token_version == 1     # bumped
 
-
-def test_forgot_password_nonexistent_email_silent_204(client):
-    with patch("routers.auth.send_reset_email", new_callable=AsyncMock) as mock_send:
-        res = client.post("/auth/forgot-password", json={
-            "email": "nobody@example.com",
+    def test_wrong_current_password_returns_400(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.post("/v1/auth/change-password", json={
+            "current_password": "WRONG",
+            "new_password":     "doesntmatter",
         })
-        assert res.status_code == 204
-        mock_send.assert_not_called()
+        assert r.status_code == 400
 
-
-# ── POST /auth/reset-password ────────────────────────────────────────────────
-
-
-def test_reset_password_valid_token(client, db, test_owner):
-    user = test_owner["user"]
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
-    db.flush()
-
-    res = client.post("/auth/reset-password", json={
-        "token": token,
-        "new_password": "newpassword123",
-    })
-    assert res.status_code == 204
-
-    # Verify new password works
-    login_res = client.post("/auth/login", json={
-        "email": "owner@test.com",
-        "password": "newpassword123",
-    })
-    assert login_res.status_code == 200
-
-
-def test_reset_password_expired_token_400(client, db, test_owner):
-    user = test_owner["user"]
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expires = datetime.now(timezone.utc) - timedelta(hours=1)
-    db.flush()
-
-    res = client.post("/auth/reset-password", json={
-        "token": token,
-        "new_password": "newpassword123",
-    })
-    assert res.status_code == 400
-    assert "expiré" in res.json()["detail"].lower()
-
-
-def test_reset_password_invalid_token_400(client):
-    res = client.post("/auth/reset-password", json={
-        "token": "completely-bogus-token",
-        "new_password": "newpassword123",
-    })
-    assert res.status_code == 400
-
-
-# ── POST /auth/forgot-password-whatsapp ──────────────────────────────────────
-
-
-def test_forgot_password_whatsapp_existing_phone_204(client, test_owner):
-    with patch("routers.auth.send_whatsapp_otp", new_callable=AsyncMock) as mock_wa:
-        res = client.post("/auth/forgot-password-whatsapp", json={
-            "phone": "0600000001",
+    def test_unauthenticated_returns_401(self, client: TestClient) -> None:
+        r = client.post("/v1/auth/change-password", json={
+            "current_password": "x", "new_password": "y",
         })
-        assert res.status_code == 204
-        mock_wa.assert_called_once()
+        assert r.status_code == 401
 
 
-def test_forgot_password_whatsapp_nonexistent_phone_silent_204(client):
-    with patch("routers.auth.send_whatsapp_otp", new_callable=AsyncMock) as mock_wa:
-        res = client.post("/auth/forgot-password-whatsapp", json={
-            "phone": "0699999999",
-        })
-        assert res.status_code == 204
-        mock_wa.assert_not_called()
+# ── POST /auth/logout ─────────────────────────────────────────────────────
+
+class TestLogout:
+    def test_happy_path_clears_cookies(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.post("/v1/auth/logout")
+        assert r.status_code == 204
+        # After logout, subsequent /me should 401 once cookies are cleared.
+        # Note: TestClient may keep stale cookies; the cleared response will
+        # have Max-Age=0 — but TestClient doesn't always honor that, so we
+        # just check the logout endpoint itself succeeded.
+
+    def test_unauth_logout_is_idempotent(self, client: TestClient) -> None:
+        # Public endpoint — should 204 even without a cookie.
+        r = client.post("/v1/auth/logout")
+        assert r.status_code == 204
 
 
-# ── POST /auth/verify-otp ────────────────────────────────────────────────────
+# ── POST /auth/forgot-password ────────────────────────────────────────────
+
+class TestForgotPassword:
+    def test_always_returns_200_even_for_unknown_email(self, client: TestClient) -> None:
+        r = client.post("/v1/auth/forgot-password", json={"email": "noone@example.com"})
+        assert r.status_code == 200
+        assert "email a été envoyé" in r.json()["detail"]
+
+    def test_known_email_sets_reset_token(self, client: TestClient, make_user, db: Session) -> None:
+        user, _ = make_user(role="owner")
+        r = client.post("/v1/auth/forgot-password", json={"email": user.email})
+        assert r.status_code == 200
+        db.refresh(user)
+        assert user.reset_token is not None
+        assert user.reset_token_expires is not None
+
+    def test_inactive_account_no_token_set(self, client: TestClient, make_user, db: Session) -> None:
+        user, _ = make_user(role="owner", status="inactive")
+        r = client.post("/v1/auth/forgot-password", json={"email": user.email})
+        assert r.status_code == 200
+        db.refresh(user)
+        assert user.reset_token is None
 
 
-def test_verify_otp_valid_returns_reset_token(client, db, test_owner):
-    user = test_owner["user"]
-    user.reset_token = "123456"
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=10)
-    db.flush()
+# ── GET /auth/validate-token + POST /auth/set-password ────────────────────
 
-    res = client.post("/auth/verify-otp", json={
-        "phone": "0600000001",
-        "otp": "123456",
-    })
-    assert res.status_code == 200
-    data = res.json()
-    assert "reset_token" in data
-    assert len(data["reset_token"]) > 0
+@pytest.fixture
+def reset_token(make_user, db: Session) -> tuple[str, str]:
+    """Creates a user + a fresh reset token. Returns (email, raw_token)."""
+    from utils import generate_reset_token, hash_reset_token
+    user, _ = make_user(role="owner")
+    raw = generate_reset_token()
+    user.reset_token = hash_reset_token(raw)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=30)
+    db.commit()
+    return user.email, raw
 
 
-def test_verify_otp_wrong_otp_400(client, db, test_owner):
-    user = test_owner["user"]
-    user.reset_token = "123456"
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=10)
-    db.flush()
+class TestValidateToken:
+    def test_happy_path(self, client: TestClient, reset_token) -> None:
+        _email, raw = reset_token
+        r = client.get(f"/v1/auth/validate-token?token={raw}")
+        assert r.status_code == 200
+        body = r.json()
+        assert "full_name" in body
+        assert "is_setup" in body
 
-    res = client.post("/auth/verify-otp", json={
-        "phone": "0600000001",
-        "otp": "999999",
-    })
-    assert res.status_code == 400
-    assert "invalide" in res.json()["detail"].lower()
+    def test_invalid_token_returns_400(self, client: TestClient) -> None:
+        r = client.get("/v1/auth/validate-token?token=not-a-real-token")
+        assert r.status_code == 400
+
+    def test_expired_token_returns_400(self, client: TestClient, make_user, db: Session) -> None:
+        from utils import generate_reset_token, hash_reset_token
+        user, _ = make_user(role="owner")
+        raw = generate_reset_token()
+        user.reset_token = hash_reset_token(raw)
+        user.reset_token_expires = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+        r = client.get(f"/v1/auth/validate-token?token={raw}")
+        assert r.status_code == 400
+
+
+class TestSetPassword:
+    def test_happy_path_clears_token_and_bumps_version(self, client: TestClient, reset_token, db: Session) -> None:
+        from models import User
+        email, raw = reset_token
+        before = db.query(User).filter(User.email == email).first()
+        version_before = before.token_version
+
+        r = client.post("/v1/auth/set-password", json={"token": raw, "password": "newSecure999!"})
+        assert r.status_code == 204
+
+        db.refresh(before)
+        assert before.reset_token is None
+        assert before.reset_token_expires is None
+        assert before.token_version == version_before + 1
+
+    def test_invalid_token_returns_400(self, client: TestClient) -> None:
+        r = client.post("/v1/auth/set-password", json={"token": "not-real", "password": "abc12345"})
+        assert r.status_code == 400

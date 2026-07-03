@@ -1,15 +1,20 @@
 {
   "admin": {
-    "email": "admin@gmail.com",
-    "name": "Administrateur",
+    "email":    "admin@gmail.com",
+    "name":     "Administrateur",
     "password": "admin@123"
   },
   "owner": {
-    "email": "owner@gmail.com",
-    "name": "Propriétaire Demo",
-    "password": "owner@123",
-    "phone": "0600000001",
-    "pharmacy_name": "Pharmacie Demo",
+    "email":            "owner@gmail.com",
+    "name":             "Propriétaire Demo",
+    "password":         "owner@123",
+    "phone":            "0600000001",
+    "pharmacy_name":    "Pharmacie Demo",
     "pharmacy_address": "123 Rue Mohammed V, Casablanca"
+  },
+  "developer": {
+    "email":    "dev@gmail.com",
+    "name":     "Développeur Demo",
+    "password": "dev@123"
   }
 }

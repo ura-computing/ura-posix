@@ -1,110 +1,93 @@
-import { Link } from "react-router";
-import { useAuthenticate } from "@/hooks/useAuthenticate";
-import { useLoginForm } from "@/schemas/loginForm";
-import type { LoginFormValues } from "@/schemas/loginForm";
-import { Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Link } from "react-router-dom";
 
-import { AppLogo } from "@/components/shared/appLogo";
-import { InputPassword } from "@/components/inputPassword";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { AsyncButton } from "@/components/shared/AsyncButton";
+import { AuthLayout } from "@/components/layout/AuthLayout";
+import { PasswordField } from "@/components/shared/PasswordField";
+import { TextField } from "@/components/shared/TextField";
+import { ROUTES } from "@/types";
+import { cn } from "@/utils/cn";
 
-export const Login = () => {
-  const { login: { submit: login, loginPending } } = useAuthenticate();
-  const form = useLoginForm();
+import { useLogin } from "@/pages/login/_hooks/useLogin";
 
-  const onSubmit = (values: LoginFormValues) => {
-    login({ email: values.email, password: values.password });
-  };
+const loginSchema = z.object({
+  email:    z.string().min(1, "L'email est requis.").email("Format d'email invalide."),
+  password: z.string().min(1, "Le mot de passe est requis."),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
+
+export default function LoginPage() {
+  const { handleLogin, isPending } = useLogin();
+
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
+
+  const {
+    register,
+    handleSubmit: HandleLoginSubmit,
+    formState: { errors },
+  } = form;
+
+  const handleSubmit = HandleLoginSubmit((data) => handleLogin(data));
 
   return (
-    <div className="login">
-      <div className="logo">
-        <AppLogo />
-        <span className="brand-name">PharmaGest</span>
-        <span className="brand-sub">Gestion Pharmacie</span>
+    <AuthLayout>
+      <div className="flex w-full max-w-[360px] flex-col gap-6">
+        <header className="flex flex-col gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Connexion
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Accédez à votre espace PharmaGest.
+          </p>
+        </header>
+
+        <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+          <TextField
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="vous@exemple.ma"
+            error={errors.email?.message}
+            {...register("email")}
+          />
+
+          <PasswordField
+            label="Mot de passe"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            error={errors.password?.message}
+            {...register("password")}
+          />
+
+          <div className="flex flex-col gap-4">
+            <AsyncButton
+              type="submit"
+              variant="primary"
+              className="w-full"
+              isLoading={isPending}
+              loadingText="Connexion…"
+            >
+              Se connecter
+            </AsyncButton>
+
+            <Link
+              to={ROUTES.FORGOT_PASSWORD}
+              className={cn(
+                "text-center text-[13px] font-semibold text-primary",
+                "transition-colors hover:text-primary-hover",
+              )}
+            >
+              Mot de passe oublié ?
+            </Link>
+          </div>
+        </form>
       </div>
-
-      <Card className="card">
-        <CardHeader className="header">
-          <CardTitle className="title">Connexion</CardTitle>
-          <CardDescription className="description">
-            Bienvenue sur PharmaGest
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="content">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="form">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem className="field">
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="votre@email.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem className="field">
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Mot de passe</FormLabel>
-                      <Link
-                        to="/forgot-password"
-                        className="text-xs text-muted-foreground hover:underline"
-                        tabIndex={-1}
-                      >
-                        Mot de passe oublié ?
-                      </Link>
-                    </div>
-                    <FormControl>
-                      <InputPassword id="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button type="submit" size="lg" className="submit" disabled={loginPending}>
-                {loginPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {loginPending ? "Connexion..." : "Se connecter"}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-
-        <Separator className="divider" />
-
-        <CardFooter className="footer">
-          <span>Pas de compte ?</span>
-          <Link to="/signup">Créer un compte</Link>
-        </CardFooter>
-      </Card>
-    </div>
+    </AuthLayout>
   );
-};
+}

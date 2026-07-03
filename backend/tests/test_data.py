@@ -1,272 +1,131 @@
-"""Tests for data management endpoints (routers/data.py)."""
+"""Tests for /v1/data/imports* — import-batches listing + soft-delete."""
+from __future__ import annotations
 
-from models import Pharmacy, User
-from tests.factories import make_achat, make_import_batch, make_medicament, make_vente
-from utils.auth import hash_password, create_access_token
-from utils.constants import Role, Status
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 
-def _setup_achat_data(db, pharmacy_id, dates=None):
-    """Create a medicament and several achats with the given delivery dates."""
-    med = make_medicament(db, pid="DATA-ACH-001", product="Amoxicilline 500mg")
-    dates = dates or ["2026-01-15", "2026-02-15", "2026-03-15"]
-    achats = []
-    for i, d in enumerate(dates):
-        achats.append(make_achat(
-            db, med, pharmacy_id,
-            delivery_date=d,
-            delivery_ref=f"BL-DATA-{i+1:03d}",
-        ))
-    return med, achats
+@pytest.fixture
+def import_batch(db: Session, auth_owner):
+    """Insert an ImportBatch for the owner's pharmacy."""
+    from models import ImportBatch
+    _client, owner, pharmacy = auth_owner
 
-
-def _setup_vente_data(db, pharmacy_id, dates=None):
-    """Create a medicament and several ventes with the given dates."""
-    med = make_medicament(db, pid="DATA-VEN-001", product="Doliprane 1g")
-    dates = dates or ["2026-01-10", "2026-02-10", "2026-03-10"]
-    ventes = []
-    for i, d in enumerate(dates):
-        ventes.append(make_vente(
-            db, med, pharmacy_id,
-            date=d,
-            transaction_ref=f"FAC-DATA-{i+1:03d}",
-        ))
-    return med, ventes
-
-
-def _other_user(db):
-    """Create a separate pharmacy + owner for isolation tests."""
-    pharmacy = Pharmacy(name="Pharmacie Isolee", address="999 Rue Isolee")
-    db.add(pharmacy)
-    db.flush()
-    owner = User(
-        email="isolated_owner@test.com",
-        name="Isolated Owner",
-        password_hash=hash_password("iso123"),
-        role=Role.OWNER,
-        status=Status.ACTIVE,
-        pharmacy_id=pharmacy.id,
-    )
-    db.add(owner)
-    db.flush()
-    token = create_access_token({"sub": str(owner.id)})
-    return {
-        "pharmacy": pharmacy,
-        "user": owner,
-        "headers": {"Authorization": f"Bearer {token}"},
-    }
-
-
-# ── DELETE /data/achats ──────────────────────────────────────────────────────
-
-
-class TestClearAchats:
-    def test_clear_all_achats(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        _setup_achat_data(db, pharmacy_id)
-        db.commit()
-
-        res = client.delete("/data/achats", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 3
-
-    def test_clear_achats_by_date_range(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        _setup_achat_data(db, pharmacy_id, dates=["2026-01-15", "2026-02-15", "2026-03-15"])
-        db.commit()
-
-        res = client.delete(
-            "/data/achats",
-            params={"date_from": "2026-02-01", "date_to": "2026-02-28"},
-            headers=test_owner["headers"],
+    def _make(file_type: str = "achat", filename: str = "x.csv",
+              created_by: int | None = None, deleted: bool = False):
+        from datetime import datetime, timezone
+        batch = ImportBatch(
+            pharmacy_id=pharmacy.id,
+            file_type=file_type,
+            filename=filename,
+            rows_inserted=10,
+            rows_skipped=0,
+            status="success",
+            created_by_user_id=created_by if created_by is not None else owner.id,
         )
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 1  # only the Feb record
-
-    def test_clear_achats_empty_when_no_data(self, client, test_owner):
-        res = client.delete("/data/achats", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 0
-
-    def test_clear_achats_scoped_to_own_pharmacy(self, client, db, test_owner):
-        """Deleting achats only affects the current user's pharmacy."""
-        pharmacy_id = test_owner["pharmacy"].id
-        _setup_achat_data(db, pharmacy_id)
-
-        other = _other_user(db)
-        med2 = make_medicament(db, pid="OTHER-ACH-001", product="Other Med")
-        make_achat(db, med2, other["pharmacy"].id, delivery_ref="BL-OTHER-001")
+        if deleted:
+            batch.deleted_at = datetime.now(timezone.utc)
+            batch.deleted_by_user_id = owner.id
+        db.add(batch)
         db.commit()
+        db.refresh(batch)
+        return batch
 
-        res = client.delete("/data/achats", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 3  # only own pharmacy's records
-
-        # Verify the other pharmacy's data is untouched
-        from models import Achat
-        remaining = db.query(Achat).filter(Achat.pharmacy_id == other["pharmacy"].id).count()
-        assert remaining == 1
-
-
-# ── DELETE /data/ventes ──────────────────────────────────────────────────────
-
-
-class TestClearVentes:
-    def test_clear_all_ventes(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        _setup_vente_data(db, pharmacy_id)
-        db.commit()
-
-        res = client.delete("/data/ventes", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 3
-
-    def test_clear_ventes_by_date_range(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        _setup_vente_data(db, pharmacy_id, dates=["2026-01-10", "2026-02-10", "2026-03-10"])
-        db.commit()
-
-        res = client.delete(
-            "/data/ventes",
-            params={"date_from": "2026-03-01", "date_to": "2026-03-31"},
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 1  # only the March record
-
-    def test_clear_ventes_empty_when_no_data(self, client, test_owner):
-        res = client.delete("/data/ventes", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 0
-
-
-# ── GET /data/imports ────────────────────────────────────────────────────────
+    return _make
 
 
 class TestListImports:
-    def test_list_import_batches(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        make_import_batch(db, pharmacy_id, file_type="achat", filename="achats-jan.csv")
-        make_import_batch(db, pharmacy_id, file_type="vente", filename="ventes-feb.csv")
-        db.commit()
+    def test_empty_happy_path(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.get("/v1/data/imports")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["data"] == []
 
-        res = client.get("/data/imports", headers=test_owner["headers"])
-        assert res.status_code == 200
-        data = res.json()
-        assert len(data) == 2
-        filenames = {b["filename"] for b in data}
-        assert "achats-jan.csv" in filenames
-        assert "ventes-feb.csv" in filenames
+    def test_with_rows(self, auth_owner, import_batch) -> None:
+        client, _, _ = auth_owner
+        import_batch(file_type="achat", filename="a.csv")
+        import_batch(file_type="vente", filename="v.csv")
+        r = client.get("/v1/data/imports")
+        body = r.json()
+        assert body["pagination"]["total"] == 2
 
-    def test_list_imports_scoped_to_pharmacy(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        make_import_batch(db, pharmacy_id, filename="own-batch.csv")
+    def test_includes_soft_deleted_inline(self, auth_owner, import_batch) -> None:
+        # Per-role scope returns deleted rows too so the history shows.
+        client, _, _ = auth_owner
+        import_batch(deleted=True)
+        r = client.get("/v1/data/imports")
+        body = r.json()
+        assert body["pagination"]["total"] == 1
+        assert body["data"][0]["deleted_at"] is not None
 
-        other = _other_user(db)
-        make_import_batch(db, other["pharmacy"].id, filename="foreign-batch.csv")
-        db.commit()
+    def test_unauthenticated(self, client: TestClient) -> None:
+        r = client.get("/v1/data/imports")
+        assert r.status_code == 401
 
-        res = client.get("/data/imports", headers=test_owner["headers"])
-        assert res.status_code == 200
-        filenames = {b["filename"] for b in res.json()}
-        assert "own-batch.csv" in filenames
-        assert "foreign-batch.csv" not in filenames
+    def test_missing_feature(self, auth_owner, set_pharmacy_features) -> None:
+        client, _, p = auth_owner
+        set_pharmacy_features(p.id, ())
+        r = client.get("/v1/data/imports")
+        assert r.status_code == 403
 
-    def test_list_imports_empty(self, client, test_owner):
-        res = client.get("/data/imports", headers=test_owner["headers"])
-        assert res.status_code == 200
-        assert res.json() == []
 
-    def test_import_batch_fields(self, client, db, test_owner):
-        """Verify the returned batch includes expected fields."""
-        make_import_batch(
-            db, test_owner["pharmacy"].id,
-            file_type="achat",
-            filename="fields-test.csv",
-            rows_inserted=50,
-            rows_skipped=3,
+class TestDeleteImport:
+    def test_happy_path_soft_delete_achat(self, auth_owner, import_batch, db: Session) -> None:
+        from models import ImportBatch
+        client, _, _ = auth_owner
+        batch = import_batch(file_type="achat")
+        r = client.delete(f"/v1/data/imports/{batch.id}")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["id"] == batch.id
+        assert body["file_type"] == "achat"
+        # Row stays but is soft-deleted.
+        db.refresh(batch)
+        assert batch.deleted_at is not None
+
+    def test_stock_keeps_data(self, auth_owner, import_batch) -> None:
+        # Stock variant: UPSERT can't be undone — endpoint returns 0 deleted_rows.
+        client, _, _ = auth_owner
+        batch = import_batch(file_type="stock")
+        r = client.delete(f"/v1/data/imports/{batch.id}")
+        assert r.status_code == 200
+        assert r.json()["deleted_rows"] == 0
+
+    def test_already_deleted_returns_409(self, auth_owner, import_batch) -> None:
+        client, _, _ = auth_owner
+        batch = import_batch(deleted=True)
+        r = client.delete(f"/v1/data/imports/{batch.id}")
+        assert r.status_code == 409
+
+    def test_not_found(self, auth_owner) -> None:
+        client, _, _ = auth_owner
+        r = client.delete("/v1/data/imports/999999")
+        assert r.status_code == 404
+
+    def test_other_pharmacy_404(self, auth_owner, make_pharmacy, db: Session) -> None:
+        # Insert a batch on another pharmacy; owner can't see/delete it.
+        from models import ImportBatch
+        client, _owner, _ = auth_owner
+        other = make_pharmacy(name="OtherDataPh")
+        b = ImportBatch(
+            pharmacy_id=other.id, file_type="achat", filename="foreign.csv",
+            rows_inserted=1, rows_skipped=0, status="success",
         )
+        db.add(b)
         db.commit()
+        db.refresh(b)
+        r = client.delete(f"/v1/data/imports/{b.id}")
+        assert r.status_code == 404
 
-        res = client.get("/data/imports", headers=test_owner["headers"])
-        assert res.status_code == 200
-        batch = res.json()[0]
-        assert batch["file_type"] == "achat"
-        assert batch["filename"] == "fields-test.csv"
-        assert batch["rows_inserted"] == 50
-        assert batch["rows_skipped"] == 3
-        assert "imported_at" in batch
+    def test_unauthenticated(self, client: TestClient) -> None:
+        r = client.delete("/v1/data/imports/1")
+        assert r.status_code == 401
 
-
-# ── DELETE /data/imports/{id} ────────────────────────────────────────────────
-
-
-class TestDeleteImportBatch:
-    def test_delete_achat_batch(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        batch = make_import_batch(db, pharmacy_id, file_type="achat")
-        med = make_medicament(db, pid="DEL-BATCH-001", product="Batch Med")
-        make_achat(db, med, pharmacy_id, delivery_ref="BL-BATCH-001", import_batch_id=batch.id)
-        make_achat(db, med, pharmacy_id, delivery_ref="BL-BATCH-002", import_batch_id=batch.id)
-        db.commit()
-
-        res = client.delete(
-            f"/data/imports/{batch.id}",
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 2
-
-    def test_delete_vente_batch(self, client, db, test_owner):
-        pharmacy_id = test_owner["pharmacy"].id
-        batch = make_import_batch(db, pharmacy_id, file_type="vente")
-        med = make_medicament(db, pid="DEL-VBATCH-001", product="Vente Batch Med")
-        make_vente(db, med, pharmacy_id, transaction_ref="FAC-BATCH-001", import_batch_id=batch.id)
-        db.commit()
-
-        res = client.delete(
-            f"/data/imports/{batch.id}",
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 200
-        assert res.json()["deleted"] == 1
-
-    def test_delete_missing_batch_returns_404(self, client, test_owner):
-        res = client.delete(
-            "/data/imports/99999",
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 404
-
-    def test_delete_batch_wrong_pharmacy_returns_403(self, client, db, test_owner):
-        other = _other_user(db)
-        batch = make_import_batch(db, other["pharmacy"].id, filename="other-batch.csv")
-        db.commit()
-
-        res = client.delete(
-            f"/data/imports/{batch.id}",
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 403
-
-    def test_delete_batch_removes_batch_record(self, client, db, test_owner):
-        """After deleting a batch, it should no longer appear in imports list."""
-        pharmacy_id = test_owner["pharmacy"].id
-        batch = make_import_batch(db, pharmacy_id, filename="to-remove.csv")
-        db.commit()
-
-        # Delete the batch
-        res = client.delete(
-            f"/data/imports/{batch.id}",
-            headers=test_owner["headers"],
-        )
-        assert res.status_code == 200
-
-        # Verify it's gone from the list
-        res2 = client.get("/data/imports", headers=test_owner["headers"])
-        assert res2.status_code == 200
-        ids = {b["id"] for b in res2.json()}
-        assert batch.id not in ids
+    def test_missing_feature(self, auth_owner, import_batch, set_pharmacy_features) -> None:
+        client, _, p = auth_owner
+        batch = import_batch()
+        set_pharmacy_features(p.id, ())
+        r = client.delete(f"/v1/data/imports/{batch.id}")
+        assert r.status_code == 403

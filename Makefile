@@ -1,176 +1,118 @@
-BACKEND_DIR   := ./backend
-FRONTEND_DIR  := ./frontend
-EXTENSION_DIR := ./extension
-ENV_DIR       := ./env
+BACKEND_DIR  := ./backend
+FRONTEND_DIR := ./frontend
+DEV_DB       := apcm
 
-# Prefer a Python with prebuilt psycopg2-binary wheels. 3.14 has none yet, so
-# pip would compile from source and fail without pg_config. Override with `make PYTHON=...`.
-PYTHON := $(shell command -v python3.13 2>/dev/null || command -v python3.12 2>/dev/null || command -v python3)
-VENV := $(BACKEND_DIR)/.venv
-PIP  := $(VENV)/bin/python3 -m pip
+.PHONY: help dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks
 
-.DEFAULT_GOAL := start
+help:
+	@echo "PharmaGest commands:"
+	@echo ""
+	@echo "  Local dev (dockerized DB + host backend/frontend):"
+	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
+	@echo "    make backend   — only the backend (auto-starts the DB; uvicorn :8000, hot reload)"
+	@echo "    make frontend  — only the frontend (Vite dev :5173)"
+	@echo "    make db        — start the Postgres container + create the dev DB if missing"
+	@echo "    make migrate   — apply Alembic migrations against the dev DB"
+	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
+	@echo "    make cli       — interactive Python CLI"
+	@echo ""
+	@echo "  Docker demo (one-command setup for clients):"
+	@echo "    make demo      — build + run the full stack (postgres + backend + frontend)"
+	@echo "                     → Frontend: http://localhost:4173"
+	@echo "                     → Login:    admin@gmail.com / admin@123"
+	@echo "    make down      — stop containers (DB volume survives)"
+	@echo "    make logs      — tail container logs"
+	@echo "    make clean     — DESTRUCTIVE: stop + wipe the demo DB volume"
+	@echo ""
+	@echo "  Tests + git hooks:"
+	@echo "    make test          — backend (pytest) + frontend (vitest) suites"
+	@echo "    make test-backend  — backend pytest only"
+	@echo "    make test-frontend — frontend vitest only"
+	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
+	@echo "                         (run once per clone; bypass with git push --no-verify)"
 
-.PHONY: \
-	back-install back-dev back-build back-prod back-seed back-db-clean \
-	front-install front-dev front-build front-serve \
-	ext-install ext-dev ext-build \
-	test test-back test-front test-ext test-db \
-	db db-ui down check-env install dev build serve seed db-clean clean start demo prod
+# ── Local dev (dockerized Postgres + host-side backend/frontend) ────────────
 
-# ── Environment ──────────────────────────────────────────────────────────────
-# Backend reads directly from env/{APP_ENV}/backend.env (no copy needed).
-# Frontend & extension need .env copied because Vite only reads from its own dir.
-# Docker Compose reads from root .env (copied from env/{ENV}/docker.env).
+dev: db
+	@trap 'kill 0' EXIT INT; \
+	  $(MAKE) backend & \
+	  $(MAKE) frontend & \
+	  wait
 
-# TODO: add MAIL_USERNAME MAIL_PASSWORD WHATSAPP_PHONE_NUMBER_ID WHATSAPP_ACCESS_TOKEN once configured
-REQUIRED_BACKEND_VARS := DATABASE_URL SECRET_KEY FRONTEND_URL
-
-_load-env = \
-	@cp $(ENV_DIR)/$(1)/docker.env .env; \
-	cp $(ENV_DIR)/$(1)/frontend.env $(FRONTEND_DIR)/.env; \
-	cp $(ENV_DIR)/$(1)/extension.env $(EXTENSION_DIR)/.env; \
-	echo "Loaded $(1) environment from $(ENV_DIR)/$(1)/"
-
-check-env:
-	@test -f $(ENV_DIR)/$${APP_ENV:-dev}/backend.env || { echo "ERROR: $(ENV_DIR)/$${APP_ENV:-dev}/backend.env not found"; exit 1; }
-	@missing=""; \
-	for var in $(REQUIRED_BACKEND_VARS); do \
-		val=$$(grep -E "^$$var=" $(ENV_DIR)/$${APP_ENV:-dev}/backend.env 2>/dev/null | cut -d= -f2-); \
-		if [ -z "$$val" ] || echo "$$val" | grep -qE "^your_|^your-|^CHANGE_ME"; then \
-			missing="$$missing  - $$var\n"; \
-		fi; \
-	done; \
-	if [ -n "$$missing" ]; then \
-		echo ""; \
-		echo "============================================================"; \
-		echo "FATAL: Missing or unconfigured environment variables:"; \
-		printf "$$missing"; \
-		echo "============================================================"; \
-		echo "Set them in $(ENV_DIR)/$${APP_ENV:-dev}/backend.env and try again."; \
-		echo ""; \
-		exit 1; \
-	fi
-
-# ── Database ───────────────────────────────────────────────────────────────────
-
+# `db` boots the Postgres container (idempotent — no-op if already up) and
+# ensures the dev database exists. The container's POSTGRES_DB env only
+# creates apcm_demo; we add `apcm` for dev on top of that.
 db:
-	docker compose up -d --wait db
+	@if [ -z "$$(docker compose ps -q db)" ] || [ -z "$$(docker compose ps -q --status running db)" ]; then \
+	  echo "▸ Starting Postgres container…"; \
+	  cp env/demo/docker.env .env 2>/dev/null || true; \
+	  docker compose up -d --wait db; \
+	fi
+	@docker compose exec -T db psql -U apcm -d postgres -tAc \
+	  "SELECT 1 FROM pg_database WHERE datname='$(DEV_DB)'" | grep -q 1 || { \
+	    echo "▸ Creating dev database '$(DEV_DB)'…"; \
+	    docker compose exec -T db psql -U apcm -d postgres -c "CREATE DATABASE $(DEV_DB);"; \
+	  }
 
-db-ui:
-	open tableplus://
+backend: db
+	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
+
+frontend:
+	cd $(FRONTEND_DIR) && npm run dev
+
+cli:
+	cd $(BACKEND_DIR) && uv run python -m cli
+
+migrate: db
+	cd $(BACKEND_DIR) && uv run python bootstrap.py
+
+# Run the same seed.py the docker entrypoint runs — but against the dev DB
+# (the backend's local .env / DATABASE_URL).
+seed: db migrate
+	cd $(BACKEND_DIR) && uv run python seed.py
+
+# ── Docker demo (client-shippable) ──────────────────────────────────────────
+# Boots postgres + backend + frontend via docker-compose. Re-runs are safe:
+# the backend's entrypoint inspects DB state and chooses the right path —
+#
+#   • empty volume        → create_all + alembic stamp head + seed
+#   • legacy volume       → align schema + alembic stamp head, seed skipped
+#                           (no alembic_version table yet — see bootstrap.py)
+#   • managed volume      → alembic upgrade head (pending migrations only),
+#                           seed skipped — DATA PRESERVED across the upgrade
+#
+# `make clean` is the only path that wipes data (drops the docker volume).
+
+demo:
+	@cp env/demo/docker.env .env
+	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend
+	@echo "▸ Building containers + bootstrapping schema (smart)…"
+	@docker compose up -d --build --wait
+	@echo ""
+	@echo "✓ Demo ready:"
+	@echo "    Frontend : http://localhost:4173"
+	@echo "    Backend  : http://localhost:8000"
+	@echo "    Login    : admin@gmail.com / admin@123  (or owner@gmail.com / owner@123)"
 
 down:
 	docker compose down
 
-# ── Backend ────────────────────────────────────────────────────────────────────
+logs:
+	docker compose logs -f --tail=100
 
-back-install:
-	$(PYTHON) -m venv $(VENV)
-	$(PIP) install -r $(BACKEND_DIR)/requirements.txt
-
-back-seed: check-env db
-	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python seed.py
-
-back-db-clean: db
-	cd $(BACKEND_DIR) && APP_ENV=$${APP_ENV:-dev} .venv/bin/python db_clean.py --force
-
-back-dev: back-install
-	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env
-	@docker compose up -d --wait db
-	cd $(BACKEND_DIR) && APP_ENV=dev .venv/bin/uvicorn main:app --reload --port 8000
-
-back-prod:
-	$(call _load-env,prod)
-	@APP_ENV=prod $(MAKE) check-env db
-	cd $(BACKEND_DIR) && APP_ENV=prod .venv/bin/uvicorn main:app --port 8000
-
-back-build: back-install
-
-# ── Frontend ───────────────────────────────────────────────────────────────────
-
-front-install:
-	cd $(FRONTEND_DIR) && npm install
-
-front-dev: front-install
-	cd $(FRONTEND_DIR) && npm run dev
-
-front-build: front-install
-	cd $(FRONTEND_DIR) && npm run build
-
-front-serve:
-	cd $(FRONTEND_DIR) && npm run start
-
-# ── Extension ─────────────────────────────────────────────────────────────────
-
-ext-install:
-	cd $(EXTENSION_DIR) && npm install
-
-ext-dev:
-	cd $(EXTENSION_DIR) && npm run dev
-
-ext-build:
-	cd $(EXTENSION_DIR) && npm run build
-
-# ── Shortcuts ─────────────────────────────────────────────────────────────────
-
-install: back-install front-install ext-install
-
-build: back-build front-build ext-build
-
-db-clean: back-db-clean
-clean: back-db-clean
-seed: back-seed
-
-# ── Tests ─────────────────────────────────────────────────────────────────────
-
-test-db:
-	$(call _load-env,dev)
-	@docker compose down -v 2>/dev/null || true
-	@docker compose up -d --wait db
-	@docker compose exec db psql -U apcm -d postgres -c "CREATE DATABASE apcm_test;" 2>/dev/null || true
-
-test-back: back-install test-db
-	cd $(BACKEND_DIR) && APP_ENV=test .venv/bin/python -m pytest -v $(ARGS)
-
-test-front: front-install
-	cd $(FRONTEND_DIR) && npx vitest run $(ARGS)
-
-test-ext: ext-install
-	cd $(EXTENSION_DIR) && npx vitest run $(ARGS)
-
-test: test-back test-front test-ext
-
-# ── Dev environment (local Vite dev servers + local DB) ───────────────────────
-
-dev:
-	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env db back-install
-	@APP_ENV=dev $(MAKE) back-dev &
-	@$(MAKE) front-dev
-
-start: install
-	$(call _load-env,dev)
-	@APP_ENV=dev $(MAKE) check-env db seed dev
-
-# ── Demo environment (Docker Compose — separate DB, auto-seed, clean start) ──
-
-demo:
-	$(call _load-env,demo)
-	@$(MAKE) ext-install ext-build
-	@cp resources/catalog.csv $(BACKEND_DIR)/catalog.csv 2>/dev/null || true
+clean:
 	docker compose down -v
-	docker compose build --no-cache
-	docker compose up
-	@rm -f $(BACKEND_DIR)/catalog.csv
+	@echo "✓ Volume removed. Next `make demo` starts from an empty DB."
 
-# ── Prod environment (optimised backend + pre-built frontend, local DB) ───────
+# ── Tests + git hooks ──────────────────────────────────────────────────────
 
-prod:
-	$(call _load-env,prod)
-	@APP_ENV=prod $(MAKE) build check-env db
-	@APP_ENV=prod $(MAKE) back-prod &
-	@$(MAKE) front-serve
+test: test-backend test-frontend
 
-serve: prod
+test-backend:
+	cd $(BACKEND_DIR) && uv run pytest
+
+test-frontend:
+	cd $(FRONTEND_DIR) && npm test -- --run
+
+install-hooks:
+	@bash scripts/install-hooks.sh

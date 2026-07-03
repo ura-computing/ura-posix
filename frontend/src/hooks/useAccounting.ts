@@ -1,40 +1,36 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import * as accountingApi from "@/api/accounting";
-import type { PaymentEntryCreate } from "@/api/accounting";
+/** Comptabilité — TanStack Query wrappers around the /accounting/payments
+ *  endpoints. Mutations invalidate the PAYMENTS_PREFIX so the page card grid
+ *  refreshes without a manual refetch. */
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const PAYMENTS_KEY = ["payments"] as const;
+import { deletePayment, listPayments, savePayment } from "@/api/accounting";
+import { QUERY_KEYS } from "@/types";
+import type { PaymentEntry, PaymentEntryIn } from "@/types";
 
+
+/** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
 export function usePayments(month?: string) {
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: [...PAYMENTS_KEY, month],
-    queryFn: () => accountingApi.listPayments(month),
+  return useQuery({
+    queryKey: QUERY_KEYS.PAYMENTS(month),
+    queryFn:  () => listPayments(month),
+    staleTime: 30_000,
   });
-  return { payments, isLoading };
 }
+
 
 export function useSavePayment() {
-  const queryClient = useQueryClient();
-  const { mutate: savePayment, isPending: saving } = useMutation({
-    mutationFn: (body: PaymentEntryCreate) => accountingApi.savePayment(body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY });
-      toast.success("Paiement enregistré");
-    },
-    onError: (err) => toast.error(err.message),
+  const qc = useQueryClient();
+  return useMutation<PaymentEntry, Error, PaymentEntryIn>({
+    mutationFn: savePayment,
+    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PAYMENTS_PREFIX }); },
   });
-  return { savePayment, saving };
 }
 
+
 export function useDeletePayment() {
-  const queryClient = useQueryClient();
-  const { mutate: deletePayment, isPending: deleting } = useMutation({
-    mutationFn: (id: number) => accountingApi.deletePayment(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PAYMENTS_KEY });
-      toast.success("Entrée supprimée");
-    },
-    onError: (err) => toast.error(err.message),
+  const qc = useQueryClient();
+  return useMutation<{ deleted: true }, Error, number>({
+    mutationFn: deletePayment,
+    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PAYMENTS_PREFIX }); },
   });
-  return { deletePayment, deleting };
 }

@@ -1,129 +1,116 @@
-import { request } from "./client";
-import { ENDPOINTS } from "@/constants";
+import { api } from "@/api/client";
+import type {
+  AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary,
+  VentesDiscountSummary,
+  VentesFilters, VentesListResponse, VentesSuggestions, VentesSurveillanceCounts,
+} from "@/types";
 
-export type TransactionFilters = {
-  page: number;
-  limit: number;
-  search?: string;
-  categories?: string[];
-  tva?: string[];
-  dateFrom?: string;
-  dateTo?: string;
-  surveillance?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-  /** When false, non-declared ("produits spéciaux") rows are excluded. Backend defaults true. */
-  includeNonDeclared?: boolean;
-};
 
-export type PaginatedResult<T> = {
-  data: T[];
-  pagination: { total: number; page: number; limit: number; totalPages: number };
-};
-
-export type CategorySuffixOut = {
-  id: number;
-  category: string;
-  suffix: string;
-  color?: string | null;
-};
-
-function buildTransactionQs(p: TransactionFilters): URLSearchParams {
-  const qs = new URLSearchParams({ page: String(p.page), limit: String(p.limit) });
-  if (p.search) qs.set("search", p.search);
-  p.categories?.forEach((c) => qs.append("category", c));
-  p.tva?.forEach((t) => qs.append("tva", t));
-  if (p.dateFrom) qs.set("date_from", p.dateFrom);
-  if (p.dateTo) qs.set("date_to", p.dateTo);
-  if (p.sortBy) qs.set("sort_by", p.sortBy);
-  if (p.sortOrder) qs.set("sort_order", p.sortOrder);
-  if (p.includeNonDeclared === false) qs.set("include_non_declared", "false");
-  return qs;
+/** Serialize filters into a query string. Skips empty + nulls. Used by listVentes + counts. */
+function ventesQs(f: Partial<VentesFilters>): string {
+  const p = new URLSearchParams();
+  if (f.page != null)                     p.set("page",   String(f.page));
+  if (f.limit != null)                    p.set("limit",  String(f.limit));
+  if (f.date_from)                        p.set("date_from", f.date_from);
+  if (f.date_to)                          p.set("date_to",   f.date_to);
+  if (f.search)                           p.set("search", f.search);
+  if (f.surveillance)                     p.set("surveillance", f.surveillance);
+  if (f.include_non_declared === false)   p.set("include_non_declared", "false");
+  if (f.sort_by)                          p.set("sort_by",    f.sort_by);
+  if (f.sort_order)                       p.set("sort_order", f.sort_order);
+  for (const c of f.category ?? []) p.append("category", c);
+  for (const t of f.tva ?? [])      p.append("tva",      t);
+  return p.toString();
 }
 
-export const listAchats = (p: TransactionFilters) =>
-  request<PaginatedResult<Record<string, unknown>>>(`/achat?${buildTransactionQs(p)}`);
 
-export const listVentes = (p: TransactionFilters) => {
-  const qs = buildTransactionQs(p);
-  if (p.surveillance) qs.set("surveillance", p.surveillance);
-  return request<PaginatedResult<Record<string, unknown>>>(`/ventes?${qs}`);
-};
+export function listVentes(filters: Partial<VentesFilters>): Promise<VentesListResponse> {
+  return api(`/ventes?${ventesQs(filters)}`);
+}
 
-export type SurveillanceCounts = { all: number; remises: number; remises_high: number; marge_negative: number; marge_low: number };
 
-export const venteSurveillanceCounts = (dateFrom?: string, dateTo?: string, search?: string, categories?: string[], tva?: string[]) => {
+export function listVentesCategories(): Promise<string[]> {
+  return api(`/ventes/categories`);
+}
+
+
+export function listVentesTvaRates(): Promise<string[]> {
+  return api(`/ventes/tva-rates`);
+}
+
+
+/** Full filtered set for Excel export. Honors every filter EXCEPT pagination.
+ *  Backend caps at MAX_EXPORT_ROWS (50k) → throws ApiErr 413 if exceeded. */
+export function exportVentes(filters: Partial<VentesFilters>): Promise<VentesListResponse> {
+  const { page: _p, limit: _l, ...rest } = filters;
+  const qs = ventesQs(rest);
+  return api(`/ventes?${qs}${qs ? "&" : ""}export=true`);
+}
+
+
+export function listVentesSurveillanceCounts(filters: Partial<VentesFilters>): Promise<VentesSurveillanceCounts> {
+  // Counts share the same filter shape but ignore surveillance/sort/pagination
+  const { surveillance: _s, sort_by: _sb, sort_order: _so, page: _p, limit: _l, ...rest } = filters;
+  return api(`/ventes/surveillance-counts?${ventesQs(rest)}`);
+}
+
+
+/** Discount-vs-full-price split for the /ventes remise-discipline gauge.
+ *  Same filter axes as surveillance-counts: ignores pagination/sort AND
+ *  the active surveillance tab so the gauge always reflects the full set. */
+export function listVentesDiscountSummary(filters: Partial<VentesFilters>): Promise<VentesDiscountSummary> {
+  const { surveillance: _s, sort_by: _sb, sort_order: _so, page: _p, limit: _l, ...rest } = filters;
+  return api(`/ventes/discount-summary?${ventesQs(rest)}`);
+}
+
+
+export function listVentesSuggestions(q: string): Promise<VentesSuggestions> {
+  return api(`/ventes/suggestions?q=${encodeURIComponent(q)}`);
+}
+
+// ── Achats (Page 4) ─────────────────────────────────────────────────────────
+
+function achatsQs(f: Partial<AchatsFilters>): string {
   const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (search) p.set("search", search);
-  categories?.forEach((c) => p.append("category", c));
-  tva?.forEach((t) => p.append("tva", t));
-  const qs = p.toString();
-  return request<SurveillanceCounts>(`/ventes/surveillance-counts${qs ? `?${qs}` : ""}`);
-};
+  if (f.page != null)               p.set("page",   String(f.page));
+  if (f.limit != null)              p.set("limit",  String(f.limit));
+  if (f.date_from)                  p.set("date_from", f.date_from);
+  if (f.date_to)                    p.set("date_to",   f.date_to);
+  if (f.search)                     p.set("search", f.search);
+  if (f.sort_by)                    p.set("sort_by",    f.sort_by);
+  if (f.sort_order)                 p.set("sort_order", f.sort_order);
+  for (const c of f.category ?? []) p.append("category", c);
+  for (const t of f.tva ?? [])      p.append("tva",      t);
+  return p.toString();
+}
 
-export const exportAchat = (
-  search: string,
-  categories: string[],
-  dateFrom?: string,
-  dateTo?: string,
-  tva?: string[],
-) => {
-  const p = new URLSearchParams({ export: "true" });
-  if (search) p.set("search", search);
-  categories.forEach((c) => p.append("category", c));
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  tva?.forEach((t) => p.append("tva", t));
-  return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.achat.list}?${p}`);
-};
 
-export const exportVente = (
-  search: string,
-  categories: string[],
-  dateFrom?: string,
-  dateTo?: string,
-  tva?: string[],
-  surveillance?: string,
-) => {
-  const p = new URLSearchParams({ export: "true" });
-  if (search) p.set("search", search);
-  categories.forEach((c) => p.append("category", c));
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  tva?.forEach((t) => p.append("tva", t));
-  if (surveillance) p.set("surveillance", surveillance);
-  return request<{ data: Record<string, unknown>[] }>(`${ENDPOINTS.ventes.list}?${p}`);
-};
+export function listAchats(filters: Partial<AchatsFilters>): Promise<AchatsListResponse> {
+  return api(`/achats?${achatsQs(filters)}`);
+}
 
-export const achatCategories = () => request<string[]>(ENDPOINTS.achat.categories);
-export const venteCategories = () => request<string[]>(ENDPOINTS.ventes.categories);
-export const achatTvaRates = () => request<string[]>(ENDPOINTS.achat.tvaRates);
-export const venteTvaRates = () => request<string[]>(ENDPOINTS.ventes.tvaRates);
+/** Full filtered set for Excel export. Same contract as exportVentes. */
+export function exportAchats(filters: Partial<AchatsFilters>): Promise<AchatsListResponse> {
+  const { page: _p, limit: _l, ...rest } = filters;
+  const qs = achatsQs(rest);
+  return api(`/achats?${qs}${qs ? "&" : ""}export=true`);
+}
 
-export type SupplierSummaryGroup = { total_mad: number; bl_count: number; unit_count: number };
-export type SupplierSummaryResponse = { grossiste: SupplierSummaryGroup; direct_labo: SupplierSummaryGroup };
 
-export const achatSupplierSummary = (dateFrom?: string, dateTo?: string, search?: string, categories?: string[], tva?: string[]) => {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (search) p.set("search", search);
-  if (categories?.length) categories.forEach((c) => p.append("category", c));
-  if (tva?.length) tva.forEach((t) => p.append("tva", t));
-  const qs = p.toString();
-  return request<SupplierSummaryResponse>(`/achat/supplier-summary${qs ? `?${qs}` : ""}`);
-};
+export function listAchatsCategories(): Promise<string[]> {
+  return api(`/achats/categories`);
+}
 
-export const achatSuggestions = (q: string) =>
-  request<{ products: string[]; suppliers: string[]; refs: string[] }>(
-    `/achat/suggestions?q=${encodeURIComponent(q)}`,
-  );
+export function listAchatsTvaRates(): Promise<string[]> {
+  return api(`/achats/tva-rates`);
+}
 
-export const venteSuggestions = (q: string) =>
-  request<{ products: string[]; clients: string[]; refs: string[] }>(
-    `/ventes/suggestions?q=${encodeURIComponent(q)}`,
-  );
+export function listAchatsSuggestions(q: string): Promise<AchatsSuggestions> {
+  return api(`/achats/suggestions?q=${encodeURIComponent(q)}`);
+}
 
-export const getCategorySuffixes = () => request<CategorySuffixOut[]>("/category-suffixes");
+export function listAchatsSupplierSummary(filters: Partial<AchatsFilters>): Promise<AchatsSupplierSummary> {
+  // supplier-summary ignores pagination + sort — strip them
+  const { page: _p, limit: _l, sort_by: _sb, sort_order: _so, ...rest } = filters;
+  return api(`/achats/supplier-summary?${achatsQs(rest)}`);
+}

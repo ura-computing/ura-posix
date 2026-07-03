@@ -1,0 +1,38 @@
+import { useCallback, useEffect, useState } from "react";
+
+export const THEME_MODES = { LIGHT: "light", DARK: "dark", SYSTEM: "system" } as const;
+export type ThemeMode = (typeof THEME_MODES)[keyof typeof THEME_MODES];
+
+const STORAGE_KEY = "pg-theme";
+
+function resolveDark(mode: ThemeMode): boolean {
+  if (mode === THEME_MODES.DARK) return true;
+  if (mode === THEME_MODES.LIGHT) return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function applyTheme(mode: ThemeMode): void {
+  document.documentElement.classList.toggle("dark", resolveDark(mode));
+}
+
+export function useTheme() {
+  const [mode, setModeState] = useState<ThemeMode>(
+    () => (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? THEME_MODES.SYSTEM,
+  );
+
+  useEffect(() => {
+    applyTheme(mode);
+    if (mode !== THEME_MODES.SYSTEM) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyTheme(THEME_MODES.SYSTEM);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [mode]);
+
+  const setMode = useCallback((next: ThemeMode) => {
+    localStorage.setItem(STORAGE_KEY, next);
+    setModeState(next);
+  }, []);
+
+  return { mode, setMode };
+}

@@ -1,74 +1,60 @@
-from typing import Any, Dict, Optional
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from utils.constants import Role, Status
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class UserSignup(BaseModel):
-    email: EmailStr
+class LoginRequest(BaseModel):
+    email:    EmailStr
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ValidateTokenResponse(BaseModel):
+    is_setup:  bool         # true when password_hash is null (first-time setup)
+    full_name: str          # user's display name to greet them on the set-password page
+
+
+class SetPasswordRequest(BaseModel):
+    token:    str
+    password: str = Field(min_length=8)
+
+
+class UpdateProfileRequest(BaseModel):
+    name:  str = Field(min_length=1)
+    phone: str = Field(min_length=1)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password:     str = Field(min_length=8)
+
+
+class PharmacyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id:   int
     name: str
-    phone: Optional[str] = None
-    role: str = Role.OWNER              # owner | employee
-    pharmacy_name: Optional[str] = None   # owner creating a new pharmacy
-    pharmacy_city: Optional[str] = None   # owner creating a new pharmacy
-    pharmacy_code: Optional[str] = None   # owner joining existing OR employee joining
-    pharmacy_id: Optional[int] = None    # legacy: still accepted for backward compat
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+    code: str | None
 
 
 class UserOut(BaseModel):
-    id: int
-    email: str
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    pharmacy_name: Optional[str] = None
-    profile_complete: bool = False
-    role: str = Role.OWNER
-    status: str = Status.PENDING
-    permissions: Dict[str, bool] = {}
-    pharmacy_id: Optional[int] = None
-    pharmacy_address: Optional[str] = None
-    pharmacy_code: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
 
-    @field_validator("permissions", mode="before")
-    @classmethod
-    def coerce_permissions(cls, v: Any) -> Dict[str, bool]:
-        return v if v is not None else {}
-
-    model_config = {"from_attributes": True}
+    id:            int
+    email:         EmailStr
+    name:          str | None
+    phone:         str | None
+    role:          Literal["admin", "owner", "employee", "developer"]
+    status:        Literal["active", "revoked", "pending", "rejected"]
+    pharmacy_id:   int | None
+    last_login_at: datetime | None
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: UserOut
-
-
-class ProfileUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    pharmacy_name: Optional[str] = None
-    pharmacy_address: Optional[str] = None
-
-
-class ForgotPasswordPayload(BaseModel):
-    email: EmailStr
-
-
-class ResetPasswordPayload(BaseModel):
-    token: str
-    new_password: str = Field(min_length=6)
-
-
-class ForgotPasswordWhatsAppPayload(BaseModel):
-    phone: str
-
-
-class VerifyOtpPayload(BaseModel):
-    phone: str
-    otp: str
+class MeResponse(BaseModel):
+    user:        UserOut
+    pharmacy:    PharmacyOut | None
+    permissions: list[str]

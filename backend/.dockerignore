@@ -1,10 +1,11 @@
 .venv
 __pycache__
 *.pyc
-*.pyo
-.git
 .env
-.env.local
-*.log
+.env.*
 .pytest_cache
-.coverage
+.ruff_cache
+.git
+.vscode
+.idea
+*.log
