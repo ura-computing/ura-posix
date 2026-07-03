@@ -1,275 +1,126 @@
-import { request, fetchBlob } from "./client";
-import { eCategoryType } from "@/types";
+import { api } from "@/api/client";
+import type {
+  AdminPharmacyRow,
+  AdminStatsResponse,
+  AnalyseFilters,
+  AnalyseMargeResponse,
+  ListeRequest,
+  MarginAlertsResponse,
+  MargeMode,
+  PeremptionsResponse,
+  StatsFilters,
+  StatsResponse,
+  StockAbcdResponse,
+  StockFilters,
+  StockSummaryResponse,
+} from "@/types";
 
-export type StatsKpis = {
-  ventes_total: number;
-  achats_total: number;
-  ventes_count: number;
-  achats_count: number;
-};
-export type MonthlyTrend = { month: string; ventes: number; achats: number };
-export type TopCategory = { category: string; total: number; marge_pct: number | null };
-export type AdvancedKpis = {
-  ticket_moyen: number;
-  vente_moyenne_par_jour: number;
-  best_day_dh: { date: string; total: number } | null;
-  worst_day_dh: { date: string; total: number } | null;
-  best_day_count: { date: string; count: number } | null;
-  worst_day_count: { date: string; count: number } | null;
-};
-export type TvaStats = { tva_encaissee: number; tva_payee: number; tva_a_declarer: number };
-export type MargeStats = { marge_pct: number; marge_brute_dh: number; marge_nette_dh: number };
-export type TypeBreakdown = {
-  pharmacie: { ventes_total: number };
-  parapharmacie: { ventes_total: number };
-};
-export type PreviousKpis = {
-  ventes_total: number;
-  achats_total: number;
-  /** Same per-medicament weighted formula as kpis.marge — apples-to-apples for the variation badge. */
-  marge_pct: number;
-};
-export type StatsResponse = {
-  kpis: StatsKpis;
-  previous_kpis: PreviousKpis;
-  advanced_kpis: AdvancedKpis;
-  tva: TvaStats;
-  marge: MargeStats;
-  type_breakdown: TypeBreakdown;
-  monthly_trend: MonthlyTrend[];
-  top_categories: TopCategory[];
-};
 
-export type MarginAlertBracket = {
-  count: number;
-  total_ca: number;
-  total_margin_dh: number;
-  products: { product: string; marge_pct: number; ca: number }[];
-};
-
-export type MarginAlertsResponse = {
-  negative: MarginAlertBracket;
-  low: MarginAlertBracket;
-  high: MarginAlertBracket;
-  very_high: MarginAlertBracket;
-};
-
-export type MargeKpiItem = { label: string; value: number; qty: number } | null;
-export type AnalyseMargeKpis = {
-  total_ventes_dh: number;
-  total_ventes_unites: number;
-  total_units_available: number;
-  total_pu_purchased: number;
-  ppv_total_available: number;
-  marge_pct_avg: number | null;
-  marge_pct_min: MargeKpiItem;
-  marge_pct_max: MargeKpiItem;
-  marge_dh_avg: number | null;
-  marge_dh_min: MargeKpiItem;
-  marge_dh_max: MargeKpiItem;
-  difference_gain_dh: number | null;
-};
-export type AnalyseMargeResponse = {
-  kpis: AnalyseMargeKpis;
-  rows: Record<string, unknown>[];
-};
-
-export type StockStatus =
-  | "sous-stock"
-  | "ideal"
-  | "a-surveiller"
-  | "sur-stock"
-  | "inconnu"
-  | "negatif";
-
-export type StockAbcdProduct = {
-  product: string;
-  category: string;
-  units_sold_12m: number;
-  stock_min: number;
-  stock_max: number;
-  current_stock: number | null;
-  ppv: number | null;
-  avg_pu: number | null;
-  status: StockStatus;
-};
-
-export type StockAbcdParams = {
-  classFilter?: string;
-  status?: StockStatus | "all";
-  search?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-};
-
-export type StockAbcdResponse = {
-  distribution: Record<string, number>;
-  total_references: number;
-  ppv_potentiel: number;
-  products: StockAbcdProduct[];
-};
-
-export type PeremptionProduct = {
-  product: string;
-  /** null for products in the no_date bracket (PG-008). */
-  expiry_date: string | null;
-  quantity: number;
-  ppv: number;
-};
-
-export type PeremptionBracket = {
-  count: number;
-  total_units: number;
-  purchase_value: number;
-  sale_value: number;
-  products: PeremptionProduct[];
-};
-
-export type PeremptionsResponse = {
-  expired: PeremptionBracket;
-  very_close: PeremptionBracket;
-  close: PeremptionBracket;
-  /** Products in stock whose expiry_date is missing on the Sobrus snapshot. */
-  no_date: PeremptionBracket;
-};
-
-function buildQs(dateFrom?: string, dateTo?: string, categoryType?: string): string {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
-  const qs = p.toString();
-  return qs ? `?${qs}` : "";
+function qs(filters: Partial<StatsFilters>): string {
+  const params = new URLSearchParams();
+  if (filters.date_from)            params.set("date_from",            filters.date_from);
+  if (filters.date_to)              params.set("date_to",              filters.date_to);
+  if (filters.category_type)        params.set("category_type",        filters.category_type);
+  if (filters.include_non_declared) params.set("include_non_declared", "true");
+  const s = params.toString();
+  return s ? `?${s}` : "";
 }
 
-export const getStats = (
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType?: string,
-  includeNonDeclared?: boolean,
-) => {
-  const qs = buildQs(dateFrom, dateTo, categoryType);
-  const sep = qs ? "&" : "?";
-  const extra = includeNonDeclared ? `${sep}include_non_declared=true` : "";
-  return request<StatsResponse>(`/stats${qs}${extra}`);
-};
 
-export const analyseMarge = (
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType?: string,
-  mode?: string,
-) => {
+// ── Owner endpoints ──────────────────────────────────────────────────────────
+
+export function getStats(filters: StatsFilters): Promise<StatsResponse> {
+  return api<StatsResponse>(`/stats${qs(filters)}`);
+}
+
+export function getMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">): Promise<MarginAlertsResponse> {
+  return api<MarginAlertsResponse>(`/stats/margin-alerts${qs(filters)}`);
+}
+
+export function getStockSummary(): Promise<StockSummaryResponse> {
+  return api<StockSummaryResponse>("/stats/stock-summary");
+}
+
+
+// ── Admin endpoints ──────────────────────────────────────────────────────────
+
+export function getAdminStats(): Promise<AdminStatsResponse> {
+  return api<AdminStatsResponse>("/admin/stats");
+}
+
+export function getAdminPharmacies(): Promise<AdminPharmacyRow[]> {
+  return api<AdminPharmacyRow[]>("/admin/pharmacies");
+}
+
+export function getAdminPharmacyStats(pharmacyId: number, filters: StatsFilters): Promise<StatsResponse> {
+  return api<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs(filters)}`);
+}
+
+export function getAdminPharmacyMarginAlerts(
+  pharmacyId: number,
+  filters: Omit<StatsFilters, "include_non_declared">,
+): Promise<MarginAlertsResponse> {
+  return api<MarginAlertsResponse>(`/admin/pharmacy/${pharmacyId}/stats/margin-alerts${qs(filters)}`);
+}
+
+export function getAdminPharmacyStockSummary(pharmacyId: number): Promise<StockSummaryResponse> {
+  return api<StockSummaryResponse>(`/admin/pharmacy/${pharmacyId}/stats/stock-summary`);
+}
+
+export function getAdminPharmacyAnalyseMarge(
+  pharmacyId: number,
+  mode: MargeMode,
+  filters: AnalyseFilters,
+): Promise<AnalyseMargeResponse> {
+  const params = new URLSearchParams();
+  params.set("mode", mode);
+  if (filters.date_from)     params.set("date_from",     filters.date_from);
+  if (filters.date_to)       params.set("date_to",       filters.date_to);
+  if (filters.category_type) params.set("category_type", filters.category_type);
+  return api<AnalyseMargeResponse>(`/admin/pharmacy/${pharmacyId}/stats/analyse-marge?${params.toString()}`);
+}
+
+// ── Stock (Page 6) ──────────────────────────────────────────────────────────
+
+function stockQs(f: Partial<StockFilters>): string {
   const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
-  if (mode) p.set("mode", mode);
-  const qs = p.toString();
-  return request<AnalyseMargeResponse>(`/stats/analyse-marge${qs ? `?${qs}` : ""}`);
-};
+  if (f.date_from)    p.set("date_from",    f.date_from);
+  if (f.date_to)      p.set("date_to",      f.date_to);
+  if (f.class_filter) p.set("class_filter", f.class_filter);
+  if (f.status)       p.set("status",       f.status);
+  if (f.search)       p.set("search",       f.search);
+  if (f.sort_by)      p.set("sort_by",      f.sort_by);
+  if (f.sort_order)   p.set("sort_order",   f.sort_order);
+  return p.toString();
+}
 
-export type ListeItem = { name: string; pid?: string; barcode1?: string; barcode2?: string };
+export function listStockAbcd(filters: Partial<StockFilters>): Promise<StockAbcdResponse> {
+  const qsStr = stockQs(filters);
+  return api(qsStr ? `/stats/stock-abcd?${qsStr}` : `/stats/stock-abcd`);
+}
 
-export const analyseListe = (
-  items: ListeItem[],
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType?: string,
-) =>
-  request<AnalyseMargeResponse>("/stats/analyse-liste", {
-    method: "POST",
-    body: JSON.stringify({
-      items,
-      date_from: dateFrom || null,
-      date_to: dateTo || null,
-      category_type: categoryType || "all",
-    }),
+export function listPeremptions(): Promise<PeremptionsResponse> {
+  return api(`/stats/peremptions`);
+}
+
+// ── Analyse de marge (Page 11) ──────────────────────────────────────────────
+
+export function getAnalyseMarge(
+  filters: AnalyseFilters,
+  mode:    MargeMode,
+): Promise<AnalyseMargeResponse> {
+  const p = new URLSearchParams();
+  p.set("mode", mode);
+  if (filters.date_from)     p.set("date_from", filters.date_from);
+  if (filters.date_to)       p.set("date_to",   filters.date_to);
+  if (filters.category_type) p.set("category_type", filters.category_type);
+  return api<AnalyseMargeResponse>(`/stats/analyse-marge?${p.toString()}`);
+}
+
+export function postAnalyseListe(body: ListeRequest): Promise<AnalyseMargeResponse> {
+  return api<AnalyseMargeResponse>("/stats/analyse-liste", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
   });
-
-export const exportExcel = (
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType: eCategoryType = eCategoryType.ALL,
-  includeNonDeclared?: boolean,
-): Promise<Blob> => {
-  const p = new URLSearchParams({ category_type: categoryType });
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (includeNonDeclared) p.set("include_non_declared", "true");
-  return fetchBlob(`/stats/export-excel?${p}`);
-};
-
-export const exportExcelForPharmacy = (
-  pharmacyId: number,
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType: eCategoryType = eCategoryType.ALL,
-): Promise<Blob> => {
-  const p = new URLSearchParams({ category_type: categoryType });
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  return fetchBlob(`/admin/pharmacy/${pharmacyId}/stats/export-excel?${p}`);
-};
-
-export const getMarginAlerts = (dateFrom?: string, dateTo?: string, categoryType?: string) =>
-  request<MarginAlertsResponse>(`/stats/margin-alerts${buildQs(dateFrom, dateTo, categoryType)}`);
-
-export const getPharmacyMarginAlerts = (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType?: string) =>
-  request<MarginAlertsResponse>(`/admin/pharmacy/${pharmacyId}/stats/margin-alerts${buildQs(dateFrom, dateTo, categoryType)}`);
-
-export const getPharmacyStats = (pharmacyId: number, dateFrom?: string, dateTo?: string, categoryType?: string) => {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
-  const qs = p.toString();
-  return request<StatsResponse>(`/admin/pharmacy/${pharmacyId}/stats${qs ? `?${qs}` : ""}`);
-};
-
-export const getStockAbcd = (
-  dateFrom?: string,
-  dateTo?: string,
-  extra: StockAbcdParams = {},
-) => {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (extra.classFilter) p.set("class_filter", extra.classFilter);
-  if (extra.status && extra.status !== "all") p.set("status", extra.status);
-  if (extra.search) p.set("search", extra.search);
-  if (extra.sortBy) p.set("sort_by", extra.sortBy);
-  if (extra.sortOrder) p.set("sort_order", extra.sortOrder);
-  const qs = p.toString();
-  return request<StockAbcdResponse>(`/stats/stock-abcd${qs ? `?${qs}` : ""}`);
-};
-
-export const getPharmacyStockAbcd = (pharmacyId: number, dateFrom?: string, dateTo?: string) => {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  const qs = p.toString();
-  return request<StockAbcdResponse>(`/admin/pharmacy/${pharmacyId}/stats/stock-abcd${qs ? `?${qs}` : ""}`);
-};
-
-export const getPeremptions = (dateFrom?: string, dateTo?: string) =>
-  request<PeremptionsResponse>(`/stats/peremptions${buildQs(dateFrom, dateTo)}`);
-
-export const getPharmacyPeremptions = (pharmacyId: number, dateFrom?: string, dateTo?: string) =>
-  request<PeremptionsResponse>(`/admin/pharmacy/${pharmacyId}/stats/peremptions${buildQs(dateFrom, dateTo)}`);
-
-export const analyseMargeForPharmacy = (
-  pharmacyId: number,
-  dateFrom?: string,
-  dateTo?: string,
-  categoryType?: string,
-  mode?: string,
-) => {
-  const p = new URLSearchParams();
-  if (dateFrom) p.set("date_from", dateFrom);
-  if (dateTo) p.set("date_to", dateTo);
-  if (categoryType && categoryType !== eCategoryType.ALL) p.set("category_type", categoryType);
-  if (mode) p.set("mode", mode);
-  const qs = p.toString();
-  return request<AnalyseMargeResponse>(`/admin/pharmacy/${pharmacyId}/stats/analyse-marge${qs ? `?${qs}` : ""}`);
-};
+}

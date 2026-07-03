@@ -1,192 +1,41 @@
-import logging
-import os
-import sys
-import time
-from pathlib import Path
-from dotenv import load_dotenv
-
-_env_name = os.getenv("APP_ENV", "dev")
-_env_file = Path(__file__).resolve().parent.parent / "env" / _env_name / "backend.env"
-if _env_file.exists():
-    load_dotenv(_env_file)
-
-# ---------------------------------------------------------------------------
-# Environment variable validation (runs before any other imports so we fail
-# early with a clear message instead of a cryptic traceback).
-# ---------------------------------------------------------------------------
-_REQUIRED_ENV_VARS = {
-    "DATABASE_URL": "database connection",
-    "SECRET_KEY": "JWT signing key — required for secure token generation",
-    "FRONTEND_URL": "needed for password-reset email links",
-}
-
-_OPTIONAL_ENV_VARS = {
-    # TODO: make required once email is configured
-    "MAIL_USERNAME": "email password reset will not work",
-    "MAIL_PASSWORD": "email password reset will not work",
-    # TODO: make required once WhatsApp is configured
-    "WHATSAPP_PHONE_NUMBER_ID": "WhatsApp OTP password reset will not work",
-    "WHATSAPP_ACCESS_TOKEN": "WhatsApp OTP password reset will not work",
-}
-
-_missing_required = {k: v for k, v in _REQUIRED_ENV_VARS.items() if not os.getenv(k)}
-if _missing_required:
-    msg = "\n".join(f"  - {var} ({purpose})" for var, purpose in _missing_required.items())
-    raise RuntimeError(
-        f"\n\n{'='*60}\n"
-        f"FATAL: Missing required environment variables:\n{msg}\n"
-        f"{'='*60}\n"
-        f"Set them in backend/.env and restart.\n"
-    )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-_startup_logger = logging.getLogger("apcm.startup")
-
-for var, note in _OPTIONAL_ENV_VARS.items():
-    if not os.getenv(var):
-        _startup_logger.warning("Optional env var %s is not set — %s", var, note)
-# ---------------------------------------------------------------------------
-
-from typing import List
-
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-logger = logging.getLogger("apcm")
-from sqlalchemy.orm import Session
+from config import settings
+from rate_limit import limiter, rate_limit_handler
+from routers import accounting, admin_catalog, admin_pharmacies, admin_stats, auth, category_suffixes, data, health, owner_employees, sessions, special_products, stats, store_website, transactions, uploads
 
-from database import engine, Base, get_db
-from models import CategorySuffix
-from schemas import CategorySuffixOut
-from routers import accounting, admin, auth, bl_exclusions, catalog_requests, data, owner, public, uploads
-from routers.transactions import achat_router, vente_router
-from routers.stats import router as stats_router
-from routers.auth import get_current_user
-from utils.limiter import limiter
-from models import User
 
-Base.metadata.create_all(bind=engine)
+app = FastAPI(title="PharmaGest", version="0.1.0")
 
-# Enable pg_trgm for fuzzy/similarity search (used by the product search helper).
-# Idempotent — safe to run on every boot.
-with engine.begin() as _conn:
-    _conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
-    # PG-006: unaccent powers accent-insensitive supplier/laboratoire search so
-    # `societe para` matches `Société PARA LA CDP` without the user typing the é.
-    _conn.exec_driver_sql("CREATE EXTENSION IF NOT EXISTS unaccent;")
-    # Pharmacy.city + Pharmacy.code (Ticket 5). create_all() doesn't ALTER
-    # existing tables, so we add the columns + unique index here, then
-    # backfill codes for any rows that don't have one yet.
-    _conn.exec_driver_sql("ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS city VARCHAR;")
-    _conn.exec_driver_sql("ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS code VARCHAR;")
-    _conn.exec_driver_sql(
-        "CREATE UNIQUE INDEX IF NOT EXISTS ix_pharmacies_code ON pharmacies (code);"
-    )
-
-# Backfill missing pharmacy codes — uses the name as the prefix source
-# (existing rows have no city).
-from models import Pharmacy  # noqa: E402
-from utils.pharmacy_code import generate_pharmacy_code  # noqa: E402
-from database import SessionLocal  # noqa: E402
-
-with SessionLocal() as _db:
-    _to_backfill = _db.query(Pharmacy).filter(Pharmacy.code.is_(None)).all()
-    for _p in _to_backfill:
-        _p.code = generate_pharmacy_code(_db, _p.city or _p.name)
-        # Flush after each assignment so the next call to
-        # generate_pharmacy_code sees the freshly-assigned code and picks
-        # the next slot for the same prefix (otherwise all rows that
-        # share a 3-letter prefix would collide on the unique index).
-        _db.flush()
-    if _to_backfill:
-        _db.commit()
-
-app = FastAPI(title="APCM Pharma API", version="1.1.0")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
-_allow_origins = [o.strip() for o in _cors_origins.split(",")]
-
+# CORS — exact-match the configured frontend origin. allow_credentials must be
+# True because the frontend sends httpOnly cookies (access_token, session_token).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allow_origins,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    allow_origins=[settings.FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Requested-With"],
 )
 
+# slowapi: register the limiter on app.state so the @limiter.limit decorators
+# can find it via request.app.state.limiter, and translate 429s to French.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    if os.getenv("APP_ENV") == "prod":
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    return response
-
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start = time.perf_counter()
-    response = await call_next(request)
-    duration = (time.perf_counter() - start) * 1000
-    logger.info("%s %s → %s  (%.1fms)", request.method, request.url.path, response.status_code, duration)
-    return response
-
-
-app.include_router(auth.router)
-app.include_router(public.router)
-app.include_router(uploads.router)
-app.include_router(achat_router)
-app.include_router(vente_router)
-app.include_router(data.router)
-app.include_router(admin.router)
-app.include_router(owner.router)
-app.include_router(catalog_requests.router)
-app.include_router(bl_exclusions.router)
-app.include_router(stats_router)
-app.include_router(accounting.router)
-
-
-_DEFAULTS = [
-    ("Medicament", "-1"),
-    ("Parapharmacie", "-1"),
-    ("Complement Alimentaire", "-2"),
-    ("Homeopathie", "-3"),
-]
-
-
-@app.on_event("startup")
-def seed_category_suffixes():
-    """Insert default category→suffix mappings if the table is empty."""
-    db: Session = next(get_db())
-    try:
-        if db.query(CategorySuffix).count() == 0:
-            for cat, suf in _DEFAULTS:
-                db.add(CategorySuffix(category=cat, suffix=suf))
-            db.commit()
-    finally:
-        db.close()
-
-
-@app.get("/category-suffixes", response_model=List[CategorySuffixOut], tags=["category-suffixes"])
-def get_category_suffixes(
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Return all category→suffix mappings. Available to all authenticated users."""
-    return db.query(CategorySuffix).order_by(CategorySuffix.category).all()
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+app.include_router(health.router,   prefix="/v1")
+app.include_router(auth.router,     prefix="/v1/auth")
+app.include_router(sessions.router, prefix="/v1/sessions")
+app.include_router(stats.router,         prefix="/v1")
+app.include_router(admin_stats.router,   prefix="/v1")
+app.include_router(admin_catalog.router, prefix="/v1")
+app.include_router(admin_pharmacies.router, prefix="/v1")
+app.include_router(owner_employees.router, prefix="/v1")
+app.include_router(uploads.router,      prefix="/v1")
+app.include_router(transactions.router, prefix="/v1")
+app.include_router(data.router,             prefix="/v1")
+app.include_router(category_suffixes.router, prefix="/v1")
+app.include_router(special_products.router,  prefix="/v1/special-products")
+app.include_router(accounting.router,         prefix="/v1")
+app.include_router(store_website.router,      prefix="/v1")

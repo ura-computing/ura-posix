@@ -1,531 +1,552 @@
-import csv
-import io
-from typing import Any
+"""Sobrus CSV ingestion endpoints.
 
-import openpyxl
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+Six endpoints in two flavours:
+  • Multipart CSV uploads (browser file picker):
+      POST /v1/uploads/achat
+      POST /v1/uploads/vente
+      POST /v1/uploads/stock
+  • JSON payload (Chrome extension DOM-scrapes Sobrus tables → POSTs rows directly):
+      POST /v1/uploads/achat-json
+      POST /v1/uploads/vente-json
+  • Cancel a running batch (audit Decision 3):
+      PATCH /v1/uploads/batches/{id}
+
+Achats/Ventes support chunked uploads via `batch_id`: chunk 1 returns a fresh
+ImportBatch id, subsequent chunks pass that id so a 2 000-row file produces ONE
+audit row (fixes apcm-pharma's batch_id threading bug).
+
+Stock is single-shot — Sobrus stock exports are point-in-time snapshots, no
+chunking needed. Uses Postgres `ON CONFLICT (pharmacy_id, medicament_id)` upsert
+so re-importing yesterday's stock seamlessly updates today's row.
+
+File-size limit: 10 MB across all endpoints.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Annotated, Any, Callable
+
+from fastapi import APIRouter, File, Form, HTTPException, Path, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
 
-from database import get_db
-from datetime import date as _date
-
-from models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
-from routers.auth import get_current_user
-from utils.strings import fix_mojibake, normalize_category, strip_accents
-
-# Header aliases applied AFTER mojibake fix. Keys/values are lowercased for matching.
-_HEADER_ALIASES = {
-    "caégorie": "Catégorie",  # missing 't' typo seen in some Sobrus exports
-}
-
-router = APIRouter(prefix="/uploads", tags=["uploads"])
-
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-
-def _decode(content: bytes) -> str:
-    for enc in ("utf-8-sig", "utf-8", "latin-1"):
-        try:
-            return content.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    raise HTTPException(status_code=400, detail="Impossible de décoder l'encodage du fichier")
+from csv_parse import (
+    classify_product_type, col, parse_catalog_csv, parse_csv, parse_float,
+    parse_int, parse_iso_date, upsert_medicament,
+)
+from database import DbDep
+from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
+from permissions import require_admin, require_feature, require_pharmacy_owner
+from schemas.catalog import CatalogImportResponse
+from security import CurrentUserDep
 
 
-def _parse_float(val: str) -> float | None:
-    if not val or not val.strip():
-        return None
-    try:
-        return float(val.strip().replace(",", "."))
-    except ValueError:
-        return None
+router = APIRouter(tags=["uploads"])
 
 
-def _clean_header(h: str) -> str:
-    """Strip quotes/whitespace, fix mojibake, apply known aliases."""
-    cleaned = fix_mojibake(h.strip().strip('"')) or ""
-    return _HEADER_ALIASES.get(cleaned.lower(), cleaned)
+MAX_FILE_BYTES = 10 * 1024 * 1024   # 10 MB
+ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
+EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
+EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
 
-def _clean_value(v: str) -> str:
-    """Strip quotes/whitespace, fix mojibake."""
-    return fix_mojibake(v.strip().strip('"')) or ""
+# ─── Pydantic bodies (JSON variants + PATCH) ─────────────────────────────────
+
+class JsonRow(BaseModel):
+    """Single Sobrus-row scraped from the DOM. Keys are the column labels."""
+    key:   str
+    value: str | None = None
 
 
-def _parse_csv(content: bytes) -> list[dict]:
-    text = _decode(content)
-    reader = csv.DictReader(io.StringIO(text), delimiter=";")
-    return [
-        {_clean_header(k): _clean_value(v) for k, v in row.items() if k}
-        for row in reader
-        if any((v or "").strip() for v in row.values())
-    ]
-
-
-def _upsert_medicament(db: Session, pid: str, product: str, tva: str | None,
-                        pph: float | None, ppv: float | None,
-                        category: str | None, zone: str | None) -> Medicament:
-    category = normalize_category(category)
-    # 1. Try exact Sobrus PID match
-    med = db.query(Medicament).filter(Medicament.pid == pid).first()
-    if not med:
-        # 2. Fall back to name match (case + accent insensitive)
-        name = (product or "").strip()
-        if name:
-            med = db.query(Medicament).filter(
-                Medicament.product.ilike(name)
-            ).first()
-            # 2b. Try accent-stripped match if still not found
-            if not med:
-                norm = strip_accents(name.lower())
-                med = db.query(Medicament).filter(
-                    func.lower(Medicament.product).ilike(f"%{norm}%")
-                ).first()
-                # Only accept if the stripped name is an exact match, not just a substring
-                if med and strip_accents((med.product or "").lower()) != norm:
-                    med = None
-        if med:
-            med.pid = pid  # claim: barcode/name pid → Sobrus pid
-        else:
-            med = Medicament(pid=pid, product=product, tva=tva, pph=pph,
-                             ppv=ppv, category=category, zone=zone)
-            db.add(med)
-            db.flush()
-            return med
-    # Update only fields that improve on what's already stored
-    if tva:
-        med.tva = tva
-    if pph is not None:
-        med.pph = pph
-    if ppv is not None:
-        med.ppv = ppv
-    # Never overwrite category from CSV — catalog is source of truth
-    if category and not med.category:
-        med.category = category
-    if zone:
-        med.zone = zone
-    db.flush()
-    return med
-
-
-def _insert_achats(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None, filename: str | None = None, batch_id: int | None = None) -> dict:
-    # Pre-load existing (delivery_ref, medicament_id) pairs scoped to this pharmacy
-    incoming_refs = {
-        (row.get("Référence de livraison") or "").strip()
-        for row in rows
-        if (row.get("Référence de livraison") or "").strip()
-    }
-    existing_pairs: set[tuple[str, int]] = set()
-    if incoming_refs:
-        q = db.query(Achat.delivery_ref, Achat.medicament_id).filter(
-            Achat.delivery_ref.in_(incoming_refs)
-        )
-        if pharmacy_id is not None:
-            q = q.filter(Achat.pharmacy_id == pharmacy_id)
-        existing_pairs = {(a.delivery_ref, a.medicament_id) for a in q.all()}
-
-    if batch_id:
-        batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
-        if not batch:
-            batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="achat", filename=filename)
-            db.add(batch)
-            db.flush()
-    else:
-        batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="achat", filename=filename)
-        db.add(batch)
-        db.flush()
-
-    achats = []
-    skipped = 0
-    for row in rows:
-        pid = (row.get("PID") or "").strip()
-        if not pid:
-            continue
-        med = _upsert_medicament(
-            db,
-            pid=pid,
-            product=row.get("Produit", ""),
-            tva=row.get("TVA") or None,
-            pph=_parse_float(str(row.get("PPH", ""))),
-            ppv=_parse_float(str(row.get("PPV", ""))),
-            category=row.get("Catégorie") or None,
-            zone=row.get("Zone") or None,
-        )
-        delivery_ref = (row.get("Référence de livraison") or "").strip() or None
-        if delivery_ref and (delivery_ref, med.id) in existing_pairs:
-            skipped += 1
-            continue
-        achats.append(Achat(
-            pharmacy_id=pharmacy_id,
-            medicament_id=med.id,
-            import_batch_id=batch.id,
-            created_at_source=row.get("Créée le") or None,
-            delivery_date=row.get("Date Bon de Livraison") or None,
-            delivery_ref=delivery_ref,
-            supplier=row.get("Fournisseur") or None,
-            quantity=_parse_float(str(row.get("Quantité", ""))),
-            unit_price=_parse_float(str(row.get("Prix unitaire", ""))),
-            expiry_date=row.get("Date de péremption") or None,
-            stock_min=_parse_float(str(row.get("Stock min", ""))),
-            stock_max=_parse_float(str(row.get("Stock max", ""))),
-            total=_parse_float(str(row.get("Total", ""))),
-        ))
-    db.bulk_save_objects(achats)
-    batch.rows_inserted = (batch.rows_inserted or 0) + len(achats)
-    batch.rows_skipped = (batch.rows_skipped or 0) + skipped
-    db.commit()
-    return {"inserted": len(achats), "skipped": skipped, "batch_id": batch.id}
-
-
-def _insert_ventes(db: Session, rows: list[dict[str, Any]], pharmacy_id: int | None = None, filename: str | None = None, batch_id: int | None = None) -> dict:
-    # Pre-load existing (transaction_ref, medicament_id) pairs scoped to this pharmacy
-    incoming_refs = {
-        (row.get("Numéro de transaction") or "").strip()
-        for row in rows
-        if (row.get("Numéro de transaction") or "").strip()
-    }
-    existing_pairs: set[tuple[str, int]] = set()
-    if incoming_refs:
-        q = db.query(Vente.transaction_ref, Vente.medicament_id).filter(
-            Vente.transaction_ref.in_(incoming_refs)
-        )
-        if pharmacy_id is not None:
-            q = q.filter(Vente.pharmacy_id == pharmacy_id)
-        existing_pairs = {(v.transaction_ref, v.medicament_id) for v in q.all()}
-
-    if batch_id:
-        batch = db.query(ImportBatch).filter(ImportBatch.id == batch_id).first()
-        if not batch:
-            batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="vente", filename=filename)
-            db.add(batch)
-            db.flush()
-    else:
-        batch = ImportBatch(pharmacy_id=pharmacy_id or 0, file_type="vente", filename=filename)
-        db.add(batch)
-        db.flush()
-
-    ventes = []
-    skipped = 0
-    for row in rows:
-        pid = (row.get("PID") or "").strip()
-        if not pid:
-            continue
-        med = _upsert_medicament(
-            db,
-            pid=pid,
-            product=row.get("Produit", ""),
-            tva=row.get("TVA") or None,
-            pph=_parse_float(str(row.get("PPH", ""))),
-            ppv=_parse_float(str(row.get("PPV", ""))),
-            category=row.get("Catégorie") or None,
-            zone=row.get("Zone") or None,
-        )
-        transaction_ref = (row.get("Numéro de transaction") or "").strip() or None
-        if transaction_ref and (transaction_ref, med.id) in existing_pairs:
-            skipped += 1
-            continue
-        ventes.append(Vente(
-            pharmacy_id=pharmacy_id,
-            medicament_id=med.id,
-            import_batch_id=batch.id,
-            date=row.get("Date") or None,
-            transaction_ref=transaction_ref,
-            client=row.get("Client") or None,
-            quantity=_parse_float(str(row.get("Quantité", ""))),
-            discount=_parse_float(str(row.get("Remise", ""))),
-            unit_price=_parse_float(str(row.get("Prix unitaire", ""))),
-            total=_parse_float(str(row.get("Total", ""))),
-        ))
-    db.bulk_save_objects(ventes)
-    batch.rows_inserted = (batch.rows_inserted or 0) + len(ventes)
-    batch.rows_skipped = (batch.rows_skipped or 0) + skipped
-    db.commit()
-    return {"inserted": len(ventes), "skipped": skipped, "batch_id": batch.id}
-
-
-# ─── Pydantic models ──────────────────────────────────────────────────────────
-
-class TableUpload(BaseModel):
-    rows: list[dict[str, Any]]
+class JsonUploadBody(BaseModel):
+    rows:     list[dict[str, str]]    # the extension serializes one row as {label: value, ...}
     filename: str | None = None
     batch_id: int | None = None
 
 
-# ─── Endpoints ────────────────────────────────────────────────────────────────
-
-def _require_import(current_user: User = Depends(get_current_user)) -> User:
-    if (current_user.permissions or {}).get("import") is False:
-        raise HTTPException(status_code=403, detail="Accès à l'import refusé")
-    return current_user
+class PatchBatchBody(BaseModel):
+    status:        str
+    error_message: str | None = None
 
 
-@router.post("/achat")
-async def upload_achat(
-    file: UploadFile = File(...),
-    batch_id: int | None = Form(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(_require_import),
-):
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
-    rows = _parse_csv(content)
-    if not rows:
-        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
-    return _insert_achats(db, rows, current_user.pharmacy_id, filename=file.filename, batch_id=batch_id)
+# ─── Shared helpers ──────────────────────────────────────────────────────────
+
+def _check_size(content: bytes) -> None:
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Fichier trop volumineux (max {MAX_FILE_BYTES // (1024*1024)} Mo).",
+        )
 
 
-@router.post("/achat-json")
-async def upload_achat_json(
-    body: TableUpload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(_require_import),
-):
-    if not body.rows:
-        raise HTTPException(status_code=400, detail="Aucune ligne fournie")
-    return _insert_achats(db, body.rows, current_user.pharmacy_id, filename=body.filename, batch_id=body.batch_id)
+def _check_csv(file: UploadFile) -> None:
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Seuls les fichiers CSV sont acceptés.",
+        )
 
 
-@router.post("/vente")
-async def upload_vente(
-    file: UploadFile = File(...),
-    batch_id: int | None = Form(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(_require_import),
-):
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
-    rows = _parse_csv(content)
-    if not rows:
-        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
-    return _insert_ventes(db, rows, current_user.pharmacy_id, filename=file.filename, batch_id=batch_id)
+def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filename: str | None,
+                        batch_id: int | None, user_id: int) -> ImportBatch:
+    """Returns the existing batch if `batch_id` is given AND it belongs to this pharmacy.
+    Otherwise creates a fresh `in_progress` batch and returns it. New batches start at
+    rows_inserted=0 / rows_skipped=0; chunked uploads accumulate on later calls.
+
+    `user_id` is recorded on NEW batches only — subsequent chunks that reuse an
+    existing batch preserve the original creator."""
+    if batch_id is not None:
+        batch = db.get(ImportBatch, batch_id)
+        if batch and batch.pharmacy_id == pharmacy_id and batch.file_type == file_type:
+            return batch
+        # silently fall through to create — caller passed a stale/foreign id
+    batch = ImportBatch(
+        pharmacy_id=pharmacy_id, file_type=file_type, filename=filename,
+        rows_inserted=0, rows_skipped=0, status="in_progress",
+        created_by_user_id=user_id,
+    )
+    db.add(batch)
+    db.flush()
+    return batch
 
 
-@router.post("/vente-json")
-async def upload_vente_json(
-    body: TableUpload,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(_require_import),
-):
-    if not body.rows:
-        raise HTTPException(status_code=400, detail="Aucune ligne fournie")
-    return _insert_ventes(db, body.rows, current_user.pharmacy_id, filename=body.filename, batch_id=body.batch_id)
+# ─── Sobrus CSV column name constants (catch typos at import time) ───────────
+
+COL_PID         = "PID"
+COL_PRODUCT     = "Produit"
+COL_CATEGORY    = "Catégorie"
+COL_TVA         = "TVA"
+COL_PPH         = "PPH"
+COL_PPV         = "PPV"
+COL_ZONE        = "Zone"
+COL_QUANTITY    = "Quantité"
+COL_TOTAL       = "Total"
+COL_UNIT_PRICE  = "Prix unitaire"
+# Achat-only
+COL_DELIVERY_REF  = "Référence de livraison"
+COL_DELIVERY_DATE = "Date Bon de Livraison"
+COL_CREATED      = "Créée le"
+COL_SUPPLIER     = "Fournisseur"
+COL_EXPIRY       = "Date de péremption"
+COL_STOCK_MIN    = "Stock min"
+COL_STOCK_MAX    = "Stock max"
+# Vente-only
+COL_TXN_REF      = "Numéro de transaction"
+COL_DATE         = "Date"
+COL_CLIENT       = "Client"
+COL_DISCOUNT     = "Remise"
 
 
-def _parse_catalog_csv(content: bytes) -> list[Medicament]:
-    """Parse catalog.csv (comma-delimited): Nom,Categorie,TVA,PPV,PPH,Code barre 1,Code barre 2,Laboratoire"""
-    import re
-    text = _decode(content)
-    reader = csv.DictReader(io.StringIO(text), delimiter=",")
-    medicaments = []
-    seen_names: set[str] = set()
-    seen_pids: set[str] = set()
-    for row in reader:
-        name = re.sub(r'\s+', ' ', (row.get("Nom") or "").strip())
-        if not name or name.lower() in seen_names:
+# ─── Per-type config + one generic insert pipeline (replaces _insert_achats + _insert_ventes) ─
+
+@dataclass(frozen=True)
+class TransactionConfig:
+    """Captures the 5 things that differ between an Achat ingest and a Vente ingest.
+    Everything else (medicament upsert, dedup, batch accounting, commit) is in
+    `_insert_transactions` and runs against either config unchanged."""
+    file_type:    str                                              # "achat" | "vente"
+    model:        type                                             # Achat | Vente (SQLAlchemy class)
+    dedup_column: str                                              # CSV column to dedup on
+    dedup_attr:   str                                              # corresponding model attribute name
+    build_row:    Callable[[dict[str, Any], int, int, int], Any]   # (row, pharmacy_id, med_id, batch_id) → model instance
+
+
+ACHAT_CFG = TransactionConfig(
+    file_type="achat",
+    model=Achat,
+    dedup_column=COL_DELIVERY_REF,
+    dedup_attr="delivery_ref",
+    build_row=lambda row, pharm_id, med_id, batch_id: Achat(
+        pharmacy_id=pharm_id, medicament_id=med_id, import_batch_id=batch_id,
+        created_at_source=col(row, COL_CREATED),
+        delivery_date=col(row, COL_DELIVERY_DATE),
+        delivery_ref=col(row, COL_DELIVERY_REF),
+        supplier=col(row, COL_SUPPLIER),
+        quantity=parse_float(col(row, COL_QUANTITY)),
+        unit_price=parse_float(col(row, COL_UNIT_PRICE)),
+        expiry_date=col(row, COL_EXPIRY),
+        stock_min=parse_float(col(row, COL_STOCK_MIN)),
+        stock_max=parse_float(col(row, COL_STOCK_MAX)),
+        total=parse_float(col(row, COL_TOTAL)),
+    ),
+)
+
+VENTE_CFG = TransactionConfig(
+    file_type="vente",
+    model=Vente,
+    dedup_column=COL_TXN_REF,
+    dedup_attr="transaction_ref",
+    build_row=lambda row, pharm_id, med_id, batch_id: Vente(
+        pharmacy_id=pharm_id, medicament_id=med_id, import_batch_id=batch_id,
+        date=col(row, COL_DATE),
+        transaction_ref=col(row, COL_TXN_REF),
+        client=col(row, COL_CLIENT),
+        quantity=parse_float(col(row, COL_QUANTITY)),
+        discount=parse_float(col(row, COL_DISCOUNT)),
+        unit_price=parse_float(col(row, COL_UNIT_PRICE)),
+        total=parse_float(col(row, COL_TOTAL)),
+    ),
+)
+
+
+def _preload_existing_keys(db: Session, cfg: TransactionConfig, pharmacy_id: int,
+                          refs: set[str]) -> set[tuple[str, int]]:
+    """Cheap O(1) dedup membership test: pre-load every (dedup_value, med_id) pair
+    already in DB for this pharmacy, so the per-row check is a Python `in`."""
+    if not refs:
+        return set()
+    dedup_col = getattr(cfg.model, cfg.dedup_attr)
+    rows = (
+        db.query(dedup_col, cfg.model.medicament_id)
+          .filter(cfg.model.pharmacy_id == pharmacy_id, dedup_col.in_(refs))
+          .all()
+    )
+    return {(ref, med_id) for ref, med_id in rows if ref and med_id}
+
+
+def _insert_transactions(
+    db: Session,
+    rows: list[dict[str, Any]],
+    *,
+    pharmacy_id: int,
+    filename: str | None,
+    batch_id: int | None,
+    user_id: int,
+    cfg: TransactionConfig,
+) -> dict:
+    """Generic ingest for Achat or Vente rows. Differences captured by `cfg`."""
+    batch = _get_or_create_batch(
+        db, pharmacy_id=pharmacy_id, file_type=cfg.file_type,
+        filename=filename, batch_id=batch_id, user_id=user_id,
+    )
+    refs = {r.get(cfg.dedup_column) for r in rows if r.get(cfg.dedup_column)}
+    existing = _preload_existing_keys(db, cfg, pharmacy_id, refs)
+
+    inserted = 0
+    skipped_no_pid = 0
+    skipped_no_med = 0
+    skipped_dup    = 0
+    new_medicaments: list[Medicament] = []  # F19: surface to owner so admin can classify
+    for row in rows:
+        pid = col(row, COL_PID)
+        if not pid:
+            skipped_no_pid += 1
             continue
-        seen_names.add(name.lower())
-
-        barcode = (row.get("Code barre 1") or "").strip()
-        pid = barcode if (barcode and barcode not in seen_pids) else name
-        if pid in seen_pids:
+        med, was_created = upsert_medicament(
+            db, pid=pid,
+            product=col(row, COL_PRODUCT) or pid,
+            tva=col(row, COL_TVA),
+            pph=parse_float(col(row, COL_PPH)),
+            ppv=parse_float(col(row, COL_PPV)),
+            category=col(row, COL_CATEGORY),
+            zone=col(row, COL_ZONE),
+        )
+        if not med:
+            skipped_no_med += 1
             continue
-        seen_pids.add(pid)
+        if was_created:
+            new_medicaments.append(med)
+        ref = col(row, cfg.dedup_column)
+        if ref and (ref, med.id) in existing:
+            skipped_dup += 1
+            continue
+        db.add(cfg.build_row(row, pharmacy_id, med.id, batch.id))
+        if ref:
+            existing.add((ref, med.id))
+        inserted += 1
 
-        medicaments.append(Medicament(
-            pid=pid,
-            product=name,
-            category=normalize_category(row.get("Categorie")),
-            tva=(row.get("TVA") or "").strip() or None,
-            ppv=_parse_float(row.get("PPV", "")),
-            pph=_parse_float(row.get("PPH", "")),
-            barcode1=barcode or None,
-            barcode2=(row.get("Code barre 2") or "").strip() or None,
-            laboratoire=(row.get("Laboratoire") or "").strip() or None,
-        ))
-    return medicaments
-
-
-@router.post("/catalog")
-async def upload_catalog(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
-):
-    """Import catalog from CSV or XLSM. Clears all existing medicaments then re-imports."""
-    fname = (file.filename or "").lower()
-    if not fname.endswith(".csv") and not fname.endswith(".xlsm"):
-        raise HTTPException(status_code=400, detail="Seuls les fichiers .csv ou .xlsm sont acceptés")
-
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
-
-    if fname.endswith(".csv"):
-        medicaments = _parse_catalog_csv(content)
-    else:
-        import re
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, keep_vba=True)
-        except Exception:
-            raise HTTPException(status_code=400, detail="Impossible d'ouvrir le fichier Excel")
-        if "LISTING" not in wb.sheetnames:
-            raise HTTPException(status_code=400, detail="Feuille 'LISTING' introuvable dans le fichier")
-        ws = wb["LISTING"]
-        xlsm_rows = list(ws.iter_rows(min_row=2, values_only=True))
-
-        def _clean(s: str) -> str:
-            return re.sub(r'\s+', ' ', str(s)).strip()
-
-        medicaments = []
-        seen_names: set[str] = set()
-        seen_pids: set[str] = set()
-        for row in xlsm_rows:
-            name = _clean(row[0]) if row[0] else None
-            if not name or name.lower() in seen_names:
-                continue
-            seen_names.add(name.lower())
-            barcode = str(int(row[5])) if isinstance(row[5], (int, float)) else None
-            pid = barcode if (barcode and barcode not in seen_pids) else name
-            if pid in seen_pids:
-                continue
-            seen_pids.add(pid)
-            medicaments.append(Medicament(
-                pid=pid,
-                product=name,
-                tva=str(row[2]).strip() if row[2] else None,
-                ppv=float(row[3]) if isinstance(row[3], (int, float)) else None,
-                pph=float(row[4]) if isinstance(row[4], (int, float)) else None,
-                category=normalize_category(str(row[1])) if row[1] else None,
-                zone=None,
-            ))
-
-    if not medicaments:
-        raise HTTPException(status_code=400, detail="Aucun produit trouvé dans le fichier")
-
-    db.query(Medicament).delete()
+    skipped = skipped_no_pid + skipped_no_med + skipped_dup
+    batch.rows_inserted += inserted
+    batch.rows_skipped  += skipped
+    batch.status = "success"
     db.commit()
-    db.bulk_save_objects(medicaments)
-    db.commit()
-    return {"imported": len(medicaments)}
+    return {
+        "inserted":              inserted,
+        "skipped":               skipped,
+        "skipped_no_pid":        skipped_no_pid,
+        "skipped_no_medicament": skipped_no_med,
+        "skipped_duplicate":     skipped_dup,
+        "batch_id":              batch.id,
+        "new_medicaments": {
+            "count":  len(new_medicaments),
+            "sample": [m.product or m.pid for m in new_medicaments[:10]],
+        },
+    }
 
 
-# ─── Stock ─────────────────────────────────────────────────────────────────────
+def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
+                  filename: str | None, batch_id: int | None, user_id: int) -> dict:
+    """Chunked stock import. Postgres ON CONFLICT upsert by (pharmacy_id, medicament_id)
+    so re-uploading tomorrow's stock cleanly replaces today's snapshot. The UPSERT is
+    chunk-safe — re-applying the same row is idempotent. Within ONE chunk we still
+    dedup on medicament_id so a duplicate PID inside the chunk doesn't blow up the
+    values list (rare but cheap to guard against).
 
-def _parse_date(val: str) -> _date | None:
-    if not val or not val.strip():
-        return None
-    try:
-        return _date.fromisoformat(val.strip())
-    except ValueError:
-        return None
+    batch_id threading: first chunk passes None → creates an ImportBatch and returns
+    its id. Subsequent chunks pass that id → _get_or_create_batch reuses the row and
+    we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
+    batch = _get_or_create_batch(db, pharmacy_id=pharmacy_id, file_type="stock",
+                                 filename=filename, batch_id=batch_id, user_id=user_id)
 
+    seen_meds: set[int] = set()
+    inserted_rows: list[dict] = []
+    skipped_unknown: list[dict[str, str | None]] = []
+    new_medicaments: list[Medicament] = []  # F19: surface to owner
 
-def _parse_int(val: str) -> int | None:
-    if val is None:
-        return None
-    s = str(val).strip()
-    if not s:
-        return None
-    try:
-        return int(float(s.replace(",", ".")))
-    except ValueError:
-        return None
-
-
-@router.post("/stock")
-async def upload_stock(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(_require_import),
-):
-    """Import a Sobrus stock CSV as a full snapshot for the current pharmacy.
-
-    Replaces all existing rows in `pharmacy_stock` for this pharmacy.
-    Unknown PIDs are skipped and returned so the user can request catalog additions.
-    """
-    if not current_user.pharmacy_id:
-        raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Seuls les fichiers CSV sont acceptés")
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 10 Mo)")
-    rows = _parse_csv(content)
-    if not rows:
-        raise HTTPException(status_code=400, detail="Aucune donnée trouvée dans le fichier")
-
-    # Resolve all PIDs in one query
-    pids = [r.get("PID", "").strip() for r in rows if r.get("PID")]
-    meds = db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
-    pid_to_med = {m.pid: m for m in meds}
-
-    inserted_rows = []
-    skipped_unknown: list[dict] = []
-    seen_med_ids: set[int] = set()
-    for r in rows:
-        pid = (r.get("PID") or "").strip()
+    for row in rows:
+        pid = col(row, COL_PID)
         if not pid:
             continue
-        med = pid_to_med.get(pid)
+        med, was_created = upsert_medicament(
+            db, pid=pid,
+            product=col(row, COL_PRODUCT) or pid,
+            tva=col(row, COL_TVA),
+            pph=parse_float(col(row, COL_PPH)),
+            ppv=parse_float(col(row, COL_PPV)),
+            category=col(row, COL_CATEGORY),
+            zone=col(row, COL_ZONE),
+        )
         if not med:
-            skipped_unknown.append({"pid": pid, "product": (r.get("Produit") or "").strip()})
+            skipped_unknown.append({"pid": pid, "product": col(row, COL_PRODUCT)})
             continue
-        if med.id in seen_med_ids:
+        if was_created:
+            new_medicaments.append(med)
+        if med.id in seen_meds:
             continue
-        seen_med_ids.add(med.id)
+        seen_meds.add(med.id)
         inserted_rows.append({
-            "pharmacy_id": current_user.pharmacy_id,
+            "pharmacy_id":   pharmacy_id,
             "medicament_id": med.id,
-            "current_stock": _parse_int(r.get("Stock", "")) or 0,
-            "stock_min": _parse_int(r.get("Stock min", "")),
-            "stock_max": _parse_int(r.get("Stock max", "")),
-            "expiry_date": _parse_date(r.get("Date de péremption", "")),
-            "zone": (r.get("Zone") or "").strip() or None,
+            "current_stock": parse_int(col(row, "Stock")) or 0,
+            "stock_min":     parse_int(col(row, COL_STOCK_MIN)),
+            "stock_max":     parse_int(col(row, COL_STOCK_MAX)),
+            "expiry_date":   parse_iso_date(col(row, COL_EXPIRY)),
+            "zone":          col(row, COL_ZONE),
         })
 
-    # Upsert semantics: Sobrus exports can be partial (filtered by zone/date/etc.),
-    # so we update existing rows and insert new ones, but don't wipe untouched stock.
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-    upserted = 0
     if inserted_rows:
         stmt = pg_insert(PharmacyStock).values(inserted_rows)
         stmt = stmt.on_conflict_do_update(
             index_elements=["pharmacy_id", "medicament_id"],
             set_={
                 "current_stock": stmt.excluded.current_stock,
-                "stock_min": stmt.excluded.stock_min,
-                "stock_max": stmt.excluded.stock_max,
-                "expiry_date": stmt.excluded.expiry_date,
-                "zone": stmt.excluded.zone,
-                "imported_at": func.now(),
+                "stock_min":     stmt.excluded.stock_min,
+                "stock_max":     stmt.excluded.stock_max,
+                "expiry_date":   stmt.excluded.expiry_date,
+                "zone":          stmt.excluded.zone,
             },
         )
         db.execute(stmt)
-        # Track the upload in the import history so it shows up under "Stock"
-        # in /parametres alongside achat/vente imports.
-        batch = ImportBatch(
-            pharmacy_id=current_user.pharmacy_id or 0,
-            file_type="stock",
-            filename=file.filename,
-            rows_inserted=len(inserted_rows),
-            rows_skipped=len(skipped_unknown),
-        )
-        db.add(batch)
-        db.commit()
-        upserted = len(inserted_rows)
 
+    batch.rows_inserted += len(inserted_rows)
+    batch.rows_skipped  += len(skipped_unknown)
+    batch.status = "success"
+    db.commit()
     return {
-        "inserted": upserted,
+        "inserted":        len(inserted_rows),
         "skipped_unknown": skipped_unknown,
-        "total_rows": len(rows),
+        "total_rows":      len(rows),
+        "batch_id":        batch.id,
+        "new_medicaments": {
+            "count":  len(new_medicaments),
+            "sample": [m.product or m.pid for m in new_medicaments[:10]],
+        },
+    }
+
+
+# ─── Permission gate ─────────────────────────────────────────────────────────
+
+# ─── Multipart endpoints ─────────────────────────────────────────────────────
+
+async def _read_csv_or_400(file: UploadFile) -> list[dict[str, str]]:
+    """Validate + read + parse a CSV upload in one shot. Raises 400/413 on failure."""
+    _check_csv(file)
+    content = await file.read()
+    _check_size(content)
+    rows = parse_csv(content)
+    if not rows:
+        raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
+    return rows
+
+
+@router.post("/uploads/achat")
+async def upload_achat(
+    user: CurrentUserDep,
+    db: DbDep,
+    file: Annotated[UploadFile, File(description="Sobrus Achats CSV")],
+    batch_id: Annotated[int | None, Form()] = None,
+) -> dict:
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("achats", user, db)
+    rows = await _read_csv_or_400(file)
+    return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
+                                filename=file.filename, batch_id=batch_id,
+                                user_id=user.id, cfg=ACHAT_CFG)
+
+
+@router.post("/uploads/vente")
+async def upload_vente(
+    user: CurrentUserDep,
+    db: DbDep,
+    file: Annotated[UploadFile, File(description="Sobrus Ventes CSV")],
+    batch_id: Annotated[int | None, Form()] = None,
+) -> dict:
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("ventes", user, db)
+    rows = await _read_csv_or_400(file)
+    return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
+                                filename=file.filename, batch_id=batch_id,
+                                user_id=user.id, cfg=VENTE_CFG)
+
+
+_CATALOG_MUTABLE_COLS = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
+
+
+def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> bool:
+    """Apply one parsed catalog row. Returns True if it updated an existing
+    Medicament, False if it inserted a new one. Catch-up: classifies NULL
+    product_type on existing rows (catalogue is the source of truth — see F19).
+    Admin-edited types stay untouched."""
+    if existing:
+        for c in _CATALOG_MUTABLE_COLS:
+            v = row.get(c)
+            if v is not None:
+                setattr(existing, c, v)
+        if existing.product_type is None:
+            existing.product_type = classify_product_type(row.get("category"))
+        return True
+    db.add(Medicament(
+        **row,
+        product_type=classify_product_type(row.get("category")),
+    ))
+    return False
+
+
+@router.post("/uploads/catalog", response_model=CatalogImportResponse)
+async def upload_catalog(
+    user: CurrentUserDep,
+    db:   DbDep,
+    file: Annotated[UploadFile, File(description="Sobrus catalogue CSV (comma-delimited)")],
+) -> dict:
+    """Admin-only catalog import. Upsert by synthetic PID:
+       - INSERT new rows
+       - UPDATE mutable fields on existing rows (PRESERVE product_type — admin override)
+       - rows in DB that disappear from the CSV are kept (no destructive delete)
+
+    Mojibake fix runs automatically via `parse_csv()` → `clean_value()`."""
+    require_admin(user)
+    _check_csv(file)
+    content = await file.read()
+    _check_size(content)
+    parsed, errors = parse_catalog_csv(content)
+    if not parsed and not errors:
+        raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
+
+    pids = [r["pid"] for r in parsed]
+    existing = {
+        m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
+    }
+    inserted = updated = 0
+    for row in parsed:
+        if _apply_catalog_row(db, existing.get(row["pid"]), row):
+            updated += 1
+        else:
+            inserted += 1
+    db.commit()
+    return {
+        "total_rows": len(parsed),
+        "inserted":   inserted,
+        "updated":    updated,
+        "skipped":    len(errors),
+        "errors":     errors[:10],
+    }
+
+
+# ─── JSON endpoints (Chrome extension) ───────────────────────────────────────
+
+@router.post("/uploads/achat-json")
+def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("achats", user, db)
+    if not body.rows:
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+    return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
+                                filename=body.filename, batch_id=body.batch_id,
+                                user_id=user.id, cfg=ACHAT_CFG)
+
+
+@router.post("/uploads/vente-json")
+def upload_vente_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("ventes", user, db)
+    if not body.rows:
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+    return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
+                                filename=body.filename, batch_id=body.batch_id,
+                                user_id=user.id, cfg=VENTE_CFG)
+
+
+@router.post("/uploads/stock-json")
+def upload_stock_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
+    """Chunked stock import — same JSON shape as achat/vente. First chunk passes
+    batch_id=None (creates the ImportBatch); subsequent chunks reuse it via the
+    returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
+    require_feature("stock", user, db)
+    if not body.rows:
+        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+    return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,
+                         filename=body.filename, batch_id=body.batch_id,
+                         user_id=user.id)
+
+
+# ─── PATCH batch status (cancel) ─────────────────────────────────────────────
+
+@router.patch("/uploads/batches/{batch_id}")
+def patch_batch_status(
+    batch_id: Annotated[int, Path(ge=1)],
+    body: PatchBatchBody,
+    user: CurrentUserDep,
+    db: DbDep,
+) -> dict:
+    """Update a batch's status. Two semantics:
+
+    - `status="cancelled"`: TRUE UNDO. Deletes every Achat / Vente row that was
+      inserted under this batch_id and resets the audit counters to 0. The
+      ImportBatch row stays for auditing ("this user attempted then cancelled").
+      Stock batches are exempt — they use UPSERT, so the prior snapshot is
+      already gone and there's nothing to roll back.
+    - `status="error"`: same audit-only flip + carry the error_message. Rows
+      already inserted stay (the failing chunk was likely network-side, not data-side).
+    """
+    if body.status not in ALLOWED_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Statut invalide. Attendu : {sorted(ALLOWED_STATUSES)}")
+
+    batch = db.get(ImportBatch, batch_id)
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Lot d'import introuvable.")
+    if batch.pharmacy_id != user.pharmacy_id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Accès refusé à ce lot d'import.")
+
+    deleted_rows = 0
+    if body.status == "cancelled":
+        if batch.file_type == "achat":
+            deleted_rows = db.query(Achat).filter(Achat.import_batch_id == batch.id).delete()
+        elif batch.file_type == "vente":
+            deleted_rows = db.query(Vente).filter(Vente.import_batch_id == batch.id).delete()
+        # stock: UPSERT replaced prior state, no undo possible — leave rows.
+        if batch.file_type in ("achat", "vente"):
+            batch.rows_inserted = 0
+            batch.rows_skipped = 0
+
+    batch.status = body.status
+    if body.error_message is not None:
+        batch.error_message = body.error_message
+    db.commit()
+    return {
+        "id":             batch.id,
+        "status":         batch.status,
+        "error_message":  batch.error_message,
+        "deleted_rows":   deleted_rows,
     }

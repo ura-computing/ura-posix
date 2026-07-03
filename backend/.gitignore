@@ -1,0 +1,14 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Runtime copy from `make demo` (sourced from ../resources/catalog.csv).
+# Tracked at the repo root; never commit the per-build copy.
+catalog.csv

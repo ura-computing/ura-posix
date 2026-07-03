@@ -1,26 +1,36 @@
-import { request } from "./client";
-import { ENDPOINTS } from "@/constants";
-import type { AuthToken, LoginPayload, ProfileUpdatePayload, SignupPayload, User } from "@/types";
+import { api } from "@/api/client";
+import type {
+  ForgotPasswordRequest,
+  LoginRequest,
+  MeResponse,
+  SetPasswordRequest,
+  ValidateTokenResponse,
+} from "@/types";
 
-export const login = (payload: LoginPayload) =>
-  request<AuthToken>(ENDPOINTS.auth.login, { method: "POST", body: JSON.stringify(payload) });
+export function login(input: LoginRequest): Promise<MeResponse> {
+  return api<MeResponse>("/auth/login", { method: "POST", body: input });
+}
 
-export const signup = (payload: SignupPayload) =>
-  request<AuthToken>(ENDPOINTS.auth.signup, { method: "POST", body: JSON.stringify(payload) });
+export function logout(): Promise<void> {
+  return api<void>("/auth/logout", { method: "POST" });
+}
 
-export const me = () => request<User>(ENDPOINTS.auth.me);
+export function getMe(): Promise<MeResponse> {
+  return api<MeResponse>("/auth/me", { method: "GET" });
+}
 
-export const updateMe = (payload: ProfileUpdatePayload) =>
-  request<User>(ENDPOINTS.auth.me, { method: "PUT", body: JSON.stringify(payload) });
+export function forgotPassword(input: ForgotPasswordRequest): Promise<{ detail: string }> {
+  return api<{ detail: string }>("/auth/forgot-password", { method: "POST", body: input });
+}
 
-export const forgotPassword = (email: string) =>
-  request<void>(ENDPOINTS.auth.forgotPassword, { method: "POST", body: JSON.stringify({ email }) });
+export function validateToken(token: string): Promise<ValidateTokenResponse> {
+  const q = new URLSearchParams({ token }).toString();
+  return api<ValidateTokenResponse>(`/auth/validate-token?${q}`, { method: "GET" });
+}
 
-export const forgotPasswordWhatsApp = (phone: string) =>
-  request<void>(ENDPOINTS.auth.forgotPasswordWhatsApp, { method: "POST", body: JSON.stringify({ phone }) });
+export function setPassword(input: SetPasswordRequest): Promise<void> {
+  return api<void>("/auth/set-password", { method: "POST", body: input });
+}
 
-export const verifyOtp = (phone: string, otp: string) =>
-  request<{ reset_token: string }>(ENDPOINTS.auth.verifyOtp, { method: "POST", body: JSON.stringify({ phone, otp }) });
-
-export const resetPassword = (token: string, new_password: string) =>
-  request<void>(ENDPOINTS.auth.resetPassword, { method: "POST", body: JSON.stringify({ token, new_password }) });
+// Legacy alias kept for compatibility with existing imports. Prefer LoginRequest.
+export type LoginInput = LoginRequest;

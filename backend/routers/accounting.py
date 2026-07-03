@@ -1,93 +1,59 @@
-"""Payment entries — CRUD for manually entered payment method totals."""
+"""Comptabilité — manual monthly payment-method bookkeeping.
 
-from typing import List, Optional
+The owner records totals per (month, method) on the /comptabilité page; the
+data lives in `payment_entries` and is independent of Sobrus CSV imports.
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
+Endpoints all gated by the `accounting` feature (require_pharmacy_owner).
+"""
+from __future__ import annotations
 
-from database import get_db
-from models import PaymentEntry, User
-from routers.auth import get_current_user
-from utils.constants import Role
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, Query
+
+from database import DbDep
+from models import PaymentEntry
+from permissions import require_pharmacy_owner
+from schemas.accounting import PaymentEntryIn, PaymentEntryOut
+from security import CurrentUserDep
+
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
 
-class PaymentEntryCreate(BaseModel):
-    month: str  # "2026-03"
-    method: str  # tpe, especes, cheques, virement
-    pharmacie_amount: float = 0
-    parapharmacie_amount: float = 0
-    count: int = 0
-
-
-class PaymentEntryOut(BaseModel):
-    id: int
-    month: str
-    method: str
-    pharmacie_amount: float
-    parapharmacie_amount: float
-    count: int
-
-    model_config = {"from_attributes": True}
-
-
-@router.get("/payments", response_model=List[PaymentEntryOut])
+@router.get("/payments", response_model=list[PaymentEntryOut])
 def list_payments(
-    month: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """List payment entries for the current pharmacy."""
-    if current_user.role == Role.ADMIN:
-        raise HTTPException(status_code=403, detail="Les admins utilisent les endpoints par pharmacie")
-    q = db.query(PaymentEntry).filter(PaymentEntry.pharmacy_id == current_user.pharmacy_id)
+    user: CurrentUserDep,
+    db:   DbDep,
+    month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
+) -> list[PaymentEntry]:
+    """All payment entries for the caller's pharmacy, newest month first.
+    `month` filters to one specific YYYY-MM bucket (the /comptabilité page
+    uses this to load just the currently-displayed month)."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="accounting")
+    q = db.query(PaymentEntry).filter(PaymentEntry.pharmacy_id == pharmacy_id)
     if month:
         q = q.filter(PaymentEntry.month == month)
-    return q.order_by(PaymentEntry.month.desc(), PaymentEntry.method).all()
+    return q.order_by(PaymentEntry.month.desc(), PaymentEntry.method.asc()).all()
 
 
 @router.post("/payments", response_model=PaymentEntryOut)
-def create_or_update_payment(
-    body: PaymentEntryCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Create or update a payment entry (upsert by month + method)."""
-    if current_user.role not in (Role.OWNER, Role.ADMIN):
-        raise HTTPException(status_code=403, detail="Seuls les propriétaires peuvent modifier les paiements")
-
-    pharmacy_id = current_user.pharmacy_id
-    if not pharmacy_id:
-        raise HTTPException(status_code=400, detail="Aucune pharmacie associée")
-
-    existing = (
-        db.query(PaymentEntry)
-        .filter(
-            PaymentEntry.pharmacy_id == pharmacy_id,
-            PaymentEntry.month == body.month,
-            PaymentEntry.method == body.method,
-        )
-        .first()
-    )
-
+def save_payment(body: PaymentEntryIn, user: CurrentUserDep, db: DbDep) -> PaymentEntry:
+    """Upsert by (pharmacy_id, month, method) — POST always succeeds whether
+    the row exists or not. Simpler than separate POST/PUT, matches the
+    apcm-pharma contract the frontend expects."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="accounting")
+    existing = db.query(PaymentEntry).filter_by(
+        pharmacy_id=pharmacy_id, month=body.month, method=body.method,
+    ).first()
     if existing:
-        existing.pharmacie_amount = body.pharmacie_amount
+        existing.pharmacie_amount     = body.pharmacie_amount
         existing.parapharmacie_amount = body.parapharmacie_amount
-        existing.count = body.count
+        existing.count                = body.count
         db.commit()
         db.refresh(existing)
         return existing
-
-    entry = PaymentEntry(
-        pharmacy_id=pharmacy_id,
-        month=body.month,
-        method=body.method,
-        pharmacie_amount=body.pharmacie_amount,
-        parapharmacie_amount=body.parapharmacie_amount,
-        count=body.count,
-    )
+    entry = PaymentEntry(pharmacy_id=pharmacy_id, **body.model_dump())
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -96,15 +62,14 @@ def create_or_update_payment(
 
 @router.delete("/payments/{entry_id}")
 def delete_payment(
-    entry_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    entry = db.query(PaymentEntry).filter(PaymentEntry.id == entry_id).first()
+    entry_id: Annotated[int, Path(ge=1)],
+    user: CurrentUserDep,
+    db:   DbDep,
+) -> dict:
+    pharmacy_id = require_pharmacy_owner(user, db, feature="accounting")
+    entry = db.query(PaymentEntry).filter_by(id=entry_id, pharmacy_id=pharmacy_id).first()
     if not entry:
-        raise HTTPException(status_code=404, detail="Entrée introuvable")
-    if current_user.pharmacy_id and entry.pharmacy_id != current_user.pharmacy_id:
-        raise HTTPException(status_code=403, detail="Accès refusé")
+        raise HTTPException(status_code=404, detail="Entrée introuvable.")
     db.delete(entry)
     db.commit()
     return {"deleted": True}

@@ -1,0 +1,382 @@
+/* ============================================================
+   PharmaGest — Design Tokens
+   B2B pharmacy management SaaS · React + Tailwind + shadcn/ui
+   ------------------------------------------------------------
+   - shadcn/ui semantic names preserved (--background, --primary, …)
+   - Every value defined in BOTH light (:root) and dark (.dark)
+   - Brand teal #0E9E8C (light) / #34CBB7 (dark)
+   ============================================================ */
+
+:root {
+  /* ---- Brand raw scale (reference only — use semantic vars below) ---- */
+  --teal-50:  #E7F6F3;
+  --teal-100: #C6EBE4;
+  --teal-200: #9DDDD1;
+  --teal-300: #66C9B8;
+  --teal-400: #2FB5A0;
+  --teal-500: #0E9E8C;   /* brand */
+  --teal-600: #0C8A79;
+  --teal-700: #0A6F62;
+  --teal-800: #0A574E;
+  --teal-900: #0B473F;
+  --brand-blue:   #1CB5D4; /* secondary brand accent */
+  --brand-green:  #7FBF3F; /* tertiary brand accent  */
+  --brand-violet: #7C5CF0; /* quaternary — used by the developer role badge */
+
+  /* Role accent colors (header role badge). Identity tags only;
+     unrelated to status semantics. Defined once, same in light + dark. */
+  --role-admin:     var(--brand-blue);
+  --role-owner:     var(--primary);
+  --role-employee:  var(--brand-green);
+  --role-developer: var(--brand-violet);
+
+  /* ============ SHADCN SEMANTIC — LIGHT ============ */
+  --background: #F9FBFA;
+  --foreground: #121A18;
+
+  --card: #FFFFFF;
+  --card-foreground: #121A18;
+  --popover: #FFFFFF;
+  --popover-foreground: #121A18;
+
+  --primary: #0E9E8C;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #0C8A79;
+  --primary-active: #0A6F62;
+
+  --secondary: #F0F4F3;
+  --secondary-foreground: #1E2A27;
+
+  --muted: #F0F4F3;
+  --muted-foreground: #5B6A67;
+
+  --accent: #E9F0EE;
+  --accent-foreground: #121A18;
+
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E3E8E7;
+  --border-subtle: #EDF1F0;
+  --input: #E3E8E7;
+  --ring: #0E9E8C;
+
+  /* Surfaces / text — extra granularity beyond shadcn defaults */
+  --surface-subtle: #F5F8F7;     /* input bg, row hover            */
+  --disabled-foreground: #98A5A2; /* disabled text / placeholders  */
+
+  /* ============ STATUS — LIGHT ============
+     each: solid (badge fill / icon) · foreground (text on solid)
+           subtle (tinted bg) · subtle-foreground (text on subtle) · border */
+  --success: #15803D;
+  --success-foreground: #FFFFFF;
+  --success-subtle: #E9F7EE;
+  --success-subtle-foreground: #15803D;
+  --success-border: #C2E9CE;
+
+  --warning: #B45309;
+  --warning-foreground: #FFFFFF;
+  --warning-subtle: #FEF4E6;
+  --warning-subtle-foreground: #92400E;
+  --warning-border: #F6DCB0;
+
+  --error: #DC2626;
+  --error-foreground: #FFFFFF;
+  --error-subtle: #FCECEB;
+  --error-subtle-foreground: #B42318;
+  --error-border: #F3C9C6;
+
+  --info: #1D6FB8;
+  --info-foreground: #FFFFFF;
+  --info-subtle: #E9F3FB;
+  --info-subtle-foreground: #175E9E;
+  --info-border: #BFDDF3;
+
+  /* ============ DATA-VIZ — LIGHT ============
+     5 distinct hues ordered by contrast + dedicated gain/loss */
+  --chart-1: #0E9E8C;  /* teal   */
+  --chart-2: #2D7FF9;  /* blue   */
+  --chart-3: #E8A33D;  /* amber  */
+  --chart-4: #8B5CF6;  /* violet */
+  --chart-5: #E0457B;  /* rose   */
+  --chart-6: #16A085;  /* sea-green — for donut palette beyond 5 cats */
+  --chart-7: #6366F1;  /* indigo   */
+  --chart-8: #14B8A6;  /* turquoise */
+  --chart-positive: #16A34A; /* marge gains  */
+  --chart-negative: #DC2626; /* marge losses */
+  --chart-grid: #EDF1F0;
+  --chart-axis: #5B6A67;
+  --chart-tooltip-bg: #FFFFFF;
+  --chart-tooltip-border: #E3E8E7;
+  --chart-tooltip-foreground: #121A18;
+
+  /* ============ PRODUCT CATEGORIES — LIGHT ============
+     Colorblind-safe trio: indigo (pharmacie) / orange (parapharmacie) / slate (total).
+     Each main hue = AA 4.5:1 as text on --background. Distinct from status hues. */
+  --color-pharmacie: #3651D4;          /* indigo — clinical, trustworthy   */
+  --color-pharmacie-bg: #ECEEFB;
+  --color-pharmacie-fg: #2E40B0;
+  --color-pharmacie-border: #C6CDF5;
+
+  --color-parapharmacie: #CD4B17;      /* burnt orange — warm, retail      */
+  --color-parapharmacie-bg: #FCEEE4;
+  --color-parapharmacie-fg: #B23F0E;
+  --color-parapharmacie-border: #F6D2BB;
+
+  --color-total: #475569;              /* slate — neutral “all of the above” */
+  --color-total-bg: #EEF1F4;
+  --color-total-fg: #3A4656;
+  --color-total-border: #D2DAE2;
+
+  /* ============ UPLOAD DOC TYPES — LIGHT ============
+     Used only by the Upload wizard's 3-card type picker + DropZone tinting +
+     state cards (uploading/success/cancelled/error). Identity-only colors;
+     not status semantics. Follow the same 4-token shape as pharmacie/parapharmacie. */
+  --color-doc-achat: #7E22CE;           /* violet — purchase notes */
+  --color-doc-achat-bg: #FAF5FF;
+  --color-doc-achat-fg: #6B21A8;
+  --color-doc-achat-border: #E9D5FF;
+
+  --color-doc-vente: #0F766E;           /* teal — sales receipts */
+  --color-doc-vente-bg: #F0FDFA;
+  --color-doc-vente-fg: #115E59;
+  --color-doc-vente-border: #99F6E4;
+
+  --color-doc-stock: #1D4ED8;           /* blue — stock snapshots */
+  --color-doc-stock-bg: #EFF6FF;
+  --color-doc-stock-fg: #1E40AF;
+  --color-doc-stock-border: #BFDBFE;
+
+  /* ============ ELEVATION — LIGHT ============ */
+  --shadow-sm: 0 1px 2px rgba(16,24,22,.06), 0 1px 1px rgba(16,24,22,.04);
+  --shadow-md: 0 4px 12px rgba(16,24,22,.08), 0 2px 4px rgba(16,24,22,.05);
+  --shadow-lg: 0 16px 40px rgba(16,24,22,.14), 0 4px 12px rgba(16,24,22,.08);
+
+  /* ============ BRAND AURORA (auth panel) — LIGHT/DARK shared ============ */
+  --aurora-base: #07201C;
+  --aurora-1: #0E9E8C;
+  --aurora-2: #1CB5D4;
+  --aurora-3: #2FB59A;
+
+  /* =====================================================
+     MODE-AGNOSTIC TOKENS (identical in light & dark)
+     ===================================================== */
+
+  /* ---- Typography ---- */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Geist Mono", "SF Mono", Menlo, monospace;
+
+  --text-2xs: 11px;  --leading-2xs: 16px;
+  --text-xs:  12px;  --leading-xs:  16px;
+  --text-sm:  13px;  --leading-sm:  20px;
+  --text-base:14px;  --leading-base:20px;  /* default UI body */
+  --text-md:  16px;  --leading-md:  24px;
+  --text-lg:  18px;  --leading-lg:  28px;
+  --text-xl:  24px;  --leading-xl:  32px;
+  --text-2xl: 32px;  --leading-2xl: 40px;
+
+  --font-regular: 400;  /* body            */
+  --font-medium: 500;   /* UI strong       */
+  --font-semibold: 600; /* headings        */
+
+  /* ---- Spacing (4px base) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 4px;     /* badges, chips        */
+  --radius-md: 8px;     /* cards, inputs        */
+  --radius-lg: 12px;    /* modals, drawers      */
+  --radius-full: 9999px;/* avatars, pills       */
+  --radius: 8px;        /* shadcn base          */
+
+  /* ---- Motion ---- */
+  --duration-fast: 120ms;   /* buttons, hover      */
+  --duration-normal: 200ms; /* modals, drawers     */
+  --duration-slow: 400ms;   /* page transitions    */
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1); /* page-level */
+  --ease-standard: cubic-bezier(0, 0, 0.2, 1);      /* ease-out   */
+
+  /* ---- Focus ring ---- */
+  --ring-width: 2px;
+  --ring-offset: 2px;
+  --ring-alpha: rgba(14,158,140,.5); /* primary @ 50% */
+}
+
+/* ================================================================
+   DARK MODE — overrides every surface, text, status, chart + shadow
+   ================================================================ */
+.dark {
+  --background: #0B1312;
+  --foreground: #E8EDEC;
+
+  --card: #111A18;
+  --card-foreground: #E8EDEC;
+  --popover: #131D1B;
+  --popover-foreground: #E8EDEC;
+
+  --primary: #34CBB7;
+  --primary-foreground: #06231F;
+  --primary-hover: #45D6C4;
+  --primary-active: #27B6A3;
+
+  --secondary: #18211F;
+  --secondary-foreground: #E8EDEC;
+
+  --muted: #18211F;
+  --muted-foreground: #91A09D;
+
+  --accent: #1D2826;
+  --accent-foreground: #E8EDEC;
+
+  --destructive: #E5484D;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #243230;
+  --border-subtle: #1A2624;
+  --input: #243230;
+  --ring: #34CBB7;
+
+  --surface-subtle: #141C1B;
+  --disabled-foreground: #5C6B68;
+
+  /* status — dark */
+  --success: #3FCF7A;
+  --success-foreground: #06210F;
+  --success-subtle: #11281B;
+  --success-subtle-foreground: #6EE7A0;
+  --success-border: #1E5233;
+
+  --warning: #F5B544;
+  --warning-foreground: #2A1A03;
+  --warning-subtle: #271B07;
+  --warning-subtle-foreground: #FACC6B;
+  --warning-border: #553D14;
+
+  --error: #F2555A;
+  --error-foreground: #2A0D0E;
+  --error-subtle: #2A1414;
+  --error-subtle-foreground: #FCA5A5;
+  --error-border: #5A2422;
+
+  --info: #5BA8F0;
+  --info-foreground: #07192A;
+  --info-subtle: #0E2233;
+  --info-subtle-foreground: #A9D2F7;
+  --info-border: #1C466A;
+
+  /* data-viz — dark */
+  --chart-1: #34CBB7;
+  --chart-2: #5B9CFF;
+  --chart-3: #F2B854;
+  --chart-4: #A78BFA;
+  --chart-5: #F06A9A;
+  --chart-6: #2DD4BF;
+  --chart-7: #818CF8;
+  --chart-8: #5EEAD4;
+  --chart-positive: #4ADE80;
+  --chart-negative: #F87171;
+  --chart-grid: #1A2624;
+  --chart-axis: #91A09D;
+  --chart-tooltip-bg: #131D1B;
+  --chart-tooltip-border: #243230;
+  --chart-tooltip-foreground: #E8EDEC;
+
+  /* product categories — dark (lifted hues, AA on --background) */
+  --color-pharmacie: #8593FF;
+  --color-pharmacie-bg: #1A1F3D;
+  --color-pharmacie-fg: #B4BCFF;
+  --color-pharmacie-border: #333A66;
+
+  --color-parapharmacie: #F6975A;
+  --color-parapharmacie-bg: #2A1B10;
+  --color-parapharmacie-fg: #FAB88A;
+  --color-parapharmacie-border: #5A3620;
+
+  --color-total: #9AA8BC;
+  --color-total-bg: #1A2330;
+  --color-total-fg: #B7C2D2;
+  --color-total-border: #313E50;
+
+  /* Upload doc types — dark */
+  --color-doc-achat: #C084FC;
+  --color-doc-achat-bg: #2E1739;
+  --color-doc-achat-fg: #DDB6FB;
+  --color-doc-achat-border: #4A2862;
+
+  --color-doc-vente: #5EEAD4;
+  --color-doc-vente-bg: #0E2A26;
+  --color-doc-vente-fg: #9BF3E0;
+  --color-doc-vente-border: #1F4D45;
+
+  --color-doc-stock: #93C5FD;
+  --color-doc-stock-bg: #0F1E3A;
+  --color-doc-stock-fg: #BFD9FE;
+  --color-doc-stock-border: #1F3A66;
+
+  /* elevation — dark (deeper, plus hairline) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.40), 0 0 0 1px rgba(255,255,255,.02);
+  --shadow-md: 0 4px 14px rgba(0,0,0,.50), 0 0 0 1px rgba(255,255,255,.03);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.04);
+
+  --ring-alpha: rgba(52,203,183,.5);
+}
+
+/* ================================================================
+   Helpers — focus ring + brand aurora (CSS-only animated mesh)
+   ================================================================ */
+.focus-ring:focus-visible {
+  outline: var(--ring-width) solid var(--ring);
+  outline-offset: var(--ring-offset);
+}
+/* Alternative double-ring (works on any surface): */
+.focus-ring-shadow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--ring-offset) var(--background),
+              0 0 0 calc(var(--ring-offset) + var(--ring-width)) var(--ring-alpha);
+}
+
+.brand-aurora {
+  position: relative;
+  isolation: isolate;
+  background: var(--aurora-base);
+  overflow: hidden;
+}
+.brand-aurora::before,
+.brand-aurora::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  filter: blur(60px);
+  opacity: .85;
+}
+.brand-aurora::before {
+  background:
+    radial-gradient(40% 50% at 25% 30%, var(--aurora-1) 0%, transparent 60%),
+    radial-gradient(45% 55% at 75% 25%, var(--aurora-2) 0%, transparent 60%),
+    radial-gradient(50% 60% at 60% 80%, var(--aurora-3) 0%, transparent 65%);
+  animation: aurora-drift 18s ease-in-out infinite alternate;
+}
+.brand-aurora::after {
+  background:
+    radial-gradient(35% 45% at 70% 60%, var(--aurora-1) 0%, transparent 60%),
+    radial-gradient(40% 50% at 30% 70%, var(--aurora-2) 0%, transparent 60%);
+  opacity: .5;
+  animation: aurora-drift 24s ease-in-out infinite alternate-reverse;
+}
+@keyframes aurora-drift {
+  0%   { transform: translate3d(-4%, -3%, 0) rotate(0deg)   scale(1); }
+  50%  { transform: translate3d(3%, 2%, 0)   rotate(8deg)   scale(1.12); }
+  100% { transform: translate3d(5%, 4%, 0)   rotate(-6deg)  scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-aurora::before, .brand-aurora::after { animation: none; }
+}

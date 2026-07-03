@@ -1,29 +1,20 @@
-import { request } from "./client";
+import { api } from "@/api/client";
+import type { PaymentEntry, PaymentEntryIn } from "@/types";
 
-export type PaymentEntry = {
-  id: number;
-  month: string;
-  method: string;
-  pharmacie_amount: number;
-  parapharmacie_amount: number;
-  count: number;
-};
 
-export type PaymentEntryCreate = {
-  month: string;
-  method: string;
-  pharmacie_amount: number;
-  parapharmacie_amount: number;
-  count: number;
-};
+/** List payment entries for the current pharmacy. Pass a YYYY-MM month
+ *  string to scope to one bucket (the /comptabilité page loads the
+ *  currently-displayed month this way). */
+export function listPayments(month?: string): Promise<PaymentEntry[]> {
+  return api<PaymentEntry[]>(`/accounting/payments${month ? `?month=${month}` : ""}`);
+}
 
-export const listPayments = (month?: string) => {
-  const qs = month ? `?month=${month}` : "";
-  return request<PaymentEntry[]>(`/accounting/payments${qs}`);
-};
+/** Upsert by (pharmacy_id, month, method) — POST always succeeds whether the
+ *  (month, method) row exists or not. */
+export function savePayment(body: PaymentEntryIn): Promise<PaymentEntry> {
+  return api<PaymentEntry>(`/accounting/payments`, { method: "POST", body });
+}
 
-export const savePayment = (body: PaymentEntryCreate) =>
-  request<PaymentEntry>("/accounting/payments", { method: "POST", body: JSON.stringify(body) });
-
-export const deletePayment = (id: number) =>
-  request<{ deleted: boolean }>(`/accounting/payments/${id}`, { method: "DELETE" });
+export function deletePayment(id: number): Promise<{ deleted: true }> {
+  return api<{ deleted: true }>(`/accounting/payments/${id}`, { method: "DELETE" });
+}

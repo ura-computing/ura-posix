@@ -1,14 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
-import { me as meFn } from "@/api/auth";
-import { QUERY_KEYS } from "@/constants";
-import { hasSession } from "@/utils/session";
+
+import { getMe } from "@/api/auth";
+import { QUERY_KEYS } from "@/types";
+import type { Me, MeResponse } from "@/types";
+
+function toFlat(r: MeResponse): Me {
+  return {
+    id:          String(r.user.id),
+    email:       r.user.email,
+    name:        r.user.name ?? r.user.email,
+    phone:       r.user.phone ?? undefined,
+    role:        r.user.role,
+    status:      r.user.status,
+    pharmacy:    r.pharmacy ? { id: r.pharmacy.id, name: r.pharmacy.name, code: r.pharmacy.code } : undefined,
+    permissions: r.permissions,
+  };
+}
 
 export function useMe() {
-  const { data: me, isPending: mePending, error: meError, isLoading: meLoading } = useQuery({
-    queryKey: QUERY_KEYS.me,
-    queryFn: meFn,
-    staleTime: 0,
-    enabled: hasSession(),
+  const query = useQuery<MeResponse, Error, Me>({
+    queryKey:  QUERY_KEYS.ME,
+    queryFn:   getMe,
+    select:    toFlat,
+    staleTime: 5 * 60 * 1000,
+    retry:     false,
   });
-  return { me, mePending, meError, meLoading };
+
+  return {
+    me:        query.data ?? null,
+    isLoading: query.isLoading,
+    isError:   query.isError,
+    isSuccess: query.isSuccess,
+    error:     query.error,
+  };
 }
