@@ -57,10 +57,10 @@ function AlertCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         {metrics.map((m) => (
           <div key={m.label} className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {m.label}
             </span>
-            <span className="font-mono text-base font-bold tabular-nums text-foreground">{m.value}</span>
+            <span className="font-mono text-lg font-bold tabular-nums text-foreground">{m.value}</span>
           </div>
         ))}
       </div>

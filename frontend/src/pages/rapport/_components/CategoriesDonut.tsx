@@ -1,6 +1,6 @@
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatMAD } from "@/utils/format";
-import type { TopCategoryRow } from "@/types";
+import type { CategoryType, TopCategoryRow } from "@/types";
 
 
 /**
@@ -27,10 +27,10 @@ const INNER  = 70;              // inner radius (donut hole width = OUTER-INNER 
 const GAP    = 0.012;           // gap between segments in radians (≈ 0.7°)
 
 
-export function CategoriesDonut({ categories }: { categories: TopCategoryRow[] }) {
+export function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategoryRow[]; tint?: CategoryType }) {
   if (categories.length === 0) {
     return (
-      <KpiTile label="Répartition du CA">
+      <KpiTile label="Répartition du CA" tint={tint}>
         <p className="py-12 text-center text-sm text-muted-foreground">Aucune donnée disponible.</p>
       </KpiTile>
     );
@@ -61,7 +61,7 @@ export function CategoriesDonut({ categories }: { categories: TopCategoryRow[] }
   ).out;
 
   return (
-    <KpiTile label="Répartition du CA">
+    <KpiTile label="Répartition du CA" tint={tint}>
       <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="shrink-0" aria-hidden>
           {arcs.map(({ seg, i, path }) => (

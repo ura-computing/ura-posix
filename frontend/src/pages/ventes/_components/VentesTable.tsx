@@ -34,10 +34,10 @@ function TypeBadge({ type }: { type: VenteRow["category_type"] }) {
   if (!type) return <span className="text-muted-foreground">—</span>;
   const isPharma = type === "pharmacie";
   return (
-    <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+    <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${
       isPharma
-        ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
-        : "bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300"
+        ? "bg-pharmacie-bg text-pharmacie-fg border-pharmacie-border"
+        : "bg-parapharmacie-bg text-parapharmacie-fg border-parapharmacie-border"
     }`}>
       {isPharma ? "Pharmacie" : "Parapharmacie"}
     </span>
@@ -47,11 +47,11 @@ function TypeBadge({ type }: { type: VenteRow["category_type"] }) {
 
 const COLUMNS: ColumnDef<VenteRow>[] = [
   { key: "date", label: "Date", width: 100,
-    render: (r) => <span className="font-mono text-xs tabular-nums text-muted-foreground">{r.date ?? "—"}</span> },
+    render: (r) => <span className="font-mono text-sm tabular-nums text-muted-foreground">{r.date ?? "—"}</span> },
   { key: "transaction_ref", label: "N° Transaction", width: 170,
     render: (r) => r.transaction_ref ? (
       <span className="flex items-center">
-        <span className="rounded border border-border bg-surface-subtle px-1.5 py-px font-mono text-[11px]">{r.transaction_ref}</span>
+        <span className="rounded border border-border bg-surface-subtle px-1.5 py-px font-mono text-xs">{r.transaction_ref}</span>
         {r.transaction_ref_final && r.transaction_ref_color && (
           <SuffixBadge text={r.transaction_ref_final.slice(r.transaction_ref.length)} color={r.transaction_ref_color} />
         )}
@@ -62,16 +62,16 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
   { key: "product", label: "Produit", width: 240,
     render: (r) => (
       <div className="flex flex-col">
-        <span className="truncate text-sm" title={r.product ?? ""}>{r.product ?? "—"}</span>
-        <span className="truncate font-mono text-[10px] text-muted-foreground">{r.pid ?? ""}</span>
+        <span className="truncate text-base" title={r.product ?? ""}>{r.product ?? "—"}</span>
+        <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid ?? ""}</span>
       </div>
     ) },
   { key: "category", label: "Catégorie", width: 160, sortable: false,
-    render: (r) => <span className="block max-w-[150px] truncate text-xs text-muted-foreground">{r.category ?? "—"}</span> },
+    render: (r) => <span className="block max-w-[150px] truncate text-sm text-muted-foreground">{r.category ?? "—"}</span> },
   { key: "type", label: "Type", width: 110, sortable: false,
     render: (r) => <TypeBadge type={r.category_type} /> },
   { key: "tva", label: "TVA", width: 80, sortable: false,
-    render: (r) => r.tva ? <span className="font-mono text-[11px] text-muted-foreground">{r.tva}</span> : <span className="text-muted-foreground">—</span> },
+    render: (r) => r.tva ? <span className="font-mono text-xs text-muted-foreground">{r.tva}</span> : <span className="text-muted-foreground">—</span> },
   { key: "quantity", label: "Qté", width: 70, align: "right",
     render: (r) => r.quantity != null ? formatQty(r.quantity) : "—" },
   { key: "discount", label: "Remise", width: 80, align: "right",

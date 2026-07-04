@@ -111,17 +111,18 @@
   --chart-tooltip-foreground: #121A18;
 
   /* ============ PRODUCT CATEGORIES — LIGHT ============
-     Colorblind-safe trio: indigo (pharmacie) / orange (parapharmacie) / slate (total).
+     Colorblind-safe trio: emerald (pharmacie) / indigo (parapharmacie) / slate (total).
+     Pharmacie shares the primary teal's green family so it reads as core biz.
      Each main hue = AA 4.5:1 as text on --background. Distinct from status hues. */
-  --color-pharmacie: #3651D4;          /* indigo — clinical, trustworthy   */
-  --color-pharmacie-bg: #ECEEFB;
-  --color-pharmacie-fg: #2E40B0;
-  --color-pharmacie-border: #C6CDF5;
+  --color-pharmacie: #059669;          /* emerald — core biz, healthy      */
+  --color-pharmacie-bg: #D1FAE5;
+  --color-pharmacie-fg: #047857;
+  --color-pharmacie-border: #A7F3D0;
 
-  --color-parapharmacie: #CD4B17;      /* burnt orange — warm, retail      */
-  --color-parapharmacie-bg: #FCEEE4;
-  --color-parapharmacie-fg: #B23F0E;
-  --color-parapharmacie-border: #F6D2BB;
+  --color-parapharmacie: #3651D4;      /* indigo — retail, complementary   */
+  --color-parapharmacie-bg: #ECEEFB;
+  --color-parapharmacie-fg: #2E40B0;
+  --color-parapharmacie-border: #C6CDF5;
 
   --color-total: #475569;              /* slate — neutral “all of the above” */
   --color-total-bg: #EEF1F4;
@@ -290,15 +291,15 @@
   --chart-tooltip-foreground: #E8EDEC;
 
   /* product categories — dark (lifted hues, AA on --background) */
-  --color-pharmacie: #8593FF;
-  --color-pharmacie-bg: #1A1F3D;
-  --color-pharmacie-fg: #B4BCFF;
-  --color-pharmacie-border: #333A66;
+  --color-pharmacie: #34D399;
+  --color-pharmacie-bg: #0F2B21;
+  --color-pharmacie-fg: #6EE7B7;
+  --color-pharmacie-border: #2A5646;
 
-  --color-parapharmacie: #F6975A;
-  --color-parapharmacie-bg: #2A1B10;
-  --color-parapharmacie-fg: #FAB88A;
-  --color-parapharmacie-border: #5A3620;
+  --color-parapharmacie: #8593FF;
+  --color-parapharmacie-bg: #1A1F3D;
+  --color-parapharmacie-fg: #B4BCFF;
+  --color-parapharmacie-border: #333A66;
 
   --color-total: #9AA8BC;
   --color-total-bg: #1A2330;

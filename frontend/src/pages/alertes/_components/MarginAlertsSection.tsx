@@ -30,8 +30,8 @@ export function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) 
       <header className="flex items-center gap-2.5">
         <TrendingDown className="size-5 text-error" />
         <div>
-          <h2 className="text-base font-semibold text-foreground">Alertes de marge</h2>
-          <p className="text-[13px] text-muted-foreground">Produits vendus avec une marge problématique.</p>
+          <h2 className="text-lg font-semibold text-foreground">Alertes de marge</h2>
+          <p className="text-sm text-muted-foreground">Produits vendus avec une marge problématique.</p>
         </div>
       </header>
 

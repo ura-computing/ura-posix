@@ -35,6 +35,32 @@ export const MARGIN_COLUMNS: AlertColumn<MarginRow>[] = [
     cell: (r) => <span className="font-mono">{formatMAD(r.ca)}</span> },
 ];
 
+type VsaRow = {
+  product:         string;
+  category:        string | null;
+  ppv:             number | null;
+  units_sold:      number;
+  ca:              number;
+  last_vente_date: string | null;
+};
+export const VENTES_SANS_ACHAT_COLUMNS: AlertColumn<VsaRow>[] = [
+  { key: "product", label: "Produit", align: "left", raw: (r) => r.product,
+    cell: (r) => <span className="block max-w-[280px] truncate text-sm font-medium">{r.product}</span> },
+  { key: "category", label: "Catégorie", align: "left", raw: (r) => r.category ?? "",
+    cell: (r) => <span className="text-sm text-muted-foreground">{r.category ?? "—"}</span> },
+  { key: "units_sold", label: "Quantité vendue", align: "right", raw: (r) => r.units_sold,
+    cell: (r) => <span className="font-mono">{formatQty(r.units_sold)}</span> },
+  { key: "ca", label: "CA", align: "right", raw: (r) => r.ca,
+    cell: (r) => <span className="font-mono">{formatMAD(r.ca)}</span> },
+  { key: "ppv", label: "PPV", align: "right", raw: (r) => r.ppv ?? 0,
+    cell: (r) => r.ppv == null
+      ? <span className="text-muted-foreground">—</span>
+      : <span className="font-mono">{formatMAD(r.ppv)}</span> },
+  { key: "last_vente_date", label: "Dernière vente", align: "left", raw: (r) => r.last_vente_date ?? "",
+    sortValue: (r) => (r.last_vente_date ? Date.parse(r.last_vente_date) : -Infinity),
+    cell: (r) => <span className="font-mono">{r.last_vente_date ?? "—"}</span> },
+];
+
 type PeremRow = { product: string; expiry_date: string | null; quantity: number; ppv: number };
 export const PEREMPTION_COLUMNS: AlertColumn<PeremRow>[] = [
   { key: "product", label: "Produit", align: "left", raw: (r) => r.product,

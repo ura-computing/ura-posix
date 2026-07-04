@@ -39,7 +39,7 @@ function hexA(hex: string, a: number): string {
 function ClassPill({ klass }: { klass: AbcdClass }) {
   return (
     <span
-      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold"
+      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-bold"
       style={{ background: hexA(ABCD_COLORS[klass], 0.16), color: ABCD_COLORS[klass] }}
     >
       {klass}
@@ -52,7 +52,7 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
   const meta = STATUS_META[status];
   return (
     <span className={cn(
-      "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium",
+      "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
       meta.pill,
     )}>
       <span className={cn("size-1.5 rounded-full", meta.dot)} aria-hidden />
@@ -64,7 +64,7 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
 
 const COLUMNS: ColumnDef<StockRow, StockSortKey>[] = [
   { key: "product", label: "Produit", width: 280,
-    render: (r) => <span className="block max-w-[260px] truncate text-sm" title={r.product}>{r.product}</span> },
+    render: (r) => <span className="block max-w-[260px] truncate text-base" title={r.product}>{r.product}</span> },
   { key: "category", label: "Classe", width: 80,
     render: (r) => <ClassPill klass={r.category} /> },
   { key: "units_sold_12m", label: "Ventes 12m", width: 110, align: "right",

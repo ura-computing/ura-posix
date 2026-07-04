@@ -77,26 +77,26 @@ function Card({
         <div className={`flex size-9 items-center justify-center rounded-xl ${tint.bg} ${tint.fg}`}>
           {METHOD_ICON[method]}
         </div>
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {METHOD_LABEL[method]}
         </span>
       </div>
 
       {entry ? (
         <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-xl font-semibold tabular-nums text-foreground">
+          <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">
             {formatMAD(total)}
           </span>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Ph {formatMAD(entry.pharmacie_amount)}</span>
             <span>Para {formatMAD(entry.parapharmacie_amount)}</span>
           </div>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {entry.count} transaction{entry.count > 1 ? "s" : ""}
           </span>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-base text-muted-foreground">
           <Plus className="size-4" />
           <span>Ajouter</span>
         </div>

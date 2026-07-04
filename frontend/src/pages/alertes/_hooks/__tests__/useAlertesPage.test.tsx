@@ -30,11 +30,14 @@ const emptyStock = {
   products: [], pagination: { total: 0, page: 1, limit: 50, page_count: 0 },
 };
 
+const emptyVsa = { count: 0, total_ca: 0, total_units_sold: 0, products: [] };
+
 beforeEach(() => {
   server.use(
-    http.get("*/v1/stats/margin-alerts", () => HttpResponse.json(emptyMargin)),
-    http.get("*/v1/stats/peremptions",   () => HttpResponse.json(emptyPeremptions)),
-    http.get("*/v1/stats/stock-abcd",    () => HttpResponse.json(emptyStock)),
+    http.get("*/v1/stats/margin-alerts",     () => HttpResponse.json(emptyMargin)),
+    http.get("*/v1/stats/peremptions",       () => HttpResponse.json(emptyPeremptions)),
+    http.get("*/v1/stats/stock-abcd",        () => HttpResponse.json(emptyStock)),
+    http.get("*/v1/stats/ventes-sans-achat", () => HttpResponse.json(emptyVsa)),
   );
 });
 

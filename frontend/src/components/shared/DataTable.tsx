@@ -94,13 +94,13 @@ export function DataTable<R, K extends string = string>({
           so its sticky positioning resolves to <main>, not this card. */}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-base">
             <thead>
               <tr className="border-b border-border bg-surface-subtle">
                 {columns.map((col) => {
                   const sortable = col.sortable !== false && !!onSort;
                   const headerCls = cn(
-                    "px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                    "px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
                     col.align === "right" ? "text-right" : "text-left",
                   );
                   return (

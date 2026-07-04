@@ -36,14 +36,14 @@ function PeremptionCard({
     >
       <div className="flex items-center gap-5 pt-0.5">
         <div className="flex flex-col gap-px">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Unités</span>
-          <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Unités</span>
+          <span className="font-mono text-base font-semibold tabular-nums text-foreground">
             {formatQty(bracket.total_units)}
           </span>
         </div>
         <div className="flex flex-col gap-px">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Valeur vente</span>
-          <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">Valeur vente</span>
+          <span className="font-mono text-base font-semibold tabular-nums text-foreground">
             {formatMAD(bracket.sale_value)}
           </span>
         </div>

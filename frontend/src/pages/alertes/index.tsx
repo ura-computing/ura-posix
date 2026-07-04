@@ -9,6 +9,7 @@ import { GlobalSummaryStrip } from "./_components/GlobalSummaryStrip";
 import { MarginAlertsSection } from "./_components/MarginAlertsSection";
 import { PeremptionsSection } from "./_components/PeremptionsSection";
 import { StockAlertsSection } from "./_components/StockAlertsSection";
+import { VentesSansAchatSection } from "./_components/VentesSansAchatSection";
 import { useAlertesPage, type CategoryType } from "./_hooks/useAlertesPage";
 
 
@@ -93,6 +94,7 @@ export default function AlertesPage() {
             toRestock={a.counts.sousStock}
             excessStock={a.counts.surStock}
           />
+          <VentesSansAchatSection data={a.vsa} onOpen={a.openDialog} />
           <MarginAlertsSection data={a.margin} onOpen={a.openDialog} />
           <PeremptionsSection data={a.perem} onOpen={a.openDialog} />
           <StockAlertsSection

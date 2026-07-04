@@ -22,6 +22,7 @@ from schemas.stats import (
     StatsResponse,
     StockAbcdResponse,
     StockSummaryResponse,
+    VentesSansAchatResponse,
 )
 from stock_queries import compute_peremptions, compute_stock_abcd
 from security import CurrentUserDep
@@ -31,6 +32,7 @@ from stats_queries import (
     compute_margin_alerts,
     compute_previous_kpis,
     compute_stock_summary,
+    compute_ventes_sans_achat,
     merge_top_categories,
     pharma_expr,
 )
@@ -185,6 +187,20 @@ def get_margin_alerts(
     """4 brackets feeding Rapport Section 5 ('Alertes marges') + the /alertes drill-down."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="alertes")
     return compute_margin_alerts(db, pharmacy_id, date_from or None, date_to or None, category_type)
+
+
+@router.get("/stats/ventes-sans-achat", response_model=VentesSansAchatResponse)
+def get_ventes_sans_achat(
+    user: CurrentUserDep,
+    db: DbDep,
+    date_from: DateFromQ         = None,
+    date_to:   DateToQ           = None,
+    category_type: CategoryTypeQ = "all",
+) -> dict:
+    """Products with ventes in the window but no matching achat — the root cause
+    of "—" cells in Marge %/DH on /ventes."""
+    pharmacy_id = require_pharmacy_owner(user, db, feature="alertes")
+    return compute_ventes_sans_achat(db, pharmacy_id, date_from or None, date_to or None, category_type)
 
 
 @router.get("/stats/stock-summary", response_model=StockSummaryResponse)

@@ -2,7 +2,7 @@ import { ShieldCheck, TrendingDown, TrendingUp, AlertTriangle } from "lucide-rea
 
 import { KpiTile, type IconTone } from "@/components/shared/KpiTile";
 import { formatMAD, formatQty } from "@/utils/format";
-import { ROUTES, type MarginAlertsResponse } from "@/types";
+import { ROUTES, type CategoryType, type MarginAlertsResponse } from "@/types";
 
 
 interface BracketDef {
@@ -21,7 +21,7 @@ const BRACKETS: BracketDef[] = [
 ];
 
 
-export function MarginAlertCards({ data }: { data: MarginAlertsResponse }) {
+export function MarginAlertCards({ data, tint = "all" }: { data: MarginAlertsResponse; tint?: CategoryType }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {BRACKETS.map((b) => {
@@ -40,6 +40,7 @@ export function MarginAlertCards({ data }: { data: MarginAlertsResponse }) {
             icon={<b.Icon className="size-5" />}
             iconTone={b.tone}
             badge={{ label: <>{formatQty(bucket.count)} produits</>, tone: b.tone }}
+            tint={tint}
           />
         );
       })}

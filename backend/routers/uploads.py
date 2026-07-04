@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 from csv_parse import (
     classify_product_type, col, parse_catalog_csv, parse_csv, parse_float,
-    parse_int, parse_iso_date, upsert_medicament,
+    parse_int, parse_iso_date,
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
@@ -45,7 +45,7 @@ from security import CurrentUserDep
 router = APIRouter(tags=["uploads"])
 
 
-MAX_FILE_BYTES = 10 * 1024 * 1024   # 10 MB
+MAX_FILE_BYTES = 100 * 1024 * 1024   # 100 MB
 ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
 EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
 EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
@@ -143,13 +143,13 @@ COL_DISCOUNT     = "Remise"
 @dataclass(frozen=True)
 class TransactionConfig:
     """Captures the 5 things that differ between an Achat ingest and a Vente ingest.
-    Everything else (medicament upsert, dedup, batch accounting, commit) is in
+    Everything else (medicament resolve, dedup, batch accounting, commit) is in
     `_insert_transactions` and runs against either config unchanged."""
-    file_type:    str                                              # "achat" | "vente"
-    model:        type                                             # Achat | Vente (SQLAlchemy class)
-    dedup_column: str                                              # CSV column to dedup on
-    dedup_attr:   str                                              # corresponding model attribute name
-    build_row:    Callable[[dict[str, Any], int, int, int], Any]   # (row, pharmacy_id, med_id, batch_id) → model instance
+    file_type:      str                                                        # "achat" | "vente"
+    model:          type                                                       # Achat | Vente (SQLAlchemy class)
+    dedup_column:   str                                                        # CSV column to dedup on
+    dedup_attr:     str                                                        # corresponding model attribute name
+    build_row_dict: Callable[[dict[str, Any], int, int, int], dict[str, Any]]  # (row, pharmacy_id, med_id, batch_id) → dict for bulk_insert
 
 
 ACHAT_CFG = TransactionConfig(
@@ -157,19 +157,21 @@ ACHAT_CFG = TransactionConfig(
     model=Achat,
     dedup_column=COL_DELIVERY_REF,
     dedup_attr="delivery_ref",
-    build_row=lambda row, pharm_id, med_id, batch_id: Achat(
-        pharmacy_id=pharm_id, medicament_id=med_id, import_batch_id=batch_id,
-        created_at_source=col(row, COL_CREATED),
-        delivery_date=col(row, COL_DELIVERY_DATE),
-        delivery_ref=col(row, COL_DELIVERY_REF),
-        supplier=col(row, COL_SUPPLIER),
-        quantity=parse_float(col(row, COL_QUANTITY)),
-        unit_price=parse_float(col(row, COL_UNIT_PRICE)),
-        expiry_date=col(row, COL_EXPIRY),
-        stock_min=parse_float(col(row, COL_STOCK_MIN)),
-        stock_max=parse_float(col(row, COL_STOCK_MAX)),
-        total=parse_float(col(row, COL_TOTAL)),
-    ),
+    build_row_dict=lambda row, pharm_id, med_id, batch_id: {
+        "pharmacy_id":       pharm_id,
+        "medicament_id":     med_id,
+        "import_batch_id":   batch_id,
+        "created_at_source": col(row, COL_CREATED),
+        "delivery_date":     col(row, COL_DELIVERY_DATE),
+        "delivery_ref":      col(row, COL_DELIVERY_REF),
+        "supplier":          col(row, COL_SUPPLIER),
+        "quantity":          parse_float(col(row, COL_QUANTITY)),
+        "unit_price":        parse_float(col(row, COL_UNIT_PRICE)),
+        "expiry_date":       col(row, COL_EXPIRY),
+        "stock_min":         parse_float(col(row, COL_STOCK_MIN)),
+        "stock_max":         parse_float(col(row, COL_STOCK_MAX)),
+        "total":             parse_float(col(row, COL_TOTAL)),
+    },
 )
 
 VENTE_CFG = TransactionConfig(
@@ -177,17 +179,95 @@ VENTE_CFG = TransactionConfig(
     model=Vente,
     dedup_column=COL_TXN_REF,
     dedup_attr="transaction_ref",
-    build_row=lambda row, pharm_id, med_id, batch_id: Vente(
-        pharmacy_id=pharm_id, medicament_id=med_id, import_batch_id=batch_id,
-        date=col(row, COL_DATE),
-        transaction_ref=col(row, COL_TXN_REF),
-        client=col(row, COL_CLIENT),
-        quantity=parse_float(col(row, COL_QUANTITY)),
-        discount=parse_float(col(row, COL_DISCOUNT)),
-        unit_price=parse_float(col(row, COL_UNIT_PRICE)),
-        total=parse_float(col(row, COL_TOTAL)),
-    ),
+    build_row_dict=lambda row, pharm_id, med_id, batch_id: {
+        "pharmacy_id":     pharm_id,
+        "medicament_id":   med_id,
+        "import_batch_id": batch_id,
+        "date":            col(row, COL_DATE),
+        "transaction_ref": col(row, COL_TXN_REF),
+        "client":          col(row, COL_CLIENT),
+        "quantity":        parse_float(col(row, COL_QUANTITY)),
+        "discount":        parse_float(col(row, COL_DISCOUNT)),
+        "unit_price":      parse_float(col(row, COL_UNIT_PRICE)),
+        "total":           parse_float(col(row, COL_TOTAL)),
+    },
 )
+
+
+def _batch_resolve_medicaments(
+    db: Session,
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, int], list[Medicament]]:
+    """Resolve every unique PID in `rows` to a Medicament.id using ONE SELECT + ONE
+    INSERT batch. Replaces the per-row `upsert_medicament` call — was the dominant
+    cost in ingest (N+1 SELECT + N flush per chunk).
+
+    Returns (`{pid → med_id}`, `[newly-created Medicaments]`). The list is used by
+    the response so the frontend can surface "N new products" to the owner (F19).
+
+    Trade-off vs. `upsert_medicament()`: DROPS the normalized-name fallback. Rows
+    with a NEW PID whose product name matches an existing catalog row will create
+    a duplicate Medicament instead of merging. Rare in practice — Sobrus PIDs are
+    stable — and dedupable via /admin/catalogue after the fact. In return, ingest
+    goes from ~500 SELECTs per chunk to 1.
+    """
+    # Collect unique PIDs; keep the first row we see for a given PID as the source
+    # of catalog field updates (tva/pph/ppv/zone).
+    first_row_by_pid: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        pid = col(r, COL_PID)
+        if pid and pid not in first_row_by_pid:
+            first_row_by_pid[pid] = r
+    if not first_row_by_pid:
+        return {}, []
+
+    pids = list(first_row_by_pid.keys())
+    existing: dict[str, Medicament] = {
+        m.pid: m
+        for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
+    }
+
+    # Update mutable fields on existing rows (same semantics as upsert_medicament).
+    # Category intentionally NOT overwritten — admin-curated.
+    for pid, r in first_row_by_pid.items():
+        med = existing.get(pid)
+        if not med:
+            continue
+        tva  = col(r, COL_TVA)
+        pph  = parse_float(col(r, COL_PPH))
+        ppv  = parse_float(col(r, COL_PPV))
+        zone = col(r, COL_ZONE)
+        if tva and not med.tva:
+            med.tva = tva
+        if pph is not None:
+            med.pph = pph
+        if ppv is not None:
+            med.ppv = ppv
+        if zone and not med.zone:
+            med.zone = zone
+
+    # Insert missing meds in ONE flush (SQLAlchemy issues an executemany INSERT).
+    # F19: leave product_type=NULL — catalog is the source of truth; admin classifies.
+    new_meds: list[Medicament] = []
+    for pid, r in first_row_by_pid.items():
+        if pid in existing:
+            continue
+        new_meds.append(Medicament(
+            pid=pid,
+            product=col(r, COL_PRODUCT) or pid,
+            tva=col(r, COL_TVA),
+            pph=parse_float(col(r, COL_PPH)),
+            ppv=parse_float(col(r, COL_PPV)),
+            category=col(r, COL_CATEGORY),
+            zone=col(r, COL_ZONE),
+        ))
+    if new_meds:
+        db.add_all(new_meds)
+        db.flush()   # populates .id on every new row in one round-trip
+
+    resolved: dict[str, int] = {m.pid: m.id for m in existing.values()}
+    resolved.update({m.pid: m.id for m in new_meds})
+    return resolved, new_meds
 
 
 def _preload_existing_keys(db: Session, cfg: TransactionConfig, pharmacy_id: int,
@@ -215,47 +295,44 @@ def _insert_transactions(
     user_id: int,
     cfg: TransactionConfig,
 ) -> dict:
-    """Generic ingest for Achat or Vente rows. Differences captured by `cfg`."""
+    """Generic ingest for Achat or Vente rows. Differences captured by `cfg`.
+
+    Fast path: batch-resolve all PIDs in one SELECT + insert all transaction rows
+    in one executemany. What was N+1 SELECT/flush per chunk is now 2 queries total
+    (medicament resolve + dedup preload) plus 1 bulk INSERT."""
     batch = _get_or_create_batch(
         db, pharmacy_id=pharmacy_id, file_type=cfg.file_type,
         filename=filename, batch_id=batch_id, user_id=user_id,
     )
+    med_id_by_pid, new_medicaments = _batch_resolve_medicaments(db, rows)
     refs = {r.get(cfg.dedup_column) for r in rows if r.get(cfg.dedup_column)}
     existing = _preload_existing_keys(db, cfg, pharmacy_id, refs)
 
-    inserted = 0
+    to_insert: list[dict[str, Any]] = []
     skipped_no_pid = 0
     skipped_no_med = 0
     skipped_dup    = 0
-    new_medicaments: list[Medicament] = []  # F19: surface to owner so admin can classify
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
             skipped_no_pid += 1
             continue
-        med, was_created = upsert_medicament(
-            db, pid=pid,
-            product=col(row, COL_PRODUCT) or pid,
-            tva=col(row, COL_TVA),
-            pph=parse_float(col(row, COL_PPH)),
-            ppv=parse_float(col(row, COL_PPV)),
-            category=col(row, COL_CATEGORY),
-            zone=col(row, COL_ZONE),
-        )
-        if not med:
+        med_id = med_id_by_pid.get(pid)
+        if not med_id:
             skipped_no_med += 1
             continue
-        if was_created:
-            new_medicaments.append(med)
         ref = col(row, cfg.dedup_column)
-        if ref and (ref, med.id) in existing:
+        if ref and (ref, med_id) in existing:
             skipped_dup += 1
             continue
-        db.add(cfg.build_row(row, pharmacy_id, med.id, batch.id))
+        to_insert.append(cfg.build_row_dict(row, pharmacy_id, med_id, batch.id))
         if ref:
-            existing.add((ref, med.id))
-        inserted += 1
+            existing.add((ref, med_id))
 
+    if to_insert:
+        db.bulk_insert_mappings(cfg.model, to_insert)
+
+    inserted = len(to_insert)
     skipped = skipped_no_pid + skipped_no_med + skipped_dup
     batch.rows_inserted += inserted
     batch.rows_skipped  += skipped
@@ -288,36 +365,26 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
     we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
     batch = _get_or_create_batch(db, pharmacy_id=pharmacy_id, file_type="stock",
                                  filename=filename, batch_id=batch_id, user_id=user_id)
+    med_id_by_pid, new_medicaments = _batch_resolve_medicaments(db, rows)
 
     seen_meds: set[int] = set()
     inserted_rows: list[dict] = []
     skipped_unknown: list[dict[str, str | None]] = []
-    new_medicaments: list[Medicament] = []  # F19: surface to owner
 
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
             continue
-        med, was_created = upsert_medicament(
-            db, pid=pid,
-            product=col(row, COL_PRODUCT) or pid,
-            tva=col(row, COL_TVA),
-            pph=parse_float(col(row, COL_PPH)),
-            ppv=parse_float(col(row, COL_PPV)),
-            category=col(row, COL_CATEGORY),
-            zone=col(row, COL_ZONE),
-        )
-        if not med:
+        med_id = med_id_by_pid.get(pid)
+        if not med_id:
             skipped_unknown.append({"pid": pid, "product": col(row, COL_PRODUCT)})
             continue
-        if was_created:
-            new_medicaments.append(med)
-        if med.id in seen_meds:
+        if med_id in seen_meds:
             continue
-        seen_meds.add(med.id)
+        seen_meds.add(med_id)
         inserted_rows.append({
             "pharmacy_id":   pharmacy_id,
-            "medicament_id": med.id,
+            "medicament_id": med_id,
             "current_stock": parse_int(col(row, "Stock")) or 0,
             "stock_min":     parse_int(col(row, COL_STOCK_MIN)),
             "stock_max":     parse_int(col(row, COL_STOCK_MAX)),

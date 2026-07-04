@@ -17,10 +17,10 @@ function Chip({ icon, color, label, value }: { icon: ReactNode; color: string; l
     <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 shadow-sm">
       <span className={`flex size-8 items-center justify-center rounded-md ${color}`}>{icon}</span>
       <div className="flex flex-col">
-        <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        <span className="whitespace-nowrap text-xs font-bold uppercase tracking-wide text-muted-foreground">
           {label}
         </span>
-        <span className="font-mono text-lg font-bold tabular-nums text-foreground">{formatQty(value)}</span>
+        <span className="font-mono text-xl font-bold tabular-nums text-foreground">{formatQty(value)}</span>
       </div>
     </div>
   );

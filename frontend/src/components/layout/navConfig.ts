@@ -35,7 +35,7 @@ const DATA:      Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 export const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: "Rapports", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
+      { label: "Tableau de bord", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
     ],
   },
   {
