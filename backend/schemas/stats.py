@@ -106,6 +106,24 @@ class MarginAlertsResponse(BaseModel):
     very_high: MarginAlertBracket
 
 
+# ── Ventes sans achat ─────────────────────────────────────────────────────────
+
+class VentesSansAchatProduct(BaseModel):
+    product:         str
+    category:        str | None = None
+    ppv:             float | None = None
+    units_sold:      float
+    ca:              float
+    last_vente_date: str | None = None
+
+
+class VentesSansAchatResponse(BaseModel):
+    count:            int
+    total_ca:         float
+    total_units_sold: float
+    products:         list[VentesSansAchatProduct]
+
+
 # ── Stock summary ─────────────────────────────────────────────────────────────
 
 class StockSummaryResponse(BaseModel):

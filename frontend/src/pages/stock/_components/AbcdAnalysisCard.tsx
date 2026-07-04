@@ -62,10 +62,10 @@ export function AbcdAnalysisCard({
                 >
                   {k}
                 </span>
-                <span className="font-mono text-lg font-bold tabular-nums text-foreground">
+                <span className="font-mono text-xl font-bold tabular-nums text-foreground">
                   {formatQty(count)}
                 </span>
-                <span className="-mt-0.5 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+                <span className="-mt-0.5 whitespace-nowrap font-mono text-xs text-muted-foreground">
                   {pct} %
                 </span>
               </button>
@@ -75,21 +75,21 @@ export function AbcdAnalysisCard({
 
         {/* RIGHT — Indice de santé du stock (uses the shared NeedleGauge — same gauge style as Achats supplier-mix) */}
         <div className="flex flex-col items-center justify-center gap-1 md:border-l md:border-border md:pl-3">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Indice de santé
           </span>
           <NeedleGauge value={health * 10} />
           <div className="-mt-2 flex items-baseline gap-1 whitespace-nowrap">
-            <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
+            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
               {scoreLabel}
             </span>
-            <span className="font-mono text-sm font-semibold text-muted-foreground">/ 10</span>
+            <span className="font-mono text-base font-semibold text-muted-foreground">/ 10</span>
           </div>
           {/* Explanation: pharmacists need to know what the needle measures */}
-          <p className="mt-0.5 max-w-[220px] text-center text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 max-w-[220px] text-center text-xs leading-snug text-muted-foreground">
             Part des produits en couverture idéale <span className="whitespace-nowrap">(46-60 j)</span> sur ceux qui ont des ventes.
           </p>
-          <span className="mt-0.5 text-xs text-muted-foreground">
+          <span className="mt-0.5 text-sm text-muted-foreground">
             <span className="font-mono tabular-nums text-foreground">{formatQty(totalReferences)}</span> références
           </span>
         </div>

@@ -108,6 +108,8 @@ export const QUERY_KEYS = {
     ["stats", df ?? "", dt ?? "", ct, nd] as const,
   MARGIN_ALERTS:  (df: string | null, dt: string | null, ct: string) =>
     ["margin-alerts", df ?? "", dt ?? "", ct] as const,
+  VENTES_SANS_ACHAT: (df: string | null, dt: string | null, ct: string) =>
+    ["ventes-sans-achat", df ?? "", dt ?? "", ct] as const,
   STOCK_SUMMARY:  ["stock-summary"] as const,
 
   // Rapport — admin endpoints.
@@ -149,6 +151,7 @@ export const QUERY_KEYS = {
   // that filters via non_declared_sub when an exclusion is added/removed.
   STATS_PREFIX:           ["stats"] as const,
   MARGIN_ALERTS_PREFIX:   ["margin-alerts"] as const,
+  VENTES_SANS_ACHAT_PREFIX: ["ventes-sans-achat"] as const,
   ANALYSE_MARGE_PREFIX:   ["analyse-marge"] as const,
   STOCK_ABCD_FULL_PREFIX: ["stock-abcd-full"] as const,
   STOCK_ABCD_FILTERED_PREFIX: ["stock-abcd-filtered"] as const,
@@ -301,6 +304,21 @@ export interface MarginAlertsResponse {
   medium:    MarginAlertBracket;
   high:      MarginAlertBracket;
   very_high: MarginAlertBracket;
+}
+
+export interface VentesSansAchatProduct {
+  product:         string;
+  category:        string | null;
+  ppv:             number | null;
+  units_sold:      number;
+  ca:              number;
+  last_vente_date: string | null;
+}
+export interface VentesSansAchatResponse {
+  count:            number;
+  total_ca:         number;
+  total_units_sold: number;
+  products:         VentesSansAchatProduct[];
 }
 
 export interface StockSummaryResponse {

@@ -49,7 +49,7 @@ function Card({
   const tint = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : "text-info";
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <div className="flex items-center gap-2 text-base font-semibold text-foreground">
         <span className={tint}>{icon}</span>
         {title}
       </div>
@@ -63,15 +63,15 @@ function Row({ label, value, hero, subtle }: { label: React.ReactNode; value: Re
   if (hero) {
     return (
       <div className="flex flex-col gap-0.5 pb-2 border-b border-border">
-        <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">{value}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="font-mono text-3xl font-semibold tabular-nums text-foreground">{value}</span>
       </div>
     );
   }
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className={subtle ? "text-xs text-muted-foreground" : "text-muted-foreground"}>{label}</span>
-      <span className={`font-mono tabular-nums ${subtle ? "text-xs text-muted-foreground" : "font-semibold text-foreground"}`}>{value}</span>
+    <div className="flex items-center justify-between gap-3 text-base">
+      <span className={subtle ? "text-sm text-muted-foreground" : "text-muted-foreground"}>{label}</span>
+      <span className={`font-mono tabular-nums ${subtle ? "text-sm text-muted-foreground" : "font-semibold text-foreground"}`}>{value}</span>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // src/pages/alertes/_hooks/useAlertesPage.ts
 import { useCallback, useMemo, useState } from "react";
 // Already shipped at @/hooks/stats:
-import { useMarginAlerts, usePeremptions, useStockAbcd } from "@/hooks/stats";
+import { useMarginAlerts, usePeremptions, useStockAbcd, useVentesSansAchat } from "@/hooks/stats";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import type { AlertColumn } from "../_components/AlertDetailDialog";
 
@@ -42,6 +42,11 @@ export function useAlertesPage() {
     date_to:       dateTo   || null,
     category_type: category || "all",
   });
+  const vsaQuery = useVentesSansAchat({
+    date_from:     dateFrom || null,
+    date_to:       dateTo   || null,
+    category_type: category || "all",
+  });
   const peremptionsQuery = usePeremptions(); // ignores date + category (backend)
   const stockQuery = useStockAbcd({
     date_from: dateFrom || null,
@@ -70,10 +75,12 @@ export function useAlertesPage() {
 
   const margin = marginQuery.data;
   const perem = peremptionsQuery.data;
+  const vsa = vsaQuery.data;
 
   const counts = {
-    marginNeg: margin?.negative.count ?? 0,
-    marginLow: margin?.low.count ?? 0,
+    marginNeg:      margin?.negative.count ?? 0,
+    marginLow:      margin?.low.count ?? 0,
+    ventesSansAchat: vsa?.count ?? 0,
     expired:   perem?.expired.count ?? 0,
     near2w:    perem?.near_2w.count  ?? 0,
     near1m:    perem?.near_1m.count  ?? 0,
@@ -81,20 +88,21 @@ export function useAlertesPage() {
     sousStock: sousStock.length,
     surStock:  surStock.length,
   };
-  // Total actionable alerts across the 8 brackets.
+  // Total actionable alerts across all brackets.
   const totalAlerts = Object.values(counts).reduce((a, b) => a + b, 0);
   // Expired + within-2-weeks = the "act today" subset.
   const peremptionCritical = counts.expired + counts.near2w;
 
-  const isLoading = marginQuery.isLoading || peremptionsQuery.isLoading || stockQuery.isLoading;
-  const isError = marginQuery.isError || peremptionsQuery.isError || stockQuery.isError;
+  const isLoading = marginQuery.isLoading || peremptionsQuery.isLoading || stockQuery.isLoading || vsaQuery.isLoading;
+  const isError = marginQuery.isError || peremptionsQuery.isError || stockQuery.isError || vsaQuery.isError;
   const isEmpty = !isLoading && !isError && totalAlerts === 0;
 
   const refetchAll = useCallback(() => {
     marginQuery.refetch();
+    vsaQuery.refetch();
     peremptionsQuery.refetch();
     stockQuery.refetch();
-  }, [marginQuery, peremptionsQuery, stockQuery]);
+  }, [marginQuery, vsaQuery, peremptionsQuery, stockQuery]);
 
   const resetAll = useCallback(() => {
     setRange(null, null);
@@ -106,7 +114,7 @@ export function useAlertesPage() {
     dateFrom, dateTo, category,
     setDateFrom, setDateTo, setCategory, resetAll,
     // queries + data
-    marginQuery, peremptionsQuery, stockQuery, margin, perem,
+    marginQuery, vsaQuery, peremptionsQuery, stockQuery, margin, perem, vsa,
     // derived stock
     negatif, sousStock, surStock, negUnits, sousPpv, surPpv,
     // counts

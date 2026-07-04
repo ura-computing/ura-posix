@@ -13,6 +13,7 @@ import type {
   StockAbcdResponse,
   StockFilters,
   StockSummaryResponse,
+  VentesSansAchatResponse,
 } from "@/types";
 
 
@@ -35,6 +36,10 @@ export function getStats(filters: StatsFilters): Promise<StatsResponse> {
 
 export function getMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">): Promise<MarginAlertsResponse> {
   return api<MarginAlertsResponse>(`/stats/margin-alerts${qs(filters)}`);
+}
+
+export function getVentesSansAchat(filters: Omit<StatsFilters, "include_non_declared">): Promise<VentesSansAchatResponse> {
+  return api<VentesSansAchatResponse>(`/stats/ventes-sans-achat${qs(filters)}`);
 }
 
 export function getStockSummary(): Promise<StockSummaryResponse> {

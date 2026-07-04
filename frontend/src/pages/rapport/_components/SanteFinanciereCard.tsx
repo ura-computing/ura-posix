@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatMAD } from "@/utils/format";
 import { cn } from "@/utils/cn";
-import type { MargeSummary } from "@/types";
+import type { CategoryType, MargeSummary } from "@/types";
 
 
 interface GradeDef { letter: string; label: string; bg: string; ring: string; text: string; }
@@ -19,19 +19,19 @@ function grade(marge_pct: number): GradeDef {
 }
 
 
-export function SanteFinanciereCard({ marge }: { marge: MargeSummary }) {
+export function SanteFinanciereCard({ marge, tint = "all" }: { marge: MargeSummary; tint?: CategoryType }) {
   const g = grade(marge.marge_pct);
   return (
-    <KpiTile label="Santé financière" className="items-center text-center">
+    <KpiTile label="Santé financière" className="items-center text-center" tint={tint}>
       <div className={cn(
-        "mx-auto flex size-28 items-center justify-center rounded-full border-4 font-mono text-5xl font-bold tracking-tight",
+        "mx-auto flex size-28 items-center justify-center rounded-full border-4 font-mono text-6xl font-bold tracking-tight",
         g.bg, g.ring, g.text,
       )}>
         {g.letter}
       </div>
       <div className="text-center">
-        <div className="text-sm font-semibold text-foreground">{g.label}</div>
-        <div className="mt-0.5 font-mono text-sm tabular-nums text-muted-foreground">
+        <div className="text-base font-semibold text-foreground">{g.label}</div>
+        <div className="mt-0.5 font-mono text-base tabular-nums text-muted-foreground">
           Marge moyenne : {marge.marge_pct.toFixed(2)} %
         </div>
       </div>
@@ -39,7 +39,7 @@ export function SanteFinanciereCard({ marge }: { marge: MargeSummary }) {
         <Stat label="Marge brute" value={formatMAD(marge.marge_brute_dh)} />
         <Stat label="Marge nette" value={formatMAD(marge.marge_nette_dh)} />
       </div>
-      <div className="text-center font-mono text-[10px] text-muted-foreground">
+      <div className="text-center font-mono text-xs text-muted-foreground">
         A+ (&gt;30%) · A (&gt;25%) · B+ (&gt;20%) · B (&gt;15%) · C (&gt;10%) · D (&gt;5%) · F (≤5%)
       </div>
     </KpiTile>
@@ -50,8 +50,8 @@ export function SanteFinanciereCard({ marge }: { marge: MargeSummary }) {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="font-mono text-sm font-bold tabular-nums text-foreground">{value}</span>
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="font-mono text-base font-bold tabular-nums text-foreground">{value}</span>
     </div>
   );
 }

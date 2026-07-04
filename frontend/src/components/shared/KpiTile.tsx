@@ -62,6 +62,9 @@ const SUB_TONE: Record<IconTone, string> = {
 };
 
 
+export type CategoryTint = "all" | "pharmacie" | "parapharmacie";
+
+
 export interface KpiTileProps {
   label:      ReactNode;
   value?:     ReactNode;                                             // optional: chart cards use children instead
@@ -83,12 +86,24 @@ export interface KpiTileProps {
   /** Body slot: 2×2 grid, chart, gauge, mini-stats. */
   children?:  ReactNode;
   className?: string;
+  /** Category tint — swaps the default `border-border bg-card` surface for the
+   *  pharmacie or parapharmacie palette. "all" (or omitted) = neutral. Hero
+   *  variant ignores this (its aurora gradient is already brand-branded). */
+  tint?:      CategoryTint;
 }
+
+
+const TINT_SURFACE: Record<CategoryTint, string> = {
+  all:           "border border-border bg-card",
+  pharmacie:     "border border-pharmacie-border bg-pharmacie-bg/30",
+  parapharmacie: "border border-parapharmacie-border bg-parapharmacie-bg/30",
+};
 
 
 export function KpiTile({
   label, value, sub, subTone, delta, icon, iconTone = "primary", badge,
   hero, sparkline, href, onClick, disabled, footerLink, children, className,
+  tint = "all",
 }: KpiTileProps) {
   const interactive = !disabled && (!!href || !!onClick);
 
@@ -96,7 +111,7 @@ export function KpiTile({
     "relative flex flex-col gap-2.5 rounded-2xl p-5 shadow-sm transition-shadow",
     hero
       ? "brand-aurora text-white overflow-hidden sm:col-span-2 sm:row-span-2"
-      : "border border-border bg-card",
+      : TINT_SURFACE[tint],
     interactive && "cursor-pointer hover:shadow-md",
     disabled && "cursor-not-allowed opacity-60",
     className,
@@ -106,7 +121,7 @@ export function KpiTile({
     <>
       <div className="flex items-start justify-between gap-3">
         <span className={cn(
-          "text-[11px] font-semibold uppercase tracking-wide",
+          "text-xs font-semibold uppercase tracking-wide",
           hero ? "text-white/80" : "text-muted-foreground",
         )}>
           {label}
@@ -114,7 +129,7 @@ export function KpiTile({
         <div className="flex shrink-0 items-center gap-2">
           {badge && (
             <span className={cn(
-              "rounded-full px-2.5 py-1 font-mono text-xs font-bold tabular-nums",
+              "rounded-full px-2.5 py-1 font-mono text-sm font-bold tabular-nums",
               hero ? "bg-white/15 text-white" : BADGE_TONE[badge.tone ?? iconTone],
             )}>
               {badge.label}
@@ -134,7 +149,7 @@ export function KpiTile({
       {value != null && (
         <span className={cn(
           "whitespace-nowrap font-mono font-bold tabular-nums tracking-tight",
-          hero ? "text-[44px] leading-none" : "text-[28px]",
+          hero ? "text-[52px] leading-none" : "text-[32px]",
         )}>
           {value}
         </span>
@@ -142,7 +157,7 @@ export function KpiTile({
 
       {(sub || delta) && (
         <div className={cn(
-          "flex flex-wrap items-center gap-2 text-xs",
+          "flex flex-wrap items-center gap-2 text-sm",
           hero ? "text-white/70" : subTone ? SUB_TONE[subTone] : "text-muted-foreground",
         )}>
           {delta && <DeltaBadge value={delta.value} invertColor={delta.invertColor} hero={hero} />}
@@ -156,7 +171,7 @@ export function KpiTile({
         <Link
           to={footerLink.href}
           onClick={(e) => e.stopPropagation()}
-          className="mt-auto inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary"
+          className="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary"
         >
           {footerLink.label} <ArrowRight className="size-3.5" />
         </Link>
@@ -191,7 +206,7 @@ function DeltaBadge({ value, invertColor, hero }: { value: number; invertColor?:
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-semibold",
         hero
           ? "bg-white/15 text-white"
           : positive

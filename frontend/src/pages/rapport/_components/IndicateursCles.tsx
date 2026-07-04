@@ -1,7 +1,7 @@
 import { BarChart3, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 
 import { formatMAD, formatQty, pctChange } from "@/utils/format";
-import { ROUTES, type StatsResponse } from "@/types";
+import { ROUTES, type CategoryType, type StatsResponse } from "@/types";
 
 import { KpiTile } from "@/components/shared/KpiTile";
 
@@ -18,7 +18,7 @@ import { KpiTile } from "@/components/shared/KpiTile";
  *   < 640px      → 1 col, CA on top
  */
 
-export function IndicateursCles({ stats }: { stats: StatsResponse }) {
+export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
   const ca       = stats.kpis.ventes_total;
   const achats   = stats.kpis.achats_total;
   const margePct = stats.marge.marge_pct;
@@ -44,11 +44,11 @@ export function IndicateursCles({ stats }: { stats: StatsResponse }) {
         sparkline={sparkline}
         sub={
           <>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-white">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
               <span className="size-1.5 rounded-full" style={{ background: "var(--color-pharmacie)" }} />
               Pharmacie {phShare} %
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-white">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
               <span className="size-1.5 rounded-full" style={{ background: "var(--color-parapharmacie)" }} />
               Parapharmacie {paShare} %
             </span>
@@ -62,6 +62,7 @@ export function IndicateursCles({ stats }: { stats: StatsResponse }) {
         sub={<>{formatQty(stats.kpis.achats_count)} unités</>}
         delta={dAchats != null ? { value: dAchats, invertColor: true } : null}
         icon={<ShoppingCart className="size-5" />}
+        tint={tint}
       />
       <KpiTile
         label="Marge brute moyenne"
@@ -69,12 +70,14 @@ export function IndicateursCles({ stats }: { stats: StatsResponse }) {
         sub={`Année préc. : ${stats.previous_kpis.marge_pct.toFixed(2)} %`}
         delta={dMarge != null ? { value: dMarge } : null}
         icon={<TrendingUp className="size-5" />}
+        tint={tint}
       />
       <KpiTile
         label="Transactions"
         value={formatQty(txns)}
         sub={<>Ticket moyen : {formatMAD(stats.advanced_kpis.ticket_moyen)}</>}
         icon={<BarChart3 className="size-5" />}
+        tint={tint}
       />
     </div>
   );

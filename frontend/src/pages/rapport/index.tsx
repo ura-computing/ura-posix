@@ -7,7 +7,7 @@ import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { useMe } from "@/hooks/useMe";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { ROLES } from "@/types";
-import type { Feature, MargeMode, StatsFilters } from "@/types";
+import type { CategoryType, Feature, MargeMode, StatsFilters } from "@/types";
 
 import {
   useAdminPharmacies,
@@ -100,8 +100,8 @@ function OwnerView() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Rapport</h1>
-        <p className="text-sm text-muted-foreground">Tableau de bord de votre activité.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tableau de bord</h1>
+        <p className="text-sm text-muted-foreground">Vue d'ensemble de votre activité.</p>
       </header>
 
       <FilterBar<StatsFilters["category_type"]>
@@ -127,7 +127,7 @@ function OwnerView() {
         </div>
       )}
 
-      {stats && !loading && <RapportSections stats={stats} alerts={alerts} stock={stock} />}
+      {stats && !loading && <RapportSections stats={stats} alerts={alerts} stock={stock} category={filters.category_type} />}
     </div>
   );
 }
@@ -164,7 +164,7 @@ function AdminView() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Rapport</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tableau de bord</h1>
         <p className="text-sm text-muted-foreground">Vue d'ensemble du système et drill-down par pharmacie.</p>
       </header>
 
@@ -267,12 +267,13 @@ function AdminView() {
 // ────────────────────────────────────────────────────────────────────────────
 
 interface SectionsProps {
-  stats:  NonNullable<ReturnType<typeof useStats>["stats"]>;
-  alerts: ReturnType<typeof useMarginAlerts>["alerts"];
-  stock:  ReturnType<typeof useStockSummary>["stock"];
+  stats:    NonNullable<ReturnType<typeof useStats>["stats"]>;
+  alerts:   ReturnType<typeof useMarginAlerts>["alerts"];
+  stock:    ReturnType<typeof useStockSummary>["stock"];
+  category: CategoryType;
 }
 
-function RapportSections({ stats, alerts, stock }: SectionsProps) {
+function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
   const { me } = useMe();
   // Admin bypass: see every section regardless of feature flags. Non-admin:
   // hide sections whose backing feature isn't in their effective permissions.
@@ -281,26 +282,26 @@ function RapportSections({ stats, alerts, stock }: SectionsProps) {
   return (
     <>
       {/* Section 2 — Indicateurs clés (Bento hero with aurora + sparkline) */}
-      <IndicateursCles stats={stats} />
+      <IndicateursCles stats={stats} tint={category} />
 
       {/* Section 3 — Indicateurs avancés */}
-      <IndicateursAvances kpis={stats.advanced_kpis} />
+      <IndicateursAvances kpis={stats.advanced_kpis} tint={category} />
 
       {/* Section 4 — Donut chart + Santé financière (left) + Top catégories (right) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
-        <CategoriesDonut categories={stats.top_categories} />
-        <TopCategoriesList categories={stats.top_categories} />
+        <CategoriesDonut categories={stats.top_categories} tint={category} />
+        <TopCategoriesList categories={stats.top_categories} tint={category} />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
-        <SanteFinanciereCard marge={stats.marge} />
-        <TrendChart points={stats.monthly_trend} />
+        <SanteFinanciereCard marge={stats.marge} tint={category} />
+        <TrendChart points={stats.monthly_trend} tint={category} />
       </div>
 
       {/* Section 5 — Alertes marges (feature: alertes) */}
       {has("alertes") && alerts && (
         <section className="flex flex-col gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alertes marges</h2>
-          <MarginAlertCards data={alerts} />
+          <MarginAlertCards data={alerts} tint={category} />
         </section>
       )}
 
@@ -308,18 +309,18 @@ function RapportSections({ stats, alerts, stock }: SectionsProps) {
       {has("accounting") && (
         <section className="flex flex-col gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Déclaration TVA</h2>
-          <TvaTiles tva={stats.tva} />
+          <TvaTiles tva={stats.tva} tint={category} />
         </section>
       )}
 
       {/* Section 7 — Analyse de marge preview (feature: analyse) */}
-      {has("analyse") && <AnalyseMargePreview stats={stats} />}
+      {has("analyse") && <AnalyseMargePreview stats={stats} tint={category} />}
 
       {/* Section 8 — Stock summary (feature: stock) */}
       {has("stock") && stock && (
         <section className="flex flex-col gap-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stock</h2>
-          <StockSummaryTiles stock={stock} />
+          <StockSummaryTiles stock={stock} tint={category} />
         </section>
       )}
     </>

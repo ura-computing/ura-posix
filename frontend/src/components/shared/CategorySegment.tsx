@@ -46,7 +46,7 @@ export function CategorySegment<V extends string>({
             onClick={() => onChange(opt.value)}
             className={cn(
               // h-full fills the parent's h-9; rounded-sm sits visually nested inside rounded-md
-              "h-full cursor-pointer rounded-sm px-3 text-xs font-semibold transition-colors",
+              "h-full cursor-pointer rounded-sm px-3 text-sm font-semibold transition-colors",
               active ? opt.activeBg : "text-muted-foreground hover:text-foreground",
             )}
           >

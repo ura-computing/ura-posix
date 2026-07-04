@@ -44,7 +44,7 @@ export function ModeTabs<K extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "shrink-0 cursor-pointer whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors -mb-px",
+              "shrink-0 cursor-pointer whitespace-nowrap border-b-2 px-3 py-2 text-base font-medium transition-colors -mb-px",
               active
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground",

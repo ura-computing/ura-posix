@@ -38,7 +38,7 @@ export function SurveillanceTabs({
             key={t.key}
             type="button"
             onClick={() => onSelect(isActive ? null : t.key)}
-            className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-xs font-medium transition-colors ${
+            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${
               isActive
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card text-foreground hover:bg-surface-subtle"
@@ -46,7 +46,7 @@ export function SurveillanceTabs({
           >
             <span className={`size-2 rounded-full ${t.dot} ${isActive ? "ring-2 ring-primary-foreground/40" : ""}`} aria-hidden />
             <span>{t.label}</span>
-            <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1 font-mono text-[10px] tabular-nums ${
+            <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1 font-mono text-xs tabular-nums ${
               isActive ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}>
               {formatQty(n)}

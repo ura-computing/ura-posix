@@ -40,8 +40,8 @@ export function StockAlertsSection({
       <header className="flex items-center gap-2.5">
         <PackageX className="size-5 text-warning" />
         <div>
-          <h2 className="text-base font-semibold text-foreground">Alertes de stock</h2>
-          <p className="text-[13px] text-muted-foreground">Produits en sous-stock, sur-stock ou stock négatif.</p>
+          <h2 className="text-lg font-semibold text-foreground">Alertes de stock</h2>
+          <p className="text-sm text-muted-foreground">Produits en sous-stock, sur-stock ou stock négatif.</p>
         </div>
       </header>
 
@@ -67,8 +67,8 @@ export function StockAlertsSection({
               }
             >
               <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.metricLabel}</span>
-                <span className="font-mono text-lg font-bold tabular-nums text-foreground">{c.metric}</span>
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">{c.metricLabel}</span>
+                <span className="font-mono text-xl font-bold tabular-nums text-foreground">{c.metric}</span>
               </div>
             </KpiTile>
           );

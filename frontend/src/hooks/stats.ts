@@ -6,7 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 
-import { getMarginAlerts, listPeremptions, listStockAbcd } from "@/api/stats";
+import { getMarginAlerts, getVentesSansAchat, listPeremptions, listStockAbcd } from "@/api/stats";
 import { QUERY_KEYS } from "@/types";
 import type { StatsFilters, StockFilters } from "@/types";
 
@@ -66,6 +66,21 @@ export function useMarginAlerts(filters: MarginAlertsFilters) {
       filters.category_type ?? "all",
     ),
     queryFn:  () => getMarginAlerts(filters),
+    staleTime: 60_000,
+  });
+}
+
+
+/** Products with ventes in the window but no matching achat — the root cause of
+ *  "—" cells for Marge %/DH on /ventes. Same filter shape as MarginAlerts. */
+export function useVentesSansAchat(filters: MarginAlertsFilters) {
+  return useQuery({
+    queryKey: QUERY_KEYS.VENTES_SANS_ACHAT(
+      filters.date_from ?? null,
+      filters.date_to   ?? null,
+      filters.category_type ?? "all",
+    ),
+    queryFn:  () => getVentesSansAchat(filters),
     staleTime: 60_000,
   });
 }

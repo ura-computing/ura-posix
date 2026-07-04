@@ -1,6 +1,6 @@
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatMAD } from "@/utils/format";
-import type { MonthlyTrendPoint } from "@/types";
+import type { CategoryType, MonthlyTrendPoint } from "@/types";
 
 
 const W = 720;
@@ -19,10 +19,10 @@ function shortMonth(ym: string): string {
 }
 
 
-export function TrendChart({ points }: { points: MonthlyTrendPoint[] }) {
+export function TrendChart({ points, tint = "all" }: { points: MonthlyTrendPoint[]; tint?: CategoryType }) {
   if (points.length === 0) {
     return (
-      <KpiTile label="Tendance mensuelle">
+      <KpiTile label="Tendance mensuelle" tint={tint}>
         <p className="py-12 text-center text-sm text-muted-foreground">Aucune donnée sur la période.</p>
       </KpiTile>
     );
@@ -57,6 +57,7 @@ export function TrendChart({ points }: { points: MonthlyTrendPoint[] }) {
     <KpiTile
       label="Tendance mensuelle"
       sub={<>Ventes et achats de {firstLabel} à {lastLabel}</>}
+      tint={tint}
     >
       <div className="flex justify-end">
         <Legend />

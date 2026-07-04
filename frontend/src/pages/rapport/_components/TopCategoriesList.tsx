@@ -1,6 +1,6 @@
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatMAD } from "@/utils/format";
-import type { TopCategoryRow } from "@/types";
+import type { CategoryType, TopCategoryRow } from "@/types";
 
 
 const CHART_COLOR_VARS = [
@@ -9,10 +9,10 @@ const CHART_COLOR_VARS = [
 ];
 
 
-export function TopCategoriesList({ categories }: { categories: TopCategoryRow[] }) {
+export function TopCategoriesList({ categories, tint = "all" }: { categories: TopCategoryRow[]; tint?: CategoryType }) {
   if (categories.length === 0) {
     return (
-      <KpiTile label="Top catégories">
+      <KpiTile label="Top catégories" tint={tint}>
         <p className="py-8 text-center text-sm text-muted-foreground">Aucune donnée disponible</p>
       </KpiTile>
     );
@@ -22,7 +22,7 @@ export function TopCategoriesList({ categories }: { categories: TopCategoryRow[]
   const top = categories.slice(0, 5);
 
   return (
-    <KpiTile label="Top catégories">
+    <KpiTile label="Top catégories" tint={tint}>
       <div className="flex flex-col gap-3">
         {top.map((c, i) => {
           const color = CHART_COLOR_VARS[i % CHART_COLOR_VARS.length];

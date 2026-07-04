@@ -24,7 +24,7 @@ export function TabBar({ tabs, activeId, onChange }: TabBarProps) {
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              "relative cursor-pointer px-4 py-2.5 text-sm font-medium transition-colors",
+              "relative cursor-pointer px-4 py-2.5 text-base font-medium transition-colors",
               active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >

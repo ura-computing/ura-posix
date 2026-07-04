@@ -457,6 +457,82 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
     return out
 
 
+def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional[str],
+                              dt: Optional[str], category_type: str = "all") -> dict:
+    """List products with ventes in the [df, dt] window whose medicament has NO
+    matching achat in the same window for the same pharmacy — the root cause of
+    Marge %/DH rendering "—" on /ventes for those rows.
+
+    Reuses the exact filter set from compute_margin_alerts (non-declared exclusion,
+    achat_bl_filter, category_type) so a product surfaced here is EXACTLY a product
+    that shows "—" on /ventes with the same filters."""
+    base_filter_v: list = []
+    base_filter_a: list = []
+    if pharmacy_id:
+        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
+        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
+    if df:
+        base_filter_v.append(Vente.date >= df)
+        base_filter_a.append(Achat.delivery_date >= df)
+    if dt:
+        base_filter_v.append(Vente.date <= dt)
+        base_filter_a.append(Achat.delivery_date <= dt)
+    if pharmacy_id:
+        sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                    PharmacyMedicamentStatus.declared == False)
+            .scalar_subquery()
+        )
+        base_filter_v.append(Vente.medicament_id.notin_(sub))
+        base_filter_a.append(Achat.medicament_id.notin_(sub))
+        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+
+    cat_filter: list = []
+    if category_type == "pharmacie":
+        cat_filter = [pharma_expr() == True]
+    elif category_type == "parapharmacie":
+        cat_filter = [pharma_expr() == False]
+
+    achat_meds_sub = (
+        db.query(Achat.medicament_id)
+        .filter(*base_filter_a)
+        .distinct()
+        .scalar_subquery()
+    )
+    ca_expr = func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price))
+    rows = (
+        db.query(
+            Medicament.product,
+            Medicament.category,
+            Medicament.ppv,
+            func.sum(Vente.quantity).label("units_sold"),
+            ca_expr.label("ca"),
+            func.max(Vente.date).label("last_vente_date"),
+        )
+        .join(Medicament, Vente.medicament_id == Medicament.id)
+        .filter(*base_filter_v, *cat_filter, Vente.medicament_id.notin_(achat_meds_sub))
+        .group_by(Medicament.id, Medicament.product, Medicament.category, Medicament.ppv)
+        .order_by(ca_expr.desc())
+        .limit(500)
+        .all()
+    )
+    products = [{
+        "product":         r.product or "—",
+        "category":        r.category,
+        "ppv":             float(r.ppv) if r.ppv is not None else None,
+        "units_sold":      round(float(r.units_sold or 0), 2),
+        "ca":              round(float(r.ca or 0), 2),
+        "last_vente_date": r.last_vente_date,
+    } for r in rows]
+    return {
+        "count":            len(products),
+        "total_ca":         round(sum(p["ca"] for p in products), 2),
+        "total_units_sold": round(sum(p["units_sold"] for p in products), 2),
+        "products":         products,
+    }
+
+
 # ─── Stock summary (Rapport Section 8 — 4 tiles) ─────────────────────────────
 # Lightweight — returns just the 4 tile numbers the Rapport needs.
 # The full ABCD classification ports later when /stock page is built.
