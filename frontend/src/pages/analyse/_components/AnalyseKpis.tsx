@@ -30,10 +30,10 @@ export function AnalyseKpis({ kpis }: { kpis?: AnalyseMargeKpis }) {
       />
       <KpiTile
         label="Marge moyenne (%)"
-        value={margePct != null ? formatPct(margePct, 2) : "—"}
+        value={margePct != null ? formatPct(margePct) : "—"}
         sub={
           kpis?.marge_pct_max && kpis?.marge_pct_min ? (
-            <>Max {formatPct(kpis.marge_pct_max.value, 1)} · Min {formatPct(kpis.marge_pct_min.value, 1)}</>
+            <>Max {formatPct(kpis.marge_pct_max.value)} · Min {formatPct(kpis.marge_pct_min.value)}</>
           ) : undefined
         }
         icon={<Percent className="size-5" />}

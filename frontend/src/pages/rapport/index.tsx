@@ -29,7 +29,6 @@ import { MarginAlertCards }     from "./_components/MarginAlertCards";
 import { RapportSkeleton }      from "./_components/RapportSkeleton";
 import { SanteFinanciereCard }  from "./_components/SanteFinanciereCard";
 import { StockSummaryTiles }    from "./_components/StockSummaryTiles";
-import { TopCategoriesList }    from "./_components/TopCategoriesList";
 import { TrendChart }           from "./_components/TrendChart";
 import { TvaTiles }             from "./_components/TvaTiles";
 
@@ -287,14 +286,11 @@ function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
       {/* Section 3 — Indicateurs avancés */}
       <IndicateursAvances kpis={stats.advanced_kpis} tint={category} />
 
-      {/* Section 4 — Donut chart + Santé financière (left) + Top catégories (right) */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
-        <CategoriesDonut categories={stats.top_categories} tint={category} />
-        <TopCategoriesList categories={stats.top_categories} tint={category} />
-      </div>
+      {/* Section 4 — Répartition du CA : donut + table (pleine largeur) */}
+      <CategoriesDonut categories={stats.top_categories} tint={category} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
         <SanteFinanciereCard marge={stats.marge} tint={category} />
-        <TrendChart points={stats.monthly_trend} tint={category} />
+        <TrendChart points={stats.monthly_trend} granularity={stats.trend_granularity} tint={category} />
       </div>
 
       {/* Section 5 — Alertes marges (feature: alertes) */}

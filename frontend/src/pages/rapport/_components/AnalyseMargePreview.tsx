@@ -22,7 +22,9 @@ import { useCategoryTint } from "../_hooks/useCategoryTint";
 export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
   const ca       = stats.kpis.ventes_total;
   const margePct = stats.marge.marge_pct;
-  const margeDh  = stats.marge.marge_brute_dh;
+  // Reconciled with the CA + marge % shown beside it (per request):
+  // Marge moyenne (MAD) = Chiffre d'affaires × Marge moyenne (%).
+  const margeDh  = (ca * margePct) / 100;
 
   return (
     <section className="flex flex-col gap-3">
@@ -32,7 +34,7 @@ export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsRespo
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label="Chiffre d'affaires" value={formatMAD(ca)}                icon={<Coins      className="size-5" />} tint={tint} />
-        <KpiTile label="Marge moyenne (%)"  value={`${margePct.toFixed(1)} %`}   icon={<Percent    className="size-5" />} tint={tint} />
+        <KpiTile label="Marge moyenne (%)"  value={`${margePct.toFixed(3)} %`}   icon={<Percent    className="size-5" />} tint={tint} />
         <KpiTile label="Marge moyenne (MAD)" value={formatMAD(margeDh)}          icon={<TrendingUp className="size-5" />} tint={tint} />
         <OptimisationGaugePlaceholder tint={tint} />
       </div>

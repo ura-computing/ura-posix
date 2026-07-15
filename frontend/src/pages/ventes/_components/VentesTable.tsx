@@ -24,7 +24,7 @@ function MargeCell({ row, mode }: { row: VenteRow; mode: "pct" | "dh" }) {
   const cls = pct < 0 ? "text-error" : pct < 10 ? "text-warning" : "text-success";
   return (
     <span className={cls}>
-      {mode === "pct" ? formatPct(pct, 1) : formatMAD(dh)}
+      {mode === "pct" ? formatPct(pct) : formatMAD(dh)}
     </span>
   );
 }

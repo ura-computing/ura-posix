@@ -10,7 +10,6 @@ import { AbcdAnalysisCard } from "./_components/AbcdAnalysisCard";
 import { AlertCardsGrid } from "./_components/AlertCardsGrid";
 import { PeremptionsSection } from "./_components/PeremptionsSection";
 import { StockTable } from "./_components/StockTable";
-import { STATUS_LABELS, STATUS_OPTIONS } from "./_constants";
 import { useStockPage } from "./_hooks/useStockPage";
 
 export default function StockPage() {
@@ -18,15 +17,12 @@ export default function StockPage() {
   const full = s.fullQuery;
 
   const activeFilters: ActiveFilter[] = [
-    (s.dateFrom || s.dateTo) ? {
+    // Only a pill for an EXPLICIT range — not the local 2-year default (whose
+    // "clear" would just revert to the same default and feel broken).
+    !s.isDateDefault && (s.dateFrom || s.dateTo) ? {
       key:    "dates",
       label:  <>Période : {s.dateFrom || "…"} → {s.dateTo || "…"}</>,
       onClear: () => { s.setDateFrom(""); s.setDateTo(""); },
-    } : null,
-    s.status !== "" ? {
-      key:    "status",
-      label:  <>Statut : {STATUS_LABELS[s.status] ?? s.status}</>,
-      onClear: () => s.setStatus(""),
     } : null,
     s.classFilter !== null ? {
       key:    "class",
@@ -46,12 +42,6 @@ export default function StockPage() {
           from:     s.dateFrom || null,
           to:       s.dateTo || null,
           onChange: (from, to) => { s.setDateFrom(from ?? ""); s.setDateTo(to ?? ""); },
-        }}
-        singleSelect={{
-          label:    "Statut",
-          options:  STATUS_OPTIONS,
-          value:    s.status,
-          onChange: s.setStatus,
         }}
         rightActions={[
           { label: "Exporter Excel",  icon: <Download className="size-4" />, variant: "outline", onClick: s.handleExport },
@@ -119,6 +109,7 @@ export default function StockPage() {
               isLoading={s.filteredQuery.isLoading}
               classFilter={s.classFilter}
               status={s.status}
+              onStatusChange={s.setStatus}
               search={s.search}
               sortBy={s.sortBy}
               sortOrder={s.sortOrder}

@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 //   usePeremptions()                 -> listPeremptions()
 import { useStockAbcd, usePeremptions } from "@/hooks/stats";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import { todayIso, yearsAgo } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/pages/alertes/_hooks/useAlertesPage";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
@@ -27,8 +28,16 @@ export function useStockPage() {
   // Date range comes from the cross-route global context. Other filters
   // (class, status, search, sort, pagination) stay page-local.
   const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
-  const dateFrom = globalFrom ?? "";
-  const dateTo   = globalTo   ?? "";
+  // Stock-only default: trailing 2 years → today. Computed LOCALLY so it's the
+  // effective range for this page's queries + picker WITHOUT writing to the
+  // shared cross-route context — other routes stay unaffected. Any explicit
+  // range (picked here or on another tab) lands in the global context and
+  // overrides this default; `isDateDefault` tells the UI when no range is set.
+  const defaultFrom = useMemo(() => yearsAgo(2), []);
+  const defaultTo   = useMemo(() => todayIso(), []);
+  const isDateDefault = globalFrom === null && globalTo === null;
+  const dateFrom = globalFrom ?? defaultFrom;
+  const dateTo   = globalTo   ?? defaultTo;
   const setDateFrom = (v: string) => setRange(v || null, globalTo);
   const setDateTo   = (v: string) => setRange(globalFrom, v || null);
   // Default class = "A" so pharmacists land on their best-sellers immediately.
@@ -152,6 +161,7 @@ export function useStockPage() {
     // filter state + setters
     dateFrom,
     dateTo,
+    isDateDefault,
     classFilter,
     status,
     search,

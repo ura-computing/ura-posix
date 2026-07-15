@@ -280,7 +280,8 @@ export interface TypeBreakdown {
   pharmacie:     { ventes_total: number };
   parapharmacie: { ventes_total: number };
 }
-export interface MonthlyTrendPoint { month: string; ventes: number; achats: number; }
+export interface MonthlyTrendPoint { label: string; ventes: number; achats: number; }
+export type TrendGranularity = "week" | "month" | "semester" | "year";
 export interface TopCategoryRow    { category: string; total: number; marge_pct: number | null; }
 
 export interface StatsResponse {
@@ -291,6 +292,7 @@ export interface StatsResponse {
   marge:          MargeSummary;
   type_breakdown: TypeBreakdown;
   monthly_trend:  MonthlyTrendPoint[];
+  trend_granularity?: TrendGranularity;   // optional: older mocks omit it; UI falls back to "month"
   top_categories: TopCategoryRow[];
 }
 

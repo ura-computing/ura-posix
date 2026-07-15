@@ -31,7 +31,7 @@ export function SupplierGauge({ data }: { data: AchatsSupplierSummary | undefine
         <div className="flex flex-col items-center justify-end">
           <NeedleGauge value={goodness} />
           <p className="-mt-1 text-sm font-medium text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{grossPct.toFixed(1)} %</span> grossistes
+            <span className="font-mono tabular-nums text-foreground">{grossPct.toFixed(3)} %</span> grossistes
           </p>
         </div>
         <SideTile

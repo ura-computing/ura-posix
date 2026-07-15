@@ -30,7 +30,7 @@ export function VentesSansAchatSection({ data, onOpen }: VentesSansAchatSectionP
         <KpiTile
           label="Ventes sans achat correspondant"
           value={formatMAD(data?.total_ca ?? 0)}
-          sub={`${formatQty(count)} produits · ${formatQty(data?.total_units_sold ?? 0)} unités`}
+          sub={<>{formatQty(count)} produits · {formatQty(data?.total_units_sold ?? 0)} unités</>}
           icon={<FileWarning className="size-5" />}
           iconTone="warning"
           badge={{ label: <>{formatQty(count)} produits</>, tone: "warning" }}

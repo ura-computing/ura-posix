@@ -33,7 +33,7 @@ export function DiscountGauge({ data }: { data: VentesDiscountSummary | undefine
         <div className="flex flex-col items-center justify-end">
           <NeedleGauge value={goodness} />
           <p className="-mt-1 text-sm font-medium text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{discPct.toFixed(1)} %</span> avec remise
+            <span className="font-mono tabular-nums text-foreground">{discPct.toFixed(3)} %</span> avec remise
           </p>
         </div>
         <SideTile

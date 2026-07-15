@@ -66,8 +66,8 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
       />
       <KpiTile
         label="Marge brute moyenne"
-        value={`${margePct.toFixed(2)} %`}
-        sub={`Année préc. : ${stats.previous_kpis.marge_pct.toFixed(2)} %`}
+        value={`${margePct.toFixed(3)} %`}
+        sub={`Année préc. : ${stats.previous_kpis.marge_pct.toFixed(3)} %`}
         delta={dMarge != null ? { value: dMarge } : null}
         icon={<TrendingUp className="size-5" />}
         tint={tint}

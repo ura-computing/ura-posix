@@ -32,7 +32,7 @@ export function SanteFinanciereCard({ marge, tint = "all" }: { marge: MargeSumma
       <div className="text-center">
         <div className="text-base font-semibold text-foreground">{g.label}</div>
         <div className="mt-0.5 font-mono text-base tabular-nums text-muted-foreground">
-          Marge moyenne : {marge.marge_pct.toFixed(2)} %
+          Marge moyenne : {marge.marge_pct.toFixed(3)} %
         </div>
       </div>
       <div className="grid w-full grid-cols-2 gap-3 rounded-xl bg-surface-subtle p-3">

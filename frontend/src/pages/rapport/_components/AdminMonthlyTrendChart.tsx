@@ -27,13 +27,13 @@ export function AdminMonthlyTrendChart({
           <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
             Aucune donnée mensuelle.
           </div>
-        ) : data.map((d) => (
-          <div key={d.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+        ) : data.map((d, i) => (
+          <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
             <div className="flex h-full w-full items-end justify-center gap-[3px]">
               <Bar heightPct={(d.ventes  / max) * 100} color="var(--info)" />
               <Bar heightPct={(d.achats  / max) * 100} color="var(--muted-foreground)" muted />
             </div>
-            <span className="font-mono text-[10px] text-muted-foreground">{d.month}</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{d.label}</span>
           </div>
         ))}
       </div>

@@ -37,3 +37,6 @@ htmlcov/
 # Design handoff files (presentational TSX — not wired)
 handoff/
 .claude/
+
+# Raw Sobrus CSV exports dropped into resources/ (test data, not source)
+resources/Sobrus*

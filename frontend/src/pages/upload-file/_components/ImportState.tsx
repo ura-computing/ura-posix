@@ -1,6 +1,6 @@
 import { AlertCircle, Ban, CheckCircle2, Clock, Info, Loader2, RotateCcw, X } from "lucide-react";
 
-import { formatQty } from "@/utils/format";
+import { formatNumStr, formatQty } from "@/utils/format";
 import type { DocType, UploadStockResult } from "@/types";
 
 import type { UploadPhase, UploadProgress } from "@/contexts/UploadContext";
@@ -118,18 +118,20 @@ function Success({
 
   // Skip breakdown — stock surfaces unknowns via stockResult.skipped_unknown,
   // achat/vente use the per-reason counters now populated by the backend.
+  // formatNumStr (plain string) NOT formatQty (returns JSX) — these build string
+  // list items, and interpolating JSX into a template literal yields "[object Object]".
   const skipReasons: string[] = stockResult
     ? (stockResult.skipped_unknown.length > 0
-        ? [`${formatQty(stockResult.skipped_unknown.length)} PID inconnus ignorés`]
+        ? [`${formatNumStr(stockResult.skipped_unknown.length)} PID inconnus ignorés`]
         : [])
     : [
-        ...(progress.skipped_duplicate     ? [`${formatQty(progress.skipped_duplicate)} doublon(s) ignoré(s)`]            : []),
-        ...(progress.skipped_no_pid        ? [`${formatQty(progress.skipped_no_pid)} ligne(s) sans PID`]                  : []),
-        ...(progress.skipped_no_medicament ? [`${formatQty(progress.skipped_no_medicament)} médicament(s) introuvable(s)`] : []),
+        ...(progress.skipped_duplicate     ? [`${formatNumStr(progress.skipped_duplicate)} doublon(s) ignoré(s)`]            : []),
+        ...(progress.skipped_no_pid        ? [`${formatNumStr(progress.skipped_no_pid)} ligne(s) sans PID`]                  : []),
+        ...(progress.skipped_no_medicament ? [`${formatNumStr(progress.skipped_no_medicament)} médicament(s) introuvable(s)`] : []),
       ];
   // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
   if (skipReasons.length === 0 && progress.skipped > 0) {
-    skipReasons.push(`${formatQty(progress.skipped)} ligne(s) ignorée(s)`);
+    skipReasons.push(`${formatNumStr(progress.skipped)} ligne(s) ignorée(s)`);
   }
 
   return (

@@ -52,7 +52,7 @@ export function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummary
         <KpiTile
           href={ROUTES.STOCK}
           label="Santé du stock"
-          value={<span className={cn(healthValueClass)}>{`${stock.health_pct.toFixed(1)} %`}</span>}
+          value={<span className={cn(healthValueClass)}>{`${stock.health_pct.toFixed(3)} %`}</span>}
           sub="dans la fourchette idéale"
           icon={<ShieldCheck className="size-5" />}
           iconTone={healthTone}

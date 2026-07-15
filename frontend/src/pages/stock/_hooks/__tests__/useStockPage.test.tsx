@@ -68,7 +68,8 @@ describe("useStockPage", () => {
     expect(result.current.status).toBe("");
     expect(result.current.page).toBe(1);
     expect(result.current.classFilter).toBeNull();
-    expect(result.current.dateFrom).toBe("");
+    // clearAll drops the explicit range → back to the stock 2-year default.
+    expect(result.current.isDateDefault).toBe(true);
   });
 
   test("closeTable clears the table-driving filters but leaves dates", () => {
