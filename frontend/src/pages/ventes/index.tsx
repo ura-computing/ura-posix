@@ -77,7 +77,7 @@ export default function VentesPage() {
         onResetAll={p.reset}
       />
 
-      <DiscountGauge data={p.discountSummary} />
+      <DiscountGauge data={p.discountSummary} isLoading={p.discountLoading} />
 
       {/* Surveillance tabs */}
       <SurveillanceTabs active={p.filters.surveillance} counts={p.counts} onSelect={p.setSurveillance} />

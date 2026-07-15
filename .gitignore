@@ -40,3 +40,6 @@ handoff/
 
 # Raw Sobrus CSV exports dropped into resources/ (test data, not source)
 resources/Sobrus*
+
+# Production database dumps — never commit
+*.dump

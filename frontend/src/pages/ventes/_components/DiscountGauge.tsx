@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
+import { Skeleton } from "@/components/shared/Skeleton";
 import { formatMAD, formatQty } from "@/utils/format";
 import type { VentesDiscountSummary } from "@/types";
 
@@ -9,7 +10,8 @@ import type { VentesDiscountSummary } from "@/types";
  *  remise is treated as the *desirable* outcome — so "Avec remise" sits on
  *  the right (emerald) and the needle goes greener as the discounted share
  *  rises. "Sans remise" sits on the left (rose). Goodness = discounted %. */
-export function DiscountGauge({ data }: { data: VentesDiscountSummary | undefined }) {
+export function DiscountGauge({ data, isLoading }: { data: VentesDiscountSummary | undefined; isLoading?: boolean }) {
+  if (isLoading && !data) return <GaugeSkeleton />;
   const discounted = data?.discounted ?? { total_mad: 0, count: 0, unit_count: 0 };
   const fullPrice  = data?.full_price ?? { total_mad: 0, count: 0, unit_count: 0 };
 
@@ -49,6 +51,32 @@ export function DiscountGauge({ data }: { data: VentesDiscountSummary | undefine
         <SummaryTile label="CA total" value={formatMAD(total)} />
         <SummaryTile label="Transactions" value={formatQty(totalLines)} />
         <SummaryTile label="Unités"   value={formatQty(totalUnits)} />
+      </div>
+    </div>
+  );
+}
+
+
+function GaugeSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
+        <div className="flex flex-col gap-2 pl-3">
+          <Skeleton className="h-3 w-20" /><Skeleton className="h-7 w-32" /><Skeleton className="h-3 w-24" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <Skeleton className="h-20 w-40 rounded-t-full" /><Skeleton className="h-3 w-24" />
+        </div>
+        <div className="flex flex-col items-end gap-2 pr-3">
+          <Skeleton className="h-3 w-20" /><Skeleton className="h-7 w-32" /><Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-2">
+            <Skeleton className="h-3 w-16" /><Skeleton className="h-6 w-24" />
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -122,7 +122,6 @@ export function useComptabilitePage() {
       ["Indicateur", "Valeur (MAD)"],
       ["Chiffre d'Affaires",   fmt(stats.kpis.ventes_total)],
       ["Achats",                fmt(stats.kpis.achats_total)],
-      ["Bilan (CA − Achats)",  fmt(stats.kpis.ventes_total - stats.kpis.achats_total)],
       [],
       ["Marge", ""],
       ["Marge %",              fmt(stats.marge.marge_pct)],

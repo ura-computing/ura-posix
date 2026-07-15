@@ -7,6 +7,7 @@ import type { DataTablePagination } from "@/components/shared/DataTable";
 import { useAnalyseListe, useAnalyseMarge } from "@/hooks/analyse";
 import type { AnalyseFilters, ListeItem, MargeMode } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
+import { normalizeText } from "@/utils/text";
 
 import { MARGE_COLS } from "../_constants";
 
@@ -33,20 +34,19 @@ export function useAnalysePage() {
   const activeData = mode === "liste" ? listeM.data : margeQ.data;
   const isLoading  = mode === "liste" ? listeM.isPending : margeQ.isLoading;
 
-  // Client-side search filter (case-insensitive on the row's primary label).
+  // Client-side search filter — accent- AND case-insensitive (partial match).
   const filteredRows = useMemo(() => {
     if (!activeData?.rows) return [];
     if (!search.trim()) return activeData.rows;
-    const norm = (s: unknown) => String(s ?? "").toLowerCase();
-    const q = norm(search.trim());
+    const q = normalizeText(search.trim());
     return activeData.rows.filter((r) =>
-      norm(r.product).includes(q) ||
-      norm(r.category).includes(q) ||
-      norm(r.laboratoire).includes(q) ||
-      norm(r.grossiste).includes(q) ||
-      norm(r.client).includes(q) ||
-      norm(r.mois).includes(q) ||
-      norm(r.annee).includes(q),
+      normalizeText(r.product).includes(q) ||
+      normalizeText(r.category).includes(q) ||
+      normalizeText(r.laboratoire).includes(q) ||
+      normalizeText(r.grossiste).includes(q) ||
+      normalizeText(r.client).includes(q) ||
+      normalizeText(r.mois).includes(q) ||
+      normalizeText(r.annee).includes(q),
     );
   }, [activeData, search]);
 

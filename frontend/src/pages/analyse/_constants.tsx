@@ -115,11 +115,11 @@ const ANNEE_COLS: AnalyseColDef[] = [
     key:   k,
     label: MONTH_LABELS[i],
     align: "right",
-    render: (r) => formatMAD((r as unknown as Record<string, number>)[k] ?? 0),
+    render: (r) => <span className="whitespace-nowrap">{formatMAD((r as unknown as Record<string, number>)[k] ?? 0)}</span>,
     raw:    (r) => (r as unknown as Record<string, number>)[k] ?? 0,
   })),
-  { key: "ca",  label: "Total CA", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
-  { key: "qty", label: "Total qté", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
+  { key: "ca",  label: "Total CA", align: "right", render: (r) => <span className="whitespace-nowrap">{formatMAD(r.ca ?? 0)}</span>, raw: (r) => r.ca ?? 0 },
+  { key: "qty", label: "Total qté", align: "right", render: (r) => <span className="whitespace-nowrap">{formatQty(r.qty ?? 0)}</span>, raw: (r) => r.qty ?? 0 },
 ];
 
 const LISTE_COLS: AnalyseColDef[] = [

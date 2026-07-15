@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
+import { Skeleton } from "@/components/shared/Skeleton";
 import { formatMAD, formatQty } from "@/utils/format";
 import type { AchatsSupplierSummary } from "@/types";
 
 
-export function SupplierGauge({ data }: { data: AchatsSupplierSummary | undefined }) {
+export function SupplierGauge({ data, isLoading }: { data: AchatsSupplierSummary | undefined; isLoading?: boolean }) {
+  if (isLoading && !data) return <GaugeSkeleton />;
   const grossiste   = data?.grossiste   ?? { total_mad: 0, bl_count: 0, unit_count: 0 };
   const directLabo  = data?.direct_labo ?? { total_mad: 0, bl_count: 0, unit_count: 0 };
 
@@ -48,6 +50,32 @@ export function SupplierGauge({ data }: { data: AchatsSupplierSummary | undefine
         <SummaryTile label="Somme commandée" value={formatMAD(total)} />
         <SummaryTile label="BL"               value={formatQty(totalBl)} />
         <SummaryTile label="Unités"           value={formatQty(totalUnits)} />
+      </div>
+    </div>
+  );
+}
+
+
+function GaugeSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
+        <div className="flex flex-col gap-2 pl-3">
+          <Skeleton className="h-3 w-20" /><Skeleton className="h-7 w-32" /><Skeleton className="h-3 w-24" />
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <Skeleton className="h-20 w-40 rounded-t-full" /><Skeleton className="h-3 w-24" />
+        </div>
+        <div className="flex flex-col items-end gap-2 pr-3">
+          <Skeleton className="h-3 w-20" /><Skeleton className="h-7 w-32" /><Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-2">
+            <Skeleton className="h-3 w-16" /><Skeleton className="h-6 w-24" />
+          </div>
+        ))}
       </div>
     </div>
   );

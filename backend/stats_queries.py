@@ -223,6 +223,27 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
     }
 
 
+def reconcile_marge_to_ca(marge: dict, ca: float) -> None:
+    """Single source of truth for the *displayed* aggregate margin (Santé
+    financière, Comptabilité, Analyse de marge — they must never disagree).
+
+    `marge_for_window` computes `marge_pct` from the real PU (purchase price) over
+    sales whose product has a known PU — the true unit margin. But it summed
+    `marge_brute_dh`/`marge_nette_dh` over only that covered subset (~65% of CA),
+    so next to the FULL CA they didn't reconcile (brute / CA != marge_pct). Here we
+    extrapolate the DH figures to the full CA so that **marge_brute_dh / ca ==
+    marge_pct exactly**, preserving marge_nette's brute-relative (HT/TTC) ratio.
+    `marge_pct` is left untouched (it is already the correct PU-based margin).
+    Mutates `marge` in place.
+    """
+    brute_old = marge.get("marge_brute_dh") or 0.0
+    nette_old = marge.get("marge_nette_dh") or 0.0
+    ratio     = (nette_old / brute_old) if brute_old else 0.0
+    brute_new = round(ca * (marge.get("marge_pct") or 0.0) / 100, 2)
+    marge["marge_brute_dh"] = brute_new
+    marge["marge_nette_dh"] = round(brute_new * ratio, 2)
+
+
 # ─── Aggregate KPIs (advanced + tva + marge + type_breakdown) ─────────────────
 
 def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt: str | None, category_type: str = "all") -> dict:

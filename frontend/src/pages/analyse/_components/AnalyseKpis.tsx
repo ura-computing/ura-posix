@@ -4,11 +4,25 @@ import { Coins, Percent, Sparkles, TrendingUp } from "lucide-react";
 
 import { KpiTile } from "@/components/shared/KpiTile";
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
+import { Skeleton } from "@/components/shared/Skeleton";
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import type { AnalyseMargeKpis } from "@/types";
 
 
-export function AnalyseKpis({ kpis }: { kpis?: AnalyseMargeKpis }) {
+export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?: boolean }) {
+  if (isLoading && !kpis) {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        ))}
+      </div>
+    );
+  }
   const ca       = kpis?.total_ventes_dh ?? 0;
   const unites   = kpis?.total_ventes_unites ?? 0;
   const margePct = kpis?.marge_pct_avg;

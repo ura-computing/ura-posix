@@ -7,9 +7,10 @@
  * Pattern matches the KpiTile / FilterBar / CategorySegment shared primitives.
  */
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
+import { Skeleton } from "@/components/shared/Skeleton";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
@@ -63,13 +64,43 @@ export function DataTable<R, K extends string = string>({
   pagination, emptyTitle = "Aucun résultat", emptyHint, topBanner, rowKey,
   className,
 }: DataTableProps<R, K>) {
-  // Loading + empty short-circuits (no shell when empty/loading — matches existing tables).
+  // Loading + empty short-circuits. Render the real header + shimmer rows so the
+  // table's shape is visible while data loads (smooth swap to real rows).
   if (isLoading && rows.length === 0) {
     return (
       <div className={cn("flex flex-col gap-3", className)}>
         {topBanner}
-        <div className="flex items-center justify-center rounded-xl border border-border bg-card py-16">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-base">
+              <thead>
+                <tr className="border-b border-border bg-surface-subtle">
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      className={cn(
+                        "px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+                        col.align === "right" ? "text-right" : "text-left",
+                      )}
+                    >
+                      {col.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    {columns.map((col) => (
+                      <td key={col.key} className="px-2.5 py-2.5">
+                        <Skeleton className={cn("h-4", col.align === "right" ? "ml-auto w-14" : "w-3/4")} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
