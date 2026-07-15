@@ -56,6 +56,7 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
         }
       />
       <KpiTile
+        className="lg:col-span-2"
         href={ROUTES.ACHATS}
         label="Total achats"
         value={formatMAD(achats)}

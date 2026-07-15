@@ -35,6 +35,7 @@ from stats_queries import (
     compute_ventes_sans_achat,
     merge_top_categories,
     pharma_expr,
+    reconcile_marge_to_ca,
 )
 
 
@@ -153,10 +154,15 @@ def build_stats_payload(
         non_declared_sub = _non_declared_sub_for(db, pharmacy_id)
 
     trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a)
+    kpis  = _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub)
+    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type)
+    # Single source of truth: reconcile the aggregate marge to the FULL CA so every
+    # margin display agrees (marge_brute_dh / ventes_total == marge_pct, exactly).
+    reconcile_marge_to_ca(extra["marge"], kpis["ventes_total"])
     return {
-        "kpis":           _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub),
+        "kpis":           kpis,
         "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub),
-        **compute_extra_stats(db, pharmacy_id, df, dt, category_type),
+        **extra,
         "monthly_trend":     trend["points"],
         "trend_granularity": trend["granularity"],
         "top_categories": _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub),

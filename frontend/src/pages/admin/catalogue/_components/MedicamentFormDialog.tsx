@@ -1,5 +1,6 @@
 /** Create + Edit form for a Medicament. Submits via the hook's create/update mutations. */
 import { useEffect, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { TextField } from "@/components/shared/TextField";
@@ -34,6 +35,19 @@ function fromMedicament(m: Medicament): MedicamentInput {
 }
 
 
+/** Category looks like "Médicament" — accent-insensitive, ignores the "(xx%)"
+ *  margin suffix Sobrus concatenates. Mirrors the backend keyword match. */
+function looksLikeMedicament(category: string | null | undefined): boolean {
+  return !!category && /[ée]dicament/i.test(category);
+}
+
+/** First number in a TVA label: "TVA (20.00%)" → 20, "Exonéré (0.00%)" → 0. */
+function tvaPercent(tva: string | null | undefined): number {
+  const m = tva ? String(tva).match(/[\d.]+/) : null;
+  return m ? parseFloat(m[0]) : 0;
+}
+
+
 export function MedicamentFormDialog({
   open, onClose, initial, onSubmit, isLoading,
 }: MedicamentFormDialogProps) {
@@ -48,10 +62,23 @@ export function MedicamentFormDialog({
   const setField = <K extends keyof MedicamentInput>(k: K, v: MedicamentInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // A "Médicament" should be exonéré (0 % TVA). Warn when it isn't.
+  const tvaWarning = looksLikeMedicament(form.category) && tvaPercent(form.tva) !== 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.product?.trim()) {
       setError("Le nom du produit est requis");
+      return;
+    }
+    if (
+      tvaWarning &&
+      !window.confirm(
+        `Les médicaments sont normalement exonérés de TVA (0 %).\n` +
+        `Cette catégorie « Médicament » a une TVA de ${tvaPercent(form.tva)} %.\n\n` +
+        `S'il s'agit d'un complément/cosmétique, changez plutôt la catégorie.\nEnregistrer quand même ?`,
+      )
+    ) {
       return;
     }
     onSubmit(form);
@@ -153,6 +180,16 @@ export function MedicamentFormDialog({
               </div>
             </div>
           </div>
+
+          {tvaWarning && (
+            <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <span>
+                Catégorie « Médicament » avec une TVA de <b>{tvaPercent(form.tva)} %</b>. Les médicaments sont
+                normalement <b>exonérés (0 %)</b>. S'il s'agit d'un complément / cosmétique, changez plutôt la catégorie.
+              </span>
+            </div>
+          )}
 
           <footer className="mt-2 flex justify-end gap-2 border-t border-border pt-3">
             <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>

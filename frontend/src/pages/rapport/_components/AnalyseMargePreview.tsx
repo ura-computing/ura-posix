@@ -22,9 +22,9 @@ import { useCategoryTint } from "../_hooks/useCategoryTint";
 export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
   const ca       = stats.kpis.ventes_total;
   const margePct = stats.marge.marge_pct;
-  // Reconciled with the CA + marge % shown beside it (per request):
-  // Marge moyenne (MAD) = Chiffre d'affaires × Marge moyenne (%).
-  const margeDh  = (ca * margePct) / 100;
+  // Single source of truth: the backend reconciles marge_brute_dh to the full CA
+  // (marge_brute_dh / CA == marge_pct), so every margin display reads the same value.
+  const margeDh  = stats.marge.marge_brute_dh;
 
   return (
     <section className="flex flex-col gap-3">

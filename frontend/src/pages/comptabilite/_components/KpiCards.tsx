@@ -6,9 +6,9 @@ import type { StatsResponse } from "@/types";
 
 /**
  * 3 KPI cards for /comptabilité — each card groups several related metrics:
- *  - Card 1 (CA): ventes total + marge % + marge brute + TVA encaissée
+ *  - Card 1 (CA): ventes total + marge % + TVA encaissée
  *  - Card 2 (Achats): total + count + TVA payée
- *  - Card 3 (Bilan): CA − Achats + TVA à déclarer + solde TVA année
+ *  - Card 3 (Bilan): Résultat (marge brute) + TVA à déclarer + solde TVA année
  *
  * Mirrors the old apcm-pharma layout. Pure presentational — caller passes
  * the StatsResponse and we render values + formatting.
@@ -16,14 +16,12 @@ import type { StatsResponse } from "@/types";
 export function KpiCards({ stats }: { stats: StatsResponse }) {
   const ca       = stats.kpis.ventes_total;
   const achats   = stats.kpis.achats_total;
-  const bilan    = ca - achats;
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Card icon={<Wallet className="size-5" />} title="Chiffre d'Affaires" tone="primary">
         <Row label="Ventes total"   value={formatMAD(ca)} hero />
         <Row label="Marge"           value={`${stats.marge.marge_pct.toFixed(3)} %`} />
-        <Row label="Marge brute"    value={formatMAD(stats.marge.marge_brute_dh)} />
         <Row label="TVA encaissée"   value={formatMAD(stats.tva.tva_encaissee)} />
       </Card>
 
@@ -34,7 +32,7 @@ export function KpiCards({ stats }: { stats: StatsResponse }) {
       </Card>
 
       <Card icon={<BarChart3 className="size-5" />} title="Bilan & TVA" tone="info">
-        <Row label="Bilan (CA − Achats)" value={formatMAD(bilan)} hero />
+        <Row label="Résultat (marge brute)" value={formatMAD(stats.marge.marge_brute_dh)} hero />
         <Row label="TVA à déclarer"      value={formatMAD(stats.tva.tva_a_declarer)} />
         <Row label={`Solde TVA ${new Date().getFullYear()}`} value={formatMAD(stats.tva.tva_a_declarer)} subtle />
       </Card>

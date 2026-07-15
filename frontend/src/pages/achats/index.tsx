@@ -76,7 +76,7 @@ export default function AchatsPage() {
         onResetAll={p.reset}
       />
 
-      <SupplierGauge data={p.supplierSummary} />
+      <SupplierGauge data={p.supplierSummary} isLoading={p.supplierLoading} />
 
       <AchatsTable
         rows={p.list?.data ?? []}

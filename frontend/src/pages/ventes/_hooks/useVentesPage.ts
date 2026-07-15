@@ -166,6 +166,7 @@ export function useVentesPage() {
     isError:     list.isError,
     counts:      counts.data,
     discountSummary: discountSummaryQ.data,
+    discountLoading: discountSummaryQ.isLoading,
     categories:  categories.data ?? [],
     tvaRates:    tvaRates.data ?? [],
     suggestions: suggestions.data ?? null,

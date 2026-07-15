@@ -93,7 +93,7 @@ export default function AnalysePage() {
         onChange={s.setMode}
       />
 
-      <AnalyseKpis kpis={s.kpis} />
+      <AnalyseKpis kpis={s.kpis} isLoading={s.isLoading} />
 
       {/* Liste mode: upload card on top. After submit, the table renders below. */}
       {s.mode === "liste" && (

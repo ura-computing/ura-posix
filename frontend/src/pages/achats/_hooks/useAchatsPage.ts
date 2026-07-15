@@ -145,6 +145,7 @@ export function useAchatsPage() {
     isLoading:          list.isLoading,
     isError:            list.isError,
     supplierSummary:    supplierSummary.data,
+    supplierLoading:    supplierSummary.isLoading,
     categories:         categories.data ?? [],
     tvaRates:           tvaRates.data ?? [],
     suggestions:        suggestions.data ?? null,

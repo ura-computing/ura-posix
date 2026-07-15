@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import type { StoreCategory, VisibleProduct } from "@/types/storeWebsite";
+import { normalizeText } from "@/utils/text";
 import type { PastRequest } from "@/types/storeWebsite";
 
 
@@ -109,13 +110,13 @@ export default function StoreWebsiteRoute() {
 
   // ── Tab 3 mutations ──────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizeText(search.trim());
     return products.filter((p) => {
       if (selectedCats.length > 0 && !selectedCats.includes(p.storeCategoryId ?? "cat-default")) {
         return false;
       }
       if (!q) return true;
-      return p.name.toLowerCase().includes(q) || p.sobrusCategory.toLowerCase().includes(q);
+      return normalizeText(p.name).includes(q) || normalizeText(p.sobrusCategory).includes(q);
     });
   }, [products, search, selectedCats]);
 

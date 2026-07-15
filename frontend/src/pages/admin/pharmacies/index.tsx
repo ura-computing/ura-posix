@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Plus, RefreshCw, UserPlus } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
+import { normalizeText } from "@/utils/text";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/filterBar";
 import type { CreateUserIn, CreateUserOut, PharmacyListRow } from "@/types";
@@ -58,11 +59,11 @@ export default function AdminPharmaciesIndex() {
   // Filter rows client-side. Cheap (admin has a small N of pharmacies).
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
-    const q = search.trim().toLowerCase();
+    const q = normalizeText(search.trim());
     return rows.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.code?.toLowerCase().includes(q) ?? false) ||
-      (p.city?.toLowerCase().includes(q) ?? false),
+      normalizeText(p.name).includes(q) ||
+      normalizeText(p.code).includes(q) ||
+      normalizeText(p.city).includes(q),
     );
   }, [rows, search]);
 
