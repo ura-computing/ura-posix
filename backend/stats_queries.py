@@ -56,8 +56,72 @@ def _subtract_years(d: date, years: int) -> date:
     return date(year, d.month, min(d.day, max_day))
 
 
-def _month_label(d: date) -> str:
-    return d.strftime("%Y-%m")
+# ── Adaptive trend granularity ────────────────────────────────────────────────
+# The dashboard "Tendance" chart buckets ventes/achats by a unit chosen from the
+# selected period length, so a short window still yields a readable multi-point
+# line instead of a single dot:
+#     < 2 months → week    ·   2 months–1 year → month
+#     1–4 years  → semester ·  > 4 years        → year
+_FR_SHORT_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun",
+                    "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+
+# SQL date_trunc unit used to fetch each granularity. Postgres has no "semester"
+# bucket, so we fetch monthly rows and fold them into half-years in Python.
+_TREND_SQL_UNIT = {"week": "week", "month": "month", "semester": "month", "year": "year"}
+
+
+def _trend_granularity(df: Optional[str], dt: Optional[str]) -> str:
+    """Pick the bucket unit from the selected window length (see table above)."""
+    if not df or not dt:
+        return "month"                       # default: trailing 12 months
+    span_days = (date.fromisoformat(dt) - date.fromisoformat(df)).days
+    if span_days < 60:
+        return "week"
+    if span_days < 365:
+        return "month"
+    if span_days < 1460:
+        return "semester"
+    return "year"
+
+
+def _bucket_start(d: date, gran: str) -> date:
+    """First day of the bucket that contains `d` for the given granularity."""
+    if gran == "week":
+        return d - timedelta(days=d.weekday())            # Monday (matches date_trunc)
+    if gran == "month":
+        return d.replace(day=1)
+    if gran == "semester":
+        return date(d.year, 1 if d.month <= 6 else 7, 1)
+    if gran == "year":
+        return date(d.year, 1, 1)
+    return d
+
+
+def _next_bucket(d: date, gran: str) -> date:
+    """Start of the bucket after the one beginning at `d`."""
+    if gran == "week":
+        return d + timedelta(days=7)
+    if gran == "month":
+        return date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
+    if gran == "semester":
+        return date(d.year, 7, 1) if d.month == 1 else date(d.year + 1, 1, 1)
+    if gran == "year":
+        return date(d.year + 1, 1, 1)
+    return d + timedelta(days=1)
+
+
+def _bucket_label(d: date, gran: str) -> str:
+    """Human x-axis label for a bucket start date."""
+    month = _FR_SHORT_MONTHS[d.month - 1]
+    if gran == "week":
+        return f"{d.day:02d} {month}"                     # "10 Jun" (week start)
+    if gran == "month":
+        return month                                      # "Jun"
+    if gran == "semester":
+        return f"S{1 if d.month <= 6 else 2} {d.year}"    # "S1 2025"
+    if gran == "year":
+        return str(d.year)                                # "2026"
+    return d.isoformat()
 
 
 # ─── Category classification (Pharmacie vs Parapharmacie) ─────────────────────
@@ -105,7 +169,7 @@ def merge_top_categories(rows) -> list[dict]:
             avg_pu  = m["pu_sum"]  / m["qty_sum"]
             avg_ppv = m["ppv_sum"] / m["qty_sum"]
             if avg_ppv > 0:
-                marge_pct = round((1 - avg_pu / avg_ppv) * 100, 2)
+                marge_pct = round((1 - avg_pu / avg_ppv) * 100, 3)
         result.append({"category": k, "total": round(m["total"], 2), "marge_pct": marge_pct})
     return sorted(result, key=lambda x: x["total"], reverse=True)
 
@@ -153,7 +217,7 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
         for r in marge_rows
     )
     return {
-        "marge_pct":      round(marge_pct, 2),
+        "marge_pct":      round(marge_pct, 3),
         "marge_brute_dh": round(marge_brute, 2),
         "marge_nette_dh": round(marge_nette, 2),
     }
@@ -438,7 +502,7 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
         ppv = float(r.ppv or 0); pu = float(r.pu or 0)
         if not ppv or not pu:
             continue
-        marge_pct = round((1 - pu / ppv) * 100, 2)
+        marge_pct = round((1 - pu / ppv) * 100, 3)
         key = _bracket_for(marge_pct)
         if key is None:
             continue
@@ -623,32 +687,39 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
 
 
 def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str],
-                        non_declared_sub=None, cat_filter_v=None, cat_filter_a=None) -> list[dict]:
+                        non_declared_sub=None, cat_filter_v=None, cat_filter_a=None) -> dict:
+    """Adaptive ventes/achats trend. Returns {"granularity", "points"} where the
+    bucket unit (week / month / semester / year) adapts to the selected window so
+    a short period still renders a multi-point line. See _trend_granularity()."""
     today = date.today()
-    twelve_months_ago = (today.replace(day=1) - timedelta(days=335)).replace(day=1)
-    trend_start = date.fromisoformat(df).replace(day=1) if df else twelve_months_ago
-    trend_end   = date.fromisoformat(dt).replace(day=1) if dt else today.replace(day=1)
-    trend_start_str = trend_start.strftime("%Y-%m-%d")
-    trend_end_str = (
-        date(trend_end.year, trend_end.month + 1, 1).strftime("%Y-%m-%d")
-        if trend_end.month < 12
-        else date(trend_end.year + 1, 1, 1).strftime("%Y-%m-%d")
-    )
+    gran = _trend_granularity(df, dt)
 
+    if df and dt:
+        first_bucket = _bucket_start(date.fromisoformat(df), gran)
+        last_bucket  = _bucket_start(date.fromisoformat(dt), gran)
+    else:
+        # Default (no filter): trailing 12 months, monthly — unchanged behaviour.
+        last_bucket  = _bucket_start(today, gran)
+        first_bucket = _bucket_start(today.replace(day=1) - timedelta(days=335), gran)
+
+    win_start_str = first_bucket.strftime("%Y-%m-%d")
+    win_end_str   = _next_bucket(last_bucket, gran).strftime("%Y-%m-%d")
+
+    sql_unit = _TREND_SQL_UNIT[gran]
     v_q = (
         db.query(
-            func.date_trunc("month", func.cast(Vente.date, Date)).label("month"),
+            func.date_trunc(sql_unit, func.cast(Vente.date, Date)).label("bucket"),
             func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
-        .filter(Vente.date >= trend_start_str, Vente.date < trend_end_str)
+        .filter(Vente.date >= win_start_str, Vente.date < win_end_str)
     )
     a_q = (
         db.query(
-            func.date_trunc("month", func.cast(Achat.delivery_date, Date)).label("month"),
+            func.date_trunc(sql_unit, func.cast(Achat.delivery_date, Date)).label("bucket"),
             func.sum(Achat.total).label("total"),
         )
-        .filter(Achat.delivery_date >= trend_start_str, Achat.delivery_date < trend_end_str)
+        .filter(Achat.delivery_date >= win_start_str, Achat.delivery_date < win_end_str)
     )
     if cat_filter_v: v_q = v_q.filter(*cat_filter_v)
     if cat_filter_a: a_q = a_q.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
@@ -661,13 +732,26 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
     if pharmacy_id:
         a_q = a_q.filter(achat_bl_filter(db, pharmacy_id))
 
-    v_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in v_q.group_by("month").all()}
-    a_by_month = {_month_label(r.month.date()): float(r.total or 0) for r in a_q.group_by("month").all()}
+    # Fold rows onto bucket-start keys. For "semester" this collapses the two
+    # monthly rows of each half-year into one bucket; a no-op for the others.
+    def _fold(rows) -> dict[date, float]:
+        acc: dict[date, float] = {}
+        for r in rows:
+            b = _bucket_start(r.bucket.date(), gran)
+            acc[b] = acc.get(b, 0.0) + float(r.total or 0)
+        return acc
 
-    out: list[dict] = []
-    cursor = trend_start
-    while cursor <= trend_end:
-        label = _month_label(cursor)
-        out.append({"month": label, "ventes": v_by_month.get(label, 0.0), "achats": a_by_month.get(label, 0.0)})
-        cursor = cursor.replace(month=cursor.month + 1) if cursor.month < 12 else cursor.replace(year=cursor.year + 1, month=1)
-    return out
+    v_by_bucket = _fold(v_q.group_by("bucket").all())
+    a_by_bucket = _fold(a_q.group_by("bucket").all())
+
+    points: list[dict] = []
+    cursor = first_bucket
+    while cursor <= last_bucket:
+        points.append({
+            "label":  _bucket_label(cursor, gran),
+            "ventes": v_by_bucket.get(cursor, 0.0),
+            "achats": a_by_bucket.get(cursor, 0.0),
+        })
+        cursor = _next_bucket(cursor, gran)
+
+    return {"granularity": gran, "points": points}

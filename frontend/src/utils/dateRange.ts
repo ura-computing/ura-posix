@@ -17,6 +17,18 @@ const fmt = (d: Date): string => {
 };
 
 
+/** Today as ISO YYYY-MM-DD. */
+export function todayIso(now: Date = new Date()): string {
+  return fmt(now);
+}
+
+
+/** ISO date `n` years before today (same month/day). */
+export function yearsAgo(n: number, now: Date = new Date()): string {
+  return fmt(new Date(now.getFullYear() - n, now.getMonth(), now.getDate()));
+}
+
+
 /** First day of current month → today. */
 export function currentMonth(now: Date = new Date()): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);

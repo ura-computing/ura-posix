@@ -1,4 +1,4 @@
-import { ArrowLeft, Boxes, ChevronRight, FileSpreadsheet, ShoppingBasket, ShoppingCart, UploadCloud } from "lucide-react";
+import { ArrowLeft, Boxes, CheckCircle2, ChevronRight, FileSpreadsheet, ShoppingBasket, ShoppingCart, UploadCloud } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -180,22 +180,25 @@ export default function UploadFilePage() {
       )}
 
       {/* ─── STEP 3 — Preview + import + state cards ─────────────────────
-           Renders when EITHER:
-            • user has a locally-parsed file (preview + Importer button), OR
-            • there's an existing job for this doc-type (queued / running /
-              done — show its state card so the wizard rehydrates correctly
-              on navigation even without local file state).
+           Three mutually-exclusive states, and it must NEVER render empty:
+            • file + idle   → preview table + "Importer" button
+            • active job    → the matching state card (queued/running/…/success)
+            • else (no file, no job) → the success card auto-dismissed (4s) and
+              left us parked on step 3 → show a persistent "Import terminé"
+              confirmation instead of a blank page.
       */}
-      {u.step === 3 && u.docType && (u.file || u.phase !== "idle") && (
+      {u.step === 3 && u.docType && (
         <section className="flex flex-col gap-4">
-          <button
-            type="button"
-            onClick={u.file ? u.changeFile : u.reset}
-            className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" />
-            {u.file ? "Choisir un autre fichier" : "Nouvel import"}
-          </button>
+          {(u.file || u.phase !== "idle") && (
+            <button
+              type="button"
+              onClick={u.file ? u.changeFile : u.reset}
+              className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" />
+              {u.file ? "Choisir un autre fichier" : "Nouvel import"}
+            </button>
+          )}
 
           {u.file && u.phase === "idle" ? (
             <>
@@ -217,7 +220,7 @@ export default function UploadFilePage() {
                 </button>
               </div>
             </>
-          ) : (
+          ) : u.phase !== "idle" ? (
             <ImportState
               docType={u.docType}
               phase={u.phase}
@@ -228,6 +231,8 @@ export default function UploadFilePage() {
               onCancel={u.cancel}
               onReset={u.reset}
             />
+          ) : (
+            <ImportDoneFallback docType={u.docType} onNewImport={u.reset} />
           )}
         </section>
       )}
@@ -239,4 +244,37 @@ export default function UploadFilePage() {
 function parseTypeParam(s: string | null): DocType | null {
   if (s === "achat" || s === "vente" || s === "stock") return s;
   return null;
+}
+
+
+/** Shown on step 3 once the detailed success card has auto-dismissed (4 s) but
+ *  the wizard is still parked on step 3 with no file — previously a blank page.
+ *  Reaching this state always means an import just succeeded (only "success"
+ *  jobs auto-dismiss), so a completion confirmation is safe and accurate. */
+function ImportDoneFallback({ docType, onNewImport }: { docType: DocType; onNewImport: () => void }) {
+  return (
+    <div
+      className="flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
+      style={{ borderColor: `var(--color-doc-${docType}-border)`, background: `var(--color-doc-${docType}-bg)` }}
+    >
+      <div
+        className="flex size-12 items-center justify-center rounded-full"
+        style={{ background: `color-mix(in srgb, var(--color-doc-${docType}) 15%, transparent)`, color: `var(--color-doc-${docType})` }}
+      >
+        <CheckCircle2 className="size-6" aria-hidden />
+      </div>
+      <h3 className="text-base font-semibold text-foreground">Import terminé</h3>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Vos données ont été importées avec succès. Vous pouvez lancer un nouvel import.
+      </p>
+      <button
+        type="button"
+        onClick={onNewImport}
+        className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+      >
+        <UploadCloud className="size-4" />
+        Nouvel import
+      </button>
+    </div>
+  );
 }

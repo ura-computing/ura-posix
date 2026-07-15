@@ -1,18 +1,16 @@
 import { KpiTile } from "@/components/shared/KpiTile";
-import { formatMAD } from "@/utils/format";
+import { formatNumStr, formatPct } from "@/utils/format";
 import type { CategoryType, TopCategoryRow } from "@/types";
 
 
 /**
- * Section 4 — donut chart for the CA breakdown by category.
+ * Section 4 — "Répartition du CA" : one card, donut (left) + category table (right).
  *
- * Hand-rolled SVG (~80 lines) so we don't pull Recharts for a single chart.
- * Renders up to 8 segments using the --chart-1 … --chart-8 vars locked in tokens.css.
- * If more than 8 categories are passed in, the 8th segment is "Autres" (sum of overflow).
- * The total CA shown in the center is the sum of ALL segments (including Autres).
- *
- * Layout: left = donut (sized to the parent container, max 280px square);
- *         right = legend with the same colors + per-category MAD totals + share %.
+ * Hand-rolled SVG donut (no chart lib) using the --chart-1 … --chart-8 vars from
+ * tokens.css, cycled by category index so the table dot always matches its slice.
+ * The table lists ALL categories (scrolls if long) with columns:
+ *   Catégorie · CA (MAD) · %   (share of total CA) · Part (proportional bar).
+ * Center of the donut = total CA over every category.
  */
 
 const PALETTE = [
@@ -23,7 +21,7 @@ const PALETTE = [
 const SIZE   = 220;             // SVG viewport (square)
 const CENTER = SIZE / 2;
 const OUTER  = 96;              // outer radius
-const INNER  = 70;              // inner radius (donut hole width = OUTER-INNER ≈ 26px)
+const INNER  = 70;              // inner radius (donut hole)
 const GAP    = 0.012;           // gap between segments in radians (≈ 0.7°)
 
 
@@ -36,64 +34,86 @@ export function CategoriesDonut({ categories, tint = "all" }: { categories: TopC
     );
   }
 
-  // Take top 7, collapse overflow into "Autres" (8th slot).
-  const top7   = categories.slice(0, 7);
-  const rest   = categories.slice(7);
-  const others = rest.reduce((s, c) => s + c.total, 0);
-  const segments = others > 0
-    ? [...top7, { category: "Autres", total: others, marge_pct: null }]
-    : top7;
-  const total = segments.reduce((s, c) => s + c.total, 0);
+  const total   = categories.reduce((s, c) => s + c.total, 0);
+  const maxTotal = Math.max(...categories.map((c) => c.total), 1);
 
-  // Build SVG arc paths around the circle, starting at 12 o'clock.
-  // Use reduce to thread the cursor angle through segments without mutating a
-  // closure variable (React Compiler rejects mid-render reassignment).
-  const arcs = segments.reduce<{ start: number; out: { seg: typeof segments[number]; i: number; share: number; path: string }[] }>(
-    (acc, seg, i) => {
-      const share = total ? seg.total / total : 0;
-      const sweep = share * Math.PI * 2 - GAP;
+  // Build donut arcs around the circle (start at 12 o'clock). Slices smaller than
+  // the gap can't be drawn, so we skip their path but still advance the cursor —
+  // they remain in the table with a matching colour. Reduce (not a mutated
+  // closure) keeps the React Compiler happy.
+  const arcs = categories.reduce<{ start: number; out: { i: number; draw: boolean; path: string }[] }>(
+    (acc, c, i) => {
+      const share = total ? c.total / total : 0;
+      const full  = share * Math.PI * 2;
+      const sweep = Math.max(full - GAP, 0);
       const a0    = acc.start;
-      const a1    = acc.start + sweep;
-      acc.out.push({ seg, i, share, path: arcPath(a0, a1) });
-      return { start: a1 + GAP, out: acc.out };
+      acc.out.push({ i, draw: sweep > 0.003, path: arcPath(a0, a0 + sweep) });
+      return { start: a0 + full, out: acc.out };
     },
     { start: -Math.PI / 2, out: [] },
   ).out;
 
   return (
     <KpiTile label="Répartition du CA" tint={tint}>
-      <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-center">
+        {/* Donut */}
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="shrink-0" aria-hidden>
-          {arcs.map(({ seg, i, path }) => (
-            <path key={seg.category} d={path} fill={PALETTE[i % PALETTE.length]} />
-          ))}
-          {/* center: total CA */}
-          <text x={CENTER} y={CENTER - 6} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)" fontFamily="Inter, sans-serif">
-            Total
+          {arcs.map(({ i, draw, path }) => (draw ? <path key={i} d={path} fill={PALETTE[i % PALETTE.length]} /> : null))}
+          <text x={CENTER} y={CENTER - 4} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--foreground)" fontFamily="JetBrains Mono, monospace">
+            {formatNumStr(total, 2)}
           </text>
-          <text x={CENTER} y={CENTER + 12} textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--foreground)" fontFamily="JetBrains Mono, monospace">
-            {formatMAD(total)}
+          <text x={CENTER} y={CENTER + 15} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)" fontFamily="Inter, sans-serif">
+            CA Total
           </text>
         </svg>
 
-        <ul className="flex flex-1 flex-col gap-2">
-          {arcs.map(({ seg, i, share }) => (
-            <li key={seg.category} className="flex items-center justify-between gap-3 text-sm">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="size-2.5 shrink-0 rounded-sm" style={{ background: PALETTE[i % PALETTE.length] }} />
-                <span className="truncate text-foreground">{seg.category}</span>
-              </span>
-              <span className="flex shrink-0 items-baseline gap-2">
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {(share * 100).toFixed(1)} %
-                </span>
-                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                  {formatMAD(seg.total)}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {/* Table */}
+        <div className="min-w-0 flex-1 self-stretch">
+          <div className="max-h-[300px] w-full overflow-y-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 z-10 bg-card">
+                <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-3 text-left font-semibold">Catégorie</th>
+                  <th className="px-3 py-2 text-left font-semibold">CA (MAD)</th>
+                  <th className="px-3 py-2 text-left font-semibold">Marge&nbsp;%</th>
+                  <th className="px-3 py-2 text-left font-semibold">%</th>
+                  <th className="w-32 py-2 pl-3 text-left font-semibold">Part</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c, i) => {
+                  const color = PALETTE[i % PALETTE.length];
+                  const share = total ? c.total / total : 0;
+                  const barW  = Math.max((c.total / maxTotal) * 100, 2);
+                  return (
+                    <tr key={c.category} className="border-b border-border/50 last:border-0">
+                      <td className="py-2.5 pr-3">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
+                          <span className="truncate text-foreground">{c.category}</span>
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold tabular-nums text-foreground">
+                        {formatNumStr(c.total, 2)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-foreground">
+                        {c.marge_pct != null ? formatPct(c.marge_pct) : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold tabular-nums text-foreground">
+                        {formatPct(share * 100)}
+                      </td>
+                      <td className="py-2.5 pl-3">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                          <div className="h-full rounded-full" style={{ width: `${barW}%`, background: color }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </KpiTile>
   );

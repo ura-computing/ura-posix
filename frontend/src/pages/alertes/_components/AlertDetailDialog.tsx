@@ -28,9 +28,9 @@ function hexA(hex: string, a: number) {
 type MarginRow = { product: string; marge_pct: number; ca: number };
 export const MARGIN_COLUMNS: AlertColumn<MarginRow>[] = [
   { key: "product", label: "Produit", align: "left", raw: (r) => r.product,
-    cell: (r) => <span className="block max-w-[280px] truncate text-sm font-medium">{r.product}</span> },
+    cell: (r) => <span className="text-sm font-medium" title={r.product}>{r.product}</span> },
   { key: "marge_pct", label: "Marge", align: "right", raw: (r) => r.marge_pct,
-    cell: (r) => <span className={cn("font-mono", r.marge_pct < 0 && "text-error")}>{formatPct(r.marge_pct, 1)}</span> },
+    cell: (r) => <span className={cn("font-mono", r.marge_pct < 0 && "text-error")}>{formatPct(r.marge_pct)}</span> },
   { key: "ca", label: "CA", align: "right", raw: (r) => r.ca,
     cell: (r) => <span className="font-mono">{formatMAD(r.ca)}</span> },
 ];
@@ -45,7 +45,7 @@ type VsaRow = {
 };
 export const VENTES_SANS_ACHAT_COLUMNS: AlertColumn<VsaRow>[] = [
   { key: "product", label: "Produit", align: "left", raw: (r) => r.product,
-    cell: (r) => <span className="block max-w-[280px] truncate text-sm font-medium">{r.product}</span> },
+    cell: (r) => <span className="text-sm font-medium" title={r.product}>{r.product}</span> },
   { key: "category", label: "Catégorie", align: "left", raw: (r) => r.category ?? "",
     cell: (r) => <span className="text-sm text-muted-foreground">{r.category ?? "—"}</span> },
   { key: "units_sold", label: "Quantité vendue", align: "right", raw: (r) => r.units_sold,
@@ -64,7 +64,7 @@ export const VENTES_SANS_ACHAT_COLUMNS: AlertColumn<VsaRow>[] = [
 type PeremRow = { product: string; expiry_date: string | null; quantity: number; ppv: number };
 export const PEREMPTION_COLUMNS: AlertColumn<PeremRow>[] = [
   { key: "product", label: "Produit", align: "left", raw: (r) => r.product,
-    cell: (r) => <span className="block max-w-[280px] truncate text-sm font-medium">{r.product}</span> },
+    cell: (r) => <span className="text-sm font-medium" title={r.product}>{r.product}</span> },
   { key: "expiry_date", label: "Date d'expiration", align: "left",
     raw: (r) => r.expiry_date ?? "",
     sortValue: (r) => (r.expiry_date ? Date.parse(r.expiry_date) : Infinity),
@@ -82,7 +82,7 @@ export const PEREMPTION_COLUMNS: AlertColumn<PeremRow>[] = [
 
 export const STOCK_COLUMNS: AlertColumn<StockRow>[] = [
   { key: "product", label: "Produit", align: "left", raw: (r) => r.product,
-    cell: (r) => <span className="block max-w-[260px] truncate text-sm font-medium">{r.product}</span> },
+    cell: (r) => <span className="text-sm font-medium" title={r.product}>{r.product}</span> },
   { key: "category", label: "Classe", align: "left", raw: (r) => r.category,
     cell: (r) => (
       <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold"
@@ -179,7 +179,7 @@ export function AlertDetailDialog({
           ) : (
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="overflow-x-auto">
-                <table className="w-full border-separate border-spacing-0 text-[13px]">
+                <table className="min-w-full border-separate border-spacing-0 text-[13px]">
                   <thead>
                     <tr>
                       {columns.map((c) => {

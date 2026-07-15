@@ -61,7 +61,7 @@ class TypeBreakdown(BaseModel):
 
 
 class MonthlyTrendPoint(BaseModel):
-    month:  str           # YYYY-MM
+    label:  str           # display label: "10 Jun" / "Jun" / "S1 2025" / "2026"
     ventes: float
     achats: float
 
@@ -79,7 +79,8 @@ class StatsResponse(BaseModel):
     tva:            TvaSummary
     marge:          MargeSummary
     type_breakdown: TypeBreakdown
-    monthly_trend:  list[MonthlyTrendPoint]
+    monthly_trend:     list[MonthlyTrendPoint]
+    trend_granularity: str   # week | month | semester | year — drives the chart's x-axis unit
     top_categories: list[TopCategoryRow]
 
 

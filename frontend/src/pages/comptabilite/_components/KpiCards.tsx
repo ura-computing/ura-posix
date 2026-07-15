@@ -22,7 +22,7 @@ export function KpiCards({ stats }: { stats: StatsResponse }) {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Card icon={<Wallet className="size-5" />} title="Chiffre d'Affaires" tone="primary">
         <Row label="Ventes total"   value={formatMAD(ca)} hero />
-        <Row label="Marge"           value={`${stats.marge.marge_pct.toFixed(1)} %`} />
+        <Row label="Marge"           value={`${stats.marge.marge_pct.toFixed(3)} %`} />
         <Row label="Marge brute"    value={formatMAD(stats.marge.marge_brute_dh)} />
         <Row label="TVA encaissée"   value={formatMAD(stats.tva.tva_encaissee)} />
       </Card>

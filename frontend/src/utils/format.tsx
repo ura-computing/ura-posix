@@ -40,16 +40,33 @@ function tighten(s: string): ReactNode {
 
 const MAD = new Intl.NumberFormat("fr-FR", {
   style: "currency", currency: "MAD",
-  minimumFractionDigits: 0, maximumFractionDigits: 0,
+  minimumFractionDigits: 2, maximumFractionDigits: 2,
 });
 const QTY     = new Intl.NumberFormat("fr-FR");
 const QTY_DEC = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const PCT     = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+const PCT3    = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 
 export function formatMAD(n: number | null | undefined): ReactNode {
   if (n == null) return "—";
   return tighten(MAD.format(n));
+}
+
+/** Plain-string MAD — for contexts that can't render the JSX separator spans
+ *  `formatMAD` emits (SVG `<text>`, aria-labels, title attributes, …). */
+export function formatMADStr(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return MAD.format(n);
+}
+
+const NUM_FR  = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+const NUM_FR2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Plain-string number with fr-FR grouping ("1 500 000" or "1 500 000,00") — full
+ *  numbers, no k/M abbreviation, no currency suffix. `decimals` = 0 (default, e.g.
+ *  chart axis ticks) or 2 (money columns whose header already says "MAD"). */
+export function formatNumStr(n: number | null | undefined, decimals: 0 | 2 = 0): string {
+  if (n == null) return "—";
+  return (decimals === 2 ? NUM_FR2 : NUM_FR).format(n);
 }
 
 export function formatQty(n: number | null | undefined): ReactNode {
@@ -62,10 +79,12 @@ export function formatQtyDec(n: number | null | undefined): ReactNode {
   return tighten(QTY_DEC.format(n));
 }
 
-export function formatPct(n: number | null | undefined, decimals = 1): ReactNode {
+export function formatPct(n: number | null | undefined, decimals = 3): ReactNode {
   if (n == null) return "—";
-  const trimmed = `${PCT.format(n)} %`.replace(/,(\d+)/, (_, d) => `,${d.slice(0, decimals)}`);
-  return tighten(trimmed);
+  const fmt = decimals === 3
+    ? PCT3
+    : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return tighten(`${fmt.format(n)} %`);
 }
 
 /** Variation: ((current - previous) / previous) × 100. Returns null if previous is 0. */

@@ -1,11 +1,12 @@
 import { X } from "lucide-react";
 
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
+import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 import type { AbcdClass, StockRow } from "@/types";
 
-import { ABCD_COLORS, STATUS_LABELS, STATUS_META } from "../_constants";
+import { ABCD_COLORS, STATUS_META, STATUS_OPTIONS } from "../_constants";
 import type { StockSortKey } from "../_hooks/useStockPage";
 
 
@@ -14,6 +15,7 @@ interface StockTableProps {
   isLoading:   boolean;
   classFilter: AbcdClass | null;
   status:      string;
+  onStatusChange: (v: string) => void;
   search:      string;
   sortBy:      StockSortKey;
   sortOrder:   "asc" | "desc";
@@ -86,7 +88,7 @@ const COLUMNS: ColumnDef<StockRow, StockSortKey>[] = [
 
 
 export function StockTable({
-  rows, isLoading, classFilter, status, search, sortBy, sortOrder, onSort,
+  rows, isLoading, classFilter, status, onStatusChange, search, sortBy, sortOrder, onSort,
   page, pageSize, onPage, onPageSize, onClose,
 }: StockTableProps) {
   // Active-filter banner above the table (Stock-specific UX).
@@ -101,11 +103,6 @@ export function StockTable({
           Classe {classFilter}
         </span>
       )}
-      {status !== "" && (
-        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
-          {STATUS_LABELS[status] ?? status}
-        </span>
-      )}
       {search.trim() !== "" && (
         <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
           « {search} »
@@ -114,13 +111,23 @@ export function StockTable({
       <span className="font-mono text-xs tabular-nums text-muted-foreground">
         · {formatQty(rows.length)} produits
       </span>
-      <button
-        type="button"
-        onClick={onClose}
-        className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-error/40 hover:bg-error-subtle hover:text-error"
-      >
-        <X className="size-3" /> Fermer
-      </button>
+      {/* Status filter lives on top of the table (a selector), not in the page FilterBar. */}
+      <div className="ml-auto flex items-center gap-2">
+        <SingleSelectPopover
+          label="Statut"
+          options={STATUS_OPTIONS}
+          value={status}
+          onChange={onStatusChange}
+          align="end"
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-error/40 hover:bg-error-subtle hover:text-error"
+        >
+          <X className="size-3" /> Fermer
+        </button>
+      </div>
     </div>
   );
 

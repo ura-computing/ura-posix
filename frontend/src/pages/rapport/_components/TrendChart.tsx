@@ -1,105 +1,287 @@
+import { useLayoutEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+
 import { KpiTile } from "@/components/shared/KpiTile";
-import { formatMAD } from "@/utils/format";
-import type { CategoryType, MonthlyTrendPoint } from "@/types";
+import { formatMAD, formatNumStr } from "@/utils/format";
+import type { CategoryType, MonthlyTrendPoint, TrendGranularity } from "@/types";
 
 
-const W = 720;
-const H = 220;
-const PAD_X = 16;
-const PAD_Y_TOP = 12;
-const PAD_Y_BOT = 28;
+const H = 264;
+const PAD_T = 18;
+const PAD_B = 34;
+const PAD_R = 18;
+const MIN_W = 320;
 
-const SHORT_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+// Title + count-unit word (singular, plural) per granularity. The backend picks
+// the granularity from the selected period length (see _trend_granularity).
+const TITLE: Record<TrendGranularity, string> = {
+  week:     "Tendance hebdomadaire",
+  month:    "Tendance mensuelle",
+  semester: "Tendance semestrielle",
+  year:     "Tendance annuelle",
+};
+const UNIT: Record<TrendGranularity, [string, string]> = {
+  week:     ["semaine", "semaines"],
+  month:    ["mois", "mois"],
+  semester: ["semestre", "semestres"],
+  year:     ["année", "années"],
+};
 
-function shortMonth(ym: string): string {
-  // ym = "YYYY-MM"
-  const [, m] = ym.split("-");
-  const idx = parseInt(m, 10) - 1;
-  return SHORT_MONTHS[idx] ?? m;
+/** Round the data max up to a "nice" axis top and return evenly-spaced ticks
+ *  (0 … niceMax) so labels read as round numbers: 0, 100 000, 200 000, … */
+function niceScale(max: number, targetTicks = 4): { niceMax: number; ticks: number[] } {
+  if (max <= 0) return { niceMax: 1, ticks: [0, 1] };
+  const niceNum = (x: number, round: boolean) => {
+    const exp = Math.floor(Math.log10(x));
+    const f = x / 10 ** exp;
+    const nf = round
+      ? (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10)
+      : (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10);
+    return nf * 10 ** exp;
+  };
+  const step = niceNum(max / targetTicks, true);
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks: number[] = [];
+  for (let v = 0; v <= niceMax + step / 2; v += step) ticks.push(Math.round(v));
+  return { niceMax, ticks };
 }
 
+/** Smooth monotone-cubic path (d3.curveMonotoneX style) through the points —
+ *  a clean curve with no overshoot below the data, so the area fill stays sane. */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  const n = pts.length;
+  if (n === 0) return "";
+  if (n === 1) return `M${pts[0].x},${pts[0].y}`;
+  const dx: number[] = [], slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = pts[i + 1].x - pts[i].x;
+    slope[i] = (pts[i + 1].y - pts[i].y) / (dx[i] || 1);
+  }
+  const t = new Array<number>(n);
+  t[0] = slope[0];
+  t[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / slope[i], b = t[i + 1] / slope[i];
+    const s = a * a + b * b;
+    if (s > 9) { const tau = 3 / Math.sqrt(s); t[i] = tau * a * slope[i]; t[i + 1] = tau * b * slope[i]; }
+  }
+  let d = `M${pts[0].x},${pts[0].y}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i];
+    d += `C${pts[i].x + h / 3},${pts[i].y + (t[i] * h) / 3} ${pts[i + 1].x - h / 3},${pts[i + 1].y - (t[i + 1] * h) / 3} ${pts[i + 1].x},${pts[i + 1].y}`;
+  }
+  return d;
+}
 
-export function TrendChart({ points, tint = "all" }: { points: MonthlyTrendPoint[]; tint?: CategoryType }) {
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+
+export function TrendChart({
+  points,
+  granularity = "month",
+  tint = "all",
+}: {
+  points: MonthlyTrendPoint[];
+  granularity?: TrendGranularity;
+  tint?: CategoryType;
+}) {
+  const title = TITLE[granularity] ?? TITLE.month;
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(640);
+  const [hover, setHover] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect.width ?? 0;
+      if (cw > 0) setW(cw);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   if (points.length === 0) {
     return (
-      <KpiTile label="Tendance mensuelle" tint={tint}>
-        <p className="py-12 text-center text-sm text-muted-foreground">Aucune donnée sur la période.</p>
+      <KpiTile label={title} tint={tint}>
+        <p className="py-14 text-center text-sm text-muted-foreground">Aucune donnée sur la période.</p>
       </KpiTile>
     );
   }
 
-  const maxVal = Math.max(
-    ...points.map((p) => Math.max(p.ventes, p.achats)),
-    1,
-  );
+  const single = points.length === 1;
+  const rawMax = Math.max(...points.map((p) => Math.max(p.ventes, p.achats)), 1);
+  const { niceMax, ticks } = niceScale(rawMax, 4);
+  const yLabels = ticks.map((t) => formatNumStr(t));
 
-  const innerW = W - PAD_X * 2;
-  const innerH = H - PAD_Y_TOP - PAD_Y_BOT;
-  const stepX = points.length > 1 ? innerW / (points.length - 1) : 0;
+  // Geometry in real pixels (1 svg unit = 1 px) → crisp, undistorted text.
+  const PAD_L = 14 + Math.max(...yLabels.map((s) => s.length)) * 7;
+  const W = Math.max(MIN_W, w);
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+  const stepX = points.length > 1 ? plotW / (points.length - 1) : 0;
+  const xAt = (i: number) => (single ? PAD_L + plotW / 2 : PAD_L + i * stepX);
+  const yAt = (v: number) => PAD_T + plotH - (v / niceMax) * plotH;
+  const baseY = PAD_T + plotH;
 
-  function toPath(values: number[], close: boolean) {
-    const pts = values.map((v, i) => [
-      PAD_X + i * stepX,
-      PAD_Y_TOP + innerH - (v / maxVal) * innerH,
-    ]);
-    const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-    if (!close) return line;
-    return `${line} L${PAD_X + (pts.length - 1) * stepX} ${PAD_Y_TOP + innerH} L${PAD_X} ${PAD_Y_TOP + innerH} Z`;
-  }
+  const vPts = points.map((p, i) => ({ x: xAt(i), y: yAt(p.ventes) }));
+  const aPts = points.map((p, i) => ({ x: xAt(i), y: yAt(p.achats) }));
+  const vLine = smoothPath(vPts);
+  const aLine = smoothPath(aPts);
+  const areaTail = (pts: { x: number; y: number }[]) =>
+    `${smoothPath(pts)} L${pts[pts.length - 1].x},${baseY} L${pts[0].x},${baseY} Z`;
 
-  const ventes  = points.map((p) => p.ventes);
-  const achats  = points.map((p) => p.achats);
+  const [unitSing, unitPlur] = UNIT[granularity] ?? UNIT.month;
+  const unitLabel = points.length <= 1 ? unitSing : unitPlur;
 
-  const firstLabel = shortMonth(points[0].month);
-  const lastLabel  = shortMonth(points[points.length - 1].month);
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (W / (rect.width || W));
+    const idx = single ? 0 : Math.round((x - PAD_L) / (stepX || 1));
+    setHover(clamp(idx, 0, points.length - 1));
+  };
+
+  const hi = hover;
+  const hx = hi != null ? xAt(hi) : 0;
+  const drawKey = `${granularity}:${points.length}:${points[0].label}`;
 
   return (
     <KpiTile
-      label="Tendance mensuelle"
-      sub={<>Ventes et achats de {firstLabel} à {lastLabel}</>}
+      label={title}
+      sub={<>Ventes et achats de {points[0].label} à {points[points.length - 1].label}</>}
       tint={tint}
     >
       <div className="flex justify-end">
         <Legend />
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="overflow-visible">
-        <defs>
-          <linearGradient id="trend-ventes" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--chart-1)" stopOpacity="0.28" />
-            <stop offset="1" stopColor="var(--chart-1)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="trend-achats" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--chart-3)" stopOpacity="0.20" />
-            <stop offset="1" stopColor="var(--chart-3)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
 
-        {[0.25, 0.5, 0.75].map((f) => {
-          const y = PAD_Y_TOP + innerH * f;
-          return <line key={f} x1={PAD_X} y1={y} x2={W - PAD_X} y2={y} stroke="var(--chart-grid)" strokeWidth="1" strokeDasharray="3 3" />;
-        })}
+      <div ref={wrapRef} className="relative w-full">
+        <svg
+          width={W}
+          height={H}
+          viewBox={`0 0 ${W} ${H}`}
+          className="block touch-none select-none"
+          onMouseMove={onMove}
+          onMouseLeave={() => setHover(null)}
+        >
+          <defs>
+            <linearGradient id="trend-ventes" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--chart-1)" stopOpacity="0.30" />
+              <stop offset="1" stopColor="var(--chart-1)" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="trend-achats" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--chart-3)" stopOpacity="0.18" />
+              <stop offset="1" stopColor="var(--chart-3)" stopOpacity="0" />
+            </linearGradient>
+            <filter id="trend-glow" x="-20%" y="-40%" width="140%" height="180%">
+              <feGaussianBlur stdDeviation="4" />
+            </filter>
+          </defs>
 
-        <path d={toPath(achats, true)}  fill="url(#trend-achats)" />
-        <path d={toPath(achats, false)} fill="none" stroke="var(--chart-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 3" />
-        <path d={toPath(ventes, true)}  fill="url(#trend-ventes)" />
-        <path d={toPath(ventes, false)} fill="none" stroke="var(--chart-1)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {/* y-axis: round full-number ticks + gridlines */}
+          {ticks.map((tk, i) => {
+            const y = yAt(tk);
+            const interior = i > 0 && i < ticks.length - 1;
+            return (
+              <g key={tk}>
+                {interior && (
+                  <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="var(--chart-grid)" strokeWidth="1" strokeDasharray="3 4" />
+                )}
+                <text x={PAD_L - 10} y={y + 3.5} fontSize="11" fontFamily="JetBrains Mono, monospace" fill="var(--chart-axis)" textAnchor="end">
+                  {yLabels[i]}
+                </text>
+              </g>
+            );
+          })}
 
-        {points.map((p, i) => {
-          const x = PAD_X + i * stepX;
-          const showLabel = i % Math.max(1, Math.ceil(points.length / 8)) === 0;
-          if (!showLabel) return null;
-          return (
-            <text key={p.month} x={x} y={H - 6} fontSize="10" fontFamily="JetBrains Mono, monospace" fill="var(--chart-axis)" textAnchor="middle">
-              {shortMonth(p.month)}
-            </text>
-          );
-        })}
-      </svg>
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Max&nbsp;: <span className="font-mono tabular-nums">{formatMAD(maxVal)}</span></span>
-        <span>{points.length} mois</span>
+          <g key={drawKey}>
+            {!single && (
+              <>
+                <motion.path d={areaTail(aPts)} fill="url(#trend-achats)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
+                <motion.path d={areaTail(vPts)} fill="url(#trend-ventes)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
+                {/* soft glow under the ventes line */}
+                <path d={vLine} fill="none" stroke="var(--chart-1)" strokeWidth="4" strokeOpacity="0.35" filter="url(#trend-glow)" />
+                <motion.path d={aLine} fill="none" stroke="var(--chart-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4"
+                  initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+                <motion.path d={vLine} fill="none" stroke="var(--chart-1)" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round"
+                  initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+              </>
+            )}
+          </g>
+
+          {/* single-bucket fallback: dots so it's never blank */}
+          {single && (
+            <>
+              <circle cx={xAt(0)} cy={yAt(points[0].achats)} r="4.5" fill="var(--chart-3)" />
+              <circle cx={xAt(0)} cy={yAt(points[0].ventes)} r="5" fill="var(--chart-1)" />
+            </>
+          )}
+
+          {/* hover: crosshair + focus dots */}
+          {hi != null && (
+            <g pointerEvents="none">
+              <line x1={hx} y1={PAD_T} x2={hx} y2={baseY} stroke="var(--chart-axis)" strokeWidth="1" strokeOpacity="0.45" strokeDasharray="4 4" />
+              <circle cx={hx} cy={yAt(points[hi].achats)} r="5.5" fill="var(--chart-3)" stroke="var(--card)" strokeWidth="2.5" />
+              <circle cx={hx} cy={yAt(points[hi].ventes)} r="5.5" fill="var(--chart-1)" stroke="var(--card)" strokeWidth="2.5" />
+            </g>
+          )}
+
+          {/* x-axis labels (subset to avoid crowding; hovered one always shown) */}
+          {points.map((p, i) => {
+            const show = i % Math.max(1, Math.ceil(points.length / 8)) === 0 || i === hi;
+            if (!show) return null;
+            const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
+            return (
+              <text key={i} x={xAt(i)} y={H - 8} fontSize="11" fontFamily="JetBrains Mono, monospace"
+                fill={i === hi ? "var(--foreground)" : "var(--chart-axis)"} fontWeight={i === hi ? 600 : 400} textAnchor={anchor}>
+                {p.label}
+              </text>
+            );
+          })}
+        </svg>
+
+        <AnimatePresence>
+          {hi != null && (
+            <motion.div
+              key="tip"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="pointer-events-none absolute top-1 z-10 min-w-[152px] -translate-x-1/2 rounded-xl border border-border bg-card px-3 py-2 shadow-lg"
+              style={{ left: clamp(hx, 82, W - 82) }}
+            >
+              <div className="mb-1.5 text-xs font-semibold text-foreground">{points[hi].label}</div>
+              <div className="flex flex-col gap-1">
+                <TipRow colorVar="--chart-1" name="Ventes" value={points[hi].ventes} />
+                <TipRow colorVar="--chart-3" name="Achats" value={points[hi].achats} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>Max&nbsp;: <span className="font-mono tabular-nums">{formatMAD(rawMax)}</span></span>
+        <span>{points.length} {unitLabel}</span>
       </div>
     </KpiTile>
+  );
+}
+
+
+function TipRow({ colorVar, name, value }: { colorVar: string; name: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between gap-5 text-xs">
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="size-2 rounded-full" style={{ background: `var(${colorVar})` }} />
+        {name}
+      </span>
+      <span className="font-mono tabular-nums text-foreground">{formatMAD(value)}</span>
+    </div>
   );
 }
 

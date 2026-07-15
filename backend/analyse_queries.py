@@ -150,10 +150,10 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
         stock_dispo = int(r.stock_dispo) if r.stock_dispo is not None else None
         prix_max = float(r.prix_max or 0)
         prix_min = float(r.prix_min or 0)
-        marge_pct = round((1 - pu / ppv) * 100, 2) if ppv and pu else None
+        marge_pct = round((1 - pu / ppv) * 100, 3) if ppv and pu else None
         marge_dh  = round(ppv - pu, 4) if ppv and pu else None
-        marge_pct_best  = round((1 - prix_min / ppv) * 100, 2) if ppv and prix_min else marge_pct
-        marge_pct_worst = round((1 - prix_max / ppv) * 100, 2) if ppv and prix_max else marge_pct
+        marge_pct_best  = round((1 - prix_min / ppv) * 100, 3) if ppv and prix_min else marge_pct
+        marge_pct_worst = round((1 - prix_max / ppv) * 100, 3) if ppv and prix_max else marge_pct
         marge_dh_best   = round(ppv - prix_min, 4) if ppv and prix_min else marge_dh
         marge_dh_worst  = round(ppv - prix_max, 4) if ppv and prix_max else marge_dh
         ppv_potentiel = round(ppv * stock_dispo, 2) if ppv > 0 and stock_dispo and stock_dispo > 0 else None
@@ -197,7 +197,7 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
             pu_num = sum((r["pu"] or 0) * (r["qty"] or 0) for r in group if r["pu"])
             pu_den = sum(r["qty"] or 0 for r in group if r["pu"])
             avg_pu = round(pu_num / pu_den, 4) if pu_den > 0 else None
-            marge_pct = round((1 - avg_pu / ppv) * 100, 2) if ppv and avg_pu else None
+            marge_pct = round((1 - avg_pu / ppv) * 100, 3) if ppv and avg_pu else None
             marge_dh  = round(ppv - avg_pu, 4) if ppv and avg_pu else None
             total_stock = sum(all_stock) if all_stock else None
             ppv_pot = round(ppv * total_stock, 2) if ppv and total_stock and total_stock > 0 else None
@@ -282,7 +282,7 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
             "prix_avg":      round(float(r.prix_avg or 0), 4),
             "qty":           round(float(r.qty or 0), 2),
             "ca":            round(float(r.ca or 0), 2),
-            "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 2) if m and total_qty else None,
+            "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
             "marge_dh_avg":  round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
         })
     return out
@@ -365,7 +365,7 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
             "prix_avg":         round(float(r.prix_avg or 0), 4),
             "qty":              round(float(r.qty or 0), 2),
             "ca":               round(float(r.ca or 0), 2),
-            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 2) if m and total_qty else None,
+            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
             "marge_dh_avg":     round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
             "total_achat_cost": round(gross_total_cost.get(name, 0.0), 2),
         })
@@ -445,7 +445,7 @@ def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list, cat
             "prix_avg":         round(float(r.prix_avg or 0), 4),
             "qty":              round(float(r.qty or 0), 2),
             "ca":               round(float(r.ca or 0), 2),
-            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 2) if m and total_qty else None,
+            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
             "marge_dh_avg":     round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
             "total_achat_cost": round(lab_total_cost.get(name, 0.0), 2),
         })
@@ -563,7 +563,7 @@ def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: 
             # Marge moyenne (%) matches Dashboard's "marge mixte": (1 − Σqty·PU / Σqty·PPV) × 100.
             sum_qty_ppv = sum(float(r["qty"] or 0) * float(r["ppv"] or 0) for r in marge_rows)
             sum_qty_pu  = sum(float(r["qty"] or 0) * float(r["pu"]  or 0) for r in marge_rows)
-            kpis["marge_pct_avg"] = round((1 - sum_qty_pu / sum_qty_ppv) * 100, 2) if sum_qty_ppv else None
+            kpis["marge_pct_avg"] = round((1 - sum_qty_pu / sum_qty_ppv) * 100, 3) if sum_qty_ppv else None
             kpis["marge_dh_avg"]  = round(
                 sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2)
         best_pct_key  = "marge_pct_best"  if "marge_pct_best"  in marge_rows[0] else "marge_pct"
@@ -588,7 +588,7 @@ def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: 
         total_qty = sum(float(r["qty"] or 0) for r in marge_avg_rows)
         if total_qty:
             kpis["marge_pct_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_pct_avg"] or 0) for r in marge_avg_rows) / total_qty, 2)
+                sum(float(r["qty"] or 0) * float(r["marge_pct_avg"] or 0) for r in marge_avg_rows) / total_qty, 3)
             kpis["marge_dh_avg"]  = round(
                 sum(float(r["qty"] or 0) * float(r["marge_dh_avg"]  or 0) for r in marge_avg_rows) / total_qty, 2)
         best_pct  = max(marge_avg_rows, key=lambda r: r["marge_pct_avg"])
@@ -744,7 +744,7 @@ def _compute_kpis_from_liste(found_rows: list[dict]) -> dict:
         total_qty = sum(float(r["qty"] or 0) for r in marge_rows)
         if total_qty:
             kpis["marge_pct_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 2)
+                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 3)
             kpis["marge_dh_avg"] = round(
                 sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2)
         best_pct  = max(marge_rows, key=lambda r: float(r["marge_pct"]))

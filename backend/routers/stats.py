@@ -152,11 +152,13 @@ def build_stats_payload(
     if pharmacy_id and not include_non_declared:
         non_declared_sub = _non_declared_sub_for(db, pharmacy_id)
 
+    trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a)
     return {
         "kpis":           _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub),
         "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub),
         **compute_extra_stats(db, pharmacy_id, df, dt, category_type),
-        "monthly_trend":  build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a),
+        "monthly_trend":     trend["points"],
+        "trend_granularity": trend["granularity"],
         "top_categories": _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub),
     }
 

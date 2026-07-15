@@ -214,7 +214,7 @@ function DeltaBadge({ value, invertColor, hero }: { value: number; invertColor?:
             : "bg-error-subtle text-error-subtle-foreground",
       )}
     >
-      {sign}{value.toFixed(1)} %
+      {sign}{value.toFixed(3)} %
     </span>
   );
 }
