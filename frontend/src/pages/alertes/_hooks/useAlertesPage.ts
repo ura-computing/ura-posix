@@ -82,16 +82,16 @@ export function useAlertesPage() {
     marginLow:      margin?.low.count ?? 0,
     ventesSansAchat: vsa?.count ?? 0,
     expired:   perem?.expired.count ?? 0,
-    near2w:    perem?.near_2w.count  ?? 0,
-    near1m:    perem?.near_1m.count  ?? 0,
+    veryClose: perem?.very_close.count ?? 0,
+    close:     perem?.close.count ?? 0,
     negatif:   negatif.length,
     sousStock: sousStock.length,
     surStock:  surStock.length,
   };
   // Total actionable alerts across all brackets.
   const totalAlerts = Object.values(counts).reduce((a, b) => a + b, 0);
-  // Expired + within-2-weeks = the "act today" subset.
-  const peremptionCritical = counts.expired + counts.near2w;
+  // Expired + very-close = the "act today" subset.
+  const peremptionCritical = counts.expired + counts.veryClose;
 
   const isLoading = marginQuery.isLoading || peremptionsQuery.isLoading || stockQuery.isLoading || vsaQuery.isLoading;
   const isError = marginQuery.isError || peremptionsQuery.isError || stockQuery.isError || vsaQuery.isError;

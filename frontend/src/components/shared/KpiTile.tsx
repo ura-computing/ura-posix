@@ -146,10 +146,12 @@ export function KpiTile({
         </div>
       </div>
 
+      {/* No whitespace-nowrap on the value — formatMAD guarantees the digits are
+          one unbreakable unit and the only wrap point is before "MAD". */}
       {value != null && (
         <span className={cn(
-          "whitespace-nowrap font-mono font-bold tabular-nums tracking-tight",
-          hero ? "text-[52px] leading-none" : "text-[32px]",
+          "font-mono font-bold tabular-nums tracking-tight",
+          hero ? "text-[52px] leading-[52px]" : "text-[32px] leading-[32px]",
         )}>
           {value}
         </span>

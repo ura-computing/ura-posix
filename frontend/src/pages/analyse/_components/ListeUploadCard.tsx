@@ -21,7 +21,11 @@ export interface ListeUploadCardProps {
 
 
 function detectColumn(headers: string[], aliases: string[]): number {
-  const norm = (s: string) => s.toLowerCase().replace(/[\s_-]/g, "");
+  // Strip a UTF-8 BOM — real (﻿) or mojibake ("ï»¿") — before matching:
+  // Sobrus exports glue it to the first header ("ï»¿PID"), which silently
+  // broke PID-column detection (and with it PID-based matching backend-side).
+  const norm = (s: string) =>
+    s.replace(/\uFEFF|ï»¿/g, "").toLowerCase().replace(/[\s_-]/g, "");
   const normalizedHeaders = headers.map(norm);
   for (const a of aliases) {
     const idx = normalizedHeaders.indexOf(norm(a));
@@ -32,6 +36,8 @@ function detectColumn(headers: string[], aliases: string[]): number {
 
 
 function parseCsv(text: string): ListeItem[] {
+  // Drop a leading real BOM so it can't leak into the first data cell either.
+  text = text.replace(/^\uFEFF/, "");
   // Detect delimiter from the first line (`;` wins over `,`).
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
   const delim = (firstLine.match(/;/g)?.length ?? 0) >= (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
