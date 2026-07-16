@@ -49,7 +49,26 @@ const PCT3    = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 3, maxim
 
 export function formatMAD(n: number | null | undefined): ReactNode {
   if (n == null) return "—";
-  return tighten(MAD.format(n));
+  // Split the number from the "MAD" suffix so a too-narrow container wraps
+  // ONLY before the currency (never mid-number): the digits live in a
+  // whitespace-nowrap span, followed by a plain (breakable) space + "MAD".
+  // Intl glues "MAD" with U+00A0 (never breaks) while the inline-block group
+  // separators WOULD break — i.e. exactly the wrong wrap points without this.
+  const parts    = MAD.formatToParts(n);
+  const curIdx   = parts.findIndex((p) => p.type === "currency");
+  if (curIdx === -1) return tighten(MAD.format(n));   // defensive — fr-FR always has one
+  const currency = parts[curIdx].value;
+  const numberStr = parts
+    .filter((p, i) => p.type !== "currency" && !(p.type === "literal" && i === curIdx - 1))
+    .map((p) => p.value)
+    .join("");
+  return (
+    <>
+      <span className="whitespace-nowrap">{tighten(numberStr)}</span>
+      {" "}
+      {currency}
+    </>
+  );
 }
 
 /** Plain-string MAD — for contexts that can't render the JSX separator spans

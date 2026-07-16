@@ -1,6 +1,8 @@
-/** 4 KPI tiles for /analyse: CA, Marge moyenne %, Marge moyenne DH, Optimisation.
+/** 8 KPI tiles for /analyse (old-app parity):
+ *  Row 1 — CA, Marge moyenne %, Marge moyenne DH, Optimisation.
+ *  Row 2 — Unités vendues, Unités disponibles, Prix unitaires achetés, PPV disponibles.
  *  Reuses shared KpiTile + NeedleGauge primitives. */
-import { Coins, Percent, Sparkles, TrendingUp } from "lucide-react";
+import { BarChart3, Boxes, Coins, Percent, ShoppingCart, Sparkles, TrendingUp } from "lucide-react";
 
 import { KpiTile } from "@/components/shared/KpiTile";
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
@@ -13,7 +15,7 @@ export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLo
   if (isLoading && !kpis) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
           <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-8 w-32" />
@@ -75,6 +77,38 @@ export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLo
           <NeedleGauge value={gaugeValue} />
         </div>
       </KpiTile>
+
+      {/* Row 2 — sub-KPIs (old-app parity). The stock/achat fields are only
+          populated in produit + liste modes (pu also grossiste/laboratoire);
+          elsewhere the backend sends null → "—". */}
+      <KpiTile
+        label="Unités vendues"
+        value={formatQty(unites)}
+        sub="Σ quantités vendues"
+        icon={<ShoppingCart className="size-5" />}
+        iconTone="primary"
+      />
+      <KpiTile
+        label="Unités disponibles"
+        value={kpis?.total_units_available != null ? formatQty(kpis.total_units_available) : "—"}
+        sub="Σ stock actuel"
+        icon={<Boxes className="size-5" />}
+        iconTone="success"
+      />
+      <KpiTile
+        label="Prix unitaires achetés"
+        value={kpis?.total_pu_purchased != null ? formatMAD(kpis.total_pu_purchased) : "—"}
+        sub="Σ PU × qté achetée"
+        icon={<Coins className="size-5" />}
+        iconTone="warning"
+      />
+      <KpiTile
+        label="PPV disponibles"
+        value={kpis?.ppv_total_available != null ? formatMAD(kpis.ppv_total_available) : "—"}
+        sub="Σ PPV × stock"
+        icon={<BarChart3 className="size-5" />}
+        iconTone="info"
+      />
     </div>
   );
 }

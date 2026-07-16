@@ -13,10 +13,36 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from stats_queries import _strip_pct
+
 
 # Featureless owner — drop all features so the gate fires.
 def _strip(set_pharmacy_features, p):
     set_pharmacy_features(p.id, ())
+
+
+class TestCategoryLabelMerge:
+    """`_strip_pct` collapses every Sobrus suffix variant of a category into one
+    canonical label so the report donut / analyse show a single bucket."""
+
+    def test_margin_pct_suffix_stripped(self) -> None:
+        assert _strip_pct("Médicament (33.930%)") == "Médicament"
+        assert _strip_pct("Médicament (30.000%)") == "Médicament"
+        assert _strip_pct("Parapharmacie (7.5%)") == "Parapharmacie"
+
+    def test_bare_code_suffix_stripped(self) -> None:
+        # (300)/(400) carry no '%' — these used to leak as separate categories.
+        assert _strip_pct("Médicament (300)") == "Médicament"
+        assert _strip_pct("Médicament (400)") == "Médicament"
+
+    def test_all_variants_merge_to_one(self) -> None:
+        variants = ["Médicament (33.930%)", "Médicament (30.000%)",
+                    "Médicament (29.747%)", "Médicament (300)", "Médicament (400)"]
+        assert {_strip_pct(v) for v in variants} == {"Médicament"}
+
+    def test_plain_category_untouched(self) -> None:
+        assert _strip_pct("Complément") == "Complément"
+        assert _strip_pct(None) == ""
 
 
 class TestGetStats:
@@ -98,7 +124,7 @@ class TestPeremptions:
         assert r.status_code == 200
         body = r.json()
         # 4 mutually-exclusive buckets including the data-quality no_date one
-        assert set(body.keys()) == {"expired", "near_2w", "near_1m", "no_date"}
+        assert set(body.keys()) == {"expired", "very_close", "close", "no_date"}
         for k in body:
             assert body[k]["count"] == 0
             assert body[k]["products"] == []
@@ -107,8 +133,9 @@ class TestPeremptions:
         self, auth_owner, db,
     ) -> None:
         """Insert stock rows spread across the 3 date bands + 1 NULL expiry +
-        1 out-of-range (> 30d). NULL rows land in `no_date`; > 30d still
-        skipped."""
+        1 out-of-range (≥ 12 months). NULL rows land in `no_date`; ≥ 360d still
+        skipped. Boundaries port the old apcm-pharma behavior: very_close
+        < today+180d, close < today+360d."""
         from datetime import date, timedelta
 
         from models import Medicament, PharmacyStock
@@ -128,21 +155,22 @@ class TestPeremptions:
             ))
 
         _mk("EXP",  -3)    # expired (3 days past)
-        _mk("W2A",   0)    # near_2w (today is the boundary, inclusive)
-        _mk("W2B",  14)    # near_2w (last day of 2-week window)
-        _mk("M1",   25)    # near_1m
-        _mk("FAR",  90)    # > 30d → skipped entirely
+        _mk("VCA",   0)    # very_close (today is the boundary, inclusive)
+        _mk("VCB", 179)    # very_close (last day before the 6-month boundary)
+        _mk("CLO", 180)    # close (first day of the 6→12-month band)
+        _mk("CLB", 359)    # close (last day before the 12-month boundary)
+        _mk("FAR", 360)    # ≥ 12 months → skipped entirely
         _mk("NUL", None)   # NULL expiry → lands in no_date
         db.commit()
 
         body = client.get("/v1/stats/peremptions").json()
         assert body["expired"]["count"] == 1
-        assert body["near_2w"]["count"] == 2
-        assert body["near_1m"]["count"] == 1
+        assert body["very_close"]["count"] == 2
+        assert body["close"]["count"] == 2
         assert body["no_date"]["count"] == 1
-        # FAR (> 30d) must NOT leak into any bucket; everyone else does.
+        # FAR (≥ 12 months) must NOT leak into any bucket; everyone else does.
         total = sum(b["count"] for b in body.values())
-        assert total == 5
+        assert total == 6
 
     def test_excludes_zero_stock(self, auth_owner, db) -> None:
         from datetime import date, timedelta
@@ -161,7 +189,7 @@ class TestPeremptions:
         db.commit()
 
         body = client.get("/v1/stats/peremptions").json()
-        assert body["near_2w"]["count"] == 0
+        assert body["very_close"]["count"] == 0
 
     def test_unauthenticated(self, client) -> None:
         r = client.get("/v1/stats/peremptions")

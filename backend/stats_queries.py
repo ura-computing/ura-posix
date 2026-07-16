@@ -29,14 +29,23 @@ from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, V
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
 
-_PCT_RE = re.compile(r"\s*\(\d+\.?\d*%\)")
+_PCT_RE      = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")     # margin suffix, e.g. "(33.930%)"
+_BARE_NUM_RE = re.compile(r"\s*\(\d+(?:\.\d+)?\)\s*$")  # trailing code suffix, e.g. "(300)"
 
 
 def _strip_pct(s: str | None) -> str:
-    """Remove '(xx%)' suffix from a category string."""
+    """Normalize a category label to a single canonical name for reports.
+
+    Sobrus fragments one real category into several variants by appending a
+    suffix: a margin rate "(33.930%)" or a bare code "(300)"/"(400)". Both are
+    stripped so e.g. "Médicament (33.930%)", "Médicament (300)" and
+    "Médicament (400)" all merge into a single "Médicament" bucket in the
+    dashboard donut and the Analyse par-catégorie report. The underlying
+    Medicament.category rows are left untouched (the suffix carries the margin
+    tier) — this only affects the report grouping/label."""
     if not s:
         return s or ""
-    return _PCT_RE.sub("", s).strip()
+    return _BARE_NUM_RE.sub("", _PCT_RE.sub("", s)).strip()
 
 
 def _parse_tva_rate(tva_str) -> float:
@@ -191,10 +200,14 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
         .group_by(Achat.medicament_id)
         .subquery()
     )
+    # Aggregate in SQL, grouped by the tva label (a handful of distinct strings) —
+    # fetching every Vente row here made /v1/stats take seconds. Per-tva-group sums
+    # are mathematically identical to the old per-row Python loop: the TVA rate only
+    # depends on the tva string, so Σ qty·(ppv−pu)/(1+rate) == (ΣppvΣpu per group)/(1+rate).
     marge_rows = (
         db.query(
-            Vente.quantity, Medicament.ppv,
-            avg_pu_sub.c.avg_pu.label("pu"),
+            func.sum(Vente.quantity * Medicament.ppv).label("sum_ppv"),
+            func.sum(Vente.quantity * avg_pu_sub.c.avg_pu).label("sum_pu"),
             Medicament.tva,
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
@@ -202,18 +215,16 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
         .filter(Medicament.ppv.isnot(None))
+        .filter(avg_pu_sub.c.avg_pu.isnot(None))   # was: r.pu is not None (Python-side)
+        .group_by(Medicament.tva)
         .all()
     )
-    marge_rows = [r for r in marge_rows if r.pu is not None]
-    sum_ppv = sum((r.quantity or 0) * (r.ppv or 0) for r in marge_rows)
-    sum_pu  = sum((r.quantity or 0) * (r.pu  or 0) for r in marge_rows)
+    sum_ppv = sum(float(r.sum_ppv or 0) for r in marge_rows)
+    sum_pu  = sum(float(r.sum_pu  or 0) for r in marge_rows)
     marge_brute = sum_ppv - sum_pu
     marge_pct   = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
     marge_nette = sum(
-        (r.quantity or 0) * (
-            (r.ppv or 0) / (1 + _parse_tva_rate(r.tva)) -
-            (r.pu  or 0) / (1 + _parse_tva_rate(r.tva))
-        )
+        (float(r.sum_ppv or 0) - float(r.sum_pu or 0)) / (1 + _parse_tva_rate(r.tva))
         for r in marge_rows
     )
     return {
@@ -314,21 +325,28 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
         "worst_day_count": {"date": str(worst_cnt[0]), "count": int(worst_cnt[2]  or 0)} if worst_cnt else None,
     }
 
-    # TVA
+    # TVA — aggregated in SQL per distinct tva label (a handful of groups) instead of
+    # fetching every Vente/Achat row (~800k) into Python. The rate only depends on the
+    # tva string, so the grouped sums are identical to the old per-row loop.
     vente_tva_rows = (
-        db.query((Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ppv_total"), Medicament.tva)
+        db.query(
+            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ppv_total"),
+            Medicament.tva,
+        )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
+        .group_by(Medicament.tva)
         .all()
     )
     tva_encaissee = sum((r.ppv_total or 0) * _parse_tva_rate(r.tva) for r in vente_tva_rows)
 
     achat_tva_rows = (
-        db.query(Achat.total, Medicament.tva)
+        db.query(func.sum(Achat.total).label("total"), Medicament.tva)
         .join(Medicament, Achat.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_a)
         .filter(*cat_filter_a)
+        .group_by(Medicament.tva)
         .all()
     )
     tva_payee = sum((r.total or 0) * _parse_tva_rate(r.tva) for r in achat_tva_rows)
@@ -695,7 +713,15 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         else:                   in_band    += 1
 
     classified = sous_stock + sur_stock + in_band
-    health_pct = round((in_band / classified) * 100, 1) if classified else 0.0
+    # "Santé du stock" = share of references adequately stocked (NOT at rupture risk).
+    # The [stock_min, stock_max] band is the client's reorder window — only 14→15
+    # days wide — so it is far too narrow to be an "ideal holding" range: using it as
+    # the healthy band forced this metric to ~0%. Availability (stock >= stock_min)
+    # is the meaningful signal; the sous-/sur-stock counts are surfaced separately in
+    # the tile. Over-stock (> 15 days) is counted as available here since 15 days is a
+    # reorder target, not an over-stock ceiling.
+    healthy = in_band + sur_stock
+    health_pct = round((healthy / classified) * 100, 1) if classified else 0.0
 
     return {
         "total_references": total_refs,

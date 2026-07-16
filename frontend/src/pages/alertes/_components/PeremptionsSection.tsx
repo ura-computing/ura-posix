@@ -23,8 +23,9 @@ function MiniStat({ label, value }: { label: string; value: ReactNode }) {
 }
 
 export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
-  // 4 mutually-exclusive cards. The first three are date-bucketed by
-  // urgency; the fourth (`no_date`) is a data-quality bucket — products
+  // 4 mutually-exclusive cards — labels + buckets port the old apcm-pharma
+  // app verbatim (client-requested parity). The first three are date-bucketed
+  // by urgency; the fourth (`no_date`) is a data-quality bucket — products
   // whose Sobrus export had no expiry date.
   const cards: {
     key:         keyof PeremptionsResponse;
@@ -34,10 +35,10 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
     dlgTitle:    string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired", tone: "error",   title: "Périmés",      sub: "Action urgente", dlgTitle: "Produits expirés",        dlgSubtitle: "Date de péremption dépassée" },
-    { key: "near_2w", tone: "warning", title: "≤ 2 semaines", sub: "Très urgent",    dlgTitle: "Péremption ≤ 2 semaines", dlgSubtitle: "Expiration dans les 14 prochains jours" },
-    { key: "near_1m", tone: "warning", title: "≤ 1 mois",     sub: "À surveiller",   dlgTitle: "Péremption ≤ 1 mois",     dlgSubtitle: "Expiration entre 15 et 30 jours" },
-    { key: "no_date", tone: "muted",   title: "Sans date",    sub: "À renseigner",   dlgTitle: "Produits sans date de péremption", dlgSubtitle: "Date de péremption non renseignée dans l'export Sobrus" },
+    { key: "expired",    tone: "error",   title: "Expirés",             sub: "Action urgente", dlgTitle: "Produits expirés",               dlgSubtitle: "Produits dont la date de péremption est passée." },
+    { key: "very_close", tone: "warning", title: "Très proche (<30j)", sub: "Très urgent",    dlgTitle: "Péremption très proche (<30j)",  dlgSubtitle: "Produits qui expirent dans moins de 30 jours." },
+    { key: "close",      tone: "warning", title: "Proche (<90j)",      sub: "À surveiller",   dlgTitle: "Péremption proche (<90j)",       dlgSubtitle: "Produits qui expirent dans moins de 90 jours." },
+    { key: "no_date",    tone: "muted",   title: "Sans date",           sub: "À renseigner",   dlgTitle: "Produits sans date de péremption", dlgSubtitle: "Produits en stock dont la date de péremption n'est pas renseignée." },
   ];
 
   return (

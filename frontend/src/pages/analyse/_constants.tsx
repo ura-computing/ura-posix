@@ -153,3 +153,92 @@ export const MARGE_COLS: Record<MargeMode, AnalyseColDef[]> = {
   annee:       ANNEE_COLS,
   liste:       LISTE_COLS,
 };
+
+
+// ─── Excel export columns — OLD-APP PARITY ────────────────────────────────────
+// The generated .xlsx must match the old apcm-pharma exports exactly (client
+// request): same headers, same column order; filename "APCM - ANALYSE {MODE} …"
+// and sheet name "Analyse" are set in useAnalysePage.handleExport. The on-screen
+// table keeps the newer MARGE_COLS labels above — only the export differs.
+// Exception: `liste` — the old app never exported its CSV-comparison table (its
+// "Liste" tab exported BL aggregates that no longer exist), so we export the
+// comparison with the old TABLE's headers and a French Statut.
+
+export interface AnalyseExportCol {
+  label: string;
+  raw:   (row: AnalyseMargeRow) => string | number | null;
+}
+
+// Shared tail of the old categorie/grossiste/laboratoire exports.
+const OLD_AGG_EXPORT_TAIL: AnalyseExportCol[] = [
+  { label: "Prix max",      raw: (r) => r.prix_max ?? null },
+  { label: "Prix min",      raw: (r) => r.prix_min ?? null },
+  { label: "Prix moy.",     raw: (r) => r.prix_avg ?? null },
+  { label: "Marge % moy.",  raw: (r) => r.marge_pct_avg ?? null },
+  { label: "Marge DH moy.", raw: (r) => r.marge_dh_avg ?? null },
+  { label: "Qté",           raw: (r) => r.qty ?? 0 },
+  { label: "CA (MAD)",      raw: (r) => r.ca ?? 0 },
+];
+
+// Old app used full French month abbreviations (Juin/Juil/Août) in the pivot.
+const OLD_MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+
+export const EXPORT_COLS: Record<MargeMode, AnalyseExportCol[]> = {
+  produit: [
+    { label: "Produit",          raw: (r) => r.product ?? "" },
+    { label: "Stock dispo",      raw: (r) => r.stock_dispo ?? null },
+    { label: "Vente total unit", raw: (r) => r.qty ?? 0 },
+    { label: "Vente total DH",   raw: (r) => r.ca ?? 0 },
+    { label: "Prix unit +",      raw: (r) => r.prix_max ?? null },
+    { label: "Prix unit -",      raw: (r) => r.prix_min ?? null },
+    { label: "Prix unit X",      raw: (r) => r.prix_avg ?? null },
+    { label: "PPV",              raw: (r) => r.ppv ?? null },
+    { label: "Marge% X",         raw: (r) => r.marge_pct ?? null },
+    { label: "Marge DH X",       raw: (r) => r.marge_dh ?? null },
+    { label: "Catégorie",        raw: (r) => r.category ?? "" },
+    { label: "TVA",              raw: (r) => r.tva ?? "" },
+  ],
+  categorie: [
+    { label: "Catégorie", raw: (r) => r.category ?? "" },
+    ...OLD_AGG_EXPORT_TAIL,
+  ],
+  grossiste: [
+    { label: "Grossiste", raw: (r) => r.grossiste ?? "" },
+    ...OLD_AGG_EXPORT_TAIL,
+  ],
+  laboratoire: [
+    { label: "Laboratoire", raw: (r) => r.laboratoire ?? "" },
+    ...OLD_AGG_EXPORT_TAIL,
+  ],
+  operateur: [
+    { label: "Opérateur / Client", raw: (r) => r.client ?? "" },
+    { label: "Transactions",       raw: (r) => r.nb_transactions ?? 0 },
+    { label: "Qté",                raw: (r) => r.qty ?? 0 },
+    { label: "CA (MAD)",           raw: (r) => r.ca ?? 0 },
+  ],
+  mois: [
+    { label: "Mois",         raw: (r) => r.mois ?? "" },
+    { label: "Transactions", raw: (r) => r.nb_transactions ?? 0 },
+    { label: "Qté",          raw: (r) => r.qty ?? 0 },
+    { label: "CA (MAD)",     raw: (r) => r.ca ?? 0 },
+  ],
+  annee: [
+    { label: "Année", raw: (r) => r.annee ?? "" },
+    ...MONTH_KEYS.map((k, i): AnalyseExportCol => ({
+      label: OLD_MONTH_LABELS[i],
+      raw:   (r) => (r as unknown as Record<string, number>)[k] ?? 0,
+    })),
+    { label: "Total", raw: (r) => r.ca ?? 0 },
+  ],
+  liste: [
+    { label: "Statut",      raw: (r) => r.match_status === "found" ? "Trouvé" : r.match_status === "not_found" ? "Introuvable" : "" },
+    { label: "Produit",     raw: (r) => r.product ?? "" },
+    { label: "Stock dispo", raw: (r) => r.stock_dispo ?? null },
+    { label: "Ventes",      raw: (r) => r.qty ?? 0 },
+    { label: "PPV",         raw: (r) => r.ppv ?? null },
+    { label: "PU moy.",     raw: (r) => r.pu ?? null },
+    { label: "Marge %",     raw: (r) => r.marge_pct ?? null },
+    { label: "Marge DH",    raw: (r) => r.marge_dh ?? null },
+    { label: "Catégorie",   raw: (r) => r.category ?? "" },
+  ],
+};

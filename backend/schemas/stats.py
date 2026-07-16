@@ -193,8 +193,8 @@ class PeremptionsResponse(BaseModel):
     """Pharmacy-ops horizon. NULL-expiry products are surfaced in their own
     `no_date` data-quality bucket so the team can chase missing Sobrus dates."""
     expired: PeremptionBracket    # expiry_date < today
-    near_2w: PeremptionBracket    # today ≤ expiry_date ≤ today + 14d
-    near_1m: PeremptionBracket    # today + 14d < expiry_date ≤ today + 30d
+    very_close: PeremptionBracket  # today ≤ expiry_date < today + 6 months (UI label: "<30j", old-app parity)
+    close:      PeremptionBracket  # today + 6m ≤ expiry_date < today + 12 months (UI label: "<90j")
     no_date: PeremptionBracket    # expiry_date IS NULL
 
 

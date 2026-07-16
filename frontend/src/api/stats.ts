@@ -123,9 +123,10 @@ export function getAnalyseMarge(
 }
 
 export function postAnalyseListe(body: ListeRequest): Promise<AnalyseMargeResponse> {
+  // NOTE: pass the raw object — the api() wrapper JSON.stringify's the body itself.
+  // Pre-stringifying here double-encoded it (backend received a JSON *string* → 422).
   return api<AnalyseMargeResponse>("/stats/analyse-liste", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify(body),
+    method: "POST",
+    body,
   });
 }

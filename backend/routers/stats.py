@@ -248,8 +248,8 @@ def get_stock_abcd(
 
 @router.get("/stats/peremptions", response_model=PeremptionsResponse)
 def get_peremptions(user: CurrentUserDep, db: DbDep) -> dict:
-    """4 mutually-exclusive expiry-proximity buckets: expired / near_2w (≤14d)
-    / near_1m (>14d and ≤30d) / no_date (NULL expiry_date — data quality)."""
+    """4 mutually-exclusive expiry-proximity buckets (old-app parity): expired /
+    very_close (<6 months) / close (6-12 months) / no_date (NULL expiry_date)."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
     return compute_peremptions(db, pharmacy_id)
 

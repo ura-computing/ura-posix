@@ -73,6 +73,8 @@ export default function AnalysePage() {
           value:       s.search,
           onChange:    s.setSearch,
           placeholder: "Rechercher dans les résultats…",
+          suggestions: s.suggestions,
+          onPick:      (label) => s.setSearch(label),
         }}
         rightActions={[
           {
@@ -111,7 +113,11 @@ export default function AnalysePage() {
 
       {s.error && (
         <div className="rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-sm text-error">
-          Impossible de charger l'analyse. Réessayez plus tard.
+          {/* Surface the API detail when available — a bare "réessayez" hid real causes (e.g. 422). */}
+          Impossible de charger l'analyse.{" "}
+          {s.error instanceof Error && s.error.message
+            ? s.error.message
+            : "Réessayez plus tard."}
         </div>
       )}
     </div>

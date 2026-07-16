@@ -591,8 +591,8 @@ export interface PeremptionBracket {
  *  missing Sobrus dates. */
 export interface PeremptionsResponse {
   expired: PeremptionBracket;    // expiry_date < today
-  near_2w: PeremptionBracket;    // today ≤ expiry ≤ today + 14d
-  near_1m: PeremptionBracket;    // today + 14d < expiry ≤ today + 30d
+  very_close: PeremptionBracket; // today ≤ expiry < today + 6 months (UI label "<30j" — old-app parity)
+  close:      PeremptionBracket; // today + 6m ≤ expiry < today + 12 months (UI label "<90j")
   no_date: PeremptionBracket;    // expiry_date IS NULL
 }
 
