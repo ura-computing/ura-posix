@@ -22,23 +22,25 @@ def _strip(set_pharmacy_features, p):
 
 
 class TestCategoryLabelMerge:
-    """`_strip_pct` collapses every Sobrus suffix variant of a category into one
-    canonical label so the report donut / analyse show a single bucket."""
+    """`_strip_pct` collapses the "(xx%)" margin-suffix variants of a category
+    into one canonical label for the report donut / analyse. Bare-code variants
+    ("(300)"/"(400)") stay SEPARATE — explicit user decision (2026-07-16)."""
 
     def test_margin_pct_suffix_stripped(self) -> None:
         assert _strip_pct("Médicament (33.930%)") == "Médicament"
         assert _strip_pct("Médicament (30.000%)") == "Médicament"
         assert _strip_pct("Parapharmacie (7.5%)") == "Parapharmacie"
 
-    def test_bare_code_suffix_stripped(self) -> None:
-        # (300)/(400) carry no '%' — these used to leak as separate categories.
-        assert _strip_pct("Médicament (300)") == "Médicament"
-        assert _strip_pct("Médicament (400)") == "Médicament"
+    def test_bare_code_suffix_preserved(self) -> None:
+        # (300)/(400) carry no '%' — the user wants them as separate report lines.
+        assert _strip_pct("Médicament (300)") == "Médicament (300)"
+        assert _strip_pct("Médicament (400)") == "Médicament (400)"
 
-    def test_all_variants_merge_to_one(self) -> None:
+    def test_pct_variants_merge_but_bare_codes_stay_apart(self) -> None:
         variants = ["Médicament (33.930%)", "Médicament (30.000%)",
                     "Médicament (29.747%)", "Médicament (300)", "Médicament (400)"]
-        assert {_strip_pct(v) for v in variants} == {"Médicament"}
+        assert {_strip_pct(v) for v in variants} == {
+            "Médicament", "Médicament (300)", "Médicament (400)"}
 
     def test_plain_category_untouched(self) -> None:
         assert _strip_pct("Complément") == "Complément"

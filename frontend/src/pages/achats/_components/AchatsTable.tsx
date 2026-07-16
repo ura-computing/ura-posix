@@ -43,14 +43,14 @@ const COLUMNS: ColumnDef<AchatRow>[] = [
     ) : <span className="text-muted-foreground">—</span> },
   { key: "supplier", label: "Fournisseur", width: 200,
     render: (r) => r.supplier ? <span className="truncate text-base" title={r.supplier}>{r.supplier}</span> : <span className="text-muted-foreground">—</span> },
-  { key: "product", label: "Produit", width: 260, sortable: false,
+  { key: "product", label: "Produit", width: 260,
     render: (r) => (
       <div className="flex flex-col">
         <span className="truncate text-base" title={r.product ?? ""}>{r.product ?? "—"}</span>
         <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid ?? ""}</span>
       </div>
     ) },
-  { key: "category", label: "Catégorie", width: 160, sortable: false,
+  { key: "category", label: "Catégorie", width: 160,
     render: (r) => <span className="block max-w-[150px] truncate text-sm text-muted-foreground">{r.category ?? "—"}</span> },
   { key: "category_type", label: "Type", width: 110, sortable: false,
     render: (r) => <TypeBadge type={r.category_type} /> },
