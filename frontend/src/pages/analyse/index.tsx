@@ -108,7 +108,15 @@ export default function AnalysePage() {
 
       {/* Table: shows for all 8 modes (Liste shows it once items are submitted). */}
       {(s.mode !== "liste" || s.listeSubmitted) && (
-        <AnalyseTable mode={s.mode} rows={s.rows} loading={s.isLoading} pagination={s.pagination} />
+        <AnalyseTable
+          mode={s.mode}
+          rows={s.rows}
+          loading={s.isLoading}
+          pagination={s.pagination}
+          sortBy={s.sortBy}
+          sortOrder={s.sortOrder}
+          onSort={s.toggleSort}
+        />
       )}
 
       {s.error && (

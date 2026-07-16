@@ -208,7 +208,18 @@ def _apply_surveillance(q, surveillance: str | None, avg_pu_sub, has_med_join: b
     return q
 
 
-def _apply_sort(query, model, sort_by: str | None, sort_order: str, whitelist: set[str], default_col: str):
+def _apply_sort(query, model, sort_by: str | None, sort_order: str, whitelist: set[str], default_col: str,
+                extra_cols: dict | None = None):
+    """Order by a whitelisted model column, or by an explicit joined/computed
+    expression from `extra_cols` (PG-014: lets Achats/Ventes sort on Medicament
+    columns and marge expressions). extra_cols keys are hardcoded by callers —
+    same no-injection guarantee as the whitelist. Extra expressions can be NULL
+    ("—" rows) → always pushed last."""
+    extra_cols = extra_cols or {}
+    if sort_by in extra_cols:
+        column  = extra_cols[sort_by]
+        ordered = column.desc() if sort_order == "desc" else column.asc()
+        return query.order_by(ordered.nullslast())
     col_name = sort_by if sort_by in whitelist else default_col
     column = getattr(model, col_name)
     return query.order_by(column.desc() if sort_order == "desc" else column.asc())
@@ -280,7 +291,9 @@ def list_achats(
 
     _check_export_cap(export, total)
 
-    sorted_q = _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id")
+    # PG-014: Produit/Catégorie sort via the (always-joined) Medicament.
+    sorted_q = _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id",
+                           extra_cols={"product": Medicament.product, "category": Medicament.category})
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
     # Bulk-load medicaments into the session identity map so _achat_to_row's
@@ -467,9 +480,14 @@ def list_ventes(
     # Ensure Medicament is joined for the TVA aggregate (might not be joined yet
     # if no search/category/tva filter was applied). Idempotent for SQLAlchemy.
     has_med_join = bool(search or category or tva)
-    if surveillance:
+    # PG-014: sorting by marge needs the avg-PU subquery joined (1:1 per
+    # medicament — doesn't multiply rows, so the aggregate below stays exact).
+    marge_sort = sort_by in ("marge_pct", "marge_dh")
+    avg_pu_sub = None
+    if surveillance or marge_sort:
         avg_pu_sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
         q = q.outerjoin(avg_pu_sub, Vente.medicament_id == avg_pu_sub.c.med_id)
+    if surveillance:
         q = _apply_surveillance(q, surveillance, avg_pu_sub, has_med_join=has_med_join)
         has_med_join = True  # _apply_surveillance forces the Medicament join
     if not has_med_join:
@@ -487,7 +505,17 @@ def list_ventes(
 
     _check_export_cap(export, total)
 
-    sorted_q = _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id")
+    # PG-014: joined/computed sort columns — Produit/Catégorie/PPV live on
+    # Medicament (always joined by now); marge mirrors the surveillance formula.
+    vente_extra_sort = {
+        "product":  Medicament.product,
+        "category": Medicament.category,
+        "ppv":      Medicament.ppv,
+    }
+    if marge_sort and avg_pu_sub is not None:
+        vente_extra_sort["marge_dh"]  = Medicament.ppv - avg_pu_sub.c.avg_pu
+        vente_extra_sort["marge_pct"] = (1.0 - avg_pu_sub.c.avg_pu / func.nullif(Medicament.ppv, 0)) * 100.0
+    sorted_q = _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id", extra_cols=vente_extra_sort)
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
     # Bulk-load medicaments + compute avg_pu_map for the result set (covers

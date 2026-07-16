@@ -29,23 +29,21 @@ from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, V
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
 
-_PCT_RE      = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")     # margin suffix, e.g. "(33.930%)"
-_BARE_NUM_RE = re.compile(r"\s*\(\d+(?:\.\d+)?\)\s*$")  # trailing code suffix, e.g. "(300)"
+_PCT_RE = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")   # margin suffix, e.g. "(33.930%)"
 
 
 def _strip_pct(s: str | None) -> str:
-    """Normalize a category label to a single canonical name for reports.
+    """Normalize a category label for report grouping: strip the margin-rate
+    suffix so "Médicament (33.930%)" / "(30.000%)" / "(29.747%)" all merge into
+    one "Médicament" bucket in the dashboard donut and Analyse par-catégorie.
 
-    Sobrus fragments one real category into several variants by appending a
-    suffix: a margin rate "(33.930%)" or a bare code "(300)"/"(400)". Both are
-    stripped so e.g. "Médicament (33.930%)", "Médicament (300)" and
-    "Médicament (400)" all merge into a single "Médicament" bucket in the
-    dashboard donut and the Analyse par-catégorie report. The underlying
-    Medicament.category rows are left untouched (the suffix carries the margin
-    tier) — this only affects the report grouping/label."""
+    DELIBERATE (user decision 2026-07-16): bare-code variants like
+    "Médicament (300)" / "Médicament (400)" are NOT merged — they stay separate
+    report lines. Only "(xx%)"-style suffixes are stripped. The underlying
+    Medicament.category rows are never modified."""
     if not s:
         return s or ""
-    return _BARE_NUM_RE.sub("", _PCT_RE.sub("", s)).strip()
+    return _PCT_RE.sub("", s).strip()
 
 
 def _parse_tva_rate(tva_str) -> float:
@@ -165,12 +163,16 @@ def merge_top_categories(rows) -> list[dict]:
             merged[key] = {"total": 0.0, "pu_sum": 0.0, "ppv_sum": 0.0, "qty_sum": 0.0}
         m = merged[key]
         m["total"] += float(r.total or 0)
-        qty = float(getattr(r, "qty", 0) or 0)
-        pu  = float(getattr(r, "avg_pu", 0) or 0)
-        ppv = float(getattr(r, "avg_ppv", 0) or 0)
-        m["pu_sum"]  += pu * qty
-        m["ppv_sum"] += ppv * qty
-        m["qty_sum"] += qty
+        qty    = float(getattr(r, "qty", 0) or 0)
+        pu_raw = getattr(r, "avg_pu", None)
+        ppv    = float(getattr(r, "avg_ppv", 0) or 0)
+        # PG-013: rows without a real purchase price (no achats for the whole
+        # category) are excluded from the marge weighting — treating NULL pu as
+        # 0 would fabricate a 100% margin. Their CA still counts in `total`.
+        if pu_raw is not None:
+            m["pu_sum"]  += float(pu_raw) * qty
+            m["ppv_sum"] += ppv * qty
+            m["qty_sum"] += qty
     result: list[dict] = []
     for k, m in merged.items():
         marge_pct: Optional[float] = None

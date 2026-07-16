@@ -122,7 +122,9 @@ def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub) -> 
             Medicament.category.label("category"),
             func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
             func.sum(Vente.quantity).label("qty"),
-            func.avg(func.coalesce(avg_pu_sub.c.pu, Medicament.pph)).label("avg_pu"),
+            # PG-013: no Medicament.pph fallback — the product sheet often has
+            # PPH = PPV which fabricates 0% margins. NULL pu → category marge "—".
+            func.avg(avg_pu_sub.c.pu).label("avg_pu"),
             func.avg(Medicament.ppv).label("avg_ppv"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id)

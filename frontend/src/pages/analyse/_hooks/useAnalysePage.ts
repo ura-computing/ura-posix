@@ -10,7 +10,7 @@ import type { AnalyseFilters, AnalyseMargeRow, ListeItem, MargeMode } from "@/ty
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { normalizeText } from "@/utils/text";
 
-import { EXPORT_COLS } from "../_constants";
+import { EXPORT_COLS, MARGE_COLS } from "../_constants";
 import { computeKpisFromRows } from "../_utils/kpis";
 
 
@@ -39,6 +39,10 @@ export function useAnalysePage() {
   const [search,   setSearch]   = useState("");
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // PG-014: client-side sort — rows are fully in memory, so sorting covers the
+  // ENTIRE filtered set (not just the visible page), as the QA rule requires.
+  const [sortBy,    setSortBy]    = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Auto-fetch query for 7 group-by modes; Liste uses the mutation below.
   const margeQ = useAnalyseMarge(filters, mode);
@@ -98,19 +102,52 @@ export function useAnalysePage() {
   // Reset to page 1 whenever the active dataset or filters change.
   useEffect(() => { setPage(1); }, [mode, filters, search]);
 
-  // Slice the filtered rows for the current page.
+  // Sort the FULL filtered set using the column's `raw` accessor (same values
+  // the Excel export uses). Nulls sort last in both directions; strings use
+  // French collation.
+  const sortedRows = useMemo(() => {
+    if (!sortBy) return filteredRows;
+    const col = MARGE_COLS[mode].find((c) => c.key === sortBy);
+    if (!col?.raw) return filteredRows;
+    const dir = sortOrder === "asc" ? 1 : -1;
+    return [...filteredRows].sort((a, b) => {
+      const va = col.raw!(a);
+      const vb = col.raw!(b);
+      const aEmpty = va == null || va === "";
+      const bEmpty = vb == null || vb === "";
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;   // empties last, regardless of direction
+      if (bEmpty) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), "fr") * dir;
+    });
+  }, [filteredRows, sortBy, sortOrder, mode]);
+
+  // Slice the sorted rows for the current page.
   const pageRows = useMemo(
-    () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
-    [filteredRows, page, pageSize],
+    () => sortedRows.slice((page - 1) * pageSize, page * pageSize),
+    [sortedRows, page, pageSize],
   );
 
   const pagination: DataTablePagination = {
     page,
     pageSize,
-    total: filteredRows.length,
+    total: sortedRows.length,
     onPage:     setPage,
     onPageSize: setPageSize,
   };
+
+  // Same-column click toggles direction; new column starts desc (largest first,
+  // matching Achats/Ventes behavior).
+  function toggleSort(key: string) {
+    setPage(1);
+    if (sortBy === key) {
+      setSortOrder((o) => (o === "desc" ? "asc" : "desc"));
+    } else {
+      setSortBy(key);
+      setSortOrder("desc");
+    }
+  }
 
   // Excel export — OLD-APP PARITY (client request): headers/order from
   // EXPORT_COLS, filename "APCM - ANALYSE {MODE} {from} - {to}.xlsx" and sheet
@@ -144,11 +181,13 @@ export function useAnalysePage() {
 
   // Switching mode tabs clears the text search: it filters the CURRENT mode's
   // rows, so a product name carried into e.g. Catégorie matches nothing and the
-  // page misleadingly shows "Aucun résultat". Dates/category filters stay (valid
-  // for every mode).
+  // page misleadingly shows "Aucun résultat". The sort resets too (columns
+  // differ per mode). Dates/category filters stay (valid for every mode).
   function changeMode(m: MargeMode) {
     setMode(m);
     setSearch("");
+    setSortBy(null);
+    setSortOrder("desc");
   }
 
   return {
@@ -156,6 +195,7 @@ export function useAnalysePage() {
     mode,    setMode: changeMode,
     search,  setSearch,
     suggestions,
+    sortBy, sortOrder, toggleSort,
     isLoading,
     error:    margeQ.isError ? margeQ.error : (listeM.isError ? listeM.error : null),
     kpis,

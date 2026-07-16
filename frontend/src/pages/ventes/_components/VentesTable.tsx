@@ -66,7 +66,7 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
         <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid ?? ""}</span>
       </div>
     ) },
-  { key: "category", label: "Catégorie", width: 160, sortable: false,
+  { key: "category", label: "Catégorie", width: 160,
     render: (r) => <span className="block max-w-[150px] truncate text-sm text-muted-foreground">{r.category ?? "—"}</span> },
   { key: "type", label: "Type", width: 110, sortable: false,
     render: (r) => <TypeBadge type={r.category_type} /> },
@@ -78,15 +78,15 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
     render: (r) => r.discount && r.discount > 0
       ? <span className="text-warning">{formatQty(r.discount)} %</span>
       : <span className="text-muted-foreground">0</span> },
-  { key: "ppv", label: "PPV", width: 100, align: "right", sortable: false,
+  { key: "ppv", label: "PPV", width: 100, align: "right",
     render: (r) => r.ppv != null ? formatMAD(r.ppv) : "—" },
   { key: "subtotal", label: "Sous-total", width: 110, align: "right", sortable: false,
     render: (r) => r.subtotal != null ? formatMAD(r.subtotal) : "—" },
   { key: "total", label: "Total", width: 110, align: "right",
     render: (r) => <span className="font-semibold">{r.total != null ? formatMAD(r.total) : "—"}</span> },
-  { key: "marge_pct", label: "Marge %", width: 90, align: "right", sortable: false,
+  { key: "marge_pct", label: "Marge %", width: 90, align: "right",
     render: (r) => <MargeCell row={r} mode="pct" /> },
-  { key: "marge_dh", label: "Marge DH", width: 110, align: "right", sortable: false,
+  { key: "marge_dh", label: "Marge DH", width: 110, align: "right",
     render: (r) => <MargeCell row={r} mode="dh" /> },
 ];
 
