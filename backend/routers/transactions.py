@@ -275,6 +275,9 @@ def list_achats(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     )
+    # PG-007: excluded BLs are hidden from the Achats ledger entirely — rows,
+    # the grand total, and the Excel export (all derived from `q`).
+    q = q.filter(achat_bl_filter(db, pharmacy_id))
     # Force Medicament join (for the TVA aggregate) if no search/category/tva
     if not (search or category or tva):
         q = q.outerjoin(Medicament, Achat.medicament_id == Medicament.id)
