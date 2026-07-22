@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from exclusions import achat_bl_filter
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 from search import tokenize_search
 
@@ -179,6 +180,8 @@ def compute_stock_abcd(
             Achat.medicament_id.isnot(None),
             Achat.quantity > 0,
             Achat.unit_price.isnot(None),
+            # PG-007: excluded BLs must not skew the stock PU moyen.
+            achat_bl_filter(db, pharmacy_id),
         )
         .group_by(Achat.medicament_id).subquery()
     )

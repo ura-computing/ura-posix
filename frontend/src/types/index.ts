@@ -143,6 +143,11 @@ export const QUERY_KEYS = {
   SPECIAL_PRODUCTS:        ["special-products"] as const,
   MEDICAMENT_SUGGESTIONS:  (q: string) => ["medicament-suggestions", q] as const,
 
+  // BL exclusions (PG-007) — owner-managed delivery-note exclusions + search.
+  BL_EXCLUSIONS:           ["bl-exclusions"] as const,
+  BL_SEARCH:               (q: string) => ["bl-search", q] as const,
+  BL_DETAIL:               (ref: string) => ["bl-detail", ref] as const,
+
   // Comptabilité — payment entries per (month, method).
   PAYMENTS:                (month?: string) => ["payments", month ?? null] as const,
   PAYMENTS_PREFIX:         ["payments"] as const,
@@ -871,6 +876,58 @@ export interface SpecialProductReintegrateResult {
   reintegrated:   number;
   not_special:    number;
   medicament_ids: number[];
+}
+
+
+// ── BL exclusions (PG-007) — owner-managed delivery-note exclusions ─────────
+export interface BlLine {
+  product:    string | null;
+  pid:        string | null;
+  quantity:   number | null;
+  unit_price: number | null;
+  total:      number | null;
+}
+
+export interface BlSummary {
+  delivery_ref:     string;
+  supplier:         string | null;
+  delivery_date:    string | null;
+  total:            number;
+  nb_lines:         number;
+  nb_products:      number;
+  already_excluded: boolean;
+  matched_products: string[];   // product name(s) matching the query (product search)
+}
+
+export interface BlDetail {
+  delivery_ref:  string;
+  supplier:      string | null;
+  delivery_date: string | null;
+  total:         number;
+  nb_lines:      number;
+  lines:         BlLine[];
+}
+
+export interface BlExclusion {
+  delivery_ref:  string;
+  supplier:      string | null;
+  delivery_date: string | null;
+  total:         number;
+  nb_lines:      number;
+  notes:         string | null;
+  created_at:    string;
+}
+
+export interface BlExclusionResult {
+  excluded:         number;
+  already_excluded: number;
+  item:             BlExclusion | null;
+}
+
+export interface BlReintegrateResult {
+  reintegrated:  number;
+  not_excluded:  number;
+  delivery_refs: string[];
 }
 
 

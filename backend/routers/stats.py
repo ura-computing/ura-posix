@@ -114,7 +114,9 @@ def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub) -> 
         .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
     )
     if pharmacy_id:
-        avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id)
+        # PG-007: excluded BLs must not skew the category marge shown in the donut.
+        avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id,
+                                       achat_bl_filter(db, pharmacy_id))
     avg_pu_sub = avg_pu_sub.group_by(Achat.medicament_id).subquery()
 
     q: OrmQuery = (

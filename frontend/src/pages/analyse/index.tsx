@@ -1,21 +1,23 @@
 /** /analyses — Analyse de marge with 8 modes + Liste CSV upload.
  *
  *  Mode picker: horizontal scrollable tab strip (ModeTabs).
- *  Filter bar: date range + category segment + search + Exporter Excel right action.
+ *  Filter bar: date range + category segment + search + Exporter Excel, plus an
+ *  "Importer une liste" action in Liste mode (right of Export).
  *  KPI strip: 4 KpiTile (CA / Marge % / Marge DH / Optimisation gauge).
- *  Body: per-mode table OR (Liste mode) upload card + table.
+ *  Body: per-mode table (Liste mode: slim import status line, then the table).
  */
-import { Download } from "lucide-react";
+import { useRef, useState } from "react";
+import { Download, Upload } from "lucide-react";
 
 import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
-import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
+import { FilterBar, type ActiveFilter, type RightAction } from "@/components/shared/filterBar";
 import { ModeTabs } from "@/components/shared/ModeTabs";
 import { MARGE_MODES, MARGE_MODE_LABELS } from "@/types";
 import type { AnalyseFilters, MargeMode } from "@/types";
 
 import { AnalyseKpis } from "./_components/AnalyseKpis";
 import { AnalyseTable } from "./_components/AnalyseTable";
-import { ListeUploadCard } from "./_components/ListeUploadCard";
+import { parseCsv } from "./_utils/parseListeCsv";
 import { useAnalysePage } from "./_hooks/useAnalysePage";
 
 
@@ -49,6 +51,54 @@ function buildActiveFilters(
 export default function AnalysePage() {
   const s = useAnalysePage();
 
+  // Liste import moved into the FilterBar (right of "Exporter Excel"). The hidden
+  // file input + a slim status line replace the old upload card.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [listeFile,  setListeFile]  = useState<string | null>(null);
+  const [listeCount, setListeCount] = useState<number>(0);
+  const [listeError, setListeError] = useState<string | null>(null);
+
+  function handleListeFile(file: File) {
+    setListeError(null);
+    setListeFile(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const items = parseCsv(String(reader.result ?? ""));
+        if (items.length === 0) {
+          setListeCount(0);
+          setListeError("Aucun produit détecté dans le fichier.");
+          return;
+        }
+        setListeCount(items.length);
+        s.submitListe(items);
+      } catch {
+        setListeCount(0);
+        setListeError("Impossible de lire le fichier CSV.");
+      }
+    };
+    reader.onerror = () => setListeError("Erreur de lecture du fichier.");
+    reader.readAsText(file);
+  }
+
+  const rightActions: RightAction[] = [
+    {
+      label:    "Exporter Excel",
+      icon:     <Download className="size-4" />,
+      variant:  "outline",
+      onClick:  s.handleExport,
+      disabled: s.rows.length === 0,
+    },
+    // Import lives here only in Liste mode — to the right of Exporter Excel.
+    ...(s.mode === "liste" ? [{
+      label:    s.isLoading ? "Analyse…" : "Importer une liste",
+      icon:     <Upload className="size-4" />,
+      variant:  "primary" as const,
+      onClick:  () => fileInputRef.current?.click(),
+      disabled: s.isLoading,
+    }] : []),
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
@@ -76,18 +126,40 @@ export default function AnalysePage() {
           suggestions: s.suggestions,
           onPick:      (label) => s.setSearch(label),
         }}
-        rightActions={[
-          {
-            label:    "Exporter Excel",
-            icon:     <Download className="size-4" />,
-            variant:  "outline",
-            onClick:  s.handleExport,
-            disabled: s.rows.length === 0,
-          },
-        ]}
+        rightActions={rightActions}
         activeFilters={buildActiveFilters(s.filters, s.setFilters)}
         onResetAll={s.clearAll}
       />
+
+      {/* Liste mode: hidden file input (triggered by the top-bar "Importer"
+          button) + a slim status line — replaces the old upload card. */}
+      {s.mode === "liste" && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleListeFile(f);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            {listeError ? (
+              <span className="font-semibold text-error">{listeError}</span>
+            ) : listeFile ? (
+              <>
+                <span className="font-medium text-foreground">{listeFile}</span>
+                {listeCount > 0 && <> · {listeCount} produits</>}
+              </>
+            ) : (
+              <>Importez un fichier <span className="font-semibold text-foreground">.csv</span> avec une colonne <span className="font-semibold text-foreground">Produit</span>. PID et codes-barres sont optionnels.</>
+            )}
+          </p>
+        </>
+      )}
 
       <ModeTabs<MargeMode>
         value={s.mode}
@@ -96,15 +168,6 @@ export default function AnalysePage() {
       />
 
       <AnalyseKpis kpis={s.kpis} isLoading={s.isLoading} />
-
-      {/* Liste mode: upload card on top. After submit, the table renders below. */}
-      {s.mode === "liste" && (
-        <ListeUploadCard
-          onSubmit={s.submitListe}
-          isLoading={s.isLoading}
-          submitted={s.listeSubmitted}
-        />
-      )}
 
       {/* Table: shows for all 8 modes (Liste shows it once items are submitted). */}
       {(s.mode !== "liste" || s.listeSubmitted) && (
