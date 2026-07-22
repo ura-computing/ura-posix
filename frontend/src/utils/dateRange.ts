@@ -68,8 +68,8 @@ export function previousYear(now: Date = new Date()): DateRange {
 
 
 export const DATE_PRESETS = [
-  { key: "current-month",    label: "Mois actuel",         get: currentMonth },
-  { key: "previous-month",   label: "Mois antérieur",      get: previousMonth },
-  { key: "previous-quarter", label: "Trimestre antérieur", get: previousQuarter },
-  { key: "previous-year",    label: "Année antérieure",    get: previousYear },
+  { key: "current-month",    label: "datePreset.currentMonth",         get: currentMonth },
+  { key: "previous-month",   label: "datePreset.previousMonth",      get: previousMonth },
+  { key: "previous-quarter", label: "datePreset.previousQuarter", get: previousQuarter },
+  { key: "previous-year",    label: "datePreset.previousYear",    get: previousYear },
 ] as const;

@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useT } from "@/i18n/I18nProvider";
 
 
 let _setOpen: ((open: boolean) => void) | null = null;
@@ -26,6 +27,7 @@ export function openSessionExpiredDialog(): void {
 
 
 export function SessionExpiredDialog() {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -40,11 +42,11 @@ export function SessionExpiredDialog() {
       open={open}
       onClose={() => setOpen(false)}
       onConfirm={() => window.location.reload()}
-      title="Session expirée"
-      description="Votre session a expiré. Veuillez actualiser la page pour vous reconnecter."
+      title={t("session.expiredTitle")}
+      description={t("session.expiredDesc")}
       variant="destructive"
-      confirmLabel="Actualiser"
-      cancelLabel="Plus tard"
+      confirmLabel={t("session.refresh")}
+      cancelLabel={t("session.later")}
     />
   );
 }

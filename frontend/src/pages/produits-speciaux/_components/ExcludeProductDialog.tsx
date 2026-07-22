@@ -1,4 +1,4 @@
-/** "Exclure des produits" multi-pick dialog. Friendly multi-select: type →
+/** "{t("ps.exclureProduits")}" multi-pick dialog. Friendly multi-select: type →
  *  pick one or more → optionally clear search and pick more → submit all in
  *  one shot. Picked items persist across query changes (key UX). */
 import { useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatQty } from "@/utils/format";
 import type { MedicamentSuggestion } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface ExcludeProductDialogProps {
@@ -27,6 +28,7 @@ export function ExcludeProductDialog({
   suggestions, suggestionsLoading,
   query, onQueryChange,
 }: ExcludeProductDialogProps) {
+  const t = useT();
   // Multi-pick state: keyed by med id so dedup is automatic. Persists across
   // query changes (owner can search "a", pick 2, clear, search "b", pick more).
   const [picked, setPicked] = useState<Map<number, MedicamentSuggestion>>(new Map());
@@ -58,11 +60,11 @@ export function ExcludeProductDialog({
         <div className="flex flex-col gap-4 p-5">
           <header>
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Exclure des produits
+              {t("ps.exclureProduits")}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Sélectionnez un ou plusieurs médicaments à exclure de vos rapports.
-              Réversible à tout moment.
+              {t("ps.prodDesc")}
+              
             </p>
           </header>
 
@@ -91,11 +93,11 @@ export function ExcludeProductDialog({
                   onClick={clearAll}
                   className="ml-1 inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
                 >
-                  Tout effacer
+                  {t("ps.toutEffacer")}
                 </button>
               )}
               <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-                {count} sélectionné{count > 1 ? "s" : ""}
+                {count} {t("ps.selectionne")}{count > 1 ? "s" : ""}
               </span>
             </div>
           )}
@@ -107,7 +109,7 @@ export function ExcludeProductDialog({
               autoFocus
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
-              placeholder="Nom (min 2 caractères)"
+              placeholder={t("ps.prodSearchPh")}
               className="block w-full rounded-md border border-input bg-surface-subtle py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
             />
           </div>
@@ -115,8 +117,8 @@ export function ExcludeProductDialog({
           <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
             {query.trim().length < 2 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
-                Tapez au moins 2 caractères pour rechercher.
-                {count > 0 && " Vos sélections sont conservées."}
+                {t("ps.prodMin2")}
+                {count > 0 && ` ${t("ps.selectionsConservees")}`}
               </p>
             ) : suggestionsLoading ? (
               <div className="flex items-center justify-center py-6">
@@ -125,8 +127,8 @@ export function ExcludeProductDialog({
             ) : visibleSuggestions.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
                 {suggestions.length === 0
-                  ? "Aucun produit trouvé. (Seuls vos produits avec ventes/achats sont listés.)"
-                  : "Tous les résultats sont déjà sélectionnés."}
+                  ? t("ps.aucunProduit")
+                  : t("ps.tousSelectionnes")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -154,7 +156,7 @@ export function ExcludeProductDialog({
                         </div>
                       </div>
                       <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
-                        {formatQty(s.nb_ventes)} ventes
+                        {formatQty(s.nb_ventes)} {t("ps.ventesWord")}
                       </span>
                     </button>
                   </li>
@@ -166,24 +168,24 @@ export function ExcludeProductDialog({
           <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
             <span className="text-xs text-muted-foreground">
               {count === 0
-                ? "Cliquez sur un produit pour le sélectionner."
+                ? t("ps.clickToSelect")
                 : count === 1
                 ? "1 produit sélectionné."
-                : `${count} produits sélectionnés.`}
+                : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">
               <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
-                Annuler
+                {t("common.cancel")}
               </AsyncButton>
               <AsyncButton
                 type="button"
                 variant="primary"
                 disabled={!canSubmit}
                 isLoading={isLoading}
-                loadingText="Exclusion…"
+                loadingText={t("ps.excluding")}
                 onClick={() => onSubmit([...picked.keys()])}
               >
-                {count > 0 ? `Exclure (${count})` : "Exclure"}
+                {count > 0 ? `${t("ps.exclureProduits")} (${count})` : t("common.delete")}
               </AsyncButton>
             </div>
           </footer>

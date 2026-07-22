@@ -8,6 +8,7 @@
  *  buttons that pick up the option's `activeBg` class when selected.
  */
 import { cn } from "@/utils/cn";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface SegmentOption<V extends string> {
@@ -62,8 +63,18 @@ export function CategorySegment<V extends string>({
 /** Standard 3-option set for "Catégorie" filter — Mixte / Pharmacie / Parapharmacie.
  *  Locked palette: primary teal for Mixte, indigo for Pharmacie, orange for
  *  Parapharmacie (matches the tokens.css category trio). */
-export const CATEGORY_TYPE_OPTIONS: SegmentOption<"all" | "pharmacie" | "parapharmacie">[] = [
-  { value: "all",           label: "Mixte",         activeBg: "bg-primary text-primary-foreground shadow-sm" },
-  { value: "pharmacie",     label: "Pharmacie",     activeBg: "bg-pharmacie-bg text-pharmacie-fg border border-pharmacie-border" },
-  { value: "parapharmacie", label: "Parapharmacie", activeBg: "bg-parapharmacie-bg text-parapharmacie-fg border border-parapharmacie-border" },
-];
+const CATEGORY_TYPE_STYLES = {
+  all:           "bg-primary text-primary-foreground shadow-sm",
+  pharmacie:     "bg-pharmacie-bg text-pharmacie-fg border border-pharmacie-border",
+  parapharmacie: "bg-parapharmacie-bg text-parapharmacie-fg border border-parapharmacie-border",
+} as const;
+
+/** Translated Mixte / Pharmacie / Parapharmacie options for the category filter. */
+export function useCategoryTypeOptions(): SegmentOption<"all" | "pharmacie" | "parapharmacie">[] {
+  const t = useT();
+  return [
+    { value: "all",           label: t("category.mixte"),         activeBg: CATEGORY_TYPE_STYLES.all },
+    { value: "pharmacie",     label: t("category.pharmacie"),     activeBg: CATEGORY_TYPE_STYLES.pharmacie },
+    { value: "parapharmacie", label: t("category.parapharmacie"), activeBg: CATEGORY_TYPE_STYLES.parapharmacie },
+  ];
+}

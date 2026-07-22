@@ -34,16 +34,17 @@ export interface FeatureDef {
 }
 
 
+// label/description hold i18n KEYS (adminFeat.*) — translate at render with t().
 export const FEATURES: FeatureDef[] = [
-  { key: "rapports",         label: "Rapports",           description: "Tableau de bord : KPIs, marges, alertes",                       icon: LayoutDashboard },
-  { key: "import",           label: "Import",             description: "Importer les CSV Sobrus (achats, ventes, stock)",               icon: Upload },
-  { key: "achats",           label: "Achats",             description: "Consulter le journal des achats fournisseurs",                  icon: ShoppingCart },
-  { key: "ventes",           label: "Ventes",             description: "Consulter le journal des ventes",                               icon: TrendingUp },
-  { key: "stock",            label: "Stock",              description: "État du stock, classification ABCD, péremptions",               icon: Boxes },
-  { key: "analyse",          label: "Analyse",            description: "Analyses de marge avancées",                                    icon: LineChart },
-  { key: "accounting",       label: "Comptabilité",       description: "Paiements (TPE/Espèces/Chèques/Virement) + KPIs comptables",   icon: Wallet },
-  { key: "alertes",          label: "Alertes",            description: "Alertes de marge + notifications",                              icon: Bell },
-  { key: "special_products", label: "Produits spéciaux",  description: "Exclure des produits du calcul des marges",                     icon: Star },
+  { key: "rapports",         label: "adminFeat.rapports",   description: "adminFeat.rapportsD",   icon: LayoutDashboard },
+  { key: "import",           label: "adminFeat.import",     description: "adminFeat.importD",     icon: Upload },
+  { key: "achats",           label: "adminFeat.achats",     description: "adminFeat.achatsD",     icon: ShoppingCart },
+  { key: "ventes",           label: "adminFeat.ventes",     description: "adminFeat.ventesD",     icon: TrendingUp },
+  { key: "stock",            label: "adminFeat.stock",      description: "adminFeat.stockD",      icon: Boxes },
+  { key: "analyse",          label: "adminFeat.analyse",    description: "adminFeat.analyseD",    icon: LineChart },
+  { key: "accounting",       label: "adminFeat.accounting", description: "adminFeat.accountingD", icon: Wallet },
+  { key: "alertes",          label: "adminFeat.alertes",    description: "adminFeat.alertesD",    icon: Bell },
+  { key: "special_products", label: "adminFeat.special",    description: "adminFeat.specialD",    icon: Star },
 ];
 
 
@@ -52,5 +53,6 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = Object.fromEntries(
 ) as Record<FeatureKey, string>;
 
 
-export const ROLE_LABEL = { owner: "Propriétaire", employee: "Employé" } as const;
-export const STATUS_LABEL = { active: "Actif", inactive: "Inactif" } as const;
+// Values are i18n KEYS — translate at render with t().
+export const ROLE_LABEL = { owner: "adminFeat.roleOwner", employee: "adminFeat.roleEmployee" } as const;
+export const STATUS_LABEL = { active: "adminFeat.statusActive", inactive: "adminFeat.statusInactive" } as const;

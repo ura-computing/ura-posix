@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { RefreshCw, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
@@ -39,6 +40,7 @@ const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analys
 
 
 export default function OwnerEmployeesPage() {
+  const t = useT();
   const { me } = useMe();
 
   const [createOpen,     setCreateOpen]     = useState(false);
@@ -55,7 +57,7 @@ export default function OwnerEmployeesPage() {
   if (q.isLoading || !q.data) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 py-10 text-center text-sm text-muted-foreground">
-        Chargement…
+        {t("common.loading")}
       </div>
     );
   }
@@ -75,10 +77,7 @@ export default function OwnerEmployeesPage() {
 
   const handleResetPassword = async (employeeId: number) => {
     const result = await resetPwdMut.mutateAsync(employeeId);
-    window.alert(
-      `Nouveau mot de passe : ${result.temp_password}\n\n` +
-      "Transmettez-le à l'employé ; il devra le changer à la première connexion.",
-    );
+    window.alert(t("employees.newPasswordAlert", { pwd: result.temp_password }));
   };
 
   const handleToggleStatus = async (employee: MemberOut) => {
@@ -92,23 +91,23 @@ export default function OwnerEmployeesPage() {
     setRemoveTarget(null);
   };
 
-  const pharmacyName = me?.pharmacy?.name ?? "votre pharmacie";
+  const pharmacyName = me?.pharmacy?.name ?? t("employees.yourPharmacy");
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4 pb-30">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Gérer mon équipe</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("employees.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Créez des comptes employés et choisissez les fonctionnalités qu'ils peuvent utiliser.
+          {t("employees.subtitle")}
         </p>
       </header>
 
       {/* Section A — pharmacy features summary (read-only) */}
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="text-base font-semibold text-foreground">Fonctionnalités de votre pharmacie</h2>
+          <h2 className="text-base font-semibold text-foreground">{t("employees.featuresTitle")}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Vous ne pouvez accorder à vos employés que les fonctionnalités que la pharmacie et vous-même avez activées.
+            {t("employees.featuresDesc")}
           </p>
         </div>
         <div className="grid grid-cols-1 gap-2.5 p-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -121,9 +120,9 @@ export default function OwnerEmployeesPage() {
             // Three visual states: active (you can grant), locked-by-you (pharmacy ok, you don't have it),
             // locked-by-pharmacy (admin hasn't enabled it for this pharmacy).
             const stateTone  = !phEnabled ? "muted" : !ownerEnabled ? "warning" : "ok";
-            const stateLabel = !phEnabled ? "Désactivée pour la pharmacie"
-                              : !ownerEnabled ? "Non accordée à vous"
-                              : "Disponible";
+            const stateLabel = !phEnabled ? t("employees.disabledForPharmacy")
+                              : !ownerEnabled ? t("employees.notGrantedToYou")
+                              : t("employees.available");
 
             return (
               <div
@@ -143,7 +142,7 @@ export default function OwnerEmployeesPage() {
                   <Icon className="size-4" />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm font-semibold text-foreground">{f.label}</span>
+                  <span className="text-sm font-semibold text-foreground">{t(f.label)}</span>
                   <span className="text-[11.5px] leading-snug text-muted-foreground">{stateLabel}</span>
                 </div>
               </div>
@@ -156,12 +155,12 @@ export default function OwnerEmployeesPage() {
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex flex-col gap-0.5">
-            <h2 className="text-base font-semibold text-foreground">Employés</h2>
-            <p className="text-sm text-muted-foreground">Comptes employés rattachés à votre pharmacie.</p>
+            <h2 className="text-base font-semibold text-foreground">{t("employees.employees")}</h2>
+            <p className="text-sm text-muted-foreground">{t("employees.employeesDesc")}</p>
           </div>
           <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
             <UserPlus className="size-4" />
-            Inviter un employé
+            {t("employees.invite")}
           </AsyncButton>
         </div>
 
@@ -171,18 +170,18 @@ export default function OwnerEmployeesPage() {
               <Users className="size-5" />
             </span>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Aucun employé. Cliquez sur « Inviter un employé » pour créer un compte.
+              {t("employees.empty")}
             </p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-subtle text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">Nom</th>
-                <th className="px-3 py-2.5">Rôle</th>
-                <th className="px-3 py-2.5">Statut</th>
-                <th className="px-3 py-2.5">Permissions accordées</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
+                <th className="px-3 py-2.5">{t("employees.colName")}</th>
+                <th className="px-3 py-2.5">{t("employees.colRole")}</th>
+                <th className="px-3 py-2.5">{t("employees.colStatus")}</th>
+                <th className="px-3 py-2.5">{t("employees.colPerms")}</th>
+                <th className="px-3 py-2.5 text-right">{t("employees.colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -200,11 +199,11 @@ export default function OwnerEmployeesPage() {
                     </div>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{ROLE_LABEL[m.role]}</span>
+                    <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{t(ROLE_LABEL[m.role])}</span>
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={cn(PILL_BASE, m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground")}>
-                      {STATUS_LABEL[m.status]}
+                      {t(STATUS_LABEL[m.status])}
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
@@ -218,7 +217,7 @@ export default function OwnerEmployeesPage() {
                         className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
                       >
                         <SlidersHorizontal className="size-3.5" />
-                        Gérer les permissions
+                        {t("employees.managePerms")}
                       </button>
                       <EmployeeKebab
                         employee={m}
@@ -249,14 +248,10 @@ export default function OwnerEmployeesPage() {
         open={permDialogUser !== null}
         onClose={() => setPermDialogUser(null)}
         user={permDialogUser}
-        contextStrip={
-          <>
-            Une permission n'est effective que si la pharmacie ET vous-même l'avez activée pour vous.
-          </>
-        }
+        contextStrip={t("employees.permContext")}
         ceilings={[
-          { label: "Pharmacie", values: pharmFeats },
-          { label: "Vous",      values: myPerms    },
+          { label: t("employees.ceilingPharmacy"), values: pharmFeats },
+          { label: t("employees.ceilingYou"),      values: myPerms    },
         ]}
         serverPermissions={memberPermsToRecord(permDialogUser)}
         isSaving={permsMut.isPending}
@@ -266,8 +261,8 @@ export default function OwnerEmployeesPage() {
       <ConfirmDialog
         open={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
-        title={`Supprimer définitivement ${removeTarget?.full_name ?? removeTarget?.email ?? "cet employé"} ?`}
-        description={`Cette action est irréversible. Le compte sera retiré de ${pharmacyName} et perdra immédiatement l'accès.`}
+        title={t("employees.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("employees.thisEmployee") })}
+        description={t("employees.removeDesc", { pharmacy: pharmacyName })}
         onConfirm={handleConfirmRemove}
       />
     </div>
@@ -297,7 +292,8 @@ function EmployeeKebab({
   onToggleStatus:  () => void;
   onRemove:        () => void;
 }) {
-  const toggleLabel = employee.status === "active" ? "Désactiver" : "Réactiver";
+  const t = useT();
+  const toggleLabel = employee.status === "active" ? t("employees.deactivate") : t("employees.reactivate");
   return (
     <KebabMenu>
       {(close) => (
@@ -308,7 +304,7 @@ function EmployeeKebab({
             className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
           >
             <RefreshCw className="size-3.5" />
-            Réinitialiser le mot de passe
+            {t("employees.resetPassword")}
           </button>
           <button
             type="button"
@@ -323,7 +319,7 @@ function EmployeeKebab({
             className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
           >
             <Trash2 className="size-3.5" />
-            Supprimer
+            {t("employees.delete")}
           </button>
         </>
       )}

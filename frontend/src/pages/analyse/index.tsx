@@ -9,10 +9,11 @@
 import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 
-import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
+import { useCategoryTypeOptions } from "@/components/shared/CategorySegment";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 import { FilterBar, type ActiveFilter, type RightAction } from "@/components/shared/filterBar";
 import { ModeTabs } from "@/components/shared/ModeTabs";
-import { MARGE_MODES, MARGE_MODE_LABELS } from "@/types";
+import { MARGE_MODES } from "@/types";
 import type { AnalyseFilters, MargeMode } from "@/types";
 
 import { AnalyseKpis } from "./_components/AnalyseKpis";
@@ -21,27 +22,28 @@ import { parseCsv } from "./_utils/parseListeCsv";
 import { useAnalysePage } from "./_hooks/useAnalysePage";
 
 
-const MODE_OPTIONS = MARGE_MODES.map((value) => ({ value, label: MARGE_MODE_LABELS[value] }));
 
 
-const CATEGORY_LABEL: Record<string, string> = {
-  all: "Mixte", pharmacie: "Pharmacie", parapharmacie: "Parapharmacie",
+
+const CATEGORY_KEY: Record<string, string> = {
+  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
 };
 
 
 function buildActiveFilters(
   filters: AnalyseFilters,
   setFilters: (f: AnalyseFilters) => void,
+  t: TFn,
 ): ActiveFilter[] {
   return [
     (filters.date_from || filters.date_to) && {
       key: "dates",
-      label: <>Période : {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
+      label: <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
       onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
     },
     filters.category_type !== "all" && {
       key: "category",
-      label: <>Catégorie : {CATEGORY_LABEL[filters.category_type]}</>,
+      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
       onClear: () => setFilters({ ...filters, category_type: "all" }),
     },
   ].filter(Boolean) as ActiveFilter[];
@@ -49,7 +51,10 @@ function buildActiveFilters(
 
 
 export default function AnalysePage() {
+  const t = useT();
   const s = useAnalysePage();
+  const categoryTypeOptions = useCategoryTypeOptions();
+  const MODE_OPTIONS = MARGE_MODES.map((value) => ({ value, label: t(`mode.${value}`) }));
 
   // Liste import moved into the FilterBar (right of "Exporter Excel"). The hidden
   // file input + a slim status line replace the old upload card.
@@ -67,23 +72,23 @@ export default function AnalysePage() {
         const items = parseCsv(String(reader.result ?? ""));
         if (items.length === 0) {
           setListeCount(0);
-          setListeError("Aucun produit détecté dans le fichier.");
+          setListeError(t("analyse.noProductDetected"));
           return;
         }
         setListeCount(items.length);
         s.submitListe(items);
       } catch {
         setListeCount(0);
-        setListeError("Impossible de lire le fichier CSV.");
+        setListeError(t("analyse.csvReadError"));
       }
     };
-    reader.onerror = () => setListeError("Erreur de lecture du fichier.");
+    reader.onerror = () => setListeError(t("analyse.fileReadError"));
     reader.readAsText(file);
   }
 
   const rightActions: RightAction[] = [
     {
-      label:    "Exporter Excel",
+      label:    t("common.export"),
       icon:     <Download className="size-4" />,
       variant:  "outline",
       onClick:  s.handleExport,
@@ -91,7 +96,7 @@ export default function AnalysePage() {
     },
     // Import lives here only in Liste mode — to the right of Exporter Excel.
     ...(s.mode === "liste" ? [{
-      label:    s.isLoading ? "Analyse…" : "Importer une liste",
+      label:    s.isLoading ? t("analyse.analyseLoading") : t("analyse.importListe"),
       icon:     <Upload className="size-4" />,
       variant:  "primary" as const,
       onClick:  () => fileInputRef.current?.click(),
@@ -102,9 +107,9 @@ export default function AnalysePage() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Analyse de marge</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("analyse.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          8 axes d'analyse — produit, catégorie, laboratoire, grossiste, client, mois, année, liste personnalisée.
+          {t("analyse.subtitle")}
         </p>
       </header>
 
@@ -117,17 +122,17 @@ export default function AnalysePage() {
         segment={{
           value:    s.filters.category_type,
           onChange: (v) => s.setFilters({ ...s.filters, category_type: v }),
-          options:  CATEGORY_TYPE_OPTIONS,
+          options:  categoryTypeOptions,
         }}
         search={{
           value:       s.search,
           onChange:    s.setSearch,
-          placeholder: "Rechercher dans les résultats…",
+          placeholder: t("analyse.searchPh"),
           suggestions: s.suggestions,
           onPick:      (label) => s.setSearch(label),
         }}
         rightActions={rightActions}
-        activeFilters={buildActiveFilters(s.filters, s.setFilters)}
+        activeFilters={buildActiveFilters(s.filters, s.setFilters, t)}
         onResetAll={s.clearAll}
       />
 
@@ -152,10 +157,10 @@ export default function AnalysePage() {
             ) : listeFile ? (
               <>
                 <span className="font-medium text-foreground">{listeFile}</span>
-                {listeCount > 0 && <> · {listeCount} produits</>}
+                {listeCount > 0 && <> · {listeCount} {t("stock.produitsWord")}</>}
               </>
             ) : (
-              <>Importez un fichier <span className="font-semibold text-foreground">.csv</span> avec une colonne <span className="font-semibold text-foreground">Produit</span>. PID et codes-barres sont optionnels.</>
+              t("analyse.listeHint")
             )}
           </p>
         </>
@@ -185,10 +190,10 @@ export default function AnalysePage() {
       {s.error && (
         <div className="rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-sm text-error">
           {/* Surface the API detail when available — a bare "réessayez" hid real causes (e.g. 422). */}
-          Impossible de charger l'analyse.{" "}
+          {t("analyse.loadError")}{" "}
           {s.error instanceof Error && s.error.message
             ? s.error.message
-            : "Réessayez plus tard."}
+            : t("analyse.retryLater")}
         </div>
       )}
     </div>

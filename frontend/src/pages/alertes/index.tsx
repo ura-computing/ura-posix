@@ -1,7 +1,7 @@
 // src/pages/alertes/index.tsx
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 
-import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
+import { useCategoryTypeOptions } from "@/components/shared/CategorySegment";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 
 import { AlertDetailDialog } from "./_components/AlertDetailDialog";
@@ -11,25 +11,28 @@ import { PeremptionsSection } from "./_components/PeremptionsSection";
 import { StockAlertsSection } from "./_components/StockAlertsSection";
 import { VentesSansAchatSection } from "./_components/VentesSansAchatSection";
 import { useAlertesPage, type CategoryType } from "./_hooks/useAlertesPage";
+import { useT } from "@/i18n/I18nProvider";
 
 
-const CATEGORY_LABEL: Record<CategoryType, string> = {
-  all: "Mixte", pharmacie: "Pharmacie", parapharmacie: "Parapharmacie",
+const CATEGORY_KEY: Record<CategoryType, string> = {
+  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
 };
 
 
 export default function AlertesPage() {
+  const t = useT();
   const a = useAlertesPage();
+  const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
     (a.dateFrom || a.dateTo) ? {
       key:    "dates",
-      label:  <>Période : {a.dateFrom || "…"} → {a.dateTo || "…"}</>,
+      label:  <>{t("dashboard.periode")} {a.dateFrom || "…"} → {a.dateTo || "…"}</>,
       onClear: () => { a.setDateFrom(""); a.setDateTo(""); },
     } : null,
     a.category !== "all" ? {
       key:    "cat",
-      label:  <>Catégorie : {CATEGORY_LABEL[a.category]}</>,
+      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[a.category])}</>,
       onClear: () => a.setCategory("all"),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -37,9 +40,9 @@ export default function AlertesPage() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Alertes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.alertes")}</h1>
         <p className="text-sm text-muted-foreground">
-          Centralisation des problèmes détectés dans votre pharmacie.
+          {t("alertes.subtitle")}
         </p>
       </header>
 
@@ -52,7 +55,7 @@ export default function AlertesPage() {
         segment={{
           value:    a.category,
           onChange: a.setCategory,
-          options:  CATEGORY_TYPE_OPTIONS,
+          options:  categoryTypeOptions,
         }}
         activeFilters={activeFilters}
         onResetAll={a.resetAll}
@@ -62,14 +65,14 @@ export default function AlertesPage() {
         <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
           <span className="flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="size-4" />
-            Impossible de charger les alertes.
+            {t("alertes.loadError")}
           </span>
           <button
             type="button"
             onClick={a.refetchAll}
             className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
           >
-            Réessayer
+            {t("common.retry")}
           </button>
         </div>
       ) : a.isLoading ? (
@@ -80,8 +83,8 @@ export default function AlertesPage() {
             <CheckCircle2 className="size-7" />
           </span>
           <div className="flex flex-col gap-1">
-            <h2 className="text-[17px] font-semibold text-foreground">Aucune alerte</h2>
-            <p className="text-sm text-muted-foreground">Tout va bien pour cette période.</p>
+            <h2 className="text-[17px] font-semibold text-foreground">{t("alertes.empty")}</h2>
+            <p className="text-sm text-muted-foreground">{t("alertes.emptySub")}</p>
           </div>
         </div>
       ) : (

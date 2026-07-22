@@ -8,6 +8,7 @@ import { Check, Minus } from "lucide-react";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { SuffixBadge } from "@/components/shared/SuffixBadge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useT } from "@/i18n/I18nProvider";
 import { SUFFIX_COLORS } from "@/types";
 import type { CategorySuffixIn, CategorySuffixOut, SuffixColor } from "@/types";
 
@@ -41,6 +42,7 @@ export interface CategorySuffixDialogProps {
 
 
 export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: CategorySuffixDialogProps) {
+  const t = useT();
   const [values, setValues] = useState<CategorySuffixIn>({
     category: item?.category ?? "",
     suffix:   item?.suffix ?? "",
@@ -62,7 +64,7 @@ export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }
     setValues((p) => ({ ...p, [k]: v }));
 
   const previewSuffix = values.suffix || "-?";
-  const previewCategory = values.category ? normalizeCategory(values.category) : "catégorie";
+  const previewCategory = values.category ? normalizeCategory(values.category) : t("categories.previewCategoryFallback");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,29 +76,29 @@ export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
         <div className="border-b border-border px-5 py-4">
           <h3 className="text-[17px] font-semibold text-foreground">
-            {item ? "Modifier le mapping" : "Nouveau mapping"}
+            {item ? t("categories.editMapping") : t("categories.newMapping")}
           </h3>
         </div>
 
         {/* Live preview */}
         <div className="flex items-center gap-3 border-b border-border bg-surface-subtle px-5 py-3.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aperçu</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("categories.preview")}</span>
           <SuffixBadge text={previewSuffix} color={values.color ?? "teal"} />
           <span className="ml-auto font-mono text-xs text-muted-foreground">{previewCategory}</span>
         </div>
 
         <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-          <Field label="Catégorie" required>
+          <Field label={t("col.categorie")} required>
             <Input
               value={values.category}
               onChange={(v) => set("category", v)}
-              placeholder="Médicament"
+              placeholder={t("categories.categoryPlaceholderEx")}
               required
               autoFocus
             />
           </Field>
 
-          <Field label="Suffixe" required hint="Ajouté à la fin de la référence transaction (ex: T-2024-0001-1)">
+          <Field label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
             <Input
               value={values.suffix}
               onChange={(v) => set("suffix", v)}
@@ -107,7 +109,7 @@ export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }
             />
           </Field>
 
-          <Field label="Couleur">
+          <Field label={t("categories.color")}>
             <div className="flex flex-wrap items-center gap-2">
               {SUFFIX_COLORS.map((c) => {
                 const selected = values.color === c;
@@ -129,7 +131,7 @@ export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }
               })}
               <button
                 type="button"
-                aria-label="Aucune"
+                aria-label={t("categories.colorNone")}
                 onClick={() => set("color", null)}
                 className="flex size-7 cursor-pointer items-center justify-center rounded-md border-2 bg-surface-subtle transition-transform hover:scale-110"
                 style={{ borderColor: values.color === null ? "var(--foreground)" : "transparent" }}
@@ -141,10 +143,10 @@ export function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
             <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
-              Annuler
+              {t("common.cancel")}
             </AsyncButton>
-            <AsyncButton type="submit" variant="primary" isLoading={isSaving} loadingText="Enregistrement…">
-              Enregistrer
+            <AsyncButton type="submit" variant="primary" isLoading={isSaving} loadingText={t("categories.saving")}>
+              {t("common.save")}
             </AsyncButton>
           </div>
         </form>

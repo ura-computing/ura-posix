@@ -9,6 +9,7 @@
 import { Building2, ChevronDown } from "lucide-react";
 
 import type { AdminPharmacyRow } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface PharmacyPickerProps {
@@ -19,10 +20,11 @@ export interface PharmacyPickerProps {
 
 
 export function PharmacyPicker({ pharmacies, selected, onChange }: PharmacyPickerProps) {
+  const t = useT();
   return (
     <label className="group relative inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm text-foreground transition-shadow hover:shadow-sm focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
       <Building2 className="size-4 text-muted-foreground" aria-hidden />
-      <span className="text-xs font-semibold text-muted-foreground">Pharmacie</span>
+      <span className="text-xs font-semibold text-muted-foreground">{t("shared.pharmacy")}</span>
       {selected ? (
         <>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
@@ -31,16 +33,16 @@ export function PharmacyPicker({ pharmacies, selected, onChange }: PharmacyPicke
           <span className="max-w-[160px] truncate text-sm font-medium">{selected.name}</span>
         </>
       ) : (
-        <span className="text-sm text-muted-foreground">Sélectionnez…</span>
+        <span className="text-sm text-muted-foreground">{t("shared.selectPlaceholder")}</span>
       )}
       <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
       <select
-        aria-label="Sélectionner une pharmacie"
+        aria-label={t("shared.selectPharmacy")}
         value={selected?.id ?? ""}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
         className="absolute inset-0 cursor-pointer opacity-0"
       >
-        <option value="">Sélectionnez…</option>
+        <option value="">{t("shared.selectPlaceholder")}</option>
         {pharmacies.map((p) => (
           <option key={p.id} value={p.id}>{p.code} · {p.name}</option>
         ))}

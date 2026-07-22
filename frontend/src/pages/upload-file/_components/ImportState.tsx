@@ -2,6 +2,7 @@ import { AlertCircle, Ban, CheckCircle2, Clock, Info, Loader2, RotateCcw, X } fr
 
 import { formatNumStr, formatQty } from "@/utils/format";
 import type { DocType, UploadStockResult } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 import type { UploadPhase, UploadProgress } from "@/contexts/UploadContext";
 
@@ -39,6 +40,7 @@ export function ImportState({
 
 
 function Queued({ docType, filename, onCancel }: { docType: DocType; filename: string; onCancel: () => void }) {
+  const t = useT();
   return (
     <div
       className="flex flex-col gap-3 rounded-2xl border p-5"
@@ -47,7 +49,7 @@ function Queued({ docType, filename, onCancel }: { docType: DocType; filename: s
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Clock className="size-4" style={{ color: `var(--color-doc-${docType})` }} />
-          En attente d'importation
+          {t("uploadFile.queuedTitle")}
         </h3>
         <button
           type="button"
@@ -55,11 +57,11 @@ function Queued({ docType, filename, onCancel }: { docType: DocType; filename: s
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-destructive/30 bg-card px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/5"
         >
           <X className="size-3.5" />
-          Retirer de la file
+          {t("uploadFile.removeFromQueue")}
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Démarrera automatiquement après les imports en cours.
+        {t("uploadFile.queuedHint")}
       </p>
       {filename && (
         <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
@@ -72,6 +74,7 @@ function Queued({ docType, filename, onCancel }: { docType: DocType; filename: s
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Uploading({ docType, progress, onCancel }: { docType: DocType; progress: UploadProgress; onCancel: () => void }) {
+  const t = useT();
   const ring = `var(--color-doc-${docType})`;
   const pct  = progress.total ? Math.round((progress.current / progress.total) * 100) : 0;
   return (
@@ -82,10 +85,10 @@ function Uploading({ docType, progress, onCancel }: { docType: DocType; progress
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Loader2 className="size-4 animate-spin" style={{ color: ring }} />
-          Importation en cours…
+          {t("uploadFile.uploading")}
         </h3>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          Lot {progress.current} / {progress.total}
+          {t("uploadFile.lot")} {progress.current} / {progress.total}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
@@ -95,14 +98,14 @@ function Uploading({ docType, progress, onCancel }: { docType: DocType; progress
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{pct} % complété — {formatQty(progress.inserted)} insérées, {formatQty(progress.skipped)} ignorées</span>
+        <span>{pct} % {t("uploadFile.completed")} — {formatQty(progress.inserted)} {t("uploadFile.inserted")}, {formatQty(progress.skipped)} {t("uploadFile.ignored")}</span>
         <button
           type="button"
           onClick={onCancel}
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-destructive/30 bg-card px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/5"
         >
           <Ban className="size-3.5" />
-          Annuler l'import
+          {t("uploadFile.cancelImport")}
         </button>
       </div>
     </div>
@@ -113,6 +116,7 @@ function Uploading({ docType, progress, onCancel }: { docType: DocType; progress
 function Success({
   docType, progress, filename, stockResult, onReset,
 }: { docType: DocType; progress: UploadProgress; filename: string; stockResult: UploadStockResult | null; onReset: () => void }) {
+  const t = useT();
   const ring = `var(--color-doc-${docType})`;
   const newMeds = progress.new_medicaments;
 
@@ -122,16 +126,16 @@ function Success({
   // list items, and interpolating JSX into a template literal yields "[object Object]".
   const skipReasons: string[] = stockResult
     ? (stockResult.skipped_unknown.length > 0
-        ? [`${formatNumStr(stockResult.skipped_unknown.length)} PID inconnus ignorés`]
+        ? [t("uploadFile.skipUnknownPid", { n: formatNumStr(stockResult.skipped_unknown.length) })]
         : [])
     : [
-        ...(progress.skipped_duplicate     ? [`${formatNumStr(progress.skipped_duplicate)} doublon(s) ignoré(s)`]            : []),
-        ...(progress.skipped_no_pid        ? [`${formatNumStr(progress.skipped_no_pid)} ligne(s) sans PID`]                  : []),
-        ...(progress.skipped_no_medicament ? [`${formatNumStr(progress.skipped_no_medicament)} médicament(s) introuvable(s)`] : []),
+        ...(progress.skipped_duplicate     ? [t("uploadFile.skipDuplicate", { n: formatNumStr(progress.skipped_duplicate) })]            : []),
+        ...(progress.skipped_no_pid        ? [t("uploadFile.skipNoPid", { n: formatNumStr(progress.skipped_no_pid) })]                  : []),
+        ...(progress.skipped_no_medicament ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })] : []),
       ];
   // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
   if (skipReasons.length === 0 && progress.skipped > 0) {
-    skipReasons.push(`${formatNumStr(progress.skipped)} ligne(s) ignorée(s)`);
+    skipReasons.push(t("uploadFile.skipGeneric", { n: formatNumStr(progress.skipped) }));
   }
 
   return (
@@ -143,7 +147,7 @@ function Success({
         <CheckCircle2 className="size-7" aria-hidden />
       </div>
       <h3 className="text-xl font-semibold text-foreground">
-        {formatQty(progress.inserted)} lignes importées
+        {formatQty(progress.inserted)} {t("uploadFile.linesImported")}
       </h3>
       {skipReasons.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground">
@@ -154,14 +158,14 @@ function Success({
         <div className="mt-1 flex w-full max-w-md flex-col gap-1.5 rounded-md border border-info-border bg-info-subtle px-4 py-3 text-left">
           <div className="flex items-center gap-2 text-sm font-semibold text-info">
             <Info className="size-4" aria-hidden />
-            {formatQty(newMeds.count)} nouveau{newMeds.count > 1 ? "x" : ""} produit{newMeds.count > 1 ? "s" : ""} détecté{newMeds.count > 1 ? "s" : ""}
+            {formatQty(newMeds.count)} {newMeds.count > 1 ? t("uploadFile.newProductPlural") : t("uploadFile.newProductSingular")}
           </div>
           <p className="text-xs text-info-subtle-foreground">
             {newMeds.sample.slice(0, 3).join(" · ")}
-            {newMeds.count > 3 && ` · +${newMeds.count - 3} autre${newMeds.count - 3 > 1 ? "s" : ""}`}
+            {newMeds.count > 3 && ` · +${newMeds.count - 3} ${newMeds.count - 3 > 1 ? t("uploadFile.others") : t("uploadFile.other")}`}
           </p>
           <p className="text-xs text-info-subtle-foreground">
-            Ces produits sont absents du catalogue. L'administrateur sera notifié pour les classer (Pharmacie / Parapharmacie).
+            {t("uploadFile.newProductsNote")}
           </p>
         </div>
       )}
@@ -174,7 +178,7 @@ function Success({
         className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-subtle"
       >
         <RotateCcw className="size-4" />
-        Nouvel import
+        {t("uploadFile.newImport")}
       </button>
     </div>
   );
@@ -182,17 +186,18 @@ function Success({
 
 
 function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: () => void }) {
+  const t = useT();
   const had = progress.inserted > 0;
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-subtle p-5">
       <div className="flex items-start gap-3">
         <Ban className="size-5 text-warning" aria-hidden />
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-warning">Import annulé</h3>
+          <h3 className="text-sm font-semibold text-warning">{t("uploadFile.cancelledTitle")}</h3>
           <p className="mt-0.5 text-xs text-warning-subtle-foreground">
             {had
-              ? <>{formatQty(progress.inserted)} lignes avaient été importées — elles ont été supprimées.</>
-              : "Aucune ligne n'a été importée."}
+              ? <>{formatQty(progress.inserted)} {t("uploadFile.cancelledHad")}</>
+              : t("uploadFile.cancelledNone")}
           </p>
         </div>
       </div>
@@ -202,7 +207,7 @@ function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: (
         className="inline-flex cursor-pointer items-center gap-2 self-start rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-subtle"
       >
         <RotateCcw className="size-3.5" />
-        Recommencer
+        {t("uploadFile.restart")}
       </button>
     </div>
   );
@@ -210,19 +215,20 @@ function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: (
 
 
 function Errored({ error, onDismiss }: { error: string | null; onDismiss: () => void }) {
+  const t = useT();
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-error-border bg-error-subtle p-5">
       <AlertCircle className="size-5 text-error" aria-hidden />
       <div className="flex-1">
-        <h3 className="text-sm font-semibold text-error">Erreur d'importation</h3>
+        <h3 className="text-sm font-semibold text-error">{t("uploadFile.errorTitle")}</h3>
         <p className="mt-0.5 text-xs text-error-subtle-foreground">
-          {error ?? "Une erreur inconnue est survenue."}
+          {error ?? t("uploadFile.unknownError")}
         </p>
       </div>
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Fermer"
+        aria-label={t("common.close")}
         className="cursor-pointer text-error-subtle-foreground/70 hover:text-error-subtle-foreground"
       >
         <X className="size-4" />

@@ -1,4 +1,5 @@
 import { Coins, Percent, TrendingUp, UploadCloud } from "lucide-react";
+import { useT } from "@/i18n/I18nProvider";
 import { Link } from "react-router-dom";
 
 import { formatMAD } from "@/utils/format";
@@ -20,6 +21,7 @@ import { useCategoryTint } from "../_hooks/useCategoryTint";
  */
 
 export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
+  const t = useT();
   const ca       = stats.kpis.ventes_total;
   const margePct = stats.marge.marge_pct;
   // Single source of truth: the backend reconciles marge_brute_dh to the full CA
@@ -29,13 +31,13 @@ export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsRespo
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Analyse de marge
+        {t("preview.sectionTitle")}
       </h2>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile label="Chiffre d'affaires" value={formatMAD(ca)}                icon={<Coins      className="size-5" />} tint={tint} />
-        <KpiTile label="Marge moyenne (%)"  value={`${margePct.toFixed(3)} %`}   icon={<Percent    className="size-5" />} tint={tint} />
-        <KpiTile label="Marge moyenne (MAD)" value={formatMAD(margeDh)}          icon={<TrendingUp className="size-5" />} tint={tint} />
+        <KpiTile label={t("kpi.ca")} value={formatMAD(ca)}                icon={<Coins      className="size-5" />} tint={tint} />
+        <KpiTile label={t("kpi.margeMoyPct")}  value={`${margePct.toFixed(3)} %`}   icon={<Percent    className="size-5" />} tint={tint} />
+        <KpiTile label={t("kpi.margeMoyDh")} value={formatMAD(margeDh)}          icon={<TrendingUp className="size-5" />} tint={tint} />
         <OptimisationGaugePlaceholder tint={tint} />
       </div>
 
@@ -49,11 +51,12 @@ export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsRespo
  *  /v1/stats/analyse-marge endpoint exposes `difference_gain_dh`. Until then we
  *  show a calm, branded "à venir" state — not a sad empty box. */
 function OptimisationGaugePlaceholder({ tint }: { tint: CategoryType }) {
+  const t = useT();
   const { cardClass } = useCategoryTint(tint);
   return (
     <div className={cn("flex flex-col items-center justify-between gap-2 rounded-2xl p-5 shadow-sm", cardClass)}>
       <span className="self-start text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Optimisation
+        {t("preview.optimisation")}
       </span>
       <svg viewBox="0 0 120 70" width="120" height="70" aria-hidden>
         {/* base half-ring */}
@@ -62,7 +65,7 @@ function OptimisationGaugePlaceholder({ tint }: { tint: CategoryType }) {
         <path d="M 12 60 A 48 48 0 0 1 36 18" fill="none" stroke="var(--primary)" strokeWidth="10" strokeLinecap="round" opacity="0.6" />
       </svg>
       <span className="text-center text-xs text-muted-foreground">
-        Disponible après analyse personnalisée
+        {t("preview.availableAfter")}
       </span>
     </div>
   );
@@ -70,6 +73,7 @@ function OptimisationGaugePlaceholder({ tint }: { tint: CategoryType }) {
 
 
 function CtaCard({ tint }: { tint: CategoryType }) {
+  const t = useT();
   // CtaCard keeps its dashed border but adopts the category's bg tint.
   const dashedTint = tint === "pharmacie"
     ? "border-pharmacie-border bg-pharmacie-bg/30"
@@ -82,16 +86,16 @@ function CtaCard({ tint }: { tint: CategoryType }) {
         <UploadCloud className="size-5" />
       </div>
       <div className="flex-1">
-        <h3 className="text-base font-semibold text-foreground">Analyse personnalisée</h3>
+        <h3 className="text-base font-semibold text-foreground">{t("preview.personalTitle")}</h3>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Importez une liste de produits ou sélectionnez des éléments pour simuler vos marges.
+          {t("preview.personalDesc")}
         </p>
       </div>
       <Link
         to={ROUTES.ANALYSES}
         className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md bg-primary px-4 py-2 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
       >
-        Créer une analyse
+        {t("preview.createAnalyse")}
       </Link>
     </div>
   );

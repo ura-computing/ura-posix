@@ -1,31 +1,33 @@
 /** Section 2f — dual-bar trend chart. Ventes (info-blue) + Achats (muted) per
  *  month. Pure CSS bars — no chart lib dep. Reused styling vocabulary
  *  ("var(--info)" / "var(--muted-foreground)") so it tracks the theme. */
+import { useT } from "@/i18n/I18nProvider";
 import type { MonthlyTrendPoint } from "@/types";
 
 
 export function AdminMonthlyTrendChart({
   data, subtitle,
 }: { data: MonthlyTrendPoint[]; subtitle: string }) {
+  const t = useT();
   const max = Math.max(1, ...data.flatMap((d) => [d.ventes, d.achats]));
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-semibold text-foreground">Évolution mensuelle</span>
+          <span className="text-sm font-semibold text-foreground">{t("rapportAdmin.evolutionMensuelle")}</span>
           <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
         <div className="flex items-center gap-3.5">
-          <Legend color="var(--info)" label="Ventes" />
-          <Legend color="var(--muted-foreground)" label="Achats" />
+          <Legend color="var(--info)" label={t("trend.ventes")} />
+          <Legend color="var(--muted-foreground)" label={t("trend.achats")} />
         </div>
       </div>
 
       <div className="flex h-44 items-end gap-2 pt-2">
         {data.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-            Aucune donnée mensuelle.
+            {t("rapportAdmin.aucuneDonneeMensuelle")}
           </div>
         ) : data.map((d, i) => (
           <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">

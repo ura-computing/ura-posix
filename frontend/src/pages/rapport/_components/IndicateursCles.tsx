@@ -4,6 +4,7 @@ import { formatMAD, formatQty, pctChange } from "@/utils/format";
 import { ROUTES, type CategoryType, type StatsResponse } from "@/types";
 
 import { KpiTile } from "@/components/shared/KpiTile";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /**
@@ -19,6 +20,7 @@ import { KpiTile } from "@/components/shared/KpiTile";
  */
 
 export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
+  const t = useT();
   const ca       = stats.kpis.ventes_total;
   const achats   = stats.kpis.achats_total;
   const margePct = stats.marge.marge_pct;
@@ -37,7 +39,7 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
       <KpiTile
         hero
         href={ROUTES.COMPTABILITE}
-        label="Chiffre d'affaires"
+        label={t("kpi.ca")}
         value={formatMAD(ca)}
         delta={dCA != null ? { value: dCA } : null}
         icon={<Wallet className="size-5" />}
@@ -46,11 +48,11 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
           <>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
               <span className="size-1.5 rounded-full" style={{ background: "var(--color-pharmacie)" }} />
-              Pharmacie {phShare} %
+              {t("category.pharmacie")} {phShare} %
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
               <span className="size-1.5 rounded-full" style={{ background: "var(--color-parapharmacie)" }} />
-              Parapharmacie {paShare} %
+              {t("category.parapharmacie")} {paShare} %
             </span>
           </>
         }
@@ -58,25 +60,25 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
       <KpiTile
         className="lg:col-span-2"
         href={ROUTES.ACHATS}
-        label="Total achats"
+        label={t("kpi.totalAchats")}
         value={formatMAD(achats)}
-        sub={<>{formatQty(stats.kpis.achats_count)} unités</>}
+        sub={<>{formatQty(stats.kpis.achats_count)} {t("kpi.unites")}</>}
         delta={dAchats != null ? { value: dAchats, invertColor: true } : null}
         icon={<ShoppingCart className="size-5" />}
         tint={tint}
       />
       <KpiTile
-        label="Marge brute moyenne"
+        label={t("kpi.margeBruteMoy")}
         value={`${margePct.toFixed(3)} %`}
-        sub={`Année préc. : ${stats.previous_kpis.marge_pct.toFixed(3)} %`}
+        sub={`${t("kpi.anneePrec")} ${stats.previous_kpis.marge_pct.toFixed(3)} %`}
         delta={dMarge != null ? { value: dMarge } : null}
         icon={<TrendingUp className="size-5" />}
         tint={tint}
       />
       <KpiTile
-        label="Transactions"
+        label={t("kpi.transactions")}
         value={formatQty(txns)}
-        sub={<>Ticket moyen : {formatMAD(stats.advanced_kpis.ticket_moyen)}</>}
+        sub={<>{t("kpi.ticketMoyenSub")} {formatMAD(stats.advanced_kpis.ticket_moyen)}</>}
         icon={<BarChart3 className="size-5" />}
         tint={tint}
       />

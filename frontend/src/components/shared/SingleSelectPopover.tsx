@@ -14,6 +14,7 @@
  *  trigger shows the selected value alone (no leading colon).
  */
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/i18n/I18nProvider";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/utils/cn";
@@ -48,6 +49,7 @@ export interface SingleSelectPopoverProps {
 export function SingleSelectPopover({
   label, options, value, onChange, emptyValue = "", placement = "bottom", align = "start",
 }: SingleSelectPopoverProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -86,7 +88,7 @@ export function SingleSelectPopover({
       </button>
       {open && (
         <div className={cn(POPOVER_PANEL, POPOVER_POSITION[placement], POPOVER_ALIGN[align])}>
-          {options.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">Aucune option</div>}
+          {options.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>}
           {options.map((opt) => {
             const active = opt.value === value;
             return (

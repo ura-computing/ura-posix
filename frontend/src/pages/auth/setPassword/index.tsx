@@ -8,21 +8,23 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { PasswordField } from "@/components/shared/PasswordField";
 import { ROUTES } from "@/types";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 import { useSetPassword } from "./_hooks/useSetPassword";
 import { useValidateToken } from "./_hooks/useValidateToken";
 
-const setPasswordSchema = z
-  .object({
-    password:        z.string().min(8, "Minimum 8 caractères."),
-    confirmPassword: z.string().min(1, "Veuillez confirmer le mot de passe."),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Les mots de passe ne correspondent pas.",
-    path:    ["confirmPassword"],
-  });
+const makeSetPasswordSchema = (t: TFn) =>
+  z
+    .object({
+      password:        z.string().min(8, t("auth.min8Chars")),
+      confirmPassword: z.string().min(1, t("auth.confirmRequired")),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("auth.passwordMismatch"),
+      path:    ["confirmPassword"],
+    });
 
-type SetPasswordValues = z.infer<typeof setPasswordSchema>;
+type SetPasswordValues = z.infer<ReturnType<typeof makeSetPasswordSchema>>;
 
 function FormSkeleton() {
   return (
@@ -39,34 +41,37 @@ function FormSkeleton() {
 }
 
 function ExpiredState() {
+  const t = useT();
   return (
     <div className="flex w-full max-w-[360px] flex-col items-center gap-[18px] text-center">
       <span className="flex size-16 items-center justify-center rounded-full border border-warning-border bg-warning-subtle text-warning">
         <TriangleAlert className="size-[30px]" strokeWidth={2.2} aria-hidden />
       </span>
       <div className="flex flex-col gap-2">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">Lien expiré</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">{t("auth.expiredTitle")}</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Ce lien d&apos;activation n&apos;est plus valide.
+          {t("auth.expiredDesc")}
         </p>
       </div>
       <Link
         to={ROUTES.FORGOT_PASSWORD}
         className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
       >
-        Demander un nouveau lien
+        {t("auth.requestNewLink")}
       </Link>
     </div>
   );
 }
 
 export default function SetPasswordPage() {
+  const t = useT();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
   const { isValidating, isValid, isSetup, fullName } = useValidateToken(token);
   const { handleSetPassword, isPending } = useSetPassword(token);
 
+  const setPasswordSchema = makeSetPasswordSchema(t);
   const form = useForm<SetPasswordValues>({
     resolver: zodResolver(setPasswordSchema),
     defaultValues: { password: "", confirmPassword: "" },
@@ -82,25 +87,25 @@ export default function SetPasswordPage() {
       <div className="flex w-full max-w-[360px] flex-col gap-6">
         <header className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {isSetup ? `Bienvenue, ${fullName}` : "Réinitialiser votre mot de passe"}
+            {isSetup ? t("auth.welcome", { name: fullName ?? "" }) : t("auth.resetTitle")}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isSetup
-              ? "Choisissez un mot de passe pour activer votre compte."
-              : "Choisissez un nouveau mot de passe."}
+              ? t("auth.setupDesc")
+              : t("auth.resetDesc")}
           </p>
         </header>
 
         <form className="flex flex-col gap-6" onSubmit={handleSetPasswordSubmit} noValidate>
           <PasswordField
-            label="Nouveau mot de passe"
+            label={t("auth.newPassword")}
             autoComplete="new-password"
-            hint="Minimum 8 caractères"
+            hint={t("auth.min8Hint")}
             error={errors.password?.message}
             {...register("password")}
           />
           <PasswordField
-            label={isSetup ? "Confirmer le mot de passe" : "Confirmer le nouveau mot de passe"}
+            label={isSetup ? t("auth.confirmPassword") : t("auth.confirmNewPassword")}
             autoComplete="new-password"
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}
@@ -110,9 +115,9 @@ export default function SetPasswordPage() {
             variant="primary"
             className="w-full"
             isLoading={isPending}
-            loadingText={isSetup ? "Activation…" : "Réinitialisation…"}
+            loadingText={isSetup ? t("auth.activating") : t("auth.resetting")}
           >
-            {isSetup ? "Activer mon compte" : "Réinitialiser mon mot de passe"}
+            {isSetup ? t("auth.activateAccount") : t("auth.resetButton")}
           </AsyncButton>
         </form>
       </div>

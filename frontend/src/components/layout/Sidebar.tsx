@@ -6,6 +6,7 @@ import { PharmagestWordmark } from "@/components/shared/PharmagestWordmark";
 import { Tooltip } from "@/components/shared/Tooltip";
 import { useUnclassifiedCount } from "@/hooks/adminCatalog";
 import { useLogout } from "@/hooks/useLogout";
+import { useT } from "@/i18n/I18nProvider";
 import { ROLES, ROUTES } from "@/types";
 import type { Role } from "@/types";
 import { cn } from "@/utils/cn";
@@ -36,6 +37,7 @@ function itemClasses(isActive: boolean, collapsed: boolean) {
 }
 
 function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
+  const t = useT();
   if (n <= 0) return null;
   return (
     <span
@@ -46,8 +48,8 @@ function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
           ? "absolute right-0 top-0 size-[14px] min-w-0 px-0 text-[9px]"
           : "ml-auto",
       )}
-      title={`${n} produit${n > 1 ? "s" : ""} en attente de classification`}
-      aria-label={`${n} non classés`}
+      title={t("nav.pendingTitle", { n })}
+      aria-label={t("nav.unclassifiedAria", { n })}
     >
       {n > 99 ? "99+" : n}
     </span>
@@ -56,9 +58,11 @@ function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
 
 
 function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean; badge?: number }) {
+  const t = useT();
+  const label = t(item.label);
   // Tooltip only fires when collapsed — labels are visible inline when expanded.
   // Mobile keeps native title since hover doesn't apply there.
-  const tooltipLabel = collapsed ? (item.ready === false ? `${item.label} · Bientôt disponible` : item.label) : "";
+  const tooltipLabel = collapsed ? (item.ready === false ? `${label} · ${t("nav.soon")}` : label) : "";
 
   const inner = item.ready === false ? (
     <div
@@ -66,7 +70,7 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
       className={cn(itemClasses(false, collapsed), "cursor-not-allowed opacity-45")}
     >
       <item.icon className="size-[18px] shrink-0" aria-hidden />
-      <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+      <span className={collapsed ? "md:hidden" : ""}>{label}</span>
     </div>
   ) : (
     <NavLink
@@ -75,7 +79,7 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
       className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
     >
       <item.icon className="size-[18px] shrink-0" aria-hidden />
-      <span className={collapsed ? "md:hidden" : ""}>{item.label}</span>
+      <span className={collapsed ? "md:hidden" : ""}>{label}</span>
       {badge != null && <CountBadge n={badge} collapsed={collapsed} />}
     </NavLink>
   );
@@ -86,6 +90,7 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
 export function Sidebar({
   role, permissions, collapsed, onToggleCollapse, mobileOpen, onCloseMobile,
 }: SidebarProps) {
+  const t = useT();
   const { handleLogout } = useLogout();
   const groups = visibleGroups(role, permissions);
   const unclassifiedCount = useUnclassifiedCount(role);
@@ -124,8 +129,8 @@ export function Sidebar({
         <button
           type="button"
           onClick={onToggleCollapse}
-          title={collapsed ? "Étendre le menu" : "Réduire le menu"}
-          aria-label={collapsed ? "Étendre le menu" : "Réduire le menu"}
+          title={collapsed ? t("nav.expand") : t("nav.collapse")}
+          aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
           className="absolute -right-[13px] top-[50px] z-10 hidden size-[26px] cursor-pointer items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground md:flex"
         >
           {collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
@@ -147,7 +152,7 @@ export function Sidebar({
             <div key={group.title ?? gi} className="flex flex-col gap-0.5">
               {group.title && (
                 <span className={`px-3 pb-0.5 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground ${collapsed ? "md:hidden" : ""}`}>
-                  {group.title}
+                  {t(group.title)}
                 </span>
               )}
               {group.items.map((item) => (
@@ -162,14 +167,14 @@ export function Sidebar({
             <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
           )}
           <NavRow item={ACCOUNT_ITEM} collapsed={collapsed} />
-          <Tooltip label={collapsed ? "Déconnexion" : ""} placement="right" className="relative block">
+          <Tooltip label={collapsed ? t("header.logout") : ""} placement="right" className="relative block">
             <button
               type="button"
               onClick={() => handleLogout()}
               className={cn(itemClasses(false, collapsed), "w-full cursor-pointer")}
             >
               <LogOut className="size-[18px] shrink-0" aria-hidden />
-              <span className={collapsed ? "md:hidden" : ""}>Déconnexion</span>
+              <span className={collapsed ? "md:hidden" : ""}>{t("header.logout")}</span>
             </button>
           </Tooltip>
         </div>

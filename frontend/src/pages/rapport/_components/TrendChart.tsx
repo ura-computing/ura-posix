@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatMAD, formatNumStr } from "@/utils/format";
 import type { CategoryType, MonthlyTrendPoint, TrendGranularity } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 const H = 264;
@@ -15,16 +16,13 @@ const MIN_W = 320;
 // Title + count-unit word (singular, plural) per granularity. The backend picks
 // the granularity from the selected period length (see _trend_granularity).
 const TITLE: Record<TrendGranularity, string> = {
-  week:     "Tendance hebdomadaire",
-  month:    "Tendance mensuelle",
-  semester: "Tendance semestrielle",
-  year:     "Tendance annuelle",
+  week:     "trend.week",
+  month:    "trend.month",
+  semester: "trend.semester",
+  year:     "trend.year",
 };
-const UNIT: Record<TrendGranularity, [string, string]> = {
-  week:     ["semaine", "semaines"],
-  month:    ["mois", "mois"],
-  semester: ["semestre", "semestres"],
-  year:     ["année", "années"],
+const UNIT_KEY: Record<TrendGranularity, string> = {
+  week: "trend.uWeek", month: "trend.uMonth", semester: "trend.uSemester", year: "trend.uYear",
 };
 
 /** Round the data max up to a "nice" axis top and return evenly-spaced ticks
@@ -87,7 +85,8 @@ export function TrendChart({
   granularity?: TrendGranularity;
   tint?: CategoryType;
 }) {
-  const title = TITLE[granularity] ?? TITLE.month;
+  const t = useT();
+  const title = t(TITLE[granularity] ?? TITLE.month);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(640);
@@ -107,7 +106,7 @@ export function TrendChart({
   if (points.length === 0) {
     return (
       <KpiTile label={title} tint={tint}>
-        <p className="py-14 text-center text-sm text-muted-foreground">Aucune donnée sur la période.</p>
+        <p className="py-14 text-center text-sm text-muted-foreground">{t("rapportAdmin.aucuneDonneePeriode")}</p>
       </KpiTile>
     );
   }
@@ -134,8 +133,7 @@ export function TrendChart({
   const areaTail = (pts: { x: number; y: number }[]) =>
     `${smoothPath(pts)} L${pts[pts.length - 1].x},${baseY} L${pts[0].x},${baseY} Z`;
 
-  const [unitSing, unitPlur] = UNIT[granularity] ?? UNIT.month;
-  const unitLabel = points.length <= 1 ? unitSing : unitPlur;
+  const unitLabel = t(UNIT_KEY[granularity] ?? UNIT_KEY.month);
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -151,7 +149,7 @@ export function TrendChart({
   return (
     <KpiTile
       label={title}
-      sub={<>Ventes et achats de {points[0].label} à {points[points.length - 1].label}</>}
+      sub={t("trend.rangeSub", { from: points[0].label, to: points[points.length - 1].label })}
       tint={tint}
     >
       <div className="flex justify-end">
@@ -256,8 +254,8 @@ export function TrendChart({
             >
               <div className="mb-1.5 text-xs font-semibold text-foreground">{points[hi].label}</div>
               <div className="flex flex-col gap-1">
-                <TipRow colorVar="--chart-1" name="Ventes" value={points[hi].ventes} />
-                <TipRow colorVar="--chart-3" name="Achats" value={points[hi].achats} />
+                <TipRow colorVar="--chart-1" name={t("trend.ventes")} value={points[hi].ventes} />
+                <TipRow colorVar="--chart-3" name={t("trend.achats")} value={points[hi].achats} />
               </div>
             </motion.div>
           )}
@@ -287,15 +285,16 @@ function TipRow({ colorVar, name, value }: { colorVar: string; name: string; val
 
 
 function Legend() {
+  const t = useT();
   return (
     <div className="flex items-center gap-3 text-xs">
       <span className="flex items-center gap-1.5">
         <span className="size-2 rounded-full" style={{ background: "var(--chart-1)" }} />
-        <span className="text-muted-foreground">Ventes</span>
+        <span className="text-muted-foreground">{t("trend.ventes")}</span>
       </span>
       <span className="flex items-center gap-1.5">
         <span className="size-2 rounded-full" style={{ background: "var(--chart-3)" }} />
-        <span className="text-muted-foreground">Achats</span>
+        <span className="text-muted-foreground">{t("trend.achats")}</span>
       </span>
     </div>
   );

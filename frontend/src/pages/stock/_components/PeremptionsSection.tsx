@@ -6,6 +6,7 @@ import { PEREMPTION_COLUMNS } from "@/pages/alertes/_components/AlertDetailDialo
 import type { DialogDescriptor } from "@/pages/alertes/_hooks/useAlertesPage";
 import { formatMAD, formatQty } from "@/utils/format";
 import type { PeremptionBracket, PeremptionsResponse } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface PeremptionsSectionProps {
@@ -23,6 +24,7 @@ function PeremptionCard({
   bracket: PeremptionBracket;
   onClick: () => void;
 }) {
+  const t = useT();
   return (
     <KpiTile
       label={title}
@@ -36,13 +38,13 @@ function PeremptionCard({
     >
       <div className="flex items-center gap-5 pt-0.5">
         <div className="flex flex-col gap-px">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Unités</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("peremptions.unites")}</span>
           <span className="font-mono text-base font-semibold tabular-nums text-foreground">
             {formatQty(bracket.total_units)}
           </span>
         </div>
         <div className="flex flex-col gap-px">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Valeur vente</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("peremptions.valeurVente")}</span>
           <span className="font-mono text-base font-semibold tabular-nums text-foreground">
             {formatMAD(bracket.sale_value)}
           </span>
@@ -53,7 +55,9 @@ function PeremptionCard({
 }
 
 
-export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
+export function PeremptionsSection({
+  data, onOpen }: PeremptionsSectionProps) {
+  const t = useT();
   // Same 4-bucket scheme as /alertes — clicking opens the shared
   // AlertDetailDialog with the per-bucket product list (sortable + Excel
   // export). The fourth bucket (`no_date`) is data-quality: products
@@ -66,16 +70,16 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
     dlgTitle:    string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired",    tone: "error",   title: "Expirés en stock",   sub: "Action urgente", dlgTitle: "Produits expirés",              dlgSubtitle: "Produits dont la date de péremption est passée." },
-    { key: "very_close", tone: "warning", title: "Très proche (<30j)", sub: "Très urgent",    dlgTitle: "Péremption très proche (<30j)", dlgSubtitle: "Produits qui expirent dans moins de 30 jours." },
-    { key: "close",      tone: "warning", title: "Proche (<90j)",      sub: "À surveiller",   dlgTitle: "Péremption proche (<90j)",      dlgSubtitle: "Produits qui expirent dans moins de 90 jours." },
-    { key: "no_date",    tone: "muted",   title: "Sans date",          sub: "À renseigner",   dlgTitle: "Produits sans date de péremption", dlgSubtitle: "Produits en stock dont la date de péremption n'est pas renseignée." },
+    { key: "expired",    tone: "error",   title: t("peremptions.expiresStock"),   sub: t("peremptions.actionUrgente"), dlgTitle: t("peremptions.dlgExpires"),              dlgSubtitle: t("peremptions.dlgExpiresSub") },
+    { key: "very_close", tone: "warning", title: t("peremptions.tresProche"), sub: t("peremptions.tresUrgent"),    dlgTitle: t("peremptions.dlgTresProche"), dlgSubtitle: t("peremptions.dlgTresProcheSub") },
+    { key: "close",      tone: "warning", title: t("peremptions.proche"),      sub: t("peremptions.aSurveiller"),   dlgTitle: t("peremptions.dlgProche"),      dlgSubtitle: t("peremptions.dlgProcheSub") },
+    { key: "no_date",    tone: "muted",   title: t("peremptions.sansDate"),          sub: t("peremptions.aRenseigner"),   dlgTitle: t("peremptions.dlgSansDate"), dlgSubtitle: t("peremptions.dlgSansDateSub") },
   ];
 
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Surveillance Péremptions
+        {t("peremptions.surveillance")}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => {

@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Pencil, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
@@ -40,6 +41,7 @@ const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analys
 
 
 export default function AdminPharmacyDetail() {
+  const t = useT();
   const { id: idParam } = useParams<{ id: string }>();
   const id = Number(idParam);
   const nav = useNavigate();
@@ -98,10 +100,10 @@ export default function AdminPharmacyDetail() {
     const result = await resetPwdMut.mutateAsync(userId);
     // Show the temp password in an alert for now — proper reveal-dialog parity
     // with CreateUser can land later if the UX needs the same mailto button.
-    window.alert(`Nouveau mot de passe : ${result.temp_password}\n\nTransmettez-le à l'utilisateur ; il devra le changer à la première connexion.`);
+    window.alert(t("adminPharm.newPasswordAlert", { pwd: result.temp_password }));
   };
   const handleRemoveMember = async (userId: number) => {
-    if (!window.confirm("Supprimer définitivement ce membre ?")) return;
+    if (!window.confirm(t("adminPharm.removeMemberConfirm"))) return;
     await removeMut.mutateAsync(userId);
   };
   const isLoading = detailQ.isLoading;
@@ -109,7 +111,7 @@ export default function AdminPharmacyDetail() {
   if (isLoading || !detail) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 py-10 text-center text-sm text-muted-foreground">
-        Chargement…
+        {t("common.loading")}
       </div>
     );
   }
@@ -126,11 +128,11 @@ export default function AdminPharmacyDetail() {
         className="inline-flex h-9 w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface-subtle"
       >
         <ArrowLeft className="size-4" />
-        Retour aux pharmacies
+        {t("adminPharm.backToPharmacies")}
       </Link>
 
       <nav className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Link to={ROUTES.ADMIN_PHARMACIES} className="hover:text-foreground">Pharmacies</Link>
+        <Link to={ROUTES.ADMIN_PHARMACIES} className="hover:text-foreground">{t("adminPharm.pharmacies")}</Link>
         <ChevronRight className="size-3" />
         <span className="text-foreground">{detail.name}</span>
       </nav>
@@ -149,11 +151,11 @@ export default function AdminPharmacyDetail() {
         <div className="flex shrink-0 items-center gap-2">
           <AsyncButton variant="secondary" onClick={() => setEditOpen(true)}>
             <Pencil className="size-4" />
-            Modifier
+            {t("common.edit")}
           </AsyncButton>
           <AsyncButton variant="destructive" onClick={() => setDeleteOpen(true)}>
             <Trash2 className="size-4" />
-            Supprimer
+            {t("common.delete")}
           </AsyncButton>
         </div>
       </div>
@@ -174,12 +176,12 @@ export default function AdminPharmacyDetail() {
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex flex-col gap-0.5">
-            <h2 className="text-base font-semibold text-foreground">Membres</h2>
-            <p className="text-sm text-muted-foreground">Propriétaire(s) et employés de cette pharmacie.</p>
+            <h2 className="text-base font-semibold text-foreground">{t("adminPharm.members")}</h2>
+            <p className="text-sm text-muted-foreground">{t("adminPharm.membersDesc")}</p>
           </div>
           <AsyncButton variant="secondary" onClick={() => setCreateUserOpen(true)}>
             <UserPlus className="size-4" />
-            Nouvel utilisateur
+            {t("adminPharm.newUser")}
           </AsyncButton>
         </div>
 
@@ -189,18 +191,18 @@ export default function AdminPharmacyDetail() {
               <Users className="size-5" />
             </span>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Aucun membre. Créez le premier compte propriétaire pour cette pharmacie.
+              {t("adminPharm.membersEmpty")}
             </p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-subtle text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">Nom</th>
-                <th className="px-3 py-2.5">Rôle</th>
-                <th className="px-3 py-2.5">Statut</th>
-                <th className="px-3 py-2.5">Permissions accordées</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
+                <th className="px-3 py-2.5">{t("adminPharm.colName")}</th>
+                <th className="px-3 py-2.5">{t("adminPharm.colRole")}</th>
+                <th className="px-3 py-2.5">{t("col.statut")}</th>
+                <th className="px-3 py-2.5">{t("adminPharm.colPerms")}</th>
+                <th className="px-3 py-2.5 text-right">{t("adminPharm.colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -212,7 +214,7 @@ export default function AdminPharmacyDetail() {
                     className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
                   >
                     <SlidersHorizontal className="size-3.5" />
-                    Gérer les permissions
+                    {t("adminPharm.managePerms")}
                   </button>
                 );
                 return (
@@ -230,12 +232,12 @@ export default function AdminPharmacyDetail() {
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={cn(PILL_BASE, m.role === "owner" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
-                        {ROLE_LABEL[m.role]}
+                        {t(ROLE_LABEL[m.role])}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={cn(PILL_BASE, m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground")}>
-                        {STATUS_LABEL[m.status]}
+                        {t(STATUS_LABEL[m.status])}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
@@ -282,23 +284,21 @@ export default function AdminPharmacyDetail() {
         contextStrip={
           permDialogUser?.role === "employee" ? (
             <>
-              Cet employé appartient à <strong>{detail.name}</strong>. Une permission n'est effective
-              que si la pharmacie ET au moins un propriétaire l'ont également activée.
+              {t("adminPharm.ctxEmployeeBelongs")} <strong>{detail.name}</strong>. {t("adminPharm.ctxEmployeeRule")}
             </>
           ) : (
             <>
-              Cet utilisateur appartient à <strong>{detail.name}</strong>. Une permission n'est effective
-              que si la pharmacie l'a également activée.
+              {t("adminPharm.ctxUserBelongs")} <strong>{detail.name}</strong>. {t("adminPharm.ctxUserRule")}
             </>
           )
         }
         ceilings={
           permDialogUser?.role === "employee"
             ? [
-                { label: "Pharmacie",     values: serverFeatures },
-                { label: "Propriétaires", values: permsArrayToRecord(detail.owners_union_permissions) },
+                { label: t("adminPharm.ceilingPharmacy"),  values: serverFeatures },
+                { label: t("adminPharm.ceilingOwners"),    values: permsArrayToRecord(detail.owners_union_permissions) },
               ]
-            : [{ label: "Pharmacie", values: serverFeatures }]
+            : [{ label: t("adminPharm.ceilingPharmacy"), values: serverFeatures }]
         }
         serverPermissions={memberPermsToRecord(permDialogUser)}
         isSaving={isSavingPerms}
@@ -310,8 +310,8 @@ export default function AdminPharmacyDetail() {
       <ConfirmDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        title={`Supprimer définitivement ${detail.name} ?`}
-        description="Cette action est irréversible. La pharmacie est archivée — ses utilisateurs perdent l'accès, mais les transactions, stock et paiements restent liés."
+        title={t("adminPharm.deletePharmacyTitle", { name: detail.name })}
+        description={t("adminPharm.deletePharmacyDesc")}
         onConfirm={handleDelete}
       />
     </div>
@@ -345,6 +345,7 @@ function memberPermsToRecord(m: MemberOut | null): Record<FeatureKey, boolean> {
 
 
 function MemberKebab({ onResetPassword, onRemove }: { onResetPassword: () => void; onRemove: () => void }) {
+  const t = useT();
   return (
     <KebabMenu>
       {(close) => (
@@ -354,14 +355,14 @@ function MemberKebab({ onResetPassword, onRemove }: { onResetPassword: () => voi
             onClick={() => { onResetPassword(); close(); }}
             className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
           >
-            Réinitialiser le mot de passe
+            {t("adminPharm.resetPassword")}
           </button>
           <button
             type="button"
             onClick={() => { onRemove(); close(); }}
             className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
           >
-            Supprimer
+            {t("common.delete")}
           </button>
         </>
       )}

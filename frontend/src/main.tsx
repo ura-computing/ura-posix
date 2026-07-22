@@ -9,6 +9,7 @@ import App from "@/App";
 import { openSessionExpiredDialog, SessionExpiredDialog } from "@/components/shared/SessionExpiredDialog";
 import { UploadProvider } from "@/contexts/UploadContext";
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
+import { I18nProvider } from "@/i18n/I18nProvider";
 import { QUERY_KEYS } from "@/types";
 import "@/styles/globals.css";
 
@@ -38,15 +39,17 @@ setUnauthorizedHandler(() => {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <UploadProvider>
-        <GlobalDateRangeProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-          <SessionExpiredDialog />
-          <Toaster richColors position="top-right" />
-        </GlobalDateRangeProvider>
-      </UploadProvider>
+      <I18nProvider>
+        <UploadProvider>
+          <GlobalDateRangeProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+            <SessionExpiredDialog />
+            <Toaster richColors position="top-right" />
+          </GlobalDateRangeProvider>
+        </UploadProvider>
+      </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

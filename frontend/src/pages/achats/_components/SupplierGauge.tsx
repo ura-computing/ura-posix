@@ -4,9 +4,11 @@ import { NeedleGauge } from "@/components/shared/NeedleGauge";
 import { Skeleton } from "@/components/shared/Skeleton";
 import { formatMAD, formatQty } from "@/utils/format";
 import type { AchatsSupplierSummary } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export function SupplierGauge({ data, isLoading }: { data: AchatsSupplierSummary | undefined; isLoading?: boolean }) {
+  const t = useT();
   if (isLoading && !data) return <GaugeSkeleton />;
   const grossiste   = data?.grossiste   ?? { total_mad: 0, bl_count: 0, unit_count: 0 };
   const directLabo  = data?.direct_labo ?? { total_mad: 0, bl_count: 0, unit_count: 0 };
@@ -25,21 +27,21 @@ export function SupplierGauge({ data, isLoading }: { data: AchatsSupplierSummary
       {/* Top row: grossistes tile · gauge · direct labo tile */}
       <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
         <SideTile
-          title="Grossistes"
+          title={t("achats.grossistes")}
           value={formatMAD(grossiste.total_mad)}
-          sub={<>{formatQty(grossiste.bl_count)} BL · {formatQty(grossiste.unit_count)} unités</>}
+          sub={<>{formatQty(grossiste.bl_count)} BL · {formatQty(grossiste.unit_count)} {t("kpi.unites")}</>}
           accent="border-l-rose-500/70"
         />
         <div className="flex flex-col items-center justify-end">
           <NeedleGauge value={goodness} />
           <p className="-mt-1 text-sm font-medium text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{grossPct.toFixed(3)} %</span> grossistes
+            <span className="font-mono tabular-nums text-foreground">{grossPct.toFixed(3)} %</span> {t("achats.grossistesInline")}
           </p>
         </div>
         <SideTile
-          title="Direct laboratoire"
+          title={t("achats.directLabo")}
           value={formatMAD(directLabo.total_mad)}
-          sub={<>{formatQty(directLabo.bl_count)} BL · {formatQty(directLabo.unit_count)} unités</>}
+          sub={<>{formatQty(directLabo.bl_count)} BL · {formatQty(directLabo.unit_count)} {t("kpi.unites")}</>}
           accent="border-l-emerald-500/70"
           alignRight
         />
@@ -47,9 +49,9 @@ export function SupplierGauge({ data, isLoading }: { data: AchatsSupplierSummary
 
       {/* 3 summary tiles under the gauge */}
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
-        <SummaryTile label="Somme commandée" value={formatMAD(total)} />
-        <SummaryTile label="BL"               value={formatQty(totalBl)} />
-        <SummaryTile label="Unités"           value={formatQty(totalUnits)} />
+        <SummaryTile label={t("achats.sommeCommandee")} value={formatMAD(total)} />
+        <SummaryTile label={t("achats.bl")}               value={formatQty(totalBl)} />
+        <SummaryTile label={t("col.unites")}           value={formatQty(totalUnits)} />
       </div>
     </div>
   );

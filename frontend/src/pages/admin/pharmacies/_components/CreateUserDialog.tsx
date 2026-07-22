@@ -17,6 +17,7 @@
 import { useState } from "react";
 import { CheckCircle2, Copy, Loader2, Mail, UserPlus, X } from "lucide-react";
 
+import { useT, type TFn } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -48,14 +49,15 @@ export interface CreateUserDialogProps {
 
 
 const ROLE_DESC: Record<MemberRole, string> = {
-  owner:    "Gère la pharmacie et son équipe. Une pharmacie peut en avoir plusieurs.",
-  employee: "Accès limité, supervisé par les propriétaires.",
+  owner:    "adminPharm.roleDescOwner",
+  employee: "adminPharm.roleDescEmployee",
 };
 
 
 export function CreateUserDialog({
   open, onClose, pharmacies, defaultPharmacyId, roleLocked, isSaving, onSubmit,
 }: CreateUserDialogProps) {
+  const t = useT();
   const initialRole: MemberRole = roleLocked ?? "employee";
   const initialValues: CreateUserIn = {
     full_name:   "",
@@ -98,12 +100,12 @@ export function CreateUserDialog({
     setTimeout(() => setCopied(false), 2_000);
   };
 
-  const mailtoHref = revealed ? buildMailto(revealed) : "#";
+  const mailtoHref = revealed ? buildMailto(revealed, t) : "#";
 
   const assignHint =
     values.role === "owner"
-      ? "Ce propriétaire pourra gérer cette pharmacie. Une pharmacie peut compter plusieurs propriétaires."
-      : "Cet employé sera rattaché à cette pharmacie et supervisé par ses propriétaires.";
+      ? t("adminPharm.assignHintOwner")
+      : t("adminPharm.assignHintEmployee");
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -115,14 +117,14 @@ export function CreateUserDialog({
             </span>
             <div className="flex flex-col gap-0.5">
               <h3 className="text-[17px] font-semibold text-foreground">
-                {revealed ? "Compte créé" : "Nouvel utilisateur"}
+                {revealed ? t("adminPharm.accountCreated") : t("adminPharm.newUser")}
               </h3>
               <span className="text-xs text-muted-foreground">
-                {revealed ? "Transmettez les identifiants à l'utilisateur." : "Créez un compte et assignez-le à une pharmacie."}
+                {revealed ? t("adminPharm.revealSubtitle") : t("adminPharm.createSubtitle")}
               </span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
@@ -130,18 +132,18 @@ export function CreateUserDialog({
         {/* ─── State A · Form ──────────────────────────────────────────── */}
         {!revealed && (
           <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-            <Field label="Nom complet" required>
+            <Field label={t("adminPharm.fullName")} required>
               <Input value={values.full_name ?? ""} onChange={(v) => set("full_name", v)} placeholder="Karim Bennani" required />
             </Field>
 
-            <Field label="Email" required>
+            <Field label={t("adminPharm.email")} required>
               <Input type="email" value={values.email} onChange={(v) => set("email", v)} placeholder="karim.bennani@pharmacentre.ma" required />
             </Field>
 
             {/* Rôle radio — hidden when roleLocked is set (owner-side caller
                 forces "employee"; admin-side caller shows the choice). */}
             {!roleLocked && (
-              <Field label="Rôle" required>
+              <Field label={t("adminPharm.role")} required>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(["owner", "employee"] as const).map((role) => {
                     const selected = values.role === role;
@@ -160,8 +162,8 @@ export function CreateUserDialog({
                           {selected && <span className="size-2 rounded-full bg-primary" />}
                         </span>
                         <span className="flex flex-col gap-0.5">
-                          <span className="text-[13px] font-semibold text-foreground">{ROLE_LABEL[role]}</span>
-                          <span className="text-[11.5px] leading-snug text-muted-foreground">{ROLE_DESC[role]}</span>
+                          <span className="text-[13px] font-semibold text-foreground">{t(ROLE_LABEL[role])}</span>
+                          <span className="text-[11.5px] leading-snug text-muted-foreground">{t(ROLE_DESC[role])}</span>
                         </span>
                       </button>
                     );
@@ -170,7 +172,7 @@ export function CreateUserDialog({
               </Field>
             )}
 
-            <Field label="Pharmacie assignée" required hint={assignHint}>
+            <Field label={t("adminPharm.assignedPharmacy")} required hint={assignHint}>
               <SingleSelectPopover
                 label=""
                 options={pharmacies.map((p) => ({
@@ -184,11 +186,11 @@ export function CreateUserDialog({
 
             <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
               <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
-                Annuler
+                {t("common.cancel")}
               </AsyncButton>
               <AsyncButton type="submit" variant="primary" disabled={isSaving}>
                 {isSaving && <Loader2 className="size-3.5 animate-spin" />}
-                Créer le compte
+                {t("adminPharm.createAccount")}
               </AsyncButton>
             </div>
           </form>
@@ -198,20 +200,20 @@ export function CreateUserDialog({
         {revealed && (
           <div className="flex flex-col gap-4 p-5">
             <div className="flex flex-col gap-1 rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-success-subtle-foreground">
-              <span className="text-sm font-semibold">Compte créé pour {revealed.member.full_name ?? revealed.member.email}</span>
+              <span className="text-sm font-semibold">{t("adminPharm.accountCreatedFor", { name: revealed.member.full_name ?? revealed.member.email })}</span>
               <span className="text-xs">
-                {revealed.member.email} · {ROLE_LABEL[revealed.member.role]}
+                {revealed.member.email} · {t(ROLE_LABEL[revealed.member.role])}
               </span>
             </div>
 
-            <Field label="Mot de passe temporaire" hint="Affiché une seule fois. Transmettez-le à l'utilisateur — il devra le changer à la première connexion.">
+            <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")}>
               <div className="flex items-center gap-2">
                 <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
                   {revealed.temp_password}
                 </code>
                 <AsyncButton variant="secondary" onClick={copyPassword}>
                   {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
-                  {copied ? "Copié" : "Copier"}
+                  {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
                 </AsyncButton>
               </div>
             </Field>
@@ -222,10 +224,10 @@ export function CreateUserDialog({
                 className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
               >
                 <Mail className="size-4" />
-                Envoyer par email
+                {t("adminPharm.sendByEmail")}
               </a>
               <AsyncButton variant="secondary" onClick={onClose}>
-                Fermer
+                {t("common.close")}
               </AsyncButton>
             </div>
           </div>
@@ -238,18 +240,18 @@ export function CreateUserDialog({
 
 /** Build a mailto: link with the credentials prefilled in the body. The admin
  *  reviews + sends from their own mail client. */
-function buildMailto(out: CreateUserOut): string {
-  const subject = encodeURIComponent("Vos identifiants PharmaGest");
+function buildMailto(out: CreateUserOut, t: TFn): string {
+  const subject = encodeURIComponent(t("adminPharm.mailSubject"));
   const body = encodeURIComponent(
     [
-      `Bonjour ${out.member.full_name ?? ""},`,
+      t("adminPharm.mailGreeting", { name: out.member.full_name ?? "" }),
       "",
-      "Votre compte PharmaGest a été créé.",
+      t("adminPharm.mailBody1"),
       "",
-      `Email : ${out.member.email}`,
-      `Mot de passe : ${out.temp_password}`,
+      t("adminPharm.mailEmail", { email: out.member.email }),
+      t("adminPharm.mailPassword", { pwd: out.temp_password }),
       "",
-      "Pour des raisons de sécurité, changez votre mot de passe à la première connexion.",
+      t("adminPharm.mailBody2"),
     ].join("\n"),
   );
   return `mailto:${out.member.email}?subject=${subject}&body=${body}`;

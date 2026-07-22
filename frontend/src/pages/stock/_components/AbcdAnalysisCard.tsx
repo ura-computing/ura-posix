@@ -6,6 +6,7 @@ import { formatQty } from "@/utils/format";
 import type { AbcdClass } from "@/types";
 
 import { ABCD_COLORS, ABCD_ORDER, abcdFontSize } from "../_constants";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface AbcdAnalysisCardProps {
@@ -26,10 +27,11 @@ export function AbcdAnalysisCard({
   activeClass,
   onSelectClass,
 }: AbcdAnalysisCardProps) {
+  const t = useT();
   const scoreLabel = health.toFixed(1).replace(".", ",");
 
   return (
-    <KpiTile label="Analyse Rotation Stock · ABCD">
+    <KpiTile label={t("stock.abcdTitle")}>
       <div className="grid items-center gap-6 md:grid-cols-[1.5fr_1fr]">
         {/* LEFT — 8 class circles */}
         <div className="grid grid-cols-4 gap-x-2 gap-y-3.5">

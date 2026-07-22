@@ -8,6 +8,7 @@ import { PharmagestIcon } from "@/components/shared/PharmagestIcon";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { useMe } from "@/hooks/useMe";
 import { ROLES, ROUTES, type Role } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /** Pick the post-login landing route for a role. Developers don't have
@@ -19,31 +20,6 @@ function landingRouteFor(role: Role): string {
   return role === ROLES.DEVELOPER ? ROUTES.ME : ROUTES.RAPPORT;
 }
 
-const cycle = [
-  { title: "Achats",  desc: "Importez vos bons et suivez vos entrées de stock.",  Icon: ShoppingCart, bg: "bg-info-subtle",         fg: "text-info-subtle-foreground" },
-  { title: "Ventes",  desc: "Visualisez votre activité jour après jour.",         Icon: TrendingUp,   bg: "bg-primary/12",           fg: "text-primary" },
-  { title: "Stock",   desc: "Anticipez les ruptures et les péremptions.",         Icon: Boxes,        bg: "bg-success-subtle",       fg: "text-success-subtle-foreground" },
-  { title: "Marges",  desc: "Mesurez votre rentabilité en temps réel.",           Icon: PieChart,     bg: "bg-primary/12",           fg: "text-primary" },
-];
-
-const features = [
-  { title: "Tout au même endroit",     desc: "Achats, ventes, stock et comptabilité réunis dans une interface limpide, sans friction.", Icon: Layers },
-  { title: "Marges en temps réel",     desc: "Suivez votre rentabilité par produit et par catégorie, calculée en continu.",              Icon: LineChart },
-  { title: "Sécurisé, multi-rôles",    desc: "Admin, propriétaire, employé : chacun son accès, vos données toujours protégées.",        Icon: ShieldCheck },
-];
-
-const stats = [
-  { value: "200+",   label: "officines équipées" },
-  { value: "1,2 M",  label: "ventes traitées / mois" },
-  { value: "99,9 %", label: "disponibilité" },
-];
-
-const roleLabels = {
-  admin:     "Administrateur",
-  owner:     "Propriétaire",
-  employee:  "Employé",
-  developer: "Développeur",
-} as const;
 
 function firstName(full: string | null | undefined, fallback: string): string {
   if (!full) return fallback;
@@ -51,6 +27,32 @@ function firstName(full: string | null | undefined, fallback: string): string {
 }
 
 export default function HomePage() {
+  const t = useT();
+  const cycle = [
+    { title: t("home.achats"),  desc: t("home.achatsDesc"),  Icon: ShoppingCart, bg: "bg-info-subtle",         fg: "text-info-subtle-foreground" },
+    { title: t("home.ventes"),  desc: t("home.ventesDesc"),         Icon: TrendingUp,   bg: "bg-primary/12",           fg: "text-primary" },
+    { title: t("home.stock"),   desc: t("home.stockDesc"),         Icon: Boxes,        bg: "bg-success-subtle",       fg: "text-success-subtle-foreground" },
+    { title: t("home.marges"),  desc: t("home.margesDesc"),           Icon: PieChart,     bg: "bg-primary/12",           fg: "text-primary" },
+  ];
+  
+  const features = [
+    { title: t("home.feat1"),     desc: t("home.feat1Desc"), Icon: Layers },
+    { title: t("home.feat2"),     desc: t("home.feat2Desc"),              Icon: LineChart },
+    { title: t("home.feat3"),    desc: t("home.feat3Desc"),        Icon: ShieldCheck },
+  ];
+  
+  const stats = [
+    { value: "200+",   label: t("home.stat1") },
+    { value: "1,2 M",  label: t("home.stat2") },
+    { value: "99,9 %", label: t("home.stat3") },
+  ];
+  
+  const roleLabels = {
+    admin:     t("roles.admin"),
+    owner:     t("roles.owner"),
+    employee:  t("roles.employee"),
+    developer: t("roles.developer"),
+  } as const;
   const { me } = useMe();
   const isAuthed   = !!me;
   const myLanding  = isAuthed ? landingRouteFor(me!.role as Role) : ROUTES.LOGIN;
@@ -80,23 +82,23 @@ export default function HomePage() {
       {/* NAV */}
       <header className="sticky top-0 z-50 border-b border-border" style={{ backdropFilter: "blur(10px)", background: "color-mix(in srgb, var(--background) 72%, transparent)" }}>
         <div className="mx-auto flex h-16 max-w-[1140px] items-center justify-between px-6">
-          <Link to={ROUTES.HOME} className="flex items-center gap-[11px] focus-visible:outline-2 focus-visible:outline-ring rounded-md" aria-label="Accueil PharmaGest">
+          <Link to={ROUTES.HOME} className="flex items-center gap-[11px] focus-visible:outline-2 focus-visible:outline-ring rounded-md" aria-label={t("home.logoAlt")}>
             <PharmagestIcon className="text-primary" size={30} ariaHidden />
             <span className="text-[18px] font-extrabold tracking-tight">Pharma<span className="text-primary">Gest</span></span>
           </Link>
           <nav className="hidden md:flex items-center gap-7">
-            <a href="#cycle"    className="text-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground">Le cycle</a>
-            <a href="#features" className="text-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground">Fonctionnalités</a>
+            <a href="#cycle"    className="text-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground">{t("home.navCycle")}</a>
+            <a href="#features" className="text-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground">{t("home.navFeatures")}</a>
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />
             {isAuthed ? (
               <Link to={myLanding} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                Mon espace
+                {t("home.myEspace")}
               </Link>
             ) : (
               <Link to={ROUTES.LOGIN} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                Se connecter
+                {t("home.seConnecter")}
               </Link>
             )}
           </div>
@@ -112,30 +114,30 @@ export default function HomePage() {
                 <span className="h-[7px] w-[7px] rounded-full bg-primary" />
                 {isAuthed
                   ? `${roleLabels[me!.role]}${me!.pharmacy ? ` · ${me!.pharmacy.code ?? me!.pharmacy.name}` : ""}`
-                  : "Conçu pour les pharmacies marocaines"}
+                  : t("home.heroKicker")}
               </span>
               <h1 className="m-0 max-w-[14ch] text-[52px] font-extrabold leading-[1.05] tracking-[-0.035em] text-[#121A18]">
                 {isAuthed
-                  ? <>Bon retour, {firstName(me!.name, "vous")}.</>
-                  : "Votre officine, gérée en toute fluidité."}
+                  ? t("home.bonRetour", { name: firstName(me!.name, "vous") })
+                  : t("home.heroTitle")}
               </h1>
               <p className="m-0 max-w-[44ch] text-[18px] leading-[1.6] text-muted-foreground">
                 {isAuthed
-                  ? "Votre espace est prêt. Reprenez votre activité là où vous l'avez laissée, en toute sérénité."
-                  : "Achats, ventes, stock et marges, réunis dans un espace clair, calme et sécurisé. Laissez vos données suivre leur cours, naturellement."}
+                  ? t("home.heroReady")
+                  : t("home.heroDesc")}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-3">
                 {isAuthed ? (
                   <Link to={myLanding} className="rounded-lg bg-primary px-6 py-[13px] text-[15px] font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                    Aller à mon espace
+                    {t("home.allerMonEspace")}
                   </Link>
                 ) : (
                   <Link to={ROUTES.LOGIN} className="rounded-lg bg-primary px-6 py-[13px] text-[15px] font-semibold text-primary-foreground cursor-pointer transition-colors duration-fast hover:bg-primary-hover">
-                    Se connecter
+                    {t("home.seConnecter")}
                   </Link>
                 )}
                 <a href="#cycle" className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-[13px] text-[15px] font-semibold text-foreground cursor-pointer" style={{ background: "color-mix(in srgb, var(--card) 75%, transparent)" }}>
-                  Découvrir le flux
+                  {t("home.decouvrirFlux")}
                 </a>
               </div>
             </div>
@@ -145,13 +147,13 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-[9px]">
                   <PharmagestIcon className="text-primary" size={22} ariaHidden />
-                  <span className="text-[13px] font-bold">Rapport</span>
+                  <span className="text-[13px] font-bold">{t("home.rapport")}</span>
                 </div>
                 <span className="rounded-full border border-border px-[9px] py-[3px] font-mono text-[11px] text-muted-foreground">BOU0001</span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Chiffre d&apos;affaires · aujourd&apos;hui
+                  {t("home.caAujourdhui")}
                 </span>
                 <div className="flex items-baseline gap-2.5">
                   <span className="whitespace-nowrap font-mono text-[30px] font-bold tabular-nums tracking-[-0.02em]">12 480 MAD</span>
@@ -172,7 +174,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-[7px] text-[12px] font-semibold">
                     <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-pharmacie)" }} />
-                    Pharmacie
+                    {t("category.pharmacie")}
                   </span>
                   <span className="font-mono text-[12px] text-muted-foreground">66%</span>
                 </div>
@@ -182,7 +184,7 @@ export default function HomePage() {
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-[7px] text-[12px] font-semibold">
                     <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-parapharmacie)" }} />
-                    Parapharmacie
+                    {t("category.parapharmacie")}
                   </span>
                   <span className="font-mono text-[12px] text-muted-foreground">34%</span>
                 </div>
@@ -211,10 +213,10 @@ export default function HomePage() {
       {/* CYCLE */}
       <section id="cycle" className="mx-auto max-w-[1140px] px-6 py-[72px]">
         <div className="mb-9 flex flex-col items-center gap-3 text-center">
-          <span className="text-[12px] font-bold uppercase tracking-[0.14em] text-primary">Le cycle</span>
-          <h2 className="m-0 max-w-[18ch] text-[34px] font-extrabold leading-[1.15] tracking-[-0.025em]">Un flux continu, de l&apos;achat à la marge</h2>
+          <span className="text-[12px] font-bold uppercase tracking-[0.14em] text-primary">{t("home.navCycle")}</span>
+          <h2 className="m-0 max-w-[18ch] text-[34px] font-extrabold leading-[1.15] tracking-[-0.025em]">{t("home.cycleTitle")}</h2>
           <p className="m-0 max-w-[52ch] text-base text-muted-foreground">
-            Comme le G de PharmaGest, vos données forment une boucle fermée : chaque étape alimente la suivante, sans rupture.
+            {t("home.cycleDesc")}
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-3.5 md:flex-row">
@@ -235,8 +237,8 @@ export default function HomePage() {
       <section id="features" className="border-y border-border bg-surface-subtle">
         <div className="mx-auto max-w-[1140px] px-6 py-[72px]">
           <div className="mb-9 flex max-w-[46ch] flex-col gap-2.5">
-            <span className="text-[12px] font-bold uppercase tracking-[0.14em] text-primary">Fonctionnalités</span>
-            <h2 className="m-0 text-[34px] font-extrabold leading-[1.15] tracking-[-0.025em]">Clair, calme, sous contrôle</h2>
+            <span className="text-[12px] font-bold uppercase tracking-[0.14em] text-primary">{t("home.navFeatures")}</span>
+            <h2 className="m-0 text-[34px] font-extrabold leading-[1.15] tracking-[-0.025em]">{t("home.featuresTitle")}</h2>
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {features.map(({ title, desc, Icon }) => (
@@ -258,23 +260,23 @@ export default function HomePage() {
           <div className="flex flex-col items-center gap-3.5">
             <h2 className="m-0 max-w-[18ch] text-[40px] font-extrabold leading-[1.1] tracking-[-0.03em]">
               {isAuthed
-                ? "Votre activité, à portée de main."
-                : "Laissez vos données suivre leur cours."}
+                ? t("home.ctaTitle1")
+                : t("home.ctaTitle2")}
             </h2>
             <p className="m-0 max-w-[46ch] text-[17px] leading-[1.6] opacity-80">
               {isAuthed
-                ? "Tout est prêt. Consultez vos ventes, vos marges et votre stock en un clic."
-                : "Rejoignez les officines qui pilotent leur activité en toute sérénité."}
+                ? t("home.ctaReady")
+                : t("home.ctaDesc")}
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             {isAuthed ? (
               <Link to={myLanding} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
-                Aller à mon espace
+                {t("home.allerMonEspace")}
               </Link>
             ) : (
               <Link to={ROUTES.LOGIN} className="rounded-lg bg-white px-6 py-[13px] text-[15px] font-bold text-[#0C1A17] cursor-pointer">
-                Se connecter
+                {t("home.seConnecter")}
               </Link>
             )}
           </div>
@@ -297,7 +299,7 @@ export default function HomePage() {
           <PharmagestIcon className="text-primary" size={24} ariaHidden />
           <span className="text-[15px] font-extrabold tracking-tight">Pharma<span className="text-primary">Gest</span></span>
         </div>
-        <span className="text-[13px] text-muted-foreground">© 2026 PharmaGest · Gestion d&apos;officine</span>
+        <span className="text-[13px] text-muted-foreground">{t("home.footer")}</span>
       </footer>
     </div>
   );

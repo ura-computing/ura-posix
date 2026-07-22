@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import { Info, Check, Loader2, X } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Switch } from "@/components/shared/Switch";
 import { Tooltip } from "@/components/shared/Tooltip";
@@ -60,6 +61,7 @@ const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px]
 export function UserPermissionsDialog({
   open, onClose, user, contextStrip, ceilings, serverPermissions, isSaving, onSave,
 }: UserPermissionsDialogProps) {
+  const t = useT();
   // Local pending edits — initialized from server, reset on open / user change.
   const [pending, setPending] = useState<Record<FeatureKey, boolean>>(serverPermissions);
   useEffect(() => {
@@ -91,7 +93,7 @@ export function UserPermissionsDialog({
   const lockReason = (key: FeatureKey): string => {
     const blocker = ceilings.find((layer) => !layer.values[key]);
     if (!blocker) return "";
-    return `Désactivé en amont — la couche « ${blocker.label} » ne l'a pas activée.`;
+    return t("adminPharm.lockReason", { layer: blocker.label });
   };
 
   return (
@@ -106,12 +108,12 @@ export function UserPermissionsDialog({
             <div className="flex min-w-0 flex-col gap-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[17px] font-semibold text-foreground">{user.full_name ?? user.email}</h3>
-                <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{ROLE_LABEL[user.role]}</span>
+                <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{t(ROLE_LABEL[user.role])}</span>
               </div>
               <span className="text-[12.5px] text-muted-foreground">{user.email}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
@@ -147,9 +149,9 @@ export function UserPermissionsDialog({
                     >
                       <Icon className="size-4" />
                     </span>
-                    <span className="text-[13px] font-semibold text-foreground">{f.label}</span>
+                    <span className="text-[13px] font-semibold text-foreground">{t(f.label)}</span>
                   </div>
-                  <span className="text-[11.5px] leading-snug text-muted-foreground">{f.description}</span>
+                  <span className="text-[11.5px] leading-snug text-muted-foreground">{t(f.description)}</span>
 
                   {/* Ceiling pills — one per layer. The toggle sits below
                       the pill row so the layout stays clean when N≥2. */}
@@ -161,7 +163,7 @@ export function UserPermissionsDialog({
                           key={layer.label}
                           className={cn(PILL_BASE, allowed ? "bg-info-subtle text-info" : "bg-muted text-muted-foreground")}
                         >
-                          {layer.label} : {allowed ? "Activée" : "Désactivée"}
+                          {layer.label} : {allowed ? t("adminPharm.enabledF") : t("adminPharm.disabledF")}
                         </span>
                       );
                     })}
@@ -183,15 +185,15 @@ export function UserPermissionsDialog({
         <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
           <AsyncButton variant="ghost" onClick={enableAllPossible} className="!h-9 !px-3 text-xs">
             <Check className="size-3.5" />
-            Tout activer (où possible)
+            {t("adminPharm.enableAllPossible")}
           </AsyncButton>
           <div className="flex items-center gap-2.5">
             <AsyncButton variant="secondary" onClick={onClose} disabled={isSaving}>
-              Annuler
+              {t("common.cancel")}
             </AsyncButton>
             <AsyncButton variant="primary" onClick={() => onSave(pending)} disabled={isSaving || !isDirty}>
               {isSaving && <Loader2 className="size-3.5 animate-spin" />}
-              Enregistrer
+              {t("common.save")}
             </AsyncButton>
           </div>
         </div>

@@ -7,11 +7,13 @@ import { BarChart3, Boxes, Coins, Percent, ShoppingCart, Sparkles, TrendingUp } 
 import { KpiTile } from "@/components/shared/KpiTile";
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
 import { Skeleton } from "@/components/shared/Skeleton";
+import { useT } from "@/i18n/I18nProvider";
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import type { AnalyseMargeKpis } from "@/types";
 
 
 export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?: boolean }) {
+  const t = useT();
   if (isLoading && !kpis) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -38,38 +40,38 @@ export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLo
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiTile
-        label="Chiffre d'affaires"
+        label={t("kpi.ca")}
         value={formatMAD(ca)}
-        sub={<>{formatQty(unites)} unités</>}
+        sub={<>{formatQty(unites)} {t("kpi.unites")}</>}
         icon={<Coins className="size-5" />}
         iconTone="primary"
       />
       <KpiTile
-        label="Marge moyenne (%)"
+        label={t("kpi.margeMoyPct")}
         value={margePct != null ? formatPct(margePct) : "—"}
         sub={
           kpis?.marge_pct_max && kpis?.marge_pct_min ? (
-            <>Max {formatPct(kpis.marge_pct_max.value)} · Min {formatPct(kpis.marge_pct_min.value)}</>
+            <>{t("kpi.max")} {formatPct(kpis.marge_pct_max.value)} · {t("kpi.min")} {formatPct(kpis.marge_pct_min.value)}</>
           ) : undefined
         }
         icon={<Percent className="size-5" />}
         iconTone="info"
       />
       <KpiTile
-        label="Marge moyenne (DH)"
+        label={t("kpi.margeMoyDh")}
         value={margeDh != null ? formatMAD(margeDh) : "—"}
         sub={
           kpis?.marge_dh_max && kpis?.marge_dh_min ? (
-            <>Max {formatMAD(kpis.marge_dh_max.value)} · Min {formatMAD(kpis.marge_dh_min.value)}</>
+            <>{t("kpi.max")} {formatMAD(kpis.marge_dh_max.value)} · {t("kpi.min")} {formatMAD(kpis.marge_dh_min.value)}</>
           ) : undefined
         }
         icon={<TrendingUp className="size-5" />}
         iconTone="success"
       />
       <KpiTile
-        label="Optimisation"
+        label={t("kpi.optimisation")}
         value={kpis?.difference_gain_dh != null ? formatMAD(kpis.difference_gain_dh) : "—"}
-        sub="Écart meilleur ↔ pire produit"
+        sub={t("kpi.optimisationSub")}
         icon={<Sparkles className="size-5" />}
         iconTone="warning"
       >
@@ -82,30 +84,30 @@ export function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLo
           populated in produit + liste modes (pu also grossiste/laboratoire);
           elsewhere the backend sends null → "—". */}
       <KpiTile
-        label="Unités vendues"
+        label={t("kpi.unitesVendues")}
         value={formatQty(unites)}
-        sub="Σ quantités vendues"
+        sub={t("kpi.sumQtyVendues")}
         icon={<ShoppingCart className="size-5" />}
         iconTone="primary"
       />
       <KpiTile
-        label="Unités disponibles"
+        label={t("kpi.unitesDispo")}
         value={kpis?.total_units_available != null ? formatQty(kpis.total_units_available) : "—"}
-        sub="Σ stock actuel"
+        sub={t("kpi.sumStock")}
         icon={<Boxes className="size-5" />}
         iconTone="success"
       />
       <KpiTile
-        label="Prix unitaires achetés"
+        label={t("kpi.prixUnitAchetes")}
         value={kpis?.total_pu_purchased != null ? formatMAD(kpis.total_pu_purchased) : "—"}
-        sub="Σ PU × qté achetée"
+        sub={t("kpi.sumPuQty")}
         icon={<Coins className="size-5" />}
         iconTone="warning"
       />
       <KpiTile
-        label="PPV disponibles"
+        label={t("kpi.ppvDispo")}
         value={kpis?.ppv_total_available != null ? formatMAD(kpis.ppv_total_available) : "—"}
-        sub="Σ PPV × stock"
+        sub={t("kpi.sumPpvStock")}
         icon={<BarChart3 className="size-5" />}
         iconTone="info"
       />

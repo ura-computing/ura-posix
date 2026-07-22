@@ -1,4 +1,4 @@
-/** "Réintégrer des produits" multi-pick dialog. Mirrors ExcludeProductDialog's
+/** "{t("ps.reintegrerProduits")}" multi-pick dialog. Mirrors ExcludeProductDialog's
  *  UX but operates on the in-memory list of currently-spécial products — no
  *  per-keystroke API call needed. */
 import { useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { Package, Search, X } from "lucide-react";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { SpecialProduct } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface ReintegrateProductsDialogProps {
@@ -27,6 +28,7 @@ function norm(s: string): string {
 export function ReintegrateProductsDialog({
   open, onClose, onSubmit, isLoading, specialProducts,
 }: ReintegrateProductsDialogProps) {
+  const t = useT();
   const [picked, setPicked] = useState<Map<number, SpecialProduct>>(new Map());
   const [query,  setQuery]  = useState("");
 
@@ -82,7 +84,7 @@ export function ReintegrateProductsDialog({
         <div className="flex flex-col gap-4 p-5">
           <header>
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Réintégrer des produits
+              {t("ps.reintegrerProduits")}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Sélectionnez les produits à réintégrer dans vos rapports.
@@ -131,7 +133,7 @@ export function ReintegrateProductsDialog({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filtrer la liste…"
+              placeholder={t("ps.filterPh")}
               className="block w-full rounded-md border border-input bg-surface-subtle py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
             />
           </div>
@@ -144,8 +146,8 @@ export function ReintegrateProductsDialog({
             ) : visible.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
                 {query.trim()
-                  ? "Aucun résultat pour ce filtre."
-                  : "Tous les produits exclus sont déjà sélectionnés."}
+                  ? t("ps.noFilterResult")
+                  : t("ps.allReintSelected")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -180,24 +182,24 @@ export function ReintegrateProductsDialog({
           <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
             <span className="text-xs text-muted-foreground">
               {count === 0
-                ? "Cliquez sur un produit pour le sélectionner."
+                ? t("ps.clickToSelect")
                 : count === 1
                 ? "1 produit sélectionné."
-                : `${count} produits sélectionnés.`}
+                : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">
               <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
-                Annuler
+                {t("common.cancel")}
               </AsyncButton>
               <AsyncButton
                 type="button"
                 variant="primary"
                 disabled={!canSubmit}
                 isLoading={isLoading}
-                loadingText="Réintégration…"
+                loadingText={t("ps.reintegrating")}
                 onClick={() => onSubmit([...picked.keys()])}
               >
-                {count > 0 ? `Réintégrer (${count})` : "Réintégrer"}
+                {count > 0 ? `${t("ps.reintegrer")} (${count})` : t("ps.reintegrer")}
               </AsyncButton>
             </div>
           </footer>

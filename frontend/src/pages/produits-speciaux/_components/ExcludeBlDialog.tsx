@@ -13,6 +13,7 @@ import { getBlDetail } from "@/api/blExclusions";
 import { formatMAD, formatQty } from "@/utils/format";
 import { QUERY_KEYS } from "@/types";
 import type { BlSummary } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface ExcludeBlDialogProps {
@@ -38,6 +39,7 @@ export function ExcludeBlDialog({
   open, onClose, onSubmit, isLoading,
   results, resultsLoading, searchQ, onSearchChange,
 }: ExcludeBlDialogProps) {
+  const t = useT();
   const [selected, setSelected] = useState<BlSummary | null>(null);
   const [notes,    setNotes]    = useState("");
 
@@ -57,12 +59,9 @@ export function ExcludeBlDialog({
         <div className="flex flex-col gap-4 p-5">
           <header>
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Exclure un bon de livraison
+              {t("ps.blTitle")}
             </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Recherchez par référence de BL ou par produit. L'exclusion retire ce BL de vos
-              analyses (achats, marges, stock) — réversible à tout moment.
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.blDesc")}</p>
           </header>
 
           {/* ── Step 1: search + pick ─────────────────────────────────────── */}
@@ -75,7 +74,7 @@ export function ExcludeBlDialog({
                   autoFocus
                   value={searchQ}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder="Référence (ex. LVC2606CAS00033) ou nom de produit"
+                  placeholder={t("ps.blSearchPh")}
                   className="block w-full rounded-md border border-input bg-surface-subtle py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
                 />
               </div>
@@ -83,7 +82,7 @@ export function ExcludeBlDialog({
               <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
                 {searchQ.trim().length < 2 ? (
                   <p className="p-4 text-center text-xs text-muted-foreground">
-                    Tapez au moins 2 caractères (référence ou produit).
+                    {t("ps.blMin2")}
                   </p>
                 ) : resultsLoading ? (
                   <div className="flex items-center justify-center py-6">
@@ -91,7 +90,7 @@ export function ExcludeBlDialog({
                   </div>
                 ) : results.length === 0 ? (
                   <p className="p-4 text-center text-xs text-muted-foreground">
-                    Aucun bon de livraison trouvé.
+                    {t("ps.blNoResult")}
                   </p>
                 ) : (
                   <ul className="divide-y divide-border">
@@ -108,7 +107,7 @@ export function ExcludeBlDialog({
                             <div className="flex items-center gap-2">
                               <span className="truncate font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span>
                               {b.already_excluded && (
-                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">déjà exclu</span>
+                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t("ps.dejaExclu")}</span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -116,13 +115,13 @@ export function ExcludeBlDialog({
                               <span>·</span>
                               <span>{frDate(b.delivery_date)}</span>
                               <span>·</span>
-                              <span>{formatQty(b.nb_products)} réf.</span>
+                              <span>{formatQty(b.nb_products)} {t("ps.ref")}</span>
                             </div>
                             {/* When found via a product search, show the matched product(s) so
                                 the user recognises the BL by what they bought. */}
                             {b.matched_products.length > 0 && (
                               <div className="mt-0.5 truncate text-[11px] text-primary" title={b.matched_products.join(", ")}>
-                                Contient : {b.matched_products.join(", ")}
+                                {t("ps.contient")} {b.matched_products.join(", ")}
                               </div>
                             )}
                           </div>
@@ -136,7 +135,7 @@ export function ExcludeBlDialog({
 
               <footer className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-3">
                 <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
-                  Annuler
+                  {t("common.cancel")}
                 </AsyncButton>
               </footer>
             </>
@@ -153,7 +152,7 @@ export function ExcludeBlDialog({
                   <span>·</span>
                   <span>{frDate(selected.delivery_date)}</span>
                   <span>·</span>
-                  <span>{formatQty(selected.nb_lines)} ligne{selected.nb_lines > 1 ? "s" : ""}</span>
+                  <span>{formatQty(selected.nb_lines)} {selected.nb_lines > 1 ? t("ps.lignesWord") : t("ps.ligne")}</span>
                 </div>
               </div>
 
@@ -163,15 +162,15 @@ export function ExcludeBlDialog({
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : detail.isError ? (
-                  <p className="p-4 text-center text-xs text-error">Impossible de charger le détail du BL.</p>
+                  <p className="p-4 text-center text-xs text-error">{t("ps.loadDetailErr")}</p>
                 ) : (
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 bg-surface-subtle text-[10px] uppercase tracking-wide text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-1.5 font-semibold">Produit</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">Qté</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">PU</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">Total</th>
+                        <th className="px-3 py-1.5 font-semibold">{t("col.produit")}</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.qte")}</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.puAchat")}</th>
+                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.total")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -189,29 +188,29 @@ export function ExcludeBlDialog({
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="bl-note" className="text-xs font-medium text-muted-foreground">Note (optionnelle)</label>
+                <label htmlFor="bl-note" className="text-xs font-medium text-muted-foreground">{t("ps.noteOptionnelle")}</label>
                 <textarea
                   id="bl-note"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  placeholder="Raison de l'exclusion (ex. achat exceptionnel, transfert…)"
+                  placeholder={t("ps.notePlaceholder")}
                   className="block w-full resize-none rounded-md border border-input bg-surface-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
                 />
               </div>
 
               <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
                 <AsyncButton variant="ghost" type="button" onClick={() => setSelected(null)} disabled={isLoading}>
-                  <ArrowLeft className="size-4" /> Retour
+                  <ArrowLeft className="size-4" /> {t("common.back")}
                 </AsyncButton>
                 <AsyncButton
                   type="button"
                   variant="primary"
                   isLoading={isLoading}
-                  loadingText="Exclusion…"
+                  loadingText={t("ps.excluding")}
                   onClick={() => onSubmit(selected.delivery_ref, notes.trim() || undefined)}
                 >
-                  Exclure ce BL
+                  {t("ps.excludeThisBl")}
                 </AsyncButton>
               </footer>
             </>

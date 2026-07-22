@@ -3,6 +3,7 @@ import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 import { cn } from "@/utils/cn";
 import type { DocType } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 interface DropZoneProps {
@@ -21,6 +22,7 @@ interface DropZoneProps {
  */
 
 export function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZoneProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const ring = `var(--color-doc-${docType})`;
@@ -66,13 +68,13 @@ export function DropZone({ docType, example, onAccept, errorMsg, onClearError }:
           <UploadCloud className="size-6" aria-hidden />
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-base font-semibold text-foreground">Glissez votre fichier ici</p>
+          <p className="text-base font-semibold text-foreground">{t("uploadFile.dropHere")}</p>
           <p className="text-sm text-muted-foreground">
-            ou <span className="font-semibold underline" style={{ color: ring }}>cliquez pour parcourir</span>
+            {t("uploadFile.or")} <span className="font-semibold underline" style={{ color: ring }}>{t("uploadFile.browse")}</span>
           </p>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          CSV exporté depuis Sobrus, délimiteur « ; »
+          {t("uploadFile.csvHint")}
         </p>
         <p className="font-mono text-[11px] text-muted-foreground">
           {example}
@@ -93,7 +95,7 @@ export function DropZone({ docType, example, onAccept, errorMsg, onClearError }:
           <button
             type="button"
             onClick={onClearError}
-            aria-label="Fermer"
+            aria-label={t("common.close")}
             className="cursor-pointer text-error-subtle-foreground/70 hover:text-error-subtle-foreground"
           >
             <X className="size-4" />

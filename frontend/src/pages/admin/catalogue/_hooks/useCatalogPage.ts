@@ -11,6 +11,7 @@ import {
   listCatalogCategories,
   updateMedicament,
 } from "@/api/adminCatalog";
+import { useT } from "@/i18n/I18nProvider";
 import { QUERY_KEYS } from "@/types";
 import type { CatalogFilters, Medicament, MedicamentInput, ProductType } from "@/types";
 
@@ -27,6 +28,7 @@ const DEFAULT_FILTERS: CatalogFilters = {
 
 
 export function useCatalogPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
 
@@ -66,27 +68,27 @@ export function useCatalogPage() {
 
   const create = useMutation({
     mutationFn: (body: MedicamentInput) => createMedicament(body),
-    onSuccess:  () => { toast.success("Médicament ajouté"); invalidate(); },
+    onSuccess:  () => { toast.success(t("catalogue.toastCreated")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
   const update = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Partial<MedicamentInput> }) =>
       updateMedicament(id, body),
-    onSuccess:  () => { toast.success("Médicament modifié"); invalidate(); },
+    onSuccess:  () => { toast.success(t("catalogue.toastUpdated")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
   const remove = useMutation({
     mutationFn: (id: number) => deleteMedicament(id),
-    onSuccess:  () => { toast.success("Médicament supprimé"); invalidate(); },
+    onSuccess:  () => { toast.success(t("catalogue.toastDeleted")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
   const importCsv = useMutation({
     mutationFn: (file: File) => importCatalogCsv(file),
     onSuccess:  (r) => {
-      toast.success(`Import terminé : ${r.inserted} ajoutés · ${r.updated} mis à jour · ${r.skipped} ignorés`);
+      toast.success(t("catalogue.toastImport", { inserted: r.inserted, updated: r.updated, skipped: r.skipped }));
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
