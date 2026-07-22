@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Plus, RefreshCw, UserPlus } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { normalizeText } from "@/utils/text";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
@@ -22,6 +23,7 @@ import {
 
 
 export default function AdminPharmaciesIndex() {
+  const t = useT();
   const nav = useNavigate();
 
   const [search, setSearch] = useState("");
@@ -70,7 +72,7 @@ export default function AdminPharmaciesIndex() {
   const columns: ColumnDef<PharmacyListRow>[] = [
     {
       key: "name",
-      label: "Nom",
+      label: t("adminPharm.colName"),
       sortable: true,
       render: (p) => (
         <div className="flex flex-col">
@@ -83,19 +85,19 @@ export default function AdminPharmaciesIndex() {
     },
     {
       key: "members",
-      label: "Membres",
+      label: t("adminPharm.members"),
       sortable: false,
       render: (p) => <AvatarStack initials={p.member_initials} count={p.members_count} />,
     },
     {
       key: "features",
-      label: "Fonctionnalités activées",
+      label: t("adminPharm.colFeaturesEnabled"),
       sortable: false,
       render: (p) => <FeaturePills features={p.enabled_features} />,
     },
     {
       key: "actions",
-      label: "Actions",
+      label: t("adminPharm.colActions"),
       align: "right",
       sortable: false,
       render: (p) => (
@@ -104,7 +106,7 @@ export default function AdminPharmaciesIndex() {
           onClick={(e) => { e.stopPropagation(); nav(`/admin/pharmacies/${p.id}`); }}
           className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
         >
-          Ouvrir
+          {t("adminPharm.open")}
           <ArrowRight className="size-3.5" />
         </button>
       ),
@@ -114,9 +116,9 @@ export default function AdminPharmaciesIndex() {
   return (
     <div className="mx-auto flex max-w-[1320px] flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Pharmacies</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("adminPharm.pharmacies")}</h1>
         <p className="text-sm text-muted-foreground">
-          Gérez les pharmacies enregistrées sur la plateforme.
+          {t("adminPharm.indexSubtitle")}
         </p>
       </header>
 
@@ -124,22 +126,22 @@ export default function AdminPharmaciesIndex() {
         search={{
           value: search,
           onChange: setSearch,
-          placeholder: "Rechercher par nom, code, ville…",
+          placeholder: t("adminPharm.searchPlaceholder"),
           suggestions: null,
           onPick: () => {},
         }}
         rightActions={[
-          { label: "Nouvel utilisateur", variant: "outline", icon: <UserPlus className="size-4" />, onClick: () => setCreateUserOpen(true) },
-          { label: "Nouvelle pharmacie", variant: "primary", icon: <Plus className="size-4" />,     onClick: () => setCreateOpen(true) },
+          { label: t("adminPharm.newUser"),     variant: "outline", icon: <UserPlus className="size-4" />, onClick: () => setCreateUserOpen(true) },
+          { label: t("adminPharm.newPharmacy"), variant: "primary", icon: <Plus className="size-4" />,     onClick: () => setCreateOpen(true) },
         ]}
       />
 
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
-          <span className="text-sm font-medium">Impossible de charger les pharmacies.</span>
+          <span className="text-sm font-medium">{t("adminPharm.loadError")}</span>
           <AsyncButton variant="secondary" onClick={() => void refetch()}>
             <RefreshCw className="size-3.5" />
-            Réessayer
+            {t("common.retry")}
           </AsyncButton>
         </div>
       ) : (
@@ -148,8 +150,8 @@ export default function AdminPharmaciesIndex() {
           columns={columns}
           isLoading={isLoading}
           rowKey={(r) => r.id}
-          emptyTitle="Aucune pharmacie enregistrée pour l'instant."
-          emptyHint="Créez la première pharmacie pour commencer à gérer ses fonctionnalités et son équipe."
+          emptyTitle={t("adminPharm.emptyTitle")}
+          emptyHint={t("adminPharm.emptyHint")}
         />
       )}
 

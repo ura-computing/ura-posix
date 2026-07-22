@@ -12,6 +12,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "luci
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Skeleton } from "@/components/shared/Skeleton";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
+import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 
@@ -61,9 +62,11 @@ function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" })
 
 export function DataTable<R, K extends string = string>({
   rows, columns, isLoading, sortBy, sortOrder = "desc", onSort,
-  pagination, emptyTitle = "Aucun résultat", emptyHint, topBanner, rowKey,
+  pagination, emptyTitle, emptyHint, topBanner, rowKey,
   className,
 }: DataTableProps<R, K>) {
+  const t = useT();
+  const emptyLabel = emptyTitle ?? t("common.noResult");
   // Loading + empty short-circuits. Render the real header + shimmer rows so the
   // table's shape is visible while data loads (smooth swap to real rows).
   if (isLoading && rows.length === 0) {
@@ -110,7 +113,7 @@ export function DataTable<R, K extends string = string>({
       <div className={cn("flex flex-col gap-3", className)}>
         {topBanner}
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-card py-16 text-center">
-          <p className="text-sm font-medium text-foreground">{emptyTitle}</p>
+          <p className="text-sm font-medium text-foreground">{emptyLabel}</p>
           {emptyHint && <p className="text-xs text-muted-foreground">{emptyHint}</p>}
         </div>
       </div>
@@ -194,8 +197,9 @@ export function DataTable<R, K extends string = string>({
 function PaginationFooter({
   page, pageSize, total, onPage, onPageSize, pageSizes = [10, 25, 50],
 }: DataTablePagination) {
+  const t = useT();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pageSizeOptions = pageSizes.map((n) => ({ value: String(n), label: `${n} / page` }));
+  const pageSizeOptions = pageSizes.map((n) => ({ value: String(n), label: `${n} ${t("common.perPage")}` }));
   return (
     // Mirrors the FilterBar at the top of the page: sticky-pinned to <main>,
     // own card shell, same z-20 layer. Lives OUTSIDE the table card so its
@@ -207,7 +211,7 @@ function PaginationFooter({
       )}
     >
       <span className="font-mono tabular-nums text-muted-foreground">
-        {formatQty(total)} résultats
+        {formatQty(total)} {t("common.results")}
       </span>
       <div className="flex items-center gap-2">
         <AsyncButton
@@ -215,20 +219,20 @@ function PaginationFooter({
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
           className="!h-9 !px-3"
-          aria-label="Page précédente"
+          aria-label={t("shared.pagePrev")}
         >
           <ChevronLeft className="size-4" />
-          <span className="ml-1">Précédent</span>
+          <span className="ml-1">{t("common.previous")}</span>
         </AsyncButton>
-        <span className="text-muted-foreground">Page {page} / {pageCount}</span>
+        <span className="text-muted-foreground">{t("common.page")} {page} / {pageCount}</span>
         <AsyncButton
           variant="ghost"
           disabled={page >= pageCount}
           onClick={() => onPage(page + 1)}
           className="!h-9 !px-3"
-          aria-label="Page suivante"
+          aria-label={t("shared.pageNext")}
         >
-          <span className="mr-1">Suivant</span>
+          <span className="mr-1">{t("common.next")}</span>
           <ChevronRight className="size-4" />
         </AsyncButton>
         <SingleSelectPopover

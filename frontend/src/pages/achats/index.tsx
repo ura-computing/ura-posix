@@ -3,6 +3,7 @@ import { Download, Upload } from "lucide-react";
 
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import { ROUTES } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 import { formatMAD } from "@/utils/format";
 
 import { AchatsTable }     from "./_components/AchatsTable";
@@ -11,6 +12,7 @@ import { useAchatsPage }   from "./_hooks/useAchatsPage";
 
 
 export default function AchatsPage() {
+  const t = useT();
   const p = useAchatsPage();
 
   // Wire search → suggestions debounce trigger. Same pattern as Ventes.
@@ -23,7 +25,7 @@ export default function AchatsPage() {
   const activeFilters: ActiveFilter[] = [
     p.filters.search ? {
       key: "search",
-      label: <>Recherche : {p.filters.search}</>,
+      label: <>{t("common.recherche")} {p.filters.search}</>,
       onClear: () => p.setSearch(""),
     } : null,
     (p.filters.date_from || p.filters.date_to) ? {
@@ -33,12 +35,12 @@ export default function AchatsPage() {
     } : null,
     p.filters.category.length > 0 ? {
       key: "category",
-      label: <>Catégorie : {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
+      label: <>{t("dashboard.categorieFilter")} {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
       onClear: () => p.setCategories([]),
     } : null,
     p.filters.tva.length > 0 ? {
       key: "tva",
-      label: <>TVA : {p.filters.tva.length}</>,
+      label: <>{t("common.tvaFilter")} {p.filters.tva.length}</>,
       onClear: () => p.setTva([]),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -46,16 +48,16 @@ export default function AchatsPage() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Achats</h1>
-        <p className="text-sm text-muted-foreground">Historique des bons de livraison fournisseurs.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("achats.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("achats.subtitle")}</p>
       </header>
 
       <FilterBar
         search={{
           value:       p.filters.search,
           onChange:    p.setSearch,
-          placeholder: "Produit, fournisseur, référence…",
-          suggestions: p.suggestions ? { Produit: p.suggestions.products, Fournisseur: p.suggestions.suppliers, Référence: p.suggestions.refs } : null,
+          placeholder: t("achats.searchPh"),
+          suggestions: p.suggestions ? { [t("col.produit")]: p.suggestions.products, [t("col.fournisseur")]: p.suggestions.suppliers, [t("col.reference")]: p.suggestions.refs } : null,
           onPick:      (label) => { p.setSearch(label); p.setSuggestQ(""); },
           isLoading:   p.suggestionsLoading,
         }}
@@ -65,12 +67,12 @@ export default function AchatsPage() {
           onChange: p.setDateRange,
         }}
         multiSelects={[
-          { label: "Catégorie", options: p.categories, selected: p.filters.category, onChange: p.setCategories },
-          { label: "TVA",       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
+          { label: t("col.categorie"), options: p.categories, selected: p.filters.category, onChange: p.setCategories },
+          { label: t("col.tva"),       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
         ]}
         rightActions={[
-          { label: "Exporter Excel", icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
-          { label: "Importer",       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=achat` },
+          { label: t("common.export"), icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
+          { label: t("common.import"),       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=achat` },
         ]}
         activeFilters={activeFilters}
         onResetAll={p.reset}
@@ -97,10 +99,10 @@ export default function AchatsPage() {
       {(p.list?.data ?? []).length > 0 && summary && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-4 py-2 text-xs">
           <span className="text-muted-foreground">
-            TVA payé <span className="text-foreground/60">(filtres actifs)</span> :
+            {t("achats.tvaPaye")} <span className="text-foreground/60">{t("common.filtresActifs")}</span> :
             <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">{formatMAD(summary.tva_payee)}</span>
             <span className="mx-2 text-foreground/40">·</span>
-            Total achats :
+            {t("achats.totalFooter")}
             <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">{formatMAD(summary.grand_total)}</span>
           </span>
         </div>

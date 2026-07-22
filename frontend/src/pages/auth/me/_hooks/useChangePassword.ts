@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useT } from "@/i18n/I18nProvider";
 
 import { ApiErr } from "@/api/client";
 import { changePassword } from "@/api/users";
@@ -7,6 +8,7 @@ import { QUERY_KEYS } from "@/types";
 import type { ChangePasswordRequest, Me } from "@/types";
 
 export function useChangePassword(onDone?: () => void) {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
@@ -21,11 +23,11 @@ export function useChangePassword(onDone?: () => void) {
       if (me?.id) {
         await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SESSIONS(me.id) });
       }
-      toast.success("Mot de passe modifié avec succès. Vos autres appareils ont été déconnectés.");
+      toast.success(t("toast.pwdChanged"));
       onDone?.();
     },
     onError: (err: ApiErr) => {
-      toast.error(err.detail || "Mot de passe actuel incorrect.");
+      toast.error(err.detail || t("toast.pwdCurrentWrong"));
     },
   });
 

@@ -1,6 +1,7 @@
 import { KpiTile } from "@/components/shared/KpiTile";
 import { formatNumStr, formatPct } from "@/utils/format";
 import type { CategoryType, TopCategoryRow } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /**
@@ -26,10 +27,11 @@ const GAP    = 0.012;           // gap between segments in radians (≈ 0.7°)
 
 
 export function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategoryRow[]; tint?: CategoryType }) {
+  const t = useT();
   if (categories.length === 0) {
     return (
-      <KpiTile label="Répartition du CA" tint={tint}>
-        <p className="py-12 text-center text-sm text-muted-foreground">Aucune donnée disponible.</p>
+      <KpiTile label={t("kpi.repartitionCA")} tint={tint}>
+        <p className="py-12 text-center text-sm text-muted-foreground">{t("kpi.aucuneDonnee")}</p>
       </KpiTile>
     );
   }
@@ -54,7 +56,7 @@ export function CategoriesDonut({ categories, tint = "all" }: { categories: TopC
   ).out;
 
   return (
-    <KpiTile label="Répartition du CA" tint={tint}>
+    <KpiTile label={t("kpi.repartitionCA")} tint={tint}>
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-center">
         {/* Donut */}
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="shrink-0" aria-hidden>
@@ -73,11 +75,11 @@ export function CategoriesDonut({ categories, tint = "all" }: { categories: TopC
             <table className="w-full border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-card">
                 <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pr-3 text-left font-semibold">Catégorie</th>
+                  <th className="py-2 pr-3 text-left font-semibold">{t("kpi.donutCategorie")}</th>
                   <th className="px-3 py-2 text-left font-semibold">CA (MAD)</th>
-                  <th className="px-3 py-2 text-left font-semibold">Marge&nbsp;%</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t("kpi.donutMarge")}</th>
                   <th className="px-3 py-2 text-left font-semibold">%</th>
-                  <th className="w-32 py-2 pl-3 text-left font-semibold">Part</th>
+                  <th className="w-32 py-2 pl-3 text-left font-semibold">{t("kpi.donutPart")}</th>
                 </tr>
               </thead>
               <tbody>

@@ -2,8 +2,10 @@ import { Link } from "react-router-dom";
 
 import { PharmagestIcon } from "@/components/shared/PharmagestIcon";
 import { ROUTES } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 export default function NotFoundPage() {
+  const t = useT();
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <style>{`
@@ -24,7 +26,7 @@ export default function NotFoundPage() {
       <header className="flex items-center justify-between px-7 py-6">
         <Link
           to={ROUTES.HOME}
-          aria-label="Accueil PharmaGest"
+          aria-label={t("home.logoAlt")}
           className="flex items-center gap-3 text-base font-extrabold tracking-tight rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
         >
           <PharmagestIcon className="h-[30px] w-[30px] text-primary" ariaHidden />
@@ -47,10 +49,9 @@ export default function NotFoundPage() {
           </div>
 
           <div className="pg-anim flex flex-col items-center gap-3" style={{ animationDelay: ".12s" }}>
-            <h1 className="text-[26px] font-semibold tracking-tight">Page introuvable</h1>
+            <h1 className="text-[26px] font-semibold tracking-tight">{t("misc.notFoundTitle")}</h1>
             <p className="max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">
-              La page que vous recherchez a été déplacée, supprimée, ou n&apos;a jamais existé.
-              Vérifiez l&apos;adresse ou revenez à votre tableau de bord.
+              {t("misc.notFoundDesc")}
             </p>
           </div>
 
@@ -63,19 +64,19 @@ export default function NotFoundPage() {
                 <path d="M3 11l9-8 9 8" />
                 <path d="M5 10v10h14V10" />
               </svg>
-              Retour à l&apos;accueil
+              {t("misc.backHome")}
             </Link>
           </div>
 
           <div className="pg-anim inline-flex items-center gap-2 rounded-full border border-border bg-surface-subtle px-3.5 py-1.5 font-mono text-xs text-muted-foreground" style={{ animationDelay: ".3s" }}>
             <span className="h-[7px] w-[7px] rounded-full bg-primary" />
-            Erreur 404 · Ressource introuvable
+            {t("misc.errorBadge")}
           </div>
         </div>
       </main>
 
       <footer className="px-7 py-5 text-center text-xs text-muted-foreground">
-        © PharmaGest · Gestion d&apos;officine
+        {t("misc.footer")}
       </footer>
     </div>
   );

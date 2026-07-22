@@ -11,6 +11,7 @@ import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
 import type { SurveillanceTab, VentesFilters, VentesFiltersKey } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
+import { useT } from "@/i18n/I18nProvider";
 
 
 // Local filter state — date fields live in the cross-route global context.
@@ -38,6 +39,7 @@ function trimForKey(f: VentesFilters): VentesFiltersKey {
 
 
 export function useVentesPage() {
+  const t = useT();
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [localFilters, setLocal] = useState<LocalVentesFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
@@ -150,10 +152,10 @@ export function useVentesPage() {
         exportFilename("VENTE", "xlsx", filters.date_from, filters.date_to),
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "L'export a échoué.";
+      const msg = e instanceof Error ? e.message : t("ventes.exportFailed");
       toast.error(msg);
     }
-  }, [filters]);
+  }, [filters, t]);
 
   return {
     filters,

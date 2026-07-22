@@ -14,6 +14,7 @@ import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { QUERY_KEYS } from "@/types";
 import type { AchatsFilters } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
+import { useT } from "@/i18n/I18nProvider";
 
 
 // Local filter state — same shape as AchatsFilters minus the two date fields
@@ -32,6 +33,7 @@ const DEFAULT_LOCAL: LocalAchatsFilters = {
 
 
 export function useAchatsPage() {
+  const t = useT();
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [localFilters, setLocal] = useState<LocalAchatsFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
@@ -131,10 +133,10 @@ export function useAchatsPage() {
         exportFilename("ACHAT", "xlsx", filters.date_from, filters.date_to),
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "L'export a échoué.";
+      const msg = e instanceof Error ? e.message : t("achats.exportFailed");
       toast.error(msg);
     }
-  }, [filters]);
+  }, [filters, t]);
 
   return {
     filters,

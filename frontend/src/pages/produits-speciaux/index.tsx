@@ -13,6 +13,7 @@ import { ExcludeProductDialog } from "./_components/ExcludeProductDialog";
 import { ReintegrateProductsDialog } from "./_components/ReintegrateProductsDialog";
 import { useBlExclusions } from "./_hooks/useBlExclusions";
 import { useProduitsSpeciaux } from "./_hooks/useProduitsSpeciaux";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 
 function formatRelative(iso: string): string {
@@ -22,19 +23,19 @@ function formatRelative(iso: string): string {
 }
 
 
-const PRODUCT_COLUMNS: ColumnDef<SpecialProduct>[] = [
-  { key: "product", label: "Produit", width: 320,
+const buildProductColumns = (t: TFn): ColumnDef<SpecialProduct>[] => [
+  { key: "product", label: t("col.produit"), width: 320,
     render: (sp) => (
       <div className="flex flex-col">
         <span className="truncate text-sm" title={sp.product}>{sp.product}</span>
         <span className="truncate font-mono text-[10px] text-muted-foreground">{sp.pid}</span>
       </div>
     ) },
-  { key: "category", label: "Catégorie", width: 200, sortable: false,
+  { key: "category", label: t("col.categorie"), width: 200, sortable: false,
     render: (sp) => sp.category
       ? <span className="block max-w-[190px] truncate text-xs text-muted-foreground">{sp.category}</span>
       : <span className="text-muted-foreground">—</span> },
-  { key: "created_at", label: "Exclus le", width: 160, sortable: false,
+  { key: "created_at", label: t("ps.exclusLe"), width: 160, sortable: false,
     render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span> },
 ];
 
@@ -43,6 +44,7 @@ type Tab = "produits" | "bl";
 
 
 export default function ProduitsSpeciauxPage() {
+  const t = useT();
   const p  = useProduitsSpeciaux();
   const bl = useBlExclusions();
   const [tab, setTab] = useState<Tab>("produits");
@@ -51,21 +53,21 @@ export default function ProduitsSpeciauxPage() {
   const [excludingBl, setExcludingBl]     = useState(false);
 
   const blColumns: ColumnDef<BlExclusion>[] = [
-    { key: "delivery_ref", label: "Référence", width: 200, sortable: false,
+    { key: "delivery_ref", label: t("col.reference"), width: 200, sortable: false,
       render: (b) => <span className="font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span> },
-    { key: "supplier", label: "Fournisseur", width: 200, sortable: false,
+    { key: "supplier", label: t("col.fournisseur"), width: 200, sortable: false,
       render: (b) => <span className="block max-w-[190px] truncate text-sm text-muted-foreground" title={b.supplier ?? ""}>{b.supplier ?? "—"}</span> },
-    { key: "delivery_date", label: "Date BL", width: 120, sortable: false,
+    { key: "delivery_date", label: t("col.dateBL"), width: 120, sortable: false,
       render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.delivery_date ?? "")}</span> },
-    { key: "nb_lines", label: "Lignes", width: 80, align: "right", sortable: false,
+    { key: "nb_lines", label: t("ps.lignes"), width: 80, align: "right", sortable: false,
       render: (b) => <span className="tabular-nums text-sm">{formatQty(b.nb_lines)}</span> },
-    { key: "total", label: "Total", width: 120, align: "right", sortable: false,
+    { key: "total", label: t("col.total"), width: 120, align: "right", sortable: false,
       render: (b) => <span className="font-mono text-sm tabular-nums">{formatMAD(b.total)}</span> },
-    { key: "notes", label: "Note", width: 220, sortable: false,
+    { key: "notes", label: t("ps.note"), width: 220, sortable: false,
       render: (b) => b.notes
         ? <span className="block max-w-[210px] truncate text-xs text-muted-foreground" title={b.notes}>{b.notes}</span>
         : <span className="text-muted-foreground">—</span> },
-    { key: "created_at", label: "Exclus le", width: 130, sortable: false,
+    { key: "created_at", label: t("ps.exclusLe"), width: 130, sortable: false,
       render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.created_at)}</span> },
     { key: "_action", label: "", width: 130, sortable: false, align: "right",
       render: (b) => (
@@ -75,32 +77,32 @@ export default function ProduitsSpeciauxPage() {
           isLoading={bl.reintegrating}
           onClick={() => bl.handleReintegrate([b.delivery_ref])}
         >
-          <Undo2 className="size-3.5" /> Réintégrer
+          <Undo2 className="size-3.5" /> {t("ps.reintegrer")}
         </AsyncButton>
       ) },
   ];
 
   const productFilters: ActiveFilter[] = p.search
-    ? [{ key: "search", label: <>Recherche : {p.search}</>, onClear: () => p.setSearch("") }]
+    ? [{ key: "search", label: <>{t("common.recherche")} {p.search}</>, onClear: () => p.setSearch("") }]
     : [];
   const blFilters: ActiveFilter[] = bl.search
-    ? [{ key: "search", label: <>Recherche : {bl.search}</>, onClear: () => bl.setSearch("") }]
+    ? [{ key: "search", label: <>{t("common.recherche")} {bl.search}</>, onClear: () => bl.setSearch("") }]
     : [];
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Produits spéciaux</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.produitsSpeciaux")}</h1>
         <p className="text-sm text-muted-foreground">
-          Excluez de vos rapports un produit ou un bon de livraison exceptionnel. Réversible à tout moment — aucune donnée n'est supprimée.
+          {t("ps.subtitle")}
         </p>
       </header>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {([
-          { id: "produits" as const, label: "Produits", icon: <Package className="size-4" /> },
-          { id: "bl" as const,       label: "Bons de livraison", icon: <FileText className="size-4" /> },
+          { id: "produits" as const, label: t("ps.tabProduits"), icon: <Package className="size-4" /> },
+          { id: "bl" as const,       label: t("ps.tabBL"), icon: <FileText className="size-4" /> },
         ]).map((t) => (
           <button
             key={t.id}
@@ -126,13 +128,13 @@ export default function ProduitsSpeciauxPage() {
             search={{
               value:       p.search,
               onChange:    p.setSearch,
-              placeholder: "Rechercher dans vos exclusions…",
+              placeholder: t("ps.searchProdPh"),
               suggestions: null,
             }}
             rightActions={[
-              { label: "Réintégrer des produits", icon: <Undo2 className="size-4" />, variant: "outline",
+              { label: t("ps.reintegrerProduits"), icon: <Undo2 className="size-4" />, variant: "outline",
                 onClick: () => setReintegrating(true), disabled: p.specialProducts.length === 0 },
-              { label: "Exclure des produits", icon: <Plus className="size-4" />, variant: "primary",
+              { label: t("ps.exclureProduits"), icon: <Plus className="size-4" />, variant: "primary",
                 onClick: () => setExcluding(true) },
             ]}
             activeFilters={productFilters}
@@ -141,10 +143,10 @@ export default function ProduitsSpeciauxPage() {
 
           <DataTable<SpecialProduct>
             rows={p.filteredProducts}
-            columns={PRODUCT_COLUMNS}
+            columns={buildProductColumns(t)}
             isLoading={p.isLoading}
-            emptyTitle="Aucun produit exclu"
-            emptyHint={p.search ? "Aucun résultat pour cette recherche." : "Cliquez sur Exclure des produits pour commencer."}
+            emptyTitle={t("ps.emptyProduits")}
+            emptyHint={p.search ? t("ps.emptySearchHint") : t("ps.emptyProduitsHint")}
             rowKey={(sp) => sp.medicament_id}
           />
         </>
@@ -157,11 +159,11 @@ export default function ProduitsSpeciauxPage() {
             search={{
               value:       bl.search,
               onChange:    bl.setSearch,
-              placeholder: "Rechercher dans vos BL exclus…",
+              placeholder: t("ps.searchBlPh"),
               suggestions: null,
             }}
             rightActions={[
-              { label: "Exclure un BL", icon: <Plus className="size-4" />, variant: "primary",
+              { label: t("ps.exclureBl"), icon: <Plus className="size-4" />, variant: "primary",
                 onClick: () => setExcludingBl(true) },
             ]}
             activeFilters={blFilters}
@@ -172,8 +174,8 @@ export default function ProduitsSpeciauxPage() {
             rows={bl.filtered}
             columns={blColumns}
             isLoading={bl.isLoading}
-            emptyTitle="Aucun bon de livraison exclu"
-            emptyHint={bl.search ? "Aucun résultat pour cette recherche." : "Cliquez sur Exclure un BL pour commencer."}
+            emptyTitle={t("ps.emptyBl")}
+            emptyHint={bl.search ? t("ps.emptySearchHint") : t("ps.emptyBlHint")}
             rowKey={(b) => b.delivery_ref}
           />
         </>

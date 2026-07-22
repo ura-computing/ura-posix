@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 
-import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
+import { useCategoryTypeOptions } from "@/components/shared/CategorySegment";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import { MonthPopover } from "@/components/shared/MonthPopover";
 import type { StatsFilters } from "@/types";
@@ -10,32 +10,33 @@ import { PaymentEditDialog }   from "./_components/PaymentEditDialog";
 import { PaymentMethodGrid }   from "./_components/PaymentMethodGrid";
 import { VentesLedger }        from "./_components/VentesLedger";
 import { useComptabilitePage } from "./_hooks/useComptabilitePage";
+import { useT } from "@/i18n/I18nProvider";
 
 
-const CATEGORY_LABEL: Record<StatsFilters["category_type"], string> = {
-  all:           "Mixte",
-  pharmacie:     "Pharmacie",
-  parapharmacie: "Parapharmacie",
+const CATEGORY_KEY: Record<StatsFilters["category_type"], string> = {
+  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
 };
 
 
 export default function ComptabilitePage() {
+  const t = useT();
   const p = useComptabilitePage();
+  const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
     (p.filters.date_from || p.filters.date_to) ? {
       key:   "dates",
-      label: <>Période : {p.filters.date_from ?? "…"} → {p.filters.date_to ?? "…"}</>,
+      label: <>{t("dashboard.periode")} {p.filters.date_from ?? "…"} → {p.filters.date_to ?? "…"}</>,
       onClear: () => p.setFilters({ ...p.filters, date_from: null, date_to: null }),
     } : null,
     p.filters.category_type !== "all" ? {
       key:   "cat",
-      label: <>Catégorie : {CATEGORY_LABEL[p.filters.category_type]}</>,
+      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[p.filters.category_type])}</>,
       onClear: () => p.setFilters({ ...p.filters, category_type: "all" }),
     } : null,
     p.filters.include_non_declared ? {
       key:   "nd",
-      label: <>Avec produits spéciaux</>,
+      label: <>{t("comptabilite.avecSpeciaux")}</>,
       onClear: () => p.setFilters({ ...p.filters, include_non_declared: false }),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -48,9 +49,9 @@ export default function ComptabilitePage() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Comptabilité</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.comptabilite")}</h1>
         <p className="text-sm text-muted-foreground">
-          Saisie des modes de paiement + vue d'ensemble des indicateurs comptables.
+          {t("comptabilite.pageSubtitle")}
         </p>
       </header>
 
@@ -63,11 +64,11 @@ export default function ComptabilitePage() {
         segment={{
           value:    p.filters.category_type,
           onChange: (v) => p.setFilters({ ...p.filters, category_type: v }),
-          options:  CATEGORY_TYPE_OPTIONS,
+          options:  categoryTypeOptions,
         }}
         rightActions={[
           {
-            label:    "Exporter Excel",
+            label:    t("common.export"),
             icon:     <Download className="size-4" />,
             variant:  "outline",
             onClick:  p.handleExport,
@@ -88,7 +89,7 @@ export default function ComptabilitePage() {
           onChange={(e) => p.setFilters({ ...p.filters, include_non_declared: e.target.checked })}
           className="cursor-pointer accent-primary"
         />
-        Inclure les produits spéciaux dans les KPI
+        {t("comptabilite.includeSpecial")}
       </label>
 
       {/* KPI cards (3) */}
@@ -102,7 +103,7 @@ export default function ComptabilitePage() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Modes de paiement
+            {t("comptabilite.paymentMethods")}
           </h2>
           <MonthPopover
             label=""
@@ -117,7 +118,7 @@ export default function ComptabilitePage() {
       {/* Ventes ledger */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Journal des ventes
+          {t("comptabilite.salesJournal")}
         </h2>
         <VentesLedger
           rows={p.ventes}

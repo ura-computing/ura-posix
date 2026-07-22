@@ -24,6 +24,7 @@ import {
 } from "@floating-ui/react";
 
 import { cn } from "@/utils/cn";
+import { useT } from "@/i18n/I18nProvider";
 import { DATE_PRESETS, type DateRange as IsoRange } from "@/utils/dateRange";
 
 // NOTE: do NOT import "react-day-picker/dist/style.css" — its default styles
@@ -84,6 +85,7 @@ export interface DateRangePopoverProps {
 export function DateRangePopover({
   from, to, onChange, showPresets = true, className,
 }: DateRangePopoverProps) {
+  const t = useT();
   const fromIso = from ?? "";
   const toIso   = to   ?? "";
 
@@ -282,11 +284,11 @@ export function DateRangePopover({
       {...getReferenceProps()}
       className={cn("inline-flex items-center gap-2", className)}
     >
-      <DateField side="from" label="Date début" segs={fromSegs} invalid={invalid.from}
+      <DateField side="from" label={t("shared.dateStart")} segs={fromSegs} invalid={invalid.from}
         registerRef={(field, el) => { refs.current[idxOf("from", field)] = el; }}
         onUpdate={updateSeg} onKeyDown={handleKeyDown} onBlur={() => handleBlur("from")} />
       <span className="text-sm text-muted-foreground">→</span>
-      <DateField side="to" label="Date fin" segs={toSegs} invalid={invalid.to}
+      <DateField side="to" label={t("shared.dateEnd")} segs={toSegs} invalid={invalid.to}
         registerRef={(field, el) => { refs.current[idxOf("to", field)] = el; }}
         onUpdate={updateSeg} onKeyDown={handleKeyDown} onBlur={() => handleBlur("to")} />
 
@@ -294,7 +296,7 @@ export function DateRangePopover({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        aria-label="Ouvrir le calendrier"
+        aria-label={t("shared.openCalendar")}
         className={cn(
           "inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
           open && "border-primary text-primary",
@@ -315,7 +317,7 @@ export function DateRangePopover({
             {showPresets && (
               <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Périodes rapides
+                  {t("shared.quickPeriods")}
                 </div>
                 <div className="grid grid-cols-2 gap-1">
                   {DATE_PRESETS.map((p) => (
@@ -325,7 +327,7 @@ export function DateRangePopover({
                       onClick={() => applyPreset(p.get())}
                       className="cursor-pointer rounded-md px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                     >
-                      {p.label}
+                      {t(p.label)}
                     </button>
                   ))}
                 </div>
@@ -366,6 +368,7 @@ interface DateFieldProps {
 }
 
 function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDown, onBlur }: DateFieldProps) {
+  const t = useT();
   const segClass = (w: string) =>
     cn(
       "bg-transparent text-center text-sm font-semibold tabular-nums outline-none placeholder:text-muted-foreground/60",
@@ -394,8 +397,8 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
           onFocus={(e) => e.target.select()}
           inputMode="numeric"
           maxLength={2}
-          placeholder="JJ"
-          aria-label={`${label} jour`}
+          placeholder={t("shared.dayAbbr")}
+          aria-label={`${label} ${t("shared.day")}`}
           className={segClass("w-[1.6em]")}
         />
         <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
@@ -408,8 +411,8 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
           onFocus={(e) => e.target.select()}
           inputMode="numeric"
           maxLength={2}
-          placeholder="MM"
-          aria-label={`${label} mois`}
+          placeholder={t("shared.monthAbbr")}
+          aria-label={`${label} ${t("shared.month")}`}
           className={segClass("w-[1.6em]")}
         />
         <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
@@ -422,8 +425,8 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
           onFocus={(e) => e.target.select()}
           inputMode="numeric"
           maxLength={4}
-          placeholder="AAAA"
-          aria-label={`${label} année`}
+          placeholder={t("shared.yearAbbr")}
+          aria-label={`${label} ${t("shared.year")}`}
           className={segClass("w-[3em]")}
         />
     </div>

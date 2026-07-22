@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Info, Loader2, X } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { PharmacyIn } from "@/types";
@@ -33,6 +34,7 @@ export interface PharmacyFormDialogProps {
 export function PharmacyFormDialog({
   open, onClose, initialValues, pharmacyName, isSaving, onSubmit,
 }: PharmacyFormDialogProps) {
+  const t = useT();
   const isCreate = !initialValues;
   const [values, setValues] = useState<PharmacyIn>(initialValues ?? EMPTY);
 
@@ -54,7 +56,7 @@ export function PharmacyFormDialog({
             </span>
             <div className="flex flex-wrap items-baseline gap-2">
               <h3 className="text-[17px] font-semibold text-foreground">
-                {isCreate ? "Nouvelle pharmacie" : `Modifier ${pharmacyName ?? values.name}`}
+                {isCreate ? t("adminPharm.newPharmacy") : t("adminPharm.editPharmacy", { name: pharmacyName ?? values.name })}
               </h3>
               {!isCreate && values.code && (
                 <span className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
@@ -63,7 +65,7 @@ export function PharmacyFormDialog({
               )}
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
@@ -72,23 +74,23 @@ export function PharmacyFormDialog({
           className="flex flex-col gap-3.5 p-5"
           onSubmit={(e) => { e.preventDefault(); onSubmit(values); }}
         >
-          <Field label="Nom" required>
+          <Field label={t("adminPharm.name")} required>
             <Input value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
           </Field>
 
-          <Field label="Ville" required hint={isCreate ? "Le code de la pharmacie est généré automatiquement à partir de la ville (ex : Bouskoura → BOU0001)." : undefined}>
+          <Field label={t("adminPharm.city")} required hint={isCreate ? t("adminPharm.cityHint") : undefined}>
             <Input value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
           </Field>
 
-          <Field label="Adresse">
+          <Field label={t("adminPharm.address")}>
             <Textarea value={values.address ?? ""} onChange={(v) => set("address", v)} placeholder="24 Bd Mohammed V…" />
           </Field>
 
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label="Téléphone">
+            <Field label={t("adminPharm.phone")}>
               <Input value={values.phone ?? ""} onChange={(v) => set("phone", v)} placeholder="+212 522 00 00 00" className="font-mono" />
             </Field>
-            <Field label="Email">
+            <Field label={t("adminPharm.email")}>
               <Input type="email" value={values.email ?? ""} onChange={(v) => set("email", v)} placeholder="contact@pharmacie.ma" />
             </Field>
           </div>
@@ -97,18 +99,18 @@ export function PharmacyFormDialog({
             <div className="flex items-start gap-2.5 rounded-lg border border-info-border bg-info-subtle px-3 py-2.5 text-info-subtle-foreground">
               <Info className="mt-0.5 size-4 shrink-0" />
               <span className="text-[12.5px] leading-snug">
-                Vous pourrez activer les fonctionnalités après la création.
+                {t("adminPharm.createFeaturesHint")}
               </span>
             </div>
           )}
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
             <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
-              Annuler
+              {t("common.cancel")}
             </AsyncButton>
             <AsyncButton type="submit" variant="primary" disabled={isSaving}>
               {isSaving && <Loader2 className="size-3.5 animate-spin" />}
-              {isCreate ? "Créer la pharmacie" : "Enregistrer"}
+              {isCreate ? t("adminPharm.createPharmacy") : t("common.save")}
             </AsyncButton>
           </div>
         </form>

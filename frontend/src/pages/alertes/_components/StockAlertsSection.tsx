@@ -7,6 +7,7 @@ import { formatMAD, formatQty } from "@/utils/format";
 import { STOCK_COLUMNS } from "./AlertDetailDialog";
 import type { StockRow } from "@/types";
 import type { DialogDescriptor } from "../_hooks/useAlertesPage";
+import { useT } from "@/i18n/I18nProvider";
 
 export interface StockAlertsSectionProps {
   negatif:   StockRow[];
@@ -21,6 +22,7 @@ export interface StockAlertsSectionProps {
 export function StockAlertsSection({
   negatif, sousStock, surStock, negUnits, sousPpv, surPpv, onOpen,
 }: StockAlertsSectionProps) {
+  const t = useT();
   const cards: {
     tone:        IconTone;
     title:       string;
@@ -30,9 +32,9 @@ export function StockAlertsSection({
     Icon:        typeof PackageX;
     dlgSubtitle: string;
   }[] = [
-    { tone: "error",   title: "Stock négatif", rows: negatif,   metricLabel: "Unités en négatif", metric: formatQty(negUnits), Icon: AlertTriangle, dlgSubtitle: "Stock théorique négatif" },
-    { tone: "warning", title: "Sous-stock",    rows: sousStock, metricLabel: "PPV potentiel",     metric: formatMAD(sousPpv),  Icon: TrendingDown,  dlgSubtitle: "Stock sous le minimum défini" },
-    { tone: "info",    title: "Sur-stock",     rows: surStock,  metricLabel: "PPV immobilisé",    metric: formatMAD(surPpv),   Icon: PackageOpen,   dlgSubtitle: "Stock au-dessus du maximum défini" },
+    { tone: "error",   title: t("alertes.stockNegatif"), rows: negatif,   metricLabel: t("alertes.unitesNegatif"), metric: formatQty(negUnits), Icon: AlertTriangle, dlgSubtitle: t("alertes.stockNegatifSub") },
+    { tone: "warning", title: t("alertes.sousStock"),    rows: sousStock, metricLabel: t("kpi.ppvPotentiel"),     metric: formatMAD(sousPpv),  Icon: TrendingDown,  dlgSubtitle: t("alertes.sousStockSub") },
+    { tone: "info",    title: t("alertes.surStock"),     rows: surStock,  metricLabel: t("alertes.ppvImmobilise"),    metric: formatMAD(surPpv),   Icon: PackageOpen,   dlgSubtitle: t("alertes.surStockSub") },
   ];
 
   return (
@@ -40,8 +42,8 @@ export function StockAlertsSection({
       <header className="flex items-center gap-2.5">
         <PackageX className="size-5 text-warning" />
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Alertes de stock</h2>
-          <p className="text-sm text-muted-foreground">Produits en sous-stock, sur-stock ou stock négatif.</p>
+          <h2 className="text-lg font-semibold text-foreground">{t("alertes.stockSection")}</h2>
+          <p className="text-sm text-muted-foreground">{t("alertes.stockSectionSub")}</p>
         </div>
       </header>
 
@@ -54,7 +56,7 @@ export function StockAlertsSection({
               label={c.title}
               icon={<c.Icon className="size-5" />}
               iconTone={c.tone}
-              badge={{ label: <>{formatQty(count)} produits</>, tone: c.tone }}
+              badge={{ label: <>{formatQty(count)} {t("common.wProduits")}</>, tone: c.tone }}
               disabled={count === 0}
               onClick={() =>
                 onOpen({

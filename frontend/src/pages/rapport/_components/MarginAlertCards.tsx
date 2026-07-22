@@ -2,31 +2,33 @@ import { ShieldCheck, TrendingDown, TrendingUp, AlertTriangle } from "lucide-rea
 
 import { KpiTile, type IconTone } from "@/components/shared/KpiTile";
 import { formatMAD, formatQty } from "@/utils/format";
+import { useT } from "@/i18n/I18nProvider";
 import { ROUTES, type CategoryType, type MarginAlertsResponse } from "@/types";
 
 
 interface BracketDef {
   key:       keyof MarginAlertsResponse;
-  title:     string;
+  titleKey:  string;
   Icon:      typeof AlertTriangle;
   tone:      IconTone;
   showLoss?: boolean;   // negative bracket shows total loss instead of CA concerné
 }
 
 const BRACKETS: BracketDef[] = [
-  { key: "negative",  title: "Marge négative",          Icon: TrendingDown,  tone: "error",   showLoss: true },
-  { key: "low",       title: "Marge 0 % à 10 %",        Icon: AlertTriangle, tone: "warning" },
-  { key: "high",      title: "Marge 60 % à 89,9 %",     Icon: TrendingUp,    tone: "info" },
-  { key: "very_high", title: "Marge supérieure à 90 %", Icon: ShieldCheck,   tone: "success" },
+  { key: "negative",  titleKey: "rapportAdmin.margeNegative", Icon: TrendingDown,  tone: "error",   showLoss: true },
+  { key: "low",       titleKey: "rapportAdmin.marge0a10",     Icon: AlertTriangle, tone: "warning" },
+  { key: "high",      titleKey: "rapportAdmin.marge60a90",    Icon: TrendingUp,    tone: "info" },
+  { key: "very_high", titleKey: "rapportAdmin.margeSup90",    Icon: ShieldCheck,   tone: "success" },
 ];
 
 
 export function MarginAlertCards({ data, tint = "all" }: { data: MarginAlertsResponse; tint?: CategoryType }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {BRACKETS.map((b) => {
         const bucket = data[b.key];
-        const subLabel = b.showLoss ? "Perte totale" : "CA concerné";
+        const subLabel = b.showLoss ? t("rapportAdmin.perteTotale") : t("rapportAdmin.caConcerne");
         const subValue = b.showLoss
           ? formatMAD(Math.abs(bucket.total_margin_dh))
           : formatMAD(bucket.total_ca);
@@ -34,12 +36,12 @@ export function MarginAlertCards({ data, tint = "all" }: { data: MarginAlertsRes
           <KpiTile
             key={b.key}
             href={ROUTES.ALERTES}
-            label={b.title}
+            label={t(b.titleKey)}
             value={subValue}
             sub={subLabel}
             icon={<b.Icon className="size-5" />}
             iconTone={b.tone}
-            badge={{ label: <>{formatQty(bucket.count)} produits</>, tone: b.tone }}
+            badge={{ label: <>{formatQty(bucket.count)} {t("rapportAdmin.produitsUnit")}</>, tone: b.tone }}
             tint={tint}
           />
         );

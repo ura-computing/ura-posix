@@ -10,6 +10,7 @@
  */
 import { Check, Loader2 } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Switch } from "@/components/shared/Switch";
 import { cn } from "@/utils/cn";
@@ -34,6 +35,7 @@ export interface FeatureToggleGridProps {
 export function FeatureToggleGrid({
   values, serverValues, isSaving, onToggle, onEnableAll, onDisableAll, onSave, onCancel,
 }: FeatureToggleGridProps) {
+  const t = useT();
   const enabledCount = FEATURES.filter((f) => values[f.key]).length;
   const dirtyCount   = FEATURES.filter((f) => values[f.key] !== serverValues[f.key]).length;
   const isDirty      = dirtyCount > 0;
@@ -42,14 +44,13 @@ export function FeatureToggleGrid({
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex max-w-[620px] flex-col gap-0.5">
-          <h2 className="text-base font-semibold text-foreground">Fonctionnalités de la pharmacie</h2>
+          <h2 className="text-base font-semibold text-foreground">{t("adminPharm.pharmacyFeaturesTitle")}</h2>
           <p className="text-sm text-muted-foreground">
-            Activez ou désactivez chaque fonctionnalité pour cette pharmacie. Les utilisateurs ne
-            peuvent utiliser que les fonctionnalités activées ici.
+            {t("adminPharm.pharmacyFeaturesDesc")}
           </p>
         </div>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          {enabledCount} / 9 activées
+          {enabledCount} / 9 {t("adminPharm.activatedFem")}
         </span>
       </div>
 
@@ -74,8 +75,8 @@ export function FeatureToggleGrid({
                   <Icon className="size-4" />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm font-semibold text-foreground">{f.label}</span>
-                  <span className="text-[11.5px] leading-snug text-muted-foreground">{f.description}</span>
+                  <span className="text-sm font-semibold text-foreground">{t(f.label)}</span>
+                  <span className="text-[11.5px] leading-snug text-muted-foreground">{t(f.description)}</span>
                 </div>
                 <Switch checked={on} onChange={(next) => onToggle(f.key, next)} />
               </div>
@@ -86,10 +87,10 @@ export function FeatureToggleGrid({
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
           <AsyncButton variant="ghost" onClick={onEnableAll} className="!h-8 !px-2 text-xs">
             <Check className="size-3.5" />
-            Tout activer
+            {t("adminPharm.enableAll")}
           </AsyncButton>
           <AsyncButton variant="ghost" onClick={onDisableAll} className="!h-8 !px-2 text-xs">
-            Tout désactiver
+            {t("adminPharm.disableAll")}
           </AsyncButton>
         </div>
       </div>
@@ -98,15 +99,15 @@ export function FeatureToggleGrid({
       {isDirty && (
         <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-primary/30 bg-primary/10 px-5 py-3">
           <span className="text-sm font-semibold text-primary">
-            {dirtyCount} modification{dirtyCount > 1 ? "s" : ""} non enregistrée{dirtyCount > 1 ? "s" : ""}
+            {dirtyCount} {t(dirtyCount > 1 ? "adminPharm.unsavedChangesPlural" : "adminPharm.unsavedChangesSingular")}
           </span>
           <div className="flex items-center gap-2">
             <AsyncButton variant="ghost" onClick={onCancel} disabled={isSaving}>
-              Annuler
+              {t("common.cancel")}
             </AsyncButton>
             <AsyncButton variant="primary" onClick={onSave} disabled={isSaving}>
               {isSaving && <Loader2 className="size-3.5 animate-spin" />}
-              Enregistrer
+              {t("common.save")}
             </AsyncButton>
           </div>
         </div>

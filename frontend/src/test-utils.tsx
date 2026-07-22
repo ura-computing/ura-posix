@@ -12,6 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 import { renderHook, type RenderHookOptions } from "@testing-library/react";
 
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
+import { I18nProvider } from "@/i18n/I18nProvider";
 
 
 export function makeQueryClient(): QueryClient {
@@ -33,9 +34,11 @@ export function AllProviders({
   const client = qc ?? makeQueryClient();
   return (
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <GlobalDateRangeProvider>{children}</GlobalDateRangeProvider>
-      </MemoryRouter>
+      <I18nProvider>
+        <MemoryRouter>
+          <GlobalDateRangeProvider>{children}</GlobalDateRangeProvider>
+        </MemoryRouter>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

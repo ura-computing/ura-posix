@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { KpiTile } from "@/components/shared/KpiTile";
+import { useT } from "@/i18n/I18nProvider";
 import type { MargeMode, StatsResponse } from "@/types";
 
 import { AdminMonthlyTrendChart } from "./AdminMonthlyTrendChart";
@@ -51,9 +52,10 @@ export interface AdminPharmacyBodyProps {
 export function AdminPharmacyBody({
   stats, pharmacyLabel, categoryType, marginMode, onMarginMode, marginRows, marginLoading, subtitleDates,
 }: AdminPharmacyBodyProps) {
-  const catLabel = categoryType === "pharmacie" ? "Pharmacie"
-    : categoryType === "parapharmacie" ? "Parapharmacie"
-    : "Mixte";
+  const t = useT();
+  const catLabel = categoryType === "pharmacie" ? t("category.pharmacie")
+    : categoryType === "parapharmacie" ? t("category.parapharmacie")
+    : t("category.mixte");
 
   // Revenue delta vs previous period (simple %; backend doesn't pre-compute it).
   const rev = stats.kpis.ventes_total;
@@ -72,33 +74,33 @@ export function AdminPharmacyBody({
 
       {/* 2a — Indicateurs clés */}
       <section className="flex flex-col gap-3.5">
-        <h2 className="text-base font-bold tracking-tight text-foreground">Indicateurs clés</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.indicateursCles")}</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiTile
-            label="Chiffre d'affaires"
+            label={t("rapportAdmin.chiffreAffaires")}
             value={fmtMad(rev)}
-            sub={prevRev > 0 ? "vs période précédente" : undefined}
+            sub={prevRev > 0 ? t("rapportAdmin.vsPeriodePrecedente") : undefined}
             delta={prevRev > 0 ? { value: revDelta } : null}
             icon={<TrendingUp className="size-4.5" />}
             iconTone="primary"
           />
           <KpiTile
-            label="Achats totaux"
+            label={t("rapportAdmin.achatsTotaux")}
             value={fmtMad(stats.kpis.achats_total)}
             icon={<ShoppingCart className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
-            label="Transactions ventes"
+            label={t("rapportAdmin.transactionsVentes")}
             value={fmtCount(stats.kpis.ventes_count)}
-            sub="opérations de vente"
+            sub={t("rapportAdmin.operationsVente")}
             icon={<BarChart3 className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
-            label="Transactions achats"
+            label={t("rapportAdmin.transactionsAchats")}
             value={fmtCount(stats.kpis.achats_count)}
-            sub="lignes d'achat"
+            sub={t("rapportAdmin.lignesAchat")}
             icon={<Package className="size-4.5" />}
             iconTone="slate"
           />
@@ -107,45 +109,45 @@ export function AdminPharmacyBody({
 
       {/* 2b — Indicateurs avancés */}
       <section className="flex flex-col gap-3.5">
-        <h2 className="text-base font-bold tracking-tight text-foreground">Indicateurs avancés</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.indicateursAvances")}</h2>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           <KpiTile
-            label="Ticket moyen"
+            label={t("rapportAdmin.ticketMoyen")}
             value={fmtMad(stats.advanced_kpis.ticket_moyen)}
-            sub="par transaction"
+            sub={t("rapportAdmin.parTransaction")}
             icon={<Receipt className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
-            label="Vente moyenne par jour"
+            label={t("rapportAdmin.venteMoyenneJour")}
             value={fmtMad(stats.advanced_kpis.vente_moyenne_par_jour)}
             icon={<BarChart3 className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
-            label="Meilleure journée DH"
+            label={t("rapportAdmin.meilleureJourneeDh")}
             value={fmtMad(stats.advanced_kpis.best_day_dh?.total)}
             sub={fmtDate(stats.advanced_kpis.best_day_dh?.date)}
             icon={<CalendarCheck className="size-4.5" />}
             iconTone="emerald"
           />
           <KpiTile
-            label="Meilleure journée (opé)"
-            value={stats.advanced_kpis.best_day_count ? `${fmtCount(stats.advanced_kpis.best_day_count.count)} opé` : "—"}
+            label={t("rapportAdmin.meilleureJourneeOpe")}
+            value={stats.advanced_kpis.best_day_count ? `${fmtCount(stats.advanced_kpis.best_day_count.count)} ${t("rapportAdmin.opeUnit")}` : "—"}
             sub={fmtDate(stats.advanced_kpis.best_day_count?.date)}
             icon={<CalendarCheck className="size-4.5" />}
             iconTone="emerald"
           />
           <KpiTile
-            label="Moins bonne journée DH"
+            label={t("rapportAdmin.moinsBonneJourneeDh")}
             value={fmtMad(stats.advanced_kpis.worst_day_dh?.total)}
             sub={fmtDate(stats.advanced_kpis.worst_day_dh?.date)}
             icon={<CalendarX className="size-4.5" />}
             iconTone="rose"
           />
           <KpiTile
-            label="Moins bonne journée (opé)"
-            value={stats.advanced_kpis.worst_day_count ? `${fmtCount(stats.advanced_kpis.worst_day_count.count)} opé` : "—"}
+            label={t("rapportAdmin.moinsBonneJourneeOpe")}
+            value={stats.advanced_kpis.worst_day_count ? `${fmtCount(stats.advanced_kpis.worst_day_count.count)} ${t("rapportAdmin.opeUnit")}` : "—"}
             sub={fmtDate(stats.advanced_kpis.worst_day_count?.date)}
             icon={<CalendarX className="size-4.5" />}
             iconTone="rose"
@@ -155,37 +157,37 @@ export function AdminPharmacyBody({
 
       {/* 2c — TVA */}
       <section className="flex flex-col gap-3.5">
-        <h2 className="text-base font-bold tracking-tight text-foreground">Déclaration TVA</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.declarationTva")}</h2>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <KpiTile
-            label="TVA encaissée (ventes)"
+            label={t("rapportAdmin.tvaEncaissee")}
             value={fmtMad(stats.tva.tva_encaissee)}
             icon={<Coins className="size-4.5" />}
             iconTone="info"
           />
           <KpiTile
-            label="TVA payée (achats)"
+            label={t("rapportAdmin.tvaPayee")}
             value={fmtMad(stats.tva.tva_payee)}
             icon={<Banknote className="size-4.5" />}
             iconTone="warning"
           />
           <KpiTile
-            label="TVA à déclarer"
+            label={t("rapportAdmin.tvaADeclarer")}
             value={fmtMad(stats.tva.tva_a_declarer)}
             icon={<Wallet className="size-4.5" />}
             iconTone="primary"
-            badge={{ label: "estimation", tone: "primary" }}
+            badge={{ label: t("rapportAdmin.estimation"), tone: "primary" }}
           />
         </div>
       </section>
 
       {/* 2d — Marge */}
       <section className="flex flex-col gap-3.5">
-        <h2 className="text-base font-bold tracking-tight text-foreground">Marge</h2>
+        <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.marge")}</h2>
         <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <MargeCell label="Marge %"        value={fmtPct(stats.marge.marge_pct)}      sub="moyenne pondérée" />
-          <MargeCell label="Marge brute DH" value={fmtMad(stats.marge.marge_brute_dh)} sub="avant charges" />
-          <MargeCell label="Marge nette DH" value={fmtMad(stats.marge.marge_nette_dh)} sub="après charges"  emphasis />
+          <MargeCell label={t("col.margePct")}                value={fmtPct(stats.marge.marge_pct)}      sub={t("rapportAdmin.moyennePonderee")} />
+          <MargeCell label={t("rapportAdmin.margeBruteDh")}   value={fmtMad(stats.marge.marge_brute_dh)} sub={t("rapportAdmin.avantCharges")} />
+          <MargeCell label={t("rapportAdmin.margeNetteDh")}   value={fmtMad(stats.marge.marge_nette_dh)} sub={t("rapportAdmin.apresCharges")}  emphasis />
         </div>
       </section>
 
@@ -202,9 +204,9 @@ export function AdminPharmacyBody({
 
       {/* 2g — Top catégories */}
       <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <span className="text-sm font-semibold text-foreground">Top catégories (ventes)</span>
+        <span className="text-sm font-semibold text-foreground">{t("rapportAdmin.topCategories")}</span>
         {stats.top_categories.length === 0 ? (
-          <span className="text-xs text-muted-foreground">Aucune donnée de catégorie pour la période.</span>
+          <span className="text-xs text-muted-foreground">{t("rapportAdmin.aucuneDonneeCategorie")}</span>
         ) : (
           <div className="flex flex-col gap-3.5">
             {stats.top_categories.slice(0, 5).map((c, i) => {

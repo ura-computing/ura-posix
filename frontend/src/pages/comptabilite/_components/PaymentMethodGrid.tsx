@@ -2,6 +2,7 @@ import { ArrowRightLeft, Banknote, CreditCard, Plus, Receipt } from "lucide-reac
 
 import { formatMAD } from "@/utils/format";
 import { PAYMENT_METHODS, type PaymentEntry, type PaymentMethod } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /**
@@ -13,11 +14,8 @@ import { PAYMENT_METHODS, type PaymentEntry, type PaymentMethod } from "@/types"
  * a glance — matches the apcm-pharma palette.
  */
 
-const METHOD_LABEL: Record<PaymentMethod, string> = {
-  tpe:      "TPE",
-  especes:  "Espèces",
-  cheques:  "Chèques",
-  virement: "Virement et autres",
+const METHOD_KEY: Record<PaymentMethod, string> = {
+  especes: "comptabilite.especes", cheques: "comptabilite.cheques", virement: "comptabilite.virement", tpe: "comptabilite.tpe",
 };
 
 const METHOD_ICON: Record<PaymentMethod, React.ReactNode> = {
@@ -64,6 +62,7 @@ export function PaymentMethodGrid({
 function Card({
   method, entry, onClick,
 }: { method: PaymentMethod; entry: PaymentEntry | null; onClick: () => void }) {
+  const t = useT();
   const tint  = METHOD_TINT[method];
   const total = entry ? entry.pharmacie_amount + entry.parapharmacie_amount : 0;
 
@@ -78,7 +77,7 @@ function Card({
           {METHOD_ICON[method]}
         </div>
         <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {METHOD_LABEL[method]}
+          {t(METHOD_KEY[method])}
         </span>
       </div>
 
@@ -88,17 +87,17 @@ function Card({
             {formatMAD(total)}
           </span>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Ph {formatMAD(entry.pharmacie_amount)}</span>
-            <span>Para {formatMAD(entry.parapharmacie_amount)}</span>
+            <span>{t("comptabilite.phAbbr")} {formatMAD(entry.pharmacie_amount)}</span>
+            <span>{t("comptabilite.paraAbbr")} {formatMAD(entry.parapharmacie_amount)}</span>
           </div>
           <span className="text-xs text-muted-foreground">
-            {entry.count} transaction{entry.count > 1 ? "s" : ""}
+            {entry.count} {entry.count > 1 ? t("comptabilite.transactionsWord") : t("comptabilite.transactionWord")}
           </span>
         </div>
       ) : (
         <div className="flex items-center gap-2 text-base text-muted-foreground">
           <Plus className="size-4" />
-          <span>Ajouter</span>
+          <span>{t("common.add")}</span>
         </div>
       )}
     </button>

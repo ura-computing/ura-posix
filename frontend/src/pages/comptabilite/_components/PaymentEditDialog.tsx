@@ -6,6 +6,7 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { MonthPopover } from "@/components/shared/MonthPopover";
 import { useDeletePayment, useSavePayment } from "@/hooks/useAccounting";
 import type { PaymentEntry, PaymentMethod } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /**
@@ -18,11 +19,8 @@ import type { PaymentEntry, PaymentMethod } from "@/types";
  * YYYY-MM string directly which is what the backend wants.
  */
 
-const METHOD_LABEL: Record<PaymentMethod, string> = {
-  tpe:      "TPE",
-  especes:  "Espèces",
-  cheques:  "Chèques",
-  virement: "Virement et autres",
+const METHOD_KEY: Record<PaymentMethod, string> = {
+  especes: "comptabilite.especes", cheques: "comptabilite.cheques", virement: "comptabilite.virement", tpe: "comptabilite.tpe",
 };
 
 
@@ -35,6 +33,7 @@ export interface PaymentEditDialogProps {
 }
 
 export function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditDialogProps) {
+  const t = useT();
   const save = useSavePayment();
   const del  = useDeletePayment();
 
@@ -78,28 +77,28 @@ export function PaymentEditDialog({ open, onClose, method, month, entry }: Payme
       <DialogContent className="max-w-md">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-semibold text-foreground">
-            {METHOD_LABEL[method]} — {monthV}
+            {t(METHOD_KEY[method])} — {monthV}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
 
         <div className="flex flex-col gap-4 px-5 py-4">
-          <Field label="Mois">
+          <Field label={t("comptabilite.moisLabel")}>
             <MonthPopover label="" value={monthV} onChange={setMonthV} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Pharmacie (MAD)">
+            <Field label={t("comptabilite.pharmacieMad")}>
               <NumberInput value={pharm} onChange={setPharm} />
             </Field>
-            <Field label="Parapharmacie (MAD)">
+            <Field label={t("comptabilite.parapharmacieMad")}>
               <NumberInput value={para} onChange={setPara} />
             </Field>
           </div>
 
-          <Field label="Nombre de transactions">
+          <Field label={t("comptabilite.nbTransactions")}>
             <NumberInput value={cnt} onChange={setCnt} integer />
           </Field>
         </div>

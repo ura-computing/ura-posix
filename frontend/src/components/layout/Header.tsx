@@ -1,9 +1,11 @@
 import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 
+import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { PharmagestWordmark } from "@/components/shared/PharmagestWordmark";
 import { useMe } from "@/hooks/useMe";
+import { useT } from "@/i18n/I18nProvider";
 import { ROLES } from "@/types";
 import type { Role } from "@/types";
 
@@ -13,18 +15,20 @@ interface HeaderProps {
   onOpenMobile: () => void;
 }
 
-const ROLE_LABELS: Record<Role, string> = {
-  [ROLES.ADMIN]:     "Administrateur",
-  [ROLES.OWNER]:     "Propriétaire",
-  [ROLES.EMPLOYEE]:  "Employé",
-  [ROLES.DEVELOPER]: "Développeur",
+const ROLE_KEYS: Record<Role, string> = {
+  [ROLES.ADMIN]:     "roles.admin",
+  [ROLES.OWNER]:     "roles.owner",
+  [ROLES.EMPLOYEE]:  "roles.employee",
+  [ROLES.DEVELOPER]: "roles.developer",
 };
 
 export function Header({ onOpenMobile }: HeaderProps) {
   const { pathname } = useLocation();
   const { me } = useMe();
-  const title = navTitle(pathname);
+  const t = useT();
+  const title = t(navTitle(pathname));
   const code = me?.pharmacy?.code;
+  const roleLabel = me ? t(ROLE_KEYS[me.role]) : "";
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-5">
@@ -32,7 +36,7 @@ export function Header({ onOpenMobile }: HeaderProps) {
         <button
           type="button"
           onClick={onOpenMobile}
-          aria-label="Ouvrir le menu"
+          aria-label={t("nav.expand")}
           className="flex cursor-pointer p-1 text-foreground md:hidden"
         >
           <Menu className="size-[22px]" />
@@ -41,7 +45,7 @@ export function Header({ onOpenMobile }: HeaderProps) {
           <span className="truncate text-sm font-semibold leading-tight tracking-tight">
             {title}
           </span>
-          <span className="text-[11px] text-muted-foreground">Accueil · {title}</span>
+          <span className="text-[11px] text-muted-foreground">{t("header.home")} · {title}</span>
         </div>
         <PharmagestWordmark className="md:hidden" iconSize={22} />
       </div>
@@ -59,9 +63,9 @@ export function Header({ onOpenMobile }: HeaderProps) {
                 color:       `var(--role-${me.role})`,
                 borderColor: `color-mix(in srgb, var(--role-${me.role}) 38%, transparent)`,
               }}
-              aria-label={`Rôle: ${ROLE_LABELS[me.role]}`}
+              aria-label={roleLabel}
             >
-              {ROLE_LABELS[me.role]}
+              {roleLabel}
             </span>
           </div>
         )}
@@ -70,6 +74,7 @@ export function Header({ onOpenMobile }: HeaderProps) {
             {code}
           </span>
         )}
+        <LanguageToggle />
         <ThemeToggle />
       </div>
     </header>

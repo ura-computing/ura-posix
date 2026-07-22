@@ -35,25 +35,25 @@ const DATA:      Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 export const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: "Tableau de bord", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
+      { label: "nav.dashboard", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
     ],
   },
   {
-    title: "Exploitation",
+    title: "nav.groupExploitation",
     items: [
-      { label: "Achats",             to: ROUTES.ACHATS,            icon: ShoppingCart,   roles: DATA, ready: true, feature: "achats" },
-      { label: "Ventes",             to: ROUTES.VENTES,            icon: TrendingUp,     roles: DATA, ready: true, feature: "ventes" },
-      { label: "Stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA, ready: true, feature: "stock" },
-      { label: "Analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA, ready: true, feature: "analyse" },
-      { label: "Alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA, ready: true, feature: "alertes" },
-      { label: "Comptabilité",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA, ready: true, feature: "accounting" },
-      { label: "Produits spéciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA, ready: true, feature: "special_products" },
+      { label: "nav.achats",             to: ROUTES.ACHATS,            icon: ShoppingCart,   roles: DATA, ready: true, feature: "achats" },
+      { label: "nav.ventes",             to: ROUTES.VENTES,            icon: TrendingUp,     roles: DATA, ready: true, feature: "ventes" },
+      { label: "nav.stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA, ready: true, feature: "stock" },
+      { label: "nav.analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA, ready: true, feature: "analyse" },
+      { label: "nav.alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA, ready: true, feature: "alertes" },
+      { label: "nav.comptabilite",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA, ready: true, feature: "accounting" },
+      { label: "nav.produitsSpeciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA, ready: true, feature: "special_products" },
     ],
   },
   {
-    title: "Gestion",
+    title: "nav.groupGestion",
     items: [
-      { label: "Gérer mon équipe",  to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
+      { label: "nav.equipe",  to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
       // HIDDEN 2026-07-03 — restore when the store-website feature ships.
       // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],
@@ -68,11 +68,11 @@ export const NAV_GROUPS: NavGroup[] = [
   //   ],
   // },
   {
-    title: "Administration",
+    title: "nav.groupAdministration",
     items: [
-      { label: "Pharmacies",  to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
-      { label: "Catalogue",   to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
-      { label: "Catégories",  to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.pharmacies",  to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.catalogue",   to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.categories",  to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
       // HIDDEN 2026-07-03 — admin/developers panel.
       // { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2, roles: [ROLES.ADMIN], ready: true },
     ],
@@ -80,12 +80,12 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 export const SETTINGS_ITEM: NavItem = {
-  label: "Gestion des imports", to: ROUTES.IMPORTS, icon: Settings, roles: ALL, ready: true,
+  label: "nav.imports", to: ROUTES.IMPORTS, icon: Settings, roles: ALL, ready: true,
   feature: "import",
 };
 
 export const ACCOUNT_ITEM: NavItem = {
-  label: "Mon compte", to: ROUTES.ME, icon: CircleUser, roles: ALL_HUMAN, ready: true,
+  label: "nav.compte", to: ROUTES.ME, icon: CircleUser, roles: ALL_HUMAN, ready: true,
 };
 
 /** Filter the nav for a given user. Admin sees every entry their role allows
@@ -111,5 +111,5 @@ export function visibleGroups(role: Role, permissions: readonly string[] = []): 
 export function navTitle(pathname: string): string {
   const all = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ITEM, ACCOUNT_ITEM];
   const match = all.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`));
-  return match?.label ?? "Tableau de bord";
+  return match?.label ?? "nav.dashboard";
 }

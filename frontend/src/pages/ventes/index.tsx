@@ -9,9 +9,11 @@ import { DiscountGauge }    from "./_components/DiscountGauge";
 import { SurveillanceTabs } from "./_components/SurveillanceTabs";
 import { VentesTable }      from "./_components/VentesTable";
 import { useVentesPage }    from "./_hooks/useVentesPage";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export default function VentesPage() {
+  const t = useT();
   const p = useVentesPage();
 
   // Wire search → suggestions debounce trigger. Keeps SearchAutocomplete decoupled from the API layer.
@@ -24,7 +26,7 @@ export default function VentesPage() {
   const activeFilters: ActiveFilter[] = [
     p.filters.search ? {
       key: "search",
-      label: <>Recherche : {p.filters.search}</>,
+      label: <>{t("common.recherche")} {p.filters.search}</>,
       onClear: () => p.setSearch(""),
     } : null,
     (p.filters.date_from || p.filters.date_to) ? {
@@ -34,12 +36,12 @@ export default function VentesPage() {
     } : null,
     p.filters.category.length > 0 ? {
       key: "category",
-      label: <>Catégorie : {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
+      label: <>{t("dashboard.categorieFilter")} {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
       onClear: () => p.setCategories([]),
     } : null,
     p.filters.tva.length > 0 ? {
       key: "tva",
-      label: <>TVA : {p.filters.tva.length}</>,
+      label: <>{t("common.tvaFilter")} {p.filters.tva.length}</>,
       onClear: () => p.setTva([]),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -47,16 +49,16 @@ export default function VentesPage() {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Ventes</h1>
-        <p className="text-sm text-muted-foreground">Historique des transactions de vente.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("ventes.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("ventes.subtitle")}</p>
       </header>
 
       <FilterBar
         search={{
           value:       p.filters.search,
           onChange:    p.setSearch,
-          placeholder: "Produit, client, N° transaction…",
-          suggestions: p.suggestions ? { Produit: p.suggestions.products, Client: p.suggestions.clients, "N° Transaction": p.suggestions.refs } : null,
+          placeholder: t("ventes.searchPh"),
+          suggestions: p.suggestions ? { [t("col.produit")]: p.suggestions.products, [t("col.client")]: p.suggestions.clients, [t("col.transaction")]: p.suggestions.refs } : null,
           onPick:      (label) => { p.setSearch(label); p.setSuggestQ(""); },
           isLoading:   p.suggestionsLoading,
         }}
@@ -66,12 +68,12 @@ export default function VentesPage() {
           onChange: p.setDateRange,
         }}
         multiSelects={[
-          { label: "Catégorie", options: p.categories, selected: p.filters.category, onChange: p.setCategories },
-          { label: "TVA",       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
+          { label: t("col.categorie"), options: p.categories, selected: p.filters.category, onChange: p.setCategories },
+          { label: t("col.tva"),       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
         ]}
         rightActions={[
-          { label: "Exporter Excel", icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
-          { label: "Importer",       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=vente` },
+          { label: t("common.export"), icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
+          { label: t("common.import"),       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=vente` },
         ]}
         activeFilters={activeFilters}
         onResetAll={p.reset}
@@ -102,10 +104,10 @@ export default function VentesPage() {
       {(p.list?.data ?? []).length > 0 && summary && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-4 py-2 text-xs">
           <span className="text-muted-foreground">
-            TVA encaissée <span className="text-foreground/60">(filtres actifs)</span> :
+            {t("ventes.tvaEncFooter")} <span className="text-foreground/60">{t("common.filtresActifs")}</span> :
             <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">{formatMAD(summary.tva_collected)}</span>
             <span className="mx-2 text-foreground/40">·</span>
-            CA total :
+            {t("ventes.caFooter")}
             <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">{formatMAD(summary.grand_total)}</span>
           </span>
         </div>

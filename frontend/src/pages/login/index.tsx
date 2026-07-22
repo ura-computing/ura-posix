@@ -9,19 +9,23 @@ import { PasswordField } from "@/components/shared/PasswordField";
 import { TextField } from "@/components/shared/TextField";
 import { ROUTES } from "@/types";
 import { cn } from "@/utils/cn";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 import { useLogin } from "@/pages/login/_hooks/useLogin";
 
-const loginSchema = z.object({
-  email:    z.string().min(1, "L'email est requis.").email("Format d'email invalide."),
-  password: z.string().min(1, "Le mot de passe est requis."),
-});
+const makeLoginSchema = (t: TFn) =>
+  z.object({
+    email:    z.string().min(1, t("misc.emailRequired")).email(t("misc.emailInvalid")),
+    password: z.string().min(1, t("misc.passwordRequired")),
+  });
 
-type LoginValues = z.infer<typeof loginSchema>;
+type LoginValues = z.infer<ReturnType<typeof makeLoginSchema>>;
 
 export default function LoginPage() {
+  const t = useT();
   const { handleLogin, isPending } = useLogin();
 
+  const loginSchema = makeLoginSchema(t);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -40,25 +44,25 @@ export default function LoginPage() {
       <div className="flex w-full max-w-[360px] flex-col gap-6">
         <header className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Connexion
+            {t("misc.loginTitle")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Accédez à votre espace PharmaGest.
+            {t("misc.loginSubtitle")}
           </p>
         </header>
 
         <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
           <TextField
-            label="Email"
+            label={t("misc.email")}
             type="email"
             autoComplete="email"
-            placeholder="vous@exemple.ma"
+            placeholder={t("misc.emailPlaceholder")}
             error={errors.email?.message}
             {...register("email")}
           />
 
           <PasswordField
-            label="Mot de passe"
+            label={t("misc.password")}
             autoComplete="current-password"
             placeholder="••••••••"
             error={errors.password?.message}
@@ -71,9 +75,9 @@ export default function LoginPage() {
               variant="primary"
               className="w-full"
               isLoading={isPending}
-              loadingText="Connexion…"
+              loadingText={t("misc.loggingIn")}
             >
-              Se connecter
+              {t("misc.login")}
             </AsyncButton>
 
             <Link
@@ -83,7 +87,7 @@ export default function LoginPage() {
                 "transition-colors hover:text-primary-hover",
               )}
             >
-              Mot de passe oublié ?
+              {t("misc.forgotPassword")}
             </Link>
           </div>
         </form>

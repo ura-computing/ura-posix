@@ -2,6 +2,7 @@ import { BarChart3, Receipt, Wallet } from "lucide-react";
 
 import { formatMAD } from "@/utils/format";
 import type { StatsResponse } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /**
@@ -14,26 +15,27 @@ import type { StatsResponse } from "@/types";
  * the StatsResponse and we render values + formatting.
  */
 export function KpiCards({ stats }: { stats: StatsResponse }) {
+  const t = useT();
   const ca       = stats.kpis.ventes_total;
   const achats   = stats.kpis.achats_total;
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <Card icon={<Wallet className="size-5" />} title="Chiffre d'Affaires" tone="primary">
-        <Row label="Ventes total"   value={formatMAD(ca)} hero />
-        <Row label="Marge"           value={`${stats.marge.marge_pct.toFixed(3)} %`} />
-        <Row label="TVA encaissée"   value={formatMAD(stats.tva.tva_encaissee)} />
+      <Card icon={<Wallet className="size-5" />} title={t("comptabilite.kpiCA")} tone="primary">
+        <Row label={t("comptabilite.ventesTotal")}   value={formatMAD(ca)} hero />
+        <Row label={t("comptabilite.marge")}           value={`${stats.marge.marge_pct.toFixed(3)} %`} />
+        <Row label={t("comptabilite.tvaEncaissee")}   value={formatMAD(stats.tva.tva_encaissee)} />
       </Card>
 
-      <Card icon={<Receipt className="size-5" />} title="Achats" tone="warning">
-        <Row label="Total achats"    value={formatMAD(achats)} hero />
-        <Row label="Opérations"      value={String(stats.kpis.achats_count)} />
-        <Row label="TVA payée"       value={formatMAD(stats.tva.tva_payee)} />
+      <Card icon={<Receipt className="size-5" />} title={t("comptabilite.kpiAchats")} tone="warning">
+        <Row label={t("kpi.totalAchats")}    value={formatMAD(achats)} hero />
+        <Row label={t("comptabilite.operations")}      value={String(stats.kpis.achats_count)} />
+        <Row label={t("comptabilite.tvaPayee")}       value={formatMAD(stats.tva.tva_payee)} />
       </Card>
 
-      <Card icon={<BarChart3 className="size-5" />} title="Bilan & TVA" tone="info">
-        <Row label="Résultat (marge brute)" value={formatMAD(stats.marge.marge_brute_dh)} hero />
-        <Row label="TVA à déclarer"      value={formatMAD(stats.tva.tva_a_declarer)} />
+      <Card icon={<BarChart3 className="size-5" />} title={t("comptabilite.bilanTva")} tone="info">
+        <Row label={t("comptabilite.resultat")} value={formatMAD(stats.marge.marge_brute_dh)} hero />
+        <Row label={t("comptabilite.tvaADeclarer")}      value={formatMAD(stats.tva.tva_a_declarer)} />
         <Row label={`Solde TVA ${new Date().getFullYear()}`} value={formatMAD(stats.tva.tva_a_declarer)} subtle />
       </Card>
     </div>

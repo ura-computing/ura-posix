@@ -8,6 +8,7 @@ import type { AbcdClass, StockRow } from "@/types";
 
 import { ABCD_COLORS, STATUS_META, STATUS_OPTIONS } from "../_constants";
 import type { StockSortKey } from "../_hooks/useStockPage";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 
 interface StockTableProps {
@@ -64,25 +65,25 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
 }
 
 
-const COLUMNS: ColumnDef<StockRow, StockSortKey>[] = [
-  { key: "product", label: "Produit", width: 280,
+const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
+  { key: "product", label: t("col.produit"), width: 280,
     render: (r) => <span className="block max-w-[260px] truncate text-base" title={r.product}>{r.product}</span> },
-  { key: "category", label: "Classe", width: 80,
+  { key: "category", label: t("stock.classe"), width: 80,
     render: (r) => <ClassPill klass={r.category} /> },
-  { key: "units_sold_12m", label: "Ventes 12m", width: 110, align: "right",
+  { key: "units_sold_12m", label: t("stock.ventes12m"), width: 110, align: "right",
     render: (r) => formatQty(r.units_sold_12m) },
-  { key: "stock_min", label: "Stock min", width: 100, align: "right",
+  { key: "stock_min", label: t("stock.stockMin"), width: 100, align: "right",
     render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_min)}</span> },
-  { key: "stock_max", label: "Stock max", width: 100, align: "right",
+  { key: "stock_max", label: t("stock.stockMax"), width: 100, align: "right",
     render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_max)}</span> },
-  { key: "current_stock", label: "Stock actuel", width: 120, align: "right",
+  { key: "current_stock", label: t("stock.stockActuel"), width: 120, align: "right",
     render: (r) => r.current_stock == null
       ? <span className="text-muted-foreground">—</span>
       : <span className={cn(
           "inline-block rounded px-1.5 py-0.5 font-semibold",
           r.status === "negatif" && "bg-error/10 text-error",
         )}>{formatQty(r.current_stock)}</span> },
-  { key: "status", label: "Statut", width: 140,
+  { key: "status", label: t("col.statut"), width: 140,
     render: (r) => <StatusPill status={r.status} /> },
 ];
 
@@ -91,10 +92,11 @@ export function StockTable({
   rows, isLoading, classFilter, status, onStatusChange, search, sortBy, sortOrder, onSort,
   page, pageSize, onPage, onPageSize, onClose,
 }: StockTableProps) {
+  const t = useT();
   // Active-filter banner above the table (Stock-specific UX).
   const topBanner = (
     <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-border bg-surface-subtle px-3.5 py-2.5">
-      <span className="text-xs font-semibold text-muted-foreground">Filtré sur</span>
+      <span className="text-xs font-semibold text-muted-foreground">{t("stock.filtreSur")}</span>
       {classFilter !== null && (
         <span
           className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold"
@@ -109,12 +111,12 @@ export function StockTable({
         </span>
       )}
       <span className="font-mono text-xs tabular-nums text-muted-foreground">
-        · {formatQty(rows.length)} produits
+        · {formatQty(rows.length)} {t("stock.produitsWord")}
       </span>
       {/* Status filter lives on top of the table (a selector), not in the page FilterBar. */}
       <div className="ml-auto flex items-center gap-2">
         <SingleSelectPopover
-          label="Statut"
+          label={t("col.statut")}
           options={STATUS_OPTIONS}
           value={status}
           onChange={onStatusChange}
@@ -137,7 +139,7 @@ export function StockTable({
   return (
     <DataTable<StockRow, StockSortKey>
       rows={pageRows}
-      columns={COLUMNS}
+      columns={buildColumns(t)}
       isLoading={isLoading}
       sortBy={sortBy}
       sortOrder={sortOrder}
@@ -147,8 +149,8 @@ export function StockTable({
         onPage, onPageSize,
       }}
       topBanner={topBanner}
-      emptyTitle="Aucun produit trouvé"
-      emptyHint="Ajustez les filtres pour voir d'autres produits."
+      emptyTitle={t("stock.emptyProduct")}
+      emptyHint={t("stock.emptyHint")}
       rowKey={(r, i) => `${r.product}-${i}`}
     />
   );

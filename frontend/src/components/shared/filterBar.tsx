@@ -17,6 +17,7 @@ import { ChevronDown, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/utils/cn";
+import { useT } from "@/i18n/I18nProvider";
 
 import { CategorySegment, type SegmentOption } from "./CategorySegment";
 import { DateRangePopover } from "./DateRangePopover";
@@ -83,6 +84,7 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
   isLoading = false,
   debounceMs = 300,
 }: SearchAutocompleteProps<G>) {
+  const t = useT();
   const [draft, setDraft] = useState(value);
   const [lastValue, setLastValue] = useState(value);
   const [open, setOpen] = useState(false);
@@ -133,12 +135,12 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
           {isLoading && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              Recherche…
+              {t("common.searching")}
             </div>
           )}
           {!isLoading && !hasAny && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              Aucun résultat
+              {t("common.noResult")}
             </div>
           )}
           {!isLoading &&
@@ -190,6 +192,7 @@ export function MultiSelectPopover({
   selected,
   onChange,
 }: MultiSelectPopoverProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -251,7 +254,7 @@ export function MultiSelectPopover({
               onClick={() => onChange([])}
               className="mt-1 block w-full cursor-pointer border-t border-border px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-surface-subtle"
             >
-              Tout désélectionner
+              {t("shared.deselectAll")}
             </button>
           )}
         </div>
@@ -269,13 +272,14 @@ export function FilterPill({
   children: ReactNode;
   onRemove: () => void;
 }) {
+  const t = useT();
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs">
       <span>{children}</span>
       <button
         type="button"
         onClick={onRemove}
-        aria-label="Supprimer le filtre"
+        aria-label={t("shared.removeFilter")}
         className="cursor-pointer rounded-full p-0.5 hover:bg-muted"
       >
         <X className="size-3" />
@@ -357,11 +361,12 @@ export function FilterBar<V extends string = string>({
   activeFilters,
   onResetAll,
 }: FilterBarProps<V>) {
+  const t = useT();
   const hasActive = (activeFilters?.length ?? 0) > 0;
 
   return (
     <section
-      aria-label="Filtres"
+      aria-label={t("shared.filters")}
       className="sticky top-0 z-20 flex flex-col gap-2.5 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur"
     >
       {/* Row 1 — controls + right cluster */}
@@ -463,7 +468,7 @@ export function FilterBar<V extends string = string>({
               onClick={onResetAll}
               className="ml-1 cursor-pointer text-xs font-semibold text-primary hover:underline"
             >
-              Tout réinitialiser
+              {t("shared.resetAll")}
             </button>
           )}
         </div>

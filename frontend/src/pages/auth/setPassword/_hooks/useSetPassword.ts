@@ -1,22 +1,24 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useT } from "@/i18n/I18nProvider";
 
 import { setPassword } from "@/api/auth";
 import { ApiErr } from "@/api/client";
 import { ROUTES } from "@/types";
 
 export function useSetPassword(token: string) {
+  const t = useT();
   const navigate = useNavigate();
 
   const mutation = useMutation({
     mutationFn: (input: { password: string }) => setPassword({ token, password: input.password }),
     onSuccess: () => {
-      toast.success("Mot de passe enregistré. Vous pouvez vous connecter.");
+      toast.success(t("toast.pwdSaved"));
       navigate(ROUTES.LOGIN, { replace: true });
     },
     onError: (err: ApiErr) => {
-      toast.error(err.detail || "Le lien a expiré pendant la saisie. Demandez un nouveau lien.");
+      toast.error(err.detail || t("toast.linkExpired"));
     },
   });
 

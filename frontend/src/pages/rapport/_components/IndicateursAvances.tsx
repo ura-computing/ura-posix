@@ -4,6 +4,7 @@ import { formatMAD, formatQty } from "@/utils/format";
 import type { AdvancedKpis, CategoryType } from "@/types";
 
 import { KpiTile } from "@/components/shared/KpiTile";
+import { useT } from "@/i18n/I18nProvider";
 
 
 function fmtDate(iso: string | null | undefined): string {
@@ -14,30 +15,31 @@ function fmtDate(iso: string | null | undefined): string {
 
 
 export function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?: CategoryType }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiTile
-        label="Ticket moyen"
+        label={t("kpi.ticketMoyen")}
         value={formatMAD(kpis.ticket_moyen)}
         icon={<Receipt className="size-5" />}
         tint={tint}
       />
       <KpiTile
-        label="Moyenne / jour"
+        label={t("kpi.moyenneJour")}
         value={formatMAD(kpis.vente_moyenne_par_jour)}
-        sub="ventes journalières"
+        sub={t("kpi.ventesJourn")}
         icon={<BarChart3 className="size-5" />}
         tint={tint}
       />
       <KpiTile
-        label="Meilleure journée"
+        label={t("kpi.meilleureJournee")}
         value={formatMAD(kpis.best_day_dh?.total ?? 0)}
         sub={<>{fmtDate(kpis.best_day_dh?.date)} · {formatQty(kpis.best_day_count?.count ?? 0)} opé</>}
         icon={<CalendarCheck className="size-5" />}
         tint={tint}
       />
       <KpiTile
-        label="Moins bonne journée"
+        label={t("kpi.moinsBonneJournee")}
         value={formatMAD(kpis.worst_day_dh?.total ?? 0)}
         sub={<>{fmtDate(kpis.worst_day_dh?.date)} · {formatQty(kpis.worst_day_count?.count ?? 0)} opé</>}
         icon={<CalendarX className="size-5" />}

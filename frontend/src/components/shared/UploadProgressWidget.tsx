@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useT } from "@/i18n/I18nProvider";
 import { Ban, CheckCircle2, Clock, FileSpreadsheet, Loader2, X } from "lucide-react";
 
 import { useUploadCtx, type UploadJob } from "@/contexts/UploadContext";
@@ -23,7 +24,7 @@ import type { DocType } from "@/types";
  */
 
 const TYPE_LABEL: Record<DocType, string> = {
-  achat: "Achats", vente: "Ventes", stock: "Stock",
+  achat: "upload.typeAchat", vente: "upload.typeVente", stock: "upload.typeStock",
 };
 
 /** Cap visible cards — older finished ones drop off the bottom of the stack.
@@ -77,6 +78,7 @@ function JobCard({
   onCancel:      () => void;
   onDismiss:     () => void;
 }) {
+  const t      = useT();
   const tint   = `var(--color-doc-${job.docType})`;
   const tintBg = `var(--color-doc-${job.docType}-bg)`;
   const border = `var(--color-doc-${job.docType}-border)`;
@@ -106,16 +108,16 @@ function JobCard({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {TYPE_LABEL[job.docType]}
+              {t(TYPE_LABEL[job.docType])}
             </span>
             {job.phase === "uploading" && (
               <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                Lot {job.progress.current}/{job.progress.total}
+                {t("upload.lot", { current: job.progress.current, total: job.progress.total })}
               </span>
             )}
             {job.phase === "queued" && queuePosition != null && (
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                {queuePosition === 1 ? "1ᵉʳ en file" : `${queuePosition}ᵉ en file`}
+                {queuePosition === 1 ? t("upload.firstInQueue") : t("upload.nInQueue", { n: queuePosition })}
               </span>
             )}
           </div>
@@ -134,14 +136,14 @@ function JobCard({
             />
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{pct}% · {formatQty(job.progress.inserted)} insérées</span>
+            <span>{pct}% · {formatQty(job.progress.inserted)} {t("upload.inserted")}</span>
             <button
               type="button"
               onClick={onCancel}
               className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-destructive/30 px-2 py-0.5 font-semibold text-destructive hover:bg-destructive/5"
             >
               <Ban className="size-3" />
-              Annuler
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -149,11 +151,11 @@ function JobCard({
 
       {job.phase === "queued" && (
         <div className="flex items-center justify-between px-4 pb-3 pt-1 text-[11px] text-muted-foreground">
-          <span>En attente — démarrera après l'import en cours.</span>
+          <span>{t("upload.waiting")}</span>
           <button
             type="button"
             onClick={onCancel}
-            aria-label="Retirer de la file"
+            aria-label={t("upload.removeFromQueue")}
             className="cursor-pointer text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" />
@@ -163,15 +165,15 @@ function JobCard({
 
       {job.phase === "success" && (
         <p className="px-4 pb-3 text-xs text-muted-foreground">
-          {formatQty(job.progress.inserted)} lignes importées
-          {job.progress.skipped > 0 ? <> · {formatQty(job.progress.skipped)} ignorées</> : null}
+          {formatQty(job.progress.inserted)} {t("upload.linesImported")}
+          {job.progress.skipped > 0 ? <> · {formatQty(job.progress.skipped)} {t("upload.skipped")}</> : null}
         </p>
       )}
 
       {job.phase === "cancelled" && (
         <div className="flex items-center justify-between px-4 pb-3 text-xs">
-          <span className="text-warning">Import annulé.</span>
-          <button type="button" onClick={onDismiss} aria-label="Fermer" className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <span className="text-warning">{t("upload.cancelled")}</span>
+          <button type="button" onClick={onDismiss} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-3.5" />
           </button>
         </div>
@@ -179,8 +181,8 @@ function JobCard({
 
       {job.phase === "error" && (
         <div className="flex items-start justify-between gap-2 px-4 pb-3 text-xs">
-          <span className="text-error">{job.error ?? "Erreur d'importation."}</span>
-          <button type="button" onClick={onDismiss} aria-label="Fermer" className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground">
+          <span className="text-error">{job.error ?? t("upload.importError")}</span>
+          <button type="button" onClick={onDismiss} aria-label={t("common.close")} className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground">
             <X className="size-3.5" />
           </button>
         </div>

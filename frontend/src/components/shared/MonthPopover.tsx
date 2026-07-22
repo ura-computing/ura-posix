@@ -14,15 +14,14 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/utils/cn";
+import { useMonths, useMonthsShort } from "@/i18n/dates";
+import { useT } from "@/i18n/I18nProvider";
 
 import { POPOVER_ALIGN, POPOVER_OPTION, POPOVER_PANEL, POPOVER_POSITION, POPOVER_TRIGGER } from "./filterBar";
 
 
-const MONTHS_FR = [
-  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
-];
-const MONTHS_FR_SHORT = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
+
+
 
 
 /** Decompose a "YYYY-MM" string into [year, monthIdx] (monthIdx is 0-based). */
@@ -50,8 +49,11 @@ export interface MonthPopoverProps {
 
 
 export function MonthPopover({
-  value, onChange, label = "Mois", placement = "bottom", align = "start",
+  value, onChange, label = "", placement = "bottom", align = "start",
 }: MonthPopoverProps) {
+  const t = useT();
+  const MONTHS_FR = useMonths();
+  const MONTHS_FR_SHORT = useMonthsShort();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -101,7 +103,7 @@ export function MonthPopover({
             <button
               type="button"
               onClick={() => setDisplayYear(displayYear - 1)}
-              aria-label="Année précédente"
+              aria-label={t("shared.prevYear")}
               className="rounded p-1 hover:bg-surface-subtle"
             >
               <ChevronLeft className="size-4" />
@@ -110,7 +112,7 @@ export function MonthPopover({
             <button
               type="button"
               onClick={() => setDisplayYear(displayYear + 1)}
-              aria-label="Année suivante"
+              aria-label={t("shared.nextYear")}
               className="rounded p-1 hover:bg-surface-subtle"
             >
               <ChevronRight className="size-4" />

@@ -10,6 +10,7 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DataTable } from "@/components/shared/DataTable";
 import { SuffixBadge } from "@/components/shared/SuffixBadge";
+import { useT } from "@/i18n/I18nProvider";
 import type { ColumnDef } from "@/components/shared/DataTable";
 import type { CategorySuffixOut } from "@/types";
 
@@ -28,6 +29,7 @@ function normalizeCategory(input: string): string {
 
 
 export default function AdminCategoriesPage() {
+  const t = useT();
   const list = useCategorySuffixes();
   const createMut = useCreateCategorySuffix();
   const updateMut = useUpdateCategorySuffix();
@@ -42,7 +44,7 @@ export default function AdminCategoriesPage() {
   const columns: ColumnDef<CategorySuffixOut>[] = [
     {
       key: "category",
-      label: "Catégorie",
+      label: t("col.categorie"),
       sortable: false,
       render: (row) => (
         <div className="flex flex-col">
@@ -53,7 +55,7 @@ export default function AdminCategoriesPage() {
     },
     {
       key: "suffix",
-      label: "Suffixe",
+      label: t("categories.suffix"),
       sortable: false,
       render: (row) => (
         // SuffixBadge returns null when color is null — render a fallback gray pill so
@@ -65,7 +67,7 @@ export default function AdminCategoriesPage() {
     },
     {
       key: "actions",
-      label: "Actions",
+      label: t("categories.actions"),
       align: "right",
       sortable: false,
       width: 110,
@@ -74,7 +76,7 @@ export default function AdminCategoriesPage() {
           <button
             type="button"
             onClick={() => setEditing(row)}
-            aria-label="Modifier"
+            aria-label={t("common.edit")}
             className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
           >
             <Pencil className="size-3.5" />
@@ -82,7 +84,7 @@ export default function AdminCategoriesPage() {
           <button
             type="button"
             onClick={() => setRemoveTarget(row)}
-            aria-label="Supprimer"
+            aria-label={t("common.delete")}
             className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-error-subtle hover:text-error"
           >
             <Trash2 className="size-3.5" />
@@ -96,21 +98,21 @@ export default function AdminCategoriesPage() {
     <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Catégories</h1>
-          <p className="text-sm text-muted-foreground">Suffixes de référence par catégorie de produit.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("categories.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("categories.subtitle")}</p>
         </div>
         <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
-          Nouveau mapping
+          {t("categories.newMapping")}
         </AsyncButton>
       </header>
 
       {list.isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
-          <span className="text-sm font-medium">Impossible de charger les mappings.</span>
+          <span className="text-sm font-medium">{t("categories.loadError")}</span>
           <AsyncButton variant="secondary" onClick={() => list.refetch()}>
             <RefreshCw className="size-3.5" />
-            Réessayer
+            {t("common.retry")}
           </AsyncButton>
         </div>
       ) : list.isLoading ? (
@@ -122,8 +124,8 @@ export default function AdminCategoriesPage() {
           rows={items}
           columns={columns}
           rowKey={(r) => r.id}
-          emptyTitle="Aucun mapping configuré"
-          emptyHint="Cliquez sur Nouveau mapping pour commencer."
+          emptyTitle={t("categories.emptyTitle")}
+          emptyHint={t("categories.emptyHint")}
         />
       )}
 
@@ -160,11 +162,11 @@ export default function AdminCategoriesPage() {
           await deleteMut.mutateAsync(removeTarget.id);
           setRemoveTarget(null);
         }}
-        title={removeTarget ? `Supprimer le mapping « ${removeTarget.category} » ?` : ""}
-        description="Les ventes liées à cette catégorie n'afficheront plus de suffixe coloré."
+        title={removeTarget ? t("categories.deleteTitle", { category: removeTarget.category }) : ""}
+        description={t("categories.deleteDesc")}
         variant="destructive"
-        confirmLabel="Supprimer"
-        loadingLabel="Suppression…"
+        confirmLabel={t("common.delete")}
+        loadingLabel={t("categories.deleting")}
         isLoading={deleteMut.isPending}
       />
     </div>

@@ -7,6 +7,7 @@ import { formatMAD, formatQty } from "@/utils/format";
 import { PEREMPTION_COLUMNS } from "./AlertDetailDialog";
 import type { PeremptionsResponse, PeremptionBracket } from "@/types";
 import type { DialogDescriptor } from "../_hooks/useAlertesPage";
+import { useT } from "@/i18n/I18nProvider";
 
 export interface PeremptionsSectionProps {
   data?: PeremptionsResponse;
@@ -22,7 +23,9 @@ function MiniStat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
+export function PeremptionsSection({
+  data, onOpen }: PeremptionsSectionProps) {
+  const t = useT();
   // 4 mutually-exclusive cards — labels + buckets port the old apcm-pharma
   // app verbatim (client-requested parity). The first three are date-bucketed
   // by urgency; the fourth (`no_date`) is a data-quality bucket — products
@@ -35,10 +38,10 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
     dlgTitle:    string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired",    tone: "error",   title: "Expirés",             sub: "Action urgente", dlgTitle: "Produits expirés",               dlgSubtitle: "Produits dont la date de péremption est passée." },
-    { key: "very_close", tone: "warning", title: "Très proche (<30j)", sub: "Très urgent",    dlgTitle: "Péremption très proche (<30j)",  dlgSubtitle: "Produits qui expirent dans moins de 30 jours." },
-    { key: "close",      tone: "warning", title: "Proche (<90j)",      sub: "À surveiller",   dlgTitle: "Péremption proche (<90j)",       dlgSubtitle: "Produits qui expirent dans moins de 90 jours." },
-    { key: "no_date",    tone: "muted",   title: "Sans date",           sub: "À renseigner",   dlgTitle: "Produits sans date de péremption", dlgSubtitle: "Produits en stock dont la date de péremption n'est pas renseignée." },
+    { key: "expired",    tone: "error",   title: t("peremptions.expires"),             sub: t("peremptions.actionUrgente"), dlgTitle: t("peremptions.dlgExpires"),               dlgSubtitle: t("peremptions.dlgExpiresSub") },
+    { key: "very_close", tone: "warning", title: t("peremptions.tresProche"), sub: t("peremptions.tresUrgent"),    dlgTitle: t("peremptions.dlgTresProche"),  dlgSubtitle: t("peremptions.dlgTresProcheSub") },
+    { key: "close",      tone: "warning", title: t("peremptions.proche"),      sub: t("peremptions.aSurveiller"),   dlgTitle: t("peremptions.dlgProche"),       dlgSubtitle: t("peremptions.dlgProcheSub") },
+    { key: "no_date",    tone: "muted",   title: t("peremptions.sansDate"),           sub: t("peremptions.aRenseigner"),   dlgTitle: t("peremptions.dlgSansDate"), dlgSubtitle: t("peremptions.dlgSansDateSub") },
   ];
 
   return (
@@ -46,8 +49,8 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
       <header className="flex items-center gap-2.5">
         <CalendarX className="size-5 text-error" />
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Alertes de péremption</h2>
-          <p className="text-sm text-muted-foreground">Produits expirés ou proches de l'expiration.</p>
+          <h2 className="text-lg font-semibold text-foreground">{t("peremptions.sectionTitle")}</h2>
+          <p className="text-sm text-muted-foreground">{t("peremptions.sectionSub")}</p>
         </div>
       </header>
 
@@ -79,8 +82,8 @@ export function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
               }
             >
               <div className="flex items-center gap-5 pt-0.5">
-                <MiniStat label="Unités"       value={formatQty(b?.total_units ?? 0)} />
-                <MiniStat label="Valeur achat" value={formatMAD(b?.purchase_value ?? 0)} />
+                <MiniStat label={t("col.unites")}       value={formatQty(b?.total_units ?? 0)} />
+                <MiniStat label={t("peremptions.valeurAchat")} value={formatMAD(b?.purchase_value ?? 0)} />
               </div>
             </KpiTile>
           );

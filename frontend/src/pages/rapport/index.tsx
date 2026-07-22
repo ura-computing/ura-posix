@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Building2 } from "lucide-react";
 
-import { CATEGORY_TYPE_OPTIONS } from "@/components/shared/CategorySegment";
+import { useCategoryTypeOptions } from "@/components/shared/CategorySegment";
 import { FilterBar, type ActiveFilter } from "@/components/shared/filterBar";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { useMe } from "@/hooks/useMe";
@@ -31,25 +31,27 @@ import { SanteFinanciereCard }  from "./_components/SanteFinanciereCard";
 import { StockSummaryTiles }    from "./_components/StockSummaryTiles";
 import { TrendChart }           from "./_components/TrendChart";
 import { TvaTiles }             from "./_components/TvaTiles";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 
-const CATEGORY_LABEL = { all: "Mixte", pharmacie: "Pharmacie", parapharmacie: "Parapharmacie" } as const;
+const CATEGORY_KEY = { all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie" } as const;
 
 
 /** Build the activeFilters[] array from StatsFilters — shared by both owner + admin views. */
 function buildActiveFilters(
   filters: StatsFilters,
   setFilters: (f: StatsFilters) => void,
+  t: TFn,
 ): ActiveFilter[] {
   return [
     (filters.date_from || filters.date_to) ? {
       key:    "dates",
-      label:  <>Période : {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
+      label:  <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
       onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
     } : null,
     filters.category_type !== "all" ? {
       key:    "category",
-      label:  <>Catégorie : {CATEGORY_LABEL[filters.category_type]}</>,
+      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
       onClear: () => setFilters({ ...filters, category_type: "all" }),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -79,6 +81,8 @@ export default function RapportPage() {
 // ────────────────────────────────────────────────────────────────────────────
 
 function OwnerView() {
+  const t = useT();
+  const categoryTypeOptions = useCategoryTypeOptions();
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
   const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
@@ -99,8 +103,8 @@ function OwnerView() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tableau de bord</h1>
-        <p className="text-sm text-muted-foreground">Vue d'ensemble de votre activité.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("dashboard.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("dashboard.subtitle")}</p>
       </header>
 
       <FilterBar<StatsFilters["category_type"]>
@@ -112,9 +116,9 @@ function OwnerView() {
         segment={{
           value:    filters.category_type,
           onChange: (v) => setFilters({ ...filters, category_type: v }),
-          options:  CATEGORY_TYPE_OPTIONS,
+          options:  categoryTypeOptions,
         }}
-        activeFilters={buildActiveFilters(filters, setFilters)}
+        activeFilters={buildActiveFilters(filters, setFilters, t)}
         onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); }}
       />
 
@@ -122,7 +126,7 @@ function OwnerView() {
 
       {e1 && (
         <div className="rounded-md border border-error-border bg-error-subtle px-4 py-3 text-sm text-error-subtle-foreground">
-          Impossible de charger le rapport. Réessayez plus tard.
+          {t("dashboard.loadError")}
         </div>
       )}
 
@@ -137,6 +141,8 @@ function OwnerView() {
 // ────────────────────────────────────────────────────────────────────────────
 
 function AdminView() {
+  const t = useT();
+  const categoryTypeOptions = useCategoryTypeOptions();
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
@@ -157,19 +163,19 @@ function AdminView() {
 
   const loading = pharmacyId !== null && l1;
   const subtitleDates = dateFrom || dateTo
-    ? `Période : ${dateFrom ?? "…"} → ${dateTo ?? "…"}`
-    : "Ventes et achats sur les 12 derniers mois";
+    ? `${t("dashboard.periode")} ${dateFrom ?? "…"} → ${dateTo ?? "…"}`
+    : t("trend.last12");
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tableau de bord</h1>
-        <p className="text-sm text-muted-foreground">Vue d'ensemble du système et drill-down par pharmacie.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("dashboard.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("dashboard.subtitleAdmin")}</p>
       </header>
 
       {/* Vue système — always shown */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vue système</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.vueSysteme")}</h2>
         {ls || !systemStats ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />)}
@@ -181,17 +187,17 @@ function AdminView() {
 
       {/* Per-pharmacy drill-down */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rapport par pharmacie</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.parPharmacie")}</h2>
         {/* Admin pharmacy picker — uses the shared SingleSelectPopover so the
             trigger + panel match every other dropdown in the app (Catégorie,
             Type, Statut, page-size, etc.). */}
         <div className="flex flex-wrap items-center gap-3">
           <SingleSelectPopover
-            label="Pharmacie"
+            label={t("category.pharmacie")}
             value={pharmacyId != null ? String(pharmacyId) : ""}
             onChange={(v) => setPharmacyId(v ? Number(v) : null)}
             options={[
-              { value: "", label: "Toutes les pharmacies" },
+              { value: "", label: t("dashboard.toutesPharmacies") },
               ...pharmacies.map((p) => ({
                 value: String(p.id),
                 label: [p.code, p.name].filter(Boolean).join(" · "),
@@ -209,15 +215,15 @@ function AdminView() {
           segment={{
             value:    filters.category_type,
             onChange: (v) => setFilters({ ...filters, category_type: v }),
-            options:  CATEGORY_TYPE_OPTIONS,
+            options:  categoryTypeOptions,
           }}
           activeFilters={[
             ...(pharmacyId !== null ? [{
               key:    "pharmacy",
-              label:  <>Pharmacie : {pharmacies.find((p) => p.id === pharmacyId)?.code ?? pharmacies.find((p) => p.id === pharmacyId)?.name ?? "—"}</>,
+              label:  <>{t("rapportAdmin.pharmacieFilter")} {pharmacies.find((p) => p.id === pharmacyId)?.code ?? pharmacies.find((p) => p.id === pharmacyId)?.name ?? "—"}</>,
               onClear: () => setPharmacyId(null),
             }] : []),
-            ...buildActiveFilters(filters, setFilters),
+            ...buildActiveFilters(filters, setFilters, t),
           ]}
           onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); setPharmacyId(null); }}
         />
@@ -226,7 +232,7 @@ function AdminView() {
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <Building2 className="size-12 text-muted-foreground" aria-hidden />
             <p className="max-w-md text-sm text-muted-foreground">
-              Sélectionnez une pharmacie ci-dessus pour afficher ses statistiques détaillées.
+              {t("rapportAdmin.selectPharmacyHint")}
             </p>
           </div>
         )}
@@ -235,7 +241,7 @@ function AdminView() {
 
         {e1 && (
           <div className="rounded-md border border-error-border bg-error-subtle px-4 py-3 text-sm text-error-subtle-foreground">
-            Impossible de charger le rapport pour cette pharmacie.
+            {t("rapportAdmin.pharmacyLoadError")}
           </div>
         )}
 
@@ -273,6 +279,7 @@ interface SectionsProps {
 }
 
 function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
+  const t = useT();
   const { me } = useMe();
   // Admin bypass: see every section regardless of feature flags. Non-admin:
   // hide sections whose backing feature isn't in their effective permissions.
@@ -296,7 +303,7 @@ function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
       {/* Section 5 — Alertes marges (feature: alertes) */}
       {has("alertes") && alerts && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alertes marges</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.alertesMarges")}</h2>
           <MarginAlertCards data={alerts} tint={category} />
         </section>
       )}
@@ -304,7 +311,7 @@ function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
       {/* Section 6 — Déclaration TVA (feature: accounting) */}
       {has("accounting") && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Déclaration TVA</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.declarationTva")}</h2>
           <TvaTiles tva={stats.tva} tint={category} />
         </section>
       )}
@@ -315,7 +322,7 @@ function RapportSections({ stats, alerts, stock, category }: SectionsProps) {
       {/* Section 8 — Stock summary (feature: stock) */}
       {has("stock") && stock && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stock</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("col.stock")}</h2>
           <StockSummaryTiles stock={stock} tint={category} />
         </section>
       )}

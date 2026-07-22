@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle, TrendingDown, CalendarX, PackageMinus, PackagePlus } from "lucide-react";
 import { formatQty } from "@/utils/format";
+import { useT } from "@/i18n/I18nProvider";
 
 export interface GlobalSummaryStripProps {
   totalAlerts: number;
@@ -27,14 +28,15 @@ function Chip({ icon, color, label, value }: { icon: ReactNode; color: string; l
 }
 
 export function GlobalSummaryStrip(p: GlobalSummaryStripProps) {
+  const t = useT();
   return (
     <div className="flex flex-wrap gap-3">
-      <Chip icon={<AlertTriangle className="size-4" />} color="bg-red-500/10 text-red-500" label="Alertes totales" value={p.totalAlerts} />
-      <Chip icon={<TrendingDown className="size-4" />} color="bg-red-500/10 text-red-500" label="Marges négatives" value={p.marginNegative} />
-      <Chip icon={<TrendingDown className="size-4" />} color="bg-amber-500/10 text-amber-500" label="Marges faibles" value={p.marginLow} />
-      <Chip icon={<CalendarX className="size-4" />} color="bg-red-500/10 text-red-500" label="Péremptions critiques" value={p.peremptionCritical} />
-      <Chip icon={<PackageMinus className="size-4" />} color="bg-amber-500/10 text-amber-500" label="Stock à réapprovisionner" value={p.toRestock} />
-      <Chip icon={<PackagePlus className="size-4" />} color="bg-blue-500/10 text-blue-500" label="Stock excessif" value={p.excessStock} />
+      <Chip icon={<AlertTriangle className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.alertesTotales")} value={p.totalAlerts} />
+      <Chip icon={<TrendingDown className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.margesNegatives")} value={p.marginNegative} />
+      <Chip icon={<TrendingDown className="size-4" />} color="bg-amber-500/10 text-amber-500" label={t("alertes.margesFaibles")} value={p.marginLow} />
+      <Chip icon={<CalendarX className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.peremptionsCritiques")} value={p.peremptionCritical} />
+      <Chip icon={<PackageMinus className="size-4" />} color="bg-amber-500/10 text-amber-500" label={t("alertes.stockReappro")} value={p.toRestock} />
+      <Chip icon={<PackagePlus className="size-4" />} color="bg-blue-500/10 text-blue-500" label={t("alertes.stockExcessif")} value={p.excessStock} />
     </div>
   );
 }

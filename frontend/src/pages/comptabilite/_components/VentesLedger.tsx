@@ -1,5 +1,6 @@
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/components/shared/DataTable";
 import type { VenteRow } from "@/types";
+import { useT, type TFn } from "@/i18n/I18nProvider";
 
 
 /**
@@ -14,7 +15,7 @@ import type { VenteRow } from "@/types";
  * unit_price, total. We expose date / client as sortable.
  */
 
-const COLUMNS: ColumnDef<VenteRow>[] = [
+const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
   {
     key: "date",
     label: "Date",
@@ -23,13 +24,13 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
   },
   {
     key: "client",
-    label: "Client",
+    label: t("col.client"),
     sortable: true,
-    render: (r) => <span>{r.client || <span className="text-muted-foreground">Anonyme</span>}</span>,
+    render: (r) => <span>{r.client || <span className="text-muted-foreground">{t("ventes.anonyme")}</span>}</span>,
   },
   {
     key: "product",
-    label: "Produit",
+    label: t("col.produit"),
     sortable: false,
     render: (r) => (
       <div className="flex flex-col">
@@ -40,7 +41,7 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
   },
   {
     key: "category",
-    label: "Catégorie",
+    label: t("col.categorie"),
     sortable: false,
     render: (r) => <span className="text-xs text-muted-foreground">{r.category ?? "—"}</span>,
   },
@@ -49,9 +50,9 @@ const COLUMNS: ColumnDef<VenteRow>[] = [
     label: "Type",
     sortable: false,
     render: (r) => r.category_type === "pharmacie"
-      ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">Pharmacie</span>
+      ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-600">{t("category.pharmacie")}</span>
       : r.category_type === "parapharmacie"
-        ? <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600">Parapharmacie</span>
+        ? <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600">{t("category.parapharmacie")}</span>
         : <span className="text-muted-foreground">—</span>,
   },
   {
@@ -74,16 +75,17 @@ interface VentesLedgerProps {
 }
 
 export function VentesLedger({ rows, isLoading, sortBy, sortOrder, onSort, pagination }: VentesLedgerProps) {
+  const t = useT();
   return (
     <DataTable
       rows={rows}
-      columns={COLUMNS}
+      columns={buildColumns(t)}
       isLoading={isLoading}
       sortBy={sortBy}
       sortOrder={sortOrder}
       onSort={onSort}
       pagination={pagination}
-      emptyTitle="Aucune transaction de vente pour la période."
+      emptyTitle={t("comptabilite.emptyVentes")}
     />
   );
 }

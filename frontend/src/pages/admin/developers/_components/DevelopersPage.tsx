@@ -1,13 +1,22 @@
 import { Plus, Search, UserCog } from "lucide-react";
 
+import { useT } from "@/i18n/I18nProvider";
 import { KebabMenu } from "@/components/shared/KebabMenu";
 import { Button } from "@/components/ui/button";
 import {
-  DEVELOPER_STATUS_LABEL,
   type DeveloperAccount, type DeveloperStatus,
 } from "@/types/storeWebsite";
 
 import { formatRelative } from "../../../store-website/_format";
+
+
+/** i18n key per developer status — the source enum values ("actif" | …) stay
+ *  as logic; only the displayed label is translated. */
+const STATUS_KEY: Record<DeveloperStatus, string> = {
+  actif:      "developers.statusActif",
+  en_attente: "developers.statusEnAttente",
+  desactive:  "developers.statusDesactive",
+};
 
 
 /** /admin/developers — admin user-management page for developer accounts.
@@ -31,20 +40,21 @@ export interface DevelopersPageProps {
 
 
 export function DevelopersPage(props: DevelopersPageProps) {
+  const t = useT();
   const { developers, isLoading, isError, search } = props;
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Développeurs</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("developers.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Gérez les comptes développeur de la plateforme.
+            {t("developers.subtitle")}
           </p>
         </div>
         <Button onClick={props.onInvite}>
           <Plus className="size-4" />
-          Inviter un développeur
+          {t("developers.invite")}
         </Button>
       </header>
 
@@ -53,16 +63,16 @@ export function DevelopersPage(props: DevelopersPageProps) {
         <input
           value={search}
           onChange={(e) => props.onSearch(e.target.value)}
-          placeholder="Rechercher par nom ou e-mail…"
+          placeholder={t("developers.searchPlaceholder")}
           className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
       </div>
 
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-error-border bg-error-subtle px-4 py-3 text-sm font-medium text-error-subtle-foreground">
-          Impossible de charger les développeurs.
+          {t("developers.loadError")}
           <Button variant="outline" size="sm" onClick={props.onRetry}>
-            Réessayer
+            {t("common.retry")}
           </Button>
         </div>
       ) : isLoading ? (
@@ -74,10 +84,10 @@ export function DevelopersPage(props: DevelopersPageProps) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-subtle text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5">Nom</th>
-                <th className="px-4 py-2.5">Statut</th>
-                <th className="px-4 py-2.5 text-right">Demandes actives</th>
-                <th className="px-4 py-2.5">Dernière activité</th>
+                <th className="px-4 py-2.5">{t("developers.colName")}</th>
+                <th className="px-4 py-2.5">{t("col.statut")}</th>
+                <th className="px-4 py-2.5 text-right">{t("developers.colActiveRequests")}</th>
+                <th className="px-4 py-2.5">{t("developers.colLastActive")}</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -111,7 +121,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
                             onClick={() => { props.onResetPassword(d.id); close(); }}
                             className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
                           >
-                            Réinitialiser le mot de passe
+                            {t("developers.resetPassword")}
                           </button>
                           {d.status === "desactive" ? (
                             <button
@@ -119,7 +129,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
                               onClick={() => { props.onToggleActive(d.id, true); close(); }}
                               className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
                             >
-                              Activer le compte
+                              {t("developers.activateAccount")}
                             </button>
                           ) : (
                             <button
@@ -127,7 +137,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
                               onClick={() => { props.onToggleActive(d.id, false); close(); }}
                               className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-error-subtle-foreground hover:bg-error-subtle"
                             >
-                              Désactiver le compte
+                              {t("developers.deactivateAccount")}
                             </button>
                           )}
                         </>
@@ -146,6 +156,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
 
 
 function StatusBadge({ status }: { status: DeveloperStatus }) {
+  const t = useT();
   const tone =
     status === "actif"
       ? "bg-success-subtle text-success-subtle-foreground"
@@ -155,24 +166,25 @@ function StatusBadge({ status }: { status: DeveloperStatus }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone}`}>
       <span className="size-1.5 rounded-full bg-current" />
-      {DEVELOPER_STATUS_LABEL[status]}
+      {t(STATUS_KEY[status])}
     </span>
   );
 }
 
 
 function EmptyState({ onInvite }: { onInvite: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border p-10 text-center">
       <span className="flex size-12 items-center justify-center rounded-xl bg-surface-subtle text-primary">
         <UserCog className="size-5" />
       </span>
       <p className="text-sm text-muted-foreground">
-        Aucun développeur pour l'instant. Invitez le premier pour commencer.
+        {t("developers.empty")}
       </p>
       <Button onClick={onInvite}>
         <Plus className="size-4" />
-        Inviter un développeur
+        {t("developers.invite")}
       </Button>
     </div>
   );

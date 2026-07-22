@@ -11,8 +11,10 @@ import { AlertCardsGrid } from "./_components/AlertCardsGrid";
 import { PeremptionsSection } from "./_components/PeremptionsSection";
 import { StockTable } from "./_components/StockTable";
 import { useStockPage } from "./_hooks/useStockPage";
+import { useT } from "@/i18n/I18nProvider";
 
 export default function StockPage() {
+  const t = useT();
   const s = useStockPage();
   const full = s.fullQuery;
 
@@ -21,12 +23,12 @@ export default function StockPage() {
     // "clear" would just revert to the same default and feel broken).
     !s.isDateDefault && (s.dateFrom || s.dateTo) ? {
       key:    "dates",
-      label:  <>Période : {s.dateFrom || "…"} → {s.dateTo || "…"}</>,
+      label:  <>{t("dashboard.periode")} {s.dateFrom || "…"} → {s.dateTo || "…"}</>,
       onClear: () => { s.setDateFrom(""); s.setDateTo(""); },
     } : null,
     s.classFilter !== null ? {
       key:    "class",
-      label:  <>Classe : {s.classFilter}</>,
+      label:  <>{t("stock.classe")} : {s.classFilter}</>,
       onClear: s.closeTable,
     } : null,
   ].filter(Boolean) as ActiveFilter[];
@@ -34,7 +36,7 @@ export default function StockPage() {
   return (
     <div className="flex flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Stock</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.stock")}</h1>
       </header>
 
       <FilterBar
@@ -44,8 +46,8 @@ export default function StockPage() {
           onChange: (from, to) => { s.setDateFrom(from ?? ""); s.setDateTo(to ?? ""); },
         }}
         rightActions={[
-          { label: "Exporter Excel",  icon: <Download className="size-4" />, variant: "outline", onClick: s.handleExport },
-          { label: "Importer stock",  icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=stock` },
+          { label: t("common.export"),  icon: <Download className="size-4" />, variant: "outline", onClick: s.handleExport },
+          { label: t("stock.importStock"),  icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=stock` },
         ]}
         activeFilters={activeFilters}
         onResetAll={s.clearAll}
@@ -56,14 +58,14 @@ export default function StockPage() {
         <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
           <span className="flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="size-4" />
-            Impossible de charger l'analyse du stock.
+            {t("stock.loadError")}
           </span>
           <button
             type="button"
             onClick={() => full.refetch()}
             className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
           >
-            Réessayer
+            {t("common.retry")}
           </button>
         </div>
       )}
@@ -78,16 +80,16 @@ export default function StockPage() {
             <Package className="size-7" />
           </span>
           <div className="flex max-w-md flex-col gap-1.5">
-            <h2 className="text-[17px] font-semibold text-foreground">Aucune donnée de stock</h2>
+            <h2 className="text-[17px] font-semibold text-foreground">{t("stock.empty")}</h2>
             <p className="text-sm text-muted-foreground">
-              Importez des achats et des ventes pour générer l'analyse ABCD de vos stocks.
+              {t("stock.emptyDesc")}
             </p>
           </div>
           <Link
             to={`${ROUTES.UPLOAD_FILE}?type=stock`}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4.5 py-2.5 text-sm font-semibold text-primary-foreground"
           >
-            <Upload className="size-4" /> Importer du stock
+            <Upload className="size-4" /> {t("stock.importDuStock")}
           </Link>
         </div>
       )}
