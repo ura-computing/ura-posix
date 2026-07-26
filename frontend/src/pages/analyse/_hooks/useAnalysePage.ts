@@ -8,7 +8,7 @@ import { useAnalyseListe, useAnalyseMarge } from "@/hooks/analyse";
 import { MARGE_MODE_LABELS } from "@/types";
 import type { AnalyseFilters, AnalyseMargeRow, ListeItem, MargeMode } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
-import { normalizeText } from "@/utils/text";
+import { normalizeText, matchesText, matchesFields } from "@/utils/text";
 
 import { EXPORT_COLS, MARGE_COLS } from "../_constants";
 import { computeKpisFromRows } from "../_utils/kpis";
@@ -52,19 +52,13 @@ export function useAnalysePage() {
   const activeData = mode === "liste" ? listeM.data : margeQ.data;
   const isLoading  = mode === "liste" ? listeM.isPending : margeQ.isLoading;
 
-  // Client-side search filter — accent- AND case-insensitive (partial match).
+  // Client-side search filter — accent/case-insensitive, `*` wildcard aware
+  // (prefix `rino*`, suffix `*enil`, infix `ri*il`), each token may match any field.
   const filteredRows = useMemo(() => {
     if (!activeData?.rows) return [];
     if (!search.trim()) return activeData.rows;
-    const q = normalizeText(search.trim());
     return activeData.rows.filter((r) =>
-      normalizeText(r.product).includes(q) ||
-      normalizeText(r.category).includes(q) ||
-      normalizeText(r.laboratoire).includes(q) ||
-      normalizeText(r.grossiste).includes(q) ||
-      normalizeText(r.client).includes(q) ||
-      normalizeText(r.mois).includes(q) ||
-      normalizeText(r.annee).includes(q),
+      matchesFields([r.product, r.category, r.laboratoire, r.grossiste, r.client, r.mois, r.annee], search),
     );
   }, [activeData, search]);
 
@@ -91,7 +85,7 @@ export function useAnalysePage() {
     const out:  string[] = [];
     for (const r of activeData.rows) {
       const label = String(r[field] ?? "").trim();
-      if (!label || seen.has(label) || !normalizeText(label).includes(q)) continue;
+      if (!label || seen.has(label) || !matchesText(label, search)) continue;
       seen.add(label);
       out.push(label);
       if (out.length >= 8) break;

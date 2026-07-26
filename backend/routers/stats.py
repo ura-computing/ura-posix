@@ -10,7 +10,7 @@ from sqlalchemy.orm import Query as OrmQuery
 
 from analyse_queries import compute_analyse_liste, compute_analyse_marge
 from database import DbDep
-from exclusions import achat_bl_filter
+from exclusions import achat_exclusion_filter
 from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
 from permissions import require_pharmacy_owner
 from schemas.stats import (
@@ -84,7 +84,7 @@ def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_decla
         aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
-        aq = aq.filter(Achat.pharmacy_id == pharmacy_id, achat_bl_filter(db, pharmacy_id))
+        aq = aq.filter(Achat.pharmacy_id == pharmacy_id, achat_exclusion_filter(db, pharmacy_id))
     if non_declared_sub is not None:
         vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
         aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
@@ -116,7 +116,7 @@ def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub) -> 
     if pharmacy_id:
         # PG-007: excluded BLs must not skew the category marge shown in the donut.
         avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id,
-                                       achat_bl_filter(db, pharmacy_id))
+                                       achat_exclusion_filter(db, pharmacy_id))
     avg_pu_sub = avg_pu_sub.group_by(Achat.medicament_id).subquery()
 
     q: OrmQuery = (

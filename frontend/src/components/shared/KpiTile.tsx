@@ -20,6 +20,7 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/utils/cn";
+import { formatPct } from "@/utils/format";
 
 
 export type IconTone = "primary" | "error" | "warning" | "success" | "info" | "slate" | "muted" | "emerald" | "rose";
@@ -216,7 +217,7 @@ function DeltaBadge({ value, invertColor, hero }: { value: number; invertColor?:
             : "bg-error-subtle text-error-subtle-foreground",
       )}
     >
-      {sign}{value.toFixed(3)} %
+      {sign}{formatPct(value)}
     </span>
   );
 }

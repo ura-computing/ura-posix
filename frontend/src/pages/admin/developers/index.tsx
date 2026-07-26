@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { listDevelopers, type DeveloperAccountOut } from "@/api/storeWebsite";
-import { normalizeText } from "@/utils/text";
+import { matchesFields } from "@/utils/text";
 import type { DeveloperAccount } from "@/types/storeWebsite";
 
 import { DevelopersPage } from "./_components/DevelopersPage";
@@ -37,11 +37,8 @@ export default function AdminDevelopersRoute() {
 
   const filtered = useMemo(() => {
     const all = (q.data ?? []).map(toAccount);
-    const term = normalizeText(search.trim());
-    if (!term) return all;
-    return all.filter(
-      (d) => normalizeText(d.name).includes(term) || normalizeText(d.email).includes(term),
-    );
+    if (!search.trim()) return all;
+    return all.filter((d) => matchesFields([d.name, d.email], search));
   }, [q.data, search]);
 
   return (

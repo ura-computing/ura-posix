@@ -121,6 +121,19 @@ class TestBlSearchAndDetail:
         # the row must surface WHICH product matched (user recognises the BL by it)
         assert "RINOMICINE ST B10 SACHETS" in hit[0]["matched_products"]
 
+    def test_search_by_product_wildcard_per_word(self, auth_owner, achat) -> None:
+        """`rinom*ne` must match the WORD 'RINOMICINE' inside a multi-word product
+        name (the SQL `~*` per-word regex), even though the full name ends 'SACHETS'."""
+        client, _, _ = auth_owner
+        achat("BL-WILD", product="RINOMICINE ST B10 SACHETS")
+        for q in ("rinom*ne", "rinom*", "*cine"):
+            r = client.get(f"/v1/bl-exclusions/search?q={q}")
+            assert r.status_code == 200
+            assert "BL-WILD" in [b["delivery_ref"] for b in r.json()], f"query {q!r} should match"
+        # a wildcard must NOT span across words
+        r = client.get("/v1/bl-exclusions/search?q=rinom*sachets")
+        assert "BL-WILD" not in [b["delivery_ref"] for b in r.json()]
+
     def test_search_flags_already_excluded(self, auth_owner, achat) -> None:
         client, _, _ = auth_owner
         achat("BL-DUP", product="SPASFON")

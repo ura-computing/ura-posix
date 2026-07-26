@@ -160,14 +160,14 @@ export function AlertDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[85vh] max-w-5xl flex-col gap-0 p-0">
+      <DialogContent className="flex max-h-[88vh] w-full max-w-[1400px] flex-col gap-0 p-0">
         {/* header */}
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2.5">
               <h2 className="text-lg font-semibold text-foreground">{title}</h2>
               <span className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-muted-foreground">
-                {formatQty(products.length)} produits
+                {formatQty(products.length)} {t("common.wProduits")}
               </span>
             </div>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
@@ -212,8 +212,10 @@ export function AlertDetailDialog({
                           <td
                             key={c.key}
                             className={cn(
-                              "whitespace-nowrap border-b border-border/60 p-2.5",
-                              c.align === "right" ? "text-right" : "text-left",
+                              "border-b border-border/60 p-2.5 align-top",
+                              c.align === "right"
+                                ? "whitespace-nowrap text-right"
+                                : "whitespace-normal break-words text-left",
                             )}
                           >
                             {c.cell(row)}
@@ -236,14 +238,14 @@ export function AlertDetailDialog({
             disabled={sorted.length === 0}
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-secondary-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
           >
-            <Download className="size-4" /> Exporter Excel
+            <Download className="size-4" /> {t("common.export")}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="rounded-md bg-secondary px-4 py-2 text-[13px] font-semibold text-secondary-foreground hover:bg-muted cursor-pointer"
           >
-            Fermer
+            {t("common.close")}
           </button>
         </div>
       </DialogContent>

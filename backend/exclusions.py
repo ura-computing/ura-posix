@@ -10,10 +10,15 @@ Both filters apply to Achat-side aggregates wherever the dashboard already filte
 non-declared products. Use `achat_bl_filter()` rather than inlining the subquery —
 SQL's `NULL NOT IN (subquery)` evaluates to NULL → silently drops rows with NULL refs.
 """
-from sqlalchemy import or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from models import Achat, PharmacyBlExclusion, PharmacyMedicamentStatus
+from models import (
+    Achat,
+    PharmacyBlExclusion,
+    PharmacyMedicamentStatus,
+    PharmacySupplierExclusion,
+)
 
 
 def non_declared_sub(db: Session, pharmacy_id: int):
@@ -44,4 +49,35 @@ def achat_bl_filter(db: Session, pharmacy_id: int):
     return or_(
         Achat.delivery_ref.is_(None),
         Achat.delivery_ref.notin_(bl_excluded_sub(db, pharmacy_id)),
+    )
+
+
+def supplier_excluded_sub(db: Session, pharmacy_id: int):
+    """Scalar subquery of NORMALIZED (unaccent+lower) supplier names the pharmacy
+    excluded. Normalized so the match is accent/case-insensitive against the
+    free-text Achat.supplier column."""
+    return (
+        db.query(func.unaccent(func.lower(PharmacySupplierExclusion.supplier)))
+        .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
+        .scalar_subquery()
+    )
+
+
+def achat_supplier_filter(db: Session, pharmacy_id: int):
+    """SQLAlchemy clause that lets an Achat row through the supplier-exclusion
+    check. NULL suppliers are kept (SQL NOT IN-vs-NULL gotcha); rows whose
+    normalized supplier matches an excluded name drop. Mirrors achat_bl_filter."""
+    return or_(
+        Achat.supplier.is_(None),
+        func.unaccent(func.lower(Achat.supplier)).notin_(supplier_excluded_sub(db, pharmacy_id)),
+    )
+
+
+def achat_exclusion_filter(db: Session, pharmacy_id: int):
+    """The full Achat-side exclusion clause = BL-exclusion AND supplier-exclusion.
+    Every aggregate that filters out excluded purchases uses THIS (so the two
+    exclusion kinds can never drift apart)."""
+    return and_(
+        achat_bl_filter(db, pharmacy_id),
+        achat_supplier_filter(db, pharmacy_id),
     )

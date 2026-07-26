@@ -7,7 +7,7 @@ import { ArrowRight, Plus, RefreshCw, UserPlus } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
-import { normalizeText } from "@/utils/text";
+import { matchesFields } from "@/utils/text";
 import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/filterBar";
 import type { CreateUserIn, CreateUserOut, PharmacyListRow } from "@/types";
@@ -61,12 +61,7 @@ export default function AdminPharmaciesIndex() {
   // Filter rows client-side. Cheap (admin has a small N of pharmacies).
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
-    const q = normalizeText(search.trim());
-    return rows.filter((p) =>
-      normalizeText(p.name).includes(q) ||
-      normalizeText(p.code).includes(q) ||
-      normalizeText(p.city).includes(q),
-    );
+    return rows.filter((p) => matchesFields([p.name, p.code, p.city], search));
   }, [rows, search]);
 
   const columns: ColumnDef<PharmacyListRow>[] = [

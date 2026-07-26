@@ -32,8 +32,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from csv_parse import (
-    classify_product_type, col, parse_catalog_csv, parse_csv, parse_float,
-    parse_int, parse_iso_date,
+    classify_product_type, col, existing_by_name, normalized_name,
+    parse_catalog_csv, parse_csv, parse_float, parse_int, parse_iso_date,
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
@@ -227,32 +227,39 @@ def _batch_resolve_medicaments(
         for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
     }
 
-    # Update mutable fields on existing rows (same semantics as upsert_medicament).
-    # Category intentionally NOT overwritten — admin-curated.
-    for pid, r in first_row_by_pid.items():
-        med = existing.get(pid)
-        if not med:
-            continue
+    def _update_fields(med: Medicament, r: dict[str, Any]) -> None:
+        # Same mutable-field semantics as upsert_medicament. Category intentionally
+        # NOT overwritten — admin-curated.
         tva  = col(r, COL_TVA)
         pph  = parse_float(col(r, COL_PPH))
         ppv  = parse_float(col(r, COL_PPV))
         zone = col(r, COL_ZONE)
-        if tva and not med.tva:
-            med.tva = tva
-        if pph is not None:
-            med.pph = pph
-        if ppv is not None:
-            med.ppv = ppv
-        if zone and not med.zone:
-            med.zone = zone
+        if tva and not med.tva:   med.tva = tva
+        if pph is not None:       med.pph = pph
+        if ppv is not None:       med.ppv = ppv
+        if zone and not med.zone: med.zone = zone
 
-    # Insert missing meds in ONE flush (SQLAlchemy issues an executemany INSERT).
-    # F19: leave product_type=NULL — catalog is the source of truth; admin classifies.
+    # Name-dedup: a row whose PID is new but whose product NAME already exists
+    # (under a different PID — e.g. a catalog row that carries the laboratoire)
+    # MERGES onto that row instead of forking a duplicate. One batched query keeps
+    # this at 1 SELECT (the N+1 name lookup was why it was dropped originally).
+    unmatched = {pid: r for pid, r in first_row_by_pid.items() if pid not in existing}
+    by_name = existing_by_name(db, (col(r, COL_PRODUCT) for r in unmatched.values()))
+
+    med_for_pid: dict[str, Medicament] = {}
     new_meds: list[Medicament] = []
+    new_by_name: dict[str, Medicament] = {}   # dedup two new rows of the same name in one batch
     for pid, r in first_row_by_pid.items():
-        if pid in existing:
+        med = existing.get(pid)
+        if med is None:
+            nkey = normalized_name(col(r, COL_PRODUCT))
+            med = by_name.get(nkey) or new_by_name.get(nkey)
+        if med is not None:
+            _update_fields(med, r)
+            med_for_pid[pid] = med
             continue
-        new_meds.append(Medicament(
+        # F19: leave product_type=NULL — catalog is the source of truth; admin classifies.
+        med = Medicament(
             pid=pid,
             product=col(r, COL_PRODUCT) or pid,
             tva=col(r, COL_TVA),
@@ -260,13 +267,18 @@ def _batch_resolve_medicaments(
             ppv=parse_float(col(r, COL_PPV)),
             category=col(r, COL_CATEGORY),
             zone=col(r, COL_ZONE),
-        ))
+        )
+        new_meds.append(med)
+        med_for_pid[pid] = med
+        nkey = normalized_name(col(r, COL_PRODUCT))
+        if nkey:
+            new_by_name[nkey] = med
+
     if new_meds:
         db.add_all(new_meds)
         db.flush()   # populates .id on every new row in one round-trip
 
-    resolved: dict[str, int] = {m.pid: m.id for m in existing.values()}
-    resolved.update({m.pid: m.id for m in new_meds})
+    resolved: dict[str, int] = {pid: med.id for pid, med in med_for_pid.items()}
     return resolved, new_meds
 
 
@@ -470,11 +482,11 @@ async def upload_vente(
 _CATALOG_MUTABLE_COLS = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
 
 
-def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> bool:
-    """Apply one parsed catalog row. Returns True if it updated an existing
-    Medicament, False if it inserted a new one. Catch-up: classifies NULL
-    product_type on existing rows (catalogue is the source of truth — see F19).
-    Admin-edited types stay untouched."""
+def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> tuple[Medicament, bool]:
+    """Apply one parsed catalog row. Returns (medicament, was_update): was_update
+    True updated an existing row, False inserted a new one. Catch-up: classifies
+    NULL product_type on existing rows (catalogue is the source of truth — see
+    F19). Admin-edited types stay untouched."""
     if existing:
         for c in _CATALOG_MUTABLE_COLS:
             v = row.get(c)
@@ -482,12 +494,10 @@ def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> b
                 setattr(existing, c, v)
         if existing.product_type is None:
             existing.product_type = classify_product_type(row.get("category"))
-        return True
-    db.add(Medicament(
-        **row,
-        product_type=classify_product_type(row.get("category")),
-    ))
-    return False
+        return existing, True
+    med = Medicament(**row, product_type=classify_product_type(row.get("category")))
+    db.add(med)
+    return med, False
 
 
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
@@ -511,15 +521,26 @@ async def upload_catalog(
         raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
 
     pids = [r["pid"] for r in parsed]
-    existing = {
+    by_pid = {
         m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
     }
+    # Name-dedup: a catalog row whose PID is new but whose product name already
+    # exists (under a different PID — e.g. a row the sales import created) MERGES
+    # onto that row (adding the laboratoire) instead of forking a duplicate.
+    by_name = existing_by_name(
+        db, (r.get("product") for r in parsed if r["pid"] not in by_pid)
+    )
     inserted = updated = 0
     for row in parsed:
-        if _apply_catalog_row(db, existing.get(row["pid"]), row):
+        match = by_pid.get(row["pid"]) or by_name.get(normalized_name(row.get("product")))
+        med, was_update = _apply_catalog_row(db, match, row)
+        if was_update:
             updated += 1
         else:
             inserted += 1
+            nkey = normalized_name(row.get("product"))
+            if nkey:
+                by_name[nkey] = med   # later same-name rows in this CSV merge onto it
     db.commit()
     return {
         "total_rows": len(parsed),

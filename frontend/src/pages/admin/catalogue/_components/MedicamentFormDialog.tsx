@@ -8,6 +8,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import type { Medicament, MedicamentInput, ProductType } from "@/types";
+import { formatPct } from "@/utils/format";
 
 
 export interface MedicamentFormDialogProps {
@@ -183,7 +184,7 @@ export function MedicamentFormDialog({
             <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
               <span>
-                {t("catalogue.tvaWarnPre")}<b>{tvaPercent(form.tva)} %</b>{t("catalogue.tvaWarnMid")}<b>{t("catalogue.tvaWarnExonere")}</b>{t("catalogue.tvaWarnPost")}
+                {t("catalogue.tvaWarnPre")}<b>{formatPct(tvaPercent(form.tva))}</b>{t("catalogue.tvaWarnMid")}<b>{t("catalogue.tvaWarnExonere")}</b>{t("catalogue.tvaWarnPost")}
               </span>
             </div>
           )}

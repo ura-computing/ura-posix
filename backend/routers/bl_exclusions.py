@@ -30,7 +30,7 @@ from schemas.bl_exclusions import (
     BlReintegrateResult,
     BlSummary,
 )
-from search import product_search_clauses, tokenize_search
+from search import product_search_clauses, supplier_search_clauses, tokenize_search
 from security import CurrentUserDep
 
 
@@ -108,24 +108,24 @@ def search_bls(
     can pick the right one; already-excluded BLs are flagged."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="special_products")
     term = q.strip()
+    tokens = tokenize_search(term)
 
-    # (a) direct reference match
-    ref_rows = (
-        db.query(Achat.delivery_ref)
-        .filter(
-            Achat.pharmacy_id == pharmacy_id,
-            Achat.delivery_ref.isnot(None),
-            func.unaccent(Achat.delivery_ref).ilike(func.unaccent(f"%{term}%")),
+    # (a) direct reference match — tokenized, accent/case-insensitive, `*`-aware
+    # (prefix `LVC*`, suffix `*2606`, infix `LV*06`) via the shared search helper.
+    refs: set[str] = set()
+    if tokens:
+        ref_rows = (
+            db.query(Achat.delivery_ref)
+            .filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None))
         )
-        .distinct()
-    )
-    refs: set[str] = {r[0] for r in ref_rows.all()}
+        for clause in supplier_search_clauses(tokens, [Achat.delivery_ref]):
+            ref_rows = ref_rows.filter(clause)
+        refs = {r[0] for r in ref_rows.distinct().all()}
 
     # (b) product match → the refs of every BL containing a matching product,
     # AND which product(s) matched (so the user recognises the BL — they remember
     # the product they bought, not the supplier/reference).
     matched_by_ref: dict[str, list[str]] = {}
-    tokens = tokenize_search(term)
     if tokens:
         prod_q = (
             db.query(Achat.delivery_ref, Medicament.product)

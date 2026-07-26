@@ -2,7 +2,7 @@ import { Coins, Percent, TrendingUp, UploadCloud } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 import { Link } from "react-router-dom";
 
-import { formatMAD } from "@/utils/format";
+import { formatMAD, formatPct } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { ROUTES } from "@/types";
 import type { CategoryType, StatsResponse } from "@/types";
@@ -36,7 +36,7 @@ export function AnalyseMargePreview({ stats, tint = "all" }: { stats: StatsRespo
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label={t("kpi.ca")} value={formatMAD(ca)}                icon={<Coins      className="size-5" />} tint={tint} />
-        <KpiTile label={t("kpi.margeMoyPct")}  value={`${margePct.toFixed(3)} %`}   icon={<Percent    className="size-5" />} tint={tint} />
+        <KpiTile label={t("kpi.margeMoyPct")}  value={formatPct(margePct)}   icon={<Percent    className="size-5" />} tint={tint} />
         <KpiTile label={t("kpi.margeMoyDh")} value={formatMAD(margeDh)}          icon={<TrendingUp className="size-5" />} tint={tint} />
         <OptimisationGaugePlaceholder tint={tint} />
       </div>

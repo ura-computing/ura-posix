@@ -28,7 +28,7 @@ const fmtMad = (n: number | null | undefined): string => {
 
 const fmtPct = (n: number | null | undefined): string => {
   if (n == null || !Number.isFinite(n)) return "—";
-  return (n > 0 ? "+" : "") + n.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+  return (n > 0 ? "+" : "") + n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
 };
 
 const fmtDate = (s: string | undefined): string => s ?? "—";
