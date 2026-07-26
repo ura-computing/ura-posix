@@ -425,7 +425,7 @@ export const fr = {
 
 
   ps: {
-    subtitle:     "Excluez de vos rapports un produit ou un bon de livraison exceptionnel. Réversible à tout moment — aucune donnée n'est supprimée.",
+    subtitle:     "Excluez de vos rapports un produit, un bon de livraison ou un fournisseur exceptionnel. Réversible à tout moment — aucune donnée n'est supprimée.",
     tabProduits:  "Produits",
     tabBL:        "Bons de livraison",
     searchProdPh: "Rechercher dans vos exclusions…",
@@ -473,6 +473,21 @@ export const fr = {
     filterPh:     "Filtrer la liste…",
     noFilterResult:"Aucun résultat pour ce filtre.",
     allReintSelected:"Tous les produits exclus sont déjà sélectionnés.",
+    tabFournisseurs:"Fournisseurs",
+    exclureFournisseur:"Exclure un fournisseur",
+    searchSupPh:  "Rechercher dans vos fournisseurs exclus…",
+    emptySup:     "Aucun fournisseur exclu",
+    emptySupHint: "Cliquez sur Exclure un fournisseur pour commencer.",
+    supTitle:     "Exclure un fournisseur",
+    supDesc:      "Recherchez un fournisseur par son nom. L'exclusion retire tous ses achats de vos analyses (achats, marges, stock) — réversible à tout moment.",
+    supSearchPh:  "Nom du fournisseur (min 2 caractères)",
+    supMin2:      "Tapez au moins 2 caractères.",
+    supNoResult:  "Aucun fournisseur trouvé.",
+    excludeThisSup:"Exclure ce fournisseur",
+    supAlreadyExcluded:"Ce fournisseur était déjà exclu",
+    supExcluded:  "Fournisseur {{name}} exclu",
+    supReintegratedOne:"Fournisseur réintégré",
+    supReintegratedMany:"Fournisseurs réintégrés",
   },
 
 

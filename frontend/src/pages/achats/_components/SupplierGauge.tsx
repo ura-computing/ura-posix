@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
 import { Skeleton } from "@/components/shared/Skeleton";
-import { formatMAD, formatQty } from "@/utils/format";
+import { formatMAD, formatQty, formatPct } from "@/utils/format";
 import type { AchatsSupplierSummary } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -35,7 +35,7 @@ export function SupplierGauge({ data, isLoading }: { data: AchatsSupplierSummary
         <div className="flex flex-col items-center justify-end">
           <NeedleGauge value={goodness} />
           <p className="-mt-1 text-sm font-medium text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{grossPct.toFixed(3)} %</span> {t("achats.grossistesInline")}
+            <span className="font-mono tabular-nums text-foreground">{formatPct(grossPct)}</span> {t("achats.grossistesInline")}
           </p>
         </div>
         <SideTile

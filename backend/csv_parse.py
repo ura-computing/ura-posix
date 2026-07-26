@@ -16,9 +16,11 @@ import csv
 import io
 import re
 import unicodedata
+from collections.abc import Iterable
 from datetime import date
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Medicament
@@ -220,7 +222,7 @@ def _derive_pid(barcode1: str | None, product: str, seen_pids: set[str]) -> str:
     bc = (barcode1 or "").strip()
     if bc and len(bc) >= 8 and bc not in seen_pids:
         return bc
-    return re.sub(r"\s+", " ", strip_accents(product).lower().strip())
+    return normalized_name(product)
 
 
 # ─── Medicament upsert ────────────────────────────────────────────────────────
@@ -282,6 +284,52 @@ def upsert_medicament(
     db.add(med)
     db.flush()      # populates med.id without committing the parent transaction
     return med, True
+
+
+# ─── Normalized-name dedup (shared by the achat/vente + catalog imports) ───────
+
+def normalized_name(product: str | None) -> str:
+    """Accent-stripped, lowercased, single-spaced product name — THE dedup key
+    that keeps the same product from forking into two Medicament rows with
+    different PIDs (the achat/vente import uses a Sobrus numeric PID; the catalog
+    import derives its PID from the barcode or this very name)."""
+    return re.sub(r"\s+", " ", strip_accents(product or "").lower().strip())
+
+
+# SQL expression producing the same key as normalized_name() for a column, so an
+# in-memory set of keys can be matched in ONE query (no per-row N+1).
+def _normalized_name_expr(column):
+    return func.lower(func.regexp_replace(func.trim(func.unaccent(column)), r"\s+", " ", "g"))
+
+
+def _prefer_lab_row(candidate: Medicament, current: Medicament) -> bool:
+    """Collision tie-break: prefer the row that already carries a laboratoire (the
+    catalogue copy we want to merge onto), else the lowest id — deterministic."""
+    cand_lab, cur_lab = bool(candidate.laboratoire), bool(current.laboratoire)
+    if cand_lab != cur_lab:
+        return cand_lab
+    return (candidate.id or 0) < (current.id or 0)
+
+
+def existing_by_name(db: Session, products: Iterable[str | None]) -> dict[str, Medicament]:
+    """One-query map {normalized_name → Medicament} for the given product names.
+    Used by both import paths to merge onto an existing row instead of creating a
+    duplicate when a same-named product already exists under a different PID."""
+    keys = {normalized_name(p) for p in products if p}
+    keys.discard("")
+    if not keys:
+        return {}
+    out: dict[str, Medicament] = {}
+    for m in (
+        db.query(Medicament)
+        .filter(_normalized_name_expr(Medicament.product).in_(list(keys)))
+        .all()
+    ):
+        k = normalized_name(m.product)
+        cur = out.get(k)
+        if cur is None or _prefer_lab_row(m, cur):
+            out[k] = m
+    return out
 
 
 # ─── Sobrus column lookup (tolerant of column reordering) ─────────────────────

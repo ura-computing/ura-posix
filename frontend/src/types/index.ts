@@ -148,6 +148,10 @@ export const QUERY_KEYS = {
   BL_SEARCH:               (q: string) => ["bl-search", q] as const,
   BL_DETAIL:               (ref: string) => ["bl-detail", ref] as const,
 
+  // Supplier (fournisseur) exclusions — owner-managed, achats-side + search.
+  SUPPLIER_EXCLUSIONS:     ["supplier-exclusions"] as const,
+  SUPPLIER_SEARCH:         (q: string) => ["supplier-search", q] as const,
+
   // Comptabilité — payment entries per (month, method).
   PAYMENTS:                (month?: string) => ["payments", month ?? null] as const,
   PAYMENTS_PREFIX:         ["payments"] as const,
@@ -928,6 +932,39 @@ export interface BlReintegrateResult {
   reintegrated:  number;
   not_excluded:  number;
   delivery_refs: string[];
+}
+
+
+// ── Supplier (fournisseur) exclusions — owner-managed, achats-side ──────────
+export interface SupplierSummary {
+  supplier:         string;
+  total:            number;
+  nb_lines:         number;
+  nb_products:      number;
+  last_date:        string | null;
+  already_excluded: boolean;
+}
+
+export interface SupplierExclusion {
+  supplier:    string;
+  total:       number;
+  nb_lines:    number;
+  nb_products: number;
+  last_date:   string | null;
+  notes:       string | null;
+  created_at:  string;
+}
+
+export interface SupplierExclusionResult {
+  excluded:         number;
+  already_excluded: number;
+  item:             SupplierExclusion | null;
+}
+
+export interface SupplierReintegrateResult {
+  reintegrated: number;
+  not_excluded: number;
+  suppliers:    string[];
 }
 
 

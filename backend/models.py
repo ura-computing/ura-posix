@@ -267,6 +267,22 @@ class PharmacyBlExclusion(Base):
     created_at:   Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class PharmacySupplierExclusion(Base):
+    """A supplier (fournisseur) name excluded from a pharmacy's stats / marges /
+    accounting. Achat rows whose supplier matches (accent/case-insensitive) drop
+    out of every aggregate via achat_supplier_filter(). Supplier is free text on
+    Achat.supplier — there is no supplier entity. NULL suppliers are preserved
+    (SQL NOT IN-vs-NULL gotcha), mirroring PharmacyBlExclusion."""
+    __tablename__ = "pharmacy_supplier_exclusions"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "supplier", name="uq_pharmacy_supplier"),)
+
+    id:          Mapped[int]      = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int]      = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
+    supplier:    Mapped[str]      = mapped_column(String, nullable=False, index=True)
+    notes:       Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at:  Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PaymentEntry(Base):
     """Manual monthly bookkeeping per payment method (TPE / Espèces / Chèques /
     Virement). Doesn't come from Sobrus — owner enters totals + transaction

@@ -420,7 +420,7 @@ export const es: Dict = {
 
 
   ps: {
-    subtitle:     "Excluya de sus informes un producto o un albarán excepcional. Reversible en cualquier momento — no se elimina ningún dato.",
+    subtitle:     "Excluya de sus informes un producto, un albarán o un proveedor excepcional. Reversible en cualquier momento — no se elimina ningún dato.",
     tabProduits:  "Productos",
     tabBL:        "Albaranes",
     searchProdPh: "Buscar en sus exclusiones…",
@@ -468,6 +468,21 @@ export const es: Dict = {
     filterPh:     "Filtrar la lista…",
     noFilterResult:"Ningún resultado para este filtro.",
     allReintSelected:"Todos los productos excluidos ya están seleccionados.",
+    tabFournisseurs:"Proveedores",
+    exclureFournisseur:"Excluir un proveedor",
+    searchSupPh:  "Buscar en sus proveedores excluidos…",
+    emptySup:     "Ningún proveedor excluido",
+    emptySupHint: "Haga clic en Excluir un proveedor para empezar.",
+    supTitle:     "Excluir un proveedor",
+    supDesc:      "Busque un proveedor por su nombre. La exclusión retira todas sus compras de sus análisis (compras, márgenes, stock) — reversible en cualquier momento.",
+    supSearchPh:  "Nombre del proveedor (mín. 2 caracteres)",
+    supMin2:      "Escriba al menos 2 caracteres.",
+    supNoResult:  "Ningún proveedor encontrado.",
+    excludeThisSup:"Excluir este proveedor",
+    supAlreadyExcluded:"Este proveedor ya estaba excluido",
+    supExcluded:  "Proveedor {{name}} excluido",
+    supReintegratedOne:"Proveedor reintegrado",
+    supReintegratedMany:"Proveedores reintegrados",
   },
 
 

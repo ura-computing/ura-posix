@@ -1,6 +1,6 @@
 import { BarChart3, Receipt, Wallet } from "lucide-react";
 
-import { formatMAD } from "@/utils/format";
+import { formatMAD, formatPct } from "@/utils/format";
 import type { StatsResponse } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -23,7 +23,7 @@ export function KpiCards({ stats }: { stats: StatsResponse }) {
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Card icon={<Wallet className="size-5" />} title={t("comptabilite.kpiCA")} tone="primary">
         <Row label={t("comptabilite.ventesTotal")}   value={formatMAD(ca)} hero />
-        <Row label={t("comptabilite.marge")}           value={`${stats.marge.marge_pct.toFixed(3)} %`} />
+        <Row label={t("comptabilite.marge")}           value={formatPct(stats.marge.marge_pct)} />
         <Row label={t("comptabilite.tvaEncaissee")}   value={formatMAD(stats.tva.tva_encaissee)} />
       </Card>
 

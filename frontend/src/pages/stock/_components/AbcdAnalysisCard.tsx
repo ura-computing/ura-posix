@@ -2,7 +2,7 @@
 import { KpiTile } from "@/components/shared/KpiTile";
 import { NeedleGauge } from "@/components/shared/NeedleGauge";
 import { cn } from "@/utils/cn";
-import { formatQty } from "@/utils/format";
+import { formatQty, formatPct } from "@/utils/format";
 import type { AbcdClass } from "@/types";
 
 import { ABCD_COLORS, ABCD_ORDER, abcdFontSize } from "../_constants";
@@ -37,7 +37,7 @@ export function AbcdAnalysisCard({
         <div className="grid grid-cols-4 gap-x-2 gap-y-3.5">
           {ABCD_ORDER.map((k) => {
             const count = distribution[k] ?? 0;
-            const pct = totalReferences > 0 ? Math.round((count / totalReferences) * 100) : 0;
+            const pct = totalReferences > 0 ? (count / totalReferences) * 100 : 0;
             const active = activeClass === k;
             return (
               <button
@@ -68,7 +68,7 @@ export function AbcdAnalysisCard({
                   {formatQty(count)}
                 </span>
                 <span className="-mt-0.5 whitespace-nowrap font-mono text-xs text-muted-foreground">
-                  {pct} %
+                  {formatPct(pct)}
                 </span>
               </button>
             );

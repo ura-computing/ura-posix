@@ -2,7 +2,7 @@ import { AlertTriangle, Boxes, Coins, ShieldCheck, UploadCloud } from "lucide-re
 import { Link } from "react-router-dom";
 
 import { KpiTile, type IconTone } from "@/components/shared/KpiTile";
-import { formatMAD, formatQty } from "@/utils/format";
+import { formatMAD, formatQty, formatPct } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import { ROUTES } from "@/types";
 import type { CategoryType, StockSummaryResponse } from "@/types";
@@ -54,7 +54,7 @@ export function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummary
         <KpiTile
           href={ROUTES.STOCK}
           label={t("kpi.santeStock")}
-          value={<span className={cn(healthValueClass)}>{`${stock.health_pct.toFixed(3)} %`}</span>}
+          value={<span className={cn(healthValueClass)}>{formatPct(stock.health_pct)}</span>}
           sub={t("kpi.fourchetteIdeale")}
           icon={<ShieldCheck className="size-5" />}
           iconTone={healthTone}

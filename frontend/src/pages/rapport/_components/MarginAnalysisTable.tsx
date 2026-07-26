@@ -30,7 +30,7 @@ function mad(v: unknown): string {
 }
 function pct(v: unknown): string {
   if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
 }
 
 

@@ -78,7 +78,7 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
     render: (r) => r.quantity != null ? formatQty(r.quantity) : "—" },
   { key: "discount", label: t("col.remise"), width: 80, align: "right",
     render: (r) => r.discount && r.discount > 0
-      ? <span className="text-warning">{formatQty(r.discount)} %</span>
+      ? <span className="text-warning">{formatPct(r.discount)}</span>
       : <span className="text-muted-foreground">0</span> },
   { key: "ppv", label: t("col.ppv"), width: 100, align: "right",
     render: (r) => r.ppv != null ? formatMAD(r.ppv) : "—" },

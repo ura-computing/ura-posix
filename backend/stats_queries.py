@@ -23,7 +23,7 @@ from typing import Optional
 from sqlalchemy import Date, case as sa_case, func
 from sqlalchemy.orm import Session
 
-from exclusions import achat_bl_filter
+from exclusions import achat_exclusion_filter
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 
 
@@ -281,7 +281,7 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
         )
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter_v: list = []
     cat_filter_a: list = []
@@ -432,7 +432,7 @@ def compute_previous_kpis(
     if cat_filter_a: aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:  aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
     if non_declared_sub is not None: aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id:  aq = aq.filter(achat_bl_filter(db, pharmacy_id))
+    if pharmacy_id:  aq = aq.filter(achat_exclusion_filter(db, pharmacy_id))
     aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
     prev_achats = aq.scalar()
 
@@ -446,7 +446,7 @@ def compute_previous_kpis(
         prev_base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         prev_base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
     if pharmacy_id:
-        prev_base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+        prev_base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     prev_marge = marge_for_window(db, prev_base_filter_v, prev_base_filter_a, cat_filter_v)
 
@@ -506,7 +506,7 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
         )
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -591,7 +591,7 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
         )
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -779,7 +779,7 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
         v_q = v_q.filter(Vente.medicament_id.notin_(non_declared_sub))
         a_q = a_q.filter(Achat.medicament_id.notin_(non_declared_sub))
     if pharmacy_id:
-        a_q = a_q.filter(achat_bl_filter(db, pharmacy_id))
+        a_q = a_q.filter(achat_exclusion_filter(db, pharmacy_id))
 
     # Fold rows onto bucket-start keys. For "semester" this collapses the two
     # monthly rows of each half-year into one bucket; a no-op for the others.

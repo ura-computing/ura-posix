@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { KpiTile } from "@/components/shared/KpiTile";
 import { useT } from "@/i18n/I18nProvider";
-import { formatMAD } from "@/utils/format";
+import { formatMAD, formatPct } from "@/utils/format";
 import { cn } from "@/utils/cn";
 import type { CategoryType, MargeSummary } from "@/types";
 
@@ -34,7 +34,7 @@ export function SanteFinanciereCard({ marge, tint = "all" }: { marge: MargeSumma
       <div className="text-center">
         <div className="text-base font-semibold text-foreground">{t(g.labelKey)}</div>
         <div className="mt-0.5 font-mono text-base tabular-nums text-muted-foreground">
-          {t("kpi.margeMoyenne")} {marge.marge_pct.toFixed(3)} %
+          {t("kpi.margeMoyenne")} {formatPct(marge.marge_pct)}
         </div>
       </div>
       <div className="grid w-full grid-cols-2 gap-3 rounded-xl bg-surface-subtle p-3">

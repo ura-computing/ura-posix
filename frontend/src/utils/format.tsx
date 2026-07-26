@@ -44,7 +44,7 @@ const MAD = new Intl.NumberFormat("fr-FR", {
 });
 const QTY     = new Intl.NumberFormat("fr-FR");
 const QTY_DEC = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
-const PCT3    = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const PCT2    = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 
 export function formatMAD(n: number | null | undefined): ReactNode {
@@ -98,12 +98,23 @@ export function formatQtyDec(n: number | null | undefined): ReactNode {
   return tighten(QTY_DEC.format(n));
 }
 
-export function formatPct(n: number | null | undefined, decimals = 3): ReactNode {
+export function formatPct(n: number | null | undefined, decimals = 2): ReactNode {
   if (n == null) return "—";
-  const fmt = decimals === 3
-    ? PCT3
+  const fmt = decimals === 2
+    ? PCT2
     : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   return tighten(`${fmt.format(n)} %`);
+}
+
+/** Plain-string percentage ("12,28 %", fr-FR comma) — for SVG `<text>`, `title`
+ *  attributes, aria-labels, and template-literal contexts that can't render the
+ *  JSX separator spans `formatPct` emits. Defaults to 2 decimals. */
+export function formatPctStr(n: number | null | undefined, decimals = 2): string {
+  if (n == null) return "—";
+  const fmt = decimals === 2
+    ? PCT2
+    : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return `${fmt.format(n)} %`;
 }
 
 /** Variation: ((current - previous) / previous) × 100. Returns null if previous is 0. */

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from csv_parse import strip_percentage
 from database import DbDep
-from exclusions import achat_bl_filter
+from exclusions import achat_exclusion_filter
 from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, Vente
 from permissions import require_pharmacy_owner
 from schemas.transactions import (
@@ -133,7 +133,7 @@ def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: 
             Achat.quantity > 0,
             Achat.unit_price.isnot(None),
             Achat.medicament_id.notin_(nd),
-            achat_bl_filter(db, pharmacy_id),
+            achat_exclusion_filter(db, pharmacy_id),
         )
     )
     if date_from:
@@ -277,7 +277,7 @@ def list_achats(
     )
     # PG-007: excluded BLs are hidden from the Achats ledger entirely — rows,
     # the grand total, and the Excel export (all derived from `q`).
-    q = q.filter(achat_bl_filter(db, pharmacy_id))
+    q = q.filter(achat_exclusion_filter(db, pharmacy_id))
     # Force Medicament join (for the TVA aggregate) if no search/category/tva
     if not (search or category or tva):
         q = q.outerjoin(Medicament, Achat.medicament_id == Medicament.id)
@@ -435,7 +435,7 @@ def achat_supplier_summary(
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     ).filter(
         Achat.supplier.isnot(None), Achat.supplier != "",
-        achat_bl_filter(db, pharmacy_id),
+        achat_exclusion_filter(db, pharmacy_id),
     )
 
     is_grossiste = func.upper(Achat.supplier).like("GROSSISTE%")

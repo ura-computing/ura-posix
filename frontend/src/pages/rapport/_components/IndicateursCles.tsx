@@ -1,6 +1,6 @@
 import { BarChart3, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
 
-import { formatMAD, formatQty, pctChange } from "@/utils/format";
+import { formatMAD, formatQty, pctChange, formatPct } from "@/utils/format";
 import { ROUTES, type CategoryType, type StatsResponse } from "@/types";
 
 import { KpiTile } from "@/components/shared/KpiTile";
@@ -69,8 +69,8 @@ export function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse;
       />
       <KpiTile
         label={t("kpi.margeBruteMoy")}
-        value={`${margePct.toFixed(3)} %`}
-        sub={`${t("kpi.anneePrec")} ${stats.previous_kpis.marge_pct.toFixed(3)} %`}
+        value={formatPct(margePct)}
+        sub={<>{t("kpi.anneePrec")} {formatPct(stats.previous_kpis.marge_pct)}</>}
         delta={dMarge != null ? { value: dMarge } : null}
         icon={<TrendingUp className="size-5" />}
         tint={tint}

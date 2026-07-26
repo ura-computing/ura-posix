@@ -14,11 +14,11 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from sqlalchemy import Date, func
+from sqlalchemy import Date, and_, func
 from sqlalchemy.orm import Session
 
 from csv_parse import strip_accents
-from exclusions import achat_bl_filter
+from exclusions import achat_exclusion_filter
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 from stats_queries import _strip_pct, pharma_expr
 
@@ -68,7 +68,7 @@ def compute_analyse_marge(
         base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
         # PG-007: exclude pharmacist-excluded BL numbers from achats.
-        base_filter_a.append(achat_bl_filter(db, pharmacy_id))
+        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -85,7 +85,7 @@ def compute_analyse_marge(
     elif mode == "grossiste":
         rows_out = _mode_grossiste(db, base_filter_v, base_filter_a)
     elif mode == "laboratoire":
-        rows_out = _mode_laboratoire(db, base_filter_v, base_filter_a, cat_filter)
+        rows_out = _mode_laboratoire(db, base_filter_v, base_filter_a)
     elif mode == "operateur":
         rows_out = _mode_operateur(db, base_filter_v, cat_filter)
     elif mode == "mois":
@@ -290,8 +290,15 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
 
 # ─── Mode: grossiste (PG-010) ─────────────────────────────────────────────────
 
-def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> list[dict]:
-    grossiste_med_sub = (
+def _supplier_axis(
+    db: Session, base_filter_v: list, base_filter_a: list, *, supplier_clause, key: str,
+) -> list[dict]:
+    """Marge grouped by `Achat.supplier` — the shared engine behind the Grossiste
+    and Laboratoire tabs (the two supplier axes). `supplier_clause` selects which
+    suppliers belong to this axis (grossiste = name starts "GROSSISTE"; laboratoire
+    = every OTHER non-null supplier). `key` is the output field name. CA/qty/prix
+    come from Ventes joined by medicament_id; PU + cost from Achats. PG-010 marge."""
+    supplier_med_sub = (
         db.query(
             Achat.supplier.label("supplier"),
             Achat.medicament_id.label("medicament_id"),
@@ -299,37 +306,37 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
             func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
         )
         .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
-        .filter(func.upper(Achat.supplier).like("GROSSISTE%"))
+        .filter(supplier_clause)
         .group_by(Achat.supplier, Achat.medicament_id)
         .subquery()
     )
     q = (
         db.query(
-            grossiste_med_sub.c.supplier.label("grossiste"),
+            supplier_med_sub.c.supplier.label(key),
             func.sum(Vente.quantity).label("qty"),
             func.sum(Vente.total).label("ca"),
             func.max(Vente.unit_price).label("prix_max"),
             func.min(Vente.unit_price).label("prix_min"),
             func.avg(Vente.unit_price).label("prix_avg"),
         )
-        .join(Vente, Vente.medicament_id == grossiste_med_sub.c.medicament_id)
+        .join(Vente, Vente.medicament_id == supplier_med_sub.c.medicament_id)
         .filter(*base_filter_v)
-        .group_by(grossiste_med_sub.c.supplier)
+        .group_by(supplier_med_sub.c.supplier)
     )
     med_marge_q = (
         db.query(
-            grossiste_med_sub.c.supplier.label("grossiste"),
+            supplier_med_sub.c.supplier.label("supplier"),
             Medicament.ppv,
-            grossiste_med_sub.c.avg_pu.label("pu"),
+            supplier_med_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
         )
-        .join(Medicament, Medicament.id == grossiste_med_sub.c.medicament_id)
-        .join(Vente, Vente.medicament_id == grossiste_med_sub.c.medicament_id)
+        .join(Medicament, Medicament.id == supplier_med_sub.c.medicament_id)
+        .join(Vente, Vente.medicament_id == supplier_med_sub.c.medicament_id)
         .filter(*base_filter_v, Medicament.ppv.isnot(None))
-        .group_by(grossiste_med_sub.c.supplier, grossiste_med_sub.c.medicament_id,
-                  Medicament.ppv, grossiste_med_sub.c.avg_pu)
+        .group_by(supplier_med_sub.c.supplier, supplier_med_sub.c.medicament_id,
+                  Medicament.ppv, supplier_med_sub.c.avg_pu)
     )
-    gross_margin: dict = {}
+    margin: dict = {}
     for m in med_marge_q.all():
         if m.pu is None:
             continue
@@ -338,28 +345,28 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
             continue
         qty = float(m.qty or 0)
         pu  = float(m.pu  or 0)
-        bucket = gross_margin.setdefault(m.grossiste, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
+        bucket = margin.setdefault(m.supplier, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
         marge_pct = (1 - pu / ppv) * 100
         bucket["sum_qty_pct"] += qty * marge_pct
         bucket["sum_qty_dh"]  += qty * (ppv - pu)
         bucket["total_qty"]   += qty
 
-    gross_cost_q = (
+    cost_q = (
         db.query(
-            grossiste_med_sub.c.supplier.label("grossiste"),
-            func.sum(grossiste_med_sub.c.total_cost).label("total_cost"),
+            supplier_med_sub.c.supplier.label("supplier"),
+            func.sum(supplier_med_sub.c.total_cost).label("total_cost"),
         )
-        .group_by(grossiste_med_sub.c.supplier)
+        .group_by(supplier_med_sub.c.supplier)
     )
-    gross_total_cost = {r.grossiste: float(r.total_cost or 0) for r in gross_cost_q.all()}
+    total_cost = {r.supplier: float(r.total_cost or 0) for r in cost_q.all()}
 
     out: list[dict] = []
     for r in q.all():
-        name = r.grossiste or "—"
-        m = gross_margin.get(name)
+        name = getattr(r, key) or "—"
+        m = margin.get(name)
         total_qty = m["total_qty"] if m else 0
         out.append({
-            "grossiste":        name,
+            key:                name,
             "prix_max":         round(float(r.prix_max or 0), 4),
             "prix_min":         round(float(r.prix_min or 0), 4),
             "prix_avg":         round(float(r.prix_avg or 0), 4),
@@ -367,89 +374,34 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
             "ca":               round(float(r.ca or 0), 2),
             "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
             "marge_dh_avg":     round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
-            "total_achat_cost": round(gross_total_cost.get(name, 0.0), 2),
+            "total_achat_cost": round(total_cost.get(name, 0.0), 2),
         })
     return out
 
 
-# ─── Mode: laboratoire (PG-010 symmetric) ─────────────────────────────────────
+def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> list[dict]:
+    return _supplier_axis(
+        db, base_filter_v, base_filter_a,
+        supplier_clause=func.upper(Achat.supplier).like("GROSSISTE%"),
+        key="grossiste",
+    )
 
-def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list, cat_filter: list) -> list[dict]:
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-            func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
-        )
-        .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
-        .group_by(Achat.medicament_id)
-        .subquery()
-    )
-    q = (
-        db.query(
-            Medicament.laboratoire,
-            func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
-            func.max(Vente.unit_price).label("prix_max"),
-            func.min(Vente.unit_price).label("prix_min"),
-            func.avg(Vente.unit_price).label("prix_avg"),
-        )
-        .join(Medicament, Vente.medicament_id == Medicament.id)
-        .filter(*base_filter_v, *cat_filter, Medicament.laboratoire.isnot(None))
-        .group_by(Medicament.laboratoire)
-    )
-    med_marge_q = (
-        db.query(
-            Medicament.laboratoire, Medicament.ppv,
-            avg_pu_sub.c.avg_pu.label("pu"),
-            func.sum(Vente.quantity).label("qty"),
-        )
-        .join(Medicament, Vente.medicament_id == Medicament.id)
-        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
-        .filter(*base_filter_v, *cat_filter,
-                Medicament.ppv.isnot(None), Medicament.laboratoire.isnot(None))
-        .group_by(Medicament.id, Medicament.laboratoire, Medicament.ppv, avg_pu_sub.c.avg_pu)
-    )
-    lab_margin: dict = {}
-    for m in med_marge_q.all():
-        if m.pu is None:
-            continue
-        ppv = float(m.ppv or 0)
-        if not ppv:
-            continue
-        qty = float(m.qty or 0)
-        pu  = float(m.pu  or 0)
-        bucket = lab_margin.setdefault(m.laboratoire, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
-        marge_pct = (1 - pu / ppv) * 100
-        bucket["sum_qty_pct"] += qty * marge_pct
-        bucket["sum_qty_dh"]  += qty * (ppv - pu)
-        bucket["total_qty"]   += qty
 
-    lab_cost_q = (
-        db.query(Medicament.laboratoire, func.sum(avg_pu_sub.c.total_cost).label("total_cost"))
-        .join(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
-        .filter(Medicament.laboratoire.isnot(None))
-        .group_by(Medicament.laboratoire)
+# ─── Mode: laboratoire — the non-grossiste suppliers (direct labs / sociétés) ──
+# The exact complement of Grossiste over the non-null suppliers, so every
+# fournisseur shows in exactly ONE of the two supplier tabs. (Previously grouped
+# by the `Medicament.laboratoire` catalogue attribute — filled for only ~7% of
+# products and NULL for every direct-supplier product; changed to the supplier
+# axis the pharmacist actually purchases from, per the /analyses redesign.)
+def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list) -> list[dict]:
+    return _supplier_axis(
+        db, base_filter_v, base_filter_a,
+        supplier_clause=and_(
+            Achat.supplier.isnot(None),
+            func.upper(Achat.supplier).notlike("GROSSISTE%"),
+        ),
+        key="laboratoire",
     )
-    lab_total_cost = {r.laboratoire: float(r.total_cost or 0) for r in lab_cost_q.all()}
-
-    out: list[dict] = []
-    for r in q.all():
-        name = r.laboratoire or "—"
-        m = lab_margin.get(name)
-        total_qty = m["total_qty"] if m else 0
-        out.append({
-            "laboratoire":      name,
-            "prix_max":         round(float(r.prix_max or 0), 4),
-            "prix_min":         round(float(r.prix_min or 0), 4),
-            "prix_avg":         round(float(r.prix_avg or 0), 4),
-            "qty":              round(float(r.qty or 0), 2),
-            "ca":               round(float(r.ca or 0), 2),
-            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
-            "marge_dh_avg":     round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
-            "total_achat_cost": round(lab_total_cost.get(name, 0.0), 2),
-        })
-    return out
 
 
 # ─── Mode: operateur (client) ─────────────────────────────────────────────────
