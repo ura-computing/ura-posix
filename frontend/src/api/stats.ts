@@ -119,6 +119,7 @@ export function getAnalyseMarge(
   if (filters.date_from)     p.set("date_from", filters.date_from);
   if (filters.date_to)       p.set("date_to",   filters.date_to);
   if (filters.category_type) p.set("category_type", filters.category_type);
+  if (filters.product)       p.set("product", filters.product);
   return api<AnalyseMargeResponse>(`/stats/analyse-marge?${p.toString()}`);
 }
 

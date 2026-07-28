@@ -45,7 +45,10 @@ export function useAnalysePage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Auto-fetch query for 7 group-by modes; Liste uses the mutation below.
-  const margeQ = useAnalyseMarge(filters, mode);
+  // In année mode the search box filters ventes by PRODUCT server-side (so each
+  // month reflects that product's quantities); other modes filter rows client-side.
+  const margeFilters = mode === "annee" ? { ...filters, product: search.trim() || null } : filters;
+  const margeQ = useAnalyseMarge(margeFilters, mode);
   const listeM = useAnalyseListe();
 
   // When mode === liste, the active result lives on the mutation; otherwise on the query.
@@ -56,11 +59,14 @@ export function useAnalysePage() {
   // (prefix `rino*`, suffix `*enil`, infix `ri*il`), each token may match any field.
   const filteredRows = useMemo(() => {
     if (!activeData?.rows) return [];
+    // Année mode already filtered server-side by product — don't also filter the
+    // year rows client-side (a product name never matches a year label).
+    if (mode === "annee") return activeData.rows;
     if (!search.trim()) return activeData.rows;
     return activeData.rows.filter((r) =>
       matchesFields([r.product, r.category, r.laboratoire, r.grossiste, r.client, r.mois, r.annee], search),
     );
-  }, [activeData, search]);
+  }, [activeData, search, mode]);
 
   // KPI cards adapt to the client-side text search: with a search active, the
   // whole KPI block is recomputed from the FILTERED rows (exact TS mirror of

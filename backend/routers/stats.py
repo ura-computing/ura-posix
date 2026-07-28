@@ -271,12 +271,15 @@ def get_analyse_marge(
     date_from:     DateFromQ     = None,
     date_to:       DateToQ       = None,
     category_type: CategoryTypeQ = "all",
+    product:       str | None    = None,
 ) -> dict:
-    """7 group-by modes for /analyse. Liste mode uses POST /stats/analyse-liste below."""
+    """7 group-by modes for /analyse. Liste mode uses POST /stats/analyse-liste below.
+
+    `product` is an optional product-name filter used by the année mode search box."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="analyse")
     if mode == MargeMode.LISTE:
         raise HTTPException(status_code=400, detail="Utilisez POST /stats/analyse-liste pour le mode liste")
-    payload = compute_analyse_marge(db, pharmacy_id, date_from, date_to, category_type, mode.value)
+    payload = compute_analyse_marge(db, pharmacy_id, date_from, date_to, category_type, mode.value, product=product)
     return {"mode": mode.value, **payload}
 
 

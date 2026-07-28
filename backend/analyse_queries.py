@@ -43,6 +43,7 @@ def compute_analyse_marge(
     dt: str | None,
     category_type: str,
     mode: str,
+    product: str | None = None,
 ) -> dict:
     base_filter_v: list = []
     base_filter_a: list = []
@@ -75,6 +76,11 @@ def compute_analyse_marge(
         cat_filter = [pharma_expr() == True]
     elif category_type == "parapharmacie":
         cat_filter = [pharma_expr() == False]
+
+    # Product search (année mode only): filter ventes by product name so the year
+    # rows AND the KPI cards both reflect the searched product.
+    if mode == "annee" and product and product.strip():
+        base_filter_v = [*base_filter_v, Medicament.product.ilike(f"%{product.strip()}%")]
 
     rows_out: list[dict[str, Any]] = []
 
@@ -452,6 +458,9 @@ def _mode_mois(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]
 # ─── Mode: annee (pivot) ──────────────────────────────────────────────────────
 
 def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]:
+    # Product filtering (for the search box in année mode) is applied upstream via
+    # base_filter_v in compute_analyse_marge, so both these rows AND the KPI cards
+    # stay consistent. Each month cell is {"qty", "ca"}.
     q = (
         db.query(
             func.extract("year",  func.cast(Vente.date, Date)).label("annee"),
@@ -469,8 +478,14 @@ def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict
         mo = int(r.mois or 0)
         if yr == 0 or not (1 <= mo <= 12):
             continue
-        row = bucket.setdefault(yr, {"annee": yr, **dict.fromkeys(_MONTH_KEYS, 0.0), "ca": 0.0, "qty": 0.0})
-        row[_MONTH_KEYS[mo - 1]] = round(float(r.ca or 0), 2)
+        row = bucket.setdefault(
+            yr,
+            {"annee": yr, **{k: {"qty": 0.0, "ca": 0.0} for k in _MONTH_KEYS}, "ca": 0.0, "qty": 0.0},
+        )
+        row[_MONTH_KEYS[mo - 1]] = {
+            "qty": round(float(r.qty or 0), 2),
+            "ca":  round(float(r.ca or 0), 2),
+        }
         row["ca"]  += float(r.ca or 0)
         row["qty"] += float(r.qty or 0)
     for row in bucket.values():
