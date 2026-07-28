@@ -35,6 +35,7 @@ export function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrde
     label:    c.key in MONTH_IDX ? monthsShort[MONTH_IDX[c.key]] : t(c.label),
     align:    c.align,
     sortable: !!c.raw,
+    width:    c.width ? parseInt(c.width, 10) : undefined,
     render:   c.key === "match_status"
       ? (r: AnalyseMargeRow) => (
           r.match_status === "found"

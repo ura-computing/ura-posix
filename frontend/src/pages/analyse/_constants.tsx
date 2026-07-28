@@ -19,6 +19,8 @@ export interface AnalyseColDef {
   render: (row: AnalyseMargeRow) => ReactNode;
   /** Raw value for Excel export. Falls back to render's string conversion if absent. */
   raw?:   (row: AnalyseMargeRow) => string | number | null;
+  /** Column width in pixels or CSS units */
+  width?: string;
 }
 
 
@@ -43,10 +45,10 @@ const PRODUIT_COLS: AnalyseColDef[] = [
   { key: "prix_avg",    label: "col.puMoy",       align: "right", render: (r) => r.prix_avg ? formatMAD(r.prix_avg) : "—", raw: (r) => r.prix_avg ?? null },
   { key: "prix_max",    label: "col.puMax",       align: "right", render: (r) => r.prix_max ? formatMAD(r.prix_max) : "—", raw: (r) => r.prix_max ?? null },
   { key: "ppv",         label: "col.ppv",          align: "right", render: (r) => r.ppv != null ? formatMAD(r.ppv) : "—", raw: (r) => r.ppv ?? null },
-  { key: "marge_pct",   label: "col.margePct",      align: "right",
+  { key: "marge_pct",   label: "col.margePct",      align: "right" as const,
     render: (r) => <span className={margeColor(r.marge_pct)}>{r.marge_pct != null ? formatPct(r.marge_pct) : "—"}</span>,
     raw: (r) => r.marge_pct ?? null },
-  { key: "marge_dh",    label: "col.margeDh",     align: "right",
+  { key: "marge_dh",    label: "col.margeDh",     align: "right" as const,
     render: (r) => <span className={margeColor(r.marge_pct)}>{r.marge_dh != null ? formatMAD(r.marge_dh) : "—"}</span>,
     raw: (r) => r.marge_dh ?? null },
 ];
@@ -109,16 +111,46 @@ const MOIS_COLS: AnalyseColDef[] = [
 const MONTH_KEYS  = ["m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"] as const;
 
 const ANNEE_COLS: AnalyseColDef[] = [
-  { key: "annee", label: "col.annee", render: (r) => String(r.annee ?? "—"), raw: (r) => r.annee ?? "" },
-  ...MONTH_KEYS.map((k, i): AnalyseColDef => ({
-    key:   k,
-    label: MONTH_KEYS[i],
-    align: "right",
-    render: (r) => <span className="whitespace-nowrap">{formatMAD((r as unknown as Record<string, number>)[k] ?? 0)}</span>,
-    raw:    (r) => (r as unknown as Record<string, number>)[k] ?? 0,
+  { 
+    key: "annee", 
+    label: "col.annee", 
+    render: (r) => <span className="font-bold">{r.annee ?? "—"}</span>, 
+    raw: (r) => r.annee ?? "",
+    align: "left" as const,
+    width: "120px"
+  },
+  ...MONTH_KEYS.map((k) => ({
+    key: k,
+    label: k,
+    align: "left" as const,
+    render: (r: AnalyseMargeRow) => {
+      const monthData = r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined;
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm tabular-nums">qty: {formatQty(monthData?.qty ?? 0)}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">CA: {formatMAD(monthData?.ca ?? 0)}</span>
+        </div>
+      );
+    },
+    raw: (r: AnalyseMargeRow) => {
+      const monthData = r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined;
+      return monthData?.qty ?? 0;
+    },
+    width: "200px"
   })),
-  { key: "ca",  label: "col.totalCA", align: "right", render: (r) => <span className="whitespace-nowrap">{formatMAD(r.ca ?? 0)}</span>, raw: (r) => r.ca ?? 0 },
-  { key: "qty", label: "col.totalQte", align: "right", render: (r) => <span className="whitespace-nowrap">{formatQty(r.qty ?? 0)}</span>, raw: (r) => r.qty ?? 0 },
+  {
+    key: "total",
+    label: "Total",
+    align: "left" as const,
+    render: (r) => (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm tabular-nums">qty: {formatQty(r.qty ?? 0)}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">CA: {formatMAD(r.ca ?? 0)}</span>
+      </div>
+    ),
+    raw: (r) => r.qty ?? 0,
+    width: "200px"
+  }
 ];
 
 const LISTE_COLS: AnalyseColDef[] = [
@@ -133,10 +165,10 @@ const LISTE_COLS: AnalyseColDef[] = [
   { key: "qty",         label: "col.qteVendue",   align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
   { key: "ppv",         label: "col.ppv",          align: "right", render: (r) => r.ppv != null ? formatMAD(r.ppv) : "—", raw: (r) => r.ppv ?? null },
   { key: "pu",          label: "col.puMoy",       align: "right", render: (r) => r.pu  != null ? formatMAD(r.pu)  : "—", raw: (r) => r.pu  ?? null },
-  { key: "marge_pct",   label: "col.margePct",      align: "right",
+  { key: "marge_pct",   label: "col.margePct",      align: "right" as const,
     render: (r) => <span className={margeColor(r.marge_pct)}>{r.marge_pct != null ? formatPct(r.marge_pct) : "—"}</span>,
     raw: (r) => r.marge_pct ?? null },
-  { key: "marge_dh",    label: "col.margeDh",     align: "right",
+  { key: "marge_dh",    label: "col.margeDh",     align: "right" as const,
     render: (r) => <span className={margeColor(r.marge_pct)}>{r.marge_dh != null ? formatMAD(r.marge_dh) : "—"}</span>,
     raw: (r) => r.marge_dh ?? null },
 ];
@@ -183,6 +215,21 @@ const OLD_AGG_EXPORT_TAIL: AnalyseExportCol[] = [
 const OLD_MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 
 export const EXPORT_COLS: Record<MargeMode, AnalyseExportCol[]> = {
+  annee: [
+    { label: "Année", raw: (r: AnalyseMargeRow) => r.annee ?? "" },
+    ...MONTH_KEYS.flatMap((k, i) => [
+      {
+        label: `${OLD_MONTH_LABELS[i]} (Qty)`,
+        raw: (r: AnalyseMargeRow) => ((r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined)?.qty ?? 0)
+      },
+      {
+        label: `${OLD_MONTH_LABELS[i]} (CA)`,
+        raw: (r: AnalyseMargeRow) => ((r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined)?.ca ?? 0)
+      }
+    ]),
+    { label: "Total Qté", raw: (r: AnalyseMargeRow) => r.qty ?? 0 },
+    { label: "Total CA", raw: (r: AnalyseMargeRow) => r.ca ?? 0 }
+  ],
   produit: [
     { label: "Produit",          raw: (r) => r.product ?? "" },
     { label: "Stock dispo",      raw: (r) => r.stock_dispo ?? null },
@@ -220,14 +267,6 @@ export const EXPORT_COLS: Record<MargeMode, AnalyseExportCol[]> = {
     { label: "Transactions", raw: (r) => r.nb_transactions ?? 0 },
     { label: "Qté",          raw: (r) => r.qty ?? 0 },
     { label: "CA (MAD)",     raw: (r) => r.ca ?? 0 },
-  ],
-  annee: [
-    { label: "Année", raw: (r) => r.annee ?? "" },
-    ...MONTH_KEYS.map((k, i): AnalyseExportCol => ({
-      label: OLD_MONTH_LABELS[i],
-      raw:   (r) => (r as unknown as Record<string, number>)[k] ?? 0,
-    })),
-    { label: "Total", raw: (r) => r.ca ?? 0 },
   ],
   liste: [
     { label: "Statut",      raw: (r) => r.match_status === "found" ? "Trouvé" : r.match_status === "not_found" ? "Introuvable" : "" },

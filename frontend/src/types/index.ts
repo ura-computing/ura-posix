@@ -129,8 +129,8 @@ export const QUERY_KEYS = {
 
   // Analyse de marge (Page 11) — 7 group-by modes + Liste CSV upload.
   // Cache slot per (mode, window, categoryType). Liste keyed on items hash.
-  ANALYSE_MARGE: (mode: MargeMode, df: string | null, dt: string | null, ct: string) =>
-    ["analyse-marge", mode, df ?? "", dt ?? "", ct] as const,
+  ANALYSE_MARGE: (mode: MargeMode, df: string | null, dt: string | null, ct: string, product?: string | null) =>
+    ["analyse-marge", mode, df ?? "", dt ?? "", ct, product ?? ""] as const,
   ANALYSE_LISTE: (itemsKey: string, df: string | null, dt: string | null, ct: string) =>
     ["analyse-liste", itemsKey, df ?? "", dt ?? "", ct] as const,
 
@@ -758,11 +758,14 @@ export interface AnalyseMargeRow {
   client?:           string;
   mois?:             string;
   nb_transactions?:  number;
-  // annee (pivot)
+  // annee (pivot) — each month is {qty, ca} from the backend
   annee?:            number;
-  m01?: number; m02?: number; m03?: number; m04?: number;
-  m05?: number; m06?: number; m07?: number; m08?: number;
-  m09?: number; m10?: number; m11?: number; m12?: number;
+  m01?: { qty: number; ca: number }; m02?: { qty: number; ca: number };
+  m03?: { qty: number; ca: number }; m04?: { qty: number; ca: number };
+  m05?: { qty: number; ca: number }; m06?: { qty: number; ca: number };
+  m07?: { qty: number; ca: number }; m08?: { qty: number; ca: number };
+  m09?: { qty: number; ca: number }; m10?: { qty: number; ca: number };
+  m11?: { qty: number; ca: number }; m12?: { qty: number; ca: number };
   // liste
   match_status?:     "found" | "not_found";
   tva?:              string | null;
@@ -792,6 +795,8 @@ export interface AnalyseFilters {
   date_from:     string | null;
   date_to:       string | null;
   category_type: string;
+  product?:      string | null;
+  search?:       string | null;
 }
 
 

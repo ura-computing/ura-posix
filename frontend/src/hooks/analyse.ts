@@ -13,7 +13,7 @@ import type { AnalyseFilters, ListeRequest, MargeMode } from "@/types";
 
 export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
   return useQuery({
-    queryKey: QUERY_KEYS.ANALYSE_MARGE(mode, filters.date_from, filters.date_to, filters.category_type),
+    queryKey: QUERY_KEYS.ANALYSE_MARGE(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
     queryFn:  () => getAnalyseMarge(filters, mode),
     staleTime: 60_000,
     enabled:   mode !== "liste",   // Liste uses the mutation hook below

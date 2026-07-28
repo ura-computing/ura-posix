@@ -29,8 +29,12 @@ const OLD_APP_HEADERS: Record<string, string[]> = {
   operateur: ["Opérateur / Client", "Transactions", "Qté", "CA (MAD)"],
   mois:      ["Mois", "Transactions", "Qté", "CA (MAD)"],
   annee: [
-    "Année", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août",
-    "Sep", "Oct", "Nov", "Déc", "Total",
+    "Année",
+    "Jan (Qty)", "Jan (CA)", "Fév (Qty)", "Fév (CA)", "Mar (Qty)", "Mar (CA)",
+    "Avr (Qty)", "Avr (CA)", "Mai (Qty)", "Mai (CA)", "Juin (Qty)", "Juin (CA)",
+    "Juil (Qty)", "Juil (CA)", "Août (Qty)", "Août (CA)", "Sep (Qty)", "Sep (CA)",
+    "Oct (Qty)", "Oct (CA)", "Nov (Qty)", "Nov (CA)", "Déc (Qty)", "Déc (CA)",
+    "Total Qté", "Total CA",
   ],
   // Old app never exported the liste comparison (its "Liste" tab exported BL
   // aggregates that no longer exist) — we export the comparison table with the
