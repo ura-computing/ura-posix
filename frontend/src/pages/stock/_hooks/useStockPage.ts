@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 //   usePeremptions()                 -> listPeremptions()
 import { useStockAbcd, usePeremptions } from "@/hooks/stats";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { todayIso, yearsAgo } from "@/utils/dateRange";
+import { monthsAgo, todayIso } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/pages/alertes/_hooks/useAlertesPage";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
@@ -28,12 +28,12 @@ export function useStockPage() {
   // Date range comes from the cross-route global context. Other filters
   // (class, status, search, sort, pagination) stay page-local.
   const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
-  // Stock-only default: trailing 2 years → today. Computed LOCALLY so it's the
+  // Stock-only default: trailing 2 months → today. Computed LOCALLY so it's the
   // effective range for this page's queries + picker WITHOUT writing to the
   // shared cross-route context — other routes stay unaffected. Any explicit
   // range (picked here or on another tab) lands in the global context and
   // overrides this default; `isDateDefault` tells the UI when no range is set.
-  const defaultFrom = useMemo(() => yearsAgo(2), []);
+  const defaultFrom = useMemo(() => monthsAgo(2), []);
   const defaultTo   = useMemo(() => todayIso(), []);
   const isDateDefault = globalFrom === null && globalTo === null;
   const dateFrom = globalFrom ?? defaultFrom;
@@ -120,7 +120,11 @@ export function useStockPage() {
     setPage(1);
   }, []);
 
-  // ---- Excel export: CURRENT full (filtered-by-date) products, 8 columns ----
+  // ---- Excel export: the CURRENT filtered-by-status table (9 columns).
+  // When a table filter (status / class / search) is active, the filtered fetch
+  // has the server-side filtered rows → export exactly what the user sees.
+  // With no table filter, `filteredQuery` is disabled, so fall back to the
+  // date-only full set (identical rows in that case).
   const handleExport = useCallback(() => {
     const header = [
       "Produit",
@@ -131,8 +135,12 @@ export function useStockPage() {
       "Stock max",
       "PPV",
       "PU moyen",
+      "Statut",
     ];
-    const body = fullProducts.map((r) => [
+    const rowsToExport = hasTableFilter
+      ? (filteredQuery.data?.products ?? [])
+      : fullProducts;
+    const body = rowsToExport.map((r) => [
       r.product,
       r.category,
       r.units_sold_12m,
@@ -141,12 +149,13 @@ export function useStockPage() {
       r.stock_max,
       r.ppv ?? 0,
       r.avg_pu ?? 0,
+      r.status,
     ]);
     downloadXlsx(
       [header, ...body],
       exportFilename("STOCK", "xlsx", dateFrom, dateTo),
     );
-  }, [fullProducts, dateFrom, dateTo]);
+  }, [fullProducts, filteredQuery.data, hasTableFilter, dateFrom, dateTo]);
 
   return {
     // queries
@@ -157,6 +166,7 @@ export function useStockPage() {
     fullProducts,
     healthScore,
     hasTableFilter,
+    isExportLoading: hasTableFilter && filteredQuery.isLoading,
     isEmpty: (fullQuery.data?.total_references ?? 0) === 0,
     // filter state + setters
     dateFrom,

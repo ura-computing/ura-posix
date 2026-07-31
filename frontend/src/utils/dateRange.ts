@@ -29,6 +29,19 @@ export function yearsAgo(n: number, now: Date = new Date()): string {
 }
 
 
+/** ISO date `n` months before today (same day, clamped to month length).
+ *  e.g. monthsAgo(2) on 2026-07-31 → 2026-05-31,
+ *       monthsAgo(1) on 2026-08-31 → 2026-07-31 (not rolled into Sept).
+ */
+export function monthsAgo(n: number, now: Date = new Date()): string {
+  const day = now.getDate();
+  const d   = new Date(now.getFullYear(), now.getMonth() - n, 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return fmt(d);
+}
+
+
 /** First day of current month → today. */
 export function currentMonth(now: Date = new Date()): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
