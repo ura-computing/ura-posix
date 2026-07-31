@@ -126,10 +126,7 @@ const ANNEE_COLS: AnalyseColDef[] = [
     render: (r: AnalyseMargeRow) => {
       const monthData = r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined;
       return (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm tabular-nums">qty: {formatQty(monthData?.qty ?? 0)}</span>
-          <span className="text-xs text-muted-foreground tabular-nums">CA: {formatMAD(monthData?.ca ?? 0)}</span>
-        </div>
+        <span className="text-sm tabular-nums">{formatMAD(monthData?.ca ?? 0)}</span>
       );
     },
     raw: (r: AnalyseMargeRow) => {
@@ -143,10 +140,7 @@ const ANNEE_COLS: AnalyseColDef[] = [
     label: "Total",
     align: "left" as const,
     render: (r) => (
-      <div className="flex flex-col gap-0.5">
-        <span className="text-sm tabular-nums">qty: {formatQty(r.qty ?? 0)}</span>
-        <span className="text-xs text-muted-foreground tabular-nums">CA: {formatMAD(r.ca ?? 0)}</span>
-      </div>
+      <span className="text-sm tabular-nums">{formatMAD(r.ca ?? 0)}</span>
     ),
     raw: (r) => r.qty ?? 0,
     width: "200px"
