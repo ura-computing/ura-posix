@@ -19,7 +19,7 @@ export default function StockPage() {
   const full = s.fullQuery;
 
   const activeFilters: ActiveFilter[] = [
-    // Only a pill for an EXPLICIT range — not the local 2-year default (whose
+    // Only a pill for an EXPLICIT range — not the local 2-month default (whose
     // "clear" would just revert to the same default and feel broken).
     !s.isDateDefault && (s.dateFrom || s.dateTo) ? {
       key:    "dates",
@@ -46,7 +46,13 @@ export default function StockPage() {
           onChange: (from, to) => { s.setDateFrom(from ?? ""); s.setDateTo(to ?? ""); },
         }}
         rightActions={[
-          { label: t("common.export"),  icon: <Download className="size-4" />, variant: "outline", onClick: s.handleExport },
+          {
+            label: t("common.export"),
+            icon: <Download className="size-4" />,
+            variant: "outline",
+            onClick: s.handleExport,
+            disabled: s.isExportLoading,
+          },
           { label: t("stock.importStock"),  icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=stock` },
         ]}
         activeFilters={activeFilters}
