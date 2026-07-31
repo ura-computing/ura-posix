@@ -99,7 +99,7 @@ describe("useStockPage", () => {
     expect(result.current.status).toBe("");
     expect(result.current.page).toBe(1);
     expect(result.current.classFilter).toBeNull();
-    // clearAll drops the explicit range → back to the stock 2-month default.
+    // clearAll drops the explicit range → back to the stock 12-month default.
     expect(result.current.isDateDefault).toBe(true);
   });
 
