@@ -28,12 +28,12 @@ export function useStockPage() {
   // Date range comes from the cross-route global context. Other filters
   // (class, status, search, sort, pagination) stay page-local.
   const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
-  // Stock-only default: trailing 2 months → today. Computed LOCALLY so it's the
+  // Stock-only default: trailing 12 months → today. Computed LOCALLY so it's the
   // effective range for this page's queries + picker WITHOUT writing to the
   // shared cross-route context — other routes stay unaffected. Any explicit
   // range (picked here or on another tab) lands in the global context and
   // overrides this default; `isDateDefault` tells the UI when no range is set.
-  const defaultFrom = useMemo(() => monthsAgo(2), []);
+  const defaultFrom = useMemo(() => monthsAgo(12), []);
   const defaultTo   = useMemo(() => todayIso(), []);
   const isDateDefault = globalFrom === null && globalTo === null;
   const dateFrom = globalFrom ?? defaultFrom;

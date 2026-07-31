@@ -19,7 +19,7 @@ export default function StockPage() {
   const full = s.fullQuery;
 
   const activeFilters: ActiveFilter[] = [
-    // Only a pill for an EXPLICIT range — not the local 2-month default (whose
+    // Only a pill for an EXPLICIT range — not the local 12-month default (whose
     // "clear" would just revert to the same default and feel broken).
     !s.isDateDefault && (s.dateFrom || s.dateTo) ? {
       key:    "dates",
