@@ -118,24 +118,27 @@ def _non_declared_sub(pharmacy_id: int):
     )
 
 
-def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None):
-    """Weighted avg purchase price per medicament. Window + non-declared + BL exclusion.
-    Used by both list_ventes (avg_pu_map for marge cells) and surveillance_counts
-    (so badge counts match visible rows — fixes the apcm-pharma parity bug)."""
+def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None,
+                 *, include_non_declared: bool = True):
+    """Weighted avg purchase price per medicament. Window + (optionally) non-declared
+    + BL exclusion. Used by both list_ventes (avg_pu_map for marge cells) and
+    surveillance_counts (so badge counts match visible rows). include_non_declared=True
+    (default): specials + excluded BLs/suppliers count — the /ventes page shows the
+    full picture. False: comptabilite view applies the exclusions."""
     nd = _non_declared_sub(pharmacy_id)
-    q = (
-        db.query(
+    q = db.query(
             Achat.medicament_id.label("med_id"),
             (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(
+        ).filter(
             Achat.pharmacy_id == pharmacy_id,
             Achat.quantity > 0,
             Achat.unit_price.isnot(None),
+        )
+    if not include_non_declared:
+        q = q.filter(
             Achat.medicament_id.notin_(nd),
             achat_exclusion_filter(db, pharmacy_id),
         )
-    )
     if date_from:
         q = q.filter(Achat.delivery_date >= date_from)
     if date_to:
@@ -266,6 +269,7 @@ def list_achats(
     search:     SearchQ        = None,
     category:   CategoryMultiQ = None,
     tva:        TvaMultiQ      = None,
+    include_non_declared: IncludeNDQ = True,
     sort_by:    SortByQ        = None,
     sort_order: SortOrderQ     = "desc",
     export:     ExportQ        = False,
@@ -275,9 +279,11 @@ def list_achats(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     )
-    # PG-007: excluded BLs are hidden from the Achats ledger entirely — rows,
-    # the grand total, and the Excel export (all derived from `q`).
-    q = q.filter(achat_exclusion_filter(db, pharmacy_id))
+    # PG-007: excluded BLs/suppliers are hidden from the Achats ledger ONLY in the
+    # comptabilite view (include_non_declared=false). All other sections show the
+    # full picture — rows, the grand total, and the Excel export.
+    if not include_non_declared:
+        q = q.filter(achat_exclusion_filter(db, pharmacy_id))
     # Force Medicament join (for the TVA aggregate) if no search/category/tva
     if not (search or category or tva):
         q = q.outerjoin(Medicament, Achat.medicament_id == Medicament.id)
@@ -425,18 +431,18 @@ def achat_supplier_summary(
     search:    SearchQ        = None,
     category:  CategoryMultiQ = None,
     tva:       TvaMultiQ      = None,
+    include_non_declared: IncludeNDQ = True,
 ) -> dict:
     """Split supplier-side totals into grossiste vs direct_labo for the gauge.
     Classification: UPPER(supplier) LIKE 'GROSSISTE%' → grossiste, else direct_labo.
-    BL exclusion is applied (matches stats parity)."""
+    Exclusions apply only in the comptabilite view (include_non_declared=false)."""
     pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
     base = _apply_achat_filters(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
-    ).filter(
-        Achat.supplier.isnot(None), Achat.supplier != "",
-        achat_exclusion_filter(db, pharmacy_id),
-    )
+    ).filter(Achat.supplier.isnot(None), Achat.supplier != "")
+    if not include_non_declared:
+        base = base.filter(achat_exclusion_filter(db, pharmacy_id))
 
     is_grossiste = func.upper(Achat.supplier).like("GROSSISTE%")
 
@@ -488,7 +494,8 @@ def list_ventes(
     marge_sort = sort_by in ("marge_pct", "marge_dh")
     avg_pu_sub = None
     if surveillance or marge_sort:
-        avg_pu_sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
+        avg_pu_sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to,
+                                  include_non_declared=include_non_declared)
         q = q.outerjoin(avg_pu_sub, Vente.medicament_id == avg_pu_sub.c.med_id)
     if surveillance:
         q = _apply_surveillance(q, surveillance, avg_pu_sub, has_med_join=has_med_join)
@@ -527,7 +534,8 @@ def list_ventes(
     avg_pu_map: dict[int, float] = {}
     if med_ids:
         db.query(Medicament).filter(Medicament.id.in_(med_ids)).all()
-        sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
+        sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to,
+                           include_non_declared=include_non_declared)
         for row in db.query(sub.c.med_id, sub.c.avg_pu).filter(sub.c.med_id.in_(med_ids)).all():
             if row.avg_pu is not None:
                 avg_pu_map[row.med_id] = float(row.avg_pu)

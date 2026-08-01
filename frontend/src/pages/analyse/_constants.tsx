@@ -110,6 +110,16 @@ const MOIS_COLS: AnalyseColDef[] = [
 
 const MONTH_KEYS  = ["m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"] as const;
 
+/** Two-line cell body used by the Année pivot: qty on the first line, CA on the second. */
+function monthValueCell(qty: number, ca: number) {
+  return (
+    <span className="flex flex-col text-sm tabular-nums">
+      <span>{formatQty(qty)}</span>
+      <span>{formatMAD(ca)}</span>
+    </span>
+  );
+}
+
 const ANNEE_COLS: AnalyseColDef[] = [
   { 
     key: "annee", 
@@ -125,9 +135,7 @@ const ANNEE_COLS: AnalyseColDef[] = [
     align: "left" as const,
     render: (r: AnalyseMargeRow) => {
       const monthData = r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined;
-      return (
-        <span className="text-sm tabular-nums">{formatMAD(monthData?.ca ?? 0)}</span>
-      );
+      return monthValueCell(monthData?.qty ?? 0, monthData?.ca ?? 0);
     },
     raw: (r: AnalyseMargeRow) => {
       const monthData = r[k as keyof AnalyseMargeRow] as { qty: number; ca: number } | undefined;
@@ -139,9 +147,7 @@ const ANNEE_COLS: AnalyseColDef[] = [
     key: "total",
     label: "Total",
     align: "left" as const,
-    render: (r) => (
-      <span className="text-sm tabular-nums">{formatMAD(r.ca ?? 0)}</span>
-    ),
+    render: (r) => monthValueCell(r.qty ?? 0, r.ca ?? 0),
     raw: (r) => r.qty ?? 0,
     width: "200px"
   }

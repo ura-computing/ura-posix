@@ -259,8 +259,12 @@ def reconcile_marge_to_ca(marge: dict, ca: float) -> None:
 
 # ─── Aggregate KPIs (advanced + tva + marge + type_breakdown) ─────────────────
 
-def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt: str | None, category_type: str = "all") -> dict:
-    """Returns the bundle: advanced_kpis (best/worst day, ticket_moyen), tva, marge, type_breakdown."""
+def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt: str | None,
+                        category_type: str = "all", *, include_non_declared: bool = True) -> dict:
+    """Returns the bundle: advanced_kpis (best/worst day, ticket_moyen), tva, marge, type_breakdown.
+
+    include_non_declared=True (default): specials + excluded BLs/suppliers are
+    included. include_non_declared=False: applies all exclusions (comptabilite)."""
     base_filter_v: list = []
     base_filter_a: list = []
     if pharmacy_id:
@@ -272,7 +276,7 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     if dt:
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         sub = (
             db.query(PharmacyMedicamentStatus.medicament_id)
             .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
@@ -399,6 +403,8 @@ def compute_previous_kpis(
     cat_filter_v: list,
     cat_filter_a: list,
     non_declared_sub=None,
+    *,
+    include_non_declared: bool = True,
 ) -> dict:
     """ventes_total + achats_total + marge_pct for the same window shifted -1 year."""
     today = date.today()
@@ -432,7 +438,7 @@ def compute_previous_kpis(
     if cat_filter_a: aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:  aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
     if non_declared_sub is not None: aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id:  aq = aq.filter(achat_exclusion_filter(db, pharmacy_id))
+    if pharmacy_id and not include_non_declared:  aq = aq.filter(achat_exclusion_filter(db, pharmacy_id))
     aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
     prev_achats = aq.scalar()
 
@@ -445,7 +451,7 @@ def compute_previous_kpis(
     if non_declared_sub is not None:
         prev_base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
         prev_base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         prev_base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     prev_marge = marge_for_window(db, prev_base_filter_v, prev_base_filter_a, cat_filter_v)
@@ -482,7 +488,8 @@ def _bracket_for(marge_pct: float) -> str | None:
 
 
 def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str],
-                          dt: Optional[str], category_type: str = "all") -> dict:
+                          dt: Optional[str], category_type: str = "all",
+                          *, include_non_declared: bool = True) -> dict:
     """Group products by margin brackets. Each bracket returns {count, total_ca,
     total_margin_dh, products[]}. `products` is sorted by abs(marge_pct) desc so the
     drill-down lists the most extreme cases first."""
@@ -497,7 +504,7 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
     if dt:
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         sub = (
             db.query(PharmacyMedicamentStatus.medicament_id)
             .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
@@ -563,7 +570,8 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
 
 
 def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional[str],
-                              dt: Optional[str], category_type: str = "all") -> dict:
+                              dt: Optional[str], category_type: str = "all",
+                              *, include_non_declared: bool = True) -> dict:
     """List products with ventes in the [df, dt] window whose medicament has NO
     matching achat in the same window for the same pharmacy — the root cause of
     Marge %/DH rendering "—" on /ventes for those rows.
@@ -582,7 +590,7 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
     if dt:
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         sub = (
             db.query(PharmacyMedicamentStatus.medicament_id)
             .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
@@ -642,7 +650,7 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
 # Lightweight — returns just the 4 tile numbers the Rapport needs.
 # The full ABCD classification ports later when /stock page is built.
 
-def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
+def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared: bool = True) -> dict:
     """Returns {total_references, ppv_potentiel, sous_stock_count, sur_stock_count,
     in_band_count, health_pct} for the Rapport Stock section.
 
@@ -660,12 +668,13 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
                 PharmacyMedicamentStatus.declared == False)
         .scalar_subquery()
-    )
+    ) if not include_non_declared else None
 
     # 12-month sales per medicament for this pharmacy.
     from datetime import date as _date, timedelta as _td
     today = _date.today()
     start_12m = (today - _td(days=365)).isoformat()
+    sales_12m_filter = [] if sub is None else [Vente.medicament_id.notin_(sub)]
     sales_12m = (
         db.query(
             Vente.medicament_id,
@@ -675,12 +684,13 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
             Vente.pharmacy_id == pharmacy_id,
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
-            Vente.medicament_id.notin_(sub),
+            *sales_12m_filter,
         )
         .group_by(Vente.medicament_id)
         .subquery()
     )
 
+    rows_filter = [] if sub is None else [PharmacyStock.medicament_id.notin_(sub)]
     rows = (
         db.query(
             PharmacyStock.medicament_id,
@@ -692,7 +702,7 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         .outerjoin(sales_12m, PharmacyStock.medicament_id == sales_12m.c.medicament_id)
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
-            PharmacyStock.medicament_id.notin_(sub),
+            *rows_filter,
         )
         .all()
     )
@@ -736,7 +746,8 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
 
 
 def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str],
-                        non_declared_sub=None, cat_filter_v=None, cat_filter_a=None) -> dict:
+                        non_declared_sub=None, cat_filter_v=None, cat_filter_a=None,
+                        *, include_non_declared: bool = True) -> dict:
     """Adaptive ventes/achats trend. Returns {"granularity", "points"} where the
     bucket unit (week / month / semester / year) adapts to the selected window so
     a short period still renders a multi-point line. See _trend_granularity()."""
@@ -778,7 +789,7 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
     if non_declared_sub is not None:
         v_q = v_q.filter(Vente.medicament_id.notin_(non_declared_sub))
         a_q = a_q.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         a_q = a_q.filter(achat_exclusion_filter(db, pharmacy_id))
 
     # Fold rows onto bucket-start keys. For "semester" this collapses the two

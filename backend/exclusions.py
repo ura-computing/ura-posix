@@ -5,10 +5,17 @@ Two kinds of exclusion exist per pharmacy:
   catalog-request flow. A row in `pharmacy_medicament_status` with `declared=False`.
 - **BL exclusions** (PG-007 achats-half) — pharmacist excluded a specific delivery_ref
   from accounting. Achat rows with that ref disappear from every aggregate.
+- **Supplier exclusions** — pharmacist excluded a normalized supplier name.
 
 Both filters apply to Achat-side aggregates wherever the dashboard already filters
 non-declared products. Use `achat_bl_filter()` rather than inlining the subquery —
 SQL's `NULL NOT IN (subquery)` evaluates to NULL → silently drops rows with NULL refs.
+
+APPLICATION RULE (user decision 2026-08-01): excluded/special products, excluded
+suppliers and excluded BLs are **included everywhere except /comptabilite**.
+Every consumer gates the exclusion predicates on `include_non_declared`:
+`True` (the default for every section) → NO exclusion clauses are added;
+`False` (comptabilite only) → the full non-declared + BL + supplier filters apply.
 """
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
