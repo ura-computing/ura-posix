@@ -101,7 +101,46 @@ def compute_analyse_marge(
     # "liste" mode handled by compute_analyse_liste below
 
     kpis = _compute_kpis(db, base_filter_v, cat_filter, rows_out)
+    # "Unités disponibles" is a CURRENT stock snapshot, not a row aggregate.
+    # Compute it directly from PharmacyStock so the tile is real in EVERY tab
+    # (produit's rows carry stock_dispo, but categorie/mois/année/... don't),
+    # while still respecting the tab's category_type + optional product filter.
+    kpis["total_units_available"] = _compute_total_units_available(
+        db, pharmacy_id, cat_filter, product,
+    )
     return {"kpis": kpis, "rows": rows_out}
+
+
+def _compute_total_units_available(
+    db: Session,
+    pharmacy_id: int | None,
+    cat_filter: list,
+    product: str | None = None,
+) -> int | None:
+    """Sum of current stock across the pharmacy's products matching the current
+    analyse filter (category_type via `cat_filter`, optional product search).
+    Stock is a current snapshot — intentionally NOT date-filtered (matches how
+    produit mode reads latest_stock_sub). Returns None when there's no stock."""
+    q = (
+        db.query(func.coalesce(func.sum(PharmacyStock.current_stock), 0))
+        .join(Medicament, PharmacyStock.medicament_id == Medicament.id)
+        .filter(*cat_filter)
+    )
+    if pharmacy_id:
+        q = q.filter(PharmacyStock.pharmacy_id == pharmacy_id)
+        non_declared_sub = (
+            db.query(PharmacyMedicamentStatus.medicament_id)
+            .filter(
+                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                PharmacyMedicamentStatus.declared == False,
+            )
+            .scalar_subquery()
+        )
+        q = q.filter(PharmacyStock.medicament_id.notin_(non_declared_sub))
+    if product and product.strip():
+        q = q.filter(Medicament.product.ilike(f"%{product.strip()}%"))
+    total = q.scalar() or 0
+    return round(total) if total else None
 
 
 # ─── Mode: produit ────────────────────────────────────────────────────────────
