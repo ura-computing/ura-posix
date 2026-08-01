@@ -44,7 +44,15 @@ def compute_analyse_marge(
     category_type: str,
     mode: str,
     product: str | None = None,
+    *,
+    include_non_declared: bool = True,
 ) -> dict:
+    """Analyse de marge for all non-list modes.
+
+    include_non_declared=True (default): special/excluded products, excluded
+    suppliers and excluded BLs are ALL included — the Analyse tabs always show
+    the full picture. include_non_declared=False: comptabilite-only view that
+    applies the non-declared + BL + supplier exclusions."""
     base_filter_v: list = []
     base_filter_a: list = []
     if pharmacy_id:
@@ -57,7 +65,7 @@ def compute_analyse_marge(
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
 
-    if pharmacy_id:
+    if pharmacy_id and not include_non_declared:
         non_declared_sub = (
             db.query(PharmacyMedicamentStatus.medicament_id)
             .filter(
@@ -106,7 +114,7 @@ def compute_analyse_marge(
     # (produit's rows carry stock_dispo, but categorie/mois/année/... don't),
     # while still respecting the tab's category_type + optional product filter.
     kpis["total_units_available"] = _compute_total_units_available(
-        db, pharmacy_id, cat_filter, product,
+        db, pharmacy_id, cat_filter, product, include_non_declared=include_non_declared,
     )
     return {"kpis": kpis, "rows": rows_out}
 
@@ -116,6 +124,8 @@ def _compute_total_units_available(
     pharmacy_id: int | None,
     cat_filter: list,
     product: str | None = None,
+    *,
+    include_non_declared: bool = True,
 ) -> int | None:
     """Sum of current stock across the pharmacy's products matching the current
     analyse filter (category_type via `cat_filter`, optional product search).
@@ -128,15 +138,16 @@ def _compute_total_units_available(
     )
     if pharmacy_id:
         q = q.filter(PharmacyStock.pharmacy_id == pharmacy_id)
-        non_declared_sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(
-                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                PharmacyMedicamentStatus.declared == False,
+        if not include_non_declared:
+            non_declared_sub = (
+                db.query(PharmacyMedicamentStatus.medicament_id)
+                .filter(
+                    PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+                    PharmacyMedicamentStatus.declared == False,
+                )
+                .scalar_subquery()
             )
-            .scalar_subquery()
-        )
-        q = q.filter(PharmacyStock.medicament_id.notin_(non_declared_sub))
+            q = q.filter(PharmacyStock.medicament_id.notin_(non_declared_sub))
     if product and product.strip():
         q = q.filter(Medicament.product.ilike(f"%{product.strip()}%"))
     total = q.scalar() or 0
@@ -622,6 +633,8 @@ def compute_analyse_liste(
     df: str | None,
     dt: str | None,
     category_type: str,
+    *,
+    include_non_declared: bool = True,
 ) -> dict:
     """Match an uploaded list of products (by name → barcode1 → barcode2 → PID) against
     the pharmacy's catalogue + ventes. Returns the same shape as compute_analyse_marge
@@ -678,7 +691,10 @@ def compute_analyse_liste(
             unmatched.append(original_name)
 
     # Run produit mode then filter to matched ids
-    full = compute_analyse_marge(db, pharmacy_id, df, dt, category_type, "produit")
+    full = compute_analyse_marge(
+        db, pharmacy_id, df, dt, category_type, "produit",
+        include_non_declared=include_non_declared,
+    )
     matched_meds_by_id = {m.id: m for m in med_rows if m.id in matched_ids}
     matched_norms_db   = {strip_accents((m.product or "").strip().lower()) for m in matched_meds_by_id.values()}
 

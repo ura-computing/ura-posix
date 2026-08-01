@@ -16,11 +16,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from exclusions import achat_exclusion_filter
-from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
+from models import Achat, Medicament, PharmacyStock, Vente
 from search import matches_all_tokens, tokenize_search
 
 
@@ -100,15 +99,7 @@ def _resolve_windows(df: str | None, dt: str | None) -> tuple[str, str, str]:
     return start_12m.isoformat(), start_4m.isoformat(), end_date.isoformat()
 
 
-def _non_declared_select(pharmacy_id: int):
-    """SELECT of medicament_ids the pharmacy has marked as non-declared."""
-    return select(PharmacyMedicamentStatus.medicament_id).where(
-        PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-        PharmacyMedicamentStatus.declared.is_(False),
-    )
-
-
-def _vente_units_subq(pharmacy_id: int, start: str, end: str, exclude_nd, db: Session):
+def _vente_units_subq(pharmacy_id: int, start: str, end: str, db: Session):
     """Subquery: Σ(quantity) per medicament_id over [start, end]."""
     return (
         db.query(
@@ -120,7 +111,6 @@ def _vente_units_subq(pharmacy_id: int, start: str, end: str, exclude_nd, db: Se
             Vente.medicament_id.isnot(None),
             Vente.date >= start,
             Vente.date <= end,
-            Vente.medicament_id.notin_(exclude_nd),
         )
         .group_by(Vente.medicament_id)
         .subquery()
@@ -145,10 +135,9 @@ def compute_stock_abcd(
     Only the `products` list is filtered/sorted by class/status/search/sort.
     """
     start_12m, start_4m, end_date = _resolve_windows(df, dt)
-    nd = _non_declared_select(pharmacy_id)
 
-    sales_12m         = _vente_units_subq(pharmacy_id, start_12m, end_date, nd, db)
-    sales_4m          = _vente_units_subq(pharmacy_id, start_4m,  end_date, nd, db)
+    sales_12m         = _vente_units_subq(pharmacy_id, start_12m, end_date, db)
+    sales_4m          = _vente_units_subq(pharmacy_id, start_4m,  end_date, db)
     sales_before_4m_q = (
         db.query(Vente.medicament_id, func.sum(Vente.quantity).label("units"))
         .filter(
@@ -156,7 +145,6 @@ def compute_stock_abcd(
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
             Vente.date <  start_4m,
-            Vente.medicament_id.notin_(nd),
         )
         .group_by(Vente.medicament_id).subquery()
     )
@@ -165,7 +153,6 @@ def compute_stock_abcd(
         db.query(PharmacyStock.medicament_id, PharmacyStock.current_stock)
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
-            PharmacyStock.medicament_id.notin_(nd),
         )
         .subquery()
     )
@@ -180,8 +167,8 @@ def compute_stock_abcd(
             Achat.medicament_id.isnot(None),
             Achat.quantity > 0,
             Achat.unit_price.isnot(None),
-            # PG-007: excluded BLs must not skew the stock PU moyen.
-            achat_exclusion_filter(db, pharmacy_id),
+            # PG-007: excluded BLs/suppliers are included — stock PU avg reflects
+            # the FULL purchasing history everywhere except comptabilite.
         )
         .group_by(Achat.medicament_id).subquery()
     )
@@ -194,14 +181,12 @@ def compute_stock_abcd(
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
             Vente.date <= end_date,
-            Vente.medicament_id.notin_(nd),
         ).distinct()
     )
     stocked_ids = (
         db.query(PharmacyStock.medicament_id)
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
-            PharmacyStock.medicament_id.notin_(nd),
         ).distinct()
     )
     all_med_ids = {r[0] for r in sold_ids.all()} | {r[0] for r in stocked_ids.all()}
@@ -313,8 +298,6 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
     boundary_6m  = today + timedelta(days=6 * 30)
     boundary_12m = today + timedelta(days=12 * 30)
 
-    nd = _non_declared_select(pharmacy_id)
-
     rows = (
         db.query(
             Medicament.product,
@@ -327,7 +310,6 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
             PharmacyStock.current_stock > 0,
-            PharmacyStock.medicament_id.notin_(nd),
         )
         .all()
     )

@@ -69,7 +69,8 @@ def _non_declared_sub_for(db, pharmacy_id: int):
     )
 
 
-def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub) -> dict:
+def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub,
+                  *, include_non_declared: bool = True) -> dict:
     """ventes_total/count + achats_total/count for the window."""
     vq = (
         db.query(
@@ -84,7 +85,10 @@ def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_decla
         aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     if pharmacy_id:
         vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
-        aq = aq.filter(Achat.pharmacy_id == pharmacy_id, achat_exclusion_filter(db, pharmacy_id))
+        if not include_non_declared:
+            aq = aq.filter(Achat.pharmacy_id == pharmacy_id, achat_exclusion_filter(db, pharmacy_id))
+        else:
+            aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
     if non_declared_sub is not None:
         vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
         aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
@@ -104,7 +108,8 @@ def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_decla
     }
 
 
-def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub) -> list[dict]:
+def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub,
+                    *, include_non_declared: bool = True) -> list[dict]:
     """Aggregate Vente by category, merge percent suffixes, sort by CA desc."""
     avg_pu_sub = (
         db.query(
@@ -114,9 +119,12 @@ def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub) -> 
         .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
     )
     if pharmacy_id:
-        # PG-007: excluded BLs must not skew the category marge shown in the donut.
-        avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id,
-                                       achat_exclusion_filter(db, pharmacy_id))
+        if not include_non_declared:
+            # PG-007: excluded BLs must not skew the category marge shown in the donut.
+            avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id,
+                                           achat_exclusion_filter(db, pharmacy_id))
+        else:
+            avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id)
     avg_pu_sub = avg_pu_sub.group_by(Achat.medicament_id).subquery()
 
     q: OrmQuery = (
@@ -157,19 +165,24 @@ def build_stats_payload(
     if pharmacy_id and not include_non_declared:
         non_declared_sub = _non_declared_sub_for(db, pharmacy_id)
 
-    trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a)
-    kpis  = _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub)
-    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type)
+    trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a,
+                                include_non_declared=include_non_declared)
+    kpis  = _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub,
+                          include_non_declared=include_non_declared)
+    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type,
+                                include_non_declared=include_non_declared)
     # Single source of truth: reconcile the aggregate marge to the FULL CA so every
     # margin display agrees (marge_brute_dh / ventes_total == marge_pct, exactly).
     reconcile_marge_to_ca(extra["marge"], kpis["ventes_total"])
     return {
         "kpis":           kpis,
-        "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub),
+        "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a,
+                                                non_declared_sub, include_non_declared=include_non_declared),
         **extra,
         "monthly_trend":     trend["points"],
         "trend_granularity": trend["granularity"],
-        "top_categories": _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub),
+        "top_categories": _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub,
+                                          include_non_declared=include_non_declared),
     }
 
 

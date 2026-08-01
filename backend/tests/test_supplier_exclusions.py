@@ -128,7 +128,9 @@ class TestSupplierSearch:
 class TestSupplierExclusionEffect:
     """Excluding a supplier must remove its Achats from the aggregates."""
 
-    def test_excluded_supplier_drops_from_achats_list(self, auth_owner, achat) -> None:
+    def test_excluded_supplier_drops_from_achats_list_in_comptabilite_view(self, auth_owner, achat) -> None:
+        """USER DECISION 2026-08-01: excluded suppliers drop from the Achats ledger
+        ONLY in the comptabilite view (include_non_declared=false)."""
         client, _, _ = auth_owner
         achat("KEEP-SUP", product="V", qty=1, unit_price=50, delivery_ref="R1")
         achat("DROP-SUP", product="H", qty=1, unit_price=200, delivery_ref="R2")
@@ -140,17 +142,30 @@ class TestSupplierExclusionEffect:
 
         client.post("/v1/supplier-exclusions/", json={"supplier": "DROP-SUP"})
 
+        # Default view keeps the excluded supplier visible
         r = client.get("/v1/achats?limit=100").json()
+        suppliers = {row["supplier"] for row in r["data"]}
+        assert {"KEEP-SUP", "DROP-SUP"} <= suppliers
+        assert round(r["summary"]["grand_total"], 2) == total_before
+
+        # Comptabilite view drops it
+        r = client.get("/v1/achats?limit=100&include_non_declared=false").json()
         suppliers = {row["supplier"] for row in r["data"]}
         assert "DROP-SUP" not in suppliers and "KEEP-SUP" in suppliers
         assert round(total_before - r["summary"]["grand_total"], 2) == 200.0
 
     def test_exclusion_is_accent_case_insensitive(self, auth_owner, achat) -> None:
-        """Excluding 'grossiste cdp' must also drop rows stored as 'GROSSISTE CDP'."""
+        """Excluding 'grossiste cdp' must also drop rows stored as 'GROSSISTE CDP'
+        in the comptabilite view."""
         client, _, _ = auth_owner
         achat("GROSSISTE CDP", product="A", qty=1, unit_price=100, delivery_ref="R1")
 
         client.post("/v1/supplier-exclusions/", json={"supplier": "GROSSISTE CDP"})
 
+        # Default keeps it
         r = client.get("/v1/achats?limit=100").json()
+        assert "GROSSISTE CDP" in {row["supplier"] for row in r["data"]}
+
+        # Comptabilite drops it
+        r = client.get("/v1/achats?limit=100&include_non_declared=false").json()
         assert "GROSSISTE CDP" not in {row["supplier"] for row in r["data"]}

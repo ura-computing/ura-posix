@@ -65,7 +65,9 @@ function buildActiveFilters(
 type LocalStatsFilters = Omit<StatsFilters, "date_from" | "date_to">;
 const INITIAL_LOCAL: LocalStatsFilters = {
   category_type:        "all",
-  include_non_declared: false,
+  // USER DECISION 2026-08-01: special/excluded products + excluded fournisseurs/BLs
+  // are INCLUDED in the Dashboard (Rapport). Only /comptabilite applies exclusions.
+  include_non_declared: true,
 };
 
 

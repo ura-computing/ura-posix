@@ -164,24 +164,38 @@ class TestBlExclusionEffect:
     """Excluding a BL must remove its Achats from the aggregates (achat_bl_filter)."""
 
     def test_excluded_bl_drops_from_supplier_summary(self, auth_owner, achat) -> None:
+        """Exclusions apply ONLY in the comptabilite view (include_non_declared=false)."""
         client, _, _ = auth_owner
         achat("BL-KEEP", product="A", qty=1, unit_price=100, supplier="Grossiste Test")
         achat("BL-DROP", product="B", qty=1, unit_price=999, supplier="Grossiste Test")
 
-        before = client.get("/v1/achats/supplier-summary").json()
+        before = client.get("/v1/achats/supplier-summary?include_non_declared=false").json()
         total_before = before["grossiste"]["total_mad"] + before["direct_labo"]["total_mad"]
 
         client.post("/v1/bl-exclusions/", json={"delivery_ref": "BL-DROP"})
 
-        after = client.get("/v1/achats/supplier-summary").json()
+        after = client.get("/v1/achats/supplier-summary?include_non_declared=false").json()
         total_after = after["grossiste"]["total_mad"] + after["direct_labo"]["total_mad"]
 
         assert round(total_before - total_after, 2) == 999.0   # exactly the excluded BL
 
-    def test_excluded_bl_drops_from_stock_avg_pu(self, auth_owner, db) -> None:
-        """PG-007 parity gap: the /stock PU moyen must ignore excluded-BL lines.
-        Two BLs for the same product (PU 10 and 100) → avg 55; excluding the
-        100-BL leaves avg 10."""
+    def test_excluded_bl_stays_visible_by_default(self, auth_owner, achat) -> None:
+        """USER DECISION 2026-08-01: excluded BLs are INCLUDED everywhere except
+        comptabilite → the default supplier-summary must NOT drop the BL."""
+        client, _, _ = auth_owner
+        achat("BL-KEEP", product="A", qty=1, unit_price=100, supplier="Grossiste Test")
+        achat("BL-DROP", product="B", qty=1, unit_price=999, supplier="Grossiste Test")
+
+        client.post("/v1/bl-exclusions/", json={"delivery_ref": "BL-DROP"})
+
+        r = client.get("/v1/achats/supplier-summary").json()
+        total = r["grossiste"]["total_mad"] + r["direct_labo"]["total_mad"]
+        assert round(total, 2) == 1099.0   # both BLs counted
+
+    def test_excluded_bl_included_in_stock_avg_pu(self, auth_owner, db) -> None:
+        """USER DECISION 2026-08-01: the stock PU moyen reflects the FULL purchase
+        history. Two BLs for the same product (PU 10 and 100) → avg 55 stays 55
+        even after excluding the 100-BL."""
         from models import Achat, Medicament, PharmacyStock
         from stock_queries import compute_stock_abcd
         client, _, pharmacy = auth_owner
@@ -195,19 +209,18 @@ class TestBlExclusionEffect:
         db.add(PharmacyStock(pharmacy_id=pharmacy.id, medicament_id=m.id, current_stock=5))
         db.commit()
 
-        def pu_of(product_id: int) -> float | None:
+        def pu_of() -> float | None:
             data = compute_stock_abcd(db, pharmacy.id, None, None)
-            row = next((p for p in data["products"] if p.get("id") == product_id
-                        or p.get("medicament_id") == product_id
-                        or p.get("product") == "STOCK-MED"), None)
+            row = next((p for p in data["products"] if p.get("product") == "STOCK-MED"), None)
             return None if row is None else row.get("avg_pu")
 
-        assert pu_of(m.id) == pytest.approx(55.0)          # (10 + 100) / 2
+        assert pu_of() == pytest.approx(55.0)          # (10 + 100) / 2
         client.post("/v1/bl-exclusions/", json={"delivery_ref": "BL-PRICEY"})
-        assert pu_of(m.id) == pytest.approx(10.0)          # pricey BL gone
+        assert pu_of() == pytest.approx(55.0)          # still 55 — BL excluded only for comptabilite
 
-    def test_excluded_bl_hidden_from_achats_list(self, auth_owner, achat) -> None:
-        """PG-007: excluded BLs disappear from the Achats ledger — rows AND total."""
+    def test_excluded_bl_hidden_from_achats_list_in_comptabilite_view(self, auth_owner, achat) -> None:
+        """PG-007: excluded BLs disappear from the Achats ledger ONLY in the
+        comptabilite view (include_non_declared=false) — rows AND total."""
         client, _, _ = auth_owner
         achat("BL-VISIBLE", product="V", qty=1, unit_price=50)
         achat("BL-HIDDEN",  product="H", qty=1, unit_price=200)
@@ -219,7 +232,14 @@ class TestBlExclusionEffect:
 
         client.post("/v1/bl-exclusions/", json={"delivery_ref": "BL-HIDDEN"})
 
+        # Default view keeps the excluded BL visible
         r = client.get("/v1/achats?limit=100").json()
+        refs = {row["delivery_ref"] for row in r["data"]}
+        assert {"BL-VISIBLE", "BL-HIDDEN"} <= refs
+        assert round(r["summary"]["grand_total"], 2) == total_before
+
+        # Comptabilite view drops it
+        r = client.get("/v1/achats?limit=100&include_non_declared=false").json()
         refs = {row["delivery_ref"] for row in r["data"]}
         assert "BL-HIDDEN" not in refs and "BL-VISIBLE" in refs   # row gone
         assert round(total_before - r["summary"]["grand_total"], 2) == 200.0   # total dropped
