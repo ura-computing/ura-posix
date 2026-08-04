@@ -23,7 +23,7 @@ from typing import Optional
 from sqlalchemy import Date, case as sa_case, func
 from sqlalchemy.orm import Session
 
-from exclusions import achat_exclusion_filter
+from exclusions import achat_exclusion_filter, excluded_medicaments_select
 from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
 
 
@@ -277,15 +277,11 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
     if pharmacy_id and not include_non_declared:
-        sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                    PharmacyMedicamentStatus.declared == False)
-            .scalar_subquery()
-        )
+        # Unified med-level exclusion: special products + all products on an excluded
+        # BL + all products from an excluded supplier, dropped from ventes AND achats.
+        sub = excluded_medicaments_select(db, pharmacy_id)
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter_v: list = []
     cat_filter_a: list = []
@@ -505,15 +501,11 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
     if pharmacy_id and not include_non_declared:
-        sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                    PharmacyMedicamentStatus.declared == False)
-            .scalar_subquery()
-        )
+        # Unified med-level exclusion: special products + all products on an excluded
+        # BL + all products from an excluded supplier, dropped from ventes AND achats.
+        sub = excluded_medicaments_select(db, pharmacy_id)
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":
@@ -591,15 +583,11 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
         base_filter_v.append(Vente.date <= dt)
         base_filter_a.append(Achat.delivery_date <= dt)
     if pharmacy_id and not include_non_declared:
-        sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                    PharmacyMedicamentStatus.declared == False)
-            .scalar_subquery()
-        )
+        # Unified med-level exclusion: special products + all products on an excluded
+        # BL + all products from an excluded supplier, dropped from ventes AND achats.
+        sub = excluded_medicaments_select(db, pharmacy_id)
         base_filter_v.append(Vente.medicament_id.notin_(sub))
         base_filter_a.append(Achat.medicament_id.notin_(sub))
-        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
 
     cat_filter: list = []
     if category_type == "pharmacie":

@@ -36,7 +36,6 @@ from security import CurrentUserDep
 
 router = APIRouter(tags=["bl-exclusions"])
 
-_SEARCH_LIMIT = 30   # BLs returned by the exclude-search
 
 
 def _bl_aggregate(db, pharmacy_id: int, refs: list[str] | None = None):
@@ -146,7 +145,6 @@ def search_bls(
     rows = (
         _bl_aggregate(db, pharmacy_id, list(refs))
         .order_by(func.max(Achat.delivery_date).desc())
-        .limit(_SEARCH_LIMIT)
         .all()
     )
     excluded = _excluded_refs(db, pharmacy_id)

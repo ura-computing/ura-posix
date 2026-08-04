@@ -202,7 +202,7 @@ def medicament_suggestions(
     for clause in product_search_clauses(tokenize_search(q)):
         qry = qry.filter(clause)
 
-    rows = qry.order_by(Medicament.product.asc()).limit(10).all()
+    rows = qry.order_by(Medicament.product.asc()).all()
     return [{
         "id":        r.id,
         "pid":       r.pid,

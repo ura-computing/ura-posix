@@ -33,7 +33,6 @@ from security import CurrentUserDep
 
 router = APIRouter(tags=["supplier-exclusions"])
 
-_SEARCH_LIMIT = 30   # suppliers returned by the exclude-search
 
 
 def _norm(name: str | None) -> str:
@@ -116,7 +115,7 @@ def search_suppliers(
     agg = _supplier_aggregate(db, pharmacy_id)
     for clause in supplier_search_clauses(tokens, [Achat.supplier]):
         agg = agg.filter(clause)
-    rows = agg.order_by(func.sum(Achat.total).desc()).limit(_SEARCH_LIMIT).all()
+    rows = agg.order_by(func.sum(Achat.total).desc()).all()
 
     excluded = _excluded_norm_set(db, pharmacy_id)
     return [{

@@ -557,6 +557,7 @@ export const es: Dict = {
   },
 
   datePreset: {
+    currentYear:     "Año en curso",
     currentMonth:    "Mes actual",
     previousMonth:   "Mes anterior",
     previousQuarter: "Trimestre anterior",

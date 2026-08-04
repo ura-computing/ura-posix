@@ -17,7 +17,7 @@ Every consumer gates the exclusion predicates on `include_non_declared`:
 `True` (the default for every section) → NO exclusion clauses are added;
 `False` (comptabilite only) → the full non-declared + BL + supplier filters apply.
 """
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, select, union
 from sqlalchemy.orm import Session
 
 from models import (
@@ -88,3 +88,31 @@ def achat_exclusion_filter(db: Session, pharmacy_id: int):
         achat_bl_filter(db, pharmacy_id),
         achat_supplier_filter(db, pharmacy_id),
     )
+
+
+def excluded_medicaments_select(db: Session, pharmacy_id: int):
+    """medicament_ids excluded from comptabilité — the SINGLE source of truth.
+
+    Unifies the three exclusion kinds into one medicament set so that excluding a
+    BL or a fournisseur behaves EXACTLY like excluding a special product: every
+    product on that BL, and every product from that supplier, is dropped from BOTH
+    achats AND ventes (med-level). Use with `.notin_()` on Vente.medicament_id and
+    Achat.medicament_id. Only applied when include_non_declared=False (comptabilité);
+    everywhere else the products show normally.
+    """
+    special = select(PharmacyMedicamentStatus.medicament_id).where(
+        PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+        PharmacyMedicamentStatus.declared == False,  # noqa: E712
+    )
+    on_excluded_bl = select(Achat.medicament_id).where(
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.isnot(None),
+        Achat.delivery_ref.in_(bl_excluded_sub(db, pharmacy_id)),
+    )
+    from_excluded_supplier = select(Achat.medicament_id).where(
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.isnot(None),
+        func.unaccent(func.lower(Achat.supplier)).in_(supplier_excluded_sub(db, pharmacy_id)),
+    )
+    combined = union(special, on_excluded_bl, from_excluded_supplier).subquery()
+    return select(combined.c.medicament_id)

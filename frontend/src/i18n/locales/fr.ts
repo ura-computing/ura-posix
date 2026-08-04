@@ -562,6 +562,7 @@ export const fr = {
   },
 
   datePreset: {
+    currentYear:     "Année en cours",
     currentMonth:    "Mois actuel",
     previousMonth:   "Mois antérieur",
     previousQuarter: "Trimestre antérieur",

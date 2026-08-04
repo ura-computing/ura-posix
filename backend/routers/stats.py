@@ -10,7 +10,7 @@ from sqlalchemy.orm import Query as OrmQuery
 
 from analyse_queries import compute_analyse_liste, compute_analyse_marge
 from database import DbDep
-from exclusions import achat_exclusion_filter
+from exclusions import achat_exclusion_filter, excluded_medicaments_select
 from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
 from permissions import require_pharmacy_owner
 from schemas.stats import (
@@ -58,15 +58,10 @@ def _category_filters(category_type: str) -> tuple[list, list]:
 
 
 def _non_declared_sub_for(db, pharmacy_id: int):
-    """Scalar subquery of non-declared medicament_ids for this pharmacy."""
-    return (
-        db.query(PharmacyMedicamentStatus.medicament_id)
-        .filter(
-            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-            PharmacyMedicamentStatus.declared == False,
-        )
-        .scalar_subquery()
-    )
+    """medicament_ids excluded from comptabilité: special products + all products on
+    an excluded BL + all products from an excluded supplier (unified, med-level).
+    Applied to BOTH ventes and achats by every caller."""
+    return excluded_medicaments_select(db, pharmacy_id)
 
 
 def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub,

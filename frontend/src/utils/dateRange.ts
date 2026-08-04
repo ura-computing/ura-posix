@@ -80,7 +80,15 @@ export function previousYear(now: Date = new Date()): DateRange {
 }
 
 
+/** Full current calendar year (Jan 1 → today). */
+export function currentYear(now: Date = new Date()): DateRange {
+  const y = now.getFullYear();
+  return { from: `${y}-01-01`, to: fmt(now) };
+}
+
+
 export const DATE_PRESETS = [
+  { key: "current-year",     label: "datePreset.currentYear",     get: currentYear },
   { key: "current-month",    label: "datePreset.currentMonth",         get: currentMonth },
   { key: "previous-month",   label: "datePreset.previousMonth",      get: previousMonth },
   { key: "previous-quarter", label: "datePreset.previousQuarter", get: previousQuarter },

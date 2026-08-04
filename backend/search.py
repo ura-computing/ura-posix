@@ -4,39 +4,41 @@ Pharmacists type search queries like:
   "doliprane 1000"     → two tokens, both must match somewhere (AND)
   "societe para"       → matches "Société PARA LA CDP" (accent-insensitive)
 
-Search is **strict substring** — accent- and case-insensitive — with an
-explicit `*` wildcard for anchoring:
+Search is **strict substring** — accent- and case-insensitive — with an explicit
+`*` grammar:
 
-  "cin"    → contains "cin"            (ILIKE %cin%)
-  "cin*"   → starts with "cin"         (ILIKE cin%)
-  "*cin"   → ends with "cin"           (ILIKE %cin)
-  "c*a"    → starts with "c", ends "a" (ILIKE c%a)
+  "med"      → contains "med"                 (ILIKE %med%)
+  "*med"     → contains "med"                 (ILIKE %med%)
+  "med*"     → starts with "med"              (ILIKE med%)
+  "*a*b*c"   → contains a OR b OR c            (%a% OR %b% OR %c%)
 
-Multiple whitespace-separated tokens are ANDed (every token must match
-somewhere). `*` is a wildcard *inside* a token, not a separator.
+Rule per token: split on `*`; keep non-empty parts.
+  - 1 part, token ends with `*` (not starts) → starts-with   `part%`
+  - 1 part otherwise                         → contains       `%part%`
+  - 2+ parts                                 → OR of contains `%p%` for each p
 
+Multiple whitespace-separated tokens are ANDed (every token must match somewhere).
 Builds on the Postgres `unaccent` extension (enabled in the db).
-Used by /achats and /ventes search + suggestions endpoints.
 """
 from __future__ import annotations
 
 import re
 from typing import Iterable
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, true
 from sqlalchemy.sql.elements import ColumnElement
 
 from csv_parse import strip_accents
 from models import Medicament
 
 
-_TOKEN_SPLIT = re.compile(r"\s+")   # split on whitespace only — `*` is a wildcard
+_TOKEN_SPLIT = re.compile(r"\s+")   # split on whitespace only — `*` is grammar, not a separator here
 _LIKE_ESCAPE = "\\"                  # ILIKE escape char for literal % and _
 
 
 def tokenize_search(query: str | None) -> list[str]:
     """Split on whitespace. Lowercase. Dedupe (order preserved).
-    `*` is preserved inside tokens (it is a wildcard, handled downstream)."""
+    `*` is preserved inside tokens (it drives the grammar, handled downstream)."""
     if not query:
         return []
     seen: set[str] = set()
@@ -50,8 +52,8 @@ def tokenize_search(query: str | None) -> list[str]:
 
 
 def _like_escape(literal: str) -> str:
-    """Escape ILIKE metacharacters (`%`, `_`, and the escape char itself) in a
-    literal text chunk so user input can't act as a wildcard by accident."""
+    """Escape ILIKE metacharacters (`%`, `_`, and the escape char itself) so user
+    input can't act as a wildcard by accident."""
     return (
         literal.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
         .replace("%", _LIKE_ESCAPE + "%")
@@ -60,79 +62,94 @@ def _like_escape(literal: str) -> str:
 
 
 def _token_to_pattern(token: str) -> str:
-    """Substring ILIKE pattern for a NO-wildcard token (`%token%`). Used for the
-    plain 'contains' case; wildcard tokens go through `_token_to_regex_sql`."""
-    return f"%{_like_escape(token)}%"
+    """Single ILIKE pattern for one token (legacy wrapper used by tests).
+    Returns '' for lone `*` (caller must handle the "match all" semantic)."""
+    parts = _token_to_ilike_patterns(token)
+    return parts[0] if parts else ""
 
 
-# POSIX-ERE metacharacters to backslash-escape for Postgres `~*` regex.
-_PG_RE_META = re.compile(r"([.\\+?()\[\]{}^$|*])")
-
-
-def _pg_re_escape(literal: str) -> str:
-    return _PG_RE_META.sub(r"\\\1", literal)
+def _token_to_ilike_patterns(token: str) -> list[str]:
+    """ILIKE patterns for one token per the `*` grammar (see module docstring).
+    Returns one pattern (contains/starts) or several (OR of contains)."""
+    parts = [p for p in token.split("*") if p]
+    if not parts:
+        return []                                    # lone "*" → matches everything (handled by caller)
+    if len(parts) == 1:
+        seg = _like_escape(parts[0])
+        if token.endswith("*") and not token.startswith("*"):
+            return [f"{seg}%"]                        # starts with
+        return [f"%{seg}%"]                           # contains
+    return [f"%{_like_escape(p)}%" for p in parts]    # OR of contains
 
 
 def _token_to_regex_sql(token: str) -> str:
-    r"""Postgres regex (for `~*`) matching a token WITHIN A SINGLE WORD. `*` is a
-    within-word wildcard (`[^[:space:]]*`); the token anchors to the word start
-    (`\m`) / end (`\M`) unless it opens / closes with `*`. Anchoring per word (not
-    per whole column) is what lets `rinom*ne` match the word "RINOMICINE" inside
-    "RINOMICINE ST B10 SACHETS".
-      "rinom*"  → \mrinom              (word starts with rinom)
-      "*ne"     → ne\M                 (word ends with ne)
-      "ri*il"   → \mri[^space]*il\M    (word starts ri, ends il)
-    """
+    """Postgres regex for one token per the `*` grammar, word-anchored (\\m/\\M).
+    - `rino*` → `\\mrino` (starts with)
+    - `*enil` → `enil\\M` (ends with)
+    - `ri*il` → `\\mri[^[:space:]]*il\\M` (infix, within one word)
+    - bare `cin` → `\\mcin\\M` (exact word match)
+    Metacharacters (`.`, `(`, `)`, etc.) are regex-escaped."""
     parts = [p for p in token.split("*") if p]
-    body = "[^[:space:]]*".join(_pg_re_escape(part) for part in parts)
-    start = "" if token.startswith("*") else r"\m"
-    end = "" if token.endswith("*") else r"\M"
-    return f"{start}{body}{end}"
+    if not parts:
+        return ""                                    # lone "*" → match all
 
+    def _re_escape(s: str) -> str:
+        return re.escape(s)
 
-def _token_to_regex(token: str) -> re.Pattern[str]:
-    """Python-side twin of `_token_to_regex_sql` for in-memory matching, tested
-    against ONE word at a time (so `^`/`$` anchor the word, matching the SQL
-    `\\m`/`\\M` per-word behavior):
-      "cin"  → substring within a word   re.escape("cin")
-      "cin*" → word starts with          "^cin"
-      "*cin" → word ends with            "cin$"
-      "c*a"  → word starts "c" ends "a"  "^c.*a$"
-    """
-    if "*" not in token:
-        return re.compile(re.escape(token))
-    body = ".*".join(re.escape(part) for part in token.split("*"))
-    start = "" if token.startswith("*") else "^"
-    end = "" if token.endswith("*") else "$"
-    return re.compile(f"{start}{body}{end}")
+    if len(parts) == 1:
+        seg = _re_escape(parts[0])
+        if token.endswith("*") and not token.startswith("*"):
+            return r"\m" + seg                        # starts with
+        if token.startswith("*") and not token.endswith("*"):
+            return seg + r"\M"                        # ends with
+        return r"\m" + seg + r"\M"                    # exact word
 
-
-def matches_all_tokens(text: str | None, tokens: Iterable[str]) -> bool:
-    """True when every token matches `text` (accent/case-insensitive, `*`-aware).
-    A `*`-anchored token matches PER WORD; a plain token is a substring anywhere.
-    Mirrors the SQL search for the endpoints that filter materialized Python lists."""
-    norm = strip_accents(text or "").lower()
-    words = norm.split()
-
-    def _tok_ok(raw: str) -> bool:
-        tok = strip_accents(raw).lower()
-        if "*" not in tok:
-            return tok in norm                        # substring anywhere
-        rx = _token_to_regex(tok)
-        return any(rx.search(w) for w in words)        # anchored per word
-
-    return all(_tok_ok(t) for t in tokens)
+    # Infix: a*b → \ma[^[:space:]]*b\M
+    inner = r"[^[:space:]]*".join(_re_escape(p) for p in parts)
+    return r"\m" + inner + r"\M"
 
 
 def _pattern_ilike(column, token: str, *, unaccent: bool) -> ColumnElement[bool]:
-    """Accent-optional, case-insensitive match against `column` for one token.
-    Wildcard tokens use a per-word Postgres regex (`~*`); plain tokens use a
-    substring ILIKE."""
+    """Accent-optional, case-insensitive match against `column` for one token,
+    following the `*` grammar.
+    Simple tokens (prefix/suffix/contains) → ILIKE.
+    Infix tokens (a*b) → per-word Postgres regex (~*) so they don't cross word boundaries."""
     tok = strip_accents(token).lower() if unaccent else token
     col = func.unaccent(column) if unaccent else column
-    if "*" in tok:
-        return col.op("~*")(_token_to_regex_sql(tok))
-    return col.ilike(_token_to_pattern(tok), escape=_LIKE_ESCAPE)
+    parts = [p for p in tok.split("*") if p]
+    if not parts:
+        return true()                                 # lone "*" → no constraint
+    if len(parts) >= 2:
+        # Infix: use per-word regex so a*b must match within ONE word
+        regex = _token_to_regex_sql(tok)
+        return col.op("~*")(regex) if regex else true()
+    patterns = _token_to_ilike_patterns(tok)
+    return or_(*(col.ilike(p, escape=_LIKE_ESCAPE) for p in patterns))
+
+
+def matches_all_tokens(text: str | None, tokens: Iterable[str]) -> bool:
+    """Python twin of the SQL search (for endpoints that filter materialized lists).
+    Every token must match `text` (accent/case-insensitive) per the `*` grammar:
+    contains / starts-with / word-anchored infix (mirrors `_token_to_regex_sql`)."""
+    norm = strip_accents(text or "").lower()
+
+    def _tok_ok(raw: str) -> bool:
+        tok = strip_accents(raw).lower()
+        parts = [p for p in tok.split("*") if p]
+        if not parts:
+            return True                               # lone "*"
+        if len(parts) == 1:
+            if tok.endswith("*") and not tok.startswith("*"):
+                return norm.startswith(parts[0])       # starts with
+            return parts[0] in norm                    # contains
+        # 2+ parts: infix a*b*c → must match WITHIN ONE WORD
+        # Build a regex: \mpart1[^[:space:]]*part2[^[:space:]]*part3\M
+        inner = r"[^\s]*".join(re.escape(p) for p in parts)
+        pattern = re.compile(inner)
+        words = _TOKEN_SPLIT.split(norm)
+        return any(pattern.search(w) for w in words)   # at least one word must contain the infix
+
+    return all(_tok_ok(t) for t in tokens)
 
 
 def supplier_search_clauses(
@@ -140,7 +157,7 @@ def supplier_search_clauses(
     columns: Iterable,
 ) -> list[ColumnElement[bool]]:
     """For each token: OR(unaccent_ilike(col, tok) for col in columns).
-    Caller ANDs the clauses (Google-style — every token must match somewhere).
+    Caller ANDs the clauses (every token must match somewhere).
 
     Designed for supplier / delivery-ref / generic-text search where the
     columns don't include pid/barcodes."""
@@ -153,8 +170,8 @@ def product_search_clauses(
     extra_columns: Iterable = (),
 ) -> list[ColumnElement[bool]]:
     """Product search across name + pid + barcodes + any extra columns
-    (typically Achat.supplier + Achat.delivery_ref). Strict substring with
-    `*` wildcard support — no fuzzy matching."""
+    (typically Achat.supplier + Achat.delivery_ref). Strict substring with the
+    `*` grammar — no fuzzy matching."""
     clauses: list[ColumnElement[bool]] = []
     extra = list(extra_columns)
     for tok in tokens:
