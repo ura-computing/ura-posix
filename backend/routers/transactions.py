@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from csv_parse import strip_percentage
 from database import DbDep
-from exclusions import achat_exclusion_filter
+from exclusions import achat_exclusion_filter, excluded_medicaments_select
 from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, Vente
 from permissions import require_pharmacy_owner
 from schemas.transactions import (
@@ -109,13 +109,11 @@ def _suffix_map(db: Session) -> dict[str, tuple[str, str | None]]:
     }
 
 
-def _non_declared_sub(pharmacy_id: int):
-    """Select of medicament_ids the pharmacy has marked as non-declared. Returned as a
-    `select()` rather than `.subquery()` because SQLAlchemy 2.x coerces with a warning."""
-    return select(PharmacyMedicamentStatus.medicament_id).where(
-        PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-        PharmacyMedicamentStatus.declared.is_(False),
-    )
+def _non_declared_sub(db, pharmacy_id: int):
+    """medicament_ids excluded from comptabilité (med-level): special products + all
+    products on an excluded BL + all products from an excluded supplier. Applied to
+    ventes AND achats so a BL/supplier exclusion behaves like a special product."""
+    return excluded_medicaments_select(db, pharmacy_id)
 
 
 def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None,
@@ -125,7 +123,7 @@ def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: 
     surveillance_counts (so badge counts match visible rows). include_non_declared=True
     (default): specials + excluded BLs/suppliers count — the /ventes page shows the
     full picture. False: comptabilite view applies the exclusions."""
-    nd = _non_declared_sub(pharmacy_id)
+    nd = _non_declared_sub(db, pharmacy_id)
     q = db.query(
             Achat.medicament_id.label("med_id"),
             (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
@@ -176,7 +174,7 @@ def _apply_vente_filters(
     """Reusable WHERE-chain shared by list + surveillance-counts."""
     q = q.filter(Vente.pharmacy_id == pharmacy_id)
     if not include_non_declared:
-        q = q.filter(Vente.medicament_id.notin_(_non_declared_sub(pharmacy_id)))
+        q = q.filter(Vente.medicament_id.notin_(_non_declared_sub(db, pharmacy_id)))
     if date_from:
         q = q.filter(Vente.date >= date_from)
     if date_to:
@@ -279,11 +277,11 @@ def list_achats(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     )
-    # PG-007: excluded BLs/suppliers are hidden from the Achats ledger ONLY in the
-    # comptabilite view (include_non_declared=false). All other sections show the
-    # full picture — rows, the grand total, and the Excel export.
+    # Excluded products (special + all products on an excluded BL + all products from
+    # an excluded supplier) are hidden from the Achats ledger ONLY in the comptabilite
+    # view (include_non_declared=false). Med-level, so the ledger total matches stats.
     if not include_non_declared:
-        q = q.filter(achat_exclusion_filter(db, pharmacy_id))
+        q = q.filter(Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id)))
     # Force Medicament join (for the TVA aggregate) if no search/category/tva
     if not (search or category or tva):
         q = q.outerjoin(Medicament, Achat.medicament_id == Medicament.id)
@@ -392,7 +390,7 @@ def _suggest_supplier_col(db, pharmacy_id: int, col, tokens: list[str]) -> list[
     """Top-6 distinct values of `col` matching all tokens. col is unaccent-substring matched."""
     q = db.query(col).filter(Achat.pharmacy_id == pharmacy_id, col.isnot(None))
     q = _apply_clauses(q, supplier_search_clauses(tokens, [col]))
-    return [getattr(r, col.key) for r in q.distinct().limit(6).all() if getattr(r, col.key)]
+    return [getattr(r, col.key) for r in q.distinct().all() if getattr(r, col.key)]
 
 
 @router.get("/achats/suggestions", response_model=AchatsSuggestions)
@@ -411,7 +409,7 @@ def list_achat_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> di
         .filter(Achat.pharmacy_id == pharmacy_id)
     )
     prod_q   = _apply_clauses(prod_q, product_search_clauses(tokens))
-    products = [r.product for r in prod_q.distinct().limit(6).all() if r.product]
+    products = [r.product for r in prod_q.distinct().all() if r.product]
 
     return {
         "products":  products,
@@ -442,7 +440,7 @@ def achat_supplier_summary(
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     ).filter(Achat.supplier.isnot(None), Achat.supplier != "")
     if not include_non_declared:
-        base = base.filter(achat_exclusion_filter(db, pharmacy_id))
+        base = base.filter(Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id)))
 
     is_grossiste = func.upper(Achat.supplier).like("GROSSISTE%")
 
@@ -628,7 +626,7 @@ def _suggest_vente_col(db, pharmacy_id: int, col, tokens: list[str]) -> list[str
     """Distinct top-6 values of `col` matching all tokens via unaccent-substring."""
     q = db.query(col).filter(Vente.pharmacy_id == pharmacy_id, col.isnot(None))
     q = _apply_clauses(q, supplier_search_clauses(tokens, [col]))
-    return [getattr(r, col.key) for r in q.distinct().limit(6).all() if getattr(r, col.key)]
+    return [getattr(r, col.key) for r in q.distinct().all() if getattr(r, col.key)]
 
 
 @router.get("/ventes/suggestions", response_model=VentesSuggestions)
@@ -646,7 +644,7 @@ def list_vente_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> di
         .filter(Vente.pharmacy_id == pharmacy_id)
     )
     prod_q   = _apply_clauses(prod_q, product_search_clauses(tokens))
-    products = [r.product for r in prod_q.distinct().limit(6).all() if r.product]
+    products = [r.product for r in prod_q.distinct().all() if r.product]
 
     return {
         "products": products,

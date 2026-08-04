@@ -44,6 +44,7 @@ export function useBlExclusions() {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FULL_PREFIX });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FILTERED_PREFIX });
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACHATS_PREFIX });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VENTES_PREFIX });
   };
 
   const exclude = useMutation({

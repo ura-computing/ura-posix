@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 //   useStockAbcd(filters[, options]) -> listStockAbcd(filters)
 //   usePeremptions()                 -> listPeremptions()
 import { useStockAbcd, usePeremptions } from "@/hooks/stats";
-import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { monthsAgo, todayIso } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/pages/alertes/_hooks/useAlertesPage";
 import { downloadXlsx, exportFilename } from "@/utils/table";
@@ -27,19 +26,17 @@ export function useStockPage() {
   // ---- filter + view state ----
   // Date range comes from the cross-route global context. Other filters
   // (class, status, search, sort, pagination) stay page-local.
-  const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
-  // Stock-only default: trailing 12 months → today. Computed LOCALLY so it's the
-  // effective range for this page's queries + picker WITHOUT writing to the
-  // shared cross-route context — other routes stay unaffected. Any explicit
-  // range (picked here or on another tab) lands in the global context and
-  // overrides this default; `isDateDefault` tells the UI when no range is set.
+  // Stock date range is LOCAL (independent from Dashboard, Achats, Ventes, etc.)
+  const [localFrom, setLocalFrom] = useState<string | null>(null);
+  const [localTo,   setLocalTo]   = useState<string | null>(null);
+  // Stock-only default: trailing 12 months → today.
   const defaultFrom = useMemo(() => monthsAgo(12), []);
   const defaultTo   = useMemo(() => todayIso(), []);
-  const isDateDefault = globalFrom === null && globalTo === null;
-  const dateFrom = globalFrom ?? defaultFrom;
-  const dateTo   = globalTo   ?? defaultTo;
-  const setDateFrom = (v: string) => setRange(v || null, globalTo);
-  const setDateTo   = (v: string) => setRange(globalFrom, v || null);
+  const isDateDefault = localFrom === null && localTo === null;
+  const dateFrom = localFrom ?? defaultFrom;
+  const dateTo   = localTo   ?? defaultTo;
+  const setDateFrom = (v: string) => setLocalFrom(v || null);
+  const setDateTo   = (v: string) => setLocalTo(v || null);
   // Default class = "A" so pharmacists land on their best-sellers immediately.
   // "Tout réinitialiser" / "Fermer" still clear to null — the default only applies on first mount.
   const [classFilter, setClassFilter] = useState<AbcdClass | null>("A");
@@ -106,7 +103,8 @@ export function useStockPage() {
   }, []);
 
   const clearAll = useCallback(() => {
-    setRange(null, null);
+    setLocalFrom(null);
+    setLocalTo(null);
     setClassFilter(null);
     setStatus("");
     setSearch("");

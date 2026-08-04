@@ -39,6 +39,8 @@ export function useAnalysePage() {
   const [search,   setSearch]   = useState("");
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // Uploaded Liste items, kept so date/category filter changes can re-run Liste.
+  const [listeItems, setListeItems] = useState<ListeItem[] | null>(null);
   // PG-014: client-side sort — rows are fully in memory, so sorting covers the
   // ENTIRE filtered set (not just the visible page), as the QA rule requires.
   const [sortBy,    setSortBy]    = useState<string | null>(null);
@@ -101,6 +103,16 @@ export function useAnalysePage() {
 
   // Reset to page 1 whenever the active dataset or filters change.
   useEffect(() => { setPage(1); }, [mode, filters, search]);
+
+  // Liste is a mutation (no auto-refetch like the query modes). Re-run it when the
+  // date / category (Mixte / Pharmacie / Parapharmacie) filters change so the rows
+  // AND the KPI cards follow the selected window. (Text search stays client-side.)
+  useEffect(() => {
+    if (mode === "liste" && listeItems) {
+      listeM.mutate({ items: listeItems, ...filters });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, filters.date_from, filters.date_to, filters.category_type]);
 
   // Sort the FULL filtered set using the column's `raw` accessor (same values
   // the Excel export uses). Nulls sort last in both directions; strings use
@@ -171,6 +183,7 @@ export function useAnalysePage() {
   }
 
   function submitListe(items: ListeItem[]) {
+    setListeItems(items);
     listeM.mutate({ items, ...filters });
   }
 
