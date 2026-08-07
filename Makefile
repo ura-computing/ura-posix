@@ -2,10 +2,14 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks
+.PHONY: help install dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks
 
 help:
 	@echo "PharmaGest commands:"
+	@echo ""
+	@echo "  Setup (first-time clone):"
+	@echo "    make install  — install backend (uv sync) + frontend (npm install) deps"
+	@echo "                    and create gitignored backend/.env + frontend/.env if missing"
 	@echo ""
 	@echo "  Local dev (dockerized DB + host backend/frontend):"
 	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
@@ -30,6 +34,29 @@ help:
 	@echo "    make test-frontend — frontend vitest only"
 	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
 	@echo "                         (run once per clone; bypass with git push --no-verify)"
+
+# ── Setup (fresh clone) ─────────────────────────────────────────────────────
+
+# One-command setup for a fresh clone: install backend + frontend deps and
+# provision the gitignored .env files. The backend .env is generated with dev
+# defaults — a DATABASE_URL matching the dockerized Postgres and a fresh random
+# JWT_SECRET (the .env.example placeholder would trip the boot-time validator).
+# Re-running `make install` is a no-op for existing .env files.
+install:
+	@echo "▸ Installing backend dependencies…"
+	@cd $(BACKEND_DIR) && uv sync
+	@echo "▸ Installing frontend dependencies…"
+	@cd $(FRONTEND_DIR) && npm install
+	@if [ ! -f $(BACKEND_DIR)/.env ]; then \
+	  echo "▸ Creating backend/.env (dev defaults + random JWT_SECRET)…"; \
+	  printf 'DATABASE_URL=postgresql+psycopg2://apcm:apcm@localhost:5432/%s\nJWT_SECRET=%s\nJWT_ACCESS_EXPIRY_MIN=10080\nCOOKIE_SECURE=false\nFRONTEND_URL=http://localhost:5173\nMAIL_USERNAME=\nMAIL_PASSWORD=\nMAIL_FROM=\n' \
+	    "$(DEV_DB)" "$$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')" > $(BACKEND_DIR)/.env; \
+	fi
+	@if [ ! -f $(FRONTEND_DIR)/.env ]; then \
+	  echo "▸ Creating frontend/.env from example…"; \
+	  cp $(FRONTEND_DIR)/.env.example $(FRONTEND_DIR)/.env; \
+	fi
+	@echo "✓ Install complete. Next: make db && make seed && make dev"
 
 # ── Local dev (dockerized Postgres + host-side backend/frontend) ────────────
 

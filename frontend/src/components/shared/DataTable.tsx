@@ -6,7 +6,7 @@
  *
  * Pattern matches the KpiTile / FilterBar / CategorySegment shared primitives.
  */
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
@@ -15,6 +15,25 @@ import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
+
+
+// Pagination footer sits below the (possibly long) table; without this, changing
+// page leaves the viewport scrolled down at the footer with no visual cue that
+// the table above just changed. Walk up to the nearest scrollable ancestor
+// (AppLayout's <main overflow-auto>) and scroll it back to the top so the new
+// page's rows are visible immediately.
+function scrollNearestAncestorToTop(el: HTMLElement | null) {
+  let node = el?.parentElement ?? null;
+  while (node) {
+    const { overflowY } = getComputedStyle(node);
+    if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight) {
+      node.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    node = node.parentElement;
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 
 export interface ColumnDef<R, K extends string = string> {
@@ -66,6 +85,7 @@ export function DataTable<R, K extends string = string>({
   className,
 }: DataTableProps<R, K>) {
   const t = useT();
+  const rootRef = useRef<HTMLDivElement>(null);
   const emptyLabel = emptyTitle ?? t("common.noResult");
   // Loading + empty short-circuits. Render the real header + shimmer rows so the
   // table's shape is visible while data loads (smooth swap to real rows).
@@ -121,7 +141,7 @@ export function DataTable<R, K extends string = string>({
   }
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div ref={rootRef} className={cn("flex flex-col gap-3", className)}>
       {topBanner}
       {/* Table card. Stays overflow-hidden so the rounded corners clip the
           horizontal scrollbar cleanly. Pagination footer is a SIBLING (below)
@@ -188,7 +208,12 @@ export function DataTable<R, K extends string = string>({
         </div>
       </div>
 
-      {pagination && <PaginationFooter {...pagination} />}
+      {pagination && (
+        <PaginationFooter
+          {...pagination}
+          onPage={(p) => { scrollNearestAncestorToTop(rootRef.current); pagination.onPage(p); }}
+        />
+      )}
     </div>
   );
 }

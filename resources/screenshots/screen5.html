@@ -1,0 +1,5027 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PharmaGest — Gestion avancée de votre Pharmacie</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ══════════════════════════════════════════════
+   VARIABLES — LIGHT MODE (default)
+══════════════════════════════════════════════ */
+      :root {
+        --cyan: #0cc0df;
+        --cyan2: #09a8c4;
+        --yellow: #ffde59;
+        --gray: #545454;
+
+        --bg: #f4f6f9;
+        --bg2: #ffffff;
+        --bg3: #f0f3f7;
+        --bg4: #e8ecf2;
+        --sidebar: #1e2530;
+        --sidebar2: #252d3a;
+        --sidebar3: #2e3847;
+
+        --text: #1a1f2e;
+        --text2: #545454;
+        --text3: #8a94a6;
+        --text-inv: #ffffff;
+
+        --border: rgba(0, 0, 0, 0.07);
+        --border2: rgba(0, 0, 0, 0.12);
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+
+        --green: #22c55e;
+        --green-bg: #f0fdf4;
+        --green-border: #bbf7d0;
+        --red: #ef4444;
+        --red-bg: #fef2f2;
+        --red-border: #fecaca;
+        --orange: #f97316;
+        --orange-bg: #fff7ed;
+        --orange-border: #fed7aa;
+        --amber: #f59e0b;
+        --amber-bg: #fffbeb;
+        --amber-border: #fde68a;
+        --purple: #8b5cf6;
+        --purple-bg: #f5f3ff;
+        --purple-border: #ddd6fe;
+        --blue: #3b82f6;
+        --blue-bg: #eff6ff;
+        --blue-border: #bfdbfe;
+
+        --r: 12px;
+        --r-sm: 8px;
+        --r-xs: 6px;
+        font-family: "Inter", sans-serif;
+      }
+
+      /* DARK MODE */
+      body.dark {
+        --bg: #0f1117;
+        --bg2: #171c26;
+        --bg3: #1e2433;
+        --bg4: #252d3f;
+        --sidebar: #0d1016;
+        --sidebar2: #13181f;
+        --sidebar3: #1a2030;
+        --text: #e8ecf5;
+        --text2: #94a3b8;
+        --text3: #4a5568;
+        --border: rgba(255, 255, 255, 0.06);
+        --border2: rgba(255, 255, 255, 0.12);
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2);
+        --green-bg: rgba(34, 197, 94, 0.1);
+        --green-border: rgba(34, 197, 94, 0.25);
+        --red-bg: rgba(239, 68, 68, 0.1);
+        --red-border: rgba(239, 68, 68, 0.25);
+        --orange-bg: rgba(249, 115, 22, 0.1);
+        --orange-border: rgba(249, 115, 22, 0.25);
+        --amber-bg: rgba(245, 158, 11, 0.1);
+        --amber-border: rgba(245, 158, 11, 0.25);
+        --purple-bg: rgba(139, 92, 246, 0.1);
+        --purple-border: rgba(139, 92, 246, 0.25);
+        --blue-bg: rgba(59, 130, 246, 0.1);
+        --blue-border: rgba(59, 130, 246, 0.25);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-size: 13px;
+        display: flex;
+        transition:
+          background 0.25s,
+          color 0.25s;
+      }
+
+      /* ══ SIDEBAR ══ */
+      .sidebar {
+        width: 220px;
+        background: var(--sidebar);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        height: 100vh;
+        overflow: hidden;
+        transition: background 0.25s;
+      }
+      .sb-logo {
+        padding: 20px 18px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sb-logo-icon {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+      }
+      .sb-logo-text {
+        flex: 1;
+      }
+      .sb-logo-name {
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+        background: linear-gradient(90deg, #0cc0df 40%, #ffde59 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .sb-logo-sub {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.3);
+        margin-top: 1px;
+      }
+
+      .sb-nav {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 0;
+      }
+      .sb-section {
+        margin-bottom: 8px;
+      }
+      .sb-section-title {
+        padding: 6px 18px 4px;
+        font-size: 9px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .sb-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 18px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.55);
+        transition: all 0.15s;
+        position: relative;
+        border-left: 2px solid transparent;
+      }
+      .sb-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .sb-item.active {
+        background: rgba(12, 192, 223, 0.12);
+        color: #0cc0df;
+        border-left-color: #0cc0df;
+      }
+      .sb-item-ic {
+        font-size: 15px;
+        width: 18px;
+        text-align: center;
+        flex-shrink: 0;
+      }
+      .sb-badge {
+        margin-left: auto;
+        background: #ef4444;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        font-weight: 700;
+        color: #fff;
+        padding: 0 5px;
+      }
+      .sb-sep {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.07);
+        margin: 8px 18px;
+      }
+
+      .sb-bottom {
+        padding: 14px 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .sb-user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .sb-user-av {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #0cc0df, #ffde59);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e2530;
+      }
+      .sb-user-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .sb-user-role {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+
+      /* MODE TOGGLE */
+      .mode-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 18px;
+        cursor: pointer;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        border-radius: 0;
+        transition: color 0.15s;
+      }
+      .mode-toggle:hover {
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .toggle-track {
+        width: 34px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        position: relative;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle-track.on {
+        background: var(--cyan);
+      }
+      .toggle-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .toggle-track.on .toggle-thumb {
+        transform: translateX(16px);
+      }
+
+      /* ══ MAIN ══ */
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        height: 100vh;
+      }
+
+      /* TOP BAR */
+      .topbar {
+        height: 56px;
+        background: var(--bg2);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        gap: 10px;
+        flex-shrink: 0;
+        box-shadow: var(--shadow);
+        transition:
+          background 0.25s,
+          border-color 0.25s;
+      }
+      .tb-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.5px;
+        margin-right: 8px;
+        min-width: 160px;
+      }
+      .tb-sep {
+        width: 1px;
+        height: 22px;
+        background: var(--border2);
+        flex-shrink: 0;
+      }
+
+      /* FILTER BUTTONS */
+      .tb-btn {
+        padding: 7px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1.5px solid;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .tb-btn.mixte {
+        background: #0cc0df;
+        border-color: #0cc0df;
+        color: #fff;
+      }
+      .tb-btn.pharma {
+        background: transparent;
+        border-color: #0cc0df;
+        color: #0cc0df;
+      }
+      .tb-btn.pharma:hover {
+        background: rgba(12, 192, 223, 0.08);
+      }
+      .tb-btn.paraph {
+        background: transparent;
+        border-color: #8b5cf6;
+        color: #8b5cf6;
+      }
+      .tb-btn.paraph:hover {
+        background: rgba(139, 92, 246, 0.08);
+      }
+      .tb-btn.date {
+        background: var(--bg3);
+        border-color: var(--border2);
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tb-btn.date:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .tb-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tb-icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--r-sm);
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 15px;
+        color: var(--text2);
+        transition: all 0.15s;
+      }
+      .tb-icon-btn:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .tb-export {
+        padding: 7px 16px;
+        border-radius: var(--r-sm);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--bg3);
+        border: 1.5px solid var(--border2);
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+      }
+      .tb-export:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+        background: rgba(12, 192, 223, 0.05);
+      }
+
+      /* ══ CONTENT ══ */
+      .content {
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .page {
+        display: none;
+        height: 100%;
+        overflow-y: auto;
+      }
+      .page.active {
+        display: block;
+      }
+
+      /* ══ SHARED ══ */
+      .page-inner {
+        padding: 20px;
+      }
+
+      .card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        box-shadow: var(--shadow);
+        transition:
+          background 0.25s,
+          border-color 0.25s;
+      }
+
+      .section-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        color: var(--text3);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      /* KPI CARD */
+      .kpi-grid {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .kpi-grid-4 {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .kpi-grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .kpi-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .kpi-card {
+        padding: 16px 18px;
+        position: relative;
+        overflow: hidden;
+      }
+      .kpi-card-accent {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        border-radius: var(--r) var(--r) 0 0;
+      }
+      .kpi-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text3);
+        margin-bottom: 6px;
+      }
+      .kpi-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: -0.5px;
+        font-family: "DM Mono", monospace;
+      }
+      .kpi-sub {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .kpi-badge {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .kpi-badge.up {
+        background: var(--green-bg);
+        color: var(--green);
+        border: 1px solid var(--green-border);
+      }
+      .kpi-badge.dn {
+        background: var(--red-bg);
+        color: var(--red);
+        border: 1px solid var(--red-border);
+      }
+      .kpi-badge.neutral {
+        background: var(--bg3);
+        color: var(--text3);
+        border: 1px solid var(--border);
+      }
+
+      /* TABLE */
+      .tbl-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      thead th {
+        padding: 9px 12px;
+        text-align: left;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg3);
+        white-space: nowrap;
+      }
+      tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: background 0.1s;
+        cursor: pointer;
+      }
+      tbody tr:hover {
+        background: var(--bg3);
+      }
+      td {
+        padding: 9px 12px;
+        font-size: 12px;
+        vertical-align: middle;
+      }
+      .td-nm {
+        font-weight: 500;
+        color: var(--text);
+      }
+      .td-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+      .td-mono {
+        font-family: "DM Mono", monospace;
+        font-weight: 500;
+      }
+      .td-num {
+        font-family: "DM Mono", monospace;
+        font-weight: 600;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        border: 1px solid;
+        white-space: nowrap;
+      }
+      .pill.pharma {
+        background: var(--blue-bg);
+        color: var(--blue);
+        border-color: var(--blue-border);
+      }
+      .pill.paraph {
+        background: var(--purple-bg);
+        color: var(--purple);
+        border-color: var(--purple-border);
+      }
+      .pill.exo {
+        background: var(--bg3);
+        color: var(--text3);
+        border-color: var(--border);
+      }
+      .pill.tva {
+        background: var(--amber-bg);
+        color: var(--amber);
+        border-color: var(--amber-border);
+      }
+
+      .tag-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1px 6px;
+        border-radius: 5px;
+        font-size: 10px;
+        font-weight: 600;
+        background: var(--red-bg);
+        color: var(--red);
+        border: 1px solid var(--red-border);
+      }
+      .tag-num.neg {
+        background: var(--red-bg);
+        color: var(--red);
+        border-color: var(--red-border);
+      }
+
+      /* SCROLLBAR */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--bg4);
+        border-radius: 4px;
+      }
+
+      /* ══════════════════════════════════════════
+   PAGE TABLEAU DE BORD
+══════════════════════════════════════════ */
+      .ticker-bar {
+        background: linear-gradient(
+          90deg,
+          rgba(12, 192, 223, 0.1),
+          rgba(12, 192, 223, 0.05)
+        );
+        border: 1px solid rgba(12, 192, 223, 0.2);
+        border-radius: var(--r-sm);
+        padding: 8px 14px;
+        margin-bottom: 16px;
+        font-size: 11px;
+        color: var(--text2);
+        line-height: 1.5;
+      }
+      .ticker-bar strong {
+        color: var(--cyan);
+      }
+      .ticker-bar .dn {
+        color: var(--red);
+        font-weight: 600;
+      }
+
+      .db-row {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .db-row-3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      .db-row-2-1 {
+        grid-template-columns: 2fr 1fr;
+      }
+      .db-row-3-2 {
+        grid-template-columns: 3fr 2fr;
+      }
+
+      /* Ticket moyen special card */
+      .ticket-card {
+        padding: 16px 18px;
+      }
+      .ticket-card-title {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text3);
+        margin-bottom: 10px;
+      }
+      .ticket-vals {
+        display: flex;
+        gap: 0;
+      }
+      .tv-item {
+        flex: 1;
+        padding: 0 12px;
+        border-right: 1px solid var(--border);
+        text-align: center;
+      }
+      .tv-item:first-child {
+        padding-left: 0;
+      }
+      .tv-item:last-child {
+        border-right: none;
+      }
+      .tv-label {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 4px;
+      }
+      .tv-val {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+        font-family: "DM Mono", monospace;
+      }
+      .tv-unit {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+
+      /* Meilleure/moins bonne journée */
+      .jour-card {
+        padding: 14px 16px;
+      }
+      .jour-title {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text3);
+        margin-bottom: 10px;
+      }
+      .jour-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+      }
+      .jour-item {
+        padding: 0;
+      }
+      .jour-item + .jour-item {
+        padding-left: 12px;
+        border-left: 1px solid var(--border);
+      }
+      .jour-date {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 4px;
+      }
+      .jour-val {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+      }
+      .jour-val.g {
+        color: var(--green);
+      }
+      .jour-val.r {
+        color: var(--red);
+      }
+      .jour-ops {
+        font-size: 11px;
+        color: var(--text2);
+        margin-top: 3px;
+        font-weight: 600;
+      }
+      .jour-ops-lbl {
+        font-size: 9px;
+        color: var(--text3);
+      }
+
+      /* Donut chart */
+      .donut-section {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+      }
+      .donut-wrap {
+        position: relative;
+        width: 130px;
+        height: 130px;
+        flex-shrink: 0;
+      }
+      .donut-wrap svg {
+        width: 130px;
+        height: 130px;
+      }
+      .donut-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+      .donut-center-val {
+        font-size: 14px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+      .donut-center-lbl {
+        font-size: 9px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+      .donut-legend {
+        flex: 1;
+      }
+      .dl-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 11px;
+      }
+      .dl-row:last-child {
+        border-bottom: none;
+      }
+      .dl-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 3px;
+        flex-shrink: 0;
+      }
+      .dl-nm {
+        flex: 1;
+        color: var(--text2);
+      }
+      .dl-ca {
+        font-family: "DM Mono", monospace;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .dl-marge {
+        font-size: 10px;
+        color: var(--text3);
+      }
+      .dl-part {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--cyan);
+        width: 36px;
+        text-align: right;
+      }
+
+      /* Santé trésorerie */
+      .sante-card {
+        background: var(--sidebar);
+        padding: 16px 18px;
+        border-radius: var(--r);
+      }
+      body.dark .sante-card {
+        background: var(--bg3);
+      }
+      .sante-score {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+      }
+      .sante-grade {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--cyan);
+        font-family: "DM Mono", monospace;
+      }
+      .sante-score-num {
+        font-size: 22px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.8);
+        font-family: "DM Mono", monospace;
+      }
+      body.dark .sante-score-num {
+        color: var(--text);
+      }
+      .sante-sub {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-bottom: 10px;
+      }
+      body.dark .sante-sub {
+        color: var(--text3);
+      }
+      .sante-bar {
+        height: 6px;
+        background: linear-gradient(
+          90deg,
+          #22c55e 0%,
+          #84cc16 20%,
+          #eab308 40%,
+          #f97316 60%,
+          #ef4444 80%,
+          #991b1b 100%
+        );
+        border-radius: 3px;
+        position: relative;
+        margin-bottom: 6px;
+      }
+      .sante-cursor {
+        position: absolute;
+        top: -3px;
+        width: 12px;
+        height: 12px;
+        background: #fff;
+        border-radius: 50%;
+        border: 2px solid #1e2530;
+        transform: translateX(-50%);
+      }
+      .sante-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.3);
+        margin-bottom: 12px;
+      }
+      body.dark .sante-labels {
+        color: var(--text3);
+      }
+      .sante-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .sg-item-lbl {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      body.dark .sg-item-lbl {
+        color: var(--text3);
+      }
+      .sg-item-val {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--cyan);
+        font-family: "DM Mono", monospace;
+      }
+      .sante-solde-lbl {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      body.dark .sante-solde-lbl {
+        color: var(--text3);
+      }
+      .sante-solde-val {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--red);
+        font-family: "DM Mono", monospace;
+      }
+      .sante-tags {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .stag {
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .stag.g {
+        background: rgba(34, 197, 94, 0.15);
+        color: #4ade80;
+      }
+      .stag.a {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--amber);
+      }
+      .stag.r {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--red);
+      }
+
+      /* Alertes marges */
+      .marges-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .marge-card {
+        padding: 14px 16px;
+        border-radius: var(--r);
+        border-left: 4px solid;
+      }
+      .marge-card.neg {
+        background: var(--red-bg);
+        border-color: var(--red);
+      }
+      .marge-card.low {
+        background: var(--amber-bg);
+        border-color: var(--amber);
+      }
+      .marge-card.hi {
+        background: var(--green-bg);
+        border-color: var(--green);
+      }
+      .marge-card.exc {
+        background: rgba(12, 192, 223, 0.08);
+        border-color: var(--cyan);
+      }
+      .marge-card-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .marge-card.neg .marge-card-title {
+        color: var(--red);
+      }
+      .marge-card.low .marge-card-title {
+        color: var(--amber);
+      }
+      .marge-card.hi .marge-card-title {
+        color: var(--green);
+      }
+      .marge-card.exc .marge-card-title {
+        color: var(--cyan);
+      }
+      .marge-count {
+        font-size: 28px;
+        font-weight: 800;
+        font-family: "DM Mono", monospace;
+      }
+      .marge-card.neg .marge-count {
+        color: var(--red);
+      }
+      .marge-card.low .marge-count {
+        color: var(--amber);
+      }
+      .marge-card.hi .marge-count {
+        color: var(--green);
+      }
+      .marge-card.exc .marge-count {
+        color: var(--cyan);
+      }
+      .marge-desc {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 2px;
+      }
+      .marge-montant {
+        font-size: 13px;
+        font-weight: 700;
+        margin-top: 6px;
+        font-family: "DM Mono", monospace;
+      }
+      .marge-card.neg .marge-montant {
+        color: var(--red);
+      }
+      .marge-card.low .marge-montant {
+        color: var(--amber);
+      }
+      .marge-card.hi .marge-montant {
+        color: var(--green);
+      }
+      .marge-card.exc .marge-montant {
+        color: var(--cyan);
+      }
+
+      /* ══════════════════════════
+   PAGE TABLEAU DE BORD PAGE 2 (ABCD)
+══════════════════════════ */
+      .abcd-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .abcd-item {
+        flex: 1;
+        border-radius: 10px;
+        padding: 12px 10px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .abcd-letter {
+        font-size: 18px;
+        font-weight: 800;
+      }
+      .abcd-count {
+        font-size: 22px;
+        font-weight: 800;
+        font-family: "DM Mono", monospace;
+      }
+      .abcd-pct {
+        font-size: 10px;
+        font-weight: 500;
+        opacity: 0.7;
+      }
+      .abcd-item.a {
+        background: #dcfce7;
+      }
+      .abcd-item.a .abcd-letter,
+      .abcd-item.a .abcd-count {
+        color: #16a34a;
+      }
+      .abcd-item.am {
+        background: #d1fae5;
+      }
+      .abcd-item.am .abcd-letter,
+      .abcd-item.am .abcd-count {
+        color: #059669;
+      }
+      .abcd-item.bp {
+        background: #e0f2fe;
+      }
+      .abcd-item.bp .abcd-letter,
+      .abcd-item.bp .abcd-count {
+        color: #0284c7;
+      }
+      .abcd-item.b {
+        background: #eff6ff;
+      }
+      .abcd-item.b .abcd-letter,
+      .abcd-item.b .abcd-count {
+        color: #2563eb;
+      }
+      .abcd-item.c {
+        background: #fef9c3;
+      }
+      .abcd-item.c .abcd-letter,
+      .abcd-item.c .abcd-count {
+        color: #ca8a04;
+      }
+      .abcd-item.cm {
+        background: #fef3c7;
+      }
+      .abcd-item.cm .abcd-letter,
+      .abcd-item.cm .abcd-count {
+        color: #d97706;
+      }
+      .abcd-item.cn {
+        background: #ffedd5;
+      }
+      .abcd-item.cn .abcd-letter,
+      .abcd-item.cn .abcd-count {
+        color: #ea580c;
+      }
+      .abcd-item.d {
+        background: #fee2e2;
+      }
+      .abcd-item.d .abcd-letter,
+      .abcd-item.d .abcd-count {
+        color: #dc2626;
+      }
+      body.dark .abcd-item.a,
+      .body.dark .abcd-item.am {
+        background: rgba(22, 163, 74, 0.15);
+      }
+      body.dark .abcd-item.c,
+      .body.dark .abcd-item.cm {
+        background: rgba(202, 138, 4, 0.15);
+      }
+      body.dark .abcd-item.d {
+        background: rgba(220, 38, 38, 0.15);
+      }
+
+      .stock-alert-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .sa-card {
+        padding: 14px 16px;
+        border-radius: var(--r);
+      }
+      .sa-card.neg {
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid var(--red-border);
+      }
+      .sa-card.sous {
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid var(--amber-border);
+      }
+      .sa-card.sur {
+        background: rgba(249, 115, 22, 0.08);
+        border: 1px solid var(--orange-border);
+      }
+      .sa-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+      .sa-card.neg .sa-title {
+        color: var(--red);
+      }
+      .sa-card.sous .sa-title {
+        color: var(--amber);
+      }
+      .sa-card.sur .sa-title {
+        color: var(--orange);
+      }
+      .sa-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 8px;
+      }
+      .sa-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .sa-item-lbl {
+        font-size: 9px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      .sa-item-val {
+        font-size: 15px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+      }
+      .sa-card.neg .sa-item-val {
+        color: var(--red);
+      }
+      .sa-card.sous .sa-item-val {
+        color: var(--amber);
+      }
+      .sa-card.sur .sa-item-val {
+        color: var(--orange);
+      }
+
+      .perem-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .pe-card {
+        padding: 14px 16px;
+        border-radius: var(--r);
+        border: 1px solid;
+      }
+      .pe-card.crit {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+      }
+      .pe-card.proche {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+      }
+      .pe-card.warn {
+        background: var(--orange-bg);
+        border-color: var(--orange-border);
+      }
+      .pe-badge-urgent {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 20px;
+        font-size: 9px;
+        font-weight: 700;
+        background: var(--red);
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .pe-badge-months {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 20px;
+        font-size: 9px;
+        font-weight: 700;
+        float: right;
+      }
+      .pe-badge-months.proche {
+        background: var(--amber);
+        color: #fff;
+      }
+      .pe-badge-months.warn {
+        background: var(--orange);
+        color: #fff;
+      }
+      .pe-title {
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .pe-card.crit .pe-title {
+        color: var(--red);
+      }
+      .pe-card.proche .pe-title {
+        color: var(--amber);
+      }
+      .pe-card.warn .pe-title {
+        color: var(--orange);
+      }
+      .pe-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 8px;
+      }
+      .pe-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+      .pe-item-lbl {
+        font-size: 9px;
+        color: var(--text3);
+        text-transform: uppercase;
+      }
+      .pe-item-val {
+        font-size: 14px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+      }
+      .pe-card.crit .pe-item-val {
+        color: var(--red);
+      }
+      .pe-card.proche .pe-item-val {
+        color: var(--amber);
+      }
+      .pe-card.warn .pe-item-val {
+        color: var(--orange);
+      }
+
+      /* TABS inside page */
+      .inner-tabs {
+        display: flex;
+        gap: 1px;
+        background: var(--bg4);
+        border-radius: var(--r-sm);
+        padding: 3px;
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        width: fit-content;
+      }
+      .inner-tab {
+        padding: 6px 16px;
+        border-radius: var(--r-xs);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        color: var(--text3);
+        transition: all 0.15s;
+      }
+      .inner-tab.active {
+        background: var(--bg2);
+        color: var(--text);
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      }
+
+      /* NOTE QUALITY */
+      .note-card {
+        background: var(--sidebar);
+        border-radius: var(--r);
+        padding: 12px 14px;
+      }
+      body.dark .note-card {
+        background: var(--bg4);
+      }
+      .note-score {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--cyan);
+        font-family: "DM Mono", monospace;
+        margin-bottom: 4px;
+      }
+      .note-bar-wrap {
+        position: relative;
+      }
+      .note-bar {
+        height: 8px;
+        background: linear-gradient(90deg, #22c55e, #84cc16, #eab308, #ef4444);
+        border-radius: 4px;
+        margin-bottom: 4px;
+      }
+      .note-cursor {
+        position: absolute;
+        top: -4px;
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        border: 2px solid #333;
+        border-radius: 50%;
+        transform: translateX(-50%);
+        left: 72%;
+      }
+      .note-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.3);
+      }
+      body.dark .note-labels {
+        color: var(--text3);
+      }
+      .note-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .ns-item-lbl {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      body.dark .ns-item-lbl {
+        color: var(--text3);
+      }
+      .ns-item-val {
+        font-size: 13px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      body.dark .ns-item-val {
+        color: var(--text);
+      }
+
+      /* ══════════════════════════
+   PAGE COMPTABILITÉ
+══════════════════════════ */
+      .compta-export-bar {
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        padding: 8px 14px;
+        margin-bottom: 16px;
+        font-size: 11px;
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .compta-export-bar span {
+        font-weight: 600;
+        color: var(--text2);
+      }
+      .export-link {
+        color: var(--cyan);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .export-link:hover {
+        text-decoration: underline;
+      }
+
+      .compta-section-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text);
+        padding: 10px 0 8px;
+        border-bottom: 2px solid var(--cyan);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .compta-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1.5fr 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .compta-kpi {
+        padding: 16px 18px;
+      }
+      .ck-label {
+        font-size: 10px;
+        color: var(--text3);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .ck-val {
+        font-size: 20px;
+        font-weight: 800;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+      .ck-sub {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 4px;
+      }
+      .ck-sub-val {
+        font-size: 14px;
+        font-weight: 600;
+        font-family: "DM Mono", monospace;
+      }
+
+      .pay-methods {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .pm-card {
+        padding: 14px;
+      }
+      .pm-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 10px;
+      }
+      .pm-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+      }
+      .pm-item {
+        padding: 0 10px;
+        border-right: 1px solid var(--border);
+      }
+      .pm-item:last-child {
+        border-right: none;
+      }
+      .pm-item-lbl {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 3px;
+      }
+      .pm-item-val {
+        font-size: 15px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+      }
+      .pm-card.tpe .pm-title {
+        color: var(--blue);
+      }
+      .pm-card.esp .pm-title {
+        color: var(--green);
+      }
+      .pm-card.chq .pm-title {
+        color: var(--green);
+      }
+      .pm-card.vir .pm-title {
+        color: var(--red);
+      }
+      .pm-card.tpe {
+        border-top: 3px solid var(--blue);
+      }
+      .pm-card.esp {
+        border-top: 3px solid var(--green);
+      }
+      .pm-card.chq {
+        border-top: 3px solid #22c55e;
+      }
+      .pm-card.vir {
+        border-top: 3px solid var(--red);
+      }
+
+      /* ══════════════════════════
+   PAGE ANALYSES
+══════════════════════════ */
+      .analyses-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .at-btn {
+        padding: 7px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1.5px solid var(--border2);
+        color: var(--text2);
+        background: var(--bg2);
+        transition: all 0.15s;
+      }
+      .at-btn.active {
+        background: var(--cyan);
+        border-color: var(--cyan);
+        color: #fff;
+      }
+      .at-btn:hover:not(.active) {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+
+      .analyses-kpi-row {
+        display: grid;
+        grid-template-columns: 1fr 1.5fr 1.5fr 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .ak-card {
+        padding: 14px 16px;
+      }
+      .ak-title {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+      .ak-val {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+      .ak-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 3px;
+      }
+      .ak-highlight {
+        color: var(--red);
+        font-weight: 600;
+      }
+      .ak-highl-g {
+        color: var(--green);
+        font-weight: 600;
+      }
+
+      .optim-btn {
+        display: flex;
+        gap: 0;
+        border-radius: 20px;
+        overflow: hidden;
+        border: none;
+      }
+      .ob-direct {
+        padding: 8px 20px;
+        background: var(--green);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .ob-gros {
+        padding: 8px 20px;
+        background: var(--red);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .ob-vs {
+        padding: 8px 12px;
+        background: var(--bg4);
+        color: var(--text3);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .analyses-summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--border);
+        border-radius: var(--r-sm);
+        overflow: hidden;
+        margin-bottom: 16px;
+      }
+      .as-item {
+        background: var(--bg3);
+        padding: 12px 14px;
+        text-align: center;
+      }
+      .as-lbl {
+        font-size: 10px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+      }
+      .as-val {
+        font-size: 14px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+
+      /* ══════════════════════════
+   PAGE ACHATS / VENTES
+══════════════════════════ */
+      .fournisseur-grid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0;
+        margin-bottom: 16px;
+        align-items: start;
+      }
+      .fourn-block {
+        padding: 18px;
+      }
+      .fourn-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 12px;
+      }
+      .fourn-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+      .fourn-label {
+        font-size: 11px;
+        color: var(--text3);
+      }
+      .fourn-val {
+        font-size: 18px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+      .fourn-val.marge {
+        color: var(--green);
+        font-size: 14px;
+      }
+
+      /* Gauge */
+      .gauge-wrap {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .gauge-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+      .gauge-svg {
+        width: 100px;
+        height: 55px;
+      }
+
+      /* Table toolbar */
+      .tbl-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm) var(--r-sm) 0 0;
+        border-bottom: none;
+        flex-wrap: wrap;
+      }
+      .tbl-tab {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1.5px solid var(--border2);
+        color: var(--text2);
+        background: var(--bg2);
+        transition: all 0.15s;
+      }
+      .tbl-tab.active {
+        background: var(--bg4);
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+      .tbl-tab:hover:not(.active) {
+        color: var(--text);
+      }
+      .tbl-search {
+        flex: 1;
+        max-width: 300px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 6px 12px 6px 30px;
+        font-size: 11px;
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        outline: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: 10px center;
+      }
+      .tbl-filter-select {
+        padding: 5px 10px;
+        border-radius: var(--r-xs);
+        font-size: 11px;
+        color: var(--text2);
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        font-family: "Inter", sans-serif;
+      }
+      .tbl-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+      }
+      .tbl-action-btn {
+        padding: 5px 12px;
+        border-radius: var(--r-xs);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: var(--bg2);
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s;
+      }
+      .tbl-action-btn:hover {
+        border-color: var(--cyan);
+        color: var(--cyan);
+      }
+
+      /* Ventes à surveiller bar */
+      .surveiller-bar {
+        display: flex;
+        gap: 8px;
+        padding: 10px 14px;
+        background: rgba(239, 68, 68, 0.06);
+        border: 1px solid var(--red-border);
+        border-radius: var(--r-sm) var(--r-sm) 0 0;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .surveiller-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--red);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .surv-btn {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid;
+        transition: all 0.15s;
+      }
+      .surv-btn.m-neg {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+        color: var(--red);
+      }
+      .surv-btn.m-low {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+        color: var(--amber);
+      }
+      .surv-btn.hs {
+        background: var(--orange-bg);
+        border-color: var(--orange-border);
+        color: var(--orange);
+      }
+      .surv-btn.crd {
+        background: var(--purple-bg);
+        border-color: var(--purple-border);
+        color: var(--purple);
+      }
+      .surv-btn.rem {
+        background: var(--blue-bg);
+        border-color: var(--blue-border);
+        color: var(--blue);
+      }
+      .surv-btn.ret {
+        background: var(--bg3);
+        border-color: var(--border2);
+        color: var(--text2);
+      }
+
+      /* ══════════════════════════
+   PAGE ALERTES
+══════════════════════════ */
+      .alertes-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .alerte-card {
+        padding: 16px;
+        border-left: 4px solid;
+      }
+      .alerte-card.crit {
+        border-color: var(--red);
+        background: var(--red-bg);
+      }
+      .alerte-card.warn {
+        border-color: var(--amber);
+        background: var(--amber-bg);
+      }
+      .alerte-card.info {
+        border-color: var(--cyan);
+        background: rgba(12, 192, 223, 0.06);
+      }
+      .ac-ic {
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+      .ac-title {
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+      .alerte-card.crit .ac-title {
+        color: var(--red);
+      }
+      .alerte-card.warn .ac-title {
+        color: var(--amber);
+      }
+      .alerte-card.info .ac-title {
+        color: var(--cyan);
+      }
+      .ac-val {
+        font-size: 24px;
+        font-weight: 800;
+        font-family: "DM Mono", monospace;
+      }
+      .alerte-card.crit .ac-val {
+        color: var(--red);
+      }
+      .alerte-card.warn .ac-val {
+        color: var(--amber);
+      }
+      .alerte-card.info .ac-val {
+        color: var(--cyan);
+      }
+      .ac-desc {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 4px;
+      }
+      .ac-action {
+        margin-top: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text3);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .ac-action:hover {
+        color: var(--cyan);
+      }
+
+      /* ══════════════════════════
+   PAGE EQUIPE
+══════════════════════════ */
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .team-card {
+        padding: 16px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .team-av {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .team-av.owner {
+        background: linear-gradient(135deg, #0cc0df, #ffde59);
+        color: #1e2530;
+      }
+      .team-av.pharm {
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--blue);
+      }
+      .team-av.prep {
+        background: rgba(139, 92, 246, 0.15);
+        color: var(--purple);
+      }
+      .team-nm {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .team-role {
+        font-size: 10px;
+        color: var(--text3);
+        margin-bottom: 6px;
+      }
+      .team-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: 600;
+        border: 1px solid;
+      }
+      .team-badge.active {
+        background: var(--green-bg);
+        color: var(--green);
+        border-color: var(--green-border);
+      }
+      .team-badge.absent {
+        background: var(--red-bg);
+        color: var(--red);
+        border-color: var(--red-border);
+      }
+      .team-stats {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .ts-item-lbl {
+        font-size: 9px;
+        color: var(--text3);
+        text-transform: uppercase;
+      }
+      .ts-item-val {
+        font-size: 13px;
+        font-weight: 700;
+        font-family: "DM Mono", monospace;
+        color: var(--text);
+      }
+
+      /* ══════════════════════════
+   PAGE PARAMÈTRES
+══════════════════════════ */
+      .param-wrap {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        height: 100%;
+      }
+      .param-nav {
+        border-right: 1px solid var(--border);
+        padding: 16px 0;
+        background: var(--bg2);
+        transition: background 0.25s;
+      }
+      .pn-group {
+        margin-bottom: 10px;
+      }
+      .pn-title {
+        padding: 4px 16px;
+        font-size: 9px;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        font-weight: 600;
+      }
+      .pn-item {
+        padding: 8px 16px;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text2);
+        transition: all 0.1s;
+        border-left: 2px solid transparent;
+      }
+      .pn-item:hover {
+        background: var(--bg3);
+        color: var(--text);
+      }
+      .pn-item.active {
+        background: rgba(12, 192, 223, 0.08);
+        color: var(--cyan);
+        border-left-color: var(--cyan);
+        font-weight: 600;
+      }
+      .pn-ic {
+        font-size: 14px;
+      }
+      .param-content {
+        overflow-y: auto;
+        padding: 20px;
+      }
+      .param-section {
+        margin-bottom: 20px;
+      }
+      .param-section-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid var(--cyan);
+      }
+      .param-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 11px 14px;
+        background: var(--bg2);
+        border-radius: var(--r-sm);
+        margin-bottom: 5px;
+        border: 1px solid var(--border);
+        transition:
+          background 0.25s,
+          border-color 0.25s;
+      }
+      .param-row:hover {
+        border-color: var(--border2);
+      }
+      .param-lbl {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .param-sub {
+        font-size: 10px;
+        color: var(--text3);
+        margin-top: 1px;
+      }
+      .param-input {
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xs);
+        padding: 5px 10px;
+        color: var(--text);
+        font-size: 11px;
+        font-family: "Inter", sans-serif;
+        outline: none;
+        width: 160px;
+      }
+      .param-input:focus {
+        border-color: var(--cyan);
+      }
+      .ptoggle {
+        width: 36px;
+        height: 20px;
+        border-radius: 20px;
+        position: relative;
+        cursor: pointer;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .ptoggle.off {
+        background: var(--bg4);
+        border: 1px solid var(--border2);
+      }
+      .ptoggle.on {
+        background: var(--cyan);
+        border: 1px solid var(--cyan);
+      }
+      .ptoggle::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+      }
+      .ptoggle.on::after {
+        transform: translateX(16px);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ══ SIDEBAR ══ -->
+    <div class="sidebar">
+      <div class="sb-logo">
+        <svg
+          class="sb-logo-icon"
+          viewBox="0 0 36 36"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            stroke="url(#lg1)"
+            stroke-width="2.5"
+            fill="none"
+            stroke-dasharray="78 16"
+          />
+          <line
+            x1="18"
+            y1="11"
+            x2="18"
+            y2="25"
+            stroke="url(#lg2)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          />
+          <line
+            x1="11"
+            y1="18"
+            x2="25"
+            y2="18"
+            stroke="url(#lg2)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          />
+          <defs>
+            <linearGradient
+              id="lg1"
+              x1="3"
+              y1="3"
+              x2="33"
+              y2="33"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop stop-color="#0CC0DF" />
+              <stop offset="1" stop-color="#FFDE59" />
+            </linearGradient>
+            <linearGradient
+              id="lg2"
+              x1="11"
+              y1="11"
+              x2="25"
+              y2="25"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop stop-color="#0CC0DF" />
+              <stop offset="1" stop-color="#FFDE59" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="sb-logo-text">
+          <div class="sb-logo-name">PharmaGest</div>
+          <div class="sb-logo-sub">Gestion avancée</div>
+        </div>
+      </div>
+
+      <nav class="sb-nav">
+        <div class="sb-section">
+          <div class="sb-section-title">Principal</div>
+          <div
+            class="sb-item active"
+            onclick="nav('dashboard', 'Tableau de bord')"
+          >
+            <div class="sb-item-ic">📊</div>
+            Tableau de bord
+          </div>
+          <div class="sb-item" onclick="nav('compta', 'Comptabilité')">
+            <div class="sb-item-ic">💼</div>
+            Comptabilité
+          </div>
+          <div class="sb-item" onclick="nav('analyses', 'Analyses')">
+            <div class="sb-item-ic">🔬</div>
+            Analyses
+          </div>
+        </div>
+        <div class="sb-sep"></div>
+        <div class="sb-section">
+          <div class="sb-section-title">Transactions</div>
+          <div class="sb-item" onclick="nav('achats', 'Achats')">
+            <div class="sb-item-ic">🛒</div>
+            Achats
+          </div>
+          <div class="sb-item" onclick="nav('ventes', 'Ventes')">
+            <div class="sb-item-ic">💰</div>
+            Ventes
+          </div>
+        </div>
+        <div class="sb-sep"></div>
+        <div class="sb-section">
+          <div class="sb-section-title">Gestion</div>
+          <div class="sb-item" onclick="nav('alertes', 'Alertes')">
+            <div class="sb-item-ic">🔔</div>
+            Alertes
+            <div class="sb-badge">4</div>
+          </div>
+          <div class="sb-item" onclick="nav('equipe', 'Équipe')">
+            <div class="sb-item-ic">👥</div>
+            Équipe
+          </div>
+          <div class="sb-item" onclick="nav('params', 'Paramètres')">
+            <div class="sb-item-ic">⚙️</div>
+            Paramètres
+          </div>
+        </div>
+      </nav>
+
+      <div class="sb-bottom">
+        <div class="mode-toggle" onclick="toggleMode()">
+          <div id="mode-track" class="toggle-track">
+            <div class="toggle-thumb"></div>
+          </div>
+          <span id="mode-label">Mode nuit</span>
+        </div>
+        <div class="sb-user">
+          <div class="sb-user-av">MZ</div>
+          <div>
+            <div class="sb-user-name">Marouane</div>
+            <div class="sb-user-role">Propriétaire</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MAIN ══ -->
+    <div class="main">
+      <!-- TOP BAR -->
+      <div class="topbar">
+        <div class="tb-title" id="tb-title">Tableau de bord</div>
+        <div class="tb-sep"></div>
+        <button class="tb-btn mixte" onclick="setFilter('mixte', this)">
+          Mixte
+        </button>
+        <button class="tb-btn pharma" onclick="setFilter('pharma', this)">
+          Pharmacie
+        </button>
+        <button class="tb-btn paraph" onclick="setFilter('paraph', this)">
+          Parapharmacie
+        </button>
+        <button class="tb-btn date">📅 01/01/2026 — 31/03/2026</button>
+        <div class="tb-right">
+          <div class="tb-icon-btn" title="Rechercher">🔍</div>
+          <button class="tb-export">⬇ Exporter</button>
+        </div>
+      </div>
+
+      <!-- CONTENT -->
+      <div class="content">
+        <!-- ══════════ PAGE TABLEAU DE BORD ══════════ -->
+        <div class="page active" id="page-dashboard">
+          <div class="page-inner">
+            <!-- Ticker -->
+            <div class="ticker-bar">
+              Performance <strong>+12,4%</strong> sur la période · Parapharmacie
+              <strong>56,7%</strong> du CA · Marge moy. <strong>30,9%</strong> ·
+              <span class="dn">4 lots</span> en péremption critique · Stock:
+              note <strong>7.2/10</strong>
+            </div>
+
+            <!-- KPI ROW 1 -->
+            <div class="kpi-grid kpi-grid-4" style="margin-bottom: 12px">
+              <div class="card kpi-card">
+                <div
+                  class="kpi-card-accent"
+                  style="background: var(--cyan)"
+                ></div>
+                <div class="kpi-label">Chiffre d'affaires</div>
+                <div class="kpi-value">
+                  790 000
+                  <span
+                    style="
+                      font-size: 14px;
+                      font-weight: 400;
+                      color: var(--text3);
+                    "
+                    >MAD</span
+                  >
+                </div>
+                <div class="kpi-sub">
+                  <span class="kpi-badge up">↑ +12,5%</span> vs période préc.
+                </div>
+              </div>
+              <div class="card kpi-card">
+                <div
+                  class="kpi-card-accent"
+                  style="background: var(--blue)"
+                ></div>
+                <div class="kpi-label">Total achats</div>
+                <div class="kpi-value">
+                  356 349
+                  <span
+                    style="
+                      font-size: 14px;
+                      font-weight: 400;
+                      color: var(--text3);
+                    "
+                    >MAD</span
+                  >
+                </div>
+                <div class="kpi-sub">
+                  <span class="kpi-badge up">↑ +6,2%</span> 12 463 unités
+                </div>
+              </div>
+              <div class="card kpi-card">
+                <div
+                  class="kpi-card-accent"
+                  style="background: var(--green)"
+                ></div>
+                <div class="kpi-label">Marge brute moyenne</div>
+                <div class="kpi-value">
+                  30,7
+                  <span
+                    style="
+                      font-size: 14px;
+                      font-weight: 400;
+                      color: var(--text3);
+                    "
+                    >%</span
+                  >
+                </div>
+                <div class="kpi-sub">
+                  <span class="kpi-badge dn">↓ −1,2%</span> vs période préc.
+                </div>
+              </div>
+              <div class="card kpi-card">
+                <div
+                  class="kpi-card-accent"
+                  style="background: var(--purple)"
+                ></div>
+                <div class="kpi-label">Transactions</div>
+                <div class="kpi-value">14 569</div>
+                <div class="kpi-sub">
+                  <span class="kpi-badge up">↑ +2%</span> panier moy. 82,5 MAD
+                </div>
+              </div>
+            </div>
+
+            <!-- KPI ROW 2 -->
+            <div
+              class="kpi-grid"
+              style="
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+                margin-bottom: 16px;
+              "
+            >
+              <div class="card ticket-card">
+                <div class="ticket-card-title">Ticket moyen x̄</div>
+                <div class="ticket-vals">
+                  <div class="tv-item">
+                    <div class="tv-label">Mixte</div>
+                    <div class="tv-val">82</div>
+                    <div class="tv-unit">MAD</div>
+                  </div>
+                  <div class="tv-item">
+                    <div class="tv-label">Pharmacie</div>
+                    <div class="tv-val">68</div>
+                    <div class="tv-unit">MAD</div>
+                  </div>
+                  <div class="tv-item">
+                    <div class="tv-label">Parapharmacie</div>
+                    <div class="tv-val">142</div>
+                    <div class="tv-unit">MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card ticket-card">
+                <div class="ticket-card-title">Moyenne / jour</div>
+                <div style="display: flex; gap: 0">
+                  <div
+                    class="tv-item"
+                    style="
+                      text-align: left;
+                      padding-left: 0;
+                      padding-right: 16px;
+                    "
+                  >
+                    <div class="tv-label">Ventes</div>
+                    <div
+                      style="
+                        font-size: 20px;
+                        font-weight: 800;
+                        font-family: &quot;DM Mono&quot;, monospace;
+                        color: var(--cyan);
+                      "
+                    >
+                      15 629
+                    </div>
+                    <div class="tv-unit">MAD / jour</div>
+                  </div>
+                  <div
+                    class="tv-item"
+                    style="text-align: left; border-right: none"
+                  >
+                    <div class="tv-label">Opérations</div>
+                    <div
+                      style="
+                        font-size: 20px;
+                        font-weight: 800;
+                        font-family: &quot;DM Mono&quot;, monospace;
+                        color: var(--text);
+                      "
+                    >
+                      178
+                    </div>
+                    <div class="tv-unit">/ jour</div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card jour-card"
+                style="border-top: 3px solid var(--green)"
+              >
+                <div class="jour-title" style="color: var(--green)">
+                  Meilleure journée
+                </div>
+                <div class="jour-grid">
+                  <div class="jour-item">
+                    <div class="jour-date">Date</div>
+                    <div class="jour-val g">356 349</div>
+                    <div style="font-size: 9px; color: var(--text3)">MAD</div>
+                  </div>
+                  <div class="jour-item">
+                    <div class="jour-date">Opérations</div>
+                    <div class="jour-val g">346</div>
+                    <div style="font-size: 9px; color: var(--text3)">
+                      transactions
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card jour-card"
+                style="border-top: 3px solid var(--red)"
+              >
+                <div class="jour-title" style="color: var(--red)">
+                  Moins bonne journée
+                </div>
+                <div class="jour-grid">
+                  <div class="jour-item">
+                    <div class="jour-date">Date</div>
+                    <div class="jour-val r">356 349</div>
+                    <div style="font-size: 9px; color: var(--text3)">MAD</div>
+                  </div>
+                  <div class="jour-item">
+                    <div class="jour-date">Opérations</div>
+                    <div class="jour-val r">123</div>
+                    <div style="font-size: 9px; color: var(--text3)">
+                      transactions
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- RÉPARTITION & MARGES -->
+            <div class="section-title">Répartition &amp; Marges</div>
+            <div class="db-row db-row-2-1" style="margin-bottom: 16px">
+              <div class="card" style="padding: 16px 18px">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 12px;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 12px;
+                      font-weight: 700;
+                      color: var(--text);
+                    "
+                  >
+                    Répartition par catégorie
+                  </div>
+                  <span
+                    style="
+                      font-size: 10px;
+                      color: var(--text3);
+                      background: var(--bg3);
+                      padding: 3px 10px;
+                      border-radius: 20px;
+                      border: 1px solid var(--border);
+                    "
+                    >Mixte</span
+                  >
+                </div>
+                <div class="donut-section">
+                  <div class="donut-wrap">
+                    <svg
+                      viewBox="0 0 100 100"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#e5e7eb"
+                        stroke-width="14"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#0CC0DF"
+                        stroke-width="14"
+                        stroke-dasharray="47.8 191.0"
+                        stroke-dashoffset="0"
+                        transform="rotate(-90 50 50)"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#3b82f6"
+                        stroke-width="14"
+                        stroke-dasharray="45.5 193.3"
+                        stroke-dashoffset="-47.8"
+                        transform="rotate(-90 50 50)"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#8b5cf6"
+                        stroke-width="14"
+                        stroke-dasharray="21.7 217.1"
+                        stroke-dashoffset="-93.3"
+                        transform="rotate(-90 50 50)"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#f59e0b"
+                        stroke-width="14"
+                        stroke-dasharray="9.5 229.3"
+                        stroke-dashoffset="-115.0"
+                        transform="rotate(-90 50 50)"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="38"
+                        fill="none"
+                        stroke="#f97316"
+                        stroke-width="14"
+                        stroke-dasharray="8.1 230.7"
+                        stroke-dashoffset="-124.5"
+                        transform="rotate(-90 50 50)"
+                      />
+                    </svg>
+                    <div class="donut-center">
+                      <div class="donut-center-val">1,23M</div>
+                      <div class="donut-center-lbl">CA Total</div>
+                    </div>
+                  </div>
+                  <div class="donut-legend">
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #0cc0df"></div>
+                      <div class="dl-nm">Médicaments 33%</div>
+                      <div class="dl-ca">102 340</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        37,28%
+                      </div>
+                      <div class="dl-part">20%</div>
+                    </div>
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #3b82f6"></div>
+                      <div class="dl-nm">Compléments alim. 30%</div>
+                      <div class="dl-ca">42 168</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        36,29%
+                      </div>
+                      <div class="dl-part">9,4%</div>
+                    </div>
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #8b5cf6"></div>
+                      <div class="dl-nm">Parapharmacie 30%</div>
+                      <div class="dl-ca">79 304</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        19,50%
+                      </div>
+                      <div class="dl-part">13,6%</div>
+                    </div>
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #f59e0b"></div>
+                      <div class="dl-nm">Homéopathie</div>
+                      <div class="dl-ca">11 109</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        33,90%
+                      </div>
+                      <div class="dl-part">3,8%</div>
+                    </div>
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #f97316"></div>
+                      <div class="dl-nm">Médicaments 400</div>
+                      <div class="dl-ca">37 469</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        22,47%
+                      </div>
+                      <div class="dl-part">8,5%</div>
+                    </div>
+                    <div class="dl-row">
+                      <div class="dl-dot" style="background: #22c55e"></div>
+                      <div class="dl-nm">Diététique</div>
+                      <div class="dl-ca">23 769</div>
+                      <div
+                        class="dl-marge"
+                        style="margin: 0 6px; color: var(--text3)"
+                      >
+                        16,33%
+                      </div>
+                      <div class="dl-part">7,9%</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sante-card">
+                <div class="sante-score">
+                  <div>
+                    <div
+                      style="
+                        font-size: 9px;
+                        color: rgba(255, 255, 255, 0.4);
+                        text-transform: uppercase;
+                        letter-spacing: 0.6px;
+                        margin-bottom: 4px;
+                      "
+                    >
+                      Santé Trésorerie
+                    </div>
+                    <div class="sante-grade">A+</div>
+                    <div class="sante-sub">Excellente santé financière</div>
+                  </div>
+                  <div style="text-align: right">
+                    <div
+                      style="font-size: 10px; color: rgba(255, 255, 255, 0.3)"
+                    >
+                      Score
+                    </div>
+                    <div class="sante-score-num">92</div>
+                  </div>
+                </div>
+                <div class="sante-bar">
+                  <div class="sante-cursor" style="left: 8%"></div>
+                </div>
+                <div class="sante-labels">
+                  <span>A+</span><span>A</span><span>B+</span><span>B</span
+                  ><span>C+</span><span>C</span><span>D</span>
+                </div>
+                <div class="sante-grid">
+                  <div>
+                    <div class="sg-item-lbl">TVA Encaissée</div>
+                    <div class="sg-item-val">149 335</div>
+                  </div>
+                  <div>
+                    <div class="sg-item-lbl">TVA Payée</div>
+                    <div class="sg-item-val">192 435</div>
+                  </div>
+                </div>
+                <div>
+                  <div class="sante-solde-lbl">Solde TVA</div>
+                  <div class="sante-solde-val">−43 099 MAD</div>
+                </div>
+                <div class="sante-tags">
+                  <div class="stag g">Liquidité 2.4×</div>
+                  <div class="stag a">Délai: 34j</div>
+                  <div class="stag r">Échus: 12 400 MAD</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ALERTES MARGES -->
+            <div class="section-title">Alertes Marges</div>
+            <div class="marges-grid">
+              <div class="marge-card neg">
+                <div class="marge-card-title">Marge négative</div>
+                <div class="marge-count">7</div>
+                <div class="marge-desc">références en perte net</div>
+                <div class="marge-montant">−38 569 MAD</div>
+              </div>
+              <div class="marge-card low">
+                <div class="marge-card-title">Marge 0% → 10%</div>
+                <div class="marge-count">23</div>
+                <div class="marge-desc">références sous-optimisées</div>
+                <div class="marge-montant">12 539 MAD concerné</div>
+              </div>
+              <div class="marge-card hi">
+                <div class="marge-card-title">Marge 60% → 89,9%</div>
+                <div class="marge-count">47</div>
+                <div class="marge-desc">références trop performantes</div>
+                <div class="marge-montant">86 790 MAD concerné</div>
+              </div>
+              <div class="marge-card exc">
+                <div class="marge-card-title">Marge ≥ 90%</div>
+                <div class="marge-count">17</div>
+                <div class="marge-desc">Références avec marge maximale</div>
+                <div class="marge-montant">39 937 MAD concerné</div>
+              </div>
+            </div>
+
+            <div style="height: 20px"></div>
+            <!-- ABCD -->
+            <div class="section-title">Analyse Rotation Stock — ABCD</div>
+            <div style="display: flex; gap: 12px; margin-bottom: 16px">
+              <div class="card" style="flex: 1; padding: 16px">
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--text3);
+                    margin-bottom: 10px;
+                    display: flex;
+                    justify-content: space-between;
+                  "
+                >
+                  <span>Distribution ABCD des références</span
+                  ><span style="font-weight: 600; color: var(--text)"
+                    >Mixte · 3 361 références</span
+                  >
+                </div>
+                <div class="abcd-bar">
+                  <div class="abcd-item a">
+                    <div class="abcd-letter">A</div>
+                    <div class="abcd-count">129</div>
+                    <div class="abcd-pct">3,7%</div>
+                  </div>
+                  <div class="abcd-item am">
+                    <div class="abcd-letter">A−</div>
+                    <div class="abcd-count">82</div>
+                    <div class="abcd-pct">2,8%</div>
+                  </div>
+                  <div class="abcd-item bp">
+                    <div class="abcd-letter">B+</div>
+                    <div class="abcd-count">178</div>
+                    <div class="abcd-pct">5,7%</div>
+                  </div>
+                  <div class="abcd-item b">
+                    <div class="abcd-letter">B</div>
+                    <div class="abcd-count">883</div>
+                    <div class="abcd-pct">26,3%</div>
+                  </div>
+                  <div class="abcd-item c">
+                    <div class="abcd-letter">C</div>
+                    <div class="abcd-count">1243</div>
+                    <div class="abcd-pct">37%</div>
+                  </div>
+                  <div class="abcd-item cm">
+                    <div class="abcd-letter">C−</div>
+                    <div class="abcd-count">412</div>
+                    <div class="abcd-pct">12,4%</div>
+                  </div>
+                  <div class="abcd-item cn">
+                    <div class="abcd-letter">C−N</div>
+                    <div class="abcd-count">107</div>
+                    <div class="abcd-pct">4,9%</div>
+                  </div>
+                  <div class="abcd-item d">
+                    <div class="abcd-letter">D</div>
+                    <div class="abcd-count">432</div>
+                    <div class="abcd-pct">12,6%</div>
+                  </div>
+                </div>
+              </div>
+              <div class="note-card" style="width: 200px; flex-shrink: 0">
+                <div
+                  style="
+                    font-size: 9px;
+                    color: rgba(255, 255, 255, 0.35);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Note qualité du stock
+                </div>
+                <div class="note-score">7.2</div>
+                <div class="note-bar">
+                  <div class="note-cursor" style="left: 72%"></div>
+                </div>
+                <div class="note-labels">
+                  <span>1</span><span>3</span><span>5</span><span>7</span
+                  ><span>9</span><span>10</span>
+                </div>
+                <div class="note-stats">
+                  <div>
+                    <div class="ns-item-lbl">A</div>
+                    <div class="ns-item-val">12%</div>
+                  </div>
+                  <div>
+                    <div class="ns-item-lbl">Cat B</div>
+                    <div class="ns-item-val">13%</div>
+                  </div>
+                  <div>
+                    <div class="ns-item-lbl">Slow</div>
+                    <div class="ns-item-val">49%</div>
+                  </div>
+                  <div>
+                    <div class="ns-item-lbl">D</div>
+                    <div class="ns-item-val">27%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="stock-alert-grid">
+              <div class="sa-card neg">
+                <div class="sa-title">Stock négatif</div>
+                <div class="sa-grid">
+                  <div>
+                    <div class="sa-item-lbl">Références</div>
+                    <div class="sa-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Unités totales</div>
+                    <div class="sa-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Valeur achats</div>
+                    <div class="sa-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">PPV potentiel</div>
+                    <div class="sa-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="sa-card sous">
+                <div class="sa-title">
+                  Sous stock Top références
+                  <span
+                    style="
+                      background: rgba(245, 158, 11, 0.15);
+                      padding: 2px 8px;
+                      border-radius: 20px;
+                      font-size: 9px;
+                      margin-left: 6px;
+                    "
+                    >A &amp; A−</span
+                  >
+                </div>
+                <div class="sa-grid">
+                  <div>
+                    <div class="sa-item-lbl">Références</div>
+                    <div class="sa-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Unités totales</div>
+                    <div class="sa-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Valeur achats</div>
+                    <div class="sa-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">PPV potentiel</div>
+                    <div class="sa-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="sa-card sur">
+                <div class="sa-title">Sur stock &gt; 100 jours</div>
+                <div class="sa-grid">
+                  <div>
+                    <div class="sa-item-lbl">Références</div>
+                    <div class="sa-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Unités totales</div>
+                    <div class="sa-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">Valeur achats</div>
+                    <div class="sa-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="sa-item-lbl">PPV potentiel</div>
+                    <div class="sa-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="height: 16px"></div>
+            <div class="section-title">Surveillance Péremptions</div>
+            <div class="perem-grid">
+              <div class="pe-card crit">
+                <span class="pe-badge-urgent">Urgent</span>
+                <div class="pe-title">Périmés en stock</div>
+                <div class="pe-sub">
+                  Dates passées + mois en cours + mois suivant
+                </div>
+                <div class="pe-grid">
+                  <div>
+                    <div class="pe-item-lbl">Références</div>
+                    <div class="pe-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Unités totales</div>
+                    <div class="pe-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Valeur achats</div>
+                    <div class="pe-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">PPV potentiel</div>
+                    <div class="pe-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="pe-card proche">
+                <span class="pe-badge-months proche" style="float: right"
+                  >2 → 6 mois</span
+                >
+                <div class="pe-title">Très proches périmés</div>
+                <div class="pe-sub">Expire entre mois+2 et mois+6</div>
+                <div class="pe-grid">
+                  <div>
+                    <div class="pe-item-lbl">Références</div>
+                    <div class="pe-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Unités totales</div>
+                    <div class="pe-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Valeur achats</div>
+                    <div class="pe-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">PPV potentiel</div>
+                    <div class="pe-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="pe-card warn">
+                <span class="pe-badge-months warn" style="float: right"
+                  >7 → 12 mois</span
+                >
+                <div class="pe-title">Périmés en stock</div>
+                <div class="pe-sub">Expire entre mois+7 et mois+12</div>
+                <div class="pe-grid">
+                  <div>
+                    <div class="pe-item-lbl">Références</div>
+                    <div class="pe-item-val">14</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Unités totales</div>
+                    <div class="pe-item-val">138 u.</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">Valeur achats</div>
+                    <div class="pe-item-val">4 829 MAD</div>
+                  </div>
+                  <div>
+                    <div class="pe-item-lbl">PPV potentiel</div>
+                    <div class="pe-item-val">6 459 MAD</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE COMPTABILITÉ ══════════ -->
+        <div class="page" id="page-compta">
+          <div class="page-inner">
+            <div class="compta-export-bar">
+              Exporter : <span class="export-link">Excel</span> —
+              <span class="export-link">PDF</span> —
+              <span class="export-link">email</span>
+            </div>
+
+            <!-- GLOBAL -->
+            <div class="compta-grid-3">
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--cyan)"
+              >
+                <div class="ck-label">Chiffre d'affaires</div>
+                <div class="ck-val">
+                  1 225 815
+                  <span style="font-size: 13px; color: var(--text3)">MAD</span>
+                </div>
+                <div style="margin-top: 10px">
+                  <div class="ck-label">Marge brute en MAD</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      color: var(--green);
+                      font-size: 16px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      font-weight: 700;
+                    "
+                  >
+                    378 776,84 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 8px">
+                  <div class="ck-label">TVA encaissée</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      font-weight: 600;
+                    "
+                  >
+                    147 097,80 MAD
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--blue)"
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                  "
+                >
+                  <div class="ck-label">Achats</div>
+                  <div
+                    class="ck-sub-val"
+                    style="color: var(--text3); font-size: 12px"
+                  >
+                    Opérations
+                  </div>
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: baseline;
+                    gap: 16px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <div class="ck-val">
+                    901 781
+                    <span style="font-size: 13px; color: var(--text3)"
+                      >MAD</span
+                    >
+                  </div>
+                  <div
+                    style="
+                      font-size: 22px;
+                      font-weight: 700;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      color: var(--text);
+                    "
+                  >
+                    1 256
+                  </div>
+                </div>
+                <div class="ck-label">TVA payée</div>
+                <div
+                  class="ck-sub-val"
+                  style="
+                    font-size: 16px;
+                    font-family: &quot;DM Mono&quot;, monospace;
+                    font-weight: 700;
+                    color: var(--blue);
+                  "
+                >
+                  108 224,52 MAD
+                </div>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    margin-top: 6px;
+                  "
+                >
+                  <div
+                    style="
+                      font-size: 13px;
+                      font-weight: 700;
+                      color: var(--text);
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    Marge x̄ brute
+                  </div>
+                  <div
+                    style="
+                      font-size: 18px;
+                      font-weight: 800;
+                      color: var(--cyan);
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      margin-left: auto;
+                    "
+                  >
+                    30,9%
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--green)"
+              >
+                <div class="ck-label">Bilan — Résultat</div>
+                <div
+                  class="ck-val"
+                  style="font-size: 16px; color: var(--green)"
+                >
+                  CA − Achats = 324 034 MAD
+                </div>
+                <div style="margin-top: 10px">
+                  <div class="ck-label">TVA à déclarer (estimation)</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      font-weight: 700;
+                    "
+                  >
+                    38 873,28 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 8px">
+                  <div class="ck-label">Solde TVA année 2026</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      font-weight: 700;
+                      color: var(--red);
+                    "
+                  >
+                    52 038,12 MAD
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PHARMACIE -->
+            <div
+              class="compta-section-title"
+              style="border-bottom-color: var(--blue)"
+            >
+              <span
+                style="
+                  background: var(--blue-bg);
+                  color: var(--blue);
+                  padding: 3px 10px;
+                  border-radius: 20px;
+                  font-size: 11px;
+                "
+                >💊 Pharmacie</span
+              >
+            </div>
+            <div class="compta-grid-3" style="margin-bottom: 20px">
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--blue)"
+              >
+                <div class="ck-label">Chiffre d'affaires</div>
+                <div class="ck-val">
+                  790 000
+                  <span style="font-size: 13px; color: var(--text3)">MAD</span>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Marge brute MAD</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      color: var(--green);
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    240 318 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">TVA encaissée</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    94 800 MAD
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--blue)"
+              >
+                <div class="ck-label">Achats</div>
+                <div class="ck-val">
+                  356 349
+                  <span style="font-size: 13px; color: var(--text3)">MAD</span>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Opérations</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 16px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    1 256
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">TVA payée</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      color: var(--blue);
+                    "
+                  >
+                    42 761,88 MAD
+                  </div>
+                </div>
+                <div
+                  style="
+                    margin-top: 6px;
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: var(--cyan);
+                    font-family: &quot;DM Mono&quot;, monospace;
+                  "
+                >
+                  30,42%
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--green)"
+              >
+                <div class="ck-label">Résultat</div>
+                <div
+                  class="ck-val"
+                  style="font-size: 14px; color: var(--green)"
+                >
+                  CA − Achats = 433 651 MAD
+                </div>
+                <div style="margin-top: 8px">
+                  <div class="ck-label">TVA à déclarer</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    52 038,12 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Solde TVA 2026</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      color: var(--red);
+                    "
+                  >
+                    52 038,12 MAD
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PARAPHARMACIE -->
+            <div
+              class="compta-section-title"
+              style="border-bottom-color: var(--purple)"
+            >
+              <span
+                style="
+                  background: var(--purple-bg);
+                  color: var(--purple);
+                  padding: 3px 10px;
+                  border-radius: 20px;
+                  font-size: 11px;
+                "
+                >🧴 Parapharmacie</span
+              >
+            </div>
+            <div class="compta-grid-3" style="margin-bottom: 20px">
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--purple)"
+              >
+                <div class="ck-label">Chiffre d'affaires</div>
+                <div class="ck-val">
+                  790 000
+                  <span style="font-size: 13px; color: var(--text3)">MAD</span>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Marge brute MAD</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      color: var(--green);
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    240 318 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">TVA encaissée</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    94 800 MAD
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--purple)"
+              >
+                <div class="ck-label">Achats</div>
+                <div class="ck-val">
+                  356 349
+                  <span style="font-size: 13px; color: var(--text3)">MAD</span>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Opérations</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 16px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    1 256
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">TVA payée</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 14px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      color: var(--purple);
+                    "
+                  >
+                    42 761,88 MAD
+                  </div>
+                </div>
+                <div
+                  style="
+                    margin-top: 6px;
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: var(--purple);
+                    font-family: &quot;DM Mono&quot;, monospace;
+                  "
+                >
+                  30,42%
+                </div>
+              </div>
+              <div
+                class="card compta-kpi"
+                style="border-top: 3px solid var(--green)"
+              >
+                <div class="ck-label">Résultat</div>
+                <div
+                  class="ck-val"
+                  style="font-size: 14px; color: var(--green)"
+                >
+                  CA − Achats = 433 651 MAD
+                </div>
+                <div style="margin-top: 8px">
+                  <div class="ck-label">TVA à déclarer</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                    "
+                  >
+                    52 038,12 MAD
+                  </div>
+                </div>
+                <div style="margin-top: 6px">
+                  <div class="ck-label">Solde TVA 2026</div>
+                  <div
+                    class="ck-sub-val"
+                    style="
+                      font-size: 13px;
+                      font-family: &quot;DM Mono&quot;, monospace;
+                      color: var(--red);
+                    "
+                  >
+                    52 038,12 MAD
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODES DE PAIEMENT -->
+            <div
+              class="compta-section-title"
+              style="border-bottom-color: var(--gray)"
+            >
+              Modes de paiement
+            </div>
+            <div class="pay-methods">
+              <div class="card pm-card tpe">
+                <div class="pm-title">TPE</div>
+                <div class="pm-grid">
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Pharmacie</div>
+                    <div class="pm-item-val">68 MAD</div>
+                  </div>
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Parapharmacie</div>
+                    <div class="pm-item-val">142 MAD</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card pm-card esp">
+                <div class="pm-title">Espèces</div>
+                <div class="pm-grid">
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Pharmacie</div>
+                    <div class="pm-item-val" style="font-size: 13px">
+                      15 629 MAD
+                    </div>
+                  </div>
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Parapharmacie</div>
+                    <div class="pm-item-val">178</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card pm-card chq">
+                <div class="pm-title">Chèques</div>
+                <div class="pm-grid">
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Pharmacie</div>
+                    <div
+                      class="pm-item-val"
+                      style="font-size: 13px; color: var(--green)"
+                    >
+                      356 349 MAD
+                    </div>
+                  </div>
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Parapharmacie</div>
+                    <div class="pm-item-val" style="color: var(--green)">
+                      346
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card pm-card vir">
+                <div class="pm-title">Virement et autres</div>
+                <div class="pm-grid">
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Pharmacie</div>
+                    <div
+                      class="pm-item-val"
+                      style="font-size: 13px; color: var(--red)"
+                    >
+                      356 349 MAD
+                    </div>
+                  </div>
+                  <div class="pm-item">
+                    <div class="pm-item-lbl">Parapharmacie</div>
+                    <div class="pm-item-val" style="color: var(--red)">123</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABLE TRANSACTIONS -->
+            <div style="margin-top: 16px">
+              <div class="tbl-toolbar">
+                <input
+                  class="tbl-search"
+                  placeholder="N° transaction, produit..."
+                />
+                <div class="tbl-actions">
+                  <button class="tbl-action-btn">📊 Colonnes</button>
+                  <button class="tbl-action-btn">⬇ CSV</button>
+                </div>
+              </div>
+              <div
+                class="card"
+                style="border-radius: 0 0 var(--r) var(--r); border-top: none"
+              >
+                <div class="tbl-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>N° Transaction</th>
+                        <th>N° Trans. Final</th>
+                        <th>Client</th>
+                        <th>Produit</th>
+                        <th>Catégorie</th>
+                        <th>Type</th>
+                        <th>TVA</th>
+                        <th>Qté</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−2</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">PHYSIOTUSS TOUX SECHES ET...</div>
+                          <div class="td-sub">PID 190523</div>
+                        </td>
+                        <td>Complément Alimentaire</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">SYMBICORT TURB AE 200/6µG...</div>
+                          <div class="td-sub">PID 28659</div>
+                        </td>
+                        <td>Médicament</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−2</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">NOBIOS B30 GELULES</div>
+                          <div class="td-sub">PID 150473</div>
+                        </td>
+                        <td>Complément Alimentaire</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242559</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242559</span>
+                          <span
+                            class="tag-num neg"
+                            style="
+                              background: rgba(239, 68, 68, 0.15);
+                              font-size: 9px;
+                              padding: 1px 5px;
+                            "
+                            >−10</span
+                          >
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">CORALAN CO 5MG B28 COMP</div>
+                          <div class="td-sub">PID 31784</div>
+                        </td>
+                        <td>Homéopathie</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242558</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242558</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">PROFENID SU 100MG B12 SUPPO</div>
+                          <div class="td-sub">PID 27805</div>
+                        </td>
+                        <td>Médicament</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242557</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242557</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">STERI-STRIP ORANGE 6MM*100...</div>
+                          <div class="td-sub">PID 136775</div>
+                        </td>
+                        <td>Parapharmacie</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE ANALYSES ══════════ -->
+        <div class="page" id="page-analyses">
+          <div class="page-inner">
+            <div class="analyses-tabs">
+              <button class="at-btn active">Produit</button>
+              <button class="at-btn">Fournisseur</button>
+              <button class="at-btn">Opérateur</button>
+              <button class="at-btn">Laboratoire</button>
+              <button class="at-btn">LMMJVSD</button>
+              <button class="at-btn">Mois / année</button>
+              <button class="at-btn">Catégorie</button>
+              <button class="at-btn">Liste</button>
+            </div>
+
+            <div class="analyses-kpi-row">
+              <div class="card ak-card">
+                <div class="ak-title">Total vente</div>
+                <div class="ak-val">1,23M MAD</div>
+                <div class="ak-sub">Total unités : <strong>14 569</strong></div>
+              </div>
+              <div class="card ak-card">
+                <div class="ak-title">Marge x̄ en %</div>
+                <div class="ak-val" style="color: var(--green)">30,9%</div>
+                <div class="ak-sub">
+                  Plus faible : <span class="ak-highlight">−4,2%</span> · Plus
+                  forte : <span class="ak-highl-g">52,1%</span>
+                </div>
+              </div>
+              <div class="card ak-card">
+                <div class="ak-title">Marge x̄ en MAD</div>
+                <div class="ak-val" style="color: var(--cyan)">378 776 MAD</div>
+                <div class="ak-sub">
+                  Min : <span class="ak-highlight">−38 569</span> · Max :
+                  <span class="ak-highl-g">86 790</span>
+                </div>
+              </div>
+              <div
+                class="card ak-card"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: center;
+                "
+              >
+                <div class="ak-title">Optimisation marge</div>
+                <div class="optim-btn">
+                  <div class="ob-direct">Directs</div>
+                  <div class="ob-vs">vs</div>
+                  <div class="ob-gros">Grossistes</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="analyses-summary">
+              <div class="as-item">
+                <div class="as-lbl">Unités total vendues</div>
+                <div class="as-val">14 569</div>
+              </div>
+              <div class="as-item">
+                <div class="as-lbl">Unités total disponibles</div>
+                <div class="as-val">22 840</div>
+              </div>
+              <div class="as-item">
+                <div class="as-lbl">Prix unitaires total achetés</div>
+                <div class="as-val">901 781 MAD</div>
+              </div>
+              <div class="as-item">
+                <div class="as-lbl">PPV total disponibles</div>
+                <div class="as-val">1 225 815 MAD</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produit</th>
+                      <th>Stock dispo</th>
+                      <th>Vente total unt</th>
+                      <th>Vente total MAD</th>
+                      <th>Prix Unt +</th>
+                      <th>Prix Unt −</th>
+                      <th>Prix Unt x̄</th>
+                      <th>PPV</th>
+                      <th>Marge % x̄</th>
+                      <th>Marge MAD x̄</th>
+                      <th>Catégorie</th>
+                      <th>TVA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <div class="td-nm">BIODERMA SENSIBIO H2O 500ML</div>
+                      </td>
+                      <td>10</td>
+                      <td>3</td>
+                      <td><div class="td-num">3×162=486 MAD</div></td>
+                      <td><div class="td-num">122,74 MAD</div></td>
+                      <td>
+                        <div style="font-size: 11px; color: var(--text3)">
+                          124,23 MAD<br />9 unités<br />124,23 MAD<br />3 unités
+                        </div>
+                      </td>
+                      <td>
+                        <div style="font-size: 11px; color: var(--text3)">
+                          123,113 MAD<br />3 unités<br />124,23 MAD<br />3
+                          unités
+                        </div>
+                      </td>
+                      <td>
+                        <div class="td-num">162 MAD<br />162 MAD</div>
+                      </td>
+                      <td>
+                        <div class="td-num" style="color: var(--green)">
+                          24%<br />23,31%
+                        </div>
+                      </td>
+                      <td>
+                        <div style="font-size: 11px">
+                          162−123,113=38,887<br />162−124,23=37,77
+                        </div>
+                      </td>
+                      <td><span class="pill paraph">Parapharmacie</span></td>
+                      <td><span class="pill tva">20%</span></td>
+                    </tr>
+                    <tr>
+                      <td><div class="td-nm">DOLIPRANE 1000MG B16</div></td>
+                      <td>84</td>
+                      <td>24</td>
+                      <td><div class="td-num">369,60 MAD</div></td>
+                      <td><div class="td-num">11,20 MAD</div></td>
+                      <td>
+                        <div style="font-size: 11px; color: var(--text3)">
+                          11,20 MAD
+                        </div>
+                      </td>
+                      <td><div class="td-num">11,20 MAD</div></td>
+                      <td><div class="td-num">15,40 MAD</div></td>
+                      <td>
+                        <div class="td-num" style="color: var(--green)">
+                          32%
+                        </div>
+                      </td>
+                      <td><div class="td-num">4,20 MAD</div></td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td><span class="pill exo">Exo.</span></td>
+                    </tr>
+                    <tr>
+                      <td><div class="td-nm">INEXIUM 20MG B14 COMP MR</div></td>
+                      <td>8</td>
+                      <td>6</td>
+                      <td><div class="td-num">460,20 MAD</div></td>
+                      <td><div class="td-num">58,00 MAD</div></td>
+                      <td>
+                        <div style="font-size: 11px; color: var(--text3)">
+                          58,00 MAD
+                        </div>
+                      </td>
+                      <td><div class="td-num">58,00 MAD</div></td>
+                      <td><div class="td-num">76,70 MAD</div></td>
+                      <td>
+                        <div class="td-num" style="color: var(--green)">
+                          24,4%
+                        </div>
+                      </td>
+                      <td><div class="td-num">18,70 MAD</div></td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td><span class="pill exo">Exo.</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE ACHATS ══════════ -->
+        <div class="page" id="page-achats">
+          <div class="page-inner">
+            <!-- Fournisseurs summary -->
+            <div class="card" style="margin-bottom: 14px">
+              <div class="fournisseur-grid">
+                <div
+                  class="fourn-block"
+                  style="border-right: 1px solid var(--border)"
+                >
+                  <div class="fourn-title">Grossistes</div>
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap">
+                    <div>
+                      <div class="fourn-label">Achats</div>
+                      <div class="fourn-val">180 000 MAD</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">BL</div>
+                      <div class="fourn-val">350</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">Unités</div>
+                      <div class="fourn-val">12 570</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">Marge moy.</div>
+                      <div class="fourn-val marge">29,63%</div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="gauge-wrap"
+                  style="border-right: 1px solid var(--border)"
+                >
+                  <div class="gauge-title">Jauge</div>
+                  <svg
+                    class="gauge-svg"
+                    viewBox="0 0 100 55"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      fill="none"
+                      stroke="#fee2e2"
+                      stroke-width="10"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M 10 50 A 40 40 0 0 1 90 50"
+                      fill="none"
+                      stroke="url(#gaugeLg)"
+                      stroke-width="10"
+                      stroke-linecap="round"
+                      stroke-dasharray="120 126"
+                      stroke-dashoffset="0"
+                    />
+                    <defs>
+                      <linearGradient
+                        id="gaugeLg"
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="0%"
+                      >
+                        <stop offset="0%" stop-color="#ef4444" />
+                        <stop offset="40%" stop-color="#f59e0b" />
+                        <stop offset="100%" stop-color="#22c55e" />
+                      </linearGradient>
+                    </defs>
+                    <!-- needle pointing to ~60% = yellow/amber zone -->
+                    <line
+                      x1="50"
+                      y1="50"
+                      x2="50"
+                      y2="14"
+                      stroke="#1a1f2e"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      transform="rotate(0 50 50)"
+                    />
+                    <circle cx="50" cy="50" r="3.5" fill="#1a1f2e" />
+                  </svg>
+                </div>
+                <div class="fourn-block">
+                  <div class="fourn-title">Direct laboratoires</div>
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap">
+                    <div>
+                      <div class="fourn-label">Achats</div>
+                      <div class="fourn-val">84 920 MAD</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">BL</div>
+                      <div class="fourn-val">72</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">Unités</div>
+                      <div class="fourn-val">9 820</div>
+                    </div>
+                    <div>
+                      <div class="fourn-label">Marge moy.</div>
+                      <div class="fourn-val marge">38,47%</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <div class="tbl-toolbar">
+              <div class="tbl-tab active">BL</div>
+              <div class="tbl-tab">Fournisseur</div>
+              <div class="tbl-tab">Produit</div>
+              <div class="tbl-tab">Liste ☁</div>
+              <div class="tbl-tab">Catégorie</div>
+              <div class="tbl-tab">TVA</div>
+              <div class="tbl-tab">Statut payé ?</div>
+              <div class="tbl-tab">Opérateur</div>
+              <input
+                class="tbl-search"
+                placeholder="Produit, fournisseur, référence..."
+              />
+              <div style="display: flex; gap: 6px">
+                <span class="pill pharma">Médicaments</span>
+                <span class="pill paraph">Parapharmacie</span>
+              </div>
+              <div class="tbl-actions">
+                <button class="tbl-action-btn">📊 Colonnes</button>
+                <button class="tbl-action-btn">⬇ CSV</button>
+              </div>
+            </div>
+            <div
+              class="tbl-toolbar"
+              style="border-radius: 0; background: var(--bg2); gap: 6px"
+            >
+              <select class="tbl-filter-select">
+                <option>Période</option>
+              </select>
+              <select class="tbl-filter-select">
+                <option>Toutes les catégories</option>
+              </select>
+              <select class="tbl-filter-select">
+                <option>TVA</option>
+              </select>
+            </div>
+            <div
+              class="card"
+              style="border-radius: 0 0 var(--r) var(--r); border-top: none"
+            >
+              <div class="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date BL</th>
+                      <th>Référence Finale</th>
+                      <th>Fournisseur</th>
+                      <th>Produit</th>
+                      <th>Catégorie</th>
+                      <th>Type</th>
+                      <th>TVA</th>
+                      <th>Qté</th>
+                      <th>PP Achat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono">7081260</span>
+                        <span class="tag-num neg">−10</span>
+                      </td>
+                      <td>Grossiste GPM</td>
+                      <td>
+                        <div class="td-nm">CORALAN CO 5MG B28 COMP</div>
+                        <div class="td-sub">PID 31784</div>
+                      </td>
+                      <td>Homéopathie</td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td>Exonéré</td>
+                      <td>4</td>
+                      <td class="td-num">12x</td>
+                    </tr>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono" style="font-size: 10px"
+                          >20260228172444-1:</span
+                        >
+                      </td>
+                      <td>Laboratoire PHI (PHARM...)</td>
+                      <td>
+                        <div class="td-nm">STREPSILS WARM GINGER B16...</div>
+                        <div class="td-sub">PID 202074</div>
+                      </td>
+                      <td>Complément Alimentaire</td>
+                      <td><span class="pill paraph">Parapharmacie</span></td>
+                      <td>TVA 20%</td>
+                      <td>5</td>
+                      <td class="td-num">25x</td>
+                    </tr>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono" style="font-size: 10px"
+                          >20260228172444-1:</span
+                        >
+                      </td>
+                      <td>Laboratoire PHI (PHARM...)</td>
+                      <td>
+                        <div class="td-nm">GAVISCON DOUBLE ACTION B16...</div>
+                        <div class="td-sub">PID 201488</div>
+                      </td>
+                      <td>Médicament</td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td>Exonéré</td>
+                      <td>24</td>
+                      <td class="td-num">33x</td>
+                    </tr>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono" style="font-size: 10px"
+                          >20260228172444-1:</span
+                        >
+                      </td>
+                      <td>Laboratoire PHI (PHARM...)</td>
+                      <td>
+                        <div class="td-nm">GAVISCON ST B20 SACHETS</div>
+                        <div class="td-sub">PID 122792</div>
+                      </td>
+                      <td>Médicament</td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td>Exonéré</td>
+                      <td>84</td>
+                      <td class="td-num">61x</td>
+                    </tr>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono" style="font-size: 10px"
+                          >20260228172444-1:</span
+                        >
+                      </td>
+                      <td>Laboratoire PHI (PHARM...)</td>
+                      <td>
+                        <div class="td-nm">STREPSILS CO INTENSIVE FLU...</div>
+                        <div class="td-sub">PID 105288</div>
+                      </td>
+                      <td>Médicament</td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td>Exonéré</td>
+                      <td>25</td>
+                      <td class="td-num">43x</td>
+                    </tr>
+                    <tr>
+                      <td>2026-02-28</td>
+                      <td>
+                        <span class="td-mono" style="font-size: 10px"
+                          >20260228172444-1:</span
+                        >
+                      </td>
+                      <td>Laboratoire PHI (PHARM...)</td>
+                      <td>
+                        <div class="td-nm">STREPSILS CO ORANGE VITAMI...</div>
+                        <div class="td-sub">PID 88729</div>
+                      </td>
+                      <td>Médicament</td>
+                      <td><span class="pill pharma">Pharmacie</span></td>
+                      <td>Exonéré</td>
+                      <td>5</td>
+                      <td class="td-num">29x</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE VENTES ══════════ -->
+        <div class="page" id="page-ventes">
+          <div class="page-inner">
+            <div style="margin-bottom: 4px">
+              <div
+                style="
+                  font-size: 20px;
+                  font-weight: 800;
+                  color: var(--text);
+                  margin-bottom: 4px;
+                "
+              >
+                Ventes
+              </div>
+              <div style="font-size: 12px; color: var(--text3)">
+                Historique des transactions de vente.
+              </div>
+            </div>
+
+            <!-- MAIN TABLE -->
+            <div style="margin: 14px 0 0">
+              <div class="tbl-toolbar">
+                <input
+                  class="tbl-search"
+                  placeholder="Produit, client, N° transaction..."
+                />
+                <div style="display: flex; gap: 6px">
+                  <span class="pill pharma">Médicaments</span>
+                  <span class="pill paraph">Parapharmacie</span>
+                </div>
+                <div class="tbl-actions">
+                  <button class="tbl-action-btn">📊 Colonnes</button>
+                  <button class="tbl-action-btn">⬇ CSV</button>
+                </div>
+              </div>
+              <div
+                class="tbl-toolbar"
+                style="border-radius: 0; background: var(--bg2); gap: 6px"
+              >
+                <select class="tbl-filter-select">
+                  <option>📅 Période</option>
+                </select>
+                <select class="tbl-filter-select">
+                  <option>Toutes les catégories</option>
+                </select>
+                <select class="tbl-filter-select">
+                  <option>TVA</option>
+                </select>
+              </div>
+              <div
+                class="card"
+                style="border-radius: 0 0 var(--r) var(--r); border-top: none"
+              >
+                <div class="tbl-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>N° Transaction</th>
+                        <th>N° Trans. Final</th>
+                        <th>Client</th>
+                        <th>Produit</th>
+                        <th>Catégorie</th>
+                        <th>Type</th>
+                        <th>TVA</th>
+                        <th>Qté</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−2</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">PHYSIOTUSS TOUX SECHES ET...</div>
+                          <div class="td-sub">PID 190523</div>
+                        </td>
+                        <td>Complément Alimentaire</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">
+                            SYMBICORT TURB AE 200/6µG 1...
+                          </div>
+                          <div class="td-sub">PID 28659</div>
+                        </td>
+                        <td>Médicament</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−2</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">NOBIOS B30 GELULES</div>
+                          <div class="td-sub">PID 150473</div>
+                        </td>
+                        <td>Complément Alimentaire</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242559</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242559</span>
+                          <span
+                            class="tag-num neg"
+                            style="padding: 1px 5px; font-size: 9px"
+                            >−10</span
+                          >
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">CORALAN CO 5MG B28 COMP</div>
+                          <div class="td-sub">PID 31784</div>
+                        </td>
+                        <td>Homéopathie</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242558</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242558</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">PROFENID SU 100MG B12 SUPPO</div>
+                          <div class="td-sub">PID 27805</div>
+                        </td>
+                        <td>Médicament</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- VENTES À SURVEILLER -->
+            <div style="margin-top: 16px">
+              <div class="surveiller-bar">
+                <div class="surveiller-title">⚠️ Ventes à surveiller</div>
+                <div class="surv-btn m-neg">marge négative</div>
+                <div class="surv-btn m-low">vente &lt; 10%</div>
+                <div class="surv-btn hs">ventes hors stock</div>
+                <div class="surv-btn crd">ventes à crédits</div>
+                <div class="surv-btn rem">Remises</div>
+                <div class="surv-btn ret">Retours</div>
+              </div>
+              <div
+                class="card"
+                style="border-radius: 0 0 var(--r) var(--r); border-top: none"
+              >
+                <div class="tbl-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>N° Transaction</th>
+                        <th>N° Trans. Final</th>
+                        <th>Client</th>
+                        <th>Produit</th>
+                        <th>Catégorie</th>
+                        <th>Type</th>
+                        <th>TVA</th>
+                        <th>Qté</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−2</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">PHYSIOTUSS TOUX SECHES ET...</div>
+                          <div class="td-sub">PID 190523</div>
+                        </td>
+                        <td>Complément Alimentaire</td>
+                        <td><span class="pill paraph">Parapharmacie</span></td>
+                        <td>TVA 20%</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242560</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242560</span>
+                          <span class="tag-num neg">−1</span>
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">
+                            SYMBICORT TURB AE 200/6µG 1...
+                          </div>
+                          <div class="td-sub">PID 28659</div>
+                        </td>
+                        <td>Médicament</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>2026-03-18</td>
+                        <td><span class="td-mono">FAC-242559</span></td>
+                        <td>
+                          <span class="td-mono">FAC-242559</span>
+                          <span
+                            class="tag-num neg"
+                            style="padding: 1px 5px; font-size: 9px"
+                            >−10</span
+                          >
+                        </td>
+                        <td style="color: var(--text3)">Anonyme</td>
+                        <td>
+                          <div class="td-nm">CORALAN CO 5MG B28 COMP</div>
+                          <div class="td-sub">PID 31784</div>
+                        </td>
+                        <td>Homéopathie</td>
+                        <td><span class="pill pharma">Pharmacie</span></td>
+                        <td>Exonéré</td>
+                        <td>1</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE ALERTES ══════════ -->
+        <div class="page" id="page-alertes">
+          <div class="page-inner">
+            <div class="alertes-grid">
+              <div class="card alerte-card crit">
+                <div class="ac-ic">🔴</div>
+                <div class="ac-title">Périmés en stock</div>
+                <div class="ac-val">14</div>
+                <div class="ac-desc">
+                  Références avec date de péremption dépassée. Retrait immédiat
+                  requis.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+              <div class="card alerte-card warn">
+                <div class="ac-ic">🟡</div>
+                <div class="ac-title">Péremptions proches (2–6 mois)</div>
+                <div class="ac-val">23</div>
+                <div class="ac-desc">
+                  Produits expirant dans les 6 prochains mois. Planifier les
+                  ventes.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+              <div
+                class="card alerte-card warn"
+                style="
+                  border-color: var(--orange);
+                  background: var(--orange-bg);
+                "
+              >
+                <div class="ac-ic">🟠</div>
+                <div class="ac-title">Stock négatif</div>
+                <div class="ac-val" style="color: var(--orange)">7</div>
+                <div class="ac-desc">
+                  Références avec stock négatif. Correction inventaire
+                  nécessaire.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+              <div class="card alerte-card info">
+                <div class="ac-ic">🔵</div>
+                <div class="ac-title">Références sous-stock A/A−</div>
+                <div class="ac-val" style="color: var(--cyan)">14</div>
+                <div class="ac-desc">
+                  Top références en sous-approvisionnement. Commande urgente
+                  conseillée.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+              <div
+                class="card alerte-card crit"
+                style="border-color: var(--red)"
+              >
+                <div class="ac-ic">📉</div>
+                <div class="ac-title">Marge négative</div>
+                <div class="ac-val">7</div>
+                <div class="ac-desc">
+                  Produits vendus à perte. Correction tarifaire ou retrait
+                  recommandé.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+              <div
+                class="card alerte-card warn"
+                style="border-color: var(--amber)"
+              >
+                <div class="ac-ic">💳</div>
+                <div class="ac-title">Ventes à crédits impayées</div>
+                <div class="ac-val" style="color: var(--amber)">12 400 MAD</div>
+                <div class="ac-desc">
+                  Montant total des crédits clients en cours. Délai moyen : 34
+                  jours.
+                </div>
+                <div class="ac-action">→ Voir le détail</div>
+              </div>
+            </div>
+
+            <div class="section-title">Historique des alertes récentes</div>
+            <div class="card">
+              <div class="tbl-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Produit</th>
+                      <th>Détail</th>
+                      <th>Statut</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>04/04/2026</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--red-bg);
+                            color: var(--red);
+                            border-color: var(--red-border);
+                          "
+                          >Péremption</span
+                        >
+                      </td>
+                      <td><div class="td-nm">ASPRO EFFERVESCENT B20</div></td>
+                      <td>Lot ASP-2024-0233 · Exp: 06/2026</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--amber-bg);
+                            color: var(--amber);
+                            border-color: var(--amber-border);
+                          "
+                          >En cours</span
+                        >
+                      </td>
+                      <td>
+                        <span
+                          style="
+                            color: var(--cyan);
+                            cursor: pointer;
+                            font-size: 11px;
+                            font-weight: 600;
+                          "
+                          >Traiter</span
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>03/04/2026</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--orange-bg);
+                            color: var(--orange);
+                            border-color: var(--orange-border);
+                          "
+                          >Stock négatif</span
+                        >
+                      </td>
+                      <td><div class="td-nm">DULTAVAX DTPOLIO VACCIN</div></td>
+                      <td>−3 unités en stock · Écart inventaire</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--red-bg);
+                            color: var(--red);
+                            border-color: var(--red-border);
+                          "
+                          >Urgent</span
+                        >
+                      </td>
+                      <td>
+                        <span
+                          style="
+                            color: var(--cyan);
+                            cursor: pointer;
+                            font-size: 11px;
+                            font-weight: 600;
+                          "
+                          >Traiter</span
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>02/04/2026</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--red-bg);
+                            color: var(--red);
+                            border-color: var(--red-border);
+                          "
+                          >Marge négative</span
+                        >
+                      </td>
+                      <td><div class="td-nm">CORALAN CO 5MG B28 COMP</div></td>
+                      <td>Marge: −4,2% · PPV en dessous du PA</td>
+                      <td>
+                        <span
+                          class="pill"
+                          style="
+                            background: var(--green-bg);
+                            color: var(--green);
+                            border-color: var(--green-border);
+                          "
+                          >Résolu</span
+                        >
+                      </td>
+                      <td>
+                        <span style="color: var(--text3); font-size: 11px"
+                          >Clôturé</span
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE ÉQUIPE ══════════ -->
+        <div class="page" id="page-equipe">
+          <div class="page-inner">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 16px;
+              "
+            >
+              <div style="font-size: 14px; font-weight: 700">
+                Gestion de l'équipe
+              </div>
+              <button
+                class="tbl-action-btn"
+                style="
+                  background: var(--cyan);
+                  color: #fff;
+                  border-color: var(--cyan);
+                "
+              >
+                + Ajouter un membre
+              </button>
+            </div>
+            <div class="team-grid">
+              <div class="card team-card">
+                <div class="team-av owner">MZ</div>
+                <div>
+                  <div class="team-nm">Marouane Zahir</div>
+                  <div class="team-role">Propriétaire · Pharmacien</div>
+                  <span class="team-badge active">Actif</span>
+                  <div class="team-stats">
+                    <div>
+                      <div class="ts-item-lbl">CA généré</div>
+                      <div class="ts-item-val">48 200 MAD</div>
+                    </div>
+                    <div>
+                      <div class="ts-item-lbl">Transactions</div>
+                      <div class="ts-item-val">187</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card team-card">
+                <div class="team-av pharm">KM</div>
+                <div>
+                  <div class="team-nm">Karim Moussaoui</div>
+                  <div class="team-role">Pharmacien adjoint · Caisse 1</div>
+                  <span class="team-badge active">Actif</span>
+                  <div class="team-stats">
+                    <div>
+                      <div class="ts-item-lbl">CA généré</div>
+                      <div class="ts-item-val">32 140 MAD</div>
+                    </div>
+                    <div>
+                      <div class="ts-item-lbl">Transactions</div>
+                      <div class="ts-item-val">142</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card team-card">
+                <div class="team-av prep">SA</div>
+                <div>
+                  <div class="team-nm">Sara Alaoui</div>
+                  <div class="team-role">Préparatrice · Caisse 2</div>
+                  <span class="team-badge active">Actif</span>
+                  <div class="team-stats">
+                    <div>
+                      <div class="ts-item-lbl">CA généré</div>
+                      <div class="ts-item-val">19 880 MAD</div>
+                    </div>
+                    <div>
+                      <div class="ts-item-lbl">Transactions</div>
+                      <div class="ts-item-val">98</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card team-card">
+                <div
+                  class="team-av"
+                  style="background: rgba(239, 68, 68, 0.12); color: var(--red)"
+                >
+                  YB
+                </div>
+                <div>
+                  <div class="team-nm">Yassine Benali</div>
+                  <div class="team-role">Préparateur · Caisse 3</div>
+                  <span class="team-badge absent">Absent</span>
+                  <div class="team-stats">
+                    <div>
+                      <div class="ts-item-lbl">CA généré</div>
+                      <div class="ts-item-val">— MAD</div>
+                    </div>
+                    <div>
+                      <div class="ts-item-lbl">Transactions</div>
+                      <div class="ts-item-val">—</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="height: 20px"></div>
+          </div>
+        </div>
+
+        <!-- ══════════ PAGE PARAMÈTRES ══════════ -->
+        <div class="page" id="page-params" style="overflow: hidden">
+          <div class="param-wrap">
+            <div class="param-nav">
+              <div class="pn-group">
+                <div class="pn-title">Pharmacie</div>
+                <div class="pn-item active">
+                  <span class="pn-ic">🏪</span>Informations
+                </div>
+                <div class="pn-item">
+                  <span class="pn-ic">👥</span>Utilisateurs
+                </div>
+                <div class="pn-item">
+                  <span class="pn-ic">🔐</span>Permissions
+                </div>
+              </div>
+              <div class="pn-group">
+                <div class="pn-title">Application</div>
+                <div class="pn-item">
+                  <span class="pn-ic">💰</span>Tarification
+                </div>
+                <div class="pn-item"><span class="pn-ic">🎁</span>Fidélité</div>
+                <div class="pn-item"><span class="pn-ic">📄</span>Exports</div>
+              </div>
+              <div class="pn-group">
+                <div class="pn-title">Système</div>
+                <div class="pn-item">
+                  <span class="pn-ic">☁️</span>Sauvegardes
+                </div>
+                <div class="pn-item">
+                  <span class="pn-ic">🔗</span>Intégrations
+                </div>
+                <div class="pn-item">
+                  <span class="pn-ic">🔔</span>Notifications
+                </div>
+              </div>
+            </div>
+            <div class="param-content">
+              <div class="param-section">
+                <div class="param-section-title">Informations pharmacie</div>
+                <div class="param-row">
+                  <div>
+                    <div class="param-lbl">Nom de la pharmacie</div>
+                    <div class="param-sub">
+                      Affiché sur les tickets et factures
+                    </div>
+                  </div>
+                  <input class="param-input" value="Pharmacie Mohammed V" />
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Ville / Région</div></div>
+                  <input class="param-input" value="Casablanca — Maarif" />
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Numéro RC</div></div>
+                  <input class="param-input" value="RC-2018-CAS-04821" />
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Téléphone</div></div>
+                  <input class="param-input" value="+212 5 22 XX XX XX" />
+                </div>
+              </div>
+              <div class="param-section">
+                <div class="param-section-title">Options d'affichage</div>
+                <div class="param-row">
+                  <div>
+                    <div class="param-lbl">Mode sombre activé</div>
+                    <div class="param-sub">
+                      Thème clair / nuit selon préférence
+                    </div>
+                  </div>
+                  <div
+                    class="ptoggle off"
+                    id="dark-toggle-param"
+                    onclick="toggleMode()"
+                  ></div>
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Langue de l'interface</div></div>
+                  <select class="param-input" style="width: 160px">
+                    <option>Français</option>
+                    <option>العربية</option>
+                    <option>English</option>
+                  </select>
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Devise</div></div>
+                  <select class="param-input" style="width: 160px">
+                    <option>MAD — Dirham marocain</option>
+                    <option>EUR — Euro</option>
+                  </select>
+                </div>
+              </div>
+              <div class="param-section">
+                <div class="param-section-title">Alertes automatiques</div>
+                <div class="param-row">
+                  <div>
+                    <div class="param-lbl">Alerte péremptions &lt; 3 mois</div>
+                  </div>
+                  <div class="ptoggle on"></div>
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Alerte stock négatif</div></div>
+                  <div class="ptoggle on"></div>
+                </div>
+                <div class="param-row">
+                  <div><div class="param-lbl">Alerte marge négative</div></div>
+                  <div class="ptoggle on"></div>
+                </div>
+                <div class="param-row">
+                  <div>
+                    <div class="param-lbl">Notification email quotidienne</div>
+                    <div class="param-sub">Résumé CA envoyé chaque soir</div>
+                  </div>
+                  <div class="ptoggle off"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- end content -->
+    </div>
+    <!-- end main -->
+
+    <script>
+      let darkMode = false;
+
+      function nav(pageId, title) {
+        document
+          .querySelectorAll(".page")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".sb-item")
+          .forEach((i) => i.classList.remove("active"));
+        document.getElementById("page-" + pageId).classList.add("active");
+        document.getElementById("tb-title").textContent = title;
+        event.currentTarget.classList.add("active");
+      }
+
+      function setFilter(type, el) {
+        document
+          .querySelectorAll(".tb-btn.mixte, .tb-btn.pharma, .tb-btn.paraph")
+          .forEach((b) => {
+            b.style.background = "transparent";
+            b.style.color = b.classList.contains("mixte")
+              ? "#0CC0DF"
+              : b.classList.contains("pharma")
+                ? "#0CC0DF"
+                : "#8b5cf6";
+            b.style.borderColor = b.classList.contains("paraph")
+              ? "#8b5cf6"
+              : "#0CC0DF";
+          });
+        el.style.background = type === "paraph" ? "#8b5cf6" : "#0CC0DF";
+        el.style.color = "#fff";
+        el.style.borderColor = type === "paraph" ? "#8b5cf6" : "#0CC0DF";
+      }
+
+      function toggleMode() {
+        darkMode = !darkMode;
+        document.body.classList.toggle("dark", darkMode);
+        const track = document.getElementById("mode-track");
+        const label = document.getElementById("mode-label");
+        const paramToggle = document.getElementById("dark-toggle-param");
+        track.classList.toggle("on", darkMode);
+        if (paramToggle) paramToggle.classList.toggle("on", darkMode);
+        label.textContent = darkMode ? "Mode clair" : "Mode nuit";
+      }
+
+      document.querySelectorAll(".pn-item").forEach((i) => {
+        i.addEventListener("click", function () {
+          document
+            .querySelectorAll(".pn-item")
+            .forEach((x) => x.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+      document.querySelectorAll(".ptoggle").forEach((t) => {
+        t.addEventListener("click", function () {
+          this.classList.toggle("on");
+          this.classList.toggle("off");
+        });
+      });
+      document.querySelectorAll(".analyses-tabs .at-btn").forEach((b) => {
+        b.addEventListener("click", function () {
+          document
+            .querySelectorAll(".analyses-tabs .at-btn")
+            .forEach((x) => x.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+      document.querySelectorAll(".tbl-tab").forEach((t) => {
+        t.addEventListener("click", function () {
+          this.closest(".tbl-toolbar")
+            .querySelectorAll(".tbl-tab")
+            .forEach((x) => x.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+      document.querySelectorAll(".inner-tab").forEach((t) => {
+        t.addEventListener("click", function () {
+          this.closest(".inner-tabs")
+            .querySelectorAll(".inner-tab")
+            .forEach((x) => x.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>

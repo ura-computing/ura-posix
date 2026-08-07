@@ -84,7 +84,7 @@ export function useAnalysePage() {
 
   // Autocomplete — suggest the current mode's labels (products, laboratoires, …)
   // from the FULL loaded row set (not the filtered one), accent/case-insensitive,
-  // top 8 distinct matches. All rows are already in memory → no API round-trip.
+  // all distinct matches. All rows are already in memory → no API round-trip.
   const suggestions = useMemo(() => {
     const q = normalizeText(search.trim());
     if (q.length < 2 || !activeData?.rows?.length) return null;
@@ -96,7 +96,6 @@ export function useAnalysePage() {
       if (!label || seen.has(label) || !matchesText(label, search)) continue;
       seen.add(label);
       out.push(label);
-      if (out.length >= 8) break;
     }
     return { [MARGE_MODE_LABELS[mode]]: out };
   }, [activeData, mode, search]);
