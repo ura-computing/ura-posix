@@ -14,7 +14,6 @@ export function useLogin() {
     mutationFn: login,
     onSuccess: (data) => {
       queryClient.setQueryData(QUERY_KEYS.ME, data);
-      toast.success(`Bienvenue, ${data.user.name ?? data.user.email}`);
       navigate(ROUTES.HOME);
     },
     onError: (err) => {
