@@ -298,8 +298,15 @@ def normalized_name(product: str | None) -> str:
 
 # SQL expression producing the same key as normalized_name() for a column, so an
 # in-memory set of keys can be matched in ONE query (no per-row N+1).
+#
+# Uses immutable_unaccent() (migration 0019), not the built-in unaccent() —
+# Postgres's own unaccent is STABLE, not IMMUTABLE, so it can't be indexed.
+# This must keep matching the expression indexed by
+# ix_medicaments_normalized_name exactly, or Postgres silently falls back to
+# a full table scan on medicaments (a single catalog shared by every
+# pharmacy) on every import chunk platform-wide.
 def _normalized_name_expr(column):
-    return func.lower(func.regexp_replace(func.trim(func.unaccent(column)), r"\s+", " ", "g"))
+    return func.lower(func.regexp_replace(func.trim(func.immutable_unaccent(column)), r"\s+", " ", "g"))
 
 
 def _prefer_lab_row(candidate: Medicament, current: Medicament) -> bool:

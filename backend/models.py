@@ -1,6 +1,6 @@
 from datetime import datetime, date
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
@@ -111,7 +111,20 @@ class UserPermission(Base):
 class Medicament(Base):
     """Global product catalog. One row per unique PID (Sobrus product id)."""
     __tablename__ = "medicaments"
-    __table_args__ = (Index("ix_medicament_category", "category"),)
+    __table_args__ = (
+        Index("ix_medicament_category", "category"),
+        # Mirrors migration 0019's expression index (same name — keeps a
+        # fresh `create_all()` bootstrap and an `alembic upgrade` on an
+        # existing DB converging on identical schema). Must stay byte-for-
+        # byte in sync with csv_parse._normalized_name_expr(), or Postgres
+        # won't match this index to that query and falls back to a full
+        # scan of this cross-pharmacy-shared table. Needs immutable_unaccent()
+        # to already exist — see bootstrap.py / conftest.py.
+        Index(
+            "ix_medicaments_normalized_name",
+            text("lower(regexp_replace(trim(immutable_unaccent(product)), '\\s+', ' ', 'g'))"),
+        ),
+    )
 
     id:           Mapped[int]            = mapped_column(Integer, primary_key=True)
     pid:          Mapped[str]            = mapped_column(String, nullable=False, unique=True, index=True)
