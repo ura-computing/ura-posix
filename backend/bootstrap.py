@@ -36,8 +36,21 @@ def _ensure_extensions() -> None:
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent;"))
+        # Postgres's own unaccent() is STABLE, not IMMUTABLE, so it can't back
+        # an index (see migration 0019 / models.Medicament's expression
+        # index). Created here — not just in that migration — because a
+        # FRESH DB takes the create_all()+stamp path below, which skips
+        # migrations' raw SQL entirely; create_all() still needs this
+        # function to exist to build that index.
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION immutable_unaccent(text)
+            RETURNS text AS
+            $$
+                SELECT unaccent('unaccent', $1)
+            $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+        """))
         conn.commit()
-    print("  ↳ pg_trgm + unaccent ready")
+    print("  ↳ pg_trgm + unaccent + immutable_unaccent() ready")
 
 
 def _run_alembic(cmd: str) -> None:

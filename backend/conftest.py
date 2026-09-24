@@ -74,6 +74,16 @@ def _bootstrap_schema() -> None:
     with test_engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent"))
+        # Mirrors bootstrap.py: needed before create_all() below, which
+        # builds Medicament's expression index and requires this function
+        # to already exist. See migration 0019 for the full rationale.
+        conn.execute(text("""
+            CREATE OR REPLACE FUNCTION immutable_unaccent(text)
+            RETURNS text AS
+            $$
+                SELECT unaccent('unaccent', $1)
+            $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
+        """))
         conn.commit()
 
     if _inspect(test_engine).has_table("pharmacies"):
