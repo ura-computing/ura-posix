@@ -3,6 +3,7 @@
  *  backend/routers/admin_pharmacies.py. */
 import { api } from "@/api/client";
 import type {
+  AdminUserRow,
   CreateUserIn,
   CreateUserOut,
   MemberOut,
@@ -75,4 +76,16 @@ export function setUserStatus(userId: number, status: MemberStatus): Promise<Mem
 
 export function deleteUser(userId: number): Promise<{ deleted: boolean }> {
   return api(`/admin/users/${userId}`, { method: "DELETE" });
+}
+
+
+// ── Every account (« Utilisateurs » tab) ─────────────────────────────────────
+
+export function listAdminUsers(): Promise<AdminUserRow[]> {
+  return api(`/admin/users`);
+}
+
+/** Attach an owner / employee to an active pharmacy. */
+export function assignUserPharmacy(userId: number, pharmacyId: number): Promise<AdminUserRow> {
+  return api(`/admin/users/${userId}/pharmacy`, { method: "PATCH", body: { pharmacy_id: pharmacyId } });
 }

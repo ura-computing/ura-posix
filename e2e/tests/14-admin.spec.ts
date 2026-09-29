@@ -7,7 +7,7 @@
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
-import { apiDelete, apiGet } from "../lib/api";
+import { apiDelete, apiGet, apiPost } from "../lib/api";
 import { ALL_FEATURES, loadState, saveState, sessionFile } from "../lib/auth";
 import { CATEGORY_TYPES, checkAnalyse, checkMarginAlerts, checkStats, checkStockSummary, type Row } from "../lib/checks";
 import { expectSame, expectSameSet } from "../lib/diff";
@@ -187,6 +187,65 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     expect(await archived).toEqual({ archived: true, pharmacy_id: c.id });
     await page.waitForURL(/\/admin\/pharmacies$/);
     expect((await apiGet<Row[]>(page, "/admin/pharmacies")).map((p) => p.id), "absente de la liste").not.toContain(c.id);
+  });
+});
+
+
+test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharmacie", async ({ page }) => {
+  // An owner left on an archived pharmacy: invisible on every pharmacy page.
+  const O = { full_name: "Orphelin E2E", email: "orphelin.e2e@pharmagest.ma", password: "OrphelinE2e#1" };
+  const archived = await apiPost(page, "/admin/pharmacies", { name: "Pharmacie Fermée E2E", city: "Rabat" });
+  const { member } = await apiPost(page, `/admin/pharmacies/${archived.id}/users`,
+    { ...O, role: "owner", pharmacy_id: archived.id });
+  await apiDelete(page, `/admin/pharmacies/${archived.id}`);
+
+  const list = pageCall<Row[]>(page, "/admin/users");
+  await page.goto("/admin/pharmacies");
+  await expect(page.getByRole("heading", { level: 1, name: "Pharmacies et utilisateurs" })).toBeVisible();
+  await page.getByRole("button", { name: "Utilisateurs", exact: true }).click();
+  await expect(page).toHaveURL(/\?tab=utilisateurs$/);
+  const users = await list;
+  const byEmail = (email: string) => users.find((u) => u.email === email);
+  const all = sorted(ALL_FEATURES);
+  expectSame(byEmail("admin@gmail.com"), { role: "admin", status: "active", pharmacy: null, granted_permissions: [] }, "admin (seed)");
+  expectSame(byEmail("dev@gmail.com"), { role: "developer", status: "active", pharmacy: null }, "développeur (seed)");
+  expectSame(byEmail("owner@gmail.com"), { full_name: "Propriétaire Demo", role: "owner", status: "active", phone: "0600000001",
+    pharmacy: { name: "Pharmacie Demo", code: "CAS0001", archived_at: null }, granted_permissions: all }, "propriétaire (seed)");
+  expectSame(byEmail("owner.e2e@pharmagest.ma"), { role: "owner", pharmacy: { id: pharmacyId(), name: "Pharmacie E2E" },
+    granted_permissions: all }, "propriétaire E2E");
+  expectSame(byEmail(O.email), { id: member.id, full_name: O.full_name, role: "owner", status: "active",
+    pharmacy: { id: archived.id, name: "Pharmacie Fermée E2E" }, granted_permissions: all }, "orphelin");
+  expect(byEmail(O.email)?.pharmacy?.archived_at, "pharmacie archivée").not.toBeNull();
+  expect(new Set(users.map((u) => u.email)).size, "un compte = une ligne").toBe(users.length);
+
+  await test.step("filtre « Sans pharmacie »", async () => {
+    await page.getByRole("button", { name: "Sans pharmacie", exact: true }).click();
+    for (const email of ["admin@gmail.com", "dev@gmail.com", O.email]) {
+      await expect(page.getByRole("row", { name: new RegExp(email) }), email).toBeVisible();
+    }
+    await expect(page.getByRole("row", { name: /owner@gmail\.com/ })).toHaveCount(0);
+  });
+
+  await test.step("assigner une pharmacie (Pharmacie Demo)", async () => {
+    await page.getByRole("row", { name: new RegExp(O.email) }).getByRole("button", { name: "Assigner une pharmacie" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Pharmacie", exact: true }).click();
+    await dialog.getByRole("button", { name: /· Pharmacie Demo$/ }).click();
+    const assigned = pageSend(page, "PATCH", `/admin/users/${member.id}/pharmacy`);
+    await dialog.getByRole("button", { name: "Assigner", exact: true }).click();
+    expectSame(await assigned, { id: member.id, pharmacy: { name: "Pharmacie Demo", archived_at: null }, granted_permissions: all },
+      "PATCH /admin/users/{id}/pharmacy");
+    await page.getByRole("button", { name: "Tous", exact: true }).click();
+    await expect(page.getByRole("row", { name: new RegExp(O.email) })).toContainText("Pharmacie Demo");
+  });
+
+  await test.step("supprimer le compte", async () => {
+    const deleted = pageSend(page, "DELETE", `/admin/users/${member.id}`);
+    await rowAction(page, O.email, "Supprimer");
+    await page.getByRole("dialog", { name: /^Supprimer définitivement Orphelin E2E/ })
+      .getByRole("button", { name: "Confirmer", exact: true }).click();
+    expect(await deleted).toEqual({ deleted: true, user_id: member.id });
+    await expect(page.getByRole("row", { name: new RegExp(O.email) })).toHaveCount(0);
   });
 });
 

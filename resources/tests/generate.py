@@ -352,6 +352,9 @@ def main() -> None:
     ap.add_argument("--today", type=date.fromisoformat, default=date.today(),
                     help="reference day, YYYY-MM-DD (default: today)")
     args = ap.parse_args()
+    if args.rows < 1000:
+        ap.error("--rows must be ≥ 1000: below that, the exclusions scenario finds no product "
+                 "that is both sold and bought (oracle.exclusion_scenario)")
 
     t0 = time.perf_counter()
     rng = random.Random(args.seed)

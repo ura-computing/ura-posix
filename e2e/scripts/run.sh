@@ -19,8 +19,14 @@ if [ ! -d node_modules/@playwright/test ]; then
   npx playwright install chromium
 fi
 
+# Below 1000 lines the generated data is too thin for some scenarios (e.g. a
+# product both sold and bought for the exclusions test) → ask again.
 export E2E_ROWS
-E2E_ROWS="$(ask "Vente rows to generate" 100000)"
+while :; do
+  E2E_ROWS="$(ask "Vente rows to generate (min 1000)" 100000)"
+  [[ "$E2E_ROWS" =~ ^[0-9]+$ ]] && [ "$E2E_ROWS" -ge 1000 ] && break
+  echo "✗ a whole number ≥ 1000, please"
+done
 args=()
 
 if [ "$MODE" = ui ]; then

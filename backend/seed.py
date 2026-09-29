@@ -21,7 +21,9 @@ from sqlalchemy.orm import Session
 
 from csv_parse import classify_product_type, parse_catalog_csv
 from database import SessionLocal
-from models import Medicament, Pharmacy, User
+from members import create_member
+from models import ALLOWED_FEATURES, Medicament, Pharmacy, PharmacyFeature, User
+from routers.admin_pharmacies import _generate_pharmacy_code
 from security import hash_password
 
 
@@ -87,21 +89,23 @@ def _seed_simple_user(db: Session, cfg: dict | None, role: str) -> str | None:
 
 
 def _seed_owner_with_pharmacy(db: Session, cfg: dict | None) -> tuple[str, str] | None:
-    """Insert an owner + their pharmacy if the owner is absent."""
+    """Insert an owner + their pharmacy if the owner is absent — same shape as
+    an admin-created one: city → code (e.g. CAS0001), every feature on, owner
+    with every permission (members.create_member)."""
     if not cfg or _user_exists(db, cfg["email"]):
         return None
-    pharmacy = Pharmacy(name=cfg["pharmacy_name"], address=cfg.get("pharmacy_address"))
+    city = cfg.get("pharmacy_city")
+    pharmacy = Pharmacy(
+        name=cfg["pharmacy_name"], address=cfg.get("pharmacy_address"), city=city,
+        code=_generate_pharmacy_code(db, city) if city else None,
+    )
     db.add(pharmacy)
     db.flush()
-    db.add(User(
-        email=cfg["email"],
-        name=cfg["name"],
-        phone=cfg.get("phone"),
-        password_hash=hash_password(cfg["password"]),
-        role=ROLE_OWNER,
-        status=STATUS_OK,
-        pharmacy_id=pharmacy.id,
-    ))
+    for feature in ALLOWED_FEATURES:
+        db.add(PharmacyFeature(pharmacy_id=pharmacy.id, feature=feature, enabled=True))
+    owner = create_member(db, email=cfg["email"], name=cfg["name"], password=cfg["password"],
+                          role=ROLE_OWNER, pharmacy_id=pharmacy.id)
+    owner.phone = cfg.get("phone")
     db.flush()
     return cfg["email"], cfg["pharmacy_name"]
 

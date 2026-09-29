@@ -17,11 +17,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   archiveAdminPharmacy,
+  assignUserPharmacy,
   createAdminPharmacy,
   createUser,
   deleteUser,
   getAdminPharmacy,
   listAdminPharmacies,
+  listAdminUsers,
   resetUserPassword,
   setPharmacyFeatures,
   setUserPermissions,
@@ -38,10 +40,19 @@ import type {
 const KEYS = {
   list:   ["admin-pharmacies"] as const,
   detail: (id: number) => ["admin-pharmacies", id] as const,
+  users:  ["admin-users"] as const,        // « Utilisateurs » tab — every account
 };
 
 
 // ── Queries ──────────────────────────────────────────────────────────────────
+
+export function useAdminUsers() {
+  return useQuery({
+    queryKey:  KEYS.users,
+    queryFn:   listAdminUsers,
+    staleTime: 30_000,
+  });
+}
 
 export function useAdminPharmaciesList() {
   return useQuery({
@@ -89,6 +100,7 @@ export function useArchivePharmacy(id: number) {
     onSuccess:  () => {
       qc.invalidateQueries({ queryKey: KEYS.list });
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: KEYS.users });
     },
   });
 }
@@ -114,6 +126,7 @@ export function useCreateUser(pharmacyId: number) {
     onSuccess:  () => {
       qc.invalidateQueries({ queryKey: KEYS.list });
       qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) });
+      qc.invalidateQueries({ queryKey: KEYS.users });
     },
   });
 }
@@ -123,7 +136,10 @@ export function useSetUserPermissions(pharmacyId: number) {
   return useMutation({
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
       setUserPermissions(userId, permissions),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) }); },
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) });
+      qc.invalidateQueries({ queryKey: KEYS.users });
+    },
   });
 }
 
@@ -139,7 +155,10 @@ export function useSetUserStatus(pharmacyId: number) {
   return useMutation({
     mutationFn: ({ userId, status }: { userId: number; status: MemberStatus }) =>
       setUserStatus(userId, status),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) }); },
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) });
+      qc.invalidateQueries({ queryKey: KEYS.users });
+    },
   });
 }
 
@@ -150,6 +169,20 @@ export function useDeleteUser(pharmacyId: number) {
     onSuccess:  () => {
       qc.invalidateQueries({ queryKey: KEYS.list });
       qc.invalidateQueries({ queryKey: KEYS.detail(pharmacyId) });
+      qc.invalidateQueries({ queryKey: KEYS.users });
+    },
+  });
+}
+
+/** « Assigner une pharmacie » — the account moves; both pharmacies' pages change. */
+export function useAssignPharmacy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number }) =>
+      assignUserPharmacy(userId, pharmacyId),
+    onSuccess:  () => {
+      qc.invalidateQueries({ queryKey: KEYS.list });      // prefix: every pharmacy detail too
+      qc.invalidateQueries({ queryKey: KEYS.users });
     },
   });
 }

@@ -6,6 +6,7 @@ statuses are "active" or "inactive" (per locked spec — no "pending" since
 there's no signup workflow)."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -148,3 +149,31 @@ class ResetPasswordOut(BaseModel):
 class StatusPatchIn(BaseModel):
     """Toggle a user between active and inactive."""
     status: MemberStatus
+
+
+# ── « Utilisateurs » tab (every account) ─────────────────────────────────────
+
+class UserPharmacyRef(BaseModel):
+    id:          int
+    name:        str
+    code:        str | None
+    archived_at: str | None
+
+
+class AdminUserRow(BaseModel):
+    """One row of the admin « Utilisateurs » tab — EVERY account, whatever its
+    role or pharmacy. `role` / `status` are the raw stored strings: legacy rows
+    may hold values outside MemberRole / MemberStatus and must still show."""
+    id:                  int
+    full_name:           str | None
+    email:               str
+    phone:               str | None
+    role:                str
+    status:              str
+    pharmacy:            UserPharmacyRef | None
+    last_login_at:       datetime | None
+    granted_permissions: list[str]
+
+
+class AssignPharmacyIn(BaseModel):
+    pharmacy_id: int

@@ -63,7 +63,8 @@ export function expectTiedPick(actual: Row | null, value: number | undefined, ti
   if (value === undefined) { expect(actual, what).toBeNull(); return; }
   expect(actual, `${what}: missing`).not.toBeNull();
   expect(Math.abs(Number(actual!.value) - value), `${what}: value ${actual!.value} ≠ ${value}`).toBeLessThanOrEqual(TOL);
-  const tie = (ties ?? []).find((t) => t.label === actual!.label);
-  expect(tie, `${what}: label "${actual!.label}" not among ${JSON.stringify(ties)}`).toBeDefined();
-  expect(Math.abs(Number(actual!.qty) - Number(tie!.qty)), `${what}: qty`).toBeLessThanOrEqual(TOL);
+  // Match label AND qty: two tied rows can share a label (catégorie mode keeps
+  // « Médicament (33.930%) » and « (30.000%) » as 2 rows, both « Médicament »).
+  const tie = (ties ?? []).find((t) => t.label === actual!.label && Math.abs(Number(actual!.qty) - Number(t.qty)) <= TOL);
+  expect(tie, `${what}: « ${actual!.label} » qty ${actual!.qty} not among ${JSON.stringify(ties)}`).toBeDefined();
 }

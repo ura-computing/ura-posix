@@ -1016,6 +1016,20 @@ export interface PharmacyDetail {
   owners_union_permissions: string[];
 }
 
+/** GET /admin/users — every account (« Utilisateurs » tab). `role` / `status`
+ *  are the raw stored strings: legacy rows may hold other values. */
+export interface AdminUserRow {
+  id:                  number;
+  full_name:           string | null;
+  email:               string;
+  phone:               string | null;
+  role:                string;
+  status:              string;
+  pharmacy:            { id: number; name: string; code: string | null; archived_at: string | null } | null;
+  last_login_at:       string | null;
+  granted_permissions: string[];
+}
+
 export interface PharmacyIn {
   name:    string;
   code?:   string | null;

@@ -24,7 +24,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Query, status
 from sqlalchemy import Integer, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import DbDep
 from members import (
@@ -41,9 +41,12 @@ from models import (
     Pharmacy,
     PharmacyFeature,
     User,
+    UserPermission,
 )
 from permissions import require_admin
 from schemas.admin_pharmacies import (
+    AdminUserRow,
+    AssignPharmacyIn,
     CreateUserIn,
     CreateUserOut,
     FeaturesBulkSet,
@@ -55,6 +58,7 @@ from schemas.admin_pharmacies import (
     ResetPasswordIn,
     ResetPasswordOut,
     StatusPatchIn,
+    UserPharmacyRef,
 )
 from security import CurrentUserDep
 
@@ -424,6 +428,62 @@ def set_user_status(
         raise HTTPException(status_code=400, detail="Impossible de modifier le statut d'un administrateur.")
     set_member_status(db, target, body.status)
     return member_out(db, target)
+
+
+# ── « Utilisateurs » tab: every account ──────────────────────────────────────
+
+def _user_row(u: User, granted: list[str]) -> AdminUserRow:
+    p = u.pharmacy
+    return AdminUserRow(
+        id=u.id, full_name=u.name, email=u.email, phone=u.phone, role=u.role, status=u.status,
+        pharmacy=UserPharmacyRef(
+            id=p.id, name=p.name, code=p.code,
+            archived_at=p.archived_at.isoformat() if p.archived_at else None,
+        ) if p else None,
+        last_login_at=u.last_login_at,
+        granted_permissions=granted,
+    )
+
+
+@router.get("/admin/users", response_model=list[AdminUserRow])
+def list_users(user: CurrentUserDep, db: DbDep) -> list[AdminUserRow]:
+    """Every account — any role, with or without a pharmacy (archived ones
+    too). The pharmacy pages only show the owner/employee members of active
+    pharmacies; this list is the one place where nobody is hidden."""
+    require_admin(user)
+    users = (
+        db.query(User)
+        .options(joinedload(User.pharmacy))
+        .order_by(User.role.asc(), User.name.asc(), User.email.asc())
+        .all()
+    )
+    granted = granted_permissions_map(db, [u.id for u in users])
+    return [_user_row(u, granted.get(u.id, [])) for u in users]
+
+
+@router.patch("/admin/users/{user_id}/pharmacy", response_model=AdminUserRow)
+def assign_user_pharmacy(
+    body: AssignPharmacyIn,
+    user: CurrentUserDep,
+    db:   DbDep,
+    user_id: Annotated[int, Path(ge=1)],
+) -> AdminUserRow:
+    """Attach an owner / employee to an active pharmacy — the fix for accounts
+    left without one (or on an archived one). A user with no permission rows
+    gets every permission (client rule: everything ON by default)."""
+    require_admin(user)
+    target = _get_member_or_404(db, user_id)
+    if target.role not in ("owner", "employee"):
+        raise HTTPException(status_code=400, detail="Seuls les propriétaires et les employés ont une pharmacie.")
+    pharm = _get_pharmacy_or_404(db, body.pharmacy_id)
+    if pharm.archived_at is not None:
+        raise HTTPException(status_code=400, detail="Cette pharmacie est archivée.")
+    target.pharmacy_id = pharm.id
+    if not db.query(UserPermission).filter(UserPermission.user_id == target.id).first():
+        apply_permissions_bulk(db, target.id, {f: True for f in ALLOWED_FEATURES})
+    db.commit()
+    db.refresh(target)
+    return _user_row(target, granted_permissions_map(db, [target.id]).get(target.id, []))
 
 
 @router.delete("/admin/users/{user_id}")

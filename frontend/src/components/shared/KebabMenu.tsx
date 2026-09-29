@@ -14,6 +14,10 @@ import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 
 
+/** Room (px) the menu needs below its trigger; with less, it opens upward. */
+const MENU_SPACE = 180;
+
+
 export function KebabMenu({
   label = "Plus d'actions",
   children,
@@ -22,7 +26,7 @@ export function KebabMenu({
   children: (close: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   const close = () => setOpen(false);
@@ -30,8 +34,12 @@ export function KebabMenu({
   const toggle = () => {
     if (!open && triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
-      // Right-align to the trigger button; sit just below it.
-      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+      const right = window.innerWidth - r.right;   // right-aligned to the trigger
+      // Below the trigger — or above it near the window's bottom edge: a fixed
+      // menu placed off-screen can't be scrolled to (last rows of a table).
+      setPos(window.innerHeight - r.bottom < MENU_SPACE
+        ? { bottom: window.innerHeight - r.top + 4, right }
+        : { top: r.bottom + 4, right });
     }
     setOpen((p) => !p);
   };
@@ -59,7 +67,7 @@ export function KebabMenu({
           <div className="fixed inset-0 z-[90]" onClick={close} />
           <div
             role="menu"
-            style={{ position: "fixed", top: pos.top, right: pos.right }}
+            style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right }}
             className="z-[91] w-56 rounded-md border border-border bg-card p-1 shadow-lg"
           >
             {children(close)}
