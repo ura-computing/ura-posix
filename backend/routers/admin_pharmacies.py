@@ -11,12 +11,12 @@ to ACTIVE rows by convention (we don't clear the archived row's code, so a
 unique-violation surfaces if admin tries to reuse — they can rename the
 archived row first or restore it instead).
 
-Random passwords: `secrets.token_urlsafe(8)` (~11 chars). Returned ONCE in
-the create-user / reset-password response; never stored cleartext.
+Member lifecycle (create / status / reset-password) + shared helpers live in
+members.py (also used by owner_employees.py); this router only does the admin
+auth + lookup checks.
 """
 from __future__ import annotations
 
-import secrets
 import unicodedata
 from datetime import datetime, timezone
 from typing import Annotated
@@ -27,12 +27,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import DbDep
+from members import (
+    apply_permissions_bulk,
+    create_member,
+    granted_permissions_map,
+    member_out,
+    member_to_out,
+    reset_member_password,
+    set_member_status,
+)
 from models import (
     ALLOWED_FEATURES,
     Pharmacy,
     PharmacyFeature,
     User,
-    UserPermission,
 )
 from permissions import require_admin
 from schemas.admin_pharmacies import (
@@ -44,33 +52,23 @@ from schemas.admin_pharmacies import (
     PharmacyDetail,
     PharmacyIn,
     PharmacyListRow,
+    ResetPasswordIn,
     ResetPasswordOut,
     StatusPatchIn,
 )
-from security import CurrentUserDep, hash_password
+from security import CurrentUserDep
 
 
 router = APIRouter(tags=["admin-pharmacies"])
 
 
 # ── Defaults applied to a newly-created pharmacy ─────────────────────────────
-# Per locked spec: the 4 most-used features are on by default; admin can
-# toggle the 5 advanced ones later via Screen 2.
-DEFAULT_ENABLED_FEATURES = ("rapports", "achats", "ventes", "stock")
+# Every feature on by default (client decision 2026-09-28); admin can toggle
+# them off later via Screen 2. Same set is granted to newly-created users.
+DEFAULT_ENABLED_FEATURES = ALLOWED_FEATURES
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
-def _member_to_out(u: User, granted: list[str]) -> MemberOut:
-    return MemberOut(
-        id=u.id,
-        full_name=u.name,
-        email=u.email,
-        role=u.role,  # type: ignore[arg-type]  # validated by Literal
-        status=u.status if u.status in ("active", "inactive") else "active",  # type: ignore[arg-type]
-        granted_permissions=granted,
-    )
-
 
 def _enabled_features(db, pharmacy_id: int) -> list[str]:
     rows = (
@@ -79,22 +77,6 @@ def _enabled_features(db, pharmacy_id: int) -> list[str]:
         .all()
     )
     return sorted({r[0] for r in rows})
-
-
-def _granted_permissions_map(db, user_ids: list[int]) -> dict[int, list[str]]:
-    """Returns {user_id: sorted enabled-permission-strings}. One query for N
-    users — avoids N+1 when building a Membres list."""
-    if not user_ids:
-        return {}
-    rows = (
-        db.query(UserPermission.user_id, UserPermission.permission)
-        .filter(UserPermission.user_id.in_(user_ids), UserPermission.enabled.is_(True))
-        .all()
-    )
-    out: dict[int, set[str]] = {uid: set() for uid in user_ids}
-    for uid, perm in rows:
-        out.setdefault(uid, set()).add(perm)
-    return {uid: sorted(perms) for uid, perms in out.items()}
 
 
 def _initials(name: str | None, email: str) -> str:
@@ -130,19 +112,12 @@ def _apply_features_bulk(db, pharmacy_id: int, features: dict[str, bool]) -> Non
             db.add(PharmacyFeature(pharmacy_id=pharmacy_id, feature=key, enabled=bool(enabled)))
 
 
-def _apply_permissions_bulk(db, user_id: int, permissions: dict[str, bool]) -> None:
-    """Same shape as _apply_features_bulk but for UserPermission rows."""
-    existing = {
-        p.permission: p for p in db.query(UserPermission)
-        .filter(UserPermission.user_id == user_id).all()
-    }
-    for key, enabled in permissions.items():
-        if key not in ALLOWED_FEATURES:
-            continue
-        if key in existing:
-            existing[key].enabled = bool(enabled)
-        else:
-            db.add(UserPermission(user_id=user_id, permission=key, enabled=bool(enabled)))
+def _get_member_or_404(db, user_id: int) -> User:
+    """Target user by id, else 404. Callers add their own admin-role guard."""
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    return target
 
 
 # ── List + Detail ────────────────────────────────────────────────────────────
@@ -227,7 +202,7 @@ def get_pharmacy(
         .order_by(User.role.desc(), User.id.asc())
         .all()
     )
-    granted = _granted_permissions_map(db, [m.id for m in members])
+    granted = granted_permissions_map(db, [m.id for m in members])
 
     # Union of active owners' enabled permissions — same definition the
     # backend uses in effective_permissions for the employee ceiling.
@@ -248,7 +223,7 @@ def get_pharmacy(
         email=pharm.email,
         archived_at=pharm.archived_at.isoformat() if pharm.archived_at else None,
         enabled_features=_enabled_features(db, pharm.id),
-        members=[_member_to_out(m, granted.get(m.id, [])) for m in members],
+        members=[member_to_out(m, granted.get(m.id, [])) for m in members],
         owners_union_permissions=sorted(owners_union),
     )
 
@@ -382,18 +357,15 @@ def set_user_permissions(
     one active owner also have it (see effective_permissions in
     backend/permissions.py)."""
     require_admin(user)
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    target = _get_member_or_404(db, user_id)
     if target.role == "admin":
         raise HTTPException(
             status_code=400,
             detail="Les administrateurs n'ont pas de permissions configurables.",
         )
-    _apply_permissions_bulk(db, target.id, body.permissions)
+    apply_permissions_bulk(db, target.id, body.permissions)
     db.commit()
-    granted = _granted_permissions_map(db, [target.id]).get(target.id, [])
-    return _member_to_out(target, granted)
+    return member_out(db, target)
 
 
 # ── Member CRUD ──────────────────────────────────────────────────────────────
@@ -405,9 +377,9 @@ def create_user(
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> CreateUserOut:
-    """Admin creates an owner or employee account directly. Generates a
-    random temp password, returns it ONCE in the response so the admin can
-    email it (the frontend uses a mailto: link). Email must be unique app-wide."""
+    """Admin creates an owner or employee account directly, with the password
+    the admin typed and every permission granted (see members.create_member).
+    Email must be unique app-wide."""
     require_admin(user)
     _get_pharmacy_or_404(db, pharmacy_id)
     if body.pharmacy_id != pharmacy_id:
@@ -415,41 +387,26 @@ def create_user(
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="Un utilisateur avec cet email existe déjà.")
 
-    temp_password = secrets.token_urlsafe(8)
-    new_user = User(
-        email=body.email,
-        name=body.full_name,
-        password_hash=hash_password(temp_password),
-        role=body.role,
-        status="active",
-        pharmacy_id=pharmacy_id,
+    new_user = create_member(
+        db, email=body.email, name=body.full_name, password=body.password,
+        role=body.role, pharmacy_id=pharmacy_id,
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return CreateUserOut(
-        member=_member_to_out(new_user, []),
-        temp_password=temp_password,
-    )
+    return CreateUserOut(member=member_out(db, new_user))
 
 
 @router.post("/admin/users/{user_id}/reset-password", response_model=ResetPasswordOut)
 def reset_user_password(
+    body: ResetPasswordIn,
     user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
-    """Regenerate a temp password. Invalidates active sessions via
+    """Set the password the admin typed. Invalidates active sessions via
     token_version bump so the user must log in with the new password."""
     require_admin(user)
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
-    temp_password = secrets.token_urlsafe(8)
-    target.password_hash = hash_password(temp_password)
-    target.token_version += 1
-    db.commit()
-    return ResetPasswordOut(user_id=target.id, temp_password=temp_password)
+    target = _get_member_or_404(db, user_id)
+    reset_member_password(db, target, body.password)
+    return ResetPasswordOut(user_id=target.id)
 
 
 @router.patch("/admin/users/{user_id}/status", response_model=MemberOut)
@@ -462,18 +419,11 @@ def set_user_status(
     """Toggle active <-> inactive. Going inactive also bumps token_version
     so existing sessions die immediately."""
     require_admin(user)
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    target = _get_member_or_404(db, user_id)
     if target.role == "admin":
         raise HTTPException(status_code=400, detail="Impossible de modifier le statut d'un administrateur.")
-    if target.status != body.status:
-        target.status = body.status
-        if body.status == "inactive":
-            target.token_version += 1
-        db.commit()
-    granted = _granted_permissions_map(db, [target.id]).get(target.id, [])
-    return _member_to_out(target, granted)
+    set_member_status(db, target, body.status)
+    return member_out(db, target)
 
 
 @router.delete("/admin/users/{user_id}")
@@ -485,9 +435,7 @@ def delete_user(
     """Hard-delete a non-admin user. Cascades drop UserPermission rows (FK
     ondelete=CASCADE). For 'soft remove access' use PATCH /status instead."""
     require_admin(user)
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    target = _get_member_or_404(db, user_id)
     if target.role == "admin":
         raise HTTPException(status_code=400, detail="Impossible de supprimer un administrateur.")
     db.delete(target)

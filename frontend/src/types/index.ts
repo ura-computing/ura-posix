@@ -1025,23 +1025,22 @@ export interface PharmacyIn {
   email?:  string | null;
 }
 
+/** `password` is typed by the admin / owner (min 8 chars — same rule as the
+ *  backend's CreateUserIn). */
 export interface CreateUserIn {
   full_name?:  string | null;
   email:       string;
+  password:    string;
   role:        MemberRole;
   pharmacy_id: number;
 }
 
-/** Response from POST /admin/pharmacies/{id}/users — temp_password is one-time
- *  cleartext for the admin's mailto handoff; never persisted server-side. */
 export interface CreateUserOut {
-  member:        MemberOut;
-  temp_password: string;
+  member: MemberOut;
 }
 
 export interface ResetPasswordOut {
-  user_id:       number;
-  temp_password: string;
+  user_id: number;
 }
 
 

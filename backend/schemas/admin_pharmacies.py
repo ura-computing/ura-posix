@@ -119,28 +119,30 @@ class PermissionsBulkSet(BaseModel):
 # ── User CRUD (admin path) ────────────────────────────────────────────────────
 
 class CreateUserIn(BaseModel):
-    """Admin creates an owner or employee for a specific pharmacy. The backend
-    generates a random temp password, hashes it for storage, and returns the
-    plaintext ONCE in the response so the admin can mail it to the user."""
+    """Admin (or owner) creates an owner / employee for a pharmacy and types
+    the password themselves (client decision 2026-09-29 — end users aren't
+    tech-savvy, so the creator hands them a password they chose). Stored
+    hashed only."""
     full_name:   str | None    = Field(None, max_length=200)
     email:       str           = Field(..., max_length=200)
+    password:    str           = Field(..., min_length=8, max_length=128)
     role:        MemberRole
     pharmacy_id: int
 
 
 class CreateUserOut(BaseModel):
-    """Create-user response. `temp_password` is the cleartext temp password
-    the admin needs to send to the user — they should change it on first
-    login. Never persisted in cleartext server-side."""
-    member:        MemberOut
-    temp_password: str
+    """Create-user response."""
+    member: MemberOut
+
+
+class ResetPasswordIn(BaseModel):
+    """'Réinitialiser le mot de passe' — the admin / owner types the new one.
+    Same length rule as ChangePasswordRequest."""
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class ResetPasswordOut(BaseModel):
-    """Same shape as the create-user response but for the 'Réinitialiser le
-    mot de passe' action."""
-    user_id:       int
-    temp_password: str
+    user_id: int
 
 
 class StatusPatchIn(BaseModel):

@@ -53,7 +53,10 @@ export function useSetEmployeeStatus() {
 }
 
 export function useResetEmployeePassword() {
-  return useMutation({ mutationFn: (employeeId: number) => resetEmployeePassword(employeeId) });
+  return useMutation({
+    mutationFn: ({ employeeId, password }: { employeeId: number; password: string }) =>
+      resetEmployeePassword(employeeId, password),
+  });
 }
 
 export function useDeleteEmployee() {

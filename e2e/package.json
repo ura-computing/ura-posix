@@ -1,0 +1,14 @@
+{
+  "name": "pharmagest-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "ui": "playwright test --ui",
+    "report": "playwright show-report report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,4 +1,4 @@
-import { API_BASE, ApiErr, api } from "@/api/client";
+import { api } from "@/api/client";
 import type {
   BatchPatchResult,
   ImportBatchStatus,
@@ -7,40 +7,7 @@ import type {
 } from "@/types";
 
 
-// ─── Multipart: single-shot achat/vente uploads (used by the Chrome extension) ──
-
-// EXEMPTION: bypasses the api() wrapper because that helper JSON-encodes its body.
-// Multipart uploads need a raw FormData with the browser-supplied boundary header
-// (setting Content-Type ourselves would break the multipart parser). Identical
-// cookies/CSRF/error semantics as api() — kept minimal and isolated to this file.
-async function postMultipart<T>(path: string, file: File, batchId?: number): Promise<T> {
-  const fd = new FormData();
-  fd.append("file", file);
-  if (batchId != null) fd.append("batch_id", String(batchId));
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "X-Requested-With": "XMLHttpRequest" },
-    body: fd,
-  });
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) {
-    const detail = data?.detail ?? "L'upload a échoué.";
-    throw new ApiErr(res.status, typeof detail === "string" ? detail : JSON.stringify(detail));
-  }
-  return data as T;
-}
-
-export const uploadAchatMultipart = (file: File, batchId?: number): Promise<UploadTxResult> =>
-  postMultipart("/uploads/achat", file, batchId);
-
-export const uploadVenteMultipart = (file: File, batchId?: number): Promise<UploadTxResult> =>
-  postMultipart("/uploads/vente", file, batchId);
-
-
-// ─── JSON: chunked uploads (page wizard) — same shape the Chrome extension uses ─
+// ─── JSON: chunked uploads (the /upload-file wizard) ────────────────────────
 
 interface JsonBody {
   rows:      Record<string, string>[];

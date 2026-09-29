@@ -1,39 +1,36 @@
 """Sobrus CSV ingestion endpoints.
 
-Six endpoints in two flavours:
-  • Multipart CSV uploads (browser file picker):
-      POST /v1/uploads/achat
-      POST /v1/uploads/vente
-      POST /v1/uploads/stock
-  • JSON payload (Chrome extension DOM-scrapes Sobrus tables → POSTs rows directly):
+  • JSON chunks (the /upload-file wizard parses the CSV in the browser and
+    POSTs 500-row chunks):
       POST /v1/uploads/achat-json
       POST /v1/uploads/vente-json
-  • Cancel a running batch (audit Decision 3):
+      POST /v1/uploads/stock-json
+  • Catalogue CSV (admin, multipart):
+      POST /v1/uploads/catalog
+  • Cancel / fail a running batch:
       PATCH /v1/uploads/batches/{id}
 
-Achats/Ventes support chunked uploads via `batch_id`: chunk 1 returns a fresh
-ImportBatch id, subsequent chunks pass that id so a 2 000-row file produces ONE
-audit row (fixes apcm-pharma's batch_id threading bug).
+Chunked uploads thread `batch_id`: chunk 1 returns a fresh ImportBatch id,
+later chunks pass it, so one file = ONE audit row.
 
-Stock is single-shot — Sobrus stock exports are point-in-time snapshots, no
-chunking needed. Uses Postgres `ON CONFLICT (pharmacy_id, medicament_id)` upsert
-so re-importing yesterday's stock seamlessly updates today's row.
+Stock uses Postgres `ON CONFLICT (pharmacy_id, medicament_id)` upsert, so
+re-importing a newer stock snapshot updates the existing rows.
 
-File-size limit: 10 MB across all endpoints.
+Catalogue file-size limit: MAX_FILE_BYTES (100 MB).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Annotated, Any, Callable
 
-from fastapi import APIRouter, File, Form, HTTPException, Path, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Path, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from csv_parse import (
     classify_product_type, col, existing_by_name, normalized_name,
-    parse_catalog_csv, parse_csv, parse_float, parse_int, parse_iso_date,
+    parse_catalog_csv, parse_float, parse_int, parse_iso_date,
 )
 from database import DbDep
 from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
@@ -52,12 +49,6 @@ EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
 
 # ─── Pydantic bodies (JSON variants + PATCH) ─────────────────────────────────
-
-class JsonRow(BaseModel):
-    """Single Sobrus-row scraped from the DOM. Keys are the column labels."""
-    key:   str
-    value: str | None = None
-
 
 class JsonUploadBody(BaseModel):
     rows:     list[dict[str, str]]    # the extension serializes one row as {label: value, ...}
@@ -434,50 +425,7 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
     }
 
 
-# ─── Permission gate ─────────────────────────────────────────────────────────
-
-# ─── Multipart endpoints ─────────────────────────────────────────────────────
-
-async def _read_csv_or_400(file: UploadFile) -> list[dict[str, str]]:
-    """Validate + read + parse a CSV upload in one shot. Raises 400/413 on failure."""
-    _check_csv(file)
-    content = await file.read()
-    _check_size(content)
-    rows = parse_csv(content)
-    if not rows:
-        raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
-    return rows
-
-
-@router.post("/uploads/achat")
-async def upload_achat(
-    user: CurrentUserDep,
-    db: DbDep,
-    file: Annotated[UploadFile, File(description="Sobrus Achats CSV")],
-    batch_id: Annotated[int | None, Form()] = None,
-) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    require_feature("achats", user, db)
-    rows = await _read_csv_or_400(file)
-    return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
-                                filename=file.filename, batch_id=batch_id,
-                                user_id=user.id, cfg=ACHAT_CFG)
-
-
-@router.post("/uploads/vente")
-async def upload_vente(
-    user: CurrentUserDep,
-    db: DbDep,
-    file: Annotated[UploadFile, File(description="Sobrus Ventes CSV")],
-    batch_id: Annotated[int | None, Form()] = None,
-) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    require_feature("ventes", user, db)
-    rows = await _read_csv_or_400(file)
-    return _insert_transactions(db, rows, pharmacy_id=pharmacy_id,
-                                filename=file.filename, batch_id=batch_id,
-                                user_id=user.id, cfg=VENTE_CFG)
-
+# ─── Catalogue CSV (admin, multipart) ────────────────────────────────────────
 
 _CATALOG_MUTABLE_COLS = ("product", "tva", "pph", "ppv", "category", "barcode1", "barcode2", "laboratoire")
 

@@ -10,6 +10,7 @@ manually too: `uv run python seed.py`.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -131,8 +132,10 @@ def seed_database() -> None:
         db.commit()
 
         # ── Catalogue (only on first init, only if empty) ───────────────────
+        # SEED_CATALOG=0 skips it (E2E: the catalogue must hold only generated
+        # products so every expected value is known).
         catalog_count = 0
-        catalog_path = _resolve_catalog()
+        catalog_path = _resolve_catalog() if os.environ.get("SEED_CATALOG", "1") != "0" else None
         if catalog_path and db.query(Medicament).count() == 0:
             print(f"  Importation du catalogue depuis {catalog_path.name}…")
             catalog_count = _import_catalog(db, catalog_path)

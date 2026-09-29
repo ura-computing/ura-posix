@@ -34,6 +34,12 @@ export function useAlertesPage() {
   const dateTo   = globalTo   ?? "";
   const setDateFrom = (v: string) => setRange(v || null, globalTo);
   const setDateTo   = (v: string) => setRange(globalFrom, v || null);
+  /** Set BOTH ends at once. Calling setDateFrom then setDateTo loses the new
+   *  start: setDateTo still sees the old `globalFrom` (stale closure). */
+  const setPeriod = useCallback(
+    (from: string | null, to: string | null) => setRange(from || null, to || null),
+    [setRange],
+  );
   const [category, setCategory] = useState<CategoryType>("all");
   const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
@@ -112,7 +118,7 @@ export function useAlertesPage() {
   return {
     // filter state
     dateFrom, dateTo, category,
-    setDateFrom, setDateTo, setCategory, resetAll,
+    setDateFrom, setDateTo, setPeriod, setCategory, resetAll,
     // queries + data
     marginQuery, vsaQuery, peremptionsQuery, stockQuery, margin, perem, vsa,
     // derived stock
