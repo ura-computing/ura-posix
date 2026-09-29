@@ -30,6 +30,10 @@ ANALYSE_MODES = ("produit", "categorie", "laboratoire", "grossiste", "operateur"
 VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042"]
 ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042"]
 
+# Produits spéciaux scenario (e2e/tests/10-exclusions.spec.ts).
+EXCLUDED_SUPPLIER = "Laboratoire WELEDA"
+SUPPLIER_QUERY = "weleda"
+
 
 # ─── Small helpers ───────────────────────────────────────────────────────────
 
@@ -147,6 +151,10 @@ def token_match(value: str | None, token: str, *, unaccent: bool) -> bool:
 
 def product_match(p, token: str) -> bool:
     return (token_match(p.name, token, unaccent=True) or token_match(p.pid, token, unaccent=False))
+
+
+def is_grossiste(supplier: str) -> bool:
+    return supplier.upper().startswith("GROSSISTE")
 
 
 # ─── The oracle ──────────────────────────────────────────────────────────────
@@ -454,22 +462,23 @@ class Oracle:
             rem = v.discount > 20
             return neg, low, rem, neg or rem or (pct is not None and pct < 10)
 
-        # `top_seq`: default list order (id desc = CSV line desc), first 2 pages of 20.
+        # `top_seq`: default list order (id desc = CSV line desc), first 50 rows
+        # (pages 1–2 at 20 rows, and at 25 rows for the Comptabilité journal).
         def v_summary(rows):
             return {"rows_total": len(rows), "grand_total": r2(sum(v.total for v in rows)),
                     "tva_collected": r2(sum(v.total * v.p.tva / 100 for v in rows)),
-                    "top_seq": [v.seq for v in sorted(rows, key=lambda v: v.seq, reverse=True)[:40]]}
+                    "top_seq": [v.seq for v in sorted(rows, key=lambda v: v.seq, reverse=True)[:50]]}
 
         def a_summary(rows):
             return {"rows_total": len(rows), "grand_total": r2(sum(a.total for a in rows)),
                     "tva_payee": r2(sum(a.total * a.p.tva / 100 for a in rows)),
-                    "top_seq": [a.seq for a in sorted(rows, key=lambda a: a.seq, reverse=True)[:40]]}
+                    "top_seq": [a.seq for a in sorted(rows, key=lambda a: a.seq, reverse=True)[:50]]}
 
         fl = [flags(v) for v in self.vw]
         tabs = {"marge_negative": 0, "marge_low": 1, "remises_high": 2, "all_flagged": 3}
         disc = [v for v in self.vw if v.discount > 0]
         full = [v for v in self.vw if not v.discount > 0]
-        is_gros = lambda a: a.supplier.upper().startswith("GROSSISTE")   # noqa: E731
+        is_gros = lambda a: is_grossiste(a.supplier)   # noqa: E731
 
         def v_suggest(q: str) -> dict:
             toks = tokenize(q)
@@ -827,6 +836,85 @@ class Oracle:
             })
         return {"rows": rows, "kpis": k, "ties": ties}
 
+    # ── Produits spéciaux → Comptabilité ────────────────────────────────────
+
+    def unique_query(self, p) -> str | None:
+        """`PRODUIT 00123` when it finds p alone. Barcodes count too
+        (routers/special_products + bl_exclusions search them): `00012` is inside
+        6119000000123, so low numbers are skipped."""
+        q = f"PRODUIT {p.name.rsplit(' ', 1)[1]}"
+        toks = tokenize(q)
+        hits = [x for x in self.products
+                if all(product_match(x, t) or token_match(x.barcode, t, unaccent=False) for t in toks)]
+        return q if hits == [p] else None
+
+    def exclusion_scenario(self) -> dict:
+        """1 special product + 1 BL (found by one of its products) + 1 supplier.
+        Comptabilité (include_non_declared=false) drops them med-level
+        (exclusions.excluded_medicaments_select): the product, EVERY product on the
+        BL and EVERY product of the supplier leave ventes AND achats. Its /stats
+        is the plain oracle run on what is left."""
+        by_ref: dict[str, list] = defaultdict(list)
+        for a in self.achats:
+            by_ref[a.ref].append(a)
+
+        def bl(ref: str) -> dict:
+            lines = by_ref[ref]
+            return {"delivery_ref": ref, "supplier": max(a.supplier for a in lines),
+                    "delivery_date": max(a.day for a in lines).isoformat(),
+                    "total": r2(sum(a.total for a in lines)), "nb_lines": len(lines)}
+
+        def bl_summary(ref: str, matched: list[str]) -> dict:
+            return {**bl(ref), "nb_products": len({a.p.pid for a in by_ref[ref]}),
+                    "already_excluded": False, "matched_products": matched}
+
+        def supplier(name: str) -> dict:
+            lines = [a for a in self.achats if a.supplier == name]
+            return {"supplier": name, "total": r2(sum(a.total for a in lines)), "nb_lines": len(lines),
+                    "nb_products": len({a.p.pid for a in lines}),
+                    "last_date": max(a.day for a in lines).isoformat(), "already_excluded": False}
+
+        # BL: first grossiste BL of the window holding a product findable alone by name.
+        ref, holder = next((a.ref, a.p) for a in self.aw if is_grossiste(a.supplier) and self.unique_query(a.p))
+        bl_pids = {a.p.pid for a in by_ref[ref]}
+        holder_refs = sorted({a.ref for a in self.achats if a.p.pid == holder.pid})
+
+        # Special product: sold + bought, not on that BL, not from the excluded supplier.
+        sold = {v.p.pid for v in self.ventes}
+        bought = {a.p.pid for a in self.achats}
+        special = next(p for p in self.products
+                       if p.pid in sold and p.pid in bought and p.pid not in bl_pids
+                       and p.supplier != EXCLUDED_SUPPLIER and self.unique_query(p))
+
+        suppliers = sorted({a.supplier for a in self.achats})
+        excluded = {special.pid} | bl_pids | {a.p.pid for a in self.achats if a.supplier == EXCLUDED_SUPPLIER}
+        compta = Oracle(self.products, [v for v in self.ventes if v.p.pid not in excluded],
+                        [a for a in self.achats if a.p.pid not in excluded], self.today, self.df, self.dt)
+        return {
+            "special": {
+                "query": self.unique_query(special), "pid": special.pid, "product": special.name,
+                "category": special.category,
+                "suggestions": [{"pid": special.pid, "product": special.name, "category": special.category,
+                                 "nb_ventes": sum(1 for v in self.ventes if v.p.pid == special.pid)}],
+            },
+            "bl": {
+                "ref": ref, "query": self.unique_query(holder),
+                "search": [bl_summary(r, [holder.name]) for r in holder_refs],
+                "search_by_ref": [bl_summary(ref, [])],
+                "detail": {**bl(ref), "lines": [{"pid": a.p.pid, "product": a.p.name, "quantity": a.qty,
+                                                 "unit_price": a.unit, "total": a.total} for a in by_ref[ref]]},
+            },
+            "supplier": {
+                "name": EXCLUDED_SUPPLIER, "query": SUPPLIER_QUERY,
+                "search": [supplier(s) for s in suppliers
+                           if all(token_match(s, t, unaccent=True) for t in tokenize(SUPPLIER_QUERY))],
+                "search_grossiste": sorted((supplier(s) for s in suppliers if is_grossiste(s)),
+                                           key=lambda r: r["total"], reverse=True),
+            },
+            "excluded_pids": sorted(excluded),
+            "stats": {ct: compta.stats(ct) for ct in CATEGORY_TYPES},
+        }
+
     # ── Everything ──────────────────────────────────────────────────────────
 
     def build(self, liste_items: list[dict]) -> dict:
@@ -842,4 +930,5 @@ class Oracle:
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},
+            "exclusions": self.exclusion_scenario(),
         }

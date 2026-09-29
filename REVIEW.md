@@ -114,7 +114,9 @@ Server in UTC, pharmacy in Casablanca, 00:30 local → "today" is still yesterda
 | G2 | `analyse_queries.py:184` row CA = `Vente.total`, but KPI CA = `qty × PPV` | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
 | G3 | `analyse_queries.py:378` sales joined once per supplier | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
 | G4 | `analyse_queries.py:658` loads the **whole** catalog and runs substring loops | a 200-item list × a 30k-product catalog → about 6M comparisons per request |
-| G5 | `uploads.py:22` docstring is out of date | it says "10 MB" and mentions a stock multipart endpoint; the code allows 100 MB and has no such endpoint |
+| G6 | Catégories: the page saves the category **without** accents (`CategorySuffixDialog.tsx:18`), `/ventes` looks it up **with** them (`transactions.py:104-109`) | mapping "Médicament" is saved "Medicament" → never matches "Médicament (33.930%)" → no suffix. E2E: `test.fail` in `14-admin.spec.ts` |
+| G7 | Admin Rapport "Analyse de marge" table reads fields the API doesn't send (`MarginAnalysisTable.tsx:43-65`) | reads `ventes_total`, `supplier`, `marge_pct` / `marge_dh` (catégorie, grossiste); API sends `ca`, `grossiste`, `marge_pct_avg` / `marge_dh_avg` → "Ventes" column and grossiste name show "—". E2E: `test.fail` in `14-admin.spec.ts` |
+| G8 | 2 routes no page calls (`admin_stats.py:97-113`) | `/admin/pharmacy/{id}/stats/margin-alerts` and `/stock-summary`: the admin drill-down has no alerts or stock section. Remove them or add the sections |
 
 ---
 

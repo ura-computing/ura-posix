@@ -11,6 +11,8 @@ Outputs (git-ignored, regenerated on every run):
     resources/tests/ventes/Sobrus - Ventes <from> - <to>.csv
     resources/tests/stock/Sobrus - Stock <yyyymmdd>.csv
     resources/tests/liste/liste.csv                    (Analyses → Liste mode)
+    resources/tests/catalog/catalog.csv                (admin catalogue import: 5 new products)
+    resources/tests/extra/Sobrus - Achats <d> - <d>.csv (600 extra lines: import then cancel / delete)
     resources/tests/expected.json                      (oracle.py: every value, field by field)
 
 Data design (keeps expected values exact and unambiguous):
@@ -52,6 +54,7 @@ STOCK_HEADER = [
     "PID", "Produit", "Catégorie", "TVA", "PPV", "PPH", "Zone", "Stock",
     "Date de péremption", "Stock min", "Stock max", "Code barre 1", "Code barre 2",
 ]
+CATALOG_HEADER = ["Nom", "Categorie", "TVA", "PPV", "PPH", "Code barre 1", "Code barre 2", "Laboratoire"]   # resources/catalog.csv
 
 # (label, is_pharmacie). Two "Médicament" variants on purpose: reports must merge
 # the "(xx%)" suffix into ONE "Médicament" bucket.
@@ -228,31 +231,63 @@ def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
     return items
 
 
+def make_extra_achats(rng: random.Random, products: list[Product], day: date) -> list[Achat]:
+    """Imports spec: 600 lines (= 2 chunks of 500) of known products at their own
+    PPH / PPV, on new BL refs. The test cancels one upload and deletes another,
+    so no number of the app changes."""
+    bought = [p for p in products if p.supplier]
+    lines: list[Achat] = []
+    bl = 0
+    while len(lines) < 600:
+        bl += 1
+        for p in rng.sample(bought, min(10, 600 - len(lines))):   # distinct per BL
+            qty = rng.randint(1, 5)
+            lines.append(Achat(len(lines), day, f"{day} 10:00:00", f"E2E-EXTRA-{bl:03d}",
+                               p.supplier, p, qty, p.pph, round(qty * p.pph, 2)))
+    return lines
+
+
+def make_catalog() -> list[dict]:
+    """Admin catalogue import: 5 NEW products (never sold, never bought)."""
+    return [{"product": f"E2E CATALOGUE {i:03d}", "category": "Parapharmacie (25.000%)", "tva": "TVA (20.00%)",
+             "ppv": 50.0 + i, "pph": 35.0 + i, "barcode1": f"6120000000{i:03d}", "barcode2": None,
+             "laboratoire": "Laboratoire E2E"} for i in range(1, 6)]
+
+
 # ─── CSV writers ─────────────────────────────────────────────────────────────
 
 def _fmt(x: float) -> str:
     return f"{x:.2f}"
 
 
-def _write(path: Path, header: list[str], rows) -> None:
+def _write(path: Path, header: list[str], rows, delimiter: str = ";") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     for old in path.parent.glob("*.csv"):
         old.unlink()
     with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f, delimiter=";", lineterminator="\n")
+        w = csv.writer(f, delimiter=delimiter, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
 
 
-def write_files(products, ventes, achats, liste, start: date, end: date, today: date) -> dict:
+def _achat_rows(achats):
+    return ([a.created, a.day.isoformat(), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
+             _fmt(a.p.pph), _fmt(a.p.ppv), a.p.category, a.p.zone, a.qty, _fmt(a.unit), "", "", "", _fmt(a.total)]
+            for a in achats)
+
+
+def write_files(products, ventes, achats, liste, extra, catalog, start: date, end: date, today: date) -> dict:
     achat_path = HERE / "achats" / f"Sobrus - Achats {start} - {end}.csv"
     vente_path = HERE / "ventes" / f"Sobrus - Ventes {start} - {end}.csv"
     stock_path = HERE / "stock" / f"Sobrus - Stock {today:%Y%m%d}.csv"
     liste_path = HERE / "liste" / "liste.csv"
-    _write(achat_path, ACHAT_HEADER, (
-        [a.created, a.day.isoformat(), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
-         _fmt(a.p.pph), _fmt(a.p.ppv), a.p.category, a.p.zone, a.qty, _fmt(a.unit), "", "", "", _fmt(a.total)]
-        for a in achats))
+    extra_path = HERE / "extra" / f"Sobrus - Achats {end} - {end}.csv"
+    catalog_path = HERE / "catalog" / "catalog.csv"
+    _write(achat_path, ACHAT_HEADER, _achat_rows(achats))
+    _write(extra_path, ACHAT_HEADER, _achat_rows(extra))
+    _write(catalog_path, CATALOG_HEADER, (
+        [c["product"], c["category"], c["tva"], _fmt(c["ppv"]), _fmt(c["pph"]), c["barcode1"], c["barcode2"] or "",
+         c["laboratoire"]] for c in catalog), delimiter=",")
     _write(vente_path, VENTE_HEADER, (
         [v.p.pid, v.p.name, v.day.isoformat(), v.ref, v.client, v.p.tva_label, _fmt(v.p.pph),
          _fmt(v.p.ppv), v.p.category, v.p.zone, v.qty, _fmt(v.discount), _fmt(v.unit), _fmt(v.total)]
@@ -269,6 +304,8 @@ def write_files(products, ventes, achats, liste, start: date, end: date, today: 
         "ventes": {"path": rel(vente_path), "rows": len(ventes)},
         "stock":  {"path": rel(stock_path), "rows": len(stocked)},
         "liste":  {"path": rel(liste_path), "rows": len(liste)},
+        "extra_achats": {"path": rel(extra_path), "rows": len(extra)},
+        "catalog": {"path": rel(catalog_path), "rows": len(catalog)},
     }
 
 
@@ -283,6 +320,24 @@ def import_section(products, ventes, achats) -> dict:
         "ventes": {"inserted": len(ventes), "skipped": 0, "new_medicaments": len(in_ventes - in_achats)},
         "stock":  {"inserted": len(in_stock), "skipped_unknown": 0,
                    "new_medicaments": len(in_stock - in_achats - in_ventes)},
+    }
+
+
+def catalog_section(products, ventes, achats, catalog) -> dict:
+    """Admin catalogue after the 3 imports: one Medicament per product found in
+    any file (SEED_CATALOG=0), then the catalogue CSV adds `items`."""
+    in_files = {a.p.pid for a in achats} | {v.p.pid for v in ventes} | {p.pid for p in products if p.stock is not None}
+    imported = sorted((p for p in products if p.pid in in_files), key=lambda p: p.name)
+    by_category: dict[str, int] = defaultdict(int)
+    for p in imported:
+        by_category[p.category] += 1
+    return {
+        "total": len(imported),
+        "first_page": [p.name for p in imported[:25]],               # sort product asc, 25 / page
+        "categories": sorted(by_category),                             # GET /admin/catalog/categories
+        "by_category": dict(by_category),
+        "items": catalog,
+        "import": {"total_rows": len(catalog), "inserted": len(catalog), "updated": 0, "skipped": 0, "errors": []},
     }
 
 
@@ -310,7 +365,9 @@ def main() -> None:
     achats = make_achats(rng, products, args.achat_rows or args.rows // 3, data_start, data_end)
     ventes = make_ventes(rng, products, args.rows, data_start, data_end)
     liste = make_liste(rng, products, ventes, window_from, window_to)
-    files = write_files(products, ventes, achats, liste, data_start, data_end, today)
+    extra = make_extra_achats(random.Random(args.seed + 1), products, data_end)
+    catalog = make_catalog()
+    files = write_files(products, ventes, achats, liste, extra, catalog, data_start, data_end, today)
 
     oracle = Oracle(products, ventes, achats, today, window_from, window_to)
     expected = {
@@ -319,6 +376,7 @@ def main() -> None:
                  "products": len(products), "tolerance": {"dh": 0.05, "pct": 0.01}},
         "files": files,
         "import": import_section(products, ventes, achats),
+        "catalog": catalog_section(products, ventes, achats, catalog),
         **oracle.build(liste),
     }
     (HERE / "expected.json").write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")

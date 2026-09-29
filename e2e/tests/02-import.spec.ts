@@ -34,8 +34,10 @@ test.describe("imports", () => {
 
       const got = { chunks: 0, inserted: 0, skipped: 0, newMeds: 0, batchId: 0, errors: [] as string[] };
       const pending: Promise<void>[] = [];
+      let lastChunkAt = 0;
       page.on("response", (res) => {
         if (!res.url().endsWith(`/v1/uploads/${type}-json`)) return;
+        lastChunkAt = Date.now();
         pending.push((async () => {
           if (!res.ok()) { got.errors.push(`${res.status()} ${await res.text()}`); return; }
           const body = await res.json();
@@ -54,14 +56,18 @@ test.describe("imports", () => {
 
       const t0 = Date.now();
       await start.click();
-      const outcome = page.getByText(/^(Import terminé|Erreur d'importation|Import annulé)$/).first();
+      // The result card title. ("Import terminé" only shows after the card
+      // auto-dismisses 4 s later: waiting for it added 4 s to every import.)
+      const outcome = page.getByRole("heading", { level: 3, name: /lignes importées$|^Erreur d'importation$|^Import annulé$/ });
       await expect(outcome).toBeVisible({ timeout: 20 * 60_000 });
-      const ms = Date.now() - t0;
+      const ms = lastChunkAt - t0;   // click → last chunk answered (UI polling not counted)
+      const title = (await outcome.textContent()) ?? "";
       recordCall({ method: "FLOW", path: `import/${kind}`, status: 200, ms, source: "flow", test: `import ${kind}` });
 
       await Promise.all(pending);
       expect(got.errors, "chunk errors").toEqual([]);
-      await expect(outcome).toHaveText("Import terminé");
+      expect(title, "result card").toMatch(/lignes importées$/);
+      expect(title.replace(/\D/g, ""), "rows shown on the result card").toBe(String(want.inserted));
       expect(got.inserted, "inserted rows").toBe(want.inserted);
       expect(got.skipped, "skipped rows").toBe(type === "stock" ? want.skipped_unknown : want.skipped);
       expect(got.newMeds, "new products").toBe(want.new_medicaments);

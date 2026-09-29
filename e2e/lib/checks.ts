@@ -20,8 +20,8 @@ function expectDay(actual: Row | null, e: Row | null, field: "total" | "count", 
   expect(e.dates, `${what}: date ${actual?.date}`).toContain(actual?.date);
 }
 
-export function checkStats(s: Row, ct: CategoryType): void {
-  const e = expected().stats[ct];
+/** `e`: another oracle answer of the same shape (Comptabilité with exclusions). */
+export function checkStats(s: Row, ct: CategoryType, e: Row = expected().stats[ct]): void {
   expectSame(s.kpis, e.kpis, `stats[${ct}].kpis`);
   expectSame(s.previous_kpis, e.previous_kpis, `stats[${ct}].previous_kpis`);
   expectSame(s.marge, e.marge, `stats[${ct}].marge`);
@@ -125,7 +125,7 @@ export function subsetSummary(kind: Ledger, keep: (r: Row) => boolean): Row {
     rows_total: rows.length,
     grand_total: sum((r) => r.total),
     [kind === "ventes" ? "tva_collected" : "tva_payee"]: sum((r) => r.total * rate(r.tva)),
-    top_seq: rows.map((r) => r.seq).sort((a, b) => b - a).slice(0, 40),
+    top_seq: rows.map((r) => r.seq).sort((a, b) => b - a).slice(0, 50),
   };
 }
 

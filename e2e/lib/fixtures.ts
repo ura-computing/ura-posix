@@ -27,10 +27,12 @@ export function recordCall(rec: CallRecord): void {
 export const test = base.extend<{ recorder: void }>({
   recorder: [async ({ page }, use, testInfo) => {
     const pending: Promise<void>[] = [];
-    const onRequest = (req: Request, failed: boolean) => {
+    const onRequest = (req: Request) => {
       if (!req.url().startsWith(`${API}/v1/`)) return;
       pending.push((async () => {
-        const res = failed ? null : await req.response();
+        // Also on "requestfailed": Chromium reports a 204 No Content fetch as
+        // failed, yet its response (with the 204) is there.
+        const res = await req.response().catch(() => null);
         recordCall({
           method: req.method(),
           path:   new URL(req.url()).pathname,
@@ -41,8 +43,8 @@ export const test = base.extend<{ recorder: void }>({
         });
       })());
     };
-    page.on("requestfinished", (req) => onRequest(req, false));
-    page.on("requestfailed",   (req) => onRequest(req, true));
+    page.on("requestfinished", onRequest);
+    page.on("requestfailed",   onRequest);
     await use();
     await Promise.all(pending);
   }, { auto: true }],

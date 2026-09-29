@@ -6,9 +6,8 @@
  *  builds on the previous step.
  *
  *  Ports 8001 / 5174 keep the dev servers (8000 / 5173) untouched.
- *    make e2e        headless (pre-push)
- *    make e2e-ui     a real browser plays every step, slowed down
- *    make e2e-debug  Playwright UI mode (press ▶; step through, API calls + durations)
+ *    make e2e-tests  headless, every test (pre-push)
+ *    make e2e-ui     a real browser plays one test file (or all), slowed down
  */
 import { defineConfig } from "@playwright/test";
 

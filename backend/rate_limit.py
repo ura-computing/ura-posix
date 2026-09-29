@@ -4,7 +4,12 @@ middleware + exception handler) and routers/*.py (to decorate endpoints).
 Storage: in-memory. Fine for a single-instance deploy on DigitalOcean App
 Platform. If we ever scale horizontally, swap for Redis via
 `Limiter(key_func=..., storage_uri="redis://...")`.
+
+RATE_LIMIT=0 turns the limits off — only the E2E suite does that (it logs in
+more than 5 times a minute). Default: on.
 """
+import os
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
@@ -12,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, enabled=os.environ.get("RATE_LIMIT", "1") != "0")
 
 
 def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

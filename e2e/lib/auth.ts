@@ -1,6 +1,7 @@
 /** Test accounts + login through the real login page. A logged-in session is
  *  saved per role (.state/<role>.json) and reused via `test.use({ storageState })`
- *  — /auth/login is rate-limited to 5/min, so never log in per test. */
+ *  — log in once, not per test (the E2E backend runs with RATE_LIMIT=0; in
+ *  production /auth/login allows 5/min). */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
@@ -19,7 +20,11 @@ export const ALL_FEATURES = [
   "rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products",
 ];
 
-export type Role = "admin" | "owner";
+/** admin / owner: saved by the setup project. employee / account: 12 and 13. */
+export type Role = "admin" | "owner" | "employee" | "account";
+
+/** Browser state with no cookie: a visitor who is not logged in. */
+export const LOGGED_OUT = { cookies: [], origins: [] };
 
 export const sessionFile = (role: Role): string => resolve(STATE_DIR, `${role}.json`);
 

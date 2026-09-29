@@ -34,15 +34,24 @@ export function pageCall<T = any>(page: Page, path: string, params: Match = {}):
 }
 
 
-/** Same as pageCall for the page's next POST /v1<path>; returns the response JSON. */
-export function pagePost<T = any>(page: Page, path: string): Promise<T> {   // eslint-disable-line @typescript-eslint/no-explicit-any
+/** Same as pageCall for the page's next write (POST / PUT / PATCH / DELETE)
+ *  to /v1<path>: checks the status, resolves with the response JSON (null
+ *  for 204 No Content). */
+export function pageSend<T = any>(   // eslint-disable-line @typescript-eslint/no-explicit-any
+  page: Page, method: "POST" | "PUT" | "PATCH" | "DELETE", path: string | RegExp, status = 200,
+): Promise<T> {
   return page.waitForResponse((res) => {
     const u = new URL(res.url());
-    return u.origin === API && u.pathname === `/v1${path}` && res.request().method() === "POST";
+    const pathOk = typeof path === "string" ? u.pathname === `/v1${path}` : path.test(u.pathname);
+    return u.origin === API && pathOk && res.request().method() === method;
   }, { timeout: 60_000 }).then(async (res) => {
-    expect(res.status(), `POST ${res.url()}`).toBe(200);
-    return res.json() as Promise<T>;
+    expect(res.status(), `${method} ${res.url()}`).toBe(status);
+    return (status === 204 ? null : res.json()) as Promise<T>;
   });
+}
+
+export function pagePost<T = any>(page: Page, path: string, status = 200): Promise<T> {   // eslint-disable-line @typescript-eslint/no-explicit-any
+  return pageSend<T>(page, "POST", path, status);
 }
 
 
