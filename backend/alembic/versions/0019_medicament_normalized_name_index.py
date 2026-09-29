@@ -44,17 +44,25 @@ INDEX_NAME = "ix_medicaments_normalized_name"
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS unaccent;")
+    # Schema-qualified: Postgres 17+ runs index expressions (CREATE INDEX,
+    # REINDEX, ANALYZE) with search_path = pg_catalog, pg_temp, so a bare
+    # `unaccent` isn't found there. Same body as bootstrap.py.
     op.execute("""
         CREATE OR REPLACE FUNCTION immutable_unaccent(text)
         RETURNS text AS
         $$
-            SELECT unaccent('unaccent', $1)
+            SELECT public.unaccent('public.unaccent'::regdictionary, $1)
         $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
     """)
 
     # CONCURRENTLY avoids holding a write-blocking lock on `medicaments`
     # while the index builds — safe to run against a live prod table.
     with op.get_context().autocommit_block():
+        # A failed earlier attempt of this migration (unqualified body on
+        # Postgres 17) leaves an INVALID index with this name; IF NOT EXISTS
+        # would then skip the build. This migration only runs where it never
+        # finished, so dropping first is safe.
+        op.execute(f"DROP INDEX CONCURRENTLY IF EXISTS {INDEX_NAME};")
         op.execute(f"""
             CREATE INDEX CONCURRENTLY IF NOT EXISTS {INDEX_NAME}
             ON medicaments (

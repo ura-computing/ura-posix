@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks e2e-tests e2e-ui
+.PHONY: help install dev backend frontend cli migrate seed db build build-backend build-frontend demo down clean logs test test-backend test-frontend install-hooks e2e-tests e2e-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -19,6 +19,11 @@ help:
 	@echo "    make migrate   — apply Alembic migrations against the dev DB"
 	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
 	@echo "    make cli       — interactive Python CLI"
+	@echo ""
+	@echo "  Build:"
+	@echo "    make build          — build-backend + build-frontend"
+	@echo "    make build-backend  — backend Docker image (the one make demo runs)"
+	@echo "    make build-frontend — type check + Vite bundle into frontend/dist"
 	@echo ""
 	@echo "  Docker demo (one-command setup for clients):"
 	@echo "    make demo      — build + run the full stack (postgres + backend + frontend)"
@@ -97,6 +102,17 @@ migrate: db
 # (the backend's local .env / DATABASE_URL).
 seed: db migrate
 	cd $(BACKEND_DIR) && uv run python seed.py
+
+# ── Build ───────────────────────────────────────────────────────────────────
+
+build: build-backend build-frontend
+
+build-backend:
+	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend (same as demo)
+	docker compose build backend
+
+build-frontend:
+	cd $(FRONTEND_DIR) && npm run build
 
 # ── Docker demo (client-shippable) ──────────────────────────────────────────
 # Boots postgres + backend + frontend via docker-compose. Re-runs are safe:

@@ -42,6 +42,7 @@ Senior engineer on PharmaGest. Save tokens ($20 plan): caveman "full" style, tin
 - Tables + short examples. List open items only, never fixed ones.
 
 # Project facts
+- Postgres **17** everywhere: dev, demo, E2E (`docker-compose.yml`) = production (DigitalOcean). Never test on another version.
 - Backend `backend/`: FastAPI + SQLAlchemy 2 + Postgres (unaccent) + Alembic. Heavy logic in `*_queries.py`, exclusions in `exclusions.py`, member lifecycle in `members.py`.
 - Frontend `frontend/src/`: React + Vite + TS + TanStack Query + Tailwind. Pages in `pages/<feature>/`.
 - Tests = Playwright E2E only (`e2e/`): huge generated Sobrus CSVs + oracle `resources/tests/oracle.py` → `expected.json`; every field of every API call; coverage + speed gates (`e2e/tests/99-gates.spec.ts`). Old pytest / vitest suites are being removed.

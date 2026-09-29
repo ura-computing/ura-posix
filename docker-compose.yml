@@ -1,13 +1,14 @@
 # Local demo stack for apcm-refactor.
 #
-# `make demo` brings this up. The named volume `postgres_data` matches the old
-# apcm-pharma compose file so when the client switches branches, their existing
-# `apcm_demo` database is mounted into this Postgres container. The backend's
-# entrypoint then runs `alembic upgrade head` (idempotent vs the old schema)
-# and seeds admin/owner/catalogue if not already present.
+# `make demo` brings this up. Postgres 17 everywhere (dev, demo, E2E) — the
+# same major version as production on DigitalOcean. Its data lives in the
+# `pg17_data` volume; the old Postgres 16 volume `postgres_data` is only read
+# once by scripts/pg16-to-17.sh (service `db16` below). The backend's
+# entrypoint runs `alembic upgrade head` and seeds admin/owner/catalogue if
+# not already present.
 services:
   db:
-    image: postgres:16
+    image: postgres:17
     environment:
       POSTGRES_DB:       ${POSTGRES_DB:-apcm_demo}
       POSTGRES_USER:     ${POSTGRES_USER:-apcm}
@@ -20,13 +21,31 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pg17_data:/var/lib/postgresql/data
     healthcheck:
       test:     ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apcm} -d ${POSTGRES_DB:-apcm_demo}"]
       interval: 5s
       timeout:  5s
       retries:  10
     restart: unless-stopped
+
+  # One-time only: opens the old Postgres 16 volume so scripts/pg16-to-17.sh
+  # can copy it into Postgres 17. Profile `pg16` → never started by
+  # `make db` / `make demo`. No port (the 17 `db` owns 5432).
+  db16:
+    image: postgres:16
+    profiles: ["pg16"]
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-apcm_demo}
+      POSTGRES_USER:     ${POSTGRES_USER:-apcm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apcm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apcm} -d ${POSTGRES_DB:-apcm_demo}"]
+      interval: 5s
+      timeout:  5s
+      retries:  10
 
   backend:
     build: ./backend
@@ -63,4 +82,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  pg17_data:
+  postgres_data:      # old Postgres 16 data — kept as a backup, read only by db16

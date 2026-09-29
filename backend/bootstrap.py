@@ -42,14 +42,25 @@ def _ensure_extensions() -> None:
         # FRESH DB takes the create_all()+stamp path below, which skips
         # migrations' raw SQL entirely; create_all() still needs this
         # function to exist to build that index.
+        # Schema-qualified body: Postgres 17+ runs index expressions (CREATE
+        # INDEX, REINDEX, ANALYZE) with search_path = pg_catalog, pg_temp.
+        # Runs on every boot, so it also repairs DBs created with the old body.
         conn.execute(text("""
             CREATE OR REPLACE FUNCTION immutable_unaccent(text)
             RETURNS text AS
             $$
-                SELECT unaccent('unaccent', $1)
+                SELECT public.unaccent('public.unaccent'::regdictionary, $1)
             $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
         """))
         conn.commit()
+
+        # Self-check under that same restricted search_path — makes a local
+        # Postgres 16 fail the way Postgres 17 does in production.
+        conn.execute(text("SET LOCAL search_path = pg_catalog, pg_temp"))
+        got = conn.execute(text("SELECT public.immutable_unaccent('é')")).scalar()
+        conn.rollback()
+        if got != "e":
+            sys.exit(f"immutable_unaccent() self-check failed: got {got!r} for 'é' (expected 'e')")
     print("  ↳ pg_trgm + unaccent + immutable_unaccent() ready")
 
 
