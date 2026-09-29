@@ -12,9 +12,10 @@ import { DataTable, type ColumnDef } from "@/components/shared/DataTable";
 import { FilterBar } from "@/components/shared/filterBar";
 import type { CreateUserIn, CreateUserOut, PharmacyListRow } from "@/types";
 
-import { FeaturePills } from "./_components/FeaturePills";
+import { CreateUserDialog } from "@/components/shared/members/CreateUserDialog";
+import { FeaturePills } from "@/components/shared/members/FeaturePills";
+
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
-import { CreateUserDialog } from "./_components/CreateUserDialog";
 import {
   useAdminPharmaciesList,
   useCreatePharmacy,

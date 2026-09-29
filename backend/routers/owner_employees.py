@@ -11,21 +11,27 @@ Permission model (3-layer): employee's effective access =
     pharmacy_features ∩ owner.user_permissions ∩ employee.user_permissions
 This router doesn't enforce the ceiling on the PUT — the frontend disables
 locked toggles; the intersection at read time (permissions.py) is the truth.
+
+Member lifecycle + shared helpers live in members.py (also used by
+admin_pharmacies.py); this router only does the owner auth + scope checks.
 """
 from __future__ import annotations
 
-import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, status as http_status
 
 from database import DbDep
-from models import (
-    ALLOWED_FEATURES,
-    PharmacyFeature,
-    User,
-    UserPermission,
+from members import (
+    apply_permissions_bulk,
+    create_member,
+    granted_permissions_map,
+    member_out,
+    member_to_out,
+    reset_member_password,
+    set_member_status,
 )
+from models import PharmacyFeature, User
 from permissions import require_pharmacy_owner
 from schemas.admin_pharmacies import (
     CreateUserIn,
@@ -36,39 +42,13 @@ from schemas.admin_pharmacies import (
     StatusPatchIn,
 )
 from schemas.owner_employees import OwnerEmployeesResponse
-from security import CurrentUserDep, hash_password
+from security import CurrentUserDep
 
 
 router = APIRouter(tags=["owner-employees"])
 
 
-# ── Helpers (kept local; admin's equivalents are private to admin_pharmacies.py) ─
-
-def _member_to_out(u: User, granted: list[str]) -> MemberOut:
-    return MemberOut(
-        id=u.id,
-        full_name=u.name,
-        email=u.email,
-        role=u.role,  # type: ignore[arg-type]
-        status=u.status if u.status in ("active", "inactive") else "active",  # type: ignore[arg-type]
-        granted_permissions=granted,
-    )
-
-
-def _granted_for(db, user_ids: list[int]) -> dict[int, list[str]]:
-    """{user_id: sorted enabled-permission-strings}. One query for N users."""
-    if not user_ids:
-        return {}
-    rows = (
-        db.query(UserPermission.user_id, UserPermission.permission)
-        .filter(UserPermission.user_id.in_(user_ids), UserPermission.enabled.is_(True))
-        .all()
-    )
-    out: dict[int, set[str]] = {uid: set() for uid in user_ids}
-    for uid, perm in rows:
-        out.setdefault(uid, set()).add(perm)
-    return {uid: sorted(perms) for uid, perms in out.items()}
-
+# ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _pharm_features(db, pharmacy_id: int) -> list[str]:
     rows = (
@@ -98,22 +78,6 @@ def _get_employee_or_404(db, pharmacy_id: int, employee_id: int) -> User:
     return emp
 
 
-def _apply_permissions_bulk(db, user_id: int, permissions: dict[str, bool]) -> None:
-    """Upsert UserPermission rows for the given user. Unknown feature keys
-    silently ignored (frontend should only send ALLOWED_FEATURES)."""
-    existing = {
-        p.permission: p for p in db.query(UserPermission)
-        .filter(UserPermission.user_id == user_id).all()
-    }
-    for key, enabled in permissions.items():
-        if key not in ALLOWED_FEATURES:
-            continue
-        if key in existing:
-            existing[key].enabled = bool(enabled)
-        else:
-            db.add(UserPermission(user_id=user_id, permission=key, enabled=bool(enabled)))
-
-
 # ── List ─────────────────────────────────────────────────────────────────────
 
 @router.get("/owner/employees", response_model=OwnerEmployeesResponse)
@@ -129,12 +93,12 @@ def list_employees(user: CurrentUserDep, db: DbDep) -> OwnerEmployeesResponse:
         .order_by(User.id.asc())
         .all()
     )
-    granted = _granted_for(db, [e.id for e in employees])
+    granted = granted_permissions_map(db, [e.id for e in employees])
 
-    my_grants = _granted_for(db, [user.id]).get(user.id, [])
+    my_grants = granted_permissions_map(db, [user.id]).get(user.id, [])
 
     return OwnerEmployeesResponse(
-        employees=[_member_to_out(e, granted.get(e.id, [])) for e in employees],
+        employees=[member_to_out(e, granted.get(e.id, [])) for e in employees],
         pharmacy_features=_pharm_features(db, pharmacy_id),
         my_permissions=my_grants,
     )
@@ -148,8 +112,11 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
     to 'employee' server-side — a malicious body with role='owner' is
     overridden silently. Pharmacy is implicit; body.pharmacy_id is ignored.
 
+    Every permission is granted by default (effective access is still capped
+    by the pharmacy + owner ceiling at read time).
+
     Generates a random temp password, returns the cleartext ONCE in the
-    response for the frontend's credentials-reveal + mailto flow."""
+    response for the frontend's credentials-reveal + Gmail flow."""
     pharmacy_id = require_pharmacy_owner(user, db)
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(
@@ -157,22 +124,12 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
             detail="Un utilisateur avec cet email existe déjà.",
         )
 
-    temp_password = secrets.token_urlsafe(8)
-    new_emp = User(
-        email=body.email,
-        name=body.full_name,
-        password_hash=hash_password(temp_password),
+    new_emp, temp_password = create_member(
+        db, email=body.email, name=body.full_name,
         role="employee",                            # hardcoded — owner can't create co-owners
-        status="active",
         pharmacy_id=pharmacy_id,
     )
-    db.add(new_emp)
-    db.commit()
-    db.refresh(new_emp)
-    return CreateUserOut(
-        member=_member_to_out(new_emp, []),
-        temp_password=temp_password,
-    )
+    return CreateUserOut(member=member_out(db, new_emp), temp_password=temp_password)
 
 
 @router.put("/owner/employees/{employee_id}/permissions", response_model=MemberOut)
@@ -187,10 +144,9 @@ def set_employee_permissions(
     Effective access is computed read-time as the intersection."""
     pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
-    _apply_permissions_bulk(db, emp.id, body.permissions)
+    apply_permissions_bulk(db, emp.id, body.permissions)
     db.commit()
-    granted = _granted_for(db, [emp.id]).get(emp.id, [])
-    return _member_to_out(emp, granted)
+    return member_out(db, emp)
 
 
 @router.patch("/owner/employees/{employee_id}/status", response_model=MemberOut)
@@ -204,13 +160,8 @@ def set_employee_status(
     session of the employee dies immediately."""
     pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
-    if emp.status != body.status:
-        emp.status = body.status
-        if body.status == "inactive":
-            emp.token_version += 1
-        db.commit()
-    granted = _granted_for(db, [emp.id]).get(emp.id, [])
-    return _member_to_out(emp, granted)
+    set_member_status(db, emp, body.status)
+    return member_out(db, emp)
 
 
 @router.post("/owner/employees/{employee_id}/reset-password", response_model=ResetPasswordOut)
@@ -222,11 +173,7 @@ def reset_employee_password(
     """Regenerate a temp password + bump token_version so live sessions die."""
     pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
-    temp_password = secrets.token_urlsafe(8)
-    emp.password_hash = hash_password(temp_password)
-    emp.token_version += 1
-    db.commit()
-    return ResetPasswordOut(user_id=emp.id, temp_password=temp_password)
+    return ResetPasswordOut(user_id=emp.id, temp_password=reset_member_password(db, emp))
 
 
 @router.delete("/owner/employees/{employee_id}")

@@ -48,9 +48,29 @@ export const FEATURES: FeatureDef[] = [
 ];
 
 
+export const FEATURE_KEYS: readonly FeatureKey[] = FEATURES.map((f) => f.key);
+
+
 export const FEATURE_LABELS: Record<FeatureKey, string> = Object.fromEntries(
   FEATURES.map((f) => [f.key, f.label]),
 ) as Record<FeatureKey, string>;
+
+
+/** Enabled-feature list (API shape) → full on/off record (toggle UI shape). */
+export function toFeatureRecord(keys: readonly string[] | null | undefined): Record<FeatureKey, boolean> {
+  const set = new Set(keys ?? []);
+  const out = {} as Record<FeatureKey, boolean>;
+  for (const k of FEATURE_KEYS) out[k] = set.has(k);
+  return out;
+}
+
+
+/** Every feature set to `v` (Tout activer / Tout désactiver). */
+export function allFeatures(v: boolean): Record<FeatureKey, boolean> {
+  const out = {} as Record<FeatureKey, boolean>;
+  for (const k of FEATURE_KEYS) out[k] = v;
+  return out;
+}
 
 
 // Values are i18n KEYS — translate at render with t().

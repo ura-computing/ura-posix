@@ -1033,7 +1033,7 @@ export interface CreateUserIn {
 }
 
 /** Response from POST /admin/pharmacies/{id}/users — temp_password is one-time
- *  cleartext for the admin's mailto handoff; never persisted server-side. */
+ *  cleartext for the admin's Gmail handoff; never persisted server-side. */
 export interface CreateUserOut {
   member:        MemberOut;
   temp_password: string;

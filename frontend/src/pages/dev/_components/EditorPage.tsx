@@ -3,6 +3,7 @@ import {
   CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload,
 } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
   EDITOR_SECTION_LABEL, FONT_PAIRINGS, TEMPLATES,
@@ -79,19 +80,23 @@ export function EditorPage(props: EditorPageProps) {
 
 function TopBar(props: EditorPageProps) {
   const canSave = props.hasUnsaved && !props.isSaving;
+  const [resetOpen, setResetOpen] = useState(false);
 
   const handleReset = () => {
     if (props.isResetting) return;
-    const ok = window.confirm(
-      "Réinitialiser la personnalisation ?\n\n"
-      + "Toutes les modifications (modèle, sections, couleurs, logo, typographie) "
-      + "seront restaurées aux valeurs par défaut. Cette action est irréversible.",
-    );
-    if (ok) props.onReset();
+    setResetOpen(true);
   };
 
   return (
     <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-border bg-card/95 px-3 py-2 backdrop-blur sm:gap-3 sm:px-4">
+      <ConfirmDialog
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        variant="destructive"
+        title="Réinitialiser la personnalisation ?"
+        description="Toutes les modifications (modèle, sections, couleurs, logo, typographie) seront restaurées aux valeurs par défaut. Cette action est irréversible."
+        onConfirm={() => { setResetOpen(false); props.onReset(); }}
+      />
       {/* Breadcrumb + save state indicator */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0 truncate text-sm text-muted-foreground">

@@ -15,7 +15,7 @@ import { AsyncButton } from "@/components/shared/AsyncButton";
 import { Switch } from "@/components/shared/Switch";
 import { cn } from "@/utils/cn";
 
-import { FEATURES, type FeatureKey } from "./constants";
+import { FEATURES, type FeatureKey } from "@/components/shared/members/constants";
 
 
 export interface FeatureToggleGridProps {

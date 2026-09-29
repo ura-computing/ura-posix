@@ -6,23 +6,26 @@
  *                 is set (caller is on Screen 2 for that pharmacy), but still
  *                 shown so the admin can override.
  *    B. REVEAL  — after a successful POST, show the one-time temp_password
- *                 with a "Copier" button + a "Envoyer par email" mailto button
+ *                 with a "Copier" button + an "Ouvrir dans Gmail" compose button
  *                 + a "Fermer" button. The dialog NEVER returns to form state
  *                 in the same lifecycle — closing fully resets via onClose.
  *
  *  The reveal IS the only chance to see the cleartext password (backend
- *  doesn't persist it). The mailto: link opens the admin's default mail
- *  client with the email pre-filled in `to:` and the credentials in the body.
+ *  doesn't persist it). The Gmail link opens a compose tab with the email
+ *  pre-filled in `to:` and the credentials in the body.
+ *
+ *  `ResetPasswordDialog` (below) reuses the same reveal for password resets
+ *  so admin + owner get one consistent credentials flow.
  */
 import { useState } from "react";
-import { CheckCircle2, Copy, Loader2, Mail, UserPlus, X } from "lucide-react";
+import { CheckCircle2, Copy, KeyRound, Loader2, Mail, UserPlus, X } from "lucide-react";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ROLE_LABEL } from "./constants";
-import type { CreateUserIn, CreateUserOut, MemberRole } from "@/types";
+import type { CreateUserIn, CreateUserOut, MemberOut, MemberRole } from "@/types";
 
 
 export interface PharmacyOption {
@@ -69,7 +72,6 @@ export function CreateUserDialog({
   const [values, setValues] = useState<CreateUserIn>(initialValues);
   /** Reveal state — non-null after a successful create. */
   const [revealed, setRevealed] = useState<CreateUserOut | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Reset everything when the dialog (re)opens — uses the recommended
   // "derive state from a prop change" pattern instead of useEffect, so we
@@ -80,7 +82,6 @@ export function CreateUserDialog({
     if (open) {
       setValues(initialValues);
       setRevealed(null);
-      setCopied(false);
     }
   }
 
@@ -93,15 +94,6 @@ export function CreateUserDialog({
     setRevealed(result);
   };
 
-  const copyPassword = async () => {
-    if (!revealed) return;
-    await navigator.clipboard.writeText(revealed.temp_password);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2_000);
-  };
-
-  const mailtoHref = revealed ? buildMailto(revealed, t) : "#";
-
   const assignHint =
     values.role === "owner"
       ? t("adminPharm.assignHintOwner")
@@ -110,24 +102,12 @@ export function CreateUserDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
-              {revealed ? <CheckCircle2 className="size-4" /> : <UserPlus className="size-4" />}
-            </span>
-            <div className="flex flex-col gap-0.5">
-              <h3 className="text-[17px] font-semibold text-foreground">
-                {revealed ? t("adminPharm.accountCreated") : t("adminPharm.newUser")}
-              </h3>
-              <span className="text-xs text-muted-foreground">
-                {revealed ? t("adminPharm.revealSubtitle") : t("adminPharm.createSubtitle")}
-              </span>
-            </div>
-          </div>
-          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
-            <X className="size-4" />
-          </button>
-        </div>
+        <DialogHead
+          icon={revealed ? <CheckCircle2 className="size-4" /> : <UserPlus className="size-4" />}
+          title={revealed ? t("adminPharm.accountCreated") : t("adminPharm.newUser")}
+          subtitle={revealed ? t("adminPharm.revealSubtitle") : t("adminPharm.createSubtitle")}
+          onClose={onClose}
+        />
 
         {/* ─── State A · Form ──────────────────────────────────────────── */}
         {!revealed && (
@@ -198,39 +178,13 @@ export function CreateUserDialog({
 
         {/* ─── State B · Reveal ────────────────────────────────────────── */}
         {revealed && (
-          <div className="flex flex-col gap-4 p-5">
-            <div className="flex flex-col gap-1 rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-success-subtle-foreground">
-              <span className="text-sm font-semibold">{t("adminPharm.accountCreatedFor", { name: revealed.member.full_name ?? revealed.member.email })}</span>
-              <span className="text-xs">
-                {revealed.member.email} · {t(ROLE_LABEL[revealed.member.role])}
-              </span>
-            </div>
-
-            <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")}>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
-                  {revealed.temp_password}
-                </code>
-                <AsyncButton variant="secondary" onClick={copyPassword}>
-                  {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
-                  {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
-                </AsyncButton>
-              </div>
-            </Field>
-
-            <div className="-mx-5 -mb-5 mt-1 flex items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-              <a
-                href={mailtoHref}
-                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-              >
-                <Mail className="size-4" />
-                {t("adminPharm.sendByEmail")}
-              </a>
-              <AsyncButton variant="secondary" onClick={onClose}>
-                {t("common.close")}
-              </AsyncButton>
-            </div>
-          </div>
+          <CredentialsReveal
+            member={revealed.member}
+            tempPassword={revealed.temp_password}
+            banner={t("adminPharm.accountCreatedFor", { name: revealed.member.full_name ?? revealed.member.email })}
+            kind="create"
+            onClose={onClose}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -238,23 +192,145 @@ export function CreateUserDialog({
 }
 
 
-/** Build a mailto: link with the credentials prefilled in the body. The admin
- *  reviews + sends from their own mail client. */
-function buildMailto(out: CreateUserOut, t: TFn): string {
-  const subject = encodeURIComponent(t("adminPharm.mailSubject"));
-  const body = encodeURIComponent(
-    [
-      t("adminPharm.mailGreeting", { name: out.member.full_name ?? "" }),
-      "",
-      t("adminPharm.mailBody1"),
-      "",
-      t("adminPharm.mailEmail", { email: out.member.email }),
-      t("adminPharm.mailPassword", { pwd: out.temp_password }),
-      "",
-      t("adminPharm.mailBody2"),
-    ].join("\n"),
+export interface ResetPasswordDialogProps {
+  /** Member + fresh temp password from the reset mutation; null = closed. */
+  reset:   { member: MemberOut; tempPassword: string } | null;
+  onClose: () => void;
+}
+
+
+/** Same reveal as CreateUserDialog's state B, for password resets. */
+export function ResetPasswordDialog({ reset, onClose }: ResetPasswordDialogProps) {
+  const t = useT();
+  return (
+    <Dialog open={reset !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
+        <DialogHead
+          icon={<KeyRound className="size-4" />}
+          title={t("adminPharm.passwordReset")}
+          subtitle={t("adminPharm.resetSubtitle")}
+          onClose={onClose}
+        />
+        {reset && (
+          <CredentialsReveal
+            member={reset.member}
+            tempPassword={reset.tempPassword}
+            banner={t("adminPharm.passwordResetFor", { name: reset.member.full_name ?? reset.member.email })}
+            kind="reset"
+            onClose={onClose}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
-  return `mailto:${out.member.email}?subject=${subject}&body=${body}`;
+}
+
+
+function DialogHead({ icon, title, subtitle, onClose }: { icon: React.ReactNode; title: string; subtitle: string; onClose: () => void }) {
+  const t = useT();
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-9 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
+          {icon}
+        </span>
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-[17px] font-semibold text-foreground">{title}</h3>
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
+        </div>
+      </div>
+      <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+
+type MailKind = "create" | "reset";
+
+/** Banner + one-time temp password (copy) + Gmail / close footer. */
+function CredentialsReveal({
+  member, tempPassword, banner, kind, onClose,
+}: {
+  member:       MemberOut;
+  tempPassword: string;
+  banner:       string;
+  kind:         MailKind;
+  onClose:      () => void;
+}) {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+
+  const copyPassword = async () => {
+    await navigator.clipboard.writeText(tempPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2_000);
+  };
+
+  return (
+    <div className="flex flex-col gap-4 p-5">
+      <div className="flex flex-col gap-1 rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-success-subtle-foreground">
+        <span className="text-sm font-semibold">{banner}</span>
+        <span className="text-xs">
+          {member.email} · {t(ROLE_LABEL[member.role])}
+        </span>
+      </div>
+
+      <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")}>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
+            {tempPassword}
+          </code>
+          <AsyncButton variant="secondary" onClick={copyPassword}>
+            {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
+            {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
+          </AsyncButton>
+        </div>
+      </Field>
+
+      <div className="-mx-5 -mb-5 mt-1 flex items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+        {/* Gmail web compose, not mailto: — mailto goes to the OS default mail
+            app (e.g. Thunderbird/Firefox on Ubuntu); client uses Gmail only. */}
+        <a
+          href={buildGmailUrl(member, tempPassword, kind, t)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+        >
+          <Mail className="size-4" />
+          {t("adminPharm.sendByGmail")}
+        </a>
+        <AsyncButton variant="secondary" onClick={onClose}>
+          {t("common.close")}
+        </AsyncButton>
+      </div>
+    </div>
+  );
+}
+
+
+/** Gmail web compose URL with the credentials prefilled. The admin reviews +
+ *  sends from Gmail in a new tab of the current browser. */
+function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, t: TFn): string {
+  const body = [
+    t("adminPharm.mailGreeting", { name: member.full_name ?? "" }),
+    "",
+    t(kind === "create" ? "adminPharm.mailBody1" : "adminPharm.mailResetBody1"),
+    "",
+    t("adminPharm.mailEmail", { email: member.email }),
+    t("adminPharm.mailPassword", { pwd: tempPassword }),
+    "",
+    t("adminPharm.mailBody2"),
+  ].join("\n");
+  const params = new URLSearchParams({
+    view: "cm",
+    fs:   "1",
+    to:   member.email,
+    su:   t(kind === "create" ? "adminPharm.mailSubject" : "adminPharm.mailResetSubject"),
+    body,
+  });
+  return `https://mail.google.com/mail/?${params.toString()}`;
 }
 
 

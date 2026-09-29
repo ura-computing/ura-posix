@@ -11,19 +11,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Pencil, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { CreateUserDialog, ResetPasswordDialog } from "@/components/shared/members/CreateUserDialog";
+import { FeaturePills } from "@/components/shared/members/FeaturePills";
+import { MemberKebab } from "@/components/shared/members/MemberKebab";
+import { UserPermissionsDialog } from "@/components/shared/members/UserPermissionsDialog";
+import { ROLE_LABEL, STATUS_LABEL, allFeatures, toFeatureRecord, type FeatureKey } from "@/components/shared/members/constants";
 import { ROUTES, type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types";
 import { cn } from "@/utils/cn";
 
-import { ROLE_LABEL, STATUS_LABEL, type FeatureKey } from "./_components/constants";
-import { FeaturePills } from "./_components/FeaturePills";
 import { FeatureToggleGrid } from "./_components/FeatureToggleGrid";
-import { UserPermissionsDialog } from "./_components/UserPermissionsDialog";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
-import { CreateUserDialog } from "./_components/CreateUserDialog";
 import {
   useAdminPharmacy,
   useArchivePharmacy,
@@ -32,12 +32,12 @@ import {
   useResetUserPassword,
   useSetPharmacyFeatures,
   useSetUserPermissions,
+  useSetUserStatus,
   useUpdatePharmacy,
 } from "./_hooks/useAdminPharmacies";
 
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
-const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
 
 
 export default function AdminPharmacyDetail() {
@@ -50,6 +50,8 @@ export default function AdminPharmacyDetail() {
   const [createUserOpen,  setCreateUserOpen]  = useState(false);
   const [permDialogUser,  setPermDialogUser]  = useState<MemberOut | null>(null);
   const [deleteOpen,      setDeleteOpen]      = useState(false);
+  const [resetFor,        setResetFor]        = useState<{ member: MemberOut; tempPassword: string } | null>(null);
+  const [removeTarget,    setRemoveTarget]    = useState<MemberOut | null>(null);
 
   // Pending feature toggles — separate from the server values; resets after save.
   const [pendingFeatures, setPendingFeatures] = useState<Record<FeatureKey, boolean> | null>(null);
@@ -63,17 +65,16 @@ export default function AdminPharmacyDetail() {
   const permsMut    = useSetUserPermissions(id);
   const createMut   = useCreateUser(id);
   const resetPwdMut = useResetUserPassword();
+  const statusMut   = useSetUserStatus(id);
   const removeMut   = useDeleteUser(id);
 
   const isSavingFeatures = featuresMut.isPending;
   const isSavingPerms    = permsMut.isPending;
 
-  const serverFeatures: Record<FeatureKey, boolean> = useMemo(() => {
-    const set = new Set(detail?.enabled_features ?? []);
-    const out = {} as Record<FeatureKey, boolean>;
-    for (const k of FEATURE_KEYS) out[k] = set.has(k);
-    return out;
-  }, [detail]);
+  const serverFeatures: Record<FeatureKey, boolean> = useMemo(
+    () => toFeatureRecord(detail?.enabled_features),
+    [detail],
+  );
 
   const featureValues = pendingFeatures ?? serverFeatures;
 
@@ -96,15 +97,18 @@ export default function AdminPharmacyDetail() {
     await archiveMut.mutateAsync();
     nav(ROUTES.ADMIN_PHARMACIES);
   };
-  const handleResetPassword = async (userId: number) => {
-    const result = await resetPwdMut.mutateAsync(userId);
-    // Show the temp password in an alert for now — proper reveal-dialog parity
-    // with CreateUser can land later if the UX needs the same mailto button.
-    window.alert(t("adminPharm.newPasswordAlert", { pwd: result.temp_password }));
+  const handleResetPassword = async (member: MemberOut) => {
+    const result = await resetPwdMut.mutateAsync(member.id);
+    setResetFor({ member, tempPassword: result.temp_password });
   };
-  const handleRemoveMember = async (userId: number) => {
-    if (!window.confirm(t("adminPharm.removeMemberConfirm"))) return;
-    await removeMut.mutateAsync(userId);
+  const handleToggleStatus = async (member: MemberOut) => {
+    const status = member.status === "active" ? "inactive" : "active";
+    await statusMut.mutateAsync({ userId: member.id, status });
+  };
+  const handleConfirmRemove = async () => {
+    if (!removeTarget) return;
+    await removeMut.mutateAsync(removeTarget.id);
+    setRemoveTarget(null);
   };
   const isLoading = detailQ.isLoading;
 
@@ -166,8 +170,8 @@ export default function AdminPharmacyDetail() {
         serverValues={serverFeatures}
         isSaving={isSavingFeatures}
         onToggle={(k, next) => setPendingFeatures({ ...featureValues, [k]: next })}
-        onEnableAll={() => setPendingFeatures(allTo(true))}
-        onDisableAll={() => setPendingFeatures(allTo(false))}
+        onEnableAll={() => setPendingFeatures(allFeatures(true))}
+        onDisableAll={() => setPendingFeatures(allFeatures(false))}
         onSave={handleSaveFeatures}
         onCancel={() => setPendingFeatures(null)}
       />
@@ -246,7 +250,12 @@ export default function AdminPharmacyDetail() {
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-end gap-1.5">
                         {manageBtn}
-                        <MemberKebab onResetPassword={() => handleResetPassword(m.id)} onRemove={() => handleRemoveMember(m.id)} />
+                        <MemberKebab
+                          member={m}
+                          onResetPassword={() => handleResetPassword(m)}
+                          onToggleStatus={() => handleToggleStatus(m)}
+                          onRemove={() => setRemoveTarget(m)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -277,6 +286,8 @@ export default function AdminPharmacyDetail() {
         onSubmit={handleCreateUser}
       />
 
+      <ResetPasswordDialog reset={resetFor} onClose={() => setResetFor(null)} />
+
       <UserPermissionsDialog
         open={permDialogUser !== null}
         onClose={() => setPermDialogUser(null)}
@@ -296,11 +307,11 @@ export default function AdminPharmacyDetail() {
           permDialogUser?.role === "employee"
             ? [
                 { label: t("adminPharm.ceilingPharmacy"),  values: serverFeatures },
-                { label: t("adminPharm.ceilingOwners"),    values: permsArrayToRecord(detail.owners_union_permissions) },
+                { label: t("adminPharm.ceilingOwners"),    values: toFeatureRecord(detail.owners_union_permissions) },
               ]
             : [{ label: t("adminPharm.ceilingPharmacy"), values: serverFeatures }]
         }
-        serverPermissions={memberPermsToRecord(permDialogUser)}
+        serverPermissions={toFeatureRecord(permDialogUser?.granted_permissions)}
         isSaving={isSavingPerms}
         onSave={async (next) => {
           if (permDialogUser) await handleSavePerms(permDialogUser, next);
@@ -314,58 +325,16 @@ export default function AdminPharmacyDetail() {
         description={t("adminPharm.deletePharmacyDesc")}
         onConfirm={handleDelete}
       />
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        variant="destructive"
+        title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
+        description={t("members.removeDesc", { pharmacy: detail.name })}
+        onConfirm={handleConfirmRemove}
+      />
     </div>
   );
 }
 
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-// const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
-
-function allTo(v: boolean): Record<FeatureKey, boolean> {
-  const out = {} as Record<FeatureKey, boolean>;
-  for (const k of FEATURE_KEYS) out[k] = v;
-  return out;
-}
-
-function permsArrayToRecord(perms: readonly string[]): Record<FeatureKey, boolean> {
-  const set = new Set(perms);
-  const out = {} as Record<FeatureKey, boolean>;
-  for (const k of FEATURE_KEYS) out[k] = set.has(k);
-  return out;
-}
-
-function memberPermsToRecord(m: MemberOut | null): Record<FeatureKey, boolean> {
-  const set = new Set(m?.granted_permissions ?? []);
-  const out = {} as Record<FeatureKey, boolean>;
-  for (const k of FEATURE_KEYS) out[k] = set.has(k);
-  return out;
-}
-
-
-function MemberKebab({ onResetPassword, onRemove }: { onResetPassword: () => void; onRemove: () => void }) {
-  const t = useT();
-  return (
-    <KebabMenu>
-      {(close) => (
-        <>
-          <button
-            type="button"
-            onClick={() => { onResetPassword(); close(); }}
-            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-          >
-            {t("adminPharm.resetPassword")}
-          </button>
-          <button
-            type="button"
-            onClick={() => { onRemove(); close(); }}
-            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
-          >
-            {t("common.delete")}
-          </button>
-        </>
-      )}
-    </KebabMenu>
-  );
-}
