@@ -5,12 +5,10 @@ The routers keep the AUTH + SCOPE checks (require_admin, require_pharmacy_owner,
 "employee belongs to caller's pharmacy"); everything below assumes the caller
 is already allowed to act on `target`.
 
-Random passwords: `secrets.token_urlsafe(8)` (~11 chars). Returned ONCE to the
-caller; only the hash is stored.
+Passwords are typed by the admin / owner (create + reset); only the hash is
+stored.
 """
 from __future__ import annotations
-
-import secrets
 
 from sqlalchemy.orm import Session
 
@@ -68,17 +66,15 @@ def apply_permissions_bulk(db: Session, user_id: int, permissions: dict[str, boo
 
 
 def create_member(
-    db: Session, *, email: str, name: str | None, role: str, pharmacy_id: int,
-) -> tuple[User, str]:
+    db: Session, *, email: str, name: str | None, password: str, role: str, pharmacy_id: int,
+) -> User:
     """Create an active owner/employee with EVERY permission granted (client
     decision 2026-09-28 — effective access is still capped by the pharmacy /
-    owner ceiling at read time). Returns (user, cleartext temp password).
-    Caller checks email uniqueness first."""
-    temp_password = secrets.token_urlsafe(8)
+    owner ceiling at read time). Caller checks email uniqueness first."""
     user = User(
         email=email,
         name=name,
-        password_hash=hash_password(temp_password),
+        password_hash=hash_password(password),
         role=role,
         status="active",
         pharmacy_id=pharmacy_id,
@@ -88,7 +84,7 @@ def create_member(
     apply_permissions_bulk(db, user.id, {f: True for f in ALLOWED_FEATURES})
     db.commit()
     db.refresh(user)
-    return user, temp_password
+    return user
 
 
 def set_member_status(db: Session, target: User, status: str) -> None:
@@ -101,11 +97,9 @@ def set_member_status(db: Session, target: User, status: str) -> None:
         db.commit()
 
 
-def reset_member_password(db: Session, target: User) -> str:
-    """Regenerate a temp password + bump token_version so live sessions die.
-    Returns the cleartext password (shown once)."""
-    temp_password = secrets.token_urlsafe(8)
-    target.password_hash = hash_password(temp_password)
+def reset_member_password(db: Session, target: User, password: str) -> None:
+    """Set the password typed by the admin / owner + bump token_version so
+    live sessions die."""
+    target.password_hash = hash_password(password)
     target.token_version += 1
     db.commit()
-    return temp_password

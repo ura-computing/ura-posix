@@ -38,6 +38,7 @@ from schemas.admin_pharmacies import (
     CreateUserOut,
     MemberOut,
     PermissionsBulkSet,
+    ResetPasswordIn,
     ResetPasswordOut,
     StatusPatchIn,
 )
@@ -113,10 +114,8 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
     overridden silently. Pharmacy is implicit; body.pharmacy_id is ignored.
 
     Every permission is granted by default (effective access is still capped
-    by the pharmacy + owner ceiling at read time).
-
-    Generates a random temp password, returns the cleartext ONCE in the
-    response for the frontend's credentials-reveal + Gmail flow."""
+    by the pharmacy + owner ceiling at read time). The owner types the
+    password (body.password)."""
     pharmacy_id = require_pharmacy_owner(user, db)
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(
@@ -124,12 +123,12 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
             detail="Un utilisateur avec cet email existe déjà.",
         )
 
-    new_emp, temp_password = create_member(
-        db, email=body.email, name=body.full_name,
+    new_emp = create_member(
+        db, email=body.email, name=body.full_name, password=body.password,
         role="employee",                            # hardcoded — owner can't create co-owners
         pharmacy_id=pharmacy_id,
     )
-    return CreateUserOut(member=member_out(db, new_emp), temp_password=temp_password)
+    return CreateUserOut(member=member_out(db, new_emp))
 
 
 @router.put("/owner/employees/{employee_id}/permissions", response_model=MemberOut)
@@ -166,14 +165,16 @@ def set_employee_status(
 
 @router.post("/owner/employees/{employee_id}/reset-password", response_model=ResetPasswordOut)
 def reset_employee_password(
+    body: ResetPasswordIn,
     user: CurrentUserDep,
     db:   DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
-    """Regenerate a temp password + bump token_version so live sessions die."""
+    """Set the password the owner typed + bump token_version so live sessions die."""
     pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
-    return ResetPasswordOut(user_id=emp.id, temp_password=reset_member_password(db, emp))
+    reset_member_password(db, emp, body.password)
+    return ResetPasswordOut(user_id=emp.id)
 
 
 @router.delete("/owner/employees/{employee_id}")

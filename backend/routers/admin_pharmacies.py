@@ -52,6 +52,7 @@ from schemas.admin_pharmacies import (
     PharmacyDetail,
     PharmacyIn,
     PharmacyListRow,
+    ResetPasswordIn,
     ResetPasswordOut,
     StatusPatchIn,
 )
@@ -376,9 +377,8 @@ def create_user(
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> CreateUserOut:
-    """Admin creates an owner or employee account directly, with every
-    permission granted (see members.create_member). Returns the temp password
-    ONCE so the admin can email it (the frontend uses a Gmail compose link).
+    """Admin creates an owner or employee account directly, with the password
+    the admin typed and every permission granted (see members.create_member).
     Email must be unique app-wide."""
     require_admin(user)
     _get_pharmacy_or_404(db, pharmacy_id)
@@ -387,23 +387,26 @@ def create_user(
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="Un utilisateur avec cet email existe déjà.")
 
-    new_user, temp_password = create_member(
-        db, email=body.email, name=body.full_name, role=body.role, pharmacy_id=pharmacy_id,
+    new_user = create_member(
+        db, email=body.email, name=body.full_name, password=body.password,
+        role=body.role, pharmacy_id=pharmacy_id,
     )
-    return CreateUserOut(member=member_out(db, new_user), temp_password=temp_password)
+    return CreateUserOut(member=member_out(db, new_user))
 
 
 @router.post("/admin/users/{user_id}/reset-password", response_model=ResetPasswordOut)
 def reset_user_password(
+    body: ResetPasswordIn,
     user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
-    """Regenerate a temp password. Invalidates active sessions via
+    """Set the password the admin typed. Invalidates active sessions via
     token_version bump so the user must log in with the new password."""
     require_admin(user)
     target = _get_member_or_404(db, user_id)
-    return ResetPasswordOut(user_id=target.id, temp_password=reset_member_password(db, target))
+    reset_member_password(db, target, body.password)
+    return ResetPasswordOut(user_id=target.id)
 
 
 @router.patch("/admin/users/{user_id}/status", response_model=MemberOut)

@@ -1,27 +1,24 @@
 /** Create a new owner or employee account (Screen 5).
  *
  *  TWO-STATE dialog:
- *    A. FORM    — full_name + email + role (owner/employee) + pharmacy picker.
- *                 The pharmacy picker is preselected when `defaultPharmacyId`
- *                 is set (caller is on Screen 2 for that pharmacy), but still
- *                 shown so the admin can override.
- *    B. REVEAL  — after a successful POST, show the one-time temp_password
- *                 with a "Copier" button + an "Ouvrir dans Gmail" compose button
+ *    A. FORM    — full_name + email + password + role (owner/employee) +
+ *                 pharmacy picker. The admin / owner TYPES the password
+ *                 (end users aren't tech-savvy). The pharmacy picker is
+ *                 preselected when `defaultPharmacyId` is set.
+ *    B. REVEAL  — after a successful POST, recap the credentials with a
+ *                 "Copier" button + an "Ouvrir dans Gmail" compose button
  *                 + a "Fermer" button. The dialog NEVER returns to form state
  *                 in the same lifecycle — closing fully resets via onClose.
  *
- *  The reveal IS the only chance to see the cleartext password (backend
- *  doesn't persist it). The Gmail link opens a compose tab with the email
- *  pre-filled in `to:` and the credentials in the body.
- *
- *  `ResetPasswordDialog` (below) reuses the same reveal for password resets
- *  so admin + owner get one consistent credentials flow.
+ *  `ResetPasswordDialog` (below) uses the same form → reveal flow for password
+ *  resets so admin + owner get one consistent credentials flow.
  */
 import { useState } from "react";
 import { CheckCircle2, Copy, KeyRound, Loader2, Mail, UserPlus, X } from "lucide-react";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/components/shared/AsyncButton";
+import { PasswordField } from "@/components/shared/PasswordField";
 import { SingleSelectPopover } from "@/components/shared/SingleSelectPopover";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ROLE_LABEL } from "./constants";
@@ -65,13 +62,14 @@ export function CreateUserDialog({
   const initialValues: CreateUserIn = {
     full_name:   "",
     email:       "",
+    password:    "",
     role:        initialRole,
     pharmacy_id: defaultPharmacyId ?? pharmacies[0]?.id ?? 0,
   };
 
   const [values, setValues] = useState<CreateUserIn>(initialValues);
   /** Reveal state — non-null after a successful create. */
-  const [revealed, setRevealed] = useState<CreateUserOut | null>(null);
+  const [revealed, setRevealed] = useState<{ member: MemberOut; password: string } | null>(null);
 
   // Reset everything when the dialog (re)opens — uses the recommended
   // "derive state from a prop change" pattern instead of useEffect, so we
@@ -91,7 +89,7 @@ export function CreateUserDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = await onSubmit(values);
-    setRevealed(result);
+    setRevealed({ member: result.member, password: values.password });
   };
 
   const assignHint =
@@ -120,10 +118,20 @@ export function CreateUserDialog({
               <Input type="email" value={values.email} onChange={(v) => set("email", v)} placeholder="karim.bennani@pharmacentre.ma" required />
             </Field>
 
+            <PasswordField
+              label={t("adminPharm.password")}
+              hint={t("adminPharm.passwordMinHint")}
+              value={values.password}
+              onChange={(e) => set("password", e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+
             {/* Rôle radio — hidden when roleLocked is set (owner-side caller
                 forces "employee"; admin-side caller shows the choice). */}
             {!roleLocked && (
-              <Field label={t("adminPharm.role")} required>
+              <Field label={t("adminPharm.role")} required group>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(["owner", "employee"] as const).map((role) => {
                     const selected = values.role === role;
@@ -152,7 +160,7 @@ export function CreateUserDialog({
               </Field>
             )}
 
-            <Field label={t("adminPharm.assignedPharmacy")} required hint={assignHint}>
+            <Field label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
               <SingleSelectPopover
                 label=""
                 options={pharmacies.map((p) => ({
@@ -180,7 +188,7 @@ export function CreateUserDialog({
         {revealed && (
           <CredentialsReveal
             member={revealed.member}
-            tempPassword={revealed.temp_password}
+            tempPassword={revealed.password}
             banner={t("adminPharm.accountCreatedFor", { name: revealed.member.full_name ?? revealed.member.email })}
             kind="create"
             onClose={onClose}
@@ -193,29 +201,79 @@ export function CreateUserDialog({
 
 
 export interface ResetPasswordDialogProps {
-  /** Member + fresh temp password from the reset mutation; null = closed. */
-  reset:   { member: MemberOut; tempPassword: string } | null;
-  onClose: () => void;
+  /** Member whose password is being reset; null = closed. */
+  member:   MemberOut | null;
+  onClose:  () => void;
+  /** Fires the reset mutation with the typed password; on success the
+   *  dialog flips to the reveal state. */
+  onSubmit: (password: string) => Promise<unknown>;
 }
 
 
-/** Same reveal as CreateUserDialog's state B, for password resets. */
-export function ResetPasswordDialog({ reset, onClose }: ResetPasswordDialogProps) {
+/** Two states like CreateUserDialog: A. new-password form → B. reveal. */
+export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPasswordDialogProps) {
   const t = useT();
+  const [password, setPassword] = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [done,     setDone]     = useState(false);
+
+  // Reset on (re)open — same derive-from-prop pattern as CreateUserDialog.
+  const [prevMember, setPrevMember] = useState(member);
+  if (member !== prevMember) {
+    setPrevMember(member);
+    setPassword("");
+    setSaving(false);
+    setDone(false);
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSubmit(password);
+      setDone(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Dialog open={reset !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open={member !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHead
-          icon={<KeyRound className="size-4" />}
-          title={t("adminPharm.passwordReset")}
+          icon={done ? <CheckCircle2 className="size-4" /> : <KeyRound className="size-4" />}
+          title={done ? t("adminPharm.passwordReset") : t("members.resetPassword")}
           subtitle={t("adminPharm.resetSubtitle")}
           onClose={onClose}
         />
-        {reset && (
+        {member && !done && (
+          <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
+            <PasswordField
+              label={t("adminPharm.newPassword")}
+              hint={t("adminPharm.passwordMinHint")}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+              autoFocus
+            />
+            <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+              <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
+                {t("common.cancel")}
+              </AsyncButton>
+              <AsyncButton type="submit" variant="primary" disabled={saving}>
+                {saving && <Loader2 className="size-3.5 animate-spin" />}
+                {t("common.save")}
+              </AsyncButton>
+            </div>
+          </form>
+        )}
+        {member && done && (
           <CredentialsReveal
-            member={reset.member}
-            tempPassword={reset.tempPassword}
-            banner={t("adminPharm.passwordResetFor", { name: reset.member.full_name ?? reset.member.email })}
+            member={member}
+            tempPassword={password}
+            banner={t("adminPharm.passwordResetFor", { name: member.full_name ?? member.email })}
             kind="reset"
             onClose={onClose}
           />
@@ -249,7 +307,7 @@ function DialogHead({ icon, title, subtitle, onClose }: { icon: React.ReactNode;
 
 type MailKind = "create" | "reset";
 
-/** Banner + one-time temp password (copy) + Gmail / close footer. */
+/** Banner + the password just set (copy) + Gmail / close footer. */
 function CredentialsReveal({
   member, tempPassword, banner, kind, onClose,
 }: {
@@ -277,7 +335,7 @@ function CredentialsReveal({
         </span>
       </div>
 
-      <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")}>
+      <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")} group>
         <div className="flex items-center gap-2">
           <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
             {tempPassword}
@@ -336,16 +394,20 @@ function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, 
 
 // ─── Tiny inline form primitives (kept inline to avoid one-off shared/ files) ──
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+/** `group`: children are buttons (role cards, picker, copy) — render a
+ *  div role="group", not a <label>: a <label> names its first button after the
+ *  whole block (the Propriétaire card was announced "Rôle* Employé…"). */
+function Field({ label, required, hint, group, children }: { label: string; required?: boolean; hint?: string; group?: boolean; children: React.ReactNode }) {
+  const Tag = group ? "div" : "label";
   return (
-    <label className="flex flex-col gap-1.5">
+    <Tag className="flex flex-col gap-1.5" {...(group ? { role: "group", "aria-label": label } : {})}>
       <span className="text-sm font-medium text-foreground">
         {label}
         {required && <span className="ml-1 text-error">*</span>}
       </span>
       {children}
       {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
-    </label>
+    </Tag>
   );
 }
 

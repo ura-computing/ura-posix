@@ -37,8 +37,8 @@ export function setEmployeeStatus(employeeId: number, status: MemberStatus): Pro
   return api(`/owner/employees/${employeeId}/status`, { method: "PATCH", body: { status } });
 }
 
-export function resetEmployeePassword(employeeId: number): Promise<ResetPasswordOut> {
-  return api(`/owner/employees/${employeeId}/reset-password`, { method: "POST" });
+export function resetEmployeePassword(employeeId: number, password: string): Promise<ResetPasswordOut> {
+  return api(`/owner/employees/${employeeId}/reset-password`, { method: "POST", body: { password } });
 }
 
 export function deleteEmployee(employeeId: number): Promise<{ deleted: boolean }> {

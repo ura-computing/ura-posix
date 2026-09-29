@@ -19,21 +19,15 @@ need access to any local files to use it.
 ## 1. Project & repo
 - **Product:** PharmaGest — a management dashboard for Moroccan pharmacies (achats/ventes/
   stock/comptabilité/marges), client-facing. UI languages: **French ⇄ Spanish**.
-- **Active repo (all work happens here):** `~/Desktop/personal/apcm/apcm-refactor`
-  - Git remote `origin` = `git@github.com:mohammedhrima/apcm-pharma.git`
-    (GitHub: `https://github.com/mohammedhrima/apcm-pharma`). **Naming trap:** the remote is
-    *named* "apcm-pharma" but this IS the apcm-refactor codebase — that's correct, not a mistake.
-  - Work on branch **`dev`**; merge to `main` via PRs (private repo).
-- **Read-only reference (never write here):** `~/Desktop/personal/apcm/apcm-pharma` — the OLD
-  app, kept only for behavior comparisons. Its `docs/APCM_CONTEXT.md` is the compacted project
-  history (domain formulas, QA tickets, conventions) — read it if available.
-- **Run it:**
-  - Backend: `cd backend && make backend` (FastAPI + uvicorn on :8000, `--reload`). Needs
-    **Postgres** with the `unaccent` extension. Migrations: `alembic upgrade head` (current
-    head = `0018`). Python deps via `uv` / the `.venv`.
-  - Frontend: Vite dev server on :5173 (React + TypeScript).
-  - Tests: backend `.venv/bin/python -m pytest` (a separate `apcm_test` DB, auto-migrated);
-    frontend `npx tsc -b` + `npx vitest run`.
+- **Repo:** `git@github.com:mohammedhrima/apcm-pharma.git` (private). Work on feature
+  branches; merge to `main` via PRs.
+- **Read-only reference (never write there):** the OLD app (separate checkout), kept only for
+  behavior comparisons. Its `docs/APCM_CONTEXT.md` is the compacted project history.
+- **Run it:** `make install` (first time) → `make db` → `make migrate` → `make seed` → `make dev`
+  (backend uvicorn :8000 with reload, frontend Vite :5173). Needs Postgres with `unaccent`
+  (dockerized by `make db`). Alembic head = `0019` (medicament normalized-name index).
+- **Tests:** Playwright end-to-end only — `make e2e-tests` (headless) / `make e2e-ui` (real
+  browser). The script asks its inputs (Enter = default). See §2 "E2E".
 
 ---
 
@@ -49,8 +43,11 @@ need access to any local files to use it.
 - `*_queries.py` — the heavy computation: `stats_queries.py` (dashboard/comptabilité KPIs +
   monthly trend), `analyse_queries.py` (/analyses — 8 modes), `stock_queries.py` (ABCD).
 - `exclusions.py` — shared filters: `non_declared_sub` (excluded products),
-  `achat_bl_filter` (excluded BLs), `achat_supplier_filter` (excluded suppliers), and the
-  combined `achat_exclusion_filter` (BL AND supplier) applied to every achat-side aggregate.
+  `achat_bl_filter` (excluded BLs), `achat_supplier_filter` (excluded suppliers),
+  `achat_exclusion_filter` (BL AND supplier) and `excluded_medicaments_select` (the med-level
+  union). Applied **only in the Comptabilité view** (`include_non_declared=false`), see §4.
+- `members.py` — shared owner/employee lifecycle (create with typed password + all
+  permissions, status, reset password) used by `admin_pharmacies.py` and `owner_employees.py`.
 - `search.py` — tokenized search with `*` wildcard (see §4). `csv_parse.py` — Sobrus CSV
   parsing + `upsert_medicament` / `existing_by_name` (import de-dup).
 
@@ -63,14 +60,26 @@ lucide-react:
 - `utils/format.tsx` — currency/qty/**percentage** formatters. `utils/text.ts` — client search.
 - **i18n** (`src/i18n/`) — custom, dependency-free: `useT()` hook, `locales/fr.ts` +
   `locales/es.ts` (must have identical key sets — a parity test enforces it), `LanguageToggle`.
+- `components/shared/members/` — CreateUserDialog (+ ResetPasswordDialog), MemberKebab,
+  UserPermissionsDialog, FeaturePills, constants: shared by the admin pharmacy page and the
+  owner's "Gérer mon équipe" page.
+
+**E2E** (`e2e/` + `resources/tests/`) — the only test suite:
+- `resources/tests/generate.py` writes huge Sobrus-format CSVs (achats / ventes / stock) and
+  `resources/tests/oracle.py` computes every value the app must return → `expected.json`.
+- Playwright specs drive the real UI (fresh `apcm_e2e` DB, ports 8001 / 5174) and compare every
+  field of every API response with the oracle. `99-gates.spec.ts` fails if any backend route is
+  never called (store-website allowlisted for now) or a route got > 20 % slower than
+  `perf-baseline.json`.
 
 ---
 
 ## 3. HARD RULES (do not violate)
 **Git / workflow**
 - **Never commit or push without explicit permission.** Wait to be told, every time.
-- Git writes happen **only** in `apcm-refactor`. The local `apcm-pharma` repo is READ-ONLY —
-  never stage/commit/push there, never "clean" its dirty tree.
+- Git writes happen **only** in this repo. The old-app checkout is READ-ONLY — never
+  stage/commit/push there, never "clean" its dirty tree.
+- The agent never runs shell commands; the owner runs them (see `CLAUDE.md` "Commands").
 - Commit messages must **NOT** include an Anthropic / AI co-author trailer (omit `Co-Authored-By`).
 - Shell cwd resets between commands — always use `git -C <path>` or re-`cd`.
 - After a batch of work, offer a client/manager-facing `.md` change report (the owner sends it
@@ -85,6 +94,13 @@ lucide-react:
   `es.ts`; keep the key-parity test green. Server error messages stay French (out of i18n scope).
   Hidden pages (`dev/*`, `store-website/*`) are lower priority.
 - **Pharmacy code** convention: city-derived, e.g. Bouskoura → `BOU0001`.
+
+**Product rules** (client decisions — full list in `CLAUDE.md` "Product rules")
+- Users are not tech-savvy → simplest UX.
+- Admin / owner **type** the password on user create + reset; credentials are sent with the
+  "Ouvrir dans Gmail" button (Gmail web compose, no mailto).
+- Never `window.alert/confirm/prompt` → `ConfirmDialog` or a toast.
+- New pharmacy / new user: every feature / permission ON by default.
 
 ---
 
@@ -107,13 +123,15 @@ lucide-react:
     `analyse_queries.py`). (Historically Laboratoire used the sparse `Medicament.laboratoire`
     catalogue attribute — deliberately changed to the supplier the pharmacist buys from.)
 - **Exclusions** (all owner-managed, reversible, non-destructive; feature-gated
-  `special_products`):
-  - **Product** (`pharmacy_medicament_status.declared=False`) → filtered from **both** ventes
-    and achats; toggle-able on some pages ("Inclure les produits spéciaux").
-  - **BL** (`delivery_ref`) and **Supplier** (`Achat.supplier`, accent/case-insensitive) →
-    **achats-side only** (sales carry neither). Applied via `achat_exclusion_filter`.
-  - Comptabilité KPIs respect all of these; the manually-entered payment-method amounts do not
-    (they aren't derived from sales).
+  `special_products`) — **apply ONLY in Comptabilité** (`include_non_declared=false`, user
+  decision 2026-08-01). Everywhere else (Rapport, Analyses, Ventes, Achats, Stock, Alertes)
+  every product, BL and supplier is included.
+  - Kinds: **Product** (`pharmacy_medicament_status.declared=False`), **BL** (`delivery_ref`),
+    **Supplier** (`Achat.supplier`, accent/case-insensitive).
+  - In Comptabilité the three are unified at medicament level (`excluded_medicaments_select`):
+    every product on an excluded BL / from an excluded supplier drops from **both** ventes and
+    achats, exactly like a special product.
+  - The manually-entered payment-method amounts are never excluded (not derived from sales).
 - **Import de-dup:** achat/vente + catalog imports merge a product by **normalized name**
   (accent/case-insensitive, whitespace-collapsed) so the same product doesn't fork into two
   `Medicament` rows with different PIDs (`csv_parse.existing_by_name`).
@@ -121,7 +139,21 @@ lucide-react:
 ---
 
 ## 5. Recent work (chat-session history summary)
-Everything below is already committed on `dev` (latest: `c85c363`).
+Latest session (2026-09-28 → 29):
+- **Members**: shared components (`components/shared/members/`) + backend `members.py`; admin
+  and owner pages behave the same (Désactiver/Réactiver, delete via ConfirmDialog, one kebab).
+- **Passwords typed** by admin / owner on create + reset (reset dialog = same reveal as
+  create); credentials sent with an "Ouvrir dans Gmail" button (no mailto).
+- **Defaults**: every feature / permission ON for a new pharmacy / new user.
+- **404 inside the layout** for pages without access (user can still log out).
+- **Fixes**: `/alertes` date filter lost the start date (stale closure); `/ventes?include_non_declared=false`
+  crashed (undefined `db`); Achats sort by PPH crashed (not an `Achat` column); role cards in
+  CreateUserDialog mislabeled for screen readers (`<label>` around buttons).
+- **Removed**: Chrome-extension multipart endpoints `/uploads/achat` + `/uploads/vente`.
+- **E2E suite** (`e2e/`, `resources/tests/`) replacing pytest / vitest; `REVIEW.md` lists the
+  open backend issues for the microservice split.
+
+Earlier (already on `main`):
 1. **i18n FR ⇄ ES** across the whole authenticated UI (custom engine, `LanguageToggle`,
    key-parity test). Excel export headers kept French.
 2. **Percentages → 2 decimals + French comma** everywhere on-screen (central `formatPct`
@@ -134,17 +166,16 @@ Everything below is already committed on `dev` (latest: `c85c363`).
 6. **/analyses "Laboratoire" tab → non-grossiste supplier axis** (WELEDA & ~200 direct suppliers
    now appear). Shared `_supplier_axis` engine with Grossiste.
 7. **Alertes detail modal** widened (`max-w-[1400px]`) + text columns wrap = no horizontal scroll.
-- A prior obsolete backfill migration (`0019`, `Medicament.laboratoire`) was **removed** once the
-  Laboratoire axis moved to suppliers; dev DB is back at head `0018`.
-- Verified each step: backend **395** pytest pass, frontend **171** vitest pass (incl. i18n parity).
+- The old backfill migration `0019` (`Medicament.laboratoire`) was removed; today's `0019` is
+  the medicament normalized-name index (import de-dup lookup).
 
 ---
 
 ## 6. Deeper references (only for an agent WITH local/repo access)
-- Compacted project history & QA tickets: `apcm-pharma/docs/APCM_CONTEXT.md` (old-app repo).
-- Persistent rules (already distilled above): `~/.claude/projects/-Users-hrimamohammed-Desktop-personal-apcm-apcm-pharma/memory/` (`MEMORY.md` + `apcm-*.md`).
-- Full chat transcript (very large, ~45 MB JSON-lines): same `…/…-apcm-pharma/<session-id>.jsonl`.
-- These are **local & private** — an external agent can't fetch them; use this brief instead.
+- `CLAUDE.md` — how the agent must work + product rules.
+- `REVIEW.md` — open backend issues / blockers for the microservice split.
+- `e2e/` + `resources/tests/` — the test suite and its oracle (expected values per field).
+- Old-app history & QA tickets: `docs/APCM_CONTEXT.md` in the old-app checkout.
 
 ---
 

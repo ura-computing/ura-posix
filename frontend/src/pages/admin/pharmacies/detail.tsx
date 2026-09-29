@@ -50,7 +50,7 @@ export default function AdminPharmacyDetail() {
   const [createUserOpen,  setCreateUserOpen]  = useState(false);
   const [permDialogUser,  setPermDialogUser]  = useState<MemberOut | null>(null);
   const [deleteOpen,      setDeleteOpen]      = useState(false);
-  const [resetFor,        setResetFor]        = useState<{ member: MemberOut; tempPassword: string } | null>(null);
+  const [resetTarget,     setResetTarget]     = useState<MemberOut | null>(null);
   const [removeTarget,    setRemoveTarget]    = useState<MemberOut | null>(null);
 
   // Pending feature toggles — separate from the server values; resets after save.
@@ -97,9 +97,8 @@ export default function AdminPharmacyDetail() {
     await archiveMut.mutateAsync();
     nav(ROUTES.ADMIN_PHARMACIES);
   };
-  const handleResetPassword = async (member: MemberOut) => {
-    const result = await resetPwdMut.mutateAsync(member.id);
-    setResetFor({ member, tempPassword: result.temp_password });
+  const handleResetPassword = async (password: string) => {
+    if (resetTarget) await resetPwdMut.mutateAsync({ userId: resetTarget.id, password });
   };
   const handleToggleStatus = async (member: MemberOut) => {
     const status = member.status === "active" ? "inactive" : "active";
@@ -252,7 +251,7 @@ export default function AdminPharmacyDetail() {
                         {manageBtn}
                         <MemberKebab
                           member={m}
-                          onResetPassword={() => handleResetPassword(m)}
+                          onResetPassword={() => setResetTarget(m)}
                           onToggleStatus={() => handleToggleStatus(m)}
                           onRemove={() => setRemoveTarget(m)}
                         />
@@ -286,7 +285,7 @@ export default function AdminPharmacyDetail() {
         onSubmit={handleCreateUser}
       />
 
-      <ResetPasswordDialog reset={resetFor} onClose={() => setResetFor(null)} />
+      <ResetPasswordDialog member={resetTarget} onClose={() => setResetTarget(null)} onSubmit={handleResetPassword} />
 
       <UserPermissionsDialog
         open={permDialogUser !== null}

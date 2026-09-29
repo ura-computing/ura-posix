@@ -18,5 +18,6 @@
 
 
 
-Sobrus - Achats 2025-01-01 - 2025-12-31-2
-Sobrus - Achats 2026-01-01 - 2026-03-31-2
++ reduce makfile comnands
++ reduce code verbosity
+

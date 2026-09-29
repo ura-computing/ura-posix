@@ -46,7 +46,7 @@ export default function OwnerEmployeesPage() {
   const [createOpen,     setCreateOpen]     = useState(false);
   const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
   const [removeTarget,   setRemoveTarget]   = useState<MemberOut | null>(null);
-  const [resetFor,       setResetFor]       = useState<{ member: MemberOut; tempPassword: string } | null>(null);
+  const [resetTarget,    setResetTarget]    = useState<MemberOut | null>(null);
 
   const q = useOwnerEmployees();
   const createMut   = useCreateEmployee();
@@ -76,9 +76,8 @@ export default function OwnerEmployeesPage() {
     setPermDialogUser(null);
   };
 
-  const handleResetPassword = async (employee: MemberOut) => {
-    const result = await resetPwdMut.mutateAsync(employee.id);
-    setResetFor({ member: employee, tempPassword: result.temp_password });
+  const handleResetPassword = async (password: string) => {
+    if (resetTarget) await resetPwdMut.mutateAsync({ employeeId: resetTarget.id, password });
   };
 
   const handleToggleStatus = async (employee: MemberOut) => {
@@ -222,7 +221,7 @@ export default function OwnerEmployeesPage() {
                       </button>
                       <MemberKebab
                         member={m}
-                        onResetPassword={() => handleResetPassword(m)}
+                        onResetPassword={() => setResetTarget(m)}
                         onToggleStatus={() => handleToggleStatus(m)}
                         onRemove={() => setRemoveTarget(m)}
                       />
@@ -245,7 +244,7 @@ export default function OwnerEmployeesPage() {
         onSubmit={handleCreate}
       />
 
-      <ResetPasswordDialog reset={resetFor} onClose={() => setResetFor(null)} />
+      <ResetPasswordDialog member={resetTarget} onClose={() => setResetTarget(null)} onSubmit={handleResetPassword} />
 
       <UserPermissionsDialog
         open={permDialogUser !== null}

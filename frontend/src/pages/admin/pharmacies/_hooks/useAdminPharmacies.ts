@@ -128,7 +128,10 @@ export function useSetUserPermissions(pharmacyId: number) {
 }
 
 export function useResetUserPassword() {
-  return useMutation({ mutationFn: (userId: number) => resetUserPassword(userId) });
+  return useMutation({
+    mutationFn: ({ userId, password }: { userId: number; password: string }) =>
+      resetUserPassword(userId, password),
+  });
 }
 
 export function useSetUserStatus(pharmacyId: number) {
