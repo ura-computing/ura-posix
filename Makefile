@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks
+.PHONY: help install dev backend frontend cli migrate seed db demo down clean logs test test-backend test-frontend install-hooks e2e-tests e2e-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -143,3 +143,15 @@ test-frontend:
 
 install-hooks:
 	@bash scripts/install-hooks.sh
+
+# ── End-to-end (Playwright) ─────────────────────────────────────────────────
+# Two commands. The script asks for its inputs (Enter = default); with no
+# terminal (git pre-push) it uses the defaults. First run installs Playwright.
+#   make e2e-tests   headless, every test
+#   make e2e-ui      real browser, slowed down; asks which test file
+
+e2e-tests:
+	@bash e2e/scripts/run.sh tests
+
+e2e-ui:
+	@bash e2e/scripts/run.sh ui

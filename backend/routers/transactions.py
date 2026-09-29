@@ -85,7 +85,7 @@ def _check_export_cap(export: bool, total: int) -> None:
 
 
 # Sort whitelists — narrow + explicit so no SQL injection vector via sort_by.
-ACHAT_SORT  = {"id", "delivery_date", "delivery_ref", "supplier", "quantity", "pph", "unit_price", "total", "expiry_date"}
+ACHAT_SORT  = {"id", "delivery_date", "delivery_ref", "supplier", "quantity", "unit_price", "total", "expiry_date"}
 VENTE_SORT  = {"id", "date", "transaction_ref", "client", "quantity", "discount", "unit_price", "total"}
 
 
@@ -174,7 +174,7 @@ def _apply_vente_filters(
     """Reusable WHERE-chain shared by list + surveillance-counts."""
     q = q.filter(Vente.pharmacy_id == pharmacy_id)
     if not include_non_declared:
-        q = q.filter(Vente.medicament_id.notin_(_non_declared_sub(db, pharmacy_id)))
+        q = q.filter(Vente.medicament_id.notin_(_non_declared_sub(q.session, pharmacy_id)))
     if date_from:
         q = q.filter(Vente.date >= date_from)
     if date_to:
@@ -298,9 +298,11 @@ def list_achats(
 
     _check_export_cap(export, total)
 
-    # PG-014: Produit/Catégorie sort via the (always-joined) Medicament.
+    # PG-014: Produit/Catégorie/PPH sort via the (always-joined) Medicament —
+    # PPH is a catalogue column, not an Achat one.
     sorted_q = _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id",
-                           extra_cols={"product": Medicament.product, "category": Medicament.category})
+                           extra_cols={"product": Medicament.product, "category": Medicament.category,
+                                       "pph": Medicament.pph})
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
     # Bulk-load medicaments into the session identity map so _achat_to_row's

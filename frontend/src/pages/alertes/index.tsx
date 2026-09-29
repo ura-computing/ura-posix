@@ -28,7 +28,7 @@ export default function AlertesPage() {
     (a.dateFrom || a.dateTo) ? {
       key:    "dates",
       label:  <>{t("dashboard.periode")} {a.dateFrom || "…"} → {a.dateTo || "…"}</>,
-      onClear: () => { a.setDateFrom(""); a.setDateTo(""); },
+      onClear: () => a.setPeriod(null, null),
     } : null,
     a.category !== "all" ? {
       key:    "cat",
@@ -50,7 +50,7 @@ export default function AlertesPage() {
         dateRange={{
           from:     a.dateFrom || null,
           to:       a.dateTo || null,
-          onChange: (from, to) => { a.setDateFrom(from ?? ""); a.setDateTo(to ?? ""); },
+          onChange: (from, to) => a.setPeriod(from, to),
         }}
         segment={{
           value:    a.category,

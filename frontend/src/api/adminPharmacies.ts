@@ -65,8 +65,8 @@ export function setUserPermissions(
   return api(`/admin/users/${userId}/permissions`, { method: "PUT", body: { permissions } });
 }
 
-export function resetUserPassword(userId: number): Promise<ResetPasswordOut> {
-  return api(`/admin/users/${userId}/reset-password`, { method: "POST" });
+export function resetUserPassword(userId: number, password: string): Promise<ResetPasswordOut> {
+  return api(`/admin/users/${userId}/reset-password`, { method: "POST", body: { password } });
 }
 
 export function setUserStatus(userId: number, status: MemberStatus): Promise<MemberOut> {

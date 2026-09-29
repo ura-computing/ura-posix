@@ -4,10 +4,12 @@ import { PharmagestIcon } from "@/components/shared/PharmagestIcon";
 import { ROUTES } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
-export default function NotFoundPage() {
+/** `embedded` = rendered inside AppLayout (sidebar + header stay visible, so a
+ *  user without access can still navigate or log out). */
+export default function NotFoundPage({ embedded = false }: { embedded?: boolean }) {
   const t = useT();
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className={embedded ? "flex h-full flex-col text-foreground" : "flex min-h-screen flex-col bg-background text-foreground"}>
       <style>{`
         @keyframes pg-rotate { to { transform: rotate(360deg) } }
         @keyframes pg-fade-up { from { transform: translateY(18px) } to { transform: none } }
@@ -23,16 +25,18 @@ export default function NotFoundPage() {
         }
       `}</style>
 
-      <header className="flex items-center justify-between px-7 py-6">
-        <Link
-          to={ROUTES.HOME}
-          aria-label={t("home.logoAlt")}
-          className="flex items-center gap-3 text-base font-extrabold tracking-tight rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-        >
-          <PharmagestIcon className="h-[30px] w-[30px] text-primary" ariaHidden />
-          <span>Pharma<span className="text-primary">Gest</span></span>
-        </Link>
-      </header>
+      {!embedded && (
+        <header className="flex items-center justify-between px-7 py-6">
+          <Link
+            to={ROUTES.HOME}
+            aria-label={t("home.logoAlt")}
+            className="flex items-center gap-3 text-base font-extrabold tracking-tight rounded-md focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+          >
+            <PharmagestIcon className="h-[30px] w-[30px] text-primary" ariaHidden />
+            <span>Pharma<span className="text-primary">Gest</span></span>
+          </Link>
+        </header>
+      )}
 
       <main className="flex flex-1 items-center justify-center px-6">
         <div className="flex w-full max-w-[540px] flex-col items-center gap-7 text-center">
@@ -75,9 +79,11 @@ export default function NotFoundPage() {
         </div>
       </main>
 
-      <footer className="px-7 py-5 text-center text-xs text-muted-foreground">
-        {t("misc.footer")}
-      </footer>
+      {!embedded && (
+        <footer className="px-7 py-5 text-center text-xs text-muted-foreground">
+          {t("misc.footer")}
+        </footer>
+      )}
     </div>
   );
 }

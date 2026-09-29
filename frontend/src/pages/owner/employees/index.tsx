@@ -6,21 +6,22 @@
  *  Section B: employees table + actions (Inviter / Gérer les permissions /
  *    Réinitialiser / Désactiver / Supprimer).
  *
- *  Reuses admin's CreateUserDialog (role locked to "employee" via the
- *  roleLocked prop) and UserPermissionsDialog (generalized to N ceiling
- *  layers — we pass [Pharmacie, Vous]). */
+ *  Shares components/shared/members/ with the admin pharmacy page:
+ *  CreateUserDialog (role locked to "employee" via the roleLocked prop),
+ *  UserPermissionsDialog (N ceiling layers — we pass [Pharmacie, Vous]) and
+ *  MemberKebab. */
 import { useState } from "react";
-import { RefreshCw, SlidersHorizontal, Trash2, UserPlus, Users } from "lucide-react";
+import { SlidersHorizontal, UserPlus, Users } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { KebabMenu } from "@/components/shared/KebabMenu";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { CreateUserDialog } from "@/pages/admin/pharmacies/_components/CreateUserDialog";
-import { UserPermissionsDialog } from "@/pages/admin/pharmacies/_components/UserPermissionsDialog";
-import { FEATURES, ROLE_LABEL, STATUS_LABEL, type FeatureKey } from "@/pages/admin/pharmacies/_components/constants";
-import { FeaturePills } from "@/pages/admin/pharmacies/_components/FeaturePills";
+import { CreateUserDialog, ResetPasswordDialog } from "@/components/shared/members/CreateUserDialog";
+import { FeaturePills } from "@/components/shared/members/FeaturePills";
+import { MemberKebab } from "@/components/shared/members/MemberKebab";
+import { UserPermissionsDialog } from "@/components/shared/members/UserPermissionsDialog";
+import { FEATURES, ROLE_LABEL, STATUS_LABEL, toFeatureRecord, type FeatureKey } from "@/components/shared/members/constants";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/utils/cn";
 import type { CreateUserIn, CreateUserOut, MemberOut } from "@/types";
@@ -36,7 +37,6 @@ import {
 
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
-const FEATURE_KEYS = ["rapports", "import", "achats", "ventes", "stock", "analyse", "accounting", "alertes", "special_products"] as const;
 
 
 export default function OwnerEmployeesPage() {
@@ -46,6 +46,7 @@ export default function OwnerEmployeesPage() {
   const [createOpen,     setCreateOpen]     = useState(false);
   const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
   const [removeTarget,   setRemoveTarget]   = useState<MemberOut | null>(null);
+  const [resetTarget,    setResetTarget]    = useState<MemberOut | null>(null);
 
   const q = useOwnerEmployees();
   const createMut   = useCreateEmployee();
@@ -63,8 +64,8 @@ export default function OwnerEmployeesPage() {
   }
 
   const { employees, pharmacy_features, my_permissions } = q.data;
-  const pharmFeats = toRecord(pharmacy_features);
-  const myPerms    = toRecord(my_permissions);
+  const pharmFeats = toFeatureRecord(pharmacy_features);
+  const myPerms    = toFeatureRecord(my_permissions);
 
   const handleCreate = async (v: CreateUserIn): Promise<CreateUserOut> =>
     createMut.mutateAsync(v);
@@ -75,9 +76,8 @@ export default function OwnerEmployeesPage() {
     setPermDialogUser(null);
   };
 
-  const handleResetPassword = async (employeeId: number) => {
-    const result = await resetPwdMut.mutateAsync(employeeId);
-    window.alert(t("employees.newPasswordAlert", { pwd: result.temp_password }));
+  const handleResetPassword = async (password: string) => {
+    if (resetTarget) await resetPwdMut.mutateAsync({ employeeId: resetTarget.id, password });
   };
 
   const handleToggleStatus = async (employee: MemberOut) => {
@@ -219,9 +219,9 @@ export default function OwnerEmployeesPage() {
                         <SlidersHorizontal className="size-3.5" />
                         {t("employees.managePerms")}
                       </button>
-                      <EmployeeKebab
-                        employee={m}
-                        onResetPassword={() => handleResetPassword(m.id)}
+                      <MemberKebab
+                        member={m}
+                        onResetPassword={() => setResetTarget(m)}
                         onToggleStatus={() => handleToggleStatus(m)}
                         onRemove={() => setRemoveTarget(m)}
                       />
@@ -244,6 +244,8 @@ export default function OwnerEmployeesPage() {
         onSubmit={handleCreate}
       />
 
+      <ResetPasswordDialog member={resetTarget} onClose={() => setResetTarget(null)} onSubmit={handleResetPassword} />
+
       <UserPermissionsDialog
         open={permDialogUser !== null}
         onClose={() => setPermDialogUser(null)}
@@ -253,7 +255,7 @@ export default function OwnerEmployeesPage() {
           { label: t("employees.ceilingPharmacy"), values: pharmFeats },
           { label: t("employees.ceilingYou"),      values: myPerms    },
         ]}
-        serverPermissions={memberPermsToRecord(permDialogUser)}
+        serverPermissions={toFeatureRecord(permDialogUser?.granted_permissions)}
         isSaving={permsMut.isPending}
         onSave={handleSavePerms}
       />
@@ -261,69 +263,13 @@ export default function OwnerEmployeesPage() {
       <ConfirmDialog
         open={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
-        title={t("employees.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("employees.thisEmployee") })}
-        description={t("employees.removeDesc", { pharmacy: pharmacyName })}
+        variant="destructive"
+        title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
+        description={t("members.removeDesc", { pharmacy: pharmacyName })}
         onConfirm={handleConfirmRemove}
       />
     </div>
   );
 }
 
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function toRecord(keys: string[]): Record<FeatureKey, boolean> {
-  const set = new Set(keys);
-  const out = {} as Record<FeatureKey, boolean>;
-  for (const k of FEATURE_KEYS) out[k] = set.has(k);
-  return out;
-}
-
-function memberPermsToRecord(m: MemberOut | null): Record<FeatureKey, boolean> {
-  return toRecord(m?.granted_permissions ?? []);
-}
-
-
-function EmployeeKebab({
-  employee, onResetPassword, onToggleStatus, onRemove,
-}: {
-  employee:        MemberOut;
-  onResetPassword: () => void;
-  onToggleStatus:  () => void;
-  onRemove:        () => void;
-}) {
-  const t = useT();
-  const toggleLabel = employee.status === "active" ? t("employees.deactivate") : t("employees.reactivate");
-  return (
-    <KebabMenu>
-      {(close) => (
-        <>
-          <button
-            type="button"
-            onClick={() => { onResetPassword(); close(); }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-          >
-            <RefreshCw className="size-3.5" />
-            {t("employees.resetPassword")}
-          </button>
-          <button
-            type="button"
-            onClick={() => { onToggleStatus(); close(); }}
-            className="block w-full cursor-pointer rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle"
-          >
-            {toggleLabel}
-          </button>
-          <button
-            type="button"
-            onClick={() => { onRemove(); close(); }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/5"
-          >
-            <Trash2 className="size-3.5" />
-            {t("employees.delete")}
-          </button>
-        </>
-      )}
-    </KebabMenu>
-  );
-}
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import { AsyncButton } from "@/components/shared/AsyncButton";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TextField } from "@/components/shared/TextField";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useT } from "@/i18n/I18nProvider";
@@ -56,10 +57,12 @@ export function MedicamentFormDialog({
   const t = useT();
   const [form, setForm] = useState<MedicamentInput>(blank());
   const [error, setError] = useState<string | null>(null);
+  const [tvaConfirmOpen, setTvaConfirmOpen] = useState(false);
 
   useEffect(() => {
     setForm(initial ? fromMedicament(initial) : blank());
     setError(null);
+    setTvaConfirmOpen(false);
   }, [initial, open]);
 
   const setField = <K extends keyof MedicamentInput>(k: K, v: MedicamentInput[K]) =>
@@ -74,17 +77,15 @@ export function MedicamentFormDialog({
       setError(t("catalogue.productRequired"));
       return;
     }
-    if (
-      tvaWarning &&
-      !window.confirm(t("catalogue.tvaConfirm", { percent: tvaPercent(form.tva) }))
-    ) {
+    if (tvaWarning) {
+      setTvaConfirmOpen(true);
       return;
     }
     onSubmit(form);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !isLoading && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && !isLoading && !tvaConfirmOpen && onClose()}>
       <DialogContent className="max-w-2xl">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
           <header>
@@ -203,6 +204,15 @@ export function MedicamentFormDialog({
             </AsyncButton>
           </footer>
         </form>
+
+        {/* Rendered inside DialogContent so its (portaled) clicks bubble to
+            DialogContent's stopPropagation and don't close the form. */}
+        <ConfirmDialog
+          open={tvaConfirmOpen}
+          onClose={() => setTvaConfirmOpen(false)}
+          title={t("catalogue.tvaConfirm", { percent: tvaPercent(form.tva) })}
+          onConfirm={() => { setTvaConfirmOpen(false); onSubmit(form); }}
+        />
       </DialogContent>
     </Dialog>
   );
