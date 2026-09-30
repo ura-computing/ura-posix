@@ -2,9 +2,9 @@
 
 Endpoints are split by intended caller:
 
-- Owner endpoints (`require_pharmacy_owner`): create + read + edit their
+- Owner endpoints (`MemberDep`): create + read + edit their
   active request while it's still `soumise`.
-- Developer endpoints (`require_developer`): browse the queue, claim,
+- Developer endpoints (`DeveloperDep`): browse the queue, claim,
   advance state, edit the customization, upload a logo.
 - Public endpoint (`/public/preview/{id}`): unauthenticated, safe subset
   of the customization + pharmacy phone, for the /preview page rendering.
@@ -20,11 +20,12 @@ from pathlib import Path
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, HTTPException, Path as PathParam, UploadFile, status as http_status
+from fastapi import APIRouter, File, Path as PathParam, UploadFile, status as http_status
 
 from database import DbDep
-from models import Pharmacy, StoreCustomization, StoreWebsiteRequest, User
-from permissions import require_admin, require_developer, require_pharmacy_owner
+from errors import ApiError, ErrorCode
+from models import StoreCustomization, StoreWebsiteRequest, User
+from permissions import AdminDep, DeveloperDep, MemberDep
 from schemas.store_website import (
     ClaimedByOut,
     CustomizationOut,
@@ -141,7 +142,7 @@ def _default_brand_colors(palette: list[str]) -> dict[str, str]:
 def _get_request_or_404(db: DbDep, request_id: UUID) -> StoreWebsiteRequest:
     req = db.get(StoreWebsiteRequest, request_id)
     if req is None:
-        raise HTTPException(status_code=404, detail="Demande introuvable.")
+        raise ApiError(404, ErrorCode.REQUEST_NOT_FOUND, "Demande introuvable.")
     return req
 
 
@@ -156,24 +157,22 @@ def _get_active_request_for_pharmacy(db: DbDep, pharmacy_id: int) -> StoreWebsit
 # ─── Owner endpoints ────────────────────────────────────────────────────────
 
 @router.get("/my-request", response_model=WebsiteRequestOut | None)
-def get_my_request(user: CurrentUserDep, db: DbDep) -> WebsiteRequestOut | None:
+def get_my_request(pharmacy_id: MemberDep, db: DbDep) -> WebsiteRequestOut | None:
     """Owner's currently active (non-cloturee) request, or null."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     req = _get_active_request_for_pharmacy(db, pharmacy_id)
     return _out(req, db) if req else None
 
 
 @router.post("/requests", response_model=WebsiteRequestOut, status_code=http_status.HTTP_201_CREATED)
-def create_request(body: WebsiteRequestCreate, user: CurrentUserDep, db: DbDep) -> WebsiteRequestOut:
+def create_request(body: WebsiteRequestCreate, pharmacy_id: MemberDep, user: CurrentUserDep, db: DbDep) -> WebsiteRequestOut:
     """Owner creates a new landing-page request.
 
     Enforces one-active-per-pharmacy: if an existing request is still open
     (not cloturee), we 409 instead of relying on the DB unique index alone
     so the frontend gets a friendly error string.
     """
-    pharmacy_id = require_pharmacy_owner(user, db)
     if _get_active_request_for_pharmacy(db, pharmacy_id) is not None:
-        raise HTTPException(status_code=409, detail="Une demande active existe déjà pour cette pharmacie.")
+        raise ApiError(409, ErrorCode.REQUEST_ACTIVE_EXISTS, "Une demande active existe déjà pour cette pharmacie.")
 
     req = StoreWebsiteRequest(
         id=uuid4(),
@@ -211,17 +210,16 @@ def create_request(body: WebsiteRequestCreate, user: CurrentUserDep, db: DbDep) 
 def patch_request(
     request_id: Annotated[UUID, PathParam()],
     body: WebsiteRequestPatch,
-    user: CurrentUserDep,
+    pharmacy_id: MemberDep,
     db: DbDep,
 ) -> WebsiteRequestOut:
     """Owner edits their brief while it's still `soumise`. Any other state
     is locked (a developer is already working on it)."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     req = _get_request_or_404(db, request_id)
     if req.pharmacy_id != pharmacy_id:
-        raise HTTPException(status_code=404, detail="Demande introuvable.")
+        raise ApiError(404, ErrorCode.REQUEST_NOT_FOUND, "Demande introuvable.")
     if req.state != "soumise":
-        raise HTTPException(status_code=409, detail="La demande ne peut plus être modifiée à ce stade.")
+        raise ApiError(409, ErrorCode.REQUEST_LOCKED, "La demande ne peut plus être modifiée à ce stade.")
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(req, field, value)
@@ -234,24 +232,23 @@ def patch_request(
 def patch_featured_categories(
     request_id: Annotated[UUID, PathParam()],
     body: dict,
-    user: CurrentUserDep,
+    pharmacy_id: MemberDep,
     db: DbDep,
 ) -> CustomizationOut:
     """Owner picks which storefront categories get the "Vedette" slot on
     the templates' home page. Moved out of the developer editor
     (user-locked decision 2026-06-27)."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     req = _get_request_or_404(db, request_id)
     if req.pharmacy_id != pharmacy_id:
-        raise HTTPException(status_code=404, detail="Demande introuvable.")
+        raise ApiError(404, ErrorCode.REQUEST_NOT_FOUND, "Demande introuvable.")
 
     ids = body.get("featured_category_ids")
     if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
-        raise HTTPException(status_code=422, detail="featured_category_ids doit être une liste de chaînes.")
+        raise ApiError(422, ErrorCode.FEATURED_IDS_INVALID, "featured_category_ids doit être une liste de chaînes.")
 
     cust = req.customization
     if cust is None:
-        raise HTTPException(status_code=500, detail="Personnalisation absente.")
+        raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
     cust.featured_category_ids = ids
     db.commit()
     db.refresh(cust)
@@ -261,10 +258,9 @@ def patch_featured_categories(
 # ─── Developer endpoints ────────────────────────────────────────────────────
 
 @router.get("/requests", response_model=list[WebsiteRequestOut])
-def list_requests(user: CurrentUserDep, db: DbDep) -> list[WebsiteRequestOut]:
+def list_requests(user: DeveloperDep, db: DbDep) -> list[WebsiteRequestOut]:
     """Every non-cloturee request, all queues in one list. Frontend splits
     into À traiter / mine / others."""
-    require_developer(user)
     rows = (
         db.query(StoreWebsiteRequest)
         .filter(StoreWebsiteRequest.state != "cloturee")
@@ -277,14 +273,13 @@ def list_requests(user: CurrentUserDep, db: DbDep) -> list[WebsiteRequestOut]:
 @router.get("/requests/{request_id}", response_model=WebsiteRequestWithCustomizationOut)
 def get_request_full(
     request_id: Annotated[UUID, PathParam()],
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> WebsiteRequestWithCustomizationOut:
     """Full brief + customization. Dev-only (the owner uses /my-request)."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.customization is None:
-        raise HTTPException(status_code=500, detail="Personnalisation absente.")
+        raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
     base = _out(req, db)
     return WebsiteRequestWithCustomizationOut(
         **base.model_dump(),
@@ -295,15 +290,14 @@ def get_request_full(
 @router.post("/requests/{request_id}/claim", response_model=WebsiteRequestOut)
 def claim_request(
     request_id: Annotated[UUID, PathParam()],
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> WebsiteRequestOut:
     """Dev takes ownership of a pending request. 409 if someone else got
     there first."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id is not None and req.claimed_by_id != user.id:
-        raise HTTPException(status_code=409, detail="Demande déjà réclamée par un autre développeur.")
+        raise ApiError(409, ErrorCode.REQUEST_CLAIMED, "Demande déjà réclamée par un autre développeur.")
 
     req.claimed_by_id = user.id
     req.claimed_at    = datetime.now(tz=timezone.utc)
@@ -317,14 +311,13 @@ def claim_request(
 @router.post("/requests/{request_id}/release", response_model=WebsiteRequestOut)
 def release_request(
     request_id: Annotated[UUID, PathParam()],
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> WebsiteRequestOut:
     """Dev unclaims — puts the request back in the shared queue."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id != user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas le développeur assigné à cette demande.")
+        raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
     req.claimed_by_id = None
     req.claimed_at    = None
     if req.state == "prise_en_charge":
@@ -338,19 +331,19 @@ def release_request(
 def transition_state(
     request_id: Annotated[UUID, PathParam()],
     body: StateTransition,
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> WebsiteRequestOut:
     """Dev advances the lifecycle. Only the claimer can move it forward."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id != user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas le développeur assigné à cette demande.")
+        raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
     allowed = ALLOWED_STATE_TRANSITIONS.get(req.state, frozenset())
     if body.state not in allowed:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Transition {req.state} → {body.state} non autorisée.",
+        raise ApiError(
+            409, ErrorCode.TRANSITION_NOT_ALLOWED,
+            f"Transition {req.state} → {body.state} non autorisée.",
+            from_state=req.state, to_state=body.state,
         )
     req.state = body.state
     db.commit()
@@ -362,17 +355,16 @@ def transition_state(
 def patch_customization(
     request_id: Annotated[UUID, PathParam()],
     body: CustomizationPatch,
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> CustomizationOut:
     """Upsert the styling state. Requires the caller be the claimer."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id != user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas le développeur assigné à cette demande.")
+        raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
     cust = req.customization
     if cust is None:
-        raise HTTPException(status_code=500, detail="Personnalisation absente.")
+        raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
 
     for field, value in body.model_dump(exclude_unset=True).items():
         if field in _JSON_MERGE_FIELDS and isinstance(value, dict):
@@ -388,18 +380,17 @@ def patch_customization(
 @router.post("/requests/{request_id}/customization/reset", response_model=CustomizationOut)
 def reset_customization(
     request_id: Annotated[UUID, PathParam()],
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
 ) -> CustomizationOut:
     """Restore the customization to its initial defaults — same shape as when
     the request was first created. Requires the caller be the claimer."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id != user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas le développeur assigné à cette demande.")
+        raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
     cust = req.customization
     if cust is None:
-        raise HTTPException(status_code=500, detail="Personnalisation absente.")
+        raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
 
     cust.template              = "lumiere"
     cust.sections              = dict(DEFAULT_SECTIONS)
@@ -415,23 +406,22 @@ def reset_customization(
 @router.post("/requests/{request_id}/logo", response_model=CustomizationOut)
 async def upload_logo(
     request_id: Annotated[UUID, PathParam()],
-    user: CurrentUserDep,
+    user: DeveloperDep,
     db: DbDep,
     file: UploadFile = File(...),
 ) -> CustomizationOut:
     """Multipart logo upload. PNG/SVG/JPG/WEBP only, ≤2 MB. Stored under
     backend/uploads/store-logos/<request_id>/<uuid>.<ext>."""
-    require_developer(user)
     req = _get_request_or_404(db, request_id)
     if req.claimed_by_id != user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas le développeur assigné à cette demande.")
+        raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
 
     if file.content_type not in LOGO_ALLOWED_TYPES:
-        raise HTTPException(status_code=422, detail="Format non pris en charge. Utilisez PNG, JPG, SVG ou WebP.")
+        raise ApiError(422, ErrorCode.LOGO_FORMAT, "Format non pris en charge. Utilisez PNG, JPG, SVG ou WebP.")
 
     contents = await file.read()
     if len(contents) > LOGO_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Le logo dépasse 2 Mo.")
+        raise ApiError(413, ErrorCode.LOGO_TOO_LARGE, "Le logo dépasse 2 Mo.")
 
     ext = {"image/png": "png", "image/jpeg": "jpg", "image/svg+xml": "svg", "image/webp": "webp"}[file.content_type]
     subdir = UPLOAD_ROOT / str(request_id)
@@ -441,7 +431,7 @@ async def upload_logo(
 
     cust = req.customization
     if cust is None:
-        raise HTTPException(status_code=500, detail="Personnalisation absente.")
+        raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
     cust.logo_url = f"/uploads/store-logos/{request_id}/{filename}"
     db.commit()
     db.refresh(cust)
@@ -457,7 +447,7 @@ def public_preview(request_id: Annotated[UUID, PathParam()], db: DbDep) -> Publi
     owner personal data. 404 masks bogus UUIDs so we don't leak validity."""
     req = db.get(StoreWebsiteRequest, request_id)
     if req is None or req.customization is None:
-        raise HTTPException(status_code=404, detail="Aperçu introuvable.")
+        raise ApiError(404, ErrorCode.PREVIEW_NOT_FOUND, "Aperçu introuvable.")
     cust = req.customization
     return PublicPreviewOut(
         template=cust.template,
@@ -474,11 +464,10 @@ def public_preview(request_id: Annotated[UUID, PathParam()], db: DbDep) -> Publi
 # ─── Admin endpoint — developer directory ──────────────────────────────────
 
 @router.get("/admin/developers", response_model=list[DeveloperAccountOut])
-def list_developers(user: CurrentUserDep, db: DbDep) -> list[DeveloperAccountOut]:
+def list_developers(user: AdminDep, db: DbDep) -> list[DeveloperAccountOut]:
     """One row per APCM developer user (role = 'developer'). Includes a
     per-dev count of active (non-closed) requests they're currently
     claiming."""
-    require_admin(user)
     from models import User
     from sqlalchemy import func as sqlfunc
 

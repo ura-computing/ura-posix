@@ -2,11 +2,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import bcrypt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, status
 from jose import JWTError, jwt
 
 from config import settings
 from database import DbDep
+from errors import ApiError, ErrorCode
 from models import Session as UserSession, User
 
 
@@ -38,7 +39,10 @@ def create_access_token(user_id: int, token_version: int, session_id: int) -> st
 
 
 def get_current_user(db: DbDep, access_token: AccessCookieDep = None) -> User:
-    creds_exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée, veuillez vous reconnecter")
+    creds_exc = ApiError(
+        status.HTTP_401_UNAUTHORIZED, ErrorCode.SESSION_EXPIRED,
+        "Session expirée, veuillez vous reconnecter",
+    )
     if not access_token:
         raise creds_exc
     try:
@@ -59,6 +63,12 @@ def get_current_user(db: DbDep, access_token: AccessCookieDep = None) -> User:
     session_row = db.get(UserSession, int(sid))
     if not session_row or session_row.user_id != user.id:
         raise creds_exc
+
+    # "Dernière activité" on /me → Sessions. At most one write per device per minute.
+    now = datetime.now(timezone.utc)
+    if now - session_row.last_used_at > timedelta(minutes=1):
+        session_row.last_used_at = now
+        db.commit()
 
     return user
 

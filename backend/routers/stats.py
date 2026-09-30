@@ -1,19 +1,19 @@
-"""Dashboard / Rapport endpoints. Owner-scoped here; admin equivalents will be
-mounted under /v1/admin in a separate router."""
+"""Stats endpoints: the owner's own pharmacy, and the admin's view of any pharmacy.
+SQL lives in stats_queries / analyse_queries / stock_queries."""
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func
-from sqlalchemy.orm import Query as OrmQuery
+from fastapi import APIRouter, Path, Query
+from sqlalchemy import func, or_
 
 from analyse_queries import compute_analyse_liste, compute_analyse_marge
 from database import DbDep
-from exclusions import achat_exclusion_filter, excluded_medicaments_select
-from models import Achat, Medicament, PharmacyMedicamentStatus, Vente
-from permissions import require_pharmacy_owner
+from errors import ApiError, ErrorCode
+from models import Medicament, Pharmacy, User
+from permissions import admin_only, member
 from schemas.stats import (
+    AdminStatsResponse,
     AnalyseMargeResponse,
     ListeRequest,
     MargeMode,
@@ -24,23 +24,21 @@ from schemas.stats import (
     StockSummaryResponse,
     VentesSansAchatResponse,
 )
-from stock_queries import compute_peremptions, compute_stock_abcd
-from security import CurrentUserDep
 from stats_queries import (
-    build_monthly_trend,
-    compute_extra_stats,
+    build_stats_payload,
     compute_margin_alerts,
-    compute_previous_kpis,
     compute_stock_summary,
     compute_ventes_sans_achat,
-    merge_top_categories,
-    pharma_expr,
-    reconcile_marge_to_ca,
 )
+from stock_queries import compute_peremptions, compute_stock_abcd
 
 
 router = APIRouter(tags=["stats"])
 
+
+# ═══ Owner stats ═════════════════════════════════════════════════════════════
+# Dashboard / Rapport endpoints. Owner-scoped here; admin equivalents will be
+# mounted under /v1/admin in a separate router.
 
 DateFromQ        = Annotated[str | None, Query(description="ISO date (YYYY-MM-DD), inclusive")]
 DateToQ          = Annotated[str | None, Query(description="ISO date (YYYY-MM-DD), inclusive")]
@@ -48,142 +46,9 @@ CategoryTypeQ    = Annotated[str,        Query(description="all | pharmacie | pa
 IncludeNonDeclQ  = Annotated[bool,       Query(description="Include products marked non-declared")]
 
 
-def _category_filters(category_type: str) -> tuple[list, list]:
-    """Returns (cat_filter_v, cat_filter_a) for Vente + Achat sides."""
-    if category_type == "pharmacie":
-        return [pharma_expr() == True], [pharma_expr() == True]
-    if category_type == "parapharmacie":
-        return [pharma_expr() == False], [pharma_expr() == False]
-    return [], []
-
-
-def _non_declared_sub_for(db, pharmacy_id: int):
-    """medicament_ids excluded from comptabilité: special products + all products on
-    an excluded BL + all products from an excluded supplier (unified, med-level).
-    Applied to BOTH ventes and achats by every caller."""
-    return excluded_medicaments_select(db, pharmacy_id)
-
-
-def _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub,
-                  *, include_non_declared: bool = True) -> dict:
-    """ventes_total/count + achats_total/count for the window."""
-    vq = (
-        db.query(
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)),
-            func.count(Vente.id),
-        )
-        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
-    )
-    aq = db.query(func.sum(Achat.total), func.count(Achat.id))
-    if cat_filter_v: vq = vq.filter(*cat_filter_v)
-    if cat_filter_a:
-        aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
-    if pharmacy_id:
-        vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
-        if not include_non_declared:
-            aq = aq.filter(Achat.pharmacy_id == pharmacy_id, achat_exclusion_filter(db, pharmacy_id))
-        else:
-            aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None:
-        vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
-        aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if df:
-        vq = vq.filter(Vente.date >= df)
-        aq = aq.filter(Achat.delivery_date >= df)
-    if dt:
-        vq = vq.filter(Vente.date <= dt)
-        aq = aq.filter(Achat.delivery_date <= dt)
-    ventes_total, ventes_count = vq.one()
-    achats_total, achats_count = aq.one()
-    return {
-        "ventes_total": float(ventes_total or 0),
-        "achats_total": float(achats_total or 0),
-        "ventes_count": ventes_count or 0,
-        "achats_count": achats_count or 0,
-    }
-
-
-def _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub,
-                    *, include_non_declared: bool = True) -> list[dict]:
-    """Aggregate Vente by category, merge percent suffixes, sort by CA desc."""
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("pu"),
-        )
-        .filter(Achat.quantity > 0, Achat.unit_price.isnot(None))
-    )
-    if pharmacy_id:
-        if not include_non_declared:
-            # PG-007: excluded BLs must not skew the category marge shown in the donut.
-            avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id,
-                                           achat_exclusion_filter(db, pharmacy_id))
-        else:
-            avg_pu_sub = avg_pu_sub.filter(Achat.pharmacy_id == pharmacy_id)
-    avg_pu_sub = avg_pu_sub.group_by(Achat.medicament_id).subquery()
-
-    q: OrmQuery = (
-        db.query(
-            Medicament.category.label("category"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
-            func.sum(Vente.quantity).label("qty"),
-            # PG-013: no Medicament.pph fallback — the product sheet often has
-            # PPH = PPV which fabricates 0% margins. NULL pu → category marge "—".
-            func.avg(avg_pu_sub.c.pu).label("avg_pu"),
-            func.avg(Medicament.ppv).label("avg_ppv"),
-        )
-        .join(Medicament, Vente.medicament_id == Medicament.id)
-        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
-        .filter(Medicament.category.isnot(None))
-    )
-    if cat_filter_v: q = q.filter(*cat_filter_v)
-    if pharmacy_id:  q = q.filter(Vente.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None:
-        q = q.filter(Vente.medicament_id.notin_(non_declared_sub))
-    if df: q = q.filter(Vente.date >= df)
-    if dt: q = q.filter(Vente.date <= dt)
-    return merge_top_categories(q.group_by(Medicament.category).all())
-
-
-def build_stats_payload(
-    db,
-    pharmacy_id: int | None,
-    df: str | None,
-    dt: str | None,
-    category_type: str,
-    include_non_declared: bool,
-) -> dict:
-    """Pure data computation — used by both owner `/v1/stats` and admin
-    `/v1/admin/pharmacy/{id}/stats`. No auth, no HTTP."""
-    cat_filter_v, cat_filter_a = _category_filters(category_type)
-    non_declared_sub = None
-    if pharmacy_id and not include_non_declared:
-        non_declared_sub = _non_declared_sub_for(db, pharmacy_id)
-
-    trend = build_monthly_trend(db, pharmacy_id, df, dt, non_declared_sub, cat_filter_v, cat_filter_a,
-                                include_non_declared=include_non_declared)
-    kpis  = _topline_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a, non_declared_sub,
-                          include_non_declared=include_non_declared)
-    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type,
-                                include_non_declared=include_non_declared)
-    # Single source of truth: reconcile the aggregate marge to the FULL CA so every
-    # margin display agrees (marge_brute_dh / ventes_total == marge_pct, exactly).
-    reconcile_marge_to_ca(extra["marge"], kpis["ventes_total"])
-    return {
-        "kpis":           kpis,
-        "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter_v, cat_filter_a,
-                                                non_declared_sub, include_non_declared=include_non_declared),
-        **extra,
-        "monthly_trend":     trend["points"],
-        "trend_granularity": trend["granularity"],
-        "top_categories": _top_categories(db, pharmacy_id, df, dt, cat_filter_v, non_declared_sub,
-                                          include_non_declared=include_non_declared),
-    }
-
-
 @router.get("/stats", response_model=StatsResponse)
 def get_stats(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("rapports")],
     db: DbDep,
     date_from: DateFromQ            = None,
     date_to:   DateToQ              = None,
@@ -191,27 +56,25 @@ def get_stats(
     include_non_declared: IncludeNonDeclQ = False,
 ) -> dict:
     """Owner dashboard payload. Admins use /v1/admin/pharmacy/{id}/stats."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="rapports")
     return build_stats_payload(db, pharmacy_id, date_from or None, date_to or None,
                                category_type, include_non_declared)
 
 
 @router.get("/stats/margin-alerts", response_model=MarginAlertsResponse)
 def get_margin_alerts(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("alertes")],
     db: DbDep,
     date_from: DateFromQ            = None,
     date_to:   DateToQ              = None,
     category_type: CategoryTypeQ    = "all",
 ) -> dict:
     """4 brackets feeding Rapport Section 5 ('Alertes marges') + the /alertes drill-down."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="alertes")
     return compute_margin_alerts(db, pharmacy_id, date_from or None, date_to or None, category_type)
 
 
 @router.get("/stats/ventes-sans-achat", response_model=VentesSansAchatResponse)
 def get_ventes_sans_achat(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("alertes")],
     db: DbDep,
     date_from: DateFromQ         = None,
     date_to:   DateToQ           = None,
@@ -219,15 +82,13 @@ def get_ventes_sans_achat(
 ) -> dict:
     """Products with ventes in the window but no matching achat — the root cause
     of "—" cells in Marge %/DH on /ventes."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="alertes")
     return compute_ventes_sans_achat(db, pharmacy_id, date_from or None, date_to or None, category_type)
 
 
 @router.get("/stats/stock-summary", response_model=StockSummaryResponse)
-def get_stock_summary(user: CurrentUserDep, db: DbDep) -> dict:
+def get_stock_summary(pharmacy_id: Annotated[int, member("stock")], db: DbDep) -> dict:
     """Lightweight 4-tile summary for Rapport Section 8. Full ABCD classification
     ships when /stock page is built."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
     return compute_stock_summary(db, pharmacy_id)
 
 # ─── Stock ABCD + Peremptions (Page 6) ───────────────────────────────────────
@@ -238,31 +99,28 @@ ClassQ  = Annotated[str | None, Query(description="A | A- | B+ | B | C | C- | C-
 
 @router.get("/stats/stock-abcd", response_model=StockAbcdResponse)
 def get_stock_abcd(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("stock")],
     db:   DbDep,
     date_from:    DateFromQ  = None,
     date_to:      DateToQ    = None,
     class_filter: ClassQ     = None,
     status:       StatusQ    = None,
-    search:       Annotated[str | None, Query()] = None,
     sort_by:      Annotated[str | None, Query()] = None,
     sort_order:   Annotated[str | None, Query()] = None,
 ) -> dict:
     """ABCD analysis + filtered product list. Distribution + total_references +
     ppv_potentiel reflect the FULL dataset; only `products` is filtered/sorted."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
     return compute_stock_abcd(
         db, pharmacy_id, date_from, date_to,
-        class_filter=class_filter, status=status, search=search,
+        class_filter=class_filter, status=status,
         sort_by=sort_by, sort_order=sort_order,
     )
 
 
 @router.get("/stats/peremptions", response_model=PeremptionsResponse)
-def get_peremptions(user: CurrentUserDep, db: DbDep) -> dict:
+def get_peremptions(pharmacy_id: Annotated[int, member("stock")], db: DbDep) -> dict:
     """4 mutually-exclusive expiry-proximity buckets (old-app parity): expired /
     very_close (<6 months) / close (6-12 months) / no_date (NULL expiry_date)."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="stock")
     return compute_peremptions(db, pharmacy_id)
 
 
@@ -273,7 +131,7 @@ ModeQ = Annotated[MargeMode, Query(description="produit | categorie | laboratoir
 
 @router.get("/stats/analyse-marge", response_model=AnalyseMargeResponse)
 def get_analyse_marge(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("analyse")],
     db:   DbDep,
     mode:          ModeQ,
     date_from:     DateFromQ     = None,
@@ -284,19 +142,106 @@ def get_analyse_marge(
     """7 group-by modes for /analyse. Liste mode uses POST /stats/analyse-liste below.
 
     `product` is an optional product-name filter used by the année mode search box."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="analyse")
     if mode == MargeMode.LISTE:
-        raise HTTPException(status_code=400, detail="Utilisez POST /stats/analyse-liste pour le mode liste")
+        raise ApiError(400, ErrorCode.LISTE_MODE_USE_POST, "Utilisez POST /stats/analyse-liste pour le mode liste")
     payload = compute_analyse_marge(db, pharmacy_id, date_from, date_to, category_type, mode.value, product=product)
     return {"mode": mode.value, **payload}
 
 
 @router.post("/stats/analyse-liste", response_model=AnalyseMargeResponse)
-def post_analyse_liste(user: CurrentUserDep, db: DbDep, body: ListeRequest) -> dict:
+def post_analyse_liste(pharmacy_id: Annotated[int, member("analyse")], db: DbDep, body: ListeRequest) -> dict:
     """Match an uploaded product list against the pharmacy's catalogue + ventes.
     Returns the same shape as analyse-marge (produit mode) but every row has
     `match_status` set ('found' | 'not_found'). Not-found rows pinned at end."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="analyse")
     payload = compute_analyse_liste(db, pharmacy_id, body.items,
                                     body.date_from, body.date_to, body.category_type)
     return {"mode": MargeMode.LISTE.value, **payload}
+
+
+# ═══ Admin stats (any pharmacy) ══════════════════════════════════════════════
+# Admin variants of the Rapport endpoints.
+#
+# `/v1/admin/stats` returns system-wide tile counts (Vue système).
+# `/v1/admin/pharmacies` powers the pharmacy selector dropdown.
+# `/v1/admin/pharmacy/{id}/stats[/...]` mirror the owner endpoints, but the target
+# pharmacy_id comes from the path (admin can pick any) instead of the JWT.
+#
+# All endpoints raise 403 for non-admin callers.
+
+PharmacyIdPath = Annotated[int, Path(ge=1, description="Target pharmacy id")]
+
+
+@router.get("/admin/stats", response_model=AdminStatsResponse, dependencies=[admin_only])
+def admin_stats(db: DbDep) -> dict:
+    """System overview (4 tiles for the Vue système section).
+
+    Counts honor soft-delete (`Pharmacy.archived_at IS NULL`) and exclude
+    admins from `total_active_users` — admins are a system role, not an
+    end-user of the platform. Users tied to an archived pharmacy are
+    excluded too (their pharmacy no longer counts, so they shouldn't either)."""
+    active_pharm_ids = (
+        db.query(Pharmacy.id).filter(Pharmacy.archived_at.is_(None)).subquery().select()
+    )
+    return {
+        "total_pharmacies": db.query(func.count(Pharmacy.id))
+                              .filter(Pharmacy.archived_at.is_(None)).scalar() or 0,
+        "total_active_users": db.query(func.count(User.id)).filter(
+            User.status == "active",
+            User.role != "admin",
+            or_(User.pharmacy_id.is_(None), User.pharmacy_id.in_(active_pharm_ids)),
+        ).scalar() or 0,
+        "total_catalog_items":      db.query(func.count(Medicament.id)).scalar() or 0,
+        "pending_catalog_requests": 0,   # catalog-request feature lands later
+    }
+
+
+# NOTE: GET /admin/pharmacies moved to routers/admin_pharmacies.py — the new
+# endpoint returns a superset (id/name/code + members count + enabled features)
+# that the PharmacyPicker dropdown still consumes correctly via its narrow type.
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats", response_model=StatsResponse, dependencies=[admin_only])
+def admin_pharmacy_stats(
+    pharmacy_id: PharmacyIdPath,
+    db: DbDep,
+    date_from: DateFromQ            = None,
+    date_to:   DateToQ              = None,
+    category_type:        CategoryTypeQ   = "all",
+    include_non_declared: IncludeNonDeclQ = False,
+) -> dict:
+    """Same shape as /v1/stats, scoped to the path-provided pharmacy."""
+    return build_stats_payload(db, pharmacy_id, date_from or None, date_to or None,
+                               category_type, include_non_declared)
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/margin-alerts", response_model=MarginAlertsResponse, dependencies=[admin_only])
+def admin_pharmacy_margin_alerts(
+    pharmacy_id: PharmacyIdPath,
+    db: DbDep,
+    date_from: DateFromQ          = None,
+    date_to:   DateToQ            = None,
+    category_type: CategoryTypeQ  = "all",
+) -> dict:
+    return compute_margin_alerts(db, pharmacy_id, date_from or None, date_to or None, category_type)
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/stock-summary", response_model=StockSummaryResponse, dependencies=[admin_only])
+def admin_pharmacy_stock_summary(pharmacy_id: PharmacyIdPath, db: DbDep) -> dict:
+    return compute_stock_summary(db, pharmacy_id)
+
+
+@router.get("/admin/pharmacy/{pharmacy_id}/stats/analyse-marge", response_model=AnalyseMargeResponse, dependencies=[admin_only])
+def admin_pharmacy_analyse_marge(
+    pharmacy_id:    PharmacyIdPath,
+    db:             DbDep,
+    mode:           Annotated[MargeMode, Query(description="produit | categorie | grossiste | bl")],
+    date_from:      DateFromQ      = None,
+    date_to:        DateToQ        = None,
+    category_type:  CategoryTypeQ  = "all",
+) -> dict:
+    """Admin variant of /stats/analyse-marge. Same shape, pharmacy from path."""
+    if mode == MargeMode.LISTE:
+        raise ApiError(400, ErrorCode.LISTE_MODE_ADMIN, "Le mode liste n'est pas supporté en admin.")
+    payload = compute_analyse_marge(db, pharmacy_id, date_from or None, date_to or None,
+                                    category_type, mode.value)
+    return {"mode": mode.value, **payload}

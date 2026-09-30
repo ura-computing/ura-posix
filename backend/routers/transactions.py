@@ -19,15 +19,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import Float, func, or_, select
+from fastapi import APIRouter, Query, status
+from sqlalchemy import Float, func, or_
 from sqlalchemy.orm import Session
 
-from csv_parse import strip_percentage
+from csv_parse import strip_percentage, suffix_key
 from database import DbDep
-from exclusions import achat_exclusion_filter, excluded_medicaments_select
-from models import Achat, CategorySuffix, Medicament, PharmacyMedicamentStatus, Vente
-from permissions import require_pharmacy_owner
+from errors import ApiError, ErrorCode
+from exclusions import achat_filter, vente_filter
+from models import Achat, CategorySuffix, Medicament, Vente
+from permissions import member
+from query_parts import Filters, avg_pu_subquery
+from schemas.transactions import paginate
 from schemas.transactions import (
     AchatRow,
     AchatsListResponse,
@@ -40,10 +43,8 @@ from schemas.transactions import (
     VentesSummary,
     VentesDiscountSummary,
     VentesSurveillanceCounts,
-    paginate,
 )
 from search import product_search_clauses, supplier_search_clauses, tokenize_search
-from security import CurrentUserDep
 
 
 # Multi-value query parameter type aliases (defined here for use across endpoints)
@@ -78,9 +79,10 @@ MAX_EXPORT_ROWS = 50_000
 def _check_export_cap(export: bool, total: int) -> None:
     """Enforce MAX_EXPORT_ROWS when export=true. Shared by list_achats + list_ventes."""
     if export and total > MAX_EXPORT_ROWS:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Trop de lignes ({total:,}) — affinez les filtres (max {MAX_EXPORT_ROWS:,}).",
+        raise ApiError(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, ErrorCode.EXPORT_TOO_LARGE,
+            f"Trop de lignes ({total:,}) — affinez les filtres (max {MAX_EXPORT_ROWS:,}).",
+            total=total, max=MAX_EXPORT_ROWS,
         )
 
 
@@ -104,49 +106,26 @@ def _build_search_filter(search: str | None, *extra_text_cols):
 def _suffix_map(db: Session) -> dict[str, tuple[str, str | None]]:
     """In-memory map of (normalized category) → (suffix, color). One DB hit per request."""
     return {
-        strip_percentage(s.category).lower(): (s.suffix, s.color)
+        suffix_key(s.category): (s.suffix, s.color)
         for s in db.query(CategorySuffix).all()
     }
 
 
-def _non_declared_sub(db, pharmacy_id: int):
-    """medicament_ids excluded from comptabilité (med-level): special products + all
-    products on an excluded BL + all products from an excluded supplier. Applied to
-    ventes AND achats so a BL/supplier exclusion behaves like a special product."""
-    return excluded_medicaments_select(db, pharmacy_id)
-
-
 def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None,
                  *, include_non_declared: bool = True):
-    """Weighted avg purchase price per medicament. Window + (optionally) non-declared
-    + BL exclusion. Used by both list_ventes (avg_pu_map for marge cells) and
-    surveillance_counts (so badge counts match visible rows). include_non_declared=True
-    (default): specials + excluded BLs/suppliers count — the /ventes page shows the
-    full picture. False: comptabilite view applies the exclusions."""
-    nd = _non_declared_sub(db, pharmacy_id)
-    q = db.query(
-            Achat.medicament_id.label("med_id"),
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        ).filter(
-            Achat.pharmacy_id == pharmacy_id,
-            Achat.quantity > 0,
-            Achat.unit_price.isnot(None),
-        )
-    if not include_non_declared:
-        q = q.filter(
-            Achat.medicament_id.notin_(nd),
-            achat_exclusion_filter(db, pharmacy_id),
-        )
-    if date_from:
-        q = q.filter(Achat.delivery_date >= date_from)
-    if date_to:
-        q = q.filter(Achat.delivery_date <= date_to)
-    return q.group_by(Achat.medicament_id).subquery()
+    """Weighted avg purchase price per medicament over the window. Used by both
+    list_ventes (avg_pu_map for marge cells) and surveillance_counts (so badge counts
+    match visible rows). include_non_declared=False (comptabilité) drops the
+    excluded products."""
+    f = Filters(pharmacy_id, date_from, date_to, include_non_declared)
+    return avg_pu_subquery(
+        db, Achat.quantity > 0, Achat.unit_price.isnot(None), *f.achats(db), id_label="med_id",
+    )
 
 
 def _apply_med_join_filters(q, search: str | None, category: list[str] | None, tva: list[str] | None):
     """Joins Medicament + applies search/category/tva. Uses tokenized PG-006
-    search (unaccent + multi-token + `*` wildcard + fuzzy ≥4 chars) across
+    search (grammar in `search.py`) across
     Medicament.product/pid/barcodes + Vente.client + Vente.transaction_ref."""
     if not (search or category or tva):
         return q
@@ -174,7 +153,7 @@ def _apply_vente_filters(
     """Reusable WHERE-chain shared by list + surveillance-counts."""
     q = q.filter(Vente.pharmacy_id == pharmacy_id)
     if not include_non_declared:
-        q = q.filter(Vente.medicament_id.notin_(_non_declared_sub(q.session, pharmacy_id)))
+        q = q.filter(vente_filter(q.session, pharmacy_id))
     if date_from:
         q = q.filter(Vente.date >= date_from)
     if date_to:
@@ -258,7 +237,7 @@ def _apply_achat_filters(
 
 @router.get("/achats", response_model=AchatsListResponse)
 def list_achats(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("achats")],
     db: DbDep,
     page:       PageQ          = 1,
     limit:      LimitQ         = 20,
@@ -272,7 +251,6 @@ def list_achats(
     sort_order: SortOrderQ     = "desc",
     export:     ExportQ        = False,
 ) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
     q = _apply_achat_filters(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
@@ -281,7 +259,7 @@ def list_achats(
     # an excluded supplier) are hidden from the Achats ledger ONLY in the comptabilite
     # view (include_non_declared=false). Med-level, so the ledger total matches stats.
     if not include_non_declared:
-        q = q.filter(Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id)))
+        q = q.filter(achat_filter(db, pharmacy_id))
     # Force Medicament join (for the TVA aggregate) if no search/category/tva
     if not (search or category or tva):
         q = q.outerjoin(Medicament, Achat.medicament_id == Medicament.id)
@@ -327,7 +305,7 @@ def list_achats(
 def _achat_to_row(db: Session, a: Achat, suffixes: dict[str, tuple[str, str | None]]) -> AchatRow:
     med = db.get(Medicament, a.medicament_id) if a.medicament_id else None
     category = med.category if med else None
-    suffix, color = suffixes.get(strip_percentage(category).lower(), ("", None))
+    suffix, color = suffixes.get(suffix_key(category), ("", None))
     ref = a.delivery_ref or ""
     return AchatRow(
         id=a.id,
@@ -353,8 +331,7 @@ def _achat_to_row(db: Session, a: Achat, suffixes: dict[str, tuple[str, str | No
 # ─── GET /achats/categories ──────────────────────────────────────────────────
 
 @router.get("/achats/categories")
-def list_achat_categories(user: CurrentUserDep, db: DbDep) -> list[str]:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
+def list_achat_categories(pharmacy_id: Annotated[int, member("achats")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.category)
         .join(Achat, Achat.medicament_id == Medicament.id)
@@ -368,8 +345,7 @@ def list_achat_categories(user: CurrentUserDep, db: DbDep) -> list[str]:
 # ─── GET /achats/tva-rates ───────────────────────────────────────────────────
 
 @router.get("/achats/tva-rates")
-def list_achat_tva_rates(user: CurrentUserDep, db: DbDep) -> list[str]:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
+def list_achat_tva_rates(pharmacy_id: Annotated[int, member("achats")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.tva)
         .join(Achat, Achat.medicament_id == Medicament.id)
@@ -389,18 +365,17 @@ def _apply_clauses(q, clauses):
 
 
 def _suggest_supplier_col(db, pharmacy_id: int, col, tokens: list[str]) -> list[str]:
-    """Top-6 distinct values of `col` matching all tokens. col is unaccent-substring matched."""
+    """Distinct values of `col` matching every token (`search.py` grammar)."""
     q = db.query(col).filter(Achat.pharmacy_id == pharmacy_id, col.isnot(None))
     q = _apply_clauses(q, supplier_search_clauses(tokens, [col]))
     return [getattr(r, col.key) for r in q.distinct().all() if getattr(r, col.key)]
 
 
 @router.get("/achats/suggestions", response_model=AchatsSuggestions)
-def list_achat_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> dict:
+def list_achat_suggestions(q: MinSearchQ, pharmacy_id: Annotated[int, member("achats")], db: DbDep) -> dict:
     """Tokenized PG-006 search across 3 groups. Products use the full
-    product_search_clauses (name + pid + barcodes + fuzzy); suppliers + refs
-    use the simpler unaccent-substring helper."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
+    product_search_clauses (name + pid + barcodes); suppliers + refs use
+    supplier_search_clauses."""
     tokens = tokenize_search(q)
     if not tokens:
         return {"products": [], "suppliers": [], "refs": []}
@@ -424,7 +399,7 @@ def list_achat_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> di
 
 @router.get("/achats/supplier-summary", response_model=AchatsSupplierSummary)
 def achat_supplier_summary(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("achats")],
     db:   DbDep,
     date_from: DateFromQ      = None,
     date_to:   DateToQ        = None,
@@ -436,13 +411,12 @@ def achat_supplier_summary(
     """Split supplier-side totals into grossiste vs direct_labo for the gauge.
     Classification: UPPER(supplier) LIKE 'GROSSISTE%' → grossiste, else direct_labo.
     Exclusions apply only in the comptabilite view (include_non_declared=false)."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="achats")
     base = _apply_achat_filters(
         db.query(Achat), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
     ).filter(Achat.supplier.isnot(None), Achat.supplier != "")
     if not include_non_declared:
-        base = base.filter(Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id)))
+        base = base.filter(achat_filter(db, pharmacy_id))
 
     is_grossiste = func.upper(Achat.supplier).like("GROSSISTE%")
 
@@ -464,7 +438,7 @@ def achat_supplier_summary(
 
 @router.get("/ventes", response_model=VentesListResponse)
 def list_ventes(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("ventes")],
     db:   DbDep,
     page:                 PageQ          = 1,
     limit:                LimitQ         = 20,
@@ -479,8 +453,6 @@ def list_ventes(
     sort_order:           SortOrderQ     = "desc",
     export:               ExportQ        = False,
 ) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
-
     q = _apply_vente_filters(
         db.query(Vente), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search,
@@ -560,7 +532,7 @@ def _vente_to_row(
 ) -> VenteRow:
     med = db.get(Medicament, v.medicament_id) if v.medicament_id else None
     category = med.category if med else None
-    suffix, color = suffixes.get(strip_percentage(category).lower(), ("", None))
+    suffix, color = suffixes.get(suffix_key(category), ("", None))
     ref = v.transaction_ref or ""
     ppv = float(med.ppv) if med and med.ppv is not None else None
     discount = float(v.discount or 0.0)
@@ -596,8 +568,7 @@ def _vente_to_row(
 # ─── GET /ventes/categories ──────────────────────────────────────────────────
 
 @router.get("/ventes/categories")
-def list_vente_categories(user: CurrentUserDep, db: DbDep) -> list[str]:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
+def list_vente_categories(pharmacy_id: Annotated[int, member("ventes")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.category)
         .join(Vente, Vente.medicament_id == Medicament.id)
@@ -611,8 +582,7 @@ def list_vente_categories(user: CurrentUserDep, db: DbDep) -> list[str]:
 # ─── GET /ventes/tva-rates ───────────────────────────────────────────────────
 
 @router.get("/ventes/tva-rates")
-def list_vente_tva_rates(user: CurrentUserDep, db: DbDep) -> list[str]:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
+def list_vente_tva_rates(pharmacy_id: Annotated[int, member("ventes")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.tva)
         .join(Vente, Vente.medicament_id == Medicament.id)
@@ -625,17 +595,16 @@ def list_vente_tva_rates(user: CurrentUserDep, db: DbDep) -> list[str]:
 # ─── GET /ventes/suggestions ─────────────────────────────────────────────────
 
 def _suggest_vente_col(db, pharmacy_id: int, col, tokens: list[str]) -> list[str]:
-    """Distinct top-6 values of `col` matching all tokens via unaccent-substring."""
+    """Distinct values of `col` matching every token (`search.py` grammar)."""
     q = db.query(col).filter(Vente.pharmacy_id == pharmacy_id, col.isnot(None))
     q = _apply_clauses(q, supplier_search_clauses(tokens, [col]))
     return [getattr(r, col.key) for r in q.distinct().all() if getattr(r, col.key)]
 
 
 @router.get("/ventes/suggestions", response_model=VentesSuggestions)
-def list_vente_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> dict:
-    """Tokenized PG-006 search across 3 groups (products use full product_search_clauses
-    with fuzzy fallback; clients + refs use unaccent-substring)."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
+def list_vente_suggestions(q: MinSearchQ, pharmacy_id: Annotated[int, member("ventes")], db: DbDep) -> dict:
+    """Tokenized PG-006 search across 3 groups (products use product_search_clauses;
+    clients + refs use supplier_search_clauses)."""
     tokens = tokenize_search(q)
     if not tokens:
         return {"products": [], "clients": [], "refs": []}
@@ -659,7 +628,7 @@ def list_vente_suggestions(q: MinSearchQ, user: CurrentUserDep, db: DbDep) -> di
 
 @router.get("/ventes/surveillance-counts", response_model=VentesSurveillanceCounts)
 def vente_surveillance_counts(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("ventes")],
     db:   DbDep,
     date_from: DateFromQ      = None,
     date_to:   DateToQ        = None,
@@ -670,7 +639,6 @@ def vente_surveillance_counts(
     """4 counts driving the surveillance tabs. BL exclusion is applied to the
     avg_pu subquery (apcm-pharma had this inconsistent — counts could disagree
     with rendered rows). Counts are recomputed per filter change."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
     avg_pu = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
 
     base = _apply_vente_filters(
@@ -711,7 +679,7 @@ def vente_surveillance_counts(
 
 @router.get("/ventes/discount-summary", response_model=VentesDiscountSummary)
 def vente_discount_summary(
-    user: CurrentUserDep,
+    pharmacy_id: Annotated[int, member("ventes")],
     db:   DbDep,
     date_from: DateFromQ      = None,
     date_to:   DateToQ        = None,
@@ -723,7 +691,6 @@ def vente_discount_summary(
     Drives the /ventes remise-discipline gauge: high discounted share = the
     team is giving away margin too often. Mirrors achat_supplier_summary
     structure (MAD + count + units per side, NO surveillance filter)."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="ventes")
     base = _apply_vente_filters(
         db.query(Vente), pharmacy_id,
         date_from=date_from, date_to=date_to, search=search,

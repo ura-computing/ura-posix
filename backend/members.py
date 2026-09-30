@@ -1,7 +1,8 @@
 """Shared pharmacy-member (owner / employee) helpers — used by both
-routers/admin_pharmacies.py and routers/owner_employees.py.
+routers/admin_pharmacies.py and routers/owner_employees.py — plus the
+pharmacy code generator (also used by seed.py).
 
-The routers keep the AUTH + SCOPE checks (require_admin, require_pharmacy_owner,
+The routers keep the AUTH + SCOPE checks (permissions.py dependencies,
 "employee belongs to caller's pharmacy"); everything below assumes the caller
 is already allowed to act on `target`.
 
@@ -10,10 +11,13 @@ stored.
 """
 from __future__ import annotations
 
+import unicodedata
+
+from sqlalchemy import Integer, func
 from sqlalchemy.orm import Session
 
-from models import ALLOWED_FEATURES, User, UserPermission
-from schemas.admin_pharmacies import MemberOut
+from models import ALLOWED_FEATURES, Pharmacy, User, UserPermission
+from schemas.members import MemberOut
 from security import hash_password
 
 
@@ -103,3 +107,27 @@ def reset_member_password(db: Session, target: User, password: str) -> None:
     target.password_hash = hash_password(password)
     target.token_version += 1
     db.commit()
+
+
+def generate_pharmacy_code(db: Session, city: str) -> str:
+    """Build a deterministic pharmacy code from the city name.
+
+    Algorithm:
+      1. NFD-normalize + strip combining marks + uppercase + alpha-only.
+      2. Take the first 3 chars (right-pad with 'X' if shorter).
+      3. Find the highest existing sequence for this prefix and add 1.
+      4. Format as `{PREFIX}{N:04d}` — e.g. Bouskoura → BOU0001 → BOU0002 …
+
+    A concurrent create with the same prefix can race on the unique index;
+    `create_pharmacy` wraps this in a retry loop to handle that.
+    """
+    norm = "".join(
+        c for c in unicodedata.normalize("NFD", city)
+        if not unicodedata.combining(c)
+    ).upper()
+    prefix = "".join(c for c in norm if c.isalpha())[:3].ljust(3, "X")
+
+    max_seq = db.query(
+        func.max(func.cast(func.substr(Pharmacy.code, 4), Integer))
+    ).filter(Pharmacy.code.like(f"{prefix}%")).scalar() or 0
+    return f"{prefix}{max_seq + 1:04d}"

@@ -1,9 +1,6 @@
-"""Shapes for the admin's permission-management pages (/admin/pharmacies).
-
-All endpoints sit behind require_admin. Members are users belonging to the
-pharmacy (role = "owner" or "employee"; admin is never a member). User
-statuses are "active" or "inactive" (per locked spec — no "pending" since
-there's no signup workflow)."""
+"""Pharmacy + member shapes. The admin pages (/admin/pharmacies) and the owner page
+(/owner/employees) share them: a user has the same shape whoever looks at it.
+Statuses: "active" | "inactive"."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,7 +9,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-# ── Member-level ──────────────────────────────────────────────────────────────
+# ═══ Admin: pharmacies + members ═════════════════════════════════════════════
+# Shapes for the admin's permission-management pages (/admin/pharmacies).
+#
+# All endpoints sit behind admin_only. Members are users belonging to the
+# pharmacy (role = "owner" or "employee"; admin is never a member). User
+# statuses are "active" or "inactive" (per locked spec — no "pending" since
+# there's no signup workflow).
 
 MemberRole   = Literal["owner", "employee"]
 MemberStatus = Literal["active", "inactive"]
@@ -71,8 +74,8 @@ class PharmacyIn(BaseModel):
     """Create or edit body. `name` + `city` are required; others optional.
 
     `city` is required because the backend derives the pharmacy `code` from
-    it (3-letter prefix + zero-padded sequence — see _generate_pharmacy_code
-    in routers/admin_pharmacies.py). On CREATE the client-sent `code` is
+    it (3-letter prefix + zero-padded sequence — see generate_pharmacy_code
+    in members.py). On CREATE the client-sent `code` is
     ignored; on EDIT it's allowed as a manual override (rare).
 
     Empty-string coercion: the frontend posts "" (not null) for cleared
@@ -177,3 +180,25 @@ class AdminUserRow(BaseModel):
 
 class AssignPharmacyIn(BaseModel):
     pharmacy_id: int
+
+
+# ═══ Owner: my team ══════════════════════════════════════════════════════════
+# Shapes for the owner's /owner/employees (Gérer mon équipe) page.
+#
+# Reuses the member / permission schemas from admin_pharmacies — the shape of
+# a user is the same whether admin or owner looks at it. The owner endpoints
+# add ONE extra response shape: the page's initial GET returns the employees
+# list PLUS the contextual ceiling info (pharmacy features + owner's own
+# permissions) in one round-trip, so the EmployeePermissionsDialog can render
+# its 2-layer ceiling without a second fetch.
+
+class OwnerEmployeesResponse(BaseModel):
+    """One-shot payload for /owner/employees:
+      - employees: members of the caller's pharmacy with role="employee"
+      - pharmacy_features: the pharmacy's enabled features (ceiling layer 1)
+      - my_permissions: the calling owner's own granted permissions (ceiling layer 2)
+    Together the two ceiling lists let the frontend disable any employee
+    permission toggle that EITHER layer doesn't allow."""
+    employees:         list[MemberOut]
+    pharmacy_features: list[str]
+    my_permissions:    list[str]

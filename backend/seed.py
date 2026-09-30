@@ -21,9 +21,8 @@ from sqlalchemy.orm import Session
 
 from csv_parse import classify_product_type, parse_catalog_csv
 from database import SessionLocal
-from members import create_member
+from members import create_member, generate_pharmacy_code
 from models import ALLOWED_FEATURES, Medicament, Pharmacy, PharmacyFeature, User
-from routers.admin_pharmacies import _generate_pharmacy_code
 from security import hash_password
 
 
@@ -97,7 +96,7 @@ def _seed_owner_with_pharmacy(db: Session, cfg: dict | None) -> tuple[str, str] 
     city = cfg.get("pharmacy_city")
     pharmacy = Pharmacy(
         name=cfg["pharmacy_name"], address=cfg.get("pharmacy_address"), city=city,
-        code=_generate_pharmacy_code(db, city) if city else None,
+        code=generate_pharmacy_code(db, city) if city else None,
     )
     db.add(pharmacy)
     db.flush()

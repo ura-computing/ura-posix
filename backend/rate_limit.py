@@ -16,13 +16,15 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from errors import ErrorCode, error_body
+
 
 limiter = Limiter(key_func=get_remote_address, enabled=os.environ.get("RATE_LIMIT", "1") != "0")
 
 
 def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    """French 429 response. Replaces slowapi's default English message."""
+    """429 with a translatable code. Replaces slowapi's default English message."""
     return JSONResponse(
         status_code=429,
-        content={"detail": "Trop de tentatives. Réessayez dans quelques minutes."},
+        content=error_body(ErrorCode.TOO_MANY_ATTEMPTS, "Trop de tentatives. Réessayez dans quelques minutes."),
     )

@@ -1,5 +1,11 @@
 """Shared permission helpers. Resolves the effective feature set for a user and
-exposes a `require(feature)` dependency factory routers can use to gate endpoints.
+exposes the FastAPI dependencies routers declare (no guard code in handler bodies):
+
+    pharmacy_id: Annotated[int, member("ventes")]   # owner / employee + feature(s)
+    pharmacy_id: MemberDep                           # owner / employee, no feature
+    pharmacy_id: OwnerDep                            # owner only
+    user: AdminDep / DeveloperDep                    # role-only, gives the user
+    APIRouter(dependencies=[admin_only])             # a whole admin router
 
 Three-layer permission model:
   - admin:    bypasses everything (gets every feature in ALLOWED_FEATURES)
@@ -13,10 +19,15 @@ Three-layer permission model:
 """
 from __future__ import annotations
 
-from fastapi import HTTPException, status
+from typing import Annotated, Any
+
+from fastapi import Depends, status
 from sqlalchemy.orm import Session
 
+from database import DbDep
+from errors import ApiError, ErrorCode
 from models import ALLOWED_FEATURES, PharmacyFeature, User, UserPermission
+from security import CurrentUserDep
 
 
 def _user_enabled_perms(db: Session, user_ids: list[int]) -> set[str]:
@@ -67,18 +78,19 @@ def effective_permissions(db: Session, user: User) -> list[str]:
 def require_feature(feature: str, user: User, db: Session) -> None:
     """Raise 403 if the user doesn't have `feature` in their effective permission set."""
     if feature not in effective_permissions(db, user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Accès refusé : la fonctionnalité « {feature} » n'est pas activée pour votre compte.",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, ErrorCode.FEATURE_DISABLED,
+            f"Accès refusé : la fonctionnalité « {feature} » n'est pas activée pour votre compte.",
+            feature=feature,
         )
 
 
 def require_admin(user: User) -> None:
     """Raise 403 for non-admin callers. Use on endpoints that manage system-wide state."""
     if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Réservé aux administrateurs.",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, ErrorCode.ADMIN_ONLY,
+            "Réservé aux administrateurs.",
         )
 
 
@@ -87,9 +99,9 @@ def require_developer(user: User) -> None:
     /v1/store-website developer-side endpoints (list requests, claim,
     edit customization, mark delivered)."""
     if user.role != "developer":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Réservé aux développeurs.",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, ErrorCode.DEVELOPER_ONLY,
+            "Réservé aux développeurs.",
         )
 
 
@@ -102,17 +114,54 @@ def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = Non
     - Optionally enforces a feature gate ("import", "achats", "ventes", …).
     """
     if user.role == "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Les admins utilisent /v1/admin/... (à venir).",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, ErrorCode.ADMIN_USE_ADMIN_ROUTES,
+            "Les admins utilisent /v1/admin/... (à venir).",
         )
     if user.role not in ("owner", "employee"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Ce compte n'a pas accès à cette ressource.",
+        raise ApiError(
+            status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN,
+            "Ce compte n'a pas accès à cette ressource.",
         )
     if user.pharmacy_id is None:
-        raise HTTPException(status_code=400, detail="Aucune pharmacie associée à ce compte.")
+        raise ApiError(400, ErrorCode.NO_PHARMACY, "Aucune pharmacie associée à ce compte.")
     if feature is not None:
         require_feature(feature, user, db)
     return user.pharmacy_id
+
+
+# ─── FastAPI dependencies ───────────────────────────────────────────────────
+
+def member(*features: str) -> Any:
+    """`pharmacy_id: Annotated[int, member("import", "achats")]` → owner or
+    employee of a pharmacy holding every listed feature; gives the pharmacy id."""
+    def dep(user: CurrentUserDep, db: DbDep) -> int:
+        pharmacy_id = require_pharmacy_owner(user, db)
+        for feature in features:
+            require_feature(feature, user, db)
+        return pharmacy_id
+    return Depends(dep)
+
+
+def _owner(user: CurrentUserDep, db: DbDep) -> int:
+    pharmacy_id = require_pharmacy_owner(user, db)
+    if user.role != "owner":
+        raise ApiError(status.HTTP_403_FORBIDDEN, ErrorCode.OWNER_ONLY, "Réservé aux propriétaires.")
+    return pharmacy_id
+
+
+def _admin(user: CurrentUserDep) -> User:
+    require_admin(user)
+    return user
+
+
+def _developer(user: CurrentUserDep) -> User:
+    require_developer(user)
+    return user
+
+
+MemberDep    = Annotated[int, member()]
+OwnerDep     = Annotated[int, Depends(_owner)]
+AdminDep     = Annotated[User, Depends(_admin)]
+DeveloperDep = Annotated[User, Depends(_developer)]
+admin_only   = Depends(_admin)

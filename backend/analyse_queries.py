@@ -2,9 +2,9 @@
 the analyse-liste matching logic from router.py.
 
 Single-file dispatch over 8 modes (produit / categorie / laboratoire / grossiste /
-operateur / mois / annee / liste). Reuses the locked PG-007 (BL exclusion), PG-013
-(no PPH fallback), PG-010 (grossiste + laboratoire marge), PG-020 (Diététique →
-Pharmacie) invariants via `pharma_expr()` and `achat_bl_filter()`.
+operateur / mois / annee / liste). Reuses the locked PG-013 (no PPH fallback),
+PG-010 (grossiste + laboratoire marge), PG-020 (Diététique → Pharmacie) invariants
+via `pharma_expr()`. Exclusions never apply here (Comptabilité only).
 
 Total CA = Σ qty × coalesce(PPV, unit_price) — matches Dashboard /stats so Rapport
 ↔ Analyse parity holds (locked by previous fix c0536f1).
@@ -18,9 +18,9 @@ from sqlalchemy import Date, and_, func
 from sqlalchemy.orm import Session
 
 from csv_parse import strip_accents
-from exclusions import achat_exclusion_filter
-from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
-from stats_queries import _strip_pct, pharma_expr
+from models import Achat, Medicament, PharmacyStock, Vente
+from query_parts import Filters, avg_pu_expr, avg_pu_subquery, ca_sum, category_filter
+from stats_queries import _strip_pct
 
 
 _MONTH_KEYS = ["m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"]
@@ -44,46 +44,13 @@ def compute_analyse_marge(
     category_type: str,
     mode: str,
     product: str | None = None,
-    *,
-    include_non_declared: bool = True,
 ) -> dict:
-    """Analyse de marge for all non-list modes.
-
-    include_non_declared=True (default): special/excluded products, excluded
-    suppliers and excluded BLs are ALL included — the Analyse tabs always show
-    the full picture. include_non_declared=False: comptabilite-only view that
-    applies the non-declared + BL + supplier exclusions."""
-    base_filter_v: list = []
-    base_filter_a: list = []
-    if pharmacy_id:
-        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
-        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
-    if df:
-        base_filter_v.append(Vente.date >= df)
-        base_filter_a.append(Achat.delivery_date >= df)
-    if dt:
-        base_filter_v.append(Vente.date <= dt)
-        base_filter_a.append(Achat.delivery_date <= dt)
-
-    if pharmacy_id and not include_non_declared:
-        non_declared_sub = (
-            db.query(PharmacyMedicamentStatus.medicament_id)
-            .filter(
-                PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                PharmacyMedicamentStatus.declared == False,
-            )
-            .scalar_subquery()
-        )
-        base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
-        base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
-        # PG-007: exclude pharmacist-excluded BL numbers from achats.
-        base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
-
-    cat_filter: list = []
-    if category_type == "pharmacie":
-        cat_filter = [pharma_expr() == True]
-    elif category_type == "parapharmacie":
-        cat_filter = [pharma_expr() == False]
+    """Analyse de marge for all non-list modes. Exclusions never apply here
+    (Comptabilité only): every product, BL and supplier is included."""
+    f = Filters(pharmacy_id, df, dt)
+    base_filter_v = f.ventes(db)
+    base_filter_a = f.achats(db)
+    cat_filter = category_filter(category_type)
 
     # Product search (année mode only): filter ventes by product name so the year
     # rows AND the KPI cards both reflect the searched product.
@@ -113,9 +80,7 @@ def compute_analyse_marge(
     # Compute it directly from PharmacyStock so the tile is real in EVERY tab
     # (produit's rows carry stock_dispo, but categorie/mois/année/... don't),
     # while still respecting the tab's category_type + optional product filter.
-    kpis["total_units_available"] = _compute_total_units_available(
-        db, pharmacy_id, cat_filter, product, include_non_declared=include_non_declared,
-    )
+    kpis["total_units_available"] = _compute_total_units_available(db, pharmacy_id, cat_filter, product)
     return {"kpis": kpis, "rows": rows_out}
 
 
@@ -124,8 +89,6 @@ def _compute_total_units_available(
     pharmacy_id: int | None,
     cat_filter: list,
     product: str | None = None,
-    *,
-    include_non_declared: bool = True,
 ) -> int | None:
     """Sum of current stock across the pharmacy's products matching the current
     analyse filter (category_type via `cat_filter`, optional product search).
@@ -138,16 +101,6 @@ def _compute_total_units_available(
     )
     if pharmacy_id:
         q = q.filter(PharmacyStock.pharmacy_id == pharmacy_id)
-        if not include_non_declared:
-            non_declared_sub = (
-                db.query(PharmacyMedicamentStatus.medicament_id)
-                .filter(
-                    PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                    PharmacyMedicamentStatus.declared == False,
-                )
-                .scalar_subquery()
-            )
-            q = q.filter(PharmacyStock.medicament_id.notin_(non_declared_sub))
     if product and product.strip():
         q = q.filter(Medicament.product.ilike(f"%{product.strip()}%"))
     total = q.scalar() or 0
@@ -161,7 +114,7 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
     achat_prices_sub = (
         db.query(
             Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+            avg_pu_expr().label("avg_pu"),
             func.max(Achat.unit_price).label("pu_max"),
             func.min(Achat.unit_price).label("pu_min"),
             func.sum(Achat.unit_price * Achat.quantity).label("total_achat_cost"),
@@ -286,21 +239,14 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
             func.sum(Vente.total).label("ca"),
             func.max(Vente.unit_price).label("prix_max"),
             func.min(Vente.unit_price).label("prix_min"),
-            func.avg(Vente.unit_price).label("prix_avg"),
+            func.sum(Vente.unit_price).label("pu_sum"),
+            func.count(Vente.unit_price).label("pu_n"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .filter(*base_filter_v, *cat_filter)
         .group_by(Medicament.category)
     )
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(*base_filter_a)
-        .group_by(Achat.medicament_id)
-        .subquery()
-    )
+    avg_pu_sub = avg_pu_subquery(db, *base_filter_a)
     med_marge_q = (
         db.query(
             Medicament.category, Medicament.ppv,
@@ -326,18 +272,33 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
         cat_margin[key]["sum_qty_dh"]  += qty * (ppv - pu)
         cat_margin[key]["total_qty"]   += qty
 
-    out: list[dict] = []
+    # One row per category label: "Médicament (33.930%)" and "Médicament (30.000%)"
+    # merge into one « Médicament » row (same key as the margins above).
+    groups: dict[str, dict] = {}
     for r in q.all():
-        key = _strip_pct(r.category or "")
+        g = groups.setdefault(_strip_pct(r.category or ""), {
+            "qty": 0.0, "ca": 0.0, "max": None, "min": None, "pu_sum": 0.0, "pu_n": 0,
+        })
+        g["qty"]    += float(r.qty or 0)
+        g["ca"]     += float(r.ca or 0)
+        g["pu_sum"] += float(r.pu_sum or 0)
+        g["pu_n"]   += int(r.pu_n or 0)
+        if r.prix_max is not None:
+            g["max"] = r.prix_max if g["max"] is None else max(g["max"], r.prix_max)
+        if r.prix_min is not None:
+            g["min"] = r.prix_min if g["min"] is None else min(g["min"], r.prix_min)
+
+    out: list[dict] = []
+    for key, g in groups.items():
         m = cat_margin.get(key)
         total_qty = m["total_qty"] if m else 0
         out.append({
             "category":      key or "—",
-            "prix_max":      round(float(r.prix_max or 0), 4),
-            "prix_min":      round(float(r.prix_min or 0), 4),
-            "prix_avg":      round(float(r.prix_avg or 0), 4),
-            "qty":           round(float(r.qty or 0), 2),
-            "ca":            round(float(r.ca or 0), 2),
+            "prix_max":      round(float(g["max"] or 0), 4),
+            "prix_min":      round(float(g["min"] or 0), 4),
+            "prix_avg":      round(g["pu_sum"] / g["pu_n"], 4) if g["pu_n"] else 0.0,
+            "qty":           round(g["qty"], 2),
+            "ca":            round(g["ca"], 2),
             "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
             "marge_dh_avg":  round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
         })
@@ -358,7 +319,7 @@ def _supplier_axis(
         db.query(
             Achat.supplier.label("supplier"),
             Achat.medicament_id.label("medicament_id"),
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
+            avg_pu_expr().label("avg_pu"),
             func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
         )
         .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
@@ -467,7 +428,7 @@ def _mode_operateur(db: Session, base_filter_v: list, cat_filter: list) -> list[
         db.query(
             Vente.client,
             func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+            ca_sum().label("ca"),
             func.count(Vente.id).label("nb_transactions"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
@@ -489,7 +450,7 @@ def _mode_mois(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]
         db.query(
             func.to_char(func.cast(Vente.date, Date), "YYYY-MM").label("mois"),
             func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+            ca_sum().label("ca"),
             func.count(Vente.id).label("nb_transactions"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
@@ -515,7 +476,7 @@ def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict
         db.query(
             func.extract("year",  func.cast(Vente.date, Date)).label("annee"),
             func.extract("month", func.cast(Vente.date, Date)).label("mois"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+            ca_sum().label("ca"),
             func.sum(Vente.quantity).label("qty"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
@@ -549,7 +510,7 @@ def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict
 def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: list[dict]) -> dict:
     # Parity with Dashboard /stats: same CA formula so totals match for the same window.
     _ca_q = (
-        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+        db.query(ca_sum())
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v, *cat_filter)
     )
@@ -633,8 +594,6 @@ def compute_analyse_liste(
     df: str | None,
     dt: str | None,
     category_type: str,
-    *,
-    include_non_declared: bool = True,
 ) -> dict:
     """Match an uploaded list of products (by name → barcode1 → barcode2 → PID) against
     the pharmacy's catalogue + ventes. Returns the same shape as compute_analyse_marge
@@ -691,10 +650,7 @@ def compute_analyse_liste(
             unmatched.append(original_name)
 
     # Run produit mode then filter to matched ids
-    full = compute_analyse_marge(
-        db, pharmacy_id, df, dt, category_type, "produit",
-        include_non_declared=include_non_declared,
-    )
+    full = compute_analyse_marge(db, pharmacy_id, df, dt, category_type, "produit")
     matched_meds_by_id = {m.id: m for m in med_rows if m.id in matched_ids}
     matched_norms_db   = {strip_accents((m.product or "").strip().lower()) for m in matched_meds_by_id.values()}
 

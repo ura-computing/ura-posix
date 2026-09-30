@@ -145,12 +145,6 @@ class AdminStatsResponse(BaseModel):
     pending_catalog_requests: int   # always 0 until the catalog-request feature ships
 
 
-class AdminPharmacyRow(BaseModel):
-    id:   int
-    name: str
-    code: str | None
-
-
 # ── Stock — ABCD analysis + filtered product list (Page 6) ──────────────────
 
 class StockRow(BaseModel):

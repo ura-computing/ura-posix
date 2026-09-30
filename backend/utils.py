@@ -14,15 +14,6 @@ def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-# Backward-compatible aliases (forgot/set password flow uses these names).
-def generate_reset_token() -> str:
-    return generate_token(32)
-
-
-def hash_reset_token(raw: str) -> str:
-    return hash_token(raw)
-
-
 def parse_user_agent(ua: str | None) -> str:
     """Cheap, no-dep UA → 'Browser on OS' label. Falls back to 'Inconnu'."""
     if not ua:

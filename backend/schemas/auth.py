@@ -1,8 +1,13 @@
+"""Login, account and session shapes."""
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from schemas.members import MemberStatus
+
+
+# ═══ Auth ════════════════════════════════════════════════════════════════════
 
 class LoginRequest(BaseModel):
     email:    EmailStr
@@ -49,7 +54,7 @@ class UserOut(BaseModel):
     name:          str | None
     phone:         str | None
     role:          Literal["admin", "owner", "employee", "developer"]
-    status:        Literal["active", "revoked", "pending", "rejected"]
+    status:        MemberStatus
     pharmacy_id:   int | None
     last_login_at: datetime | None
 
@@ -58,3 +63,13 @@ class MeResponse(BaseModel):
     user:        UserOut
     pharmacy:    PharmacyOut | None
     permissions: list[str]
+
+
+# ═══ Sessions ════════════════════════════════════════════════════════════════
+
+class SessionOut(BaseModel):
+    id:             str          # stringified for stable frontend cache keys
+    device_label:   str
+    ip:             str
+    last_active_at: datetime     # maps from sessions.last_used_at
+    is_current:     bool

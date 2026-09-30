@@ -1,38 +1,48 @@
+"""Login / logout, my account, password flows, my sessions (other devices)."""
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Request, Response, status
 from sqlalchemy.orm import Session as DbSession
 
 from config import settings
 from database import DbDep
+from email_service import send_magic_link
+from errors import ApiError, ErrorCode
 from models import Session as UserSession, User
 from permissions import effective_permissions
+from rate_limit import limiter
 from schemas.auth import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     MeResponse,
     PharmacyOut,
+    SessionOut,
     SetPasswordRequest,
     UpdateProfileRequest,
     UserOut,
     ValidateTokenResponse,
 )
 from security import (
+    create_access_token,
     CurrentUserDep,
+    hash_password,
     SESSION_COOKIE_NAME,
     SESSION_EXPIRY_DAYS,
     SessionCookieDep,
-    create_access_token,
-    hash_password,
     verify_password,
 )
-from utils import generate_reset_token, generate_token, hash_reset_token, hash_token, parse_user_agent
-from email_service import send_magic_link
-from rate_limit import limiter
+from utils import (
+    generate_token,
+    hash_token,
+    parse_user_agent,
+)
 
 
-router = APIRouter()
+router = APIRouter(tags=["auth"])
+
+
+# ═══ Auth ════════════════════════════════════════════════════════════════════
 
 RESET_TOKEN_EXPIRY_MIN = 60     # decision #4
 INVALID_TOKEN_DETAIL = "Lien invalide ou expiré"
@@ -78,7 +88,7 @@ def _lookup_valid_reset(db: DbSession, raw_token: str) -> User | None:
     """Returns the user whose reset_token hash matches, only if not expired."""
     if not raw_token:
         return None
-    hashed = hash_reset_token(raw_token)
+    hashed = hash_token(raw_token)
     user = db.query(User).filter(User.reset_token == hashed).first()
     if not user or not user.reset_token_expires:
         return None
@@ -87,14 +97,17 @@ def _lookup_valid_reset(db: DbSession, raw_token: str) -> User | None:
     return user
 
 
-@router.post("/login")
+@router.post("/auth/login")
 @limiter.limit("5/minute")
 def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -> MeResponse:
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=BAD_CREDS_DETAIL)
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, ErrorCode.BAD_CREDENTIALS, BAD_CREDS_DETAIL)
     if user.status != "active":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Votre compte a été désactivé. Contactez votre administrateur.")
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED, ErrorCode.ACCOUNT_DISABLED,
+            "Votre compte a été désactivé. Contactez votre administrateur.",
+        )
 
     now = datetime.now(timezone.utc)
     user.last_login_at = now
@@ -119,12 +132,12 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
     return _me_response(db, user)
 
 
-@router.get("/me")
+@router.get("/auth/me")
 def me(user: CurrentUserDep, db: DbDep) -> MeResponse:
     return _me_response(db, user)
 
 
-@router.patch("/me")
+@router.patch("/auth/me")
 def update_me(body: UpdateProfileRequest, user: CurrentUserDep, db: DbDep) -> MeResponse:
     user.name = body.name
     user.phone = body.phone
@@ -133,7 +146,7 @@ def update_me(body: UpdateProfileRequest, user: CurrentUserDep, db: DbDep) -> Me
     return _me_response(db, user)
 
 
-@router.post("/change-password", status_code=204)
+@router.post("/auth/change-password", status_code=204)
 def change_password(
     body: ChangePasswordRequest,
     user: CurrentUserDep,
@@ -147,7 +160,7 @@ def change_password(
     again — protects against a compromised JWT outliving the password it was issued
     against."""
     if not user.password_hash or not verify_password(body.current_password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mot de passe actuel incorrect")
+        raise ApiError(status.HTTP_400_BAD_REQUEST, ErrorCode.WRONG_PASSWORD, "Mot de passe actuel incorrect")
 
     user.password_hash = hash_password(body.new_password)
     user.token_version += 1
@@ -173,7 +186,7 @@ def change_password(
     _set_session_cookie(response, raw_session_token)
 
 
-@router.post("/logout", status_code=204)
+@router.post("/auth/logout", status_code=204)
 def logout(response: Response, db: DbDep, session_token: SessionCookieDep = None) -> None:
     if session_token:
         db.query(UserSession).filter(UserSession.refresh_token_hash == hash_token(session_token)).delete()
@@ -181,7 +194,7 @@ def logout(response: Response, db: DbDep, session_token: SessionCookieDep = None
     _clear_cookies(response)
 
 
-@router.post("/forgot-password", status_code=200)
+@router.post("/auth/forgot-password", status_code=200)
 @limiter.limit("3/hour")
 def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) -> dict:
     """Always returns 200 with a generic message. Don't leak whether the email exists.
@@ -190,8 +203,8 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
     enumeration reason — admin notices via logs."""
     user = db.query(User).filter(User.email == body.email).first()
     if user and user.status == "active":
-        raw = generate_reset_token()
-        user.reset_token = hash_reset_token(raw)
+        raw = generate_token()
+        user.reset_token = hash_token(raw)
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRY_MIN)
         db.commit()
         magic_link = f"{settings.FRONTEND_URL}/auth/set-password?token={raw}"
@@ -208,26 +221,86 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
     return {"detail": "Si votre compte existe, un email a été envoyé"}
 
 
-@router.get("/validate-token")
+@router.get("/auth/validate-token")
 def validate_token(token: str, db: DbDep) -> ValidateTokenResponse:
     user = _lookup_valid_reset(db, token)
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_TOKEN_DETAIL)
+        raise ApiError(status.HTTP_400_BAD_REQUEST, ErrorCode.INVALID_TOKEN, INVALID_TOKEN_DETAIL)
     return ValidateTokenResponse(
         is_setup=user.password_hash is None,
         full_name=user.name or user.email,
     )
 
 
-@router.post("/set-password", status_code=204)
+@router.post("/auth/set-password", status_code=204)
 def set_password(body: SetPasswordRequest, db: DbDep) -> None:
     user = _lookup_valid_reset(db, body.token)
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=INVALID_TOKEN_DETAIL)
+        raise ApiError(status.HTTP_400_BAD_REQUEST, ErrorCode.INVALID_TOKEN, INVALID_TOKEN_DETAIL)
     user.password_hash = hash_password(body.password)
     user.reset_token = None
     user.reset_token_expires = None
     user.token_version += 1     # kills any pre-existing sessions defensively (decision #105)
     # Wipe zombie session rows whose JWTs were just invalidated above.
     db.query(UserSession).filter(UserSession.user_id == user.id).delete()
+    db.commit()
+
+
+# ═══ Sessions ════════════════════════════════════════════════════════════════
+
+def _to_out(s: UserSession, current_hash: str | None) -> SessionOut:
+    return SessionOut(
+        id=str(s.id),
+        device_label=s.device_label or "Inconnu",
+        ip=s.ip or "—",
+        last_active_at=s.last_used_at,
+        is_current=(s.refresh_token_hash == current_hash) if current_hash else False,
+    )
+
+
+@router.get("/sessions")
+def list_my_sessions(
+    user: CurrentUserDep,
+    db: DbDep,
+    session_token: SessionCookieDep = None,
+) -> list[SessionOut]:
+    current_hash = hash_token(session_token) if session_token else None
+    rows = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user.id)
+        .order_by(UserSession.last_used_at.desc())
+        .all()
+    )
+    return [_to_out(s, current_hash) for s in rows]
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def kill_session(
+    session_id: int,
+    user: CurrentUserDep,
+    db: DbDep,
+) -> None:
+    """Kill a specific session belonging to the caller. Use POST /auth/logout to
+    end the CURRENT session — this endpoint is for killing other devices."""
+    deleted = (
+        db.query(UserSession)
+        .filter(UserSession.id == session_id, UserSession.user_id == user.id)
+        .delete()
+    )
+    if not deleted:
+        raise ApiError(status.HTTP_404_NOT_FOUND, ErrorCode.SESSION_NOT_FOUND, "Session introuvable")
+    db.commit()
+
+
+@router.post("/sessions/revoke-others", status_code=204)
+def revoke_other_sessions(
+    user: CurrentUserDep,
+    db: DbDep,
+    session_token: SessionCookieDep = None,
+) -> None:
+    """Delete every session of the caller EXCEPT the one matching session_token cookie."""
+    q = db.query(UserSession).filter(UserSession.user_id == user.id)
+    if session_token:
+        q = q.filter(UserSession.refresh_token_hash != hash_token(session_token))
+    q.delete()
     db.commit()

@@ -23,6 +23,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from errors import ErrorCode, error_body
 from models import Medicament
 
 
@@ -42,9 +43,15 @@ def strip_percentage(s: str | None) -> str:
     return _PCT_RE.sub("", s).strip()
 
 
+def suffix_key(category: str | None) -> str:
+    """Category-suffix match key, ignoring accents, case, extra spaces and the
+    « (x%) » part: « Médicament (33.930%) » and « medicament » → "medicament"."""
+    return " ".join(strip_accents(strip_percentage(category)).lower().split())
+
+
 # ─── Product-type classifier ──────────────────────────────────────────────────
 # Single Python-side source of truth for Pharmacie/Parapharmacie classification
-# at WRITE time (catalog import only). Same keyword set as stats_queries.pharma_expr()
+# at WRITE time (catalog import only). Same keyword set as query_parts.pharma_expr()
 # uses in its SQL fallback. Catalogue is the source of truth — see F19 plan.
 
 _PHARMA_KEYWORDS = (
@@ -181,7 +188,7 @@ def parse_csv(content: bytes, delimiter: str | None = None) -> list[dict[str, st
     return out
 
 
-def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[str]]:
+def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[dict]]:
     """Parse a Sobrus catalog CSV (`Nom,Categorie,TVA,PPV,PPH,Code barre 1,
     Code barre 2,Laboratoire`). Returns (rows, errors).
 
@@ -190,12 +197,12 @@ def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[str]]:
     dict matching MedicamentCreate fields with a derived synthetic `pid`."""
     rows = parse_csv(content, delimiter=",")
     seen_pids: set[str] = set()
-    errors:    list[str] = []
+    errors:    list[dict] = []
     out:       list[dict] = []
     for i, raw in enumerate(rows, start=2):    # row 1 = header
         name = (raw.get("Nom") or "").strip()
         if not name:
-            errors.append(f"Ligne {i}: nom manquant")
+            errors.append(error_body(ErrorCode.ROW_MISSING_NAME, f"Ligne {i}: nom manquant", line=i))
             continue
         bc1 = (raw.get("Code barre 1") or "").strip() or None
         bc2 = (raw.get("Code barre 2") or "").strip() or None
@@ -223,67 +230,6 @@ def _derive_pid(barcode1: str | None, product: str, seen_pids: set[str]) -> str:
     if bc and len(bc) >= 8 and bc not in seen_pids:
         return bc
     return normalized_name(product)
-
-
-# ─── Medicament upsert ────────────────────────────────────────────────────────
-
-def upsert_medicament(
-    db: Session,
-    pid: str,
-    product: str,
-    tva: str | None = None,
-    pph: float | None = None,
-    ppv: float | None = None,
-    category: str | None = None,
-    zone: str | None = None,
-) -> tuple[Medicament | None, bool]:
-    """Find or create a Medicament from an achat/vente import row.
-
-    Returns `(medicament, was_created)`:
-      - was_created=True  → row didn't exist; freshly inserted (admin queue signal)
-      - was_created=False → row existed (matched by PID or normalized name)
-      - medicament=None   → input was empty (no pid)
-
-    Match ladder:
-       1. exact PID (the Sobrus product id)
-       2. accent-stripped + case-insensitive product name
-
-    On match: update tva/pph/ppv/zone if provided. NEVER overwrites an existing
-    category — admins curate those.
-    On miss: insert new row with all supplied fields.
-
-    IMPORTANT (F19 contract): new rows created here have product_type = NULL
-    by design. Catalogue is the source of truth — admin must classify via
-    /admin/catalogue. Owner imports DO NOT set the type by side-effect.
-    Do NOT add a classify_product_type() call here — that would defeat the
-    "admin queue" UX that depends on NULL product_type as the signal."""
-    if not pid:
-        return None, False
-
-    med = db.query(Medicament).filter(Medicament.pid == pid).first()
-    if med is None and product:
-        norm = strip_accents(product).lower().strip()
-        for cand in db.query(Medicament).filter(Medicament.product.ilike(f"%{product[:30]}%")).all():
-            if strip_accents(cand.product or "").lower().strip() == norm:
-                med = cand
-                break
-
-    if med:
-        if tva      and not med.tva:      med.tva      = tva
-        if pph is not None:               med.pph      = pph
-        if ppv is not None:               med.ppv      = ppv
-        if zone     and not med.zone:     med.zone     = zone
-        # Category intentionally NOT overwritten — admin-curated.
-        return med, False
-
-    med = Medicament(
-        pid=pid, product=product or pid,
-        tva=tva, pph=pph, ppv=ppv,
-        category=category, zone=zone,
-    )
-    db.add(med)
-    db.flush()      # populates med.id without committing the parent transaction
-    return med, True
 
 
 # ─── Normalized-name dedup (shared by the achat/vente + catalog imports) ───────

@@ -1,46 +1,59 @@
-"""Sobrus CSV ingestion endpoints.
-
-  • JSON chunks (the /upload-file wizard parses the CSV in the browser and
-    POSTs 500-row chunks):
-      POST /v1/uploads/achat-json
-      POST /v1/uploads/vente-json
-      POST /v1/uploads/stock-json
-  • Catalogue CSV (admin, multipart):
-      POST /v1/uploads/catalog
-  • Cancel / fail a running batch:
-      PATCH /v1/uploads/batches/{id}
-
-Chunked uploads thread `batch_id`: chunk 1 returns a fresh ImportBatch id,
-later chunks pass it, so one file = ONE audit row.
-
-Stock uses Postgres `ON CONFLICT (pharmacy_id, medicament_id)` upsert, so
-re-importing a newer stock snapshot updates the existing rows.
-
-Catalogue file-size limit: MAX_FILE_BYTES (100 MB).
-"""
+"""Imports: catalogue CSV (admin), achat / vente / stock JSON chunks from the
+browser wizard, batch status, import history + delete."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Annotated, Any, Callable
 
-from fastapi import APIRouter, File, HTTPException, Path, UploadFile, status
-from pydantic import BaseModel
+from fastapi import APIRouter, File, Path, Query, status, UploadFile
+from sqlalchemy import desc, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import aliased, Query as OrmQuery, Session
 
 from csv_parse import (
-    classify_product_type, col, existing_by_name, normalized_name,
-    parse_catalog_csv, parse_float, parse_int, parse_iso_date,
+    classify_product_type,
+    col,
+    existing_by_name,
+    normalized_name,
+    parse_catalog_csv,
+    parse_float,
+    parse_int,
+    parse_iso_date,
 )
 from database import DbDep
-from models import Achat, ImportBatch, Medicament, PharmacyStock, Vente
-from permissions import require_admin, require_feature, require_pharmacy_owner
+from errors import ApiError, ErrorCode
+from models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
+from permissions import AdminDep, member, require_pharmacy_owner
 from schemas.catalog import CatalogImportResponse
+from schemas.imports import ImportsListResponse, JsonUploadBody, PatchBatchBody
+from schemas.transactions import paginate
 from security import CurrentUserDep
 
 
-router = APIRouter(tags=["uploads"])
+router = APIRouter(tags=["imports"])
 
+
+# ═══ Uploads ═════════════════════════════════════════════════════════════════
+# Sobrus CSV ingestion endpoints.
+#
+#   • JSON chunks (the /upload-file wizard parses the CSV in the browser and
+#     POSTs 500-row chunks):
+#       POST /v1/uploads/achat-json
+#       POST /v1/uploads/vente-json
+#       POST /v1/uploads/stock-json
+#   • Catalogue CSV (admin, multipart):
+#       POST /v1/uploads/catalog
+#   • Cancel / fail a running batch:
+#       PATCH /v1/uploads/batches/{id}
+#
+# Chunked uploads thread `batch_id`: chunk 1 returns a fresh ImportBatch id,
+# later chunks pass it, so one file = ONE audit row.
+#
+# Stock uses Postgres `ON CONFLICT (pharmacy_id, medicament_id)` upsert, so
+# re-importing a newer stock snapshot updates the existing rows.
+#
+# Catalogue file-size limit: MAX_FILE_BYTES (100 MB).
 
 MAX_FILE_BYTES = 100 * 1024 * 1024   # 100 MB
 ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
@@ -48,34 +61,22 @@ EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
 EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
 
-# ─── Pydantic bodies (JSON variants + PATCH) ─────────────────────────────────
-
-class JsonUploadBody(BaseModel):
-    rows:     list[dict[str, str]]    # the extension serializes one row as {label: value, ...}
-    filename: str | None = None
-    batch_id: int | None = None
-
-
-class PatchBatchBody(BaseModel):
-    status:        str
-    error_message: str | None = None
-
-
 # ─── Shared helpers ──────────────────────────────────────────────────────────
 
 def _check_size(content: bytes) -> None:
     if len(content) > MAX_FILE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Fichier trop volumineux (max {MAX_FILE_BYTES // (1024*1024)} Mo).",
+        raise ApiError(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, ErrorCode.FILE_TOO_LARGE,
+            f"Fichier trop volumineux (max {MAX_FILE_BYTES // (1024*1024)} Mo).",
+            max_mb=MAX_FILE_BYTES // (1024 * 1024),
         )
 
 
 def _check_csv(file: UploadFile) -> None:
     if not (file.filename or "").lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Seuls les fichiers CSV sont acceptés.",
+        raise ApiError(
+            status.HTTP_400_BAD_REQUEST, ErrorCode.CSV_ONLY,
+            "Seuls les fichiers CSV sont acceptés.",
         )
 
 
@@ -190,18 +191,10 @@ def _batch_resolve_medicaments(
     rows: list[dict[str, Any]],
 ) -> tuple[dict[str, int], list[Medicament]]:
     """Resolve every unique PID in `rows` to a Medicament.id using ONE SELECT + ONE
-    INSERT batch. Replaces the per-row `upsert_medicament` call — was the dominant
-    cost in ingest (N+1 SELECT + N flush per chunk).
+    INSERT batch (+ one SELECT for the name merge below).
 
     Returns (`{pid → med_id}`, `[newly-created Medicaments]`). The list is used by
-    the response so the frontend can surface "N new products" to the owner (F19).
-
-    Trade-off vs. `upsert_medicament()`: DROPS the normalized-name fallback. Rows
-    with a NEW PID whose product name matches an existing catalog row will create
-    a duplicate Medicament instead of merging. Rare in practice — Sobrus PIDs are
-    stable — and dedupable via /admin/catalogue after the fact. In return, ingest
-    goes from ~500 SELECTs per chunk to 1.
-    """
+    the response so the frontend can surface "N new products" to the owner (F19)."""
     # Collect unique PIDs; keep the first row we see for a given PID as the source
     # of catalog field updates (tva/pph/ppv/zone).
     first_row_by_pid: dict[str, dict[str, Any]] = {}
@@ -219,8 +212,8 @@ def _batch_resolve_medicaments(
     }
 
     def _update_fields(med: Medicament, r: dict[str, Any]) -> None:
-        # Same mutable-field semantics as upsert_medicament. Category intentionally
-        # NOT overwritten — admin-curated.
+        # Fill missing TVA / zone, refresh prices. Category intentionally NOT
+        # overwritten — admin-curated.
         tva  = col(r, COL_TVA)
         pph  = parse_float(col(r, COL_PPH))
         ppv  = parse_float(col(r, COL_PPV))
@@ -450,7 +443,7 @@ def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> t
 
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
 async def upload_catalog(
-    user: CurrentUserDep,
+    user: AdminDep,
     db:   DbDep,
     file: Annotated[UploadFile, File(description="Sobrus catalogue CSV (comma-delimited)")],
 ) -> dict:
@@ -460,13 +453,12 @@ async def upload_catalog(
        - rows in DB that disappear from the CSV are kept (no destructive delete)
 
     Mojibake fix runs automatically via `parse_csv()` → `clean_value()`."""
-    require_admin(user)
     _check_csv(file)
     content = await file.read()
     _check_size(content)
     parsed, errors = parse_catalog_csv(content)
     if not parsed and not errors:
-        raise HTTPException(status_code=400, detail=EMPTY_FILE_DETAIL)
+        raise ApiError(400, ErrorCode.EMPTY_FILE, EMPTY_FILE_DETAIL)
 
     pids = [r["pid"] for r in parsed]
     by_pid = {
@@ -502,36 +494,30 @@ async def upload_catalog(
 # ─── JSON endpoints (Chrome extension) ───────────────────────────────────────
 
 @router.post("/uploads/achat-json")
-def upload_achat_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    require_feature("achats", user, db)
+def upload_achat_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "achats")], user: CurrentUserDep, db: DbDep) -> dict:
     if not body.rows:
-        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+        raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
                                 filename=body.filename, batch_id=body.batch_id,
                                 user_id=user.id, cfg=ACHAT_CFG)
 
 
 @router.post("/uploads/vente-json")
-def upload_vente_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    require_feature("ventes", user, db)
+def upload_vente_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "ventes")], user: CurrentUserDep, db: DbDep) -> dict:
     if not body.rows:
-        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+        raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
     return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
                                 filename=body.filename, batch_id=body.batch_id,
                                 user_id=user.id, cfg=VENTE_CFG)
 
 
 @router.post("/uploads/stock-json")
-def upload_stock_json(body: JsonUploadBody, user: CurrentUserDep, db: DbDep) -> dict:
+def upload_stock_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "stock")], user: CurrentUserDep, db: DbDep) -> dict:
     """Chunked stock import — same JSON shape as achat/vente. First chunk passes
     batch_id=None (creates the ImportBatch); subsequent chunks reuse it via the
     returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
-    pharmacy_id = require_pharmacy_owner(user, db, feature="import")
-    require_feature("stock", user, db)
     if not body.rows:
-        raise HTTPException(status_code=400, detail=EMPTY_BODY_DETAIL)
+        raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
     return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,
                          filename=body.filename, batch_id=body.batch_id,
                          user_id=user.id)
@@ -557,13 +543,17 @@ def patch_batch_status(
       already inserted stay (the failing chunk was likely network-side, not data-side).
     """
     if body.status not in ALLOWED_STATUSES:
-        raise HTTPException(status_code=400, detail=f"Statut invalide. Attendu : {sorted(ALLOWED_STATUSES)}")
+        raise ApiError(
+            400, ErrorCode.INVALID_BATCH_STATUS,
+            f"Statut invalide. Attendu : {sorted(ALLOWED_STATUSES)}",
+            allowed=", ".join(sorted(ALLOWED_STATUSES)),
+        )
 
     batch = db.get(ImportBatch, batch_id)
     if batch is None:
-        raise HTTPException(status_code=404, detail="Lot d'import introuvable.")
+        raise ApiError(404, ErrorCode.BATCH_NOT_FOUND, "Lot d'import introuvable.")
     if batch.pharmacy_id != user.pharmacy_id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="Accès refusé à ce lot d'import.")
+        raise ApiError(403, ErrorCode.BATCH_FORBIDDEN, "Accès refusé à ce lot d'import.")
 
     deleted_rows = 0
     if body.status == "cancelled":
@@ -586,3 +576,142 @@ def patch_batch_status(
         "error_message":  batch.error_message,
         "deleted_rows":   deleted_rows,
     }
+
+
+# ═══ Import history ══════════════════════════════════════════════════════════
+# Imports history + soft-delete endpoints for the /imports page.
+#
+# One logical import = one ImportBatch row. The table can list rows 1:1 with no
+# SQL grouping logic.
+#
+# DELETE is a SOFT delete: the achat/vente rows are still removed (true undo
+# for transactional data), but the batch row stays with `deleted_at` +
+# `deleted_by_user_id` populated, so the /imports page can show it as history.
+# Stock batches: data not removed (UPSERT can't be undone — the snapshot already
+# overwrote prior values); only the batch row is marked deleted.
+#
+# Per-role visibility + authz (mirrors the listing scope):
+#   - admin    → only batches they created (in practice ~empty)
+#   - owner    → batches they created OR created by an employee in their pharmacy
+#   - employee → only batches they created
+
+def _visible_batches_query(db: Session, user: User) -> OrmQuery:
+    """Returns the base query over ImportBatch filtered by the caller's
+    per-role visibility rules. Reused by list (page through it) and delete
+    (find-by-id and 404 if outside scope).
+
+    - admin    → batches whose creator is the admin themselves
+    - owner    → caller's own batches OR batches whose creator is an active
+                 employee in the caller's pharmacy
+    - employee → caller's own batches
+    """
+    base = db.query(ImportBatch)
+    if user.role == "admin":
+        return base.filter(ImportBatch.created_by_user_id == user.id)
+    if user.role == "owner":
+        employee_ids_sq = (
+            db.query(User.id)
+            .filter(User.pharmacy_id == user.pharmacy_id, User.role == "employee")
+            .subquery()
+        )
+        # Legacy batches (created before migration 0014) have NULL creator. They
+        # belong to the pharmacy, so the owner — manager of pharmacy-scoped state
+        # — sees + can delete them. Employees stay NULL-exclusive.
+        return base.filter(
+            ImportBatch.pharmacy_id == user.pharmacy_id,
+            or_(
+                ImportBatch.created_by_user_id == user.id,
+                ImportBatch.created_by_user_id.in_(employee_ids_sq.select()),
+                ImportBatch.created_by_user_id.is_(None),
+            ),
+        )
+    # employee
+    return base.filter(
+        ImportBatch.pharmacy_id == user.pharmacy_id,
+        ImportBatch.created_by_user_id == user.id,
+    )
+
+
+def _serialize(batch: ImportBatch, creator: User | None, deletor: User | None) -> dict:
+    return {
+        "id":                   batch.id,
+        "file_type":            batch.file_type,
+        "filename":             batch.filename,
+        "rows_inserted":        batch.rows_inserted,
+        "rows_skipped":         batch.rows_skipped,
+        "status":               batch.status,
+        "error_message":        batch.error_message,
+        "imported_at":          batch.imported_at,
+        "created_by_full_name": creator.name  if creator else None,
+        "created_by_email":     creator.email if creator else None,
+        "deleted_at":           batch.deleted_at,
+        "deleted_by_full_name": deletor.name  if deletor else None,
+        "deleted_by_email":     deletor.email if deletor else None,
+    }
+
+
+@router.get("/data/imports", response_model=ImportsListResponse)
+def list_imports(
+    user: CurrentUserDep,
+    db:   DbDep,
+    page:  Annotated[int, Query(ge=1)]            = 1,
+    limit: Annotated[int, Query(ge=1, le=200)]    = 50,
+) -> dict:
+    # Non-admin must have the `import` feature; admin bypasses.
+    if user.role != "admin":
+        require_pharmacy_owner(user, db, feature="import")
+
+    creator = aliased(User)
+    deletor = aliased(User)
+    scope = _visible_batches_query(db, user)
+    total = scope.with_entities(func.count(ImportBatch.id)).scalar() or 0
+
+    rows = (
+        scope.outerjoin(creator, creator.id == ImportBatch.created_by_user_id)
+             .outerjoin(deletor, deletor.id == ImportBatch.deleted_by_user_id)
+             .with_entities(ImportBatch, creator, deletor)
+             .order_by(desc(ImportBatch.imported_at))
+             .offset((page - 1) * limit)
+             .limit(limit)
+             .all()
+    )
+    return {
+        "data":       [_serialize(b, c, d) for b, c, d in rows],
+        "pagination": paginate(total, page, limit),
+    }
+
+
+@router.delete("/data/imports/{batch_id}")
+def delete_import(
+    batch_id: Annotated[int, Path(ge=1)],
+    user:     CurrentUserDep,
+    db:       DbDep,
+) -> dict:
+    """Soft-delete: removes the Achat/Vente rows belonging to this batch (stock
+    skipped — UPSERT can't be undone), then marks the batch row with
+    `deleted_at` + `deleted_by_user_id`. The row remains visible on /imports
+    as history.
+
+    Per-role authz mirrors the list scope (see `_visible_batches_query`):
+    if you can see it, you can delete it. 404 on out-of-scope to avoid
+    leaking existence."""
+    if user.role != "admin":
+        require_pharmacy_owner(user, db, feature="import")
+
+    batch = _visible_batches_query(db, user).filter(ImportBatch.id == batch_id).first()
+    if batch is None:
+        raise ApiError(404, ErrorCode.BATCH_NOT_FOUND, "Lot d'import introuvable.")
+    if batch.deleted_at is not None:
+        raise ApiError(409, ErrorCode.BATCH_ALREADY_DELETED, "Ce lot a déjà été supprimé.")
+
+    deleted_rows = 0
+    if batch.file_type == "achat":
+        deleted_rows = db.query(Achat).filter(Achat.import_batch_id == batch.id).delete()
+    elif batch.file_type == "vente":
+        deleted_rows = db.query(Vente).filter(Vente.import_batch_id == batch.id).delete()
+    # stock: no row-level undo (UPSERT semantics)
+
+    batch.deleted_at = datetime.now(timezone.utc)
+    batch.deleted_by_user_id = user.id
+    db.commit()
+    return {"id": batch_id, "deleted_rows": deleted_rows, "file_type": batch.file_type}

@@ -1,10 +1,12 @@
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from config import settings
+from errors import ApiError, api_error_handler, validation_error_handler
 from rate_limit import limiter, rate_limit_handler
-from routers import accounting, admin_catalog, admin_pharmacies, admin_stats, auth, bl_exclusions, category_suffixes, data, health, owner_employees, sessions, special_products, stats, store_website, supplier_exclusions, transactions, uploads
+from routers import accounting, admin_pharmacies, auth, catalog, exclusions, health, imports, owner_employees, stats, store_website, transactions
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")
@@ -20,24 +22,22 @@ app.add_middleware(
 )
 
 # slowapi: register the limiter on app.state so the @limiter.limit decorators
-# can find it via request.app.state.limiter, and translate 429s to French.
+# can find it via request.app.state.limiter, and answer 429s with a translatable code.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
-app.include_router(health.router,   prefix="/v1")
-app.include_router(auth.router,     prefix="/v1/auth")
-app.include_router(sessions.router, prefix="/v1/sessions")
-app.include_router(stats.router,         prefix="/v1")
-app.include_router(admin_stats.router,   prefix="/v1")
-app.include_router(admin_catalog.router, prefix="/v1")
+# Errors carry a `code` the frontend translates (FR / ES) — see errors.py.
+app.add_exception_handler(ApiError, api_error_handler)
+app.add_exception_handler(RequestValidationError, validation_error_handler)
+
+app.include_router(health.router,           prefix="/v1")
+app.include_router(auth.router,             prefix="/v1")
+app.include_router(stats.router,            prefix="/v1")
+app.include_router(catalog.router,          prefix="/v1")
 app.include_router(admin_pharmacies.router, prefix="/v1")
-app.include_router(owner_employees.router, prefix="/v1")
-app.include_router(uploads.router,      prefix="/v1")
-app.include_router(transactions.router, prefix="/v1")
-app.include_router(data.router,             prefix="/v1")
-app.include_router(category_suffixes.router, prefix="/v1")
-app.include_router(special_products.router,  prefix="/v1/special-products")
-app.include_router(bl_exclusions.router,      prefix="/v1/bl-exclusions")
-app.include_router(supplier_exclusions.router, prefix="/v1/supplier-exclusions")
-app.include_router(accounting.router,         prefix="/v1")
-app.include_router(store_website.router,      prefix="/v1")
+app.include_router(owner_employees.router,  prefix="/v1")
+app.include_router(imports.router,          prefix="/v1")
+app.include_router(transactions.router,     prefix="/v1")
+app.include_router(exclusions.router,       prefix="/v1")
+app.include_router(accounting.router,       prefix="/v1")
+app.include_router(store_website.router,    prefix="/v1")

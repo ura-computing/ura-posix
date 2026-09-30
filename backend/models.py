@@ -267,9 +267,8 @@ class CategorySuffix(Base):
 
 
 class PharmacyBlExclusion(Base):
-    """A delivery_ref excluded from a pharmacy's stats / marges / accounting.
-    PG-007 (achats half): Achat rows with this ref disappear from every aggregate
-    via achat_bl_filter(). NULL refs are preserved (SQL NOT IN-vs-NULL gotcha)."""
+    """A delivery_ref the pharmacy excluded. In Comptabilité only, every product
+    on that BL drops from ventes and achats (exclusions.py)."""
     __tablename__ = "pharmacy_bl_exclusions"
     __table_args__ = (UniqueConstraint("pharmacy_id", "delivery_ref", name="uq_pharmacy_bl"),)
 
@@ -281,11 +280,10 @@ class PharmacyBlExclusion(Base):
 
 
 class PharmacySupplierExclusion(Base):
-    """A supplier (fournisseur) name excluded from a pharmacy's stats / marges /
-    accounting. Achat rows whose supplier matches (accent/case-insensitive) drop
-    out of every aggregate via achat_supplier_filter(). Supplier is free text on
-    Achat.supplier — there is no supplier entity. NULL suppliers are preserved
-    (SQL NOT IN-vs-NULL gotcha), mirroring PharmacyBlExclusion."""
+    """A supplier (fournisseur) name the pharmacy excluded. In Comptabilité only,
+    every product bought from it (accent/case-insensitive match) drops from ventes
+    and achats (exclusions.py). Supplier is free text on Achat.supplier — there is
+    no supplier entity."""
     __tablename__ = "pharmacy_supplier_exclusions"
     __table_args__ = (UniqueConstraint("pharmacy_id", "supplier", name="uq_pharmacy_supplier"),)
 

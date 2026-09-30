@@ -1,7 +1,7 @@
 """Owner-side /owner/employees endpoints — backs the "Gérer mon équipe" page.
 
-Every endpoint is gated by `require_pharmacy_owner(user, db)` (existing
-helper): rejects admins, rejects non-owners, returns the caller's pharmacy_id.
+Every endpoint takes `pharmacy_id: OwnerDep` (permissions.py): owners only —
+employees and admins get 403 — and gives the caller's pharmacy_id.
 The pharmacy is implicit; URLs don't take a pharmacy_id.
 
 Owner manages EMPLOYEES only (per locked decision). Co-owners are off-limits
@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, status as http_status
+from fastapi import APIRouter, Path, status as http_status
 
 from database import DbDep
+from errors import ApiError, ErrorCode
 from members import (
     apply_permissions_bulk,
     create_member,
@@ -32,8 +33,8 @@ from members import (
     set_member_status,
 )
 from models import PharmacyFeature, User
-from permissions import require_pharmacy_owner
-from schemas.admin_pharmacies import (
+from permissions import OwnerDep
+from schemas.members import (
     CreateUserIn,
     CreateUserOut,
     MemberOut,
@@ -42,7 +43,7 @@ from schemas.admin_pharmacies import (
     ResetPasswordOut,
     StatusPatchIn,
 )
-from schemas.owner_employees import OwnerEmployeesResponse
+from schemas.members import OwnerEmployeesResponse
 from security import CurrentUserDep
 
 
@@ -75,18 +76,17 @@ def _get_employee_or_404(db, pharmacy_id: int, employee_id: int) -> User:
         .first()
     )
     if not emp:
-        raise HTTPException(status_code=404, detail="Employé introuvable.")
+        raise ApiError(404, ErrorCode.EMPLOYEE_NOT_FOUND, "Employé introuvable.")
     return emp
 
 
 # ── List ─────────────────────────────────────────────────────────────────────
 
 @router.get("/owner/employees", response_model=OwnerEmployeesResponse)
-def list_employees(user: CurrentUserDep, db: DbDep) -> OwnerEmployeesResponse:
+def list_employees(pharmacy_id: OwnerDep, user: CurrentUserDep, db: DbDep) -> OwnerEmployeesResponse:
     """One-shot fetch for the page: employees + pharmacy features + caller's
     own permissions. The two ceiling lists drive the 2-layer ceiling display
     in EmployeePermissionsDialog without a second round-trip."""
-    pharmacy_id = require_pharmacy_owner(user, db)
 
     employees = (
         db.query(User)
@@ -108,7 +108,7 @@ def list_employees(user: CurrentUserDep, db: DbDep) -> OwnerEmployeesResponse:
 # ── Create / update / lifecycle ──────────────────────────────────────────────
 
 @router.post("/owner/employees", response_model=CreateUserOut)
-def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> CreateUserOut:
+def create_employee(body: CreateUserIn, pharmacy_id: OwnerDep, db: DbDep) -> CreateUserOut:
     """Create an employee account for the caller's pharmacy. Role is HARDCODED
     to 'employee' server-side — a malicious body with role='owner' is
     overridden silently. Pharmacy is implicit; body.pharmacy_id is ignored.
@@ -116,11 +116,10 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
     Every permission is granted by default (effective access is still capped
     by the pharmacy + owner ceiling at read time). The owner types the
     password (body.password)."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(
-            status_code=http_status.HTTP_409_CONFLICT,
-            detail="Un utilisateur avec cet email existe déjà.",
+        raise ApiError(
+            http_status.HTTP_409_CONFLICT, ErrorCode.EMAIL_TAKEN,
+            "Un utilisateur avec cet email existe déjà.",
         )
 
     new_emp = create_member(
@@ -134,14 +133,13 @@ def create_employee(body: CreateUserIn, user: CurrentUserDep, db: DbDep) -> Crea
 @router.put("/owner/employees/{employee_id}/permissions", response_model=MemberOut)
 def set_employee_permissions(
     body: PermissionsBulkSet,
-    user: CurrentUserDep,
+    pharmacy_id: OwnerDep,
     db:   DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Bulk-set the target employee's 9 UserPermission rows. The frontend
     disables locked toggles client-side; we persist whatever the owner sends.
     Effective access is computed read-time as the intersection."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
     apply_permissions_bulk(db, emp.id, body.permissions)
     db.commit()
@@ -151,13 +149,12 @@ def set_employee_permissions(
 @router.patch("/owner/employees/{employee_id}/status", response_model=MemberOut)
 def set_employee_status(
     body: StatusPatchIn,
-    user: CurrentUserDep,
+    pharmacy_id: OwnerDep,
     db:   DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Toggle active ↔ inactive. Bumps token_version on inactive so any live
     session of the employee dies immediately."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
     set_member_status(db, emp, body.status)
     return member_out(db, emp)
@@ -166,27 +163,24 @@ def set_employee_status(
 @router.post("/owner/employees/{employee_id}/reset-password", response_model=ResetPasswordOut)
 def reset_employee_password(
     body: ResetPasswordIn,
-    user: CurrentUserDep,
+    pharmacy_id: OwnerDep,
     db:   DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
     """Set the password the owner typed + bump token_version so live sessions die."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
     reset_member_password(db, emp, body.password)
     return ResetPasswordOut(user_id=emp.id)
 
 
-@router.delete("/owner/employees/{employee_id}")
+@router.delete("/owner/employees/{employee_id}", status_code=204)
 def delete_employee(
-    user: CurrentUserDep,
+    pharmacy_id: OwnerDep,
     db:   DbDep,
     employee_id: Annotated[int, Path(ge=1)],
-) -> dict:
+) -> None:
     """Hard-delete an employee. Cascades drop their UserPermission rows
     (FK ondelete=CASCADE). For 'soft remove' use PATCH /status instead."""
-    pharmacy_id = require_pharmacy_owner(user, db)
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
     db.delete(emp)
     db.commit()
-    return {"deleted": True, "user_id": employee_id}

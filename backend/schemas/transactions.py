@@ -1,5 +1,9 @@
+"""Achats / ventes list shapes + the Pagination every list uses."""
 from pydantic import BaseModel
 
+
+# ═══ Pagination ══════════════════════════════════════════════════════════════
+# Shapes shared by several routers.
 
 class Pagination(BaseModel):
     page:        int
@@ -14,8 +18,7 @@ def paginate(total: int, page: int, limit: int) -> Pagination:
     return Pagination(page=page, limit=limit, total=total, total_pages=pages)
 
 
-# Flat row shape — joins Achat/Vente + Medicament so the frontend doesn't have
-# to chase relations. Only the columns useful for browsing in this MVP.
+# ═══ Achats + ventes ═════════════════════════════════════════════════════════
 
 class AchatRow(BaseModel):
     id:                    int

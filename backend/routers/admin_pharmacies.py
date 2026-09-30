@@ -17,19 +17,20 @@ auth + lookup checks.
 """
 from __future__ import annotations
 
-import unicodedata
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
-from sqlalchemy import Integer, func
+from fastapi import APIRouter, Path, Query, status
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import joinedload
 
 from database import DbDep
+from errors import ApiError, ErrorCode
 from members import (
     apply_permissions_bulk,
     create_member,
+    generate_pharmacy_code,
     granted_permissions_map,
     member_out,
     member_to_out,
@@ -43,8 +44,8 @@ from models import (
     User,
     UserPermission,
 )
-from permissions import require_admin
-from schemas.admin_pharmacies import (
+from permissions import admin_only
+from schemas.members import (
     AdminUserRow,
     AssignPharmacyIn,
     CreateUserIn,
@@ -60,10 +61,9 @@ from schemas.admin_pharmacies import (
     StatusPatchIn,
     UserPharmacyRef,
 )
-from security import CurrentUserDep
 
 
-router = APIRouter(tags=["admin-pharmacies"])
+router = APIRouter(tags=["admin-pharmacies"], dependencies=[admin_only])
 
 
 # ── Defaults applied to a newly-created pharmacy ─────────────────────────────
@@ -96,7 +96,7 @@ def _initials(name: str | None, email: str) -> str:
 def _get_pharmacy_or_404(db, pharmacy_id: int) -> Pharmacy:
     pharm = db.query(Pharmacy).filter(Pharmacy.id == pharmacy_id).first()
     if not pharm:
-        raise HTTPException(status_code=404, detail="Pharmacie introuvable.")
+        raise ApiError(404, ErrorCode.PHARMACY_NOT_FOUND, "Pharmacie introuvable.")
     return pharm
 
 
@@ -120,7 +120,7 @@ def _get_member_or_404(db, user_id: int) -> User:
     """Target user by id, else 404. Callers add their own admin-role guard."""
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+        raise ApiError(404, ErrorCode.USER_NOT_FOUND, "Utilisateur introuvable.")
     return target
 
 
@@ -128,13 +128,11 @@ def _get_member_or_404(db, user_id: int) -> User:
 
 @router.get("/admin/pharmacies", response_model=list[PharmacyListRow])
 def list_pharmacies(
-    user: CurrentUserDep,
     db:   DbDep,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[PharmacyListRow]:
     """All pharmacies + members count + enabled-features summary. Archived
     rows are excluded by default."""
-    require_admin(user)
     q = db.query(Pharmacy)
     if not include_archived:
         q = q.filter(Pharmacy.archived_at.is_(None))
@@ -191,13 +189,11 @@ def list_pharmacies(
 
 @router.get("/admin/pharmacies/{pharmacy_id}", response_model=PharmacyDetail)
 def get_pharmacy(
-    user: CurrentUserDep,
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Full pharmacy payload — info + enabled features + every member with
     their granted permissions."""
-    require_admin(user)
     pharm = _get_pharmacy_or_404(db, pharmacy_id)
 
     members = (
@@ -234,41 +230,16 @@ def get_pharmacy(
 
 # ── Create / update / soft-delete ────────────────────────────────────────────
 
-def _generate_pharmacy_code(db: Session, city: str) -> str:
-    """Build a deterministic pharmacy code from the city name.
-
-    Algorithm:
-      1. NFD-normalize + strip combining marks + uppercase + alpha-only.
-      2. Take the first 3 chars (right-pad with 'X' if shorter).
-      3. Find the highest existing sequence for this prefix and add 1.
-      4. Format as `{PREFIX}{N:04d}` — e.g. Bouskoura → BOU0001 → BOU0002 …
-
-    A concurrent create with the same prefix can race on the unique index;
-    `create_pharmacy` wraps this in a retry loop to handle that.
-    """
-    norm = "".join(
-        c for c in unicodedata.normalize("NFD", city)
-        if not unicodedata.combining(c)
-    ).upper()
-    prefix = "".join(c for c in norm if c.isalpha())[:3].ljust(3, "X")
-
-    max_seq = db.query(
-        func.max(func.cast(func.substr(Pharmacy.code, 4), Integer))
-    ).filter(Pharmacy.code.like(f"{prefix}%")).scalar() or 0
-    return f"{prefix}{max_seq + 1:04d}"
-
-
 @router.post("/admin/pharmacies", response_model=PharmacyDetail)
-def create_pharmacy(body: PharmacyIn, user: CurrentUserDep, db: DbDep) -> PharmacyDetail:
+def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
     """Create + auto-enable DEFAULT_ENABLED_FEATURES. The pharmacy `code` is
     auto-generated from `city` (e.g. Bouskoura → BOU0001); any client-sent
     `body.code` is ignored on create. A small retry loop handles the rare
     concurrent-insert race against the unique-on-code index."""
-    require_admin(user)
 
     pharm: Pharmacy | None = None
     for _ in range(5):
-        code = _generate_pharmacy_code(db, body.city)
+        code = generate_pharmacy_code(db, body.city)
         pharm = Pharmacy(
             name=body.name, code=code, city=body.city,
             address=body.address, phone=body.phone, email=body.email,
@@ -282,26 +253,24 @@ def create_pharmacy(body: PharmacyIn, user: CurrentUserDep, db: DbDep) -> Pharma
             pharm = None
             continue
     if pharm is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Impossible de générer un code unique pour cette ville. Réessayez.",
+        raise ApiError(
+            status.HTTP_503_SERVICE_UNAVAILABLE, ErrorCode.PHARMACY_CODE_FAILED,
+            "Impossible de générer un code unique pour cette ville. Réessayez.",
         )
 
     for feat in DEFAULT_ENABLED_FEATURES:
         db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feat, enabled=True))
     db.commit()
-    return get_pharmacy(user, db, pharm.id)
+    return get_pharmacy(db, pharm.id)
 
 
 @router.patch("/admin/pharmacies/{pharmacy_id}", response_model=PharmacyDetail)
 def update_pharmacy(
     body: PharmacyIn,
-    user: CurrentUserDep,
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Edit pharmacy info — name/code/city/address/phone/email."""
-    require_admin(user)
     pharm = _get_pharmacy_or_404(db, pharmacy_id)
     pharm.name    = body.name
     pharm.code    = body.code
@@ -310,23 +279,20 @@ def update_pharmacy(
     pharm.phone   = body.phone
     pharm.email   = body.email
     db.commit()
-    return get_pharmacy(user, db, pharm.id)
+    return get_pharmacy(db, pharm.id)
 
 
-@router.delete("/admin/pharmacies/{pharmacy_id}")
+@router.delete("/admin/pharmacies/{pharmacy_id}", status_code=204)
 def archive_pharmacy(
-    user: CurrentUserDep,
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
-) -> dict:
+) -> None:
     """Soft-delete: set archived_at. Reversible via PATCH (clear archived_at
     out-of-band for now; restore endpoint can land later if needed)."""
-    require_admin(user)
     pharm = _get_pharmacy_or_404(db, pharmacy_id)
     if pharm.archived_at is None:
         pharm.archived_at = datetime.now(timezone.utc)
         db.commit()
-    return {"archived": True, "pharmacy_id": pharm.id}
 
 
 # ── Bulk-set toggles ─────────────────────────────────────────────────────────
@@ -334,24 +300,21 @@ def archive_pharmacy(
 @router.put("/admin/pharmacies/{pharmacy_id}/features", response_model=PharmacyDetail)
 def set_pharmacy_features(
     body: FeaturesBulkSet,
-    user: CurrentUserDep,
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Single bulk write of the 9 PharmacyFeature toggles. Frontend builds
     the full dict (saves 9 separate round-trips) and POSTs it on the
     'Enregistrer' click in Screen 2 Section A."""
-    require_admin(user)
     _get_pharmacy_or_404(db, pharmacy_id)
     _apply_features_bulk(db, pharmacy_id, body.features)
     db.commit()
-    return get_pharmacy(user, db, pharmacy_id)
+    return get_pharmacy(db, pharmacy_id)
 
 
 @router.put("/admin/users/{user_id}/permissions", response_model=MemberOut)
 def set_user_permissions(
     body: PermissionsBulkSet,
-    user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
@@ -360,12 +323,11 @@ def set_user_permissions(
     employee permission only becomes effective when the pharmacy AND at least
     one active owner also have it (see effective_permissions in
     backend/permissions.py)."""
-    require_admin(user)
     target = _get_member_or_404(db, user_id)
     if target.role == "admin":
-        raise HTTPException(
-            status_code=400,
-            detail="Les administrateurs n'ont pas de permissions configurables.",
+        raise ApiError(
+            400, ErrorCode.ADMIN_NO_PERMISSIONS,
+            "Les administrateurs n'ont pas de permissions configurables.",
         )
     apply_permissions_bulk(db, target.id, body.permissions)
     db.commit()
@@ -377,19 +339,17 @@ def set_user_permissions(
 @router.post("/admin/pharmacies/{pharmacy_id}/users", response_model=CreateUserOut)
 def create_user(
     body: CreateUserIn,
-    user: CurrentUserDep,
     db:   DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> CreateUserOut:
     """Admin creates an owner or employee account directly, with the password
     the admin typed and every permission granted (see members.create_member).
     Email must be unique app-wide."""
-    require_admin(user)
     _get_pharmacy_or_404(db, pharmacy_id)
     if body.pharmacy_id != pharmacy_id:
-        raise HTTPException(status_code=400, detail="Incohérence: pharmacy_id du body et de l'URL.")
+        raise ApiError(400, ErrorCode.PHARMACY_ID_MISMATCH, "Incohérence: pharmacy_id du body et de l'URL.")
     if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(status_code=409, detail="Un utilisateur avec cet email existe déjà.")
+        raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
 
     new_user = create_member(
         db, email=body.email, name=body.full_name, password=body.password,
@@ -401,13 +361,11 @@ def create_user(
 @router.post("/admin/users/{user_id}/reset-password", response_model=ResetPasswordOut)
 def reset_user_password(
     body: ResetPasswordIn,
-    user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
     """Set the password the admin typed. Invalidates active sessions via
     token_version bump so the user must log in with the new password."""
-    require_admin(user)
     target = _get_member_or_404(db, user_id)
     reset_member_password(db, target, body.password)
     return ResetPasswordOut(user_id=target.id)
@@ -416,16 +374,14 @@ def reset_user_password(
 @router.patch("/admin/users/{user_id}/status", response_model=MemberOut)
 def set_user_status(
     body: StatusPatchIn,
-    user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Toggle active <-> inactive. Going inactive also bumps token_version
     so existing sessions die immediately."""
-    require_admin(user)
     target = _get_member_or_404(db, user_id)
     if target.role == "admin":
-        raise HTTPException(status_code=400, detail="Impossible de modifier le statut d'un administrateur.")
+        raise ApiError(400, ErrorCode.ADMIN_STATUS_LOCKED, "Impossible de modifier le statut d'un administrateur.")
     set_member_status(db, target, body.status)
     return member_out(db, target)
 
@@ -446,11 +402,10 @@ def _user_row(u: User, granted: list[str]) -> AdminUserRow:
 
 
 @router.get("/admin/users", response_model=list[AdminUserRow])
-def list_users(user: CurrentUserDep, db: DbDep) -> list[AdminUserRow]:
+def list_users(db: DbDep) -> list[AdminUserRow]:
     """Every account — any role, with or without a pharmacy (archived ones
     too). The pharmacy pages only show the owner/employee members of active
     pharmacies; this list is the one place where nobody is hidden."""
-    require_admin(user)
     users = (
         db.query(User)
         .options(joinedload(User.pharmacy))
@@ -464,20 +419,21 @@ def list_users(user: CurrentUserDep, db: DbDep) -> list[AdminUserRow]:
 @router.patch("/admin/users/{user_id}/pharmacy", response_model=AdminUserRow)
 def assign_user_pharmacy(
     body: AssignPharmacyIn,
-    user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> AdminUserRow:
     """Attach an owner / employee to an active pharmacy — the fix for accounts
     left without one (or on an archived one). A user with no permission rows
     gets every permission (client rule: everything ON by default)."""
-    require_admin(user)
     target = _get_member_or_404(db, user_id)
     if target.role not in ("owner", "employee"):
-        raise HTTPException(status_code=400, detail="Seuls les propriétaires et les employés ont une pharmacie.")
+        raise ApiError(
+            400, ErrorCode.ONLY_MEMBERS_HAVE_PHARMACY,
+            "Seuls les propriétaires et les employés ont une pharmacie.",
+        )
     pharm = _get_pharmacy_or_404(db, body.pharmacy_id)
     if pharm.archived_at is not None:
-        raise HTTPException(status_code=400, detail="Cette pharmacie est archivée.")
+        raise ApiError(400, ErrorCode.PHARMACY_ARCHIVED, "Cette pharmacie est archivée.")
     target.pharmacy_id = pharm.id
     if not db.query(UserPermission).filter(UserPermission.user_id == target.id).first():
         apply_permissions_bulk(db, target.id, {f: True for f in ALLOWED_FEATURES})
@@ -486,18 +442,15 @@ def assign_user_pharmacy(
     return _user_row(target, granted_permissions_map(db, [target.id]).get(target.id, []))
 
 
-@router.delete("/admin/users/{user_id}")
+@router.delete("/admin/users/{user_id}", status_code=204)
 def delete_user(
-    user: CurrentUserDep,
     db:   DbDep,
     user_id: Annotated[int, Path(ge=1)],
-) -> dict:
+) -> None:
     """Hard-delete a non-admin user. Cascades drop UserPermission rows (FK
     ondelete=CASCADE). For 'soft remove access' use PATCH /status instead."""
-    require_admin(user)
     target = _get_member_or_404(db, user_id)
     if target.role == "admin":
-        raise HTTPException(status_code=400, detail="Impossible de supprimer un administrateur.")
+        raise ApiError(400, ErrorCode.ADMIN_NOT_DELETABLE, "Impossible de supprimer un administrateur.")
     db.delete(target)
     db.commit()
-    return {"deleted": True, "user_id": user_id}

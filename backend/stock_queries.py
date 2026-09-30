@@ -20,7 +20,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import Achat, Medicament, PharmacyStock, Vente
-from search import matches_all_tokens, tokenize_search
+from query_parts import avg_pu_subquery
 
 
 STOCK_SORT_KEYS = {
@@ -125,14 +125,13 @@ def compute_stock_abcd(
     *,
     class_filter: str | None = None,
     status:       str | None = None,
-    search:       str | None = None,
     sort_by:      str | None = None,
     sort_order:   str | None = None,
 ) -> dict:
     """Return { distribution, total_references, ppv_potentiel, products[] }.
 
     Distribution + total_references + ppv_potentiel reflect the FULL dataset.
-    Only the `products` list is filtered/sorted by class/status/search/sort.
+    Only the `products` list is filtered/sorted by class/status/sort.
     """
     start_12m, start_4m, end_date = _resolve_windows(df, dt)
 
@@ -157,20 +156,13 @@ def compute_stock_abcd(
         .subquery()
     )
 
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(
-            Achat.pharmacy_id == pharmacy_id,
-            Achat.medicament_id.isnot(None),
-            Achat.quantity > 0,
-            Achat.unit_price.isnot(None),
-            # PG-007: excluded BLs/suppliers are included — stock PU avg reflects
-            # the FULL purchasing history everywhere except comptabilite.
-        )
-        .group_by(Achat.medicament_id).subquery()
+    # Full purchasing history (no window, no exclusions — Comptabilité only).
+    avg_pu_sub = avg_pu_subquery(
+        db,
+        Achat.pharmacy_id == pharmacy_id,
+        Achat.medicament_id.isnot(None),
+        Achat.quantity > 0,
+        Achat.unit_price.isnot(None),
     )
 
     # Collect every medicament that was either sold or stocked
@@ -253,12 +245,6 @@ def compute_stock_abcd(
         wanted = {s.strip() for s in status.split(",") if s.strip()}
         if wanted:
             products = [p for p in products if p["status"] in wanted]
-    tokens = tokenize_search(search)
-    if tokens:
-        products = [
-            p for p in products
-            if matches_all_tokens(p["product"], tokens)
-        ]
 
     # Sort (whitelisted)
     if sort_by in STOCK_SORT_KEYS:

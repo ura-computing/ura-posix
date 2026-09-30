@@ -8,8 +8,8 @@ auth, no HTTP concerns.
 Hardening invariants baked in here (mirror PG-* tickets from apcm-pharma):
 - PG-013: marge formulas do NOT fall back to Medicament.pph when avg_pu is missing
   (Sobrus' fiche-produit often has PPH == PPV, which would produce a fake 0 % marge).
-- PG-007: BL-excluded delivery_refs filtered via `achat_bl_filter()` on every Achat
-  aggregate. The helper handles the NULL-NOT-IN gotcha.
+- Exclusions (special products / BLs / suppliers) apply only when
+  include_non_declared=False (Comptabilité), via `exclusions.vente_filter / achat_filter`.
 - PG-004: previous-window marge uses the SAME weighted formula as the current marge
   so the variation badge compares like-for-like.
 """
@@ -20,11 +20,11 @@ import re
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import Date, case as sa_case, func
+from sqlalchemy import Date, func
 from sqlalchemy.orm import Session
 
-from exclusions import achat_exclusion_filter, excluded_medicaments_select
-from models import Achat, Medicament, PharmacyMedicamentStatus, PharmacyStock, Vente
+from models import Achat, Medicament, PharmacyStock, Vente
+from query_parts import Filters, avg_pu_subquery, ca_sum, category_filter
 
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
@@ -131,27 +131,6 @@ def _bucket_label(d: date, gran: str) -> str:
     return d.isoformat()
 
 
-# ─── Category classification (Pharmacie vs Parapharmacie) ─────────────────────
-
-def pharma_expr():
-    """SQLAlchemy expression: True = pharmacie, False = parapharmacie.
-    Admin product_type override takes precedence; falls back to category keywords."""
-    auto = sa_case(
-        (func.lower(Medicament.category).contains("edicament"), True),
-        (func.lower(Medicament.category).contains("édicament"), True),
-        (func.lower(Medicament.category).contains("oméopath"), True),
-        (func.lower(Medicament.category).contains("omeopath"), True),
-        (func.lower(Medicament.category).contains("iététique"), True),
-        (func.lower(Medicament.category).contains("ietetique"), True),
-        else_=False,
-    )
-    return sa_case(
-        (Medicament.product_type == "pharmacie", True),
-        (Medicament.product_type == "parapharmacie", False),
-        else_=auto,
-    )
-
-
 # ─── Top categories ────────────────────────────────────────────────────────────
 
 def merge_top_categories(rows) -> list[dict]:
@@ -193,15 +172,7 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
     Returns {marge_pct, marge_brute_dh, marge_nette_dh}. Per-medicament avg-PU comes
     from Achat rows in the window. Products with sales but no in-window purchases are
     excluded (PU unknown, no PPH fallback)."""
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(*base_filter_a)
-        .group_by(Achat.medicament_id)
-        .subquery()
-    )
+    avg_pu_sub = avg_pu_subquery(db, *base_filter_a)
     # Aggregate in SQL, grouped by the tva label (a handful of distinct strings) —
     # fetching every Vente row here made /v1/stats take seconds. Per-tva-group sums
     # are mathematically identical to the old per-row Python loop: the TVA rate only
@@ -265,40 +236,14 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
 
     include_non_declared=True (default): specials + excluded BLs/suppliers are
     included. include_non_declared=False: applies all exclusions (comptabilite)."""
-    base_filter_v: list = []
-    base_filter_a: list = []
-    if pharmacy_id:
-        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
-        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
-    if df:
-        base_filter_v.append(Vente.date >= df)
-        base_filter_a.append(Achat.delivery_date >= df)
-    if dt:
-        base_filter_v.append(Vente.date <= dt)
-        base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id and not include_non_declared:
-        # Unified med-level exclusion: special products + all products on an excluded
-        # BL + all products from an excluded supplier, dropped from ventes AND achats.
-        sub = excluded_medicaments_select(db, pharmacy_id)
-        base_filter_v.append(Vente.medicament_id.notin_(sub))
-        base_filter_a.append(Achat.medicament_id.notin_(sub))
-
-    cat_filter_v: list = []
-    cat_filter_a: list = []
-    if category_type == "pharmacie":
-        cat_filter_v = [pharma_expr() == True]
-        cat_filter_a = [pharma_expr() == True]
-    elif category_type == "parapharmacie":
-        cat_filter_v = [pharma_expr() == False]
-        cat_filter_a = [pharma_expr() == False]
+    f = Filters(pharmacy_id, df, dt, include_non_declared)
+    base_filter_v = f.ventes(db)
+    base_filter_a = f.achats(db)
+    cat_filter_v = cat_filter_a = category_filter(category_type)
 
     # Daily aggregates (best/worst day, ticket moyen, vente moy/jour)
     daily_q = (
-        db.query(
-            Vente.date,
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)),
-            func.count(Vente.id),
-        )
+        db.query(Vente.date, ca_sum(), func.count(Vente.id))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
     )
     if cat_filter_v:
@@ -331,10 +276,7 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     # fetching every Vente/Achat row (~800k) into Python. The rate only depends on the
     # tva string, so the grouped sums are identical to the old per-row loop.
     vente_tva_rows = (
-        db.query(
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ppv_total"),
-            Medicament.tva,
-        )
+        db.query(ca_sum().label("ppv_total"), Medicament.tva)
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
@@ -364,17 +306,17 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
 
     # CA breakdown: Pharmacie vs Parapharmacie (always reported, regardless of cat filter)
     pharm_total = (
-        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+        db.query(ca_sum())
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
-        .filter(pharma_expr() == True)
+        .filter(*category_filter("pharmacie"))
         .scalar() or 0
     )
     para_total = (
-        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+        db.query(ca_sum())
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
-        .filter(pharma_expr() == False)
+        .filter(*category_filter("parapharmacie"))
         .scalar() or 0
     )
 
@@ -398,7 +340,6 @@ def compute_previous_kpis(
     dt: Optional[str],
     cat_filter_v: list,
     cat_filter_a: list,
-    non_declared_sub=None,
     *,
     include_non_declared: bool = True,
 ) -> dict:
@@ -417,39 +358,22 @@ def compute_previous_kpis(
         first_of_month = today.replace(day=1)
         prev_df = _subtract_years(first_of_month, 1); prev_dt = _subtract_years(today, 1)
 
-    prev_df_str = prev_df.strftime("%Y-%m-%d")
-    prev_dt_str = prev_dt.strftime("%Y-%m-%d")
+    f = Filters(pharmacy_id, prev_df.strftime("%Y-%m-%d"), prev_dt.strftime("%Y-%m-%d"), include_non_declared)
+    prev_base_filter_v = f.ventes(db)
+    prev_base_filter_a = f.achats(db)
 
-    vq = (
-        db.query(func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)))
+    prev_ventes = (
+        db.query(ca_sum())
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .filter(*cat_filter_v, *prev_base_filter_v)
+        .scalar()
     )
-    if cat_filter_v: vq = vq.filter(*cat_filter_v)
-    if pharmacy_id:  vq = vq.filter(Vente.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None: vq = vq.filter(Vente.medicament_id.notin_(non_declared_sub))
-    vq = vq.filter(Vente.date >= prev_df_str, Vente.date <= prev_dt_str)
-    prev_ventes = vq.scalar()
 
     aq = db.query(func.sum(Achat.total))
     if cat_filter_a: aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
-    if pharmacy_id:  aq = aq.filter(Achat.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None: aq = aq.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id and not include_non_declared:  aq = aq.filter(achat_exclusion_filter(db, pharmacy_id))
-    aq = aq.filter(Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str)
-    prev_achats = aq.scalar()
+    prev_achats = aq.filter(*prev_base_filter_a).scalar()
 
     # PG-004: previous marge via same per-medicament weighted formula as current.
-    prev_base_filter_v: list = [Vente.date >= prev_df_str, Vente.date <= prev_dt_str]
-    prev_base_filter_a: list = [Achat.delivery_date >= prev_df_str, Achat.delivery_date <= prev_dt_str]
-    if pharmacy_id:
-        prev_base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
-        prev_base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None:
-        prev_base_filter_v.append(Vente.medicament_id.notin_(non_declared_sub))
-        prev_base_filter_a.append(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id and not include_non_declared:
-        prev_base_filter_a.append(achat_exclusion_filter(db, pharmacy_id))
-
     prev_marge = marge_for_window(db, prev_base_filter_v, prev_base_filter_a, cat_filter_v)
 
     return {
@@ -484,51 +408,22 @@ def _bracket_for(marge_pct: float) -> str | None:
 
 
 def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str],
-                          dt: Optional[str], category_type: str = "all",
-                          *, include_non_declared: bool = True) -> dict:
+                          dt: Optional[str], category_type: str = "all") -> dict:
     """Group products by margin brackets. Each bracket returns {count, total_ca,
     total_margin_dh, products[]}. `products` is sorted by abs(marge_pct) desc so the
     drill-down lists the most extreme cases first."""
-    base_filter_v: list = []
-    base_filter_a: list = []
-    if pharmacy_id:
-        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
-        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
-    if df:
-        base_filter_v.append(Vente.date >= df)
-        base_filter_a.append(Achat.delivery_date >= df)
-    if dt:
-        base_filter_v.append(Vente.date <= dt)
-        base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id and not include_non_declared:
-        # Unified med-level exclusion: special products + all products on an excluded
-        # BL + all products from an excluded supplier, dropped from ventes AND achats.
-        sub = excluded_medicaments_select(db, pharmacy_id)
-        base_filter_v.append(Vente.medicament_id.notin_(sub))
-        base_filter_a.append(Achat.medicament_id.notin_(sub))
+    f = Filters(pharmacy_id, df, dt)
+    base_filter_v = f.ventes(db)
+    cat_filter = category_filter(category_type)
 
-    cat_filter: list = []
-    if category_type == "pharmacie":
-        cat_filter = [pharma_expr() == True]
-    elif category_type == "parapharmacie":
-        cat_filter = [pharma_expr() == False]
-
-    avg_pu_sub = (
-        db.query(
-            Achat.medicament_id,
-            (func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)).label("avg_pu"),
-        )
-        .filter(*base_filter_a)
-        .group_by(Achat.medicament_id)
-        .subquery()
-    )
+    avg_pu_sub = avg_pu_subquery(db, *f.achats(db))
     rows = (
         db.query(
             Medicament.product,
             Medicament.ppv,
             avg_pu_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("ca"),
+            ca_sum().label("ca"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id)
         .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
@@ -562,46 +457,25 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
 
 
 def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional[str],
-                              dt: Optional[str], category_type: str = "all",
-                              *, include_non_declared: bool = True) -> dict:
+                              dt: Optional[str], category_type: str = "all") -> dict:
     """List products with ventes in the [df, dt] window whose medicament has NO
     matching achat in the same window for the same pharmacy — the root cause of
     Marge %/DH rendering "—" on /ventes for those rows.
 
-    Reuses the exact filter set from compute_margin_alerts (non-declared exclusion,
-    achat_bl_filter, category_type) so a product surfaced here is EXACTLY a product
-    that shows "—" on /ventes with the same filters."""
-    base_filter_v: list = []
-    base_filter_a: list = []
-    if pharmacy_id:
-        base_filter_v.append(Vente.pharmacy_id == pharmacy_id)
-        base_filter_a.append(Achat.pharmacy_id == pharmacy_id)
-    if df:
-        base_filter_v.append(Vente.date >= df)
-        base_filter_a.append(Achat.delivery_date >= df)
-    if dt:
-        base_filter_v.append(Vente.date <= dt)
-        base_filter_a.append(Achat.delivery_date <= dt)
-    if pharmacy_id and not include_non_declared:
-        # Unified med-level exclusion: special products + all products on an excluded
-        # BL + all products from an excluded supplier, dropped from ventes AND achats.
-        sub = excluded_medicaments_select(db, pharmacy_id)
-        base_filter_v.append(Vente.medicament_id.notin_(sub))
-        base_filter_a.append(Achat.medicament_id.notin_(sub))
-
-    cat_filter: list = []
-    if category_type == "pharmacie":
-        cat_filter = [pharma_expr() == True]
-    elif category_type == "parapharmacie":
-        cat_filter = [pharma_expr() == False]
+    Reuses the exact filter set from compute_margin_alerts (pharmacy, window,
+    category_type) so a product surfaced here is EXACTLY a product that shows "—"
+    on /ventes with the same filters."""
+    f = Filters(pharmacy_id, df, dt)
+    base_filter_v = f.ventes(db)
+    cat_filter = category_filter(category_type)
 
     achat_meds_sub = (
         db.query(Achat.medicament_id)
-        .filter(*base_filter_a)
+        .filter(*f.achats(db))
         .distinct()
         .scalar_subquery()
     )
-    ca_expr = func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price))
+    ca_expr = ca_sum()
     rows = (
         db.query(
             Medicament.product,
@@ -638,7 +512,7 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
 # Lightweight — returns just the 4 tile numbers the Rapport needs.
 # The full ABCD classification ports later when /stock page is built.
 
-def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared: bool = True) -> dict:
+def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
     """Returns {total_references, ppv_potentiel, sous_stock_count, sur_stock_count,
     in_band_count, health_pct} for the Rapport Stock section.
 
@@ -651,18 +525,10 @@ def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared
                 "sous_stock_count": 0, "sur_stock_count": 0,
                 "in_band_count": 0, "health_pct": 0.0}
 
-    sub = (
-        db.query(PharmacyMedicamentStatus.medicament_id)
-        .filter(PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-                PharmacyMedicamentStatus.declared == False)
-        .scalar_subquery()
-    ) if not include_non_declared else None
-
     # 12-month sales per medicament for this pharmacy.
     from datetime import date as _date, timedelta as _td
     today = _date.today()
     start_12m = (today - _td(days=365)).isoformat()
-    sales_12m_filter = [] if sub is None else [Vente.medicament_id.notin_(sub)]
     sales_12m = (
         db.query(
             Vente.medicament_id,
@@ -672,13 +538,11 @@ def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared
             Vente.pharmacy_id == pharmacy_id,
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
-            *sales_12m_filter,
         )
         .group_by(Vente.medicament_id)
         .subquery()
     )
 
-    rows_filter = [] if sub is None else [PharmacyStock.medicament_id.notin_(sub)]
     rows = (
         db.query(
             PharmacyStock.medicament_id,
@@ -688,10 +552,7 @@ def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared
         )
         .join(Medicament, PharmacyStock.medicament_id == Medicament.id)
         .outerjoin(sales_12m, PharmacyStock.medicament_id == sales_12m.c.medicament_id)
-        .filter(
-            PharmacyStock.pharmacy_id == pharmacy_id,
-            *rows_filter,
-        )
+        .filter(PharmacyStock.pharmacy_id == pharmacy_id)
         .all()
     )
 
@@ -734,7 +595,7 @@ def compute_stock_summary(db: Session, pharmacy_id: int, *, include_non_declared
 
 
 def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str],
-                        non_declared_sub=None, cat_filter_v=None, cat_filter_a=None,
+                        cat_filter_v=None, cat_filter_a=None,
                         *, include_non_declared: bool = True) -> dict:
     """Adaptive ventes/achats trend. Returns {"granularity", "points"} where the
     bucket unit (week / month / semester / year) adapts to the selected window so
@@ -757,7 +618,7 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
     v_q = (
         db.query(
             func.date_trunc(sql_unit, func.cast(Vente.date, Date)).label("bucket"),
-            func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)).label("total"),
+            ca_sum().label("total"),
         )
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(Vente.date >= win_start_str, Vente.date < win_end_str)
@@ -771,14 +632,10 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
     )
     if cat_filter_v: v_q = v_q.filter(*cat_filter_v)
     if cat_filter_a: a_q = a_q.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
-    if pharmacy_id:
-        v_q = v_q.filter(Vente.pharmacy_id == pharmacy_id)
-        a_q = a_q.filter(Achat.pharmacy_id == pharmacy_id)
-    if non_declared_sub is not None:
-        v_q = v_q.filter(Vente.medicament_id.notin_(non_declared_sub))
-        a_q = a_q.filter(Achat.medicament_id.notin_(non_declared_sub))
-    if pharmacy_id and not include_non_declared:
-        a_q = a_q.filter(achat_exclusion_filter(db, pharmacy_id))
+    # Pharmacy + exclusions only: the bucket window above replaces the date filter.
+    f = Filters(pharmacy_id, include_non_declared=include_non_declared)
+    v_q = v_q.filter(*f.ventes(db))
+    a_q = a_q.filter(*f.achats(db))
 
     # Fold rows onto bucket-start keys. For "semester" this collapses the two
     # monthly rows of each half-year into one bucket; a no-op for the others.
@@ -803,3 +660,83 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
         cursor = _next_bucket(cursor, gran)
 
     return {"granularity": gran, "points": points}
+
+
+# ─── Full /stats payload (Rapport + Comptabilité, owner + admin) ─────────────
+
+def _topline_kpis(db, f: Filters, cat_filter: list) -> dict:
+    """ventes_total/count + achats_total/count for the window."""
+    vq = (
+        db.query(ca_sum(), func.count(Vente.id))
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+        .filter(*cat_filter, *f.ventes(db))
+    )
+    aq = db.query(func.sum(Achat.total), func.count(Achat.id))
+    if cat_filter:
+        aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter)
+    aq = aq.filter(*f.achats(db))
+    ventes_total, ventes_count = vq.one()
+    achats_total, achats_count = aq.one()
+    return {
+        "ventes_total": float(ventes_total or 0),
+        "achats_total": float(achats_total or 0),
+        "ventes_count": ventes_count or 0,
+        "achats_count": achats_count or 0,
+    }
+
+
+def _top_categories(db, f: Filters, cat_filter: list) -> list[dict]:
+    """Aggregate Vente by category, merge percent suffixes, sort by CA desc.
+    The category marge uses the ALL-TIME average PU (no date window)."""
+    all_time = Filters(f.pharmacy_id, include_non_declared=f.include_non_declared)
+    avg_pu_sub = avg_pu_subquery(
+        db, Achat.quantity > 0, Achat.unit_price.isnot(None), *all_time.achats(db), label="pu",
+    )
+
+    q = (
+        db.query(
+            Medicament.category.label("category"),
+            ca_sum().label("total"),
+            func.sum(Vente.quantity).label("qty"),
+            # PG-013: no Medicament.pph fallback — the product sheet often has
+            # PPH = PPV which fabricates 0% margins. NULL pu → category marge "—".
+            func.avg(avg_pu_sub.c.pu).label("avg_pu"),
+            func.avg(Medicament.ppv).label("avg_ppv"),
+        )
+        .join(Medicament, Vente.medicament_id == Medicament.id)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
+        .filter(Medicament.category.isnot(None), *cat_filter, *f.ventes(db))
+    )
+    return merge_top_categories(q.group_by(Medicament.category).all())
+
+
+def build_stats_payload(
+    db,
+    pharmacy_id: int | None,
+    df: str | None,
+    dt: str | None,
+    category_type: str,
+    include_non_declared: bool,
+) -> dict:
+    """Pure data computation — used by both owner `/v1/stats` and admin
+    `/v1/admin/pharmacy/{id}/stats`. No auth, no HTTP."""
+    f = Filters(pharmacy_id, df, dt, include_non_declared)
+    cat_filter = category_filter(category_type)
+
+    trend = build_monthly_trend(db, pharmacy_id, df, dt, cat_filter, cat_filter,
+                                include_non_declared=include_non_declared)
+    kpis  = _topline_kpis(db, f, cat_filter)
+    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type,
+                                include_non_declared=include_non_declared)
+    # Single source of truth: reconcile the aggregate marge to the FULL CA so every
+    # margin display agrees (marge_brute_dh / ventes_total == marge_pct, exactly).
+    reconcile_marge_to_ca(extra["marge"], kpis["ventes_total"])
+    return {
+        "kpis":           kpis,
+        "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter, cat_filter,
+                                                include_non_declared=include_non_declared),
+        **extra,
+        "monthly_trend":     trend["points"],
+        "trend_granularity": trend["granularity"],
+        "top_categories": _top_categories(db, f, cat_filter),
+    }
