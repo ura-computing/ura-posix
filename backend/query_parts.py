@@ -1,6 +1,6 @@
 """Shared SQL building blocks for the analytics queries (Rapport, Comptabilité,
 Analyses, Stock, ventes ledger). One definition per formula so pages can't drift.
-Moves into backend/analytics/ with the domain split (REFACTOR.md phase 2).
+Moves into backend/analytics/ with the domain split (PLAN.md §6).
 """
 from __future__ import annotations
 
