@@ -95,7 +95,7 @@ test("exclure un BL trouvé par un de ses produits", async ({ page }) => {
   const { lines, ...head } = x.detail;
   const d = await detail;
   expectSame(d, head, `détail du BL ${x.ref}`);
-  expectSameSet(d.lines, lines, (r) => r.pid, `lignes du BL ${x.ref}`);
+  expectSameSet(d.lines, lines, (r) => r.pid, `lignes du BL ${x.ref}`, { repeats: true });   // a BL may list a product twice (G1)
 
   await dialog.getByLabel("Note (optionnelle)").fill(NOTE_BL);
   const posted = pageSend(page, "POST", "/bl-exclusions/", 201);

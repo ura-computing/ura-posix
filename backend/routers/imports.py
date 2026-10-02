@@ -267,15 +267,17 @@ def _batch_resolve_medicaments(
 
 
 def _preload_existing_keys(db: Session, cfg: TransactionConfig, pharmacy_id: int,
-                          refs: set[str]) -> set[tuple[str, int]]:
-    """Cheap O(1) dedup membership test: pre-load every (dedup_value, med_id) pair
-    already in DB for this pharmacy, so the per-row check is a Python `in`."""
+                          refs: set[str], batch_id: int) -> set[tuple[str, int]]:
+    """(BL or ticket, med_id) pairs stored by the pharmacy's OTHER imports: the same
+    file imported again adds nothing. Lines of this import are never skipped: the
+    same BL + product twice in one file = 2 real purchases (G1)."""
     if not refs:
         return set()
     dedup_col = getattr(cfg.model, cfg.dedup_attr)
+    other_import = or_(cfg.model.import_batch_id.is_(None), cfg.model.import_batch_id != batch_id)
     rows = (
         db.query(dedup_col, cfg.model.medicament_id)
-          .filter(cfg.model.pharmacy_id == pharmacy_id, dedup_col.in_(refs))
+          .filter(cfg.model.pharmacy_id == pharmacy_id, other_import, dedup_col.in_(refs))
           .all()
     )
     return {(ref, med_id) for ref, med_id in rows if ref and med_id}
@@ -302,7 +304,7 @@ def _insert_transactions(
     )
     med_id_by_pid, new_medicaments = _batch_resolve_medicaments(db, rows)
     refs = {r.get(cfg.dedup_column) for r in rows if r.get(cfg.dedup_column)}
-    existing = _preload_existing_keys(db, cfg, pharmacy_id, refs)
+    existing = _preload_existing_keys(db, cfg, pharmacy_id, refs, batch.id)
 
     to_insert: list[dict[str, Any]] = []
     skipped_no_pid = 0
@@ -322,8 +324,6 @@ def _insert_transactions(
             skipped_dup += 1
             continue
         to_insert.append(cfg.build_row_dict(row, pharmacy_id, med_id, batch.id))
-        if ref:
-            existing.add((ref, med_id))
 
     if to_insert:
         # render_nulls: one INSERT shape for every row. Without it, rows with

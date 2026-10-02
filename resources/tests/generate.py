@@ -18,7 +18,8 @@ Outputs (git-ignored, regenerated on every run):
 Data design (keeps expected values exact and unambiguous):
 - one PPV / PPH / category / TVA per product, identical in all 3 files
 - one supplier per product; product names are unique ("E2E PRODUIT 00042")
-- (BL, product) and (ticket, product) pairs are unique → no import dedup skips
+- (BL, product) and (ticket, product) pairs are unique, except 3 lines of each file
+  repeated at the end (same values, like the real Sobrus files): both are stored (G1)
 - ~3 % products bought ABOVE their PPV (negative margin), ~5 % never bought
   (ventes sans achat), 10 stock-only products (never sold, never bought)
 - dates are relative to --today so "today"-based windows stay valid
@@ -31,7 +32,7 @@ import json
 import random
 import time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -216,6 +217,14 @@ def make_achats(rng: random.Random, products: list[Product], n_lines: int,
     return lines
 
 
+def repeat_lines(rng: random.Random, lines: list) -> None:
+    """G1: 3 lines appear twice in their file (same BL / ticket + product, same
+    values). Both are real and both are stored; the 2nd copy sits at the end, in
+    another import chunk than the 1st."""
+    for line in rng.sample(lines, 3):
+        lines.append(replace(line, seq=len(lines)))
+
+
 def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
                df: date, dt: date) -> list[dict]:
     """Analyses → Liste input: sold products (exact names), a stock-only product,
@@ -367,6 +376,9 @@ def main() -> None:
     products = make_products(rng, args.products or max(300, args.rows // 250), today)
     achats = make_achats(rng, products, args.achat_rows or args.rows // 3, data_start, data_end)
     ventes = make_ventes(rng, products, args.rows, data_start, data_end)
+    repeat_rng = random.Random(args.seed + 2)            # own stream: the rest of the data is unchanged
+    repeat_lines(repeat_rng, achats)
+    repeat_lines(repeat_rng, ventes)
     liste = make_liste(rng, products, ventes, window_from, window_to)
     extra = make_extra_achats(random.Random(args.seed + 1), products, data_end)
     catalog = make_catalog()

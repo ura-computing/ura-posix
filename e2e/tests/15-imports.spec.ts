@@ -103,16 +103,26 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   await sidebar.getByRole("link", { name: "Analyses", exact: true }).click();
   await refetch;                     // no request = stale numbers shown after the import
 
+  // The same file again: every line is already stored by the import above → 0 added.
+  const again = pageSend(page, "POST", "/uploads/achat-json");
+  await (await pickExtraFile(page)).click();
+  await expect(outcome).toBeVisible({ timeout: 5 * 60_000 });
+  expect((await outcome.textContent())?.replace(/\D/g, ""), "même fichier une 2e fois : lignes importées").toBe("0");
+  expectSame(await again, { inserted: 0, skipped: 2000, skipped_duplicate: 2000 }, "1er lot du même fichier");
+
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");
   const extra = (await list).data.filter((r: Row) => r.filename === extraName());
   const cancelled = extra.find((r: Row) => r.status === "cancelled");
-  const done = extra.find((r: Row) => r.status === "success");
+  const done = extra.find((r: Row) => r.status === "success" && r.rows_inserted > 0);
+  const twice = extra.find((r: Row) => r.status === "success" && r.rows_inserted === 0);
+  expectSame(twice, { file_type: "achat", rows_inserted: 0, rows_skipped: 2400, deleted_at: null }, "même fichier une 2e fois dans la liste");
   expectSame(cancelled, { id: loadState().cancelledBatch, file_type: "achat", rows_inserted: 0, rows_skipped: 0, deleted_at: null },
     "import annulé dans la liste");
   expectSame(done, { file_type: "achat", rows_inserted: 2400, rows_skipped: 0, deleted_at: null }, "réimport dans la liste");
 
   await page.getByRole("row").filter({ hasText: extraName() }).filter({ hasText: "Réussi" })
+    .filter({ has: page.getByRole("cell", { name: /^2[\s\u00a0\u202f]?400$/ }) })   // « 2 400 » cell, not « 0 · 2 400 ignorées »
     .getByRole("button", { name: "Supprimer" }).click();
   const deleted = pageSend(page, "DELETE", `/data/imports/${done.id}`);
   const list2 = pageCall(page, "/data/imports");

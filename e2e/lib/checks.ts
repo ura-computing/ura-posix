@@ -95,7 +95,8 @@ function withoutSeq(r: Row): Row {
 
 /** Every row of an export (or any full list): all fields + import batch id. */
 export function checkLedgerRows(kind: Ledger, rows: Row[], expectedRows: Row[]): void {
-  expectSameSet(rows, expectedRows.map(withoutSeq), ledgerKey(kind), `${kind} rows`);
+  // Same BL / ticket + product can repeat (G1: both lines are real).
+  expectSameSet(rows, expectedRows.map(withoutSeq), ledgerKey(kind), `${kind} rows`, { repeats: true });
   const batch = loadState()[`batch_${kind}`];
   const wrong = rows.filter((r) => r.import_batch_id !== batch).length;
   expect(wrong, `${kind} rows with import_batch_id ≠ ${batch}`).toBe(0);

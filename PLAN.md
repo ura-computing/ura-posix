@@ -69,7 +69,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | Numbers back after réintégrer / after undoing imports | `10-exclusions:212`, `15-imports:107-108` | open Comptabilité / Rapport / Achats |
 | Reset link used twice / old password | `13-compte:136-137` | open the link again → invalid-link page; old password → error toast |
 | Admin system tiles after user changes | `14-admin:89` | Rapport admin « Vue système » tile |
-| Admin drill-down margin alerts + stock summary | `14-admin:73-74` | no page calls these 2 routes (G8): **your call** (Q2) |
+| Admin drill-down margin alerts + stock summary | `14-admin:73-74` | add the 2 sections to the drill-down (G8, decided) and check them on screen |
 
 Kept: `01:10` /health (Docker only), `01:26,44`, `12:132`, `13:55,102` (extra check after a UI step);
 `10:38-43`, `14:308` (cleanup); `12:113`, `13:36`, `14:197-200` (setup).
@@ -102,7 +102,7 @@ sort, pagination, dialog, export file and value shown; test each against the ora
 | FE5 | **One hook pattern** | 2 `useMarginAlerts` (`analytics/hooks.ts:193`, `dashboard/rapport/hooks.ts:24`); achats / ventes / catalogue copy the filter state | one hook per query; one `useListFilters`. Date range shared on rapport / achats / ventes / alertes / comptabilité; /stock and /analyses keep their own |
 | FE6 | **Same search everywhere** | produits-spéciaux tables filter with a local `norm()` (no `*` grammar) | `matchesFields` |
 | FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
-| FE10 | **Dead code** | `ROUTES.RAPPORTS`, `STATUSES` (revoked/pending/rejected), admin margin-alerts / stock-summary hooks (with G8) | removed |
+| FE10 | **Dead code** | `ROUTES.RAPPORTS`, `STATUSES` (revoked/pending/rejected) | removed (the admin margin-alerts / stock-summary hooks stay: G8 uses them) |
 
 **Bugs fixed in these steps**
 
@@ -147,11 +147,10 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 
 | # | Bug | Example |
 |---|---|---|
-| G1 | Import de-dup key = (BL, product) (`routers/imports.py`) | BL-123 has DOLIPRANE lot A ×10 and lot B ×5 → the second line is skipped → 10 stored instead of 15 |
 | G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
 | G3 | Supplier axes join sales once per supplier (`analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
 | G4 | Liste mode loads the **whole** catalogue and loops on substrings (`compute_analyse_liste`) | a 200-item list × a 30k-product catalogue ≈ 6M comparisons per request |
-| G8 | 2 routes no page calls (`routers/stats.py`) | `/admin/pharmacy/{id}/stats/margin-alerts` and `/stock-summary` (Q2) |
+| G8 | 2 routes no page calls (`routers/stats.py`) — decision 2026-10-02: **show them in the admin drill-down** (alerts + stock sections, E2E through the UI) | `/admin/pharmacy/{id}/stats/margin-alerts` and `/stock-summary` (Q2) |
 
 **Blockers for the microservice split**
 
@@ -183,5 +182,3 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 | # | Question | Example |
 |---|---|---|
 | Q1 | Average PU: some places skip purchase lines with no price or qty ≤ 0 (ventes ledger, stock, top categories, analyse produit), others keep them (Rapport marge, margin alerts, analyse catégorie). Same filter everywhere? Locked formula | qty 5, PU empty kept → Σqty 15 instead of 10 → avg PU lower. Test data has no such line today |
-| Q2 | Admin drill-down margin alerts + stock summary (G8): show them in the drill-down, or delete the 2 routes? | `GET /admin/pharmacy/{id}/stats/margin-alerts` |
-| Q3 | Rapport first load without dates = whole history. Keep, or default to the last 12 months? | /stats on the whole history ≈ 0.2 s now (S5) |
