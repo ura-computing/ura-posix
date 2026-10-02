@@ -85,9 +85,9 @@ export function kpiValue(page: Page, label: string): Locator {
     .locator("span.font-mono.font-bold");
 }
 
-/** Text of every cell of one DataTable column (by its header label) on the current page. */
-export async function columnTexts(page: Page, header: string): Promise<string[]> {
-  const table = page.locator("table").first();
+/** Text of every cell of one DataTable column (by its header label) on the current page.
+ *  `table`: the page's first table unless given (pages with several tables). */
+export async function columnTexts(page: Page, header: string, table: Locator = page.locator("table").first()): Promise<string[]> {
   const headers = (await table.locator("thead th").allInnerTexts()).map((h) => h.trim().toLowerCase());
   const i = headers.indexOf(header.toLowerCase());
   if (i < 0) throw new Error(`no column « ${header} » (${headers.join(" | ")})`);

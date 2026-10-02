@@ -91,6 +91,11 @@ export const fr = {
   },
 
   shared: {
+    processing:     "Traitement…",
+    moreActions:    "Plus d'actions",
+    showPassword:   "Afficher le mot de passe",
+    hidePassword:   "Masquer le mot de passe",
+    activeFilters:  "Filtres actifs",
     pagePrev:       "Page précédente",
     pageNext:       "Page suivante",
     removeFilter:   "Supprimer le filtre",
@@ -202,6 +207,9 @@ export const fr = {
   },
 
   dashboard: {
+    caTotal:       "CA total",
+    caMad:         "CA (MAD)",
+    max:           "Max :",
     title:         "Tableau de bord",
     subtitle:      "Vue d'ensemble de votre activité.",
     subtitleAdmin: "Vue d'ensemble du système et drill-down par pharmacie.",
@@ -328,7 +336,20 @@ export const fr = {
     unites: "Unités",
   },
 
+  stockStatus: {
+    all: "Tous statuts",
+    "sous-stock": "Sous-stock",
+    ideal: "Idéal",
+    "a-surveiller": "À surveiller",
+    "sur-stock": "Sur-stock",
+    inconnu: "Inconnu",
+    negatif: "Stock négatif",
+    days: "j",
+  },
+
   stock: {
+    healthIndex: "Indice de santé",
+    classAria:   "Classe {{k}} : {{n}} références",
     empty:       "Aucune donnée de stock",
     emptyProduct:"Aucun produit trouvé",
     emptyHint:   "Ajustez les filtres pour voir d'autres produits.",
@@ -427,6 +448,8 @@ export const fr = {
 
 
   ps: {
+    reintegrerHint: "Sélectionnez les produits à réintégrer dans vos rapports. Ils réapparaîtront immédiatement dans tous les agrégats.",
+    noExcluded:     "Aucun produit exclu pour le moment.",
     subtitle:     "Excluez de vos rapports un produit, un bon de livraison ou un fournisseur exceptionnel. Réversible à tout moment — aucune donnée n'est supprimée.",
     tabProduits:  "Produits",
     tabBL:        "Bons de livraison",
@@ -504,6 +527,8 @@ export const fr = {
 
 
   analyse: {
+    found:    "Trouvé",
+    notFound: "Introuvable",
     title:        "Analyse de marge",
     subtitle:     "8 axes d'analyse — produit, catégorie, laboratoire, grossiste, client, mois, année, liste personnalisée.",
     searchPh:     "Rechercher dans les résultats…",
@@ -996,6 +1021,8 @@ export const fr = {
     aucuneDonneeMensuelle: "Aucune donnée mensuelle.",
   },
   auth: {
+    brandTitle: "Gestion de pharmacie simplifiée",
+    brandText:  "Une vue d'ensemble claire sur vos ventes, votre stock et vos marges.",
     min8Chars: "Minimum 8 caractères.",
     confirmRequired: "Veuillez confirmer le mot de passe.",
     passwordMismatch: "Les mots de passe ne correspondent pas.",
@@ -1045,6 +1072,10 @@ export const fr = {
     footer: "© PharmaGest · Gestion d'officine",
   },
   uploadFile: {
+    step1: "Type de document",
+    step2: "Fichier CSV",
+    step3: "Aperçu et import",
+    badFilename: "Nom de fichier invalide. Format attendu : « {{example}} »",
     achatTitle: "Achats",
     achatDesc: "Bons de livraison fournisseurs",
     venteTitle: "Ventes",

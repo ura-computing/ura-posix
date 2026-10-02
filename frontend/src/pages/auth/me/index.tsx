@@ -48,6 +48,7 @@ interface PhoneFieldProps {
 
 const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
   ({ label, value, onChange, country: countryProp, error, hint }, ref) => {
+    const t = useT();
     const id = useId();
     const [country, setCountry] = useState<CountryCode>(countryProp ?? "MA");
 
@@ -69,7 +70,7 @@ const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
           )}
         >
           <select
-            aria-label="Indicatif pays"
+            aria-label={t("shared.countryCode")}
             value={country}
             onChange={(e) => {
               const c = e.target.value as CountryCode;

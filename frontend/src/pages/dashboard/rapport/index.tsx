@@ -170,8 +170,8 @@ function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
       { key: "product",   label: t("col.produit"),                 sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["product"] ?? "—")}</span> },
       { key: "category",  label: t("col.categorie"),               sortable: false, render: (r) => <span className="text-muted-foreground">{String(r["category"] ?? "—")}</span> },
       { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-      { key: "ventes",    label: t("rapportAdmin.ventesMad"),      sortable: false, align: "right", render: (r) => mad(r["ventes_total"]) },
-      { key: "ppv",       label: t("col.ppv"),                     sortable: false, align: "right", render: (r) => mad(r["prix_avg"]) },
+      { key: "ventes",    label: t("rapportAdmin.ventesMad"),      sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+      { key: "ppv",       label: t("col.ppv"),                     sortable: false, align: "right", render: (r) => mad(r["ppv"]) },
       { key: "marge_pct", label: t("col.margePct"),                sortable: false, align: "right", render: (r) => pct(r["marge_pct"]) },
       { key: "marge_dh",  label: t("col.margeDh"),                 sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
       { key: "tva",       label: t("col.tva"),                     sortable: false, render: (r) => <span className="text-muted-foreground">{String(r["tva"] ?? "—")}</span> },
@@ -181,18 +181,18 @@ function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
     return [
       { key: "category",  label: t("col.categorie"),               sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["category"] ?? "—")}</span> },
       { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-      { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ventes_total"]) },
-      { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct"]) },
-      { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
+      { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+      { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct_avg"]) },
+      { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh_avg"]) },
     ];
   }
   // grossiste
   return [
-    { key: "supplier",  label: t("col.grossiste"),               sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["supplier"] ?? "—")}</span> },
+    { key: "grossiste", label: t("col.grossiste"),               sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["grossiste"] ?? "—")}</span> },
     { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-    { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ventes_total"]) },
-    { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct"]) },
-    { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
+    { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+    { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct_avg"]) },
+    { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh_avg"]) },
   ];
 }
 
@@ -627,7 +627,7 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
             {formatNumStr(total, 2)}
           </text>
           <text x={CENTER} y={CENTER + 15} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)" fontFamily="Inter, sans-serif">
-            CA Total
+            {t("dashboard.caTotal")}
           </text>
         </svg>
 
@@ -638,7 +638,7 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
               <thead className="sticky top-0 z-10 bg-card">
                 <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="py-2 pr-3 text-left font-semibold">{t("kpi.donutCategorie")}</th>
-                  <th className="px-3 py-2 text-left font-semibold">CA (MAD)</th>
+                  <th className="px-3 py-2 text-left font-semibold">{t("dashboard.caMad")}</th>
                   <th className="px-3 py-2 text-left font-semibold">{t("kpi.donutMarge")}</th>
                   <th className="px-3 py-2 text-left font-semibold">%</th>
                   <th className="w-32 py-2 pl-3 text-left font-semibold">{t("kpi.donutPart")}</th>
@@ -799,7 +799,7 @@ function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?:
         href={ROUTES.ACHATS}
         label={t("kpi.totalAchats")}
         value={formatMAD(achats)}
-        sub={<>{formatQty(stats.kpis.achats_count)} {t("kpi.unites")}</>}
+        sub={<>{formatQty(stats.kpis.achats_count)} {t("common.wLignes")}</>}
         delta={dAchats != null ? { value: dAchats, invertColor: true } : null}
         icon={<ShoppingCart className="size-5" />}
         tint={tint}
@@ -1268,7 +1268,7 @@ function TrendChart({
       </div>
 
       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Max&nbsp;: <span className="font-mono tabular-nums">{formatMAD(rawMax)}</span></span>
+        <span>{t("dashboard.max")} <span className="font-mono tabular-nums">{formatMAD(rawMax)}</span></span>
         <span>{points.length} {unitLabel}</span>
       </div>
     </KpiTile>

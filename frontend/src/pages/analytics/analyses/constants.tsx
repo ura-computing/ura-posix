@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import type { AnalyseMargeRow, MargeMode } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
 
 
 export interface AnalyseColDef {
@@ -153,11 +154,16 @@ const ANNEE_COLS: AnalyseColDef[] = [
   }
 ];
 
+function MatchBadge({ found }: { found: boolean }) {
+  const t = useT();
+  return found
+    ? <span className="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success">{t("analyse.found")}</span>
+    : <span className="rounded-full bg-error-subtle px-2 py-0.5 text-xs font-semibold text-error">{t("analyse.notFound")}</span>;
+}
+
 const LISTE_COLS: AnalyseColDef[] = [
   { key: "match_status", label: "col.statut", render: (r) => (
-      r.match_status === "found"
-        ? <span className="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success">Trouvé</span>
-        : <span className="rounded-full bg-error-subtle px-2 py-0.5 text-xs font-semibold text-error">Introuvable</span>
+      <MatchBadge found={r.match_status === "found"} />
     ), raw: (r) => r.match_status ?? "" },
   { key: "product",     label: "col.produit",      render: (r) => r.product ?? "—", raw: (r) => r.product ?? "" },
   { key: "category",    label: "col.categorie",    render: (r) => r.category ?? "—", raw: (r) => r.category ?? "" },

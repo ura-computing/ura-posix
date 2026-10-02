@@ -138,6 +138,9 @@ test.describe("employé", () => {
 
     await page.goto("/stock");
     await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+    await page.goto("/owner/employees");      // owner-only page: same 404 inside the layout
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+    await expect(page, "pas de redirection").toHaveURL(/\/owner\/employees$/);
     const logout = page.getByRole("button", { name: "Déconnexion", exact: true });
     await expect(logout, "le menu reste là (on peut se déconnecter)").toBeVisible();
 

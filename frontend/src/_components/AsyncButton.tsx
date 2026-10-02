@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/utils/cn";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?:  boolean;
@@ -19,7 +20,7 @@ const variants = {
 
 export function AsyncButton({
   isLoading = false,
-  loadingText = "Chargement…",
+  loadingText,
   variant = "primary",
   children,
   className,
@@ -27,6 +28,7 @@ export function AsyncButton({
   type = "button",
   ...rest
 }: Props) {
+  const t = useT();
   const isDisabled = isLoading || disabled;
   return (
     <button
@@ -44,7 +46,7 @@ export function AsyncButton({
       {...rest}
     >
       {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-      {isLoading ? loadingText : children}
+      {isLoading ? (loadingText ?? t("common.loading")) : children}
     </button>
   );
 }

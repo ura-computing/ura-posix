@@ -67,7 +67,6 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | Supplier search « grossiste », then after exclusion | `10-exclusions:139-140` | type in « Exclure un fournisseur » → list, then « déjà exclu » |
 | Comptabilité with special products, Mixte | `10-exclusions:172` | tick the box + Mixte on the page |
 | Numbers back after réintégrer / after undoing imports | `10-exclusions:212`, `15-imports:107-108` | open Comptabilité / Rapport / Achats |
-| Employee can't manage the team | `12-equipe:135` (403) | employee opens /owner/employees → 404 in the layout (keep the 403 as extra) |
 | Reset link used twice / old password | `13-compte:136-137` | open the link again → invalid-link page; old password → error toast |
 | Admin system tiles after user changes | `14-admin:89` | Rapport admin « Vue système » tile |
 | Admin drill-down margin alerts + stock summary | `14-admin:73-74` | no page calls these 2 routes (G8): **your call** (Q2) |
@@ -102,8 +101,6 @@ sort, pagination, dialog, export file and value shown; test each against the ora
 | FE4 | **One formatter set** | own `num/mad/fmtMad/fmtPct` (`dashboard/rapport/index.tsx:150,154,252,257`); 15 `toLocaleString` / `toFixed` outside `utils/format.tsx` | only `utils/format.tsx` |
 | FE5 | **One hook pattern** | 2 `useMarginAlerts` (`analytics/hooks.ts:193`, `dashboard/rapport/hooks.ts:24`); achats / ventes / catalogue copy the filter state | one hook per query; one `useListFilters`. Date range shared on rapport / achats / ventes / alertes / comptabilité; /stock and /analyses keep their own |
 | FE6 | **Same search everywhere** | produits-spéciaux tables filter with a local `norm()` (no `*` grammar) | `matchesFields` |
-| FE7 | **i18n gaps** (toasts done) | hardcoded French labels: upload preview / stepper / type cards / filename error, stock statuses, comptabilité payment dialog + ledger headers, produits-spéciaux dialogs, AsyncButton / ConfirmDialog / KebabMenu / PasswordField defaults, AuthLayout brand panel, rapport admin strip + donut | keys in `fr.ts` + `es.ts` |
-| FE8 | **404 in the layout for roles too** | `RequireRole` redirects to `/` (`_components/RequireRole.tsx:23`) | same in-layout 404 as `RequireFeature` |
 | FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
 | FE10 | **Dead code** | `ROUTES.RAPPORTS`, `STATUSES` (revoked/pending/rejected), admin margin-alerts / stock-summary hooks (with G8) | removed |
 
@@ -111,10 +108,6 @@ sort, pagination, dialog, export file and value shown; test each against the ora
 
 | Bug | Example | Step |
 |---|---|---|
-| Alert Excel headers are i18n keys | header « col.produit » (`analytics/_components/AlertDetailDialog.tsx:157`) | FE7 |
-| Achats tile says « unités » | shows `achats_count` = number of lines (`dashboard/rapport/index.tsx:821`) | FE7 |
-| Admin marge table: PPV column = avg purchase price + G7 | `mad(r["prix_avg"])` (`dashboard/rapport/index.tsx:170`); reads `ventes_total`, `supplier` | FE4 |
-| Upload error can't be closed | `onClearError={() => {}}` (`imports/upload/index.tsx:733`) | FE5 |
 
 **Tooling**
 
@@ -158,7 +151,6 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 | G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
 | G3 | Supplier axes join sales once per supplier (`analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
 | G4 | Liste mode loads the **whole** catalogue and loops on substrings (`compute_analyse_liste`) | a 200-item list × a 30k-product catalogue ≈ 6M comparisons per request |
-| G7 | Admin Rapport « Analyse de marge » table reads fields the API doesn't send | reads `ventes_total`, `supplier`; API sends `ca`, `grossiste` → « — » shown. E2E: `test.fail` in `14-admin.spec.ts` (fixed in FE4) |
 | G8 | 2 routes no page calls (`routers/stats.py`) | `/admin/pharmacy/{id}/stats/margin-alerts` and `/stock-summary` (Q2) |
 
 **Blockers for the microservice split**

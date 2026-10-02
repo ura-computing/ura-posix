@@ -406,7 +406,7 @@ function ExcludeProductDialog({
               {count === 0
                 ? t("ps.clickToSelect")
                 : count === 1
-                ? "1 produit sélectionné."
+                ? t("ps.unSelected")
                 : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">
@@ -669,8 +669,7 @@ function ReintegrateProductsDialog({
               {t("ps.reintegrerProduits")}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Sélectionnez les produits à réintégrer dans vos rapports.
-              Ils réapparaîtront immédiatement dans tous les agrégats.
+              {t("ps.reintegrerHint")}
             </p>
           </header>
 
@@ -699,7 +698,7 @@ function ReintegrateProductsDialog({
                   onClick={clearAll}
                   className="ml-1 inline-flex cursor-pointer items-center rounded-md px-2 py-0.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
                 >
-                  Tout effacer
+                  {t("ps.toutEffacer")}
                 </button>
               )}
               <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
@@ -723,7 +722,7 @@ function ReintegrateProductsDialog({
           <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
             {specialProducts.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
-                Aucun produit exclu pour le moment.
+                {t("ps.noExcluded")}
               </p>
             ) : visible.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
@@ -766,7 +765,7 @@ function ReintegrateProductsDialog({
               {count === 0
                 ? t("ps.clickToSelect")
                 : count === 1
-                ? "1 produit sélectionné."
+                ? t("ps.unSelected")
                 : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">

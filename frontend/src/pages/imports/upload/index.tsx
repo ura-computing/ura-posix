@@ -441,12 +441,13 @@ function fmtFR(iso: string): string {
  */
 
 const STEPS = [
-  { n: 1, label: "Type de document" },
-  { n: 2, label: "Fichier CSV" },
-  { n: 3, label: "Aperçu et import" },
+  { n: 1, label: "uploadFile.step1" },
+  { n: 2, label: "uploadFile.step2" },
+  { n: 3, label: "uploadFile.step3" },
 ] as const;
 
 function Stepper({ current }: { current: 1 | 2 | 3 }) {
+  const t = useT();
   return (
     <ol className="flex w-full items-center justify-between gap-3">
       {STEPS.map((s, i) => {
@@ -472,7 +473,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
                   (done || active) ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                {s.label}
+                {t(s.label)}
               </span>
             </div>
             {i < STEPS.length - 1 && (
@@ -730,7 +731,7 @@ export default function UploadFilePage() {
             example={u.examples[u.docType]}
             onAccept={(f) => u.acceptFile(f, u.docType!)}
             errorMsg={u.filenameError}
-            onClearError={() => { /* setting state is internal to useUpload; clearing on next accept attempt */ }}
+            onClearError={u.clearFilenameError}
           />
         </section>
       )}

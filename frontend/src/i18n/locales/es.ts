@@ -89,6 +89,11 @@ export const es: Dict = {
   },
 
   shared: {
+    processing:     "Procesando…",
+    moreActions:    "Más acciones",
+    showPassword:   "Mostrar la contraseña",
+    hidePassword:   "Ocultar la contraseña",
+    activeFilters:  "Filtros activos",
     pagePrev:       "Página anterior",
     pageNext:       "Página siguiente",
     removeFilter:   "Eliminar el filtro",
@@ -195,6 +200,9 @@ export const es: Dict = {
   },
 
   dashboard: {
+    caTotal:       "Facturación total",
+    caMad:         "Facturación (MAD)",
+    max:           "Máx.:",
     title:         "Panel de control",
     subtitle:      "Vista general de su actividad.",
     subtitleAdmin: "Vista general del sistema y detalle por farmacia.",
@@ -321,7 +329,20 @@ export const es: Dict = {
     unites: "Unidades",
   },
 
+  stockStatus: {
+    all: "Todos los estados",
+    "sous-stock": "Infrastock",
+    ideal: "Ideal",
+    "a-surveiller": "A vigilar",
+    "sur-stock": "Sobrestock",
+    inconnu: "Desconocido",
+    negatif: "Stock negativo",
+    days: "d",
+  },
+
   stock: {
+    healthIndex: "Índice de salud",
+    classAria:   "Clase {{k}}: {{n}} referencias",
     empty:       "Ningún dato de stock",
     emptyProduct:"Ningún producto encontrado",
     emptyHint:   "Ajuste los filtros para ver otros productos.",
@@ -420,6 +441,8 @@ export const es: Dict = {
 
 
   ps: {
+    reintegrerHint: "Seleccione los productos que desea reintegrar en sus informes. Volverán a aparecer de inmediato en todos los totales.",
+    noExcluded:     "Ningún producto excluido por el momento.",
     subtitle:     "Excluya de sus informes un producto, un albarán o un proveedor excepcional. Reversible en cualquier momento — no se elimina ningún dato.",
     tabProduits:  "Productos",
     tabBL:        "Albaranes",
@@ -497,6 +520,8 @@ export const es: Dict = {
 
 
   analyse: {
+    found:    "Encontrado",
+    notFound: "No encontrado",
     title:        "Análisis de margen",
     subtitle:     "8 ejes de análisis — producto, categoría, laboratorio, mayorista, cliente, mes, año, lista personalizada.",
     searchPh:     "Buscar en los resultados…",
@@ -989,6 +1014,8 @@ export const es: Dict = {
     aucuneDonneeMensuelle: "Sin datos mensuales.",
   },
   auth: {
+    brandTitle: "Gestión de farmacia simplificada",
+    brandText:  "Una visión clara de sus ventas, su stock y sus márgenes.",
     min8Chars: "Mínimo 8 caracteres.",
     confirmRequired: "Por favor, confirma la contraseña.",
     passwordMismatch: "Las contraseñas no coinciden.",
@@ -1038,6 +1065,10 @@ export const es: Dict = {
     footer: "© PharmaGest · Gestión de farmacia",
   },
   uploadFile: {
+    step1: "Tipo de documento",
+    step2: "Archivo CSV",
+    step3: "Vista previa e importación",
+    badFilename: "Nombre de archivo no válido. Formato esperado: « {{example}} »",
     achatTitle: "Compras",
     achatDesc: "Albaranes de proveedores",
     venteTitle: "Ventas",

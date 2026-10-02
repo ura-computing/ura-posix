@@ -3,6 +3,7 @@ import { Eye, EyeOff } from "lucide-react";
 import type { InputHTMLAttributes } from "react";
 
 import { TextField } from "./TextField";
+import { useT } from "@/i18n/I18nProvider";
 
 interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   label: string;
@@ -13,7 +14,8 @@ interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
 export const PasswordField = forwardRef<HTMLInputElement, Props>(function PasswordField(props, ref) {
   const [visible, setVisible] = useState(false);
   const Icon = visible ? EyeOff : Eye;
-  const toggleLabel = visible ? "Masquer le mot de passe" : "Afficher le mot de passe";
+  const t = useT();
+  const toggleLabel = visible ? t("shared.hidePassword") : t("shared.showPassword");
 
   return (
     <TextField

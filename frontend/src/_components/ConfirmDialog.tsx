@@ -5,6 +5,7 @@ import { TriangleAlert, Info } from "lucide-react";
 
 import { AsyncButton } from "./AsyncButton";
 import { cn } from "@/utils/cn";
+import { useT } from "@/i18n/I18nProvider";
 
 interface ConfirmDialogProps {
   open:          boolean;
@@ -22,9 +23,9 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({
   open, onClose, onConfirm, title, description, bullets,
-  variant = "default", confirmLabel = "Confirmer",
-  loadingLabel = "Traitement…", cancelLabel = "Annuler", isLoading = false,
+  variant = "default", confirmLabel, loadingLabel, cancelLabel, isLoading = false,
 }: ConfirmDialogProps) {
+  const t = useT();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !isLoading && onClose();
     if (open) document.addEventListener("keydown", onKey);
@@ -87,15 +88,15 @@ export function ConfirmDialog({
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <AsyncButton variant="ghost" onClick={onClose} disabled={isLoading}>
-                {cancelLabel}
+                {cancelLabel ?? t("common.cancel")}
               </AsyncButton>
               <AsyncButton
                 variant={destructive ? "destructive" : "primary"}
                 onClick={onConfirm}
                 isLoading={isLoading}
-                loadingText={loadingLabel}
+                loadingText={loadingLabel ?? t("shared.processing")}
               >
-                {confirmLabel}
+                {confirmLabel ?? t("common.confirm")}
               </AsyncButton>
             </div>
           </motion.div>

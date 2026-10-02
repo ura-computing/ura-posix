@@ -77,3 +77,6 @@ export function useT(): TFn {
  *  language the user picked (stored), French fallback. */
 export const translate: TFn = (key, vars) =>
   interpolate(lookup(DICTS[readInitialLang()], key) ?? lookup(fr, key) ?? key, vars);
+
+/** French whatever the UI language: Excel headers are always French (client rule). */
+export const translateFr: TFn = (key, vars) => interpolate(lookup(fr, key) ?? key, vars);

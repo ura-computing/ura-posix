@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
+import { useT } from "@/i18n/I18nProvider";
 
 
 /** Room (px) the menu needs below its trigger; with less, it opens upward. */
@@ -19,12 +20,13 @@ const MENU_SPACE = 180;
 
 
 export function KebabMenu({
-  label = "Plus d'actions",
+  label,
   children,
 }: {
   label?:   string;
   children: (close: () => void) => React.ReactNode;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -57,7 +59,7 @@ export function KebabMenu({
         ref={triggerRef}
         type="button"
         onClick={toggle}
-        aria-label={label}
+        aria-label={label ?? t("shared.moreActions")}
         className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
       >
         <MoreVertical className="size-4" />

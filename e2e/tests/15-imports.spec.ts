@@ -32,6 +32,17 @@ async function pickExtraFile(page: Page) {
 }
 
 
+test("nom de fichier invalide : le message s'affiche puis se ferme", async ({ page }) => {
+  await page.goto("/upload-file?type=achat");
+  await page.locator('input[type="file"]').setInputFiles({ name: "achats.csv", mimeType: "text/csv", buffer: Buffer.from("a;b\n1;2\n") });
+  const error = page.getByText(/^Nom de fichier invalide\. Format attendu : « .+ »$/);
+  await expect(error).toBeVisible();
+  await expect(page.getByRole("button", { name: "Importer dans la base" }), "pas d'aperçu").toHaveCount(0);
+  await error.locator("..").getByRole("button", { name: "Fermer" }).click();
+  await expect(error).toBeHidden();
+});
+
+
 test("liste : les 3 imports du départ", async ({ page }) => {
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");

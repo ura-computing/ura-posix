@@ -8,7 +8,7 @@ import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { ABCD_COLORS } from "@/pages/analytics/constants";
 import type { StockRow } from "@/types";
-import { useT } from "@/i18n/I18nProvider";
+import { translateFr, useT } from "@/i18n/I18nProvider";
 
 export interface AlertColumn<T = any> {
   key: string;
@@ -154,7 +154,7 @@ export function AlertDetailDialog({
 
   const handleExport = () => {
     if (sorted.length === 0) return;
-    const aoa = [columns.map((c) => c.label), ...sorted.map((r) => columns.map((c) => c.raw(r)))];
+    const aoa = [columns.map((c) => translateFr(c.label)), ...sorted.map((r) => columns.map((c) => c.raw(r)))];
     downloadXlsx(aoa, exportFilename(`ALERTES ${title}`, "xlsx", dateFrom, dateTo));
   };
 

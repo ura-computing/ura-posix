@@ -14,7 +14,7 @@ import { expectSame, expectSameSet } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
 import { REPO_DIR } from "../lib/paths";
-import { pageCall, pageSend, period, pickCategoryType, setPeriod } from "../lib/ui";
+import { columnTexts, frNumber, pageCall, pageSend, period, pickCategoryType, setPeriod } from "../lib/ui";
 
 
 test.use({ storageState: sessionFile("admin") });
@@ -74,11 +74,46 @@ test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Paraph
   checkStockSummary(await apiGet(page, `/admin/pharmacy/${id}/stats/stock-summary`));
 });
 
-test.fail("rapport admin : le tableau « Analyse de marge » montre le grossiste (bug : lit `supplier`, l'API envoie `grossiste`)", async ({ page }) => {
+/** Admin « Analyse de marge » table, per tab: [mode, tab (null = default), name column, row key, value columns]. */
+const MARGE_TABS = [
+  ["produit", null, "Produit", "product",
+    [["Qté", "qty"], ["Ventes (MAD)", "ca"], ["PPV", "ppv"], ["Marge %", "marge_pct"], ["Marge DH", "marge_dh"]]],
+  ["categorie", "Par catégorie", "Catégorie", "category",
+    [["Qté", "qty"], ["CA (MAD)", "ca"], ["Marge % moy.", "marge_pct_avg"], ["Marge DH moy.", "marge_dh_avg"]]],
+  ["grossiste", "Par grossiste", "Grossiste", "grossiste",
+    [["Qté", "qty"], ["CA (MAD)", "ca"], ["Marge % moy.", "marge_pct_avg"], ["Marge DH moy.", "marge_dh_avg"]]],
+] as const;
+
+test("rapport admin : le tableau « Analyse de marge » affiche les valeurs de l'API (3 onglets)", async ({ page }) => {
+  const w = testWindow();
+  const answer = (mode: string) => pageCall(page, `/admin/pharmacy/${pharmacyId()}/stats/analyse-marge`,
+    { ...period(w), category_type: "all", mode });
+  let next = answer("produit");
   await openAdminRapport(page);
-  await setPeriod(page, testWindow().date_from, testWindow().date_to);
-  await page.getByRole("tab", { name: "Par grossiste", exact: true }).click();
-  await expect(page.getByRole("cell", { name: "Grossiste CPM CASA", exact: true })).toBeVisible({ timeout: 5_000 });
+  await setPeriod(page, w.date_from, w.date_to);
+  for (const [mode, tab, nameCol, nameKey, cols] of MARGE_TABS) {
+    await test.step(mode, async () => {
+      if (tab) { next = answer(mode); await page.getByRole("tab", { name: tab, exact: true }).click(); }
+      const rows = (await next).rows as Row[];
+      // The drill-down has other tables (categories donut): take the one under « Analyse de marge ».
+      const table = page.locator("div").filter({ has: page.getByRole("heading", { name: "Analyse de marge", exact: true }) }).last().locator("table");
+      // columnTexts reads at once: wait until this tab's rows are drawn (not the previous tab's).
+      await expect(table.getByRole("columnheader", { name: nameCol, exact: true })).toBeVisible();
+      await expect(table.locator("tbody tr").first()).toContainText(String(rows[0]?.[nameKey] ?? "—"));
+      const names = await columnTexts(page, nameCol, table);
+      expect(names.length, `${mode}: lignes affichées`).toBeGreaterThan(0);
+      const shown = rows.slice(0, names.length);
+      expect(names, `${mode}: ${nameCol}`).toEqual(shown.map((r) => String(r[nameKey] ?? "—")));
+      for (const [header, key] of cols) {
+        const got = (await columnTexts(page, header, table)).map(frNumber);
+        const bad = shown.flatMap((r, i) => {
+          const want = r[key] == null ? null : Math.round(Number(r[key]) * 100) / 100;
+          return (got[i] === want || (got[i] != null && want != null && Math.abs(got[i]! - want) <= 0.011)) ? [] : [`${names[i]}: ${got[i]} ≠ ${want}`];
+        });
+        expect(bad.slice(0, 10), `${mode}: « ${header} »`).toEqual([]);
+      }
+    });
+  }
 });
 
 

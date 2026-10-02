@@ -70,7 +70,7 @@ function AbcdAnalysisCard({
                 type="button"
                 onClick={() => onSelectClass(k)}
                 aria-pressed={active}
-                aria-label={`Classe ${k} : ${count} références`}
+                aria-label={t("stock.classAria", { k, n: count })}
                 className="group flex flex-col items-center gap-1.5"
               >
                 <span
@@ -103,7 +103,7 @@ function AbcdAnalysisCard({
         {/* RIGHT — Indice de santé du stock (uses the shared NeedleGauge — same gauge style as Achats supplier-mix) */}
         <div className="flex flex-col items-center justify-center gap-1 md:border-l md:border-border md:pl-3">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Indice de santé
+            {t("stock.healthIndex")}
           </span>
           <NeedleGauge value={health * 10} />
           <div className="-mt-2 flex items-baseline gap-1 whitespace-nowrap">
@@ -341,6 +341,7 @@ function ClassPill({ klass }: { klass: AbcdClass }) {
 }
 
 function StatusPill({ status }: { status: StockRow["status"] }) {
+  const t = useT();
   const meta = STATUS_META[status];
   return (
     <span className={cn(
@@ -348,7 +349,7 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
       meta.pill,
     )}>
       <span className={cn("size-1.5 rounded-full", meta.dot)} aria-hidden />
-      {meta.label}
+      {t(`stockStatus.${status}`)}
     </span>
   );
 }
@@ -399,7 +400,10 @@ function StockTable({
       <div className="ml-auto flex items-center gap-2">
         <SingleSelectPopover
           label={t("col.statut")}
-          options={STATUS_OPTIONS}
+          options={STATUS_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.days ? `${t(`stockStatus.${o.value}`)} (${o.days} ${t("stockStatus.days")})` : t(`stockStatus.${o.value || "all"}`),
+          }))}
           value={status}
           onChange={onStatusChange}
           align="end"

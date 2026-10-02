@@ -8,8 +8,7 @@
  *  - filter chips (remove the category, remove the period);
  *  - Excel export of every tab (file name, sheet, French headers, every cell);
  *  - Liste: « Importer une liste » button, status line, rows + tiles, × Pharmacie /
- *    Parapharmacie, Excel, a file with no product.
- *  Known bug isolated in a `test.fail` (passes while the bug exists). */
+ *    Parapharmacie, Excel, a file with no product. */
 import { basename, resolve } from "node:path";
 import type { Page } from "@playwright/test";
 

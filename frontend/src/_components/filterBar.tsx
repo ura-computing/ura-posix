@@ -688,7 +688,7 @@ export function MultiSelectPopover({
         <div className={cn(POPOVER_PANEL, POPOVER_POSITION.bottom, POPOVER_ALIGN.start)}>
           {options.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              Aucune option
+              {t("shared.noOption")}
             </div>
           )}
           {options.map((opt) => {
@@ -912,7 +912,7 @@ export function FilterBar<V extends string = string>({
       {hasActive && (
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Filtres actifs
+            {t("shared.activeFilters")}
           </span>
           {activeFilters!.map((f) => (
             <FilterPill key={f.key} onRemove={f.onClear}>

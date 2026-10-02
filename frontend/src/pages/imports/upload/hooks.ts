@@ -7,6 +7,7 @@ import {
 import type { DocType } from "@/types";
 
 import { useUploadCtx, type UploadPhase } from "@/hooks/UploadContext";
+import { translate } from "@/i18n/I18nProvider";
 
 
 /**
@@ -99,9 +100,7 @@ export function useUpload(initialDocType: DocType | null = null) {
 
   const acceptFile = useCallback(async (f: File, t: DocType) => {
     if (!FILENAME_REGEX[t].test(f.name)) {
-      setFilenameError(
-        `Nom de fichier invalide. Format attendu : « ${EXAMPLE_FILENAME[t]} »`,
-      );
+      setFilenameError(translate("uploadFile.badFilename", { example: EXAMPLE_FILENAME[t] }));
       return;
     }
     setFilenameError(null);
@@ -165,6 +164,7 @@ export function useUpload(initialDocType: DocType | null = null) {
     examples: EXAMPLE_FILENAME,
     // shell actions
     pickType, backToType, acceptFile, changeFile, startImport,
+    clearFilenameError: () => setFilenameError(null),
     // job state (null when no job for this doc-type) — the state card reads from here
     phase:       (job?.phase       ?? "idle") as UploadPhase | "idle",
     progress:    job?.progress    ?? { current: 0, total: 0, inserted: 0, skipped: 0 },
