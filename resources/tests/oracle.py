@@ -27,8 +27,8 @@ PCT_SUFFIX = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")
 ANALYSE_MODES = ("produit", "categorie", "laboratoire", "grossiste", "operateur", "mois", "annee")
 
 # Search / suggestion queries replayed by the E2E suite (typed in the search box).
-VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042"]
-ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042"]
+VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042", "00*42"]
+ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042", "00*42"]
 
 # Produits spéciaux scenario (e2e/tests/10-exclusions.spec.ts).
 EXCLUDED_SUPPLIER = "Laboratoire WELEDA"
@@ -576,7 +576,7 @@ class Oracle:
         for v in self.vw:
             if not cat_ok(v.p, ct):
                 continue
-            g = raw.setdefault(v.p.category, {"qty": 0.0, "ca": 0.0, "units": []})
+            g = raw.setdefault(strip_pct(v.p.category), {"qty": 0.0, "ca": 0.0, "units": []})
             g["qty"] += v.qty
             g["ca"] += v.total
             g["units"].append(v.unit)
@@ -840,7 +840,7 @@ class Oracle:
 
     def unique_query(self, p) -> str | None:
         """`PRODUIT 00123` when it finds p alone. Barcodes count too
-        (routers/special_products + bl_exclusions search them): `00012` is inside
+        (the special-products + BL searches in routers/exclusions.py use them): `00012` is inside
         6119000000123, so low numbers are skipped."""
         q = f"PRODUIT {p.name.rsplit(' ', 1)[1]}"
         toks = tokenize(q)

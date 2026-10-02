@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { logout } from "@/api/auth";
-import { ApiErr } from "@/api/client";
+import { ApiErr, api } from "@/api/client";
+import { URLS } from "@/api/urls";
 import { ROUTES } from "@/types";
 
 export function useLogout() {
@@ -11,7 +11,7 @@ export function useLogout() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation<void, ApiErr>({
-    mutationFn: logout,
+    mutationFn: () => api.post<void>(URLS.auth.logout),
     onSuccess: () => {
       queryClient.clear();
       navigate(ROUTES.LOGIN);

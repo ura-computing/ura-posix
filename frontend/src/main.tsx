@@ -1,19 +1,81 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster, toast } from "sonner";
 
-import { setUnauthorizedHandler } from "@/api/client";
+import { ApiErr, setUnauthorizedHandler } from "@/api/client";
 import App from "@/App";
-import { openSessionExpiredDialog, SessionExpiredDialog } from "@/components/shared/SessionExpiredDialog";
-import { UploadProvider } from "@/contexts/UploadContext";
+import { UploadProvider } from "@/hooks/UploadContext";
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
-import { I18nProvider } from "@/i18n/I18nProvider";
+import { I18nProvider, translate, useT } from "@/i18n/I18nProvider";
 import { QUERY_KEYS } from "@/types";
 import "@/styles/globals.css";
+import { ConfirmDialog } from "@/_components/ConfirmDialog";
+
+/** Global modal that surfaces when the API client receives a 401 mid-session.
+ *
+ *  Singleton subscriber pattern (mirrors `setUnauthorizedHandler` in
+ *  `api/client.ts`): a module-level setter holds the React `setOpen` from the
+ *  mounted instance, and `openSessionExpiredDialog()` flips it. Mount the
+ *  component ONCE at app root (`main.tsx`); calling it from multiple places
+ *  would race on the setter ref.
+ *
+ *  UX: the user clicks "Actualiser" → `window.location.reload()` → fresh boot
+ *  → no auth cookie → AppLayout's auth guard bounces them to /login. The
+ *  "Plus tard" button just dismisses; the next 401 will re-open this dialog,
+ *  so the user can't really escape — but we keep the dismiss option so the
+ *  modal isn't a hard trap if someone needs to copy a value off the page
+ *  before reloading.
+ */
+
+let _setOpen: ((open: boolean) => void) | null = null;
+
+function openSessionExpiredDialog(): void {
+  _setOpen?.(true);
+}
+
+function SessionExpiredDialog() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    _setOpen = setOpen;
+    return () => {
+      _setOpen = null;
+    };
+  }, []);
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onClose={() => setOpen(false)}
+      onConfirm={() => window.location.reload()}
+      title={t("session.expiredTitle")}
+      description={t("session.expiredDesc")}
+      variant="destructive"
+      confirmLabel={t("session.refresh")}
+      cancelLabel={t("session.later")}
+    />
+  );
+}
+
+/** Every failed request shows a toast (users must see each error). Skipped:
+ *  401 (SessionExpiredDialog handles it) and mutations whose own onError
+ *  already toasts. The text is the server's French `detail` (or the
+ *  translated network / generic message from api/client.ts). */
+function toastError(err: unknown): void {
+  if (err instanceof ApiErr && err.status === 401) return;
+  toast.error(err instanceof ApiErr ? err.detail : translate("toast.genericError"));
+}
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: toastError }),
+  mutationCache: new MutationCache({
+    onError: (err, _vars, _ctx, mutation) => {
+      if (!mutation.options.onError) toastError(err);
+    },
+  }),
   defaultOptions: {
     queries: { retry: false, refetchOnWindowFocus: false },
   },

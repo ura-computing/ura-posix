@@ -9,12 +9,14 @@
  *     (committed, recorded for one ROWS size — other sizes are not compared).
  *     First run, or `make e2e-tests` answered "y" to "Record a new speed
  *     baseline?", (re)writes it.
+ *  3. ERROR CODES — backend `errors.py` ErrorCode values = frontend `api/errors.ts`
+ *     (fr.ts / es.ts already fail the build when a frontend code has no text).
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { expect, test, type CallRecord } from "../lib/fixtures";
-import { API, CALLS_FILE, E2E_DIR, RESULTS_DIR } from "../lib/paths";
+import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR } from "../lib/paths";
 
 
 const ALLOWLIST = [/^\/v1\/store-website\//];
@@ -122,4 +124,14 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
     test.info().annotations.push({ type: "speed", description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}` });
   }
   expect(slower, `slower than baseline:\n  ${slower.join("\n  ")}\n`).toEqual([]);
+});
+
+
+test("gate: same error codes in backend and frontend", () => {
+  const values = (file: string, re: RegExp) =>
+    [...readFileSync(resolve(REPO_DIR, file), "utf-8").matchAll(re)].map((m) => m[1]).sort();
+  const backend  = values("backend/errors.py", /^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm);
+  const frontend = values("frontend/src/api/errors.ts", /^ {2}[A-Z_]+:\s*"(\w+)",$/gm);
+  expect(backend.length, "codes in backend/errors.py").toBeGreaterThan(0);
+  expect(frontend, "frontend/src/api/errors.ts vs backend/errors.py").toEqual(backend);
 });

@@ -64,7 +64,7 @@ test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Paraph
     await test.step(tab, async () => {
       const analyse = pageCall(page, `/admin/pharmacy/${id}/stats/analyse-marge`,
         { ...period(w), category_type: "parapharmacie", mode });
-      await page.getByRole("button", { name: tab, exact: true }).click();
+      await page.getByRole("tab", { name: tab, exact: true }).click();
       checkAnalyse(await analyse, "parapharmacie", mode);
     });
   }
@@ -77,7 +77,7 @@ test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Paraph
 test.fail("rapport admin : le tableau « Analyse de marge » montre le grossiste (bug : lit `supplier`, l'API envoie `grossiste`)", async ({ page }) => {
   await openAdminRapport(page);
   await setPeriod(page, testWindow().date_from, testWindow().date_to);
-  await page.getByRole("button", { name: "Par grossiste", exact: true }).click();
+  await page.getByRole("tab", { name: "Par grossiste", exact: true }).click();
   await expect(page.getByRole("cell", { name: "Grossiste CPM CASA", exact: true })).toBeVisible({ timeout: 5_000 });
 });
 
@@ -172,21 +172,23 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
 
   await test.step("supprimer le membre", async () => {
     await rowAction(page, M.email, "Supprimer");
-    const deleted = pageSend(page, "DELETE", `/admin/users/${memberId}`);
+    const deleted = pageSend(page, "DELETE", `/admin/users/${memberId}`, 204);
     await page.getByRole("dialog", { name: /^Supprimer définitivement Gérant Archive/ })
       .getByRole("button", { name: "Confirmer", exact: true }).click();
-    expect(await deleted).toEqual({ deleted: true, user_id: memberId });
+    expect(await deleted, "DELETE user → 204, corps vide").toBeNull();
     await expect(page.getByRole("row", { name: new RegExp(M.email) })).toHaveCount(0);
   });
 
   await test.step("archiver la pharmacie", async () => {
     await page.getByRole("button", { name: "Supprimer", exact: true }).click();
-    const archived = pageSend(page, "DELETE", `/admin/pharmacies/${c.id}`);
+    const archived = pageSend(page, "DELETE", `/admin/pharmacies/${c.id}`, 204);
+    const list = pageCall<Row[]>(page, "/admin/pharmacies");
     await page.getByRole("dialog", { name: /^Supprimer définitivement Pharmacie Archive E2E/ })
       .getByRole("button", { name: "Confirmer", exact: true }).click();
-    expect(await archived).toEqual({ archived: true, pharmacy_id: c.id });
+    expect(await archived, "DELETE pharmacie → 204, corps vide").toBeNull();
     await page.waitForURL(/\/admin\/pharmacies$/);
-    expect((await apiGet<Row[]>(page, "/admin/pharmacies")).map((p) => p.id), "absente de la liste").not.toContain(c.id);
+    expect((await list).map((p) => p.id), "absente de la liste").not.toContain(c.id);
+    await expect(page.getByRole("row", { name: /Pharmacie Archive E2E/ }), "absente du tableau").toHaveCount(0);
   });
 });
 
@@ -197,12 +199,12 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
   const archived = await apiPost(page, "/admin/pharmacies", { name: "Pharmacie Fermée E2E", city: "Rabat" });
   const { member } = await apiPost(page, `/admin/pharmacies/${archived.id}/users`,
     { ...O, role: "owner", pharmacy_id: archived.id });
-  await apiDelete(page, `/admin/pharmacies/${archived.id}`);
+  await apiDelete(page, `/admin/pharmacies/${archived.id}`, 204);
 
   const list = pageCall<Row[]>(page, "/admin/users");
   await page.goto("/admin/pharmacies");
   await expect(page.getByRole("heading", { level: 1, name: "Pharmacies et utilisateurs" })).toBeVisible();
-  await page.getByRole("button", { name: "Utilisateurs", exact: true }).click();
+  await page.getByRole("tab", { name: "Utilisateurs", exact: true }).click();
   await expect(page).toHaveURL(/\?tab=utilisateurs$/);
   const users = await list;
   const byEmail = (email: string) => users.find((u) => u.email === email);
@@ -240,19 +242,34 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
   });
 
   await test.step("supprimer le compte", async () => {
-    const deleted = pageSend(page, "DELETE", `/admin/users/${member.id}`);
+    const deleted = pageSend(page, "DELETE", `/admin/users/${member.id}`, 204);
     await rowAction(page, O.email, "Supprimer");
     await page.getByRole("dialog", { name: /^Supprimer définitivement Orphelin E2E/ })
       .getByRole("button", { name: "Confirmer", exact: true }).click();
-    expect(await deleted).toEqual({ deleted: true, user_id: member.id });
+    expect(await deleted, "DELETE user → 204, corps vide").toBeNull();
     await expect(page.getByRole("row", { name: new RegExp(O.email) })).toHaveCount(0);
   });
 });
 
 
+/** The owner's /ventes filtered on `category` through the page (Catégorie popover);
+ *  returns the rows the page got. */
+async function ownerVentes(owner: Page, category: string): Promise<Row[]> {
+  const first = pageCall(owner, "/ventes", { page: "1" });
+  await owner.goto("/ventes");
+  await first;
+  const list = pageCall(owner, "/ventes", { category });
+  await owner.getByRole("button", { name: "Catégorie" }).first().click();
+  await owner.getByRole("checkbox", { name: category, exact: true }).check();
+  const rows = (await list).data as Row[];
+  await owner.keyboard.press("Escape");
+  expect(rows.length, `ventes « ${category} »`).toBeGreaterThan(0);
+  return rows;
+}
+
+
 test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé", async ({ page, browser }) => {
   const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
-  const ventes = async () => (await apiGet(owner, "/ventes", { category: "Parapharmacie", limit: 5 })).data as Row[];
 
   const list0 = pageCall(page, "/category-suffixes");
   await page.goto("/admin/categories");
@@ -276,22 +293,27 @@ test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé
   await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
   expectSame(await updated, { id: c.id, category: "Parapharmacie", suffix: "-PA", color: "rose" }, "PUT /category-suffixes");
 
-  const withSuffix = await ventes();
-  expect(withSuffix.length, "ventes parapharmacie").toBeGreaterThan(0);
+  const withSuffix = await ownerVentes(owner, "Parapharmacie");
   expectSame(withSuffix.map((r) => [r.transaction_ref_final, r.transaction_ref_color]),
     withSuffix.map((r) => [`${r.transaction_ref}-PA`, "rose"]), "référence + suffixe dans /ventes");
+  await expect(owner.getByText("-PA", { exact: true }).first(), "badge « -PA » à l'écran").toBeVisible();
 
   const deleted = pageSend(page, "DELETE", `/category-suffixes/${c.id}`, 204);
+  const list1 = pageCall(page, "/category-suffixes");
   await page.getByRole("row", { name: /Parapharmacie/ }).getByRole("button", { name: "Supprimer" }).click();
   await page.getByRole("dialog", { name: /^Supprimer le mapping/ }).getByRole("button", { name: "Supprimer", exact: true }).click();
   await deleted;
-  expect(await apiGet(page, "/category-suffixes"), "plus de suffixe").toEqual([]);
-  expect((await ventes()).every((r) => r.transaction_ref_final === r.transaction_ref && r.transaction_ref_color === null),
+  expect(await list1, "plus de suffixe").toEqual([]);
+  await expect(page.getByText("Aucun mapping configuré"), "liste vide à l'écran").toBeVisible();
+
+  const without = await ownerVentes(owner, "Parapharmacie");
+  expect(without.every((r) => r.transaction_ref_final === r.transaction_ref && r.transaction_ref_color === null),
     "références sans suffixe").toBe(true);
+  await expect(owner.getByText("-PA", { exact: true }), "plus de badge").toHaveCount(0);
   await owner.context().close();
 });
 
-test.fail("catégories : un suffixe « Médicament » s'applique aux ventes (bug : la page enlève l'accent, /ventes le garde)", async ({ page, browser }) => {
+test("catégories : « Médicament » (accent, sans couleur) s'applique aux ventes « Médicament (x%) »", async ({ page, browser }) => {
   const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
   await page.goto("/admin/categories");
   await page.getByRole("button", { name: "Nouveau mapping" }).click();
@@ -300,10 +322,13 @@ test.fail("catégories : un suffixe « Médicament » s'applique aux ventes (bug
   await dialog.getByLabel("Suffixe").fill("-M");
   const created = pageSend(page, "POST", "/category-suffixes", 201);
   await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
-  const c = await created;                                     // saved as "Medicament"
+  const c = await created;
+  expectSame(c, { category: "Médicament", suffix: "-M", color: null }, "saved as typed, accent kept");
   try {
-    const rows = (await apiGet(owner, "/ventes", { category: "Médicament", limit: 5 })).data as Row[];
-    expect(rows.map((r) => r.transaction_ref_final)).toEqual(rows.map((r) => `${r.transaction_ref}-M`));
+    const rows = await ownerVentes(owner, "Médicament");
+    expect(rows.map((r) => r.transaction_ref_final), "suffixe sur « Médicament (x%) »")
+      .toEqual(rows.map((r) => `${r.transaction_ref}-M`));
+    await expect(owner.getByText("-M", { exact: true }).first(), "badge gris « -M » à l'écran").toBeVisible();
   } finally {
     await apiDelete(page, `/category-suffixes/${c.id}`, 204);
     await owner.context().close();
@@ -394,6 +419,39 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     await page.getByRole("dialog", { name: "Supprimer ce médicament ?" }).getByRole("button", { name: "Supprimer", exact: true }).click();
     await deleted;
     await expect(row(NEW.product)).toHaveCount(0);
+  });
+
+  await test.step("supprimer un médicament vendu → refusé (409) + message", async () => {
+    const x = expected().exclusions.special;
+    const found = pageCall(page, "/admin/catalog", { search: x.query });
+    await page.goto("/admin/catalogue");
+    await box.fill(x.query);
+    const med = (await found).data[0];
+    const refused = pageSend(page, "DELETE", `/admin/catalog/${med.id}`, 409);
+    await page.getByRole("row", { name: x.product }).getByRole("button", { name: "Supprimer" }).click();
+    await page.getByRole("dialog", { name: "Supprimer ce médicament ?" }).getByRole("button", { name: "Supprimer", exact: true }).click();
+    expect((await refused).code, "code d'erreur").toBe("medicamentInUse");
+    await expect(page.getByText("Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible.")).toBeVisible();
+    await expect(page.getByRole("row", { name: x.product })).toHaveCount(1);
+  });
+
+  await test.step("même refus en espagnol → message traduit (errors.medicamentInUse)", async () => {
+    const x = expected().exclusions.special;
+    await page.evaluate(() => localStorage.setItem("pg-lang", "es"));
+    try {
+      const found = pageCall(page, "/admin/catalog", { search: x.query });
+      await page.goto("/admin/catalogue");
+      await page.getByPlaceholder("Nombre, categoría, código de barras, laboratorio…").fill(x.query);
+      await found;
+      const refused = pageSend(page, "DELETE", /^\/v1\/admin\/catalog\/\d+$/, 409);
+      await page.getByRole("row", { name: x.product }).getByRole("button", { name: "Eliminar" }).click();
+      await page.getByRole("dialog", { name: "¿Eliminar este medicamento?" }).getByRole("button", { name: "Eliminar", exact: true }).click();
+      expect((await refused).code, "code d'erreur").toBe("medicamentInUse");
+      await expect(page.getByText("Este medicamento se usa en ventas, compras o stock: no se puede eliminar.")).toBeVisible();
+    } finally {
+      await page.evaluate(() => localStorage.setItem("pg-lang", "fr"));
+      await page.reload();
+    }
   });
 
   await test.step("import CSV du catalogue (5 nouveaux produits)", async () => {

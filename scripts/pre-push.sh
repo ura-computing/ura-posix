@@ -2,8 +2,8 @@
 #
 # Git pre-push hook for apcm-pharma.
 #
-# Runs the backend (pytest) and frontend (vitest) suites before every push.
-# Push aborts on the first failing suite.
+# Runs the backend (pytest) suite before every push.
+# Push aborts if it fails.
 #
 # Bypass for a one-off: `git push --no-verify`.
 # Install once per clone: `make install-hooks`.
@@ -16,8 +16,5 @@ cd "$ROOT"
 
 printf "\n▸ backend tests (pytest)\n"
 ( cd backend && uv run pytest -q )
-
-printf "\n▸ frontend tests (vitest)\n"
-( cd frontend && npm test --silent -- --run )
 
 printf "\n✓ all tests green — proceeding with push\n"

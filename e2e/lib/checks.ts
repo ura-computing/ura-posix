@@ -165,7 +165,7 @@ export function checkSortPage(kind: Ledger, s: Row, key: string, order: "asc" | 
 
 export const ANALYSE_MODES = {
   produit:     { tab: "Produit",     key: (r: Row) => r.product },
-  categorie:   { tab: "Catégorie",   key: (r: Row) => `${r.category}|${r.qty}` },   // one label can appear twice (known bug)
+  categorie:   { tab: "Catégorie",   key: (r: Row) => r.category },
   laboratoire: { tab: "Laboratoire", key: (r: Row) => r.laboratoire },
   grossiste:   { tab: "Grossistes",  key: (r: Row) => r.grossiste },
   operateur:   { tab: "Client",      key: (r: Row) => r.client },

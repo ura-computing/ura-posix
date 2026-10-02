@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Building2, Info, Loader2, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { AsyncButton } from "@/components/shared/AsyncButton";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { AsyncButton } from "@/_components/AsyncButton";
+import { Dialog, DialogContent } from "@/_components/dialog";
 import type { PharmacyIn } from "@/types";
 
 

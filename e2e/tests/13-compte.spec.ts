@@ -27,7 +27,7 @@ const STATE = sessionFile("account");
 async function openAccount(page: Page, tab?: "Mot de passe" | "Sessions"): Promise<void> {
   await page.goto("/auth/me");
   await expect(page.getByRole("heading", { level: 1, name: "Mon compte", exact: true })).toBeVisible();
-  if (tab) await page.getByRole("button", { name: tab, exact: true }).click();
+  if (tab) await page.getByRole("tab", { name: tab, exact: true }).click();
 }
 
 

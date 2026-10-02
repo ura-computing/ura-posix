@@ -1,13 +1,13 @@
 import { Plus, Search, UserCog } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { KebabMenu } from "@/components/shared/KebabMenu";
-import { Button } from "@/components/ui/button";
+import { KebabMenu } from "@/_components/KebabMenu";
+import { Button } from "@/_components/button";
 import {
   type DeveloperAccount, type DeveloperStatus,
 } from "@/types/storeWebsite";
 
-import { formatRelative } from "../../../store-website/_format";
+import { formatRelative } from "@/pages/store/store-website/_format";
 
 
 /** i18n key per developer status — the source enum values ("actif" | …) stay

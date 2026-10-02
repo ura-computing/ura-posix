@@ -1,43 +1,43 @@
 import { Routes, Route } from "react-router-dom";
 
-import { AppLayout } from "@/components/layout/AppLayout";
-import { RequireFeature } from "@/components/layout/RequireFeature";
-import { RequireGuest } from "@/components/layout/RequireGuest";
-import { RequireRole } from "@/components/layout/RequireRole";
+import { AppLayout } from "@/_components/AppLayout";
+import { RequireFeature } from "@/_components/RequireFeature";
+import { RequireGuest } from "@/_components/RequireGuest";
+import { RequireRole } from "@/_components/RequireRole";
 import CataloguePage from "@/pages/admin/catalogue";
 import AdminCategoriesPage from "@/pages/admin/categories";
 import AdminPharmaciesIndex from "@/pages/admin/pharmacies";
 import AdminPharmacyDetail from "@/pages/admin/pharmacies/detail";
-import OwnerEmployeesPage from "@/pages/owner/employees";
-import ProduitsSpeciauxPage from "@/pages/produits-speciaux";
+import OwnerEmployeesPage from "@/pages/team";
+import ProduitsSpeciauxPage from "@/pages/accounting/produits-speciaux";
 // HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
 // admin/developers surfaces are wired end-to-end but not ready to ship. Restore
 // these imports and the matching Route blocks below when the feature is done.
 // import AdminDevelopersPage from "@/pages/admin/developers";
-// import DevDashboardPage from "@/pages/dev";
-// import DevExportsPage from "@/pages/dev/exports";
-// import DevEditorPage from "@/pages/dev/requests/$id.editor";
-// import DevRequestDetailPage from "@/pages/dev/requests/$id";
-// import StoreWebsitePage from "@/pages/store-website";
-// import StoreWebsiteNewPage from "@/pages/store-website/new";
-import ForgotPasswordPage from "@/pages/auth/forgotPassword";
+// import DevDashboardPage from "@/pages/store/dev";
+// import DevExportsPage from "@/pages/store/dev/exports";
+// import DevEditorPage from "@/pages/store/dev/requests/$id.editor";
+// import DevRequestDetailPage from "@/pages/store/dev/requests/$id";
+// import StoreWebsitePage from "@/pages/store/store-website";
+// import StoreWebsiteNewPage from "@/pages/store/store-website/new";
+import ForgotPasswordPage from "@/pages/auth/forgot-password";
 import MePage from "@/pages/auth/me";
-import SetPasswordPage from "@/pages/auth/setPassword";
-import HomePage from "@/pages/home";
-import LoginPage from "@/pages/login";
-import NotFoundPage from "@/pages/notFound";
+import SetPasswordPage from "@/pages/auth/set-password";
+import HomePage from "@/pages/auth/home";
+import LoginPage from "@/pages/auth/login";
+import NotFoundPage from "@/pages/auth/not-found";
 // HIDDEN 2026-07-03 — public preview page renders customization data from the
 // hidden feature. Restore alongside the block below.
-// import StorePreviewPage from "@/pages/preview";
-import ImportsPage from "@/pages/imports";
-import RapportPage from "@/pages/rapport";
-import AchatsPage from "@/pages/achats";
-import AlertesPage from "@/pages/alertes";
-import AnalysePage from "@/pages/analyse";
-import ComptabilitePage from "@/pages/comptabilite";
-import StockPage from "@/pages/stock";
-import UploadFilePage from "@/pages/upload-file";
-import VentesPage from "@/pages/ventes";
+// import StorePreviewPage from "@/pages/store/preview";
+import ImportsPage from "@/pages/imports/history";
+import RapportPage from "@/pages/dashboard/rapport";
+import AchatsPage from "@/pages/operations/achats";
+import AlertesPage from "@/pages/analytics/alertes";
+import AnalysePage from "@/pages/analytics/analyses";
+import ComptabilitePage from "@/pages/accounting/comptabilite";
+import StockPage from "@/pages/analytics/stock";
+import UploadFilePage from "@/pages/imports/upload";
+import VentesPage from "@/pages/operations/ventes";
 import { ROLES, ROUTES } from "@/types";
 
 export default function App() {

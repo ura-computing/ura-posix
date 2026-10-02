@@ -31,6 +31,6 @@ async function call<T>(page: Page, method: "GET" | "POST" | "DELETE", path: stri
 
 
 export const apiGet    = <T = any>(page: Page, path: string, params: Params = {}) => call<T>(page, "GET", path, params);
-export const apiPost   = <T = any>(page: Page, path: string, body: unknown, params: Params = {}) => call<T>(page, "POST", path, params, body);
+export const apiPost   = <T = any>(page: Page, path: string, body: unknown, params: Params = {}, status = 200) => call<T>(page, "POST", path, params, body, status);
 /** Cleanup helper (the UI deletes are tested with pageSend); `status` = what the route answers. */
 export const apiDelete = (page: Page, path: string, status = 200) => call<unknown>(page, "DELETE", path, {}, undefined, status);

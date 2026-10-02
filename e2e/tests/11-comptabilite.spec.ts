@@ -1,5 +1,5 @@
 /** Comptabilité, no exclusion in place: KPI cards (/stats, include_non_declared
- *  absent) × Mixte / Pharmacie / Parapharmacie, the sales journal (25 rows,
+ *  =false) × Mixte / Pharmacie / Parapharmacie, the sales journal (25 rows,
  *  include_non_declared=false, pages 1 + 2), the « produits spéciaux » checkbox,
  *  and the payment cards of the current month: create, edit, a second method,
  *  delete. With exclusions: see 10-exclusions.spec.ts. */
@@ -51,7 +51,7 @@ test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ven
   const ledger = pageCall(page, "/ventes", { ...period(w), page: "1", limit: "25", include_non_declared: "false" });
   for (const [i, { ct, label }] of CATEGORY_TYPES.entries()) {
     await test.step(label, async () => {
-      const stats = pageCall(page, "/stats", { ...period(w), category_type: ct, include_non_declared: null });
+      const stats = pageCall(page, "/stats", { ...period(w), category_type: ct, include_non_declared: "false" });
       if (i === 0) await setPeriod(page, w.date_from, w.date_to);
       else await pickCategoryType(page, label);
       checkStats(await stats, ct);
@@ -94,10 +94,10 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
   expectSame(second.list, [esp, { ...tpe, ...tpe2 }], "paiements triés par mode");
 
   await page.getByRole("button", { name: /^TPE/ }).click();
-  const deleted = pageSend(page, "DELETE", `/accounting/payments/${created.saved.id}`);
+  const deleted = pageSend(page, "DELETE", `/accounting/payments/${created.saved.id}`, 204);
   const list = pageCall(page, "/accounting/payments", { month });
   await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
-  expect(await deleted, "DELETE tpe").toEqual({ deleted: true });
+  expect(await deleted, "DELETE tpe → 204, corps vide").toBeNull();
   expectSame(await list, [esp], "paiements après suppression");
   await expect(page.getByRole("button", { name: /^TPE/ })).toContainText("Ajouter");
 });

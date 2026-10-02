@@ -59,7 +59,7 @@ test("analyses: mode Liste (CSV importé)", async ({ page }) => {
   checkListe(await liste);
 });
 
-test.fail("analyses: catégorie — une seule ligne par catégorie (bug: « Médicament (33.930%) » et « (30.000%) » restent 2 lignes)", async ({ page }) => {
+test("analyses: catégorie — une seule ligne par catégorie (« Médicament (33.930%) » + « (30.000%) » = « Médicament »)", async ({ page }) => {
   await open(page);
   const produit = call(page, "produit", "all");
   await setPeriod(page, testWindow().date_from, testWindow().date_to);

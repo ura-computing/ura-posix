@@ -72,3 +72,8 @@ export function useI18n(): I18nContextValue {
 export function useT(): TFn {
   return useI18n().t;
 }
+
+/** `t()` for code outside React (API client, query-cache toasts): uses the
+ *  language the user picked (stored), French fallback. */
+export const translate: TFn = (key, vars) =>
+  interpolate(lookup(DICTS[readInitialLang()], key) ?? lookup(fr, key) ?? key, vars);

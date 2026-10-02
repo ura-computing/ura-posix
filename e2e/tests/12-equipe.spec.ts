@@ -115,10 +115,10 @@ test.describe("propriétaire", () => {
     await open(page);
     await rowAction(page, other.email, "Supprimer");
     const confirm = page.getByRole("dialog", { name: /^Supprimer définitivement Stagiaire E2E/ });
-    const deleted = pageSend(page, "DELETE", `/owner/employees/${member.id}`);
+    const deleted = pageSend(page, "DELETE", `/owner/employees/${member.id}`, 204);
     const list = pageCall(page, "/owner/employees");
     await confirm.getByRole("button", { name: "Confirmer", exact: true }).click();
-    expect(await deleted, "DELETE employee").toEqual({ deleted: true, user_id: member.id });
+    expect(await deleted, "DELETE employee → 204, corps vide").toBeNull();
     expect((await list).employees.map((e: Row) => e.email), "équipe après suppression").toEqual([EMP.email]);
   });
 });
@@ -132,6 +132,8 @@ test.describe("employé", () => {
     const me = await apiGet(page, "/auth/me");
     expectSame(me.user, { email: EMP.email, name: EMP.name, role: "employee", status: "active" }, "/auth/me");
     expect([...me.permissions].sort(), "permissions effectives").toEqual(GRANTED);
+    const refused = await apiPost(page, "/owner/employees", {}, {}, 403);
+    expect(refused.code, "un employé ne gère pas l'équipe (POST /owner/employees)").toBe("ownerOnly");
     await expect(page.getByRole("link", { name: "Stock", exact: true }), "menu sans Stock").toHaveCount(0);
 
     await page.goto("/stock");

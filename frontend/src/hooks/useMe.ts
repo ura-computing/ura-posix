@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getMe } from "@/api/auth";
+import { api } from "@/api/client";
+import { URLS } from "@/api/urls";
 import { QUERY_KEYS } from "@/types";
 import type { Me, MeResponse } from "@/types";
 
@@ -20,7 +21,7 @@ function toFlat(r: MeResponse): Me {
 export function useMe() {
   const query = useQuery<MeResponse, Error, Me>({
     queryKey:  QUERY_KEYS.ME,
-    queryFn:   getMe,
+    queryFn:   () => api.get<MeResponse>(URLS.auth.me),
     select:    toFlat,
     staleTime: 5 * 60 * 1000,
     retry:     false,

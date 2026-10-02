@@ -1,7 +1,7 @@
 /** Produits spéciaux → Comptabilité. The owner excludes 1 product, 1 BL (found
  *  by a product it holds) and 1 supplier from the UI; every search / detail /
  *  list / POST answer is checked field by field (oracle: expected.exclusions).
- *  Then Comptabilité (include_non_declared absent = exclusions on) must drop every
+ *  Then Comptabilité (include_non_declared=false = exclusions on) must drop every
  *  product they touch, while its « produits spéciaux » checkbox and the Rapport
  *  still show everything. Last test reintegrates all three from the UI.
  *  Serial: each test needs the one before. afterAll cleans up if one fails. */
@@ -28,7 +28,7 @@ const scenario = (): Row => expected().exclusions;
 async function openPs(page: Page, tab?: "Bons de livraison" | "Fournisseurs"): Promise<void> {
   await page.goto("/produits-speciaux");
   await expect(page.getByRole("heading", { level: 1, name: "Produits spéciaux", exact: true })).toBeVisible();
-  if (tab) await page.getByRole("button", { name: tab, exact: true }).click();
+  if (tab) await page.getByRole("tab", { name: tab, exact: true }).click();
 }
 
 
@@ -152,7 +152,7 @@ test("comptabilité : les 3 exclusions retirent leurs produits (KPI + journal)",
   const ledger = pageCall(page, "/ventes", { ...period(w), page: "1", limit: "25", include_non_declared: "false" });
   for (const [i, { ct, label }] of CATEGORY_TYPES.entries()) {
     await test.step(label, async () => {
-      const stats = pageCall(page, "/stats", { ...period(w), category_type: ct, include_non_declared: null });
+      const stats = pageCall(page, "/stats", { ...period(w), category_type: ct, include_non_declared: "false" });
       if (i === 0) await setPeriod(page, w.date_from, w.date_to);
       else await pickCategoryType(page, label);
       checkStats(await stats, ct, x.stats[ct]);
@@ -162,7 +162,7 @@ test("comptabilité : les 3 exclusions retirent leurs produits (KPI + journal)",
 
   await test.step("case « produits spéciaux » : tout revient", async () => {
     const stats = pageCall(page, "/stats", { ...period(w), category_type: "parapharmacie", include_non_declared: "true" });
-    const full = pageCall(page, "/ventes", { ...period(w), page: "1", limit: "25", include_non_declared: null });
+    const full = pageCall(page, "/ventes", { ...period(w), page: "1", limit: "25", include_non_declared: "true" });
     await page.getByRole("checkbox", { name: "Inclure les produits spéciaux dans les KPI" }).check();
     checkStats(await stats, "parapharmacie");
     checkLedgerPage("ventes", await full, expected().ventes_list, 1, 25);
@@ -192,7 +192,7 @@ test("réintégrer produit, BL et fournisseur → comptabilité complète", asyn
   });
 
   await test.step("BL (bouton de la ligne)", async () => {
-    await page.getByRole("button", { name: "Bons de livraison", exact: true }).click();
+    await page.getByRole("tab", { name: "Bons de livraison", exact: true }).click();
     const posted = pageSend(page, "POST", "/bl-exclusions/reintegrate");
     const list = pageCall(page, "/bl-exclusions/");
     await page.getByRole("button", { name: "Réintégrer", exact: true }).click();
@@ -201,7 +201,7 @@ test("réintégrer produit, BL et fournisseur → comptabilité complète", asyn
   });
 
   await test.step("fournisseur (bouton de la ligne)", async () => {
-    await page.getByRole("button", { name: "Fournisseurs", exact: true }).click();
+    await page.getByRole("tab", { name: "Fournisseurs", exact: true }).click();
     const posted = pageSend(page, "POST", "/supplier-exclusions/reintegrate");
     const list = pageCall(page, "/supplier-exclusions/");
     await page.getByRole("button", { name: "Réintégrer", exact: true }).click();

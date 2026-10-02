@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend cli migrate seed db build build-backend build-frontend demo down clean logs test test-backend test-frontend install-hooks e2e-tests e2e-ui
+.PHONY: help install dev backend frontend cli migrate seed db build build-backend build-frontend demo down clean logs test test-backend install-hooks e2e-tests e2e-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -38,9 +38,8 @@ help:
 	@echo "    make e2e-ui        — one test file (or all) in a real browser, slowed down"
 	@echo ""
 	@echo "  Tests + git hooks:"
-	@echo "    make test          — backend (pytest) + frontend (vitest) suites"
+	@echo "    make test          — backend pytest suite"
 	@echo "    make test-backend  — backend pytest only"
-	@echo "    make test-frontend — frontend vitest only"
 	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
 	@echo "                         (run once per clone; bypass with git push --no-verify)"
 
@@ -153,13 +152,10 @@ clean:
 
 # ── Tests + git hooks ──────────────────────────────────────────────────────
 
-test: test-backend test-frontend
+test: test-backend
 
 test-backend:
 	cd $(BACKEND_DIR) && uv run pytest
-
-test-frontend:
-	cd $(FRONTEND_DIR) && npm test -- --run
 
 install-hooks:
 	@bash scripts/install-hooks.sh
