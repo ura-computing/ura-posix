@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Navigate, Outlet, useLocation, NavLink, Link, useNavigate } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
@@ -40,6 +40,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
 import { QUERIES } from "@/api/queries";
+import { Skeleton } from "./Skeleton";
 import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
@@ -668,10 +669,25 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobile={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-auto p-7">
-          <Outlet />
+          {/* Pages load on first visit (App.tsx lazy): sidebar + header stay meanwhile. */}
+          <Suspense fallback={<PageLoading />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <UploadProgressWidget />
+    </div>
+  );
+}
+
+
+/** Placeholder while a page's code downloads (first visit only): page title + body. */
+function PageLoading() {
+  return (
+    <div className="flex flex-col gap-5">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-28 w-full" />
+      <Skeleton className="h-72 w-full" />
     </div>
   );
 }

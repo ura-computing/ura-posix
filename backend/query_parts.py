@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import case as sa_case, func
+from sqlalchemy import case as sa_case, func, or_, select
 from sqlalchemy.orm import Session
 
 from exclusions import achat_filter, vente_filter
@@ -36,10 +36,18 @@ def pharma_expr():
 def category_filter(category_type: str) -> list:
     """Mixte / Pharmacie / Parapharmacie segment → WHERE clauses (caller joins Medicament)."""
     if category_type == "pharmacie":
-        return [pharma_expr() == True]  # noqa: E712
+        return [Medicament.id.in_(_product_ids(pharma=True))]
     if category_type == "parapharmacie":
-        return [pharma_expr() == False]  # noqa: E712
+        # A sale with no product counts as parapharmacie (pharma_expr()'s else branch).
+        return [or_(Medicament.id.is_(None), Medicament.id.in_(_product_ids(pharma=False)))]
     return []
+
+
+def _product_ids(pharma: bool):
+    """Ids of the pharmacie (or parapharmacie) products. Classifies the ~400 products
+    once, instead of running pharma_expr() on each of the 100k joined sale lines.
+    correlate(None): its own `medicaments` scan, not tied to the outer query's row."""
+    return select(Medicament.id).where(pharma_expr() == pharma).correlate(None)
 
 
 def ca_sum():

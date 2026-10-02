@@ -277,7 +277,7 @@ Single process (no workers) — every tenant shares one connection pool.
 | `auth.py` | `POST /auth/login`, `GET/PATCH /auth/me`, `POST /auth/change-password`, `/auth/logout`, `/auth/forgot-password`, `GET /auth/validate-token`, `POST /auth/set-password`; `GET /sessions`, `DELETE /sessions/{id}`, `POST /sessions/revoke-others` | cookie |
 | `stats.py` | `GET /stats` (Rapport + Comptabilité), `/stats/margin-alerts`, `/stats/ventes-sans-achat`, `/stats/stock-summary`, `/stats/stock-abcd`, `/stats/peremptions`, `/stats/analyse-marge?mode=…`, `POST /stats/analyse-liste`; admin: `GET /admin/stats` (system tiles), `/admin/pharmacy/{id}/stats`, `…/margin-alerts`, `…/stock-summary`, `…/analyse-marge` | rapports / alertes / stock / analyse; admin |
 | `transactions.py` | `GET /ventes`, `/ventes/categories`, `/ventes/tva-rates`, `/ventes/suggestions`, `/ventes/surveillance-counts`, `/ventes/discount-summary`; `GET /achats`, `/achats/categories`, `/achats/tva-rates`, `/achats/suggestions`, `/achats/supplier-summary` | ventes / achats |
-| `imports.py` | `POST /uploads/achat-json`, `/uploads/vente-json`, `/uploads/stock-json` (500-row chunks), `PATCH /uploads/batches/{id}` (cancel = undo), `POST /uploads/catalog` (admin, multipart); `GET /data/imports`, `DELETE /data/imports/{id}` (soft delete + removes the rows) | import + type feature |
+| `imports.py` | `POST /uploads/achat-json`, `/uploads/vente-json`, `/uploads/stock-json` (2000-row chunks), `PATCH /uploads/batches/{id}` (cancel = undo), `POST /uploads/catalog` (admin, multipart); `GET /data/imports`, `DELETE /data/imports/{id}` (soft delete + removes the rows) | import + type feature |
 | `accounting.py` | `GET/POST /accounting/payments` (upsert by month+method), `DELETE /accounting/payments/{id}` | accounting |
 | `exclusions.py` | `GET/POST /special-products/`, `POST …/reintegrate`, `GET …/suggestions`; `GET/POST /bl-exclusions/`, `GET …/search`, `GET …/detail`, `POST …/reintegrate`; `GET/POST /supplier-exclusions/`, `GET …/search`, `POST …/reintegrate` | special_products |
 | `owner_employees.py` | `GET/POST /owner/employees`, `PUT …/{id}/permissions`, `PATCH …/{id}/status`, `POST …/{id}/reset-password`, `DELETE …/{id}` | owner |
@@ -306,7 +306,7 @@ Conventions: routes return plain dicts / Pydantic models from `schemas/`; errors
 ### 4.7 Import pipeline
 1. Browser parses the Sobrus CSV (`utils/csv.ts`), validates the filename
    (`Sobrus - Achats|Ventes YYYY-MM-DD - YYYY-MM-DD.csv`, `Sobrus - Stock YYYYMMDD.csv`).
-2. `UploadContext` queues files (FIFO, one at a time) and POSTs **500-row chunks** to
+2. `UploadContext` queues files (FIFO, one at a time) and POSTs **2000-row chunks** to
    `/uploads/{achat|vente|stock}-json`. Chunk 1 creates the `import_batch`; later chunks pass
    `batch_id`.
 3. Backend (`_insert_transactions` / `_insert_stock`): resolves PIDs to `medicaments` in one query
@@ -463,16 +463,15 @@ real UI, and compare **every field of every API response** with those answers.
 ### 7.1 Run
 - `make e2e-tests` — headless, every spec. Asks: rows to generate (default 100 000, **min 1 000**),
   "Record a new speed baseline? (y/n)".
-- `make e2e-ui` — Playwright UI mode: one window (test list, live view, step through every action;
-  nothing pops over your other windows). Asks: rows, test file (`06`, `ventes`, or `all`). The
-  setup specs (01, 02) always run first.
+- `make e2e-ui` — a real maximized browser plays the tests, slowed down (`slowMo` 250 ms).
+  Asks: rows, test file (`06`, `ventes`, or `all`). The setup specs (01, 02) always run first.
 - First run installs Playwright + Chromium by itself.
 
 ### 7.2 What happens (`e2e/playwright.config.ts`, `e2e/scripts/`)
 1. `start-backend.sh`: `resources/tests/generate.py --rows N` → drops/creates DB `apcm_e2e` →
    `bootstrap.py` + `seed.py` with `SEED_CATALOG=0`, `MAIL_USERNAME=""`, `RATE_LIMIT=0` → uvicorn
    **:8001** (log: `e2e/.logs/backend.log`, where magic links land).
-2. Vite on **:5174** with `VITE_BACKEND_URL=http://localhost:8001`.
+2. Frontend **production build** (`tsc -b && vite build` into `e2e/dist`, type errors fail the run) served by `vite preview` on **:5174**, built with `VITE_BACKEND_URL=http://localhost:8001`.
 3. One worker, specs in file order; each spec reuses saved logins (`e2e/.state/*.json`).
 
 ### 7.3 Test data + oracle (`resources/tests/`)
@@ -531,6 +530,9 @@ Production = **3 parts** on DigitalOcean: the **backend** app, the **frontend** 
 | Frontend | `frontend/Dockerfile` | `VITE_BACKEND_URL` is read at **build time** (`frontend/.env.example`) |
 | Database | DO managed Postgres **17** | `DATABASE_URL` of the backend points to it |
 
+- Backend: `WEB_CONCURRENCY` = number of uvicorn processes (default 2; ~150 MB each). The login rate limit
+  counts per process until Valkey (`PLAN.md` B3). Answers > 1 kB are gzipped (`main.py`).
+- Once on the managed DB: `CREATE EXTENSION pg_stat_statements;` → `SELECT query, mean_exec_time, calls FROM pg_stat_statements ORDER BY mean_exec_time DESC LIMIT 20;` lists the slowest real queries.
 - Set every var from `backend/.env.example` on the backend (`COOKIE_SECURE=true`, real `JWT_SECRET`,
   `FRONTEND_URL` = the deployed frontend origin, SMTP). Never set `RATE_LIMIT=0` there.
 - The exact DO app spec (domains, sizes) is **not in the repo** — ask the owner.

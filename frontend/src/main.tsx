@@ -110,6 +110,15 @@ function AppToaster() {
   );
 }
 
+// After a deploy, an open tab asks for page files that no longer exist (new
+// hashed names): reload once per tab to get the new version instead of a blank page.
+window.addEventListener("vite:preloadError", (event) => {
+  if (sessionStorage.getItem("reloadedAfterDeploy")) return;   // reloaded already: show the error
+  event.preventDefault();
+  sessionStorage.setItem("reloadedAfterDeploy", "1");
+  window.location.reload();
+});
+
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: toastError }),
   mutationCache: new MutationCache({

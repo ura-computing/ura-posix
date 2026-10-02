@@ -7,11 +7,14 @@
  *
  *  Ports 8001 / 5174 keep the dev servers (8000 / 5173) untouched.
  *    make e2e-tests  headless, every test (pre-push)
- *    make e2e-ui     Playwright UI mode: one window, watch / step through each test
+ *    make e2e-ui     a real browser plays one test file (or all), slowed down
  */
 import { defineConfig } from "@playwright/test";
 
 import { API, WEB } from "./lib/paths";
+
+/** Set by `make e2e-ui`: maximized window, page fills it. Headless keeps a fixed size. */
+const HEADED = process.env.E2E_HEADED === "1";
 
 export default defineConfig({
   testDir: "./tests",
@@ -23,9 +26,13 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   use: {
     baseURL: WEB,
-    viewport: { width: 1920, height: 1080 },
+    viewport: HEADED ? null : { width: 1920, height: 1080 },
     actionTimeout: 15_000,            // a missing button fails in 15 s, not after the 20-min test timeout
     navigationTimeout: 30_000,
+    launchOptions: {
+      slowMo: Number(process.env.E2E_SLOWMO ?? 0),                    // make e2e-ui: slow enough to follow
+      args: HEADED ? ["--start-maximized"] : [],
+    },
     locale: "fr-FR",
     timezoneId: "Africa/Casablanca",
     trace: "on",
@@ -47,10 +54,11 @@ export default defineConfig({
       stdout: "pipe",
     },
     {
-      command: "npm --prefix ../frontend run dev -- --port 5174 --strictPort",
+      // Production build (= what DigitalOcean serves); VITE_BACKEND_URL is read at build time.
+      command: "npm --prefix ../frontend run build -- --outDir ../e2e/dist --emptyOutDir && npm --prefix ../frontend run preview -- --outDir ../e2e/dist --port 5174 --strictPort",
       url: WEB,
       env: { VITE_BACKEND_URL: API },
-      timeout: 2 * 60_000,
+      timeout: 5 * 60_000,
       reuseExistingServer: false,
     },
   ],

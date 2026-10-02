@@ -111,6 +111,11 @@ def _suffix_map(db: Session) -> dict[str, tuple[str, str | None]]:
     }
 
 
+def _meds_by_id(db: Session, ids: set[int]) -> dict[int, Medicament]:
+    """The medicaments of a result page / export, by id, in one query."""
+    return {m.id: m for m in db.query(Medicament).filter(Medicament.id.in_(ids))} if ids else {}
+
+
 def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None,
                  *, include_non_declared: bool = True):
     """Weighted avg purchase price per medicament over the window. Used by both
@@ -283,16 +288,13 @@ def list_achats(
                                        "pph": Medicament.pph})
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
-    # Bulk-load medicaments into the session identity map so _achat_to_row's
-    # per-row db.get() returns from cache instead of issuing N queries.
-    med_ids = {a.medicament_id for a in rows if a.medicament_id}
-    if med_ids:
-        db.query(Medicament).filter(Medicament.id.in_(med_ids)).all()
-
+    # One query for the medicaments, kept in a dict: the session's identity map
+    # is weak, so a db.get() per row re-queried each one (45k queries on export).
+    meds = _meds_by_id(db, {a.medicament_id for a in rows if a.medicament_id})
     suffixes = _suffix_map(db)
     pagination_size = max(total, 1) if export else limit
     return {
-        "data": [_achat_to_row(db, a, suffixes) for a in rows],
+        "data": [_achat_to_row(a, meds.get(a.medicament_id), suffixes) for a in rows],
         "pagination": paginate(total, 1 if export else page, pagination_size),
         "summary": AchatsSummary(
             rows_total=total,
@@ -302,8 +304,7 @@ def list_achats(
     }
 
 
-def _achat_to_row(db: Session, a: Achat, suffixes: dict[str, tuple[str, str | None]]) -> AchatRow:
-    med = db.get(Medicament, a.medicament_id) if a.medicament_id else None
+def _achat_to_row(a: Achat, med: Medicament | None, suffixes: dict[str, tuple[str, str | None]]) -> AchatRow:
     category = med.category if med else None
     suffix, color = suffixes.get(suffix_key(category), ("", None))
     ref = a.delivery_ref or ""
@@ -500,12 +501,12 @@ def list_ventes(
     sorted_q = _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id", extra_cols=vente_extra_sort)
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
-    # Bulk-load medicaments + compute avg_pu_map for the result set (covers
-    # both paginated and full-export paths — avoids N+1 in _vente_to_row).
-    med_ids = [v.medicament_id for v in rows if v.medicament_id]
+    # Medicaments (dict, one query) + avg_pu_map for the result set, same for
+    # the paginated and the full-export paths (no query per row).
+    med_ids = {v.medicament_id for v in rows if v.medicament_id}
+    meds = _meds_by_id(db, med_ids)
     avg_pu_map: dict[int, float] = {}
     if med_ids:
-        db.query(Medicament).filter(Medicament.id.in_(med_ids)).all()
         sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to,
                            include_non_declared=include_non_declared)
         for row in db.query(sub.c.med_id, sub.c.avg_pu).filter(sub.c.med_id.in_(med_ids)).all():
@@ -515,7 +516,7 @@ def list_ventes(
     suffixes = _suffix_map(db)
     pagination_size = max(total, 1) if export else limit
     return {
-        "data": [_vente_to_row(db, v, suffixes, avg_pu_map) for v in rows],
+        "data": [_vente_to_row(v, meds.get(v.medicament_id), suffixes, avg_pu_map) for v in rows],
         "pagination": paginate(total, 1 if export else page, pagination_size),
         "summary": VentesSummary(
             rows_total=total,
@@ -526,11 +527,10 @@ def list_ventes(
 
 
 def _vente_to_row(
-    db: Session, v: Vente,
+    v: Vente, med: Medicament | None,
     suffixes: dict[str, tuple[str, str | None]],
     avg_pu_map: dict[int, float],
 ) -> VenteRow:
-    med = db.get(Medicament, v.medicament_id) if v.medicament_id else None
     category = med.category if med else None
     suffix, color = suffixes.get(suffix_key(category), ("", None))
     ref = v.transaction_ref or ""

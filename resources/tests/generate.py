@@ -12,7 +12,7 @@ Outputs (git-ignored, regenerated on every run):
     resources/tests/stock/Sobrus - Stock <yyyymmdd>.csv
     resources/tests/liste/liste.csv                    (Analyses → Liste mode)
     resources/tests/catalog/catalog.csv                (admin catalogue import: 5 new products)
-    resources/tests/extra/Sobrus - Achats <d> - <d>.csv (600 extra lines: import then cancel / delete)
+    resources/tests/extra/Sobrus - Achats <d> - <d>.csv (2400 extra lines: import then cancel / delete)
     resources/tests/expected.json                      (oracle.py: every value, field by field)
 
 Data design (keeps expected values exact and unambiguous):
@@ -232,15 +232,15 @@ def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
 
 
 def make_extra_achats(rng: random.Random, products: list[Product], day: date) -> list[Achat]:
-    """Imports spec: 600 lines (= 2 chunks of 500) of known products at their own
+    """Imports spec: 2400 lines (= 2 chunks of 2000) of known products at their own
     PPH / PPV, on new BL refs. The test cancels one upload and deletes another,
     so no number of the app changes."""
     bought = [p for p in products if p.supplier]
     lines: list[Achat] = []
     bl = 0
-    while len(lines) < 600:
+    while len(lines) < 2400:
         bl += 1
-        for p in rng.sample(bought, min(10, 600 - len(lines))):   # distinct per BL
+        for p in rng.sample(bought, min(10, 2400 - len(lines))):   # distinct per BL
             qty = rng.randint(1, 5)
             lines.append(Achat(len(lines), day, f"{day} 10:00:00", f"E2E-EXTRA-{bl:03d}",
                                p.supplier, p, qty, p.pph, round(qty * p.pph, 2)))

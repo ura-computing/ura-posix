@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any, Callable
 
 from fastapi import APIRouter, File, Path, Query, status, UploadFile
-from sqlalchemy import desc, func, or_
+from sqlalchemy import desc, func, or_, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import aliased, Query as OrmQuery, Session
 
@@ -326,7 +326,9 @@ def _insert_transactions(
             existing.add((ref, med_id))
 
     if to_insert:
-        db.bulk_insert_mappings(cfg.model, to_insert)
+        # render_nulls: one INSERT shape for every row. Without it, rows with
+        # different empty columns got their own statement (107 INSERTs per 500 rows).
+        db.bulk_insert_mappings(cfg.model, to_insert, render_nulls=True)
 
     inserted = len(to_insert)
     skipped = skipped_no_pid + skipped_no_med + skipped_dup
@@ -525,6 +527,19 @@ def upload_stock_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("
 
 # ─── PATCH batch status (cancel) ─────────────────────────────────────────────
 
+_TABLES = {"achat": Achat.__tablename__, "vente": Vente.__tablename__, "stock": PharmacyStock.__tablename__}
+
+
+def _analyze(db: Session, file_type: str) -> None:
+    """Fresh table statistics right after an import / undo. Without them Postgres
+    plans the first Rapport queries blind until autoanalyze runs (~1 min later):
+    100k ventes → /stats 39 s instead of 0.5 s."""
+    table = _TABLES.get(file_type)
+    if table:
+        db.execute(text(f"ANALYZE {table}"))
+        db.commit()
+
+
 @router.patch("/uploads/batches/{batch_id}")
 def patch_batch_status(
     batch_id: Annotated[int, Path(ge=1)],
@@ -541,6 +556,7 @@ def patch_batch_status(
       already gone and there's nothing to roll back.
     - `status="error"`: same audit-only flip + carry the error_message. Rows
       already inserted stay (the failing chunk was likely network-side, not data-side).
+    - `status="success"`: sent once after the last chunk → refresh table statistics.
     """
     if body.status not in ALLOWED_STATUSES:
         raise ApiError(
@@ -570,6 +586,8 @@ def patch_batch_status(
     if body.error_message is not None:
         batch.error_message = body.error_message
     db.commit()
+    if body.status in ("success", "cancelled"):
+        _analyze(db, batch.file_type)
     return {
         "id":             batch.id,
         "status":         batch.status,
@@ -714,4 +732,5 @@ def delete_import(
     batch.deleted_at = datetime.now(timezone.utc)
     batch.deleted_by_user_id = user.id
     db.commit()
+    _analyze(db, batch.file_type)
     return {"id": batch_id, "deleted_rows": deleted_rows, "file_type": batch.file_type}

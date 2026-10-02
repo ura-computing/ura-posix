@@ -1,5 +1,5 @@
 /** The owner imports the 3 huge generated files through /upload-file, exactly
- *  like a user (browser parses the CSV, sends 500-row chunks). Checks the
+ *  like a user (browser parses the CSV, sends 2000-row chunks). Checks the
  *  inserted / skipped / new-product counts against the oracle and records the
  *  total import time as a `FLOW import/<kind>` entry for the speed gate. */
 import { resolve } from "node:path";
@@ -28,7 +28,7 @@ test.describe("imports", () => {
 
   for (const { kind, type } of KINDS) {
     test(`import ${kind}`, async ({ page }) => {
-      test.setTimeout(20 * 60_000);   // huge files go through the browser in 500-row chunks
+      test.setTimeout(20 * 60_000);   // huge files go through the browser in 2000-row chunks
       const want = expected().import[kind];
       const file = resolve(REPO_DIR, expected().files[kind].path);
 

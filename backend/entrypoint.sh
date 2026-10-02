@@ -57,4 +57,6 @@ fi
 
 # 5. Serve.
 echo "▸ Starting uvicorn on :${PORT:-8000}"
-exec uv run uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# WEB_CONCURRENCY processes (default 2): CPU-heavy requests (exports, imports) run in
+# parallel instead of sharing one Python process. Login rate limit counts per process.
+exec uv run uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers "${WEB_CONCURRENCY:-2}"

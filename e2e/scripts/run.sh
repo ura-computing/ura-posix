@@ -36,7 +36,8 @@ if [ "$MODE" = ui ]; then
     [ -z "$match" ] && { echo "✗ no test file matches \"$spec\""; ls tests; exit 1; }
     args+=("$match")
   fi
-  args+=(--ui)                          # Playwright UI mode: one window, live view, step through
+  export E2E_HEADED=1 E2E_SLOWMO=250
+  args+=(--headed)
 else
   [ "$(ask "Record a new speed baseline? (y/n)" n)" = y ] && export E2E_UPDATE_BASELINE=1
 fi

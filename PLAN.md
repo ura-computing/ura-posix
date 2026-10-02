@@ -23,7 +23,6 @@ if budget is left; §4 (E2E every page) next budget.
 
 | What | Where |
 |---|---|
-| T0: `make e2e-ui` = Playwright **UI mode** (one window: test list, live view, time travel, re-run one test; nothing pops over your other windows) — confirm on your next UI run | `e2e/scripts/run.sh` |
 
 ---
 
@@ -36,14 +35,7 @@ statistics. Cause: fresh tables have no statistics until autoanalyze (~1 min lat
 
 | # | Step | Example |
 |---|---|---|
-| S1 | **E2E runs the production build** (= what DigitalOcean runs): `npm --prefix ../frontend run build -- --outDir ../e2e/dist && npm --prefix ../frontend run preview -- --outDir ../e2e/dist --port 5174 --strictPort` in `playwright.config.ts` (timeout 5 min); `tsc -b` errors fail the run; re-record the baseline | `frontend/dist` untouched (`e2e/dist` git-ignored) |
-| S2 | **Pages loaded on demand.** `React.lazy` per route + one `<Suspense>` inside the layout (sidebar stays) | first visit downloads 1 page, not all 25 |
-| S3 | **ANALYZE after import.** The frontend sends a final « import finished » call after the last chunk; the backend sets the batch to `success` (fixes B6) and runs `ANALYZE` on the touched tables. Same after import cancel / delete | Rapport right after a 100k import: 39 s → ~0.5 s |
-| S4 | **Faster export (ventes + achats).** One SQL join (lines ⋈ medicaments, only needed columns) instead of `IN (45k ids)` ×2 + `db.get` per row; `suffix_key` cached per category (hash map); plain dicts (no double validation). Then the server writes the `.xlsx` (xlsxwriter, streaming, French headers) and the browser only downloads it; E2E reads the file (`downloadXlsx`) | ventes export 13.3 s → target < 3 s |
-| S5 | **Rapport: one call + cache + prefetch.** (a) `GET /stats/rapport` returns stats + margin alerts + stock summary + Optimisation gain, sharing filters / exclusion subqueries; admin drill-down same. (b) Cache per pharmacy keyed by a **data version**, bumped on import, import cancel / delete, exclusion, catalogue and suffix changes (numbers only change then; see B7). In-process dict now, Valkey later (§3). (c) Prefetch the Rapport right after login | first load: 5 requests → 1; second visit → served from cache |
 | S6 | **Daily pre-aggregates.** Table `daily_sales(pharmacy_id, date, medicament_id, qty, ca)` refreshed after each import (only the touched dates); Rapport trend, Analyses mois / année read it instead of every sale line | 100k lines → ~365 rows per product-year |
-| S7 | **Faster imports.** Bigger chunks (500 → 5 000 rows) and Postgres `COPY` into a temp table, then one `INSERT … SELECT … ON CONFLICT DO NOTHING` (also fixes B5) | 20 000 rows: 40 requests × ~15 queries → 4 requests |
-| S8 | **Decide from numbers:** `/stats` on the whole history (first load, no dates) still slow → profile `build_stats_payload` (`stats_queries.py`); Q3 | — |
 
 ---
 
@@ -53,12 +45,10 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 | When | Tool | What it gives | Watch out |
 |---|---|---|---|
-| Now | `GZipMiddleware` (FastAPI) | JSON 5–10× smaller on the wire (45k-row export, Rapport) | none |
-| Now | `pg_stat_statements` (DO managed Postgres supports it) | list of the slowest real queries in production | read-only, no app change |
-| Now | `uvicorn --workers 2–4` | several requests at once (one slow export no longer blocks the others) | the login rate limit counts per worker (B3) until Valkey |
-| Now | `ORJSONResponse` | faster JSON encoding of big lists | same JSON output (oracle checks it) |
-| Now | Frontend as an App Platform **static site** | served from DO's CDN; hashed assets cached 1 year, `index.html` never cached | needs S2 for small chunks |
-| Later | **Valkey** (DO Managed Caching; open-source Redis fork) | shared cache (S5) + shared rate limit (B3) + job queue for all workers | one more paid DO part |
+| Now (DO console, once) | `pg_stat_statements`: `CREATE EXTENSION pg_stat_statements;` on the managed DB | list of the slowest real queries in production | read-only, no app change |
+| Now (DO console) | Frontend as an App Platform **static site** (build `npm run build`, output `dist`, catch-all → `index.html`) | served from DO's CDN; hashed assets cached 1 year, `index.html` never cached | needs S2 for small chunks |
+| Later | Rapport server cache keyed by a data version (bumped on import, exclusion, catalogue change) | repeat visits only; first view after an import stays the same | add only if `/stats` is still a problem in production (`pg_stat_statements`) |
+| Later | **Valkey** (DO Managed Caching; open-source Redis fork) | shared Rapport cache + shared rate limit (B3) + job queue for all workers | one more paid DO part |
 | Later | **RQ worker** (Python job queue on Valkey) | imports / exports run off the request path (B4); the page polls the status | one more DO component |
 | Later | **PgBouncer** (DO connection pools) | many workers without hitting the DB connection limit | needed once workers × instances × 30 > DB limit |
 | Later | Read replica (DO managed Postgres) | Rapport / Analyses read from it, imports write to the primary | only if DB CPU is high (see `pg_stat_statements`) |
@@ -151,7 +141,7 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 | `catalog/` | routers + schemas `catalog` |
 | `imports/` | routers + schemas `imports`, Sobrus parsing from `csv_parse` |
 | `ledger/` | routers + schemas `transactions` |
-| `stats/` | routers + schemas `stats`, `stats_queries`, `analyse_queries`, `stock_queries`, `query_parts` (+ S5 cache, S6 pre-aggregates) |
+| `stats/` | routers + schemas `stats`, `stats_queries`, `analyse_queries`, `stock_queries`, `query_parts` (+ Rapport cache, S6 pre-aggregates) |
 | `exclusions/` | routers + schemas `exclusions`, `exclusions.py` → `service.py` |
 | `accounting/` | routers + schemas `accounting` |
 | `store_website/` | routers + schemas `store_website` |
@@ -180,7 +170,7 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 | B3 | In-memory rate limit (`rate_limit.py`) | 2 workers → login limit 10/min instead of 5 → `Limiter(storage_uri=<Valkey URL>)` |
 | B4 | Blocking catalogue upload: `async def upload_catalog` runs sync SQLAlchemy (`routers/imports.py`) | pharmacy A uploads a 50 MB CSV → pharmacy B's Rapport waits → plain `def`, or the RQ worker |
 | B5 | Race on a new product insert | 2 chunks insert PID 12345 at once → UniqueViolation → 500 → `ON CONFLICT (pid) DO NOTHING` + re-select (S7) |
-| B6 | Batch set to `success` after **every** chunk (`routers/imports.py`) | browser closed after chunk 1/40 → batch « success » with 500 of 20 000 rows → final call (S3) |
+| B6 | Batch set to `success` after **every** chunk (`routers/imports.py`) | browser closed after chunk 1/40 → batch « success » with 500 of 20 000 rows → chunks keep `in_progress`, the final `success` PATCH (S3) closes the batch |
 | B7 | CA = `qty × Medicament.ppv`, and `ppv` is global and mutable | January sold 100 × 15.00 = 1 500; June import sets PPV 16.50 → January becomes 1 650 for every pharmacy → every cache is cleared on catalogue edits |
 | B8 | `Vente.date`, `Achat.delivery_date` are text (`models.py`) | `cast(date as Date)` can't use the index; « 15/01/2024 » → 500 → real `DATE` columns |
 | B9 | `date.today()` uses the server timezone (`*_queries.py`) | server UTC, pharmacy at 00:30 Casablanca → « today » is yesterday → `TZ=Africa/Casablanca` in every service |
@@ -191,7 +181,7 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 
 | What | Notes |
 |---|---|
-| Microservices: ingestion + analytics | each = move one §6 folder out; blockers §7; S5 cache moves to Valkey |
+| Microservices: ingestion + analytics | each = move one §6 folder out; blockers §7; Rapport cache moves to Valkey |
 | « Ma boutique en ligne » | hidden; add its E2E specs the day it is shown (allowlisted in `99-gates.spec.ts`) |
 
 ---
@@ -202,4 +192,4 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 |---|---|---|
 | Q1 | Average PU: some places skip purchase lines with no price or qty ≤ 0 (ventes ledger, stock, top categories, analyse produit), others keep them (Rapport marge, margin alerts, analyse catégorie). Same filter everywhere? Locked formula | qty 5, PU empty kept → Σqty 15 instead of 10 → avg PU lower. Test data has no such line today |
 | Q2 | Admin drill-down margin alerts + stock summary (G8): show them in the drill-down, or delete the 2 routes? | `GET /admin/pharmacy/{id}/stats/margin-alerts` |
-| Q3 | Rapport first load without dates = whole history. Keep, or default to the last 12 months? | decide after S5 |
+| Q3 | Rapport first load without dates = whole history. Keep, or default to the last 12 months? | /stats on the whole history ≈ 0.2 s now (S5) |

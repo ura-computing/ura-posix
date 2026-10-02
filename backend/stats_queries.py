@@ -24,7 +24,7 @@ from sqlalchemy import Date, func
 from sqlalchemy.orm import Session
 
 from models import Achat, Medicament, PharmacyStock, Vente
-from query_parts import Filters, avg_pu_subquery, ca_sum, category_filter
+from query_parts import Filters, avg_pu_subquery, ca_sum, category_filter, pharma_expr
 
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
@@ -304,21 +304,26 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     # Marge (weighted, windowed, PG-013 + PG-007 safe)
     marge = marge_for_window(db, base_filter_v, base_filter_a, cat_filter_v)
 
-    # CA breakdown: Pharmacie vs Parapharmacie (always reported, regardless of cat filter)
-    pharm_total = (
-        db.query(ca_sum())
+    # CA breakdown: Pharmacie vs Parapharmacie (always reported, regardless of cat filter).
+    # Sum per product first, then classify the products (~400), not every sale line:
+    # pharma_expr() per line cost 2 × 100 ms at 100k lines.
+    per_med = (
+        db.query(Vente.medicament_id.label("med_id"), ca_sum().label("ca"))
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
-        .filter(*category_filter("pharmacie"))
-        .scalar() or 0
+        .group_by(Vente.medicament_id)
+        .subquery()
     )
-    para_total = (
-        db.query(ca_sum())
-        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
-        .filter(*base_filter_v)
-        .filter(*category_filter("parapharmacie"))
-        .scalar() or 0
+    is_pharma = pharma_expr().label("is_pharma")
+    split = dict(
+        db.query(is_pharma, func.sum(per_med.c.ca))
+        .select_from(per_med)
+        .outerjoin(Medicament, per_med.c.med_id == Medicament.id)
+        .group_by(is_pharma)
+        .all()
     )
+    pharm_total = split.get(True) or 0
+    para_total = split.get(False) or 0
 
     return {
         "advanced_kpis": advanced_kpis,

@@ -1,5 +1,5 @@
 /** Gestion des imports (owner). The 3 setup imports are listed with their
- *  counts. An extra achats file (600 lines = 2 chunks, known products on new
+ *  counts. An extra achats file (2400 lines = 2 chunks of 2000, known products on new
  *  BLs) is cancelled after its first chunk (PATCH batch → its rows removed),
  *  imported again, then deleted from the list (DELETE → rows removed). After
  *  both undos the Rapport and the achats list still equal the oracle. An import
@@ -66,8 +66,8 @@ test("annuler un import en cours : les lignes déjà importées sont retirées",
   release();
 
   const c1 = await (await chunk1).json();
-  expect(c1.inserted, "lot 1").toBe(500);
-  expectSame(await patched, { id: c1.batch_id, status: "cancelled", error_message: null, deleted_rows: 500 },
+  expect(c1.inserted, "lot 1").toBe(2000);
+  expectSame(await patched, { id: c1.batch_id, status: "cancelled", error_message: null, deleted_rows: 2000 },
     "PATCH /uploads/batches");
   await expect(page.getByRole("heading", { name: "Import annulé" })).toBeVisible();
   saveState({ cancelledBatch: c1.batch_id });
@@ -87,7 +87,7 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   await page.getByRole("button", { name: "Importer dans la base" }).click();
   const outcome = page.getByRole("heading", { level: 3, name: /lignes importées$|^Erreur d'importation$|^Import annulé$/ });
   await expect(outcome).toBeVisible({ timeout: 5 * 60_000 });
-  expect((await outcome.textContent())?.replace(/\D/g, ""), "lignes importées").toBe("600");
+  expect((await outcome.textContent())?.replace(/\D/g, ""), "lignes importées").toBe("2400");
   const refetch = pageCall(page, "/stats/analyse-marge");
   await sidebar.getByRole("link", { name: "Analyses", exact: true }).click();
   await refetch;                     // no request = stale numbers shown after the import
@@ -99,14 +99,14 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   const done = extra.find((r: Row) => r.status === "success");
   expectSame(cancelled, { id: loadState().cancelledBatch, file_type: "achat", rows_inserted: 0, rows_skipped: 0, deleted_at: null },
     "import annulé dans la liste");
-  expectSame(done, { file_type: "achat", rows_inserted: 600, rows_skipped: 0, deleted_at: null }, "réimport dans la liste");
+  expectSame(done, { file_type: "achat", rows_inserted: 2400, rows_skipped: 0, deleted_at: null }, "réimport dans la liste");
 
   await page.getByRole("row").filter({ hasText: extraName() }).filter({ hasText: "Réussi" })
     .getByRole("button", { name: "Supprimer" }).click();
   const deleted = pageSend(page, "DELETE", `/data/imports/${done.id}`);
   const list2 = pageCall(page, "/data/imports");
   await page.getByRole("dialog", { name: "Supprimer cet import ?" }).getByRole("button", { name: "Supprimer", exact: true }).click();
-  expect(await deleted, "DELETE /data/imports").toEqual({ id: done.id, deleted_rows: 600, file_type: "achat" });
+  expect(await deleted, "DELETE /data/imports").toEqual({ id: done.id, deleted_rows: 2400, file_type: "achat" });
   const after = (await list2).data.find((r: Row) => r.id === done.id);
   expectSame(after, { deleted_by_full_name: OWNER.name, deleted_by_email: OWNER.email }, "import supprimé");
   expect(after.deleted_at, "deleted_at").not.toBeNull();

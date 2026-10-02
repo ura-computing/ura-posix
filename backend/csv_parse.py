@@ -18,6 +18,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from datetime import date
+from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import func
@@ -43,6 +44,7 @@ def strip_percentage(s: str | None) -> str:
     return _PCT_RE.sub("", s).strip()
 
 
+@lru_cache(maxsize=4096)   # pure; called once per exported row (45k), few distinct categories
 def suffix_key(category: str | None) -> str:
     """Category-suffix match key, ignoring accents, case, extra spaces and the
     « (x%) » part: « Médicament (33.930%) » and « medicament » → "medicament"."""

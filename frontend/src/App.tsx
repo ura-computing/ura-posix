@@ -1,15 +1,43 @@
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 
 import { AppLayout } from "@/_components/AppLayout";
 import { RequireFeature } from "@/_components/RequireFeature";
 import { RequireGuest } from "@/_components/RequireGuest";
 import { RequireRole } from "@/_components/RequireRole";
-import CataloguePage from "@/pages/admin/catalogue";
-import AdminCategoriesPage from "@/pages/admin/categories";
-import AdminPharmaciesIndex from "@/pages/admin/pharmacies";
-import AdminPharmacyDetail from "@/pages/admin/pharmacies/detail";
-import OwnerEmployeesPage from "@/pages/team";
-import ProduitsSpeciauxPage from "@/pages/accounting/produits-speciaux";
+import HomePage from "@/pages/auth/home";
+import LoginPage from "@/pages/auth/login";
+import NotFoundPage from "@/pages/auth/not-found";
+import { ROLES, ROUTES } from "@/types";
+
+// Every other page has its own JS file: the first screen downloads one page,
+// not the whole app. The others download in the background right after.
+const PAGES = {
+  CataloguePage: () => import("@/pages/admin/catalogue"),
+  AdminCategoriesPage: () => import("@/pages/admin/categories"),
+  AdminPharmaciesIndex: () => import("@/pages/admin/pharmacies"),
+  AdminPharmacyDetail: () => import("@/pages/admin/pharmacies/detail"),
+  OwnerEmployeesPage: () => import("@/pages/team"),
+  ProduitsSpeciauxPage: () => import("@/pages/accounting/produits-speciaux"),
+  ForgotPasswordPage: () => import("@/pages/auth/forgot-password"),
+  MePage: () => import("@/pages/auth/me"),
+  SetPasswordPage: () => import("@/pages/auth/set-password"),
+  ImportsPage: () => import("@/pages/imports/history"),
+  RapportPage: () => import("@/pages/dashboard/rapport"),
+  AchatsPage: () => import("@/pages/operations/achats"),
+  AlertesPage: () => import("@/pages/analytics/alertes"),
+  AnalysePage: () => import("@/pages/analytics/analyses"),
+  ComptabilitePage: () => import("@/pages/accounting/comptabilite"),
+  StockPage: () => import("@/pages/analytics/stock"),
+  UploadFilePage: () => import("@/pages/imports/upload"),
+  VentesPage: () => import("@/pages/operations/ventes"),
+};
+const CataloguePage = lazy(PAGES.CataloguePage);
+const AdminCategoriesPage = lazy(PAGES.AdminCategoriesPage);
+const AdminPharmaciesIndex = lazy(PAGES.AdminPharmaciesIndex);
+const AdminPharmacyDetail = lazy(PAGES.AdminPharmacyDetail);
+const OwnerEmployeesPage = lazy(PAGES.OwnerEmployeesPage);
+const ProduitsSpeciauxPage = lazy(PAGES.ProduitsSpeciauxPage);
 // HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
 // admin/developers surfaces are wired end-to-end but not ready to ship. Restore
 // these imports and the matching Route blocks below when the feature is done.
@@ -20,108 +48,112 @@ import ProduitsSpeciauxPage from "@/pages/accounting/produits-speciaux";
 // import DevRequestDetailPage from "@/pages/store/dev/requests/$id";
 // import StoreWebsitePage from "@/pages/store/store-website";
 // import StoreWebsiteNewPage from "@/pages/store/store-website/new";
-import ForgotPasswordPage from "@/pages/auth/forgot-password";
-import MePage from "@/pages/auth/me";
-import SetPasswordPage from "@/pages/auth/set-password";
-import HomePage from "@/pages/auth/home";
-import LoginPage from "@/pages/auth/login";
-import NotFoundPage from "@/pages/auth/not-found";
+const ForgotPasswordPage = lazy(PAGES.ForgotPasswordPage);
+const MePage = lazy(PAGES.MePage);
+const SetPasswordPage = lazy(PAGES.SetPasswordPage);
 // HIDDEN 2026-07-03 — public preview page renders customization data from the
 // hidden feature. Restore alongside the block below.
 // import StorePreviewPage from "@/pages/store/preview";
-import ImportsPage from "@/pages/imports/history";
-import RapportPage from "@/pages/dashboard/rapport";
-import AchatsPage from "@/pages/operations/achats";
-import AlertesPage from "@/pages/analytics/alertes";
-import AnalysePage from "@/pages/analytics/analyses";
-import ComptabilitePage from "@/pages/accounting/comptabilite";
-import StockPage from "@/pages/analytics/stock";
-import UploadFilePage from "@/pages/imports/upload";
-import VentesPage from "@/pages/operations/ventes";
-import { ROLES, ROUTES } from "@/types";
+const ImportsPage = lazy(PAGES.ImportsPage);
+const RapportPage = lazy(PAGES.RapportPage);
+const AchatsPage = lazy(PAGES.AchatsPage);
+const AlertesPage = lazy(PAGES.AlertesPage);
+const AnalysePage = lazy(PAGES.AnalysePage);
+const ComptabilitePage = lazy(PAGES.ComptabilitePage);
+const StockPage = lazy(PAGES.StockPage);
+const UploadFilePage = lazy(PAGES.UploadFilePage);
+const VentesPage = lazy(PAGES.VentesPage);
 
 export default function App() {
+  // 2 s after the first screen: fetch every page's file, so later clicks don't wait.
+  useEffect(() => {
+    const t = window.setTimeout(() => { for (const load of Object.values(PAGES)) void load(); }, 2000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
-    <Routes>
-      <Route path={ROUTES.HOME} element={<HomePage />} />
+    <Suspense fallback={null}>
+      <Routes>
+        <Route path={ROUTES.HOME} element={<HomePage />} />
 
-      {/* HIDDEN 2026-07-03 — public template preview belongs to the hidden
-          store-website feature. Restore when the feature ships.
-      <Route path={ROUTES.STORE_PREVIEW} element={<StorePreviewPage />} />
-      */}
-
-      {/* Auth routes: only accessible to UNauthenticated visitors */}
-      <Route element={<RequireGuest />}>
-        <Route path={ROUTES.LOGIN}           element={<LoginPage />} />
-        <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
-        <Route path={ROUTES.SET_PASSWORD}    element={<SetPasswordPage />} />
-      </Route>
-
-      {/* App routes: only accessible to AUTHENTICATED users */}
-      <Route element={<AppLayout />}>
-        <Route path={ROUTES.ME}          element={<MePage />} />
-
-        {/* Feature-gated routes — admin bypasses; non-admin without the
-            feature in their effective permission set redirects to /404. */}
-        <Route element={<RequireFeature feature="rapports" />}>
-          <Route path={ROUTES.RAPPORT}   element={<RapportPage />} />
-        </Route>
-        <Route element={<RequireFeature feature="alertes" />}>
-          <Route path={ROUTES.ALERTES}   element={<AlertesPage />} />
-        </Route>
-        <Route element={<RequireFeature feature="import" />}>
-          <Route path={ROUTES.IMPORTS}     element={<ImportsPage />} />
-          <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
-        </Route>
-        <Route element={<RequireFeature feature="achats" />}>
-          <Route path={ROUTES.ACHATS} element={<AchatsPage />} />
-        </Route>
-        <Route element={<RequireFeature feature="ventes" />}>
-          <Route path={ROUTES.VENTES} element={<VentesPage />} />
-        </Route>
-        <Route element={<RequireFeature feature="stock" />}>
-          <Route path={ROUTES.STOCK} element={<StockPage />} />
-        </Route>
-        <Route element={<RequireFeature feature="analyse" />}>
-          <Route path={ROUTES.ANALYSES} element={<AnalysePage />} />
-        </Route>
-        <Route element={<RequireFeature feature="accounting" />}>
-          <Route path={ROUTES.COMPTABILITE} element={<ComptabilitePage />} />
-        </Route>
-        <Route element={<RequireFeature feature="special_products" />}>
-          <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
-        </Route>
-
-        <Route element={<RequireRole role={ROLES.ADMIN} />}>
-          <Route path={ROUTES.ADMIN_CATALOGUE}  element={<CataloguePage />} />
-          <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
-          <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
-          <Route path={ROUTES.ADMIN_PHARMACY}   element={<AdminPharmacyDetail />} />
-          {/* HIDDEN 2026-07-03 — admin/developers panel.
-          <Route path={ROUTES.ADMIN_DEVELOPERS} element={<AdminDevelopersPage />} />
-          */}
-        </Route>
-
-        <Route element={<RequireRole role={ROLES.OWNER} />}>
-          <Route path={ROUTES.OWNER_EMPLOYEES}   element={<OwnerEmployeesPage />} />
-          {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
-          <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
-          <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />
-          */}
-        </Route>
-
-        {/* HIDDEN 2026-07-03 — developer-only routes (queue + request detail +
-            editor + exports). Restore when the feature is complete.
-        <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>
-          <Route path={ROUTES.DEV_DASHBOARD} element={<DevDashboardPage />} />
-          <Route path={ROUTES.DEV_REQUEST}   element={<DevRequestDetailPage />} />
-          <Route path={ROUTES.DEV_EDITOR}    element={<DevEditorPage />} />
-          <Route path={ROUTES.DEV_EXPORTS}   element={<DevExportsPage />} />
-        </Route>
+        {/* HIDDEN 2026-07-03 — public template preview belongs to the hidden
+            store-website feature. Restore when the feature ships.
+        <Route path={ROUTES.STORE_PREVIEW} element={<StorePreviewPage />} />
         */}
-      </Route>
 
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        {/* Auth routes: only accessible to UNauthenticated visitors */}
+        <Route element={<RequireGuest />}>
+          <Route path={ROUTES.LOGIN}           element={<LoginPage />} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.SET_PASSWORD}    element={<SetPasswordPage />} />
+        </Route>
+
+        {/* App routes: only accessible to AUTHENTICATED users */}
+        <Route element={<AppLayout />}>
+          <Route path={ROUTES.ME}          element={<MePage />} />
+
+          {/* Feature-gated routes — admin bypasses; non-admin without the
+              feature in their effective permission set redirects to /404. */}
+          <Route element={<RequireFeature feature="rapports" />}>
+            <Route path={ROUTES.RAPPORT}   element={<RapportPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="alertes" />}>
+            <Route path={ROUTES.ALERTES}   element={<AlertesPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="import" />}>
+            <Route path={ROUTES.IMPORTS}     element={<ImportsPage />} />
+            <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
+          </Route>
+          <Route element={<RequireFeature feature="achats" />}>
+            <Route path={ROUTES.ACHATS} element={<AchatsPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="ventes" />}>
+            <Route path={ROUTES.VENTES} element={<VentesPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="stock" />}>
+            <Route path={ROUTES.STOCK} element={<StockPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="analyse" />}>
+            <Route path={ROUTES.ANALYSES} element={<AnalysePage />} />
+          </Route>
+          <Route element={<RequireFeature feature="accounting" />}>
+            <Route path={ROUTES.COMPTABILITE} element={<ComptabilitePage />} />
+          </Route>
+          <Route element={<RequireFeature feature="special_products" />}>
+            <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
+          </Route>
+
+          <Route element={<RequireRole role={ROLES.ADMIN} />}>
+            <Route path={ROUTES.ADMIN_CATALOGUE}  element={<CataloguePage />} />
+            <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
+            <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
+            <Route path={ROUTES.ADMIN_PHARMACY}   element={<AdminPharmacyDetail />} />
+            {/* HIDDEN 2026-07-03 — admin/developers panel.
+            <Route path={ROUTES.ADMIN_DEVELOPERS} element={<AdminDevelopersPage />} />
+            */}
+          </Route>
+
+          <Route element={<RequireRole role={ROLES.OWNER} />}>
+            <Route path={ROUTES.OWNER_EMPLOYEES}   element={<OwnerEmployeesPage />} />
+            {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
+            <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
+            <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />
+            */}
+          </Route>
+
+          {/* HIDDEN 2026-07-03 — developer-only routes (queue + request detail +
+              editor + exports). Restore when the feature is complete.
+          <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>
+            <Route path={ROUTES.DEV_DASHBOARD} element={<DevDashboardPage />} />
+            <Route path={ROUTES.DEV_REQUEST}   element={<DevRequestDetailPage />} />
+            <Route path={ROUTES.DEV_EDITOR}    element={<DevEditorPage />} />
+            <Route path={ROUTES.DEV_EXPORTS}   element={<DevExportsPage />} />
+          </Route>
+          */}
+        </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
   );
 }
