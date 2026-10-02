@@ -1,9 +1,12 @@
 /** App response ↔ oracle (expected.json) comparisons — every field of every
  *  payload. Specs capture the payload the way the page loads it, then call these. */
+import type { Page } from "@playwright/test";
+
 import { loadState } from "./auth";
 import { expectSame, expectSameSet, expectTiedPick, TOL, type Row } from "./diff";
 import { expected } from "./expected";
 import { expect } from "./fixtures";
+import { frNumber, kpiValue } from "./ui";
 
 export type { Row } from "./diff";
 export type CategoryType = "all" | "pharmacie" | "parapharmacie";
@@ -188,20 +191,52 @@ function checkKpis(k: Row, e: Row, ties: Row, what: string): void {
   }
 }
 
-export function checkAnalyse(s: Row, ct: CategoryType, mode: AnalyseMode): void {
-  const e = expected().analyse[ct][mode];
-  const what = `analyse[${ct}][${mode}]`;
+/** `e` defaults to the oracle's analyse[ct][mode]; pass another oracle answer of the
+ *  same shape (e.g. Année filtered by a product). */
+export function checkAnalyse(s: Row, ct: CategoryType, mode: AnalyseMode, e: Row = expected().analyse[ct][mode],
+                             what = `analyse[${ct}][${mode}]`): void {
   if (mode === "annee") expect(s.rows.map((r: Row) => r.annee), `${what} order`).toEqual(e.rows.map((r: Row) => r.annee));
   expectSameSet(s.rows, e.rows, ANALYSE_MODES[mode].key, `${what}.rows`);
   checkKpis(s.kpis, e.kpis, e.ties, what);
 }
 
-export function checkListe(s: Row): void {
-  const e = expected().liste;
+export function checkListe(s: Row, e: Row = expected().liste, what = "liste"): void {
   const found = (rows: Row[]) => rows.filter((r) => r.match_status === "found");
   const notFound = (rows: Row[]) => rows.filter((r) => r.match_status === "not_found");
-  expectSameSet(found(s.rows), found(e.rows), (r) => r.product, "liste found rows");
-  expectSame(notFound(s.rows), notFound(e.rows), "liste not-found rows (in input order, last)");
-  expect(s.rows.slice(-notFound(e.rows).length).every((r: Row) => r.match_status === "not_found"), "not-found rows are last").toBe(true);
-  checkKpis(s.kpis, e.kpis, e.ties, "liste");
+  expectSameSet(found(s.rows), found(e.rows), (r) => r.product, `${what} found rows`);
+  expectSame(notFound(s.rows), notFound(e.rows), `${what} not-found rows (in input order, last)`);
+  expect(s.rows.slice(-notFound(e.rows).length).every((r: Row) => r.match_status === "not_found"), `${what}: not-found rows are last`).toBe(true);
+  checkKpis(s.kpis, e.kpis, e.ties, what);
+}
+
+
+// ── /analyses KPI tiles: what the page SHOWS ────────────────────────────────
+
+const ANALYSE_TILES: [string, string, number | null][] = [   // label, kpi, shown when the kpi is null
+  ["Chiffre d'affaires", "total_ventes_dh", 0], ["Marge moyenne (%)", "marge_pct_avg", null],
+  ["Marge moyenne (DH)", "marge_dh_avg", null], ["Optimisation", "difference_gain_dh", null],
+  ["Unités vendues", "total_ventes_unites", 0], ["Unités disponibles", "total_units_available", null],
+  ["Prix unitaires achetés", "total_pu_purchased", null], ["PPV disponibles", "ppv_total_available", null],
+];
+const near = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) <= 0.006);
+
+/** Each of the 8 tiles shows `k` (the page's API reply, or the oracle for KPIs the page
+ *  computes itself). `gains`: tied « Optimisation » values (any one is right). The two
+ *  « Marge moyenne » tiles also show « Max x · Min y ». */
+export async function checkKpiTiles(page: Page, k: Row, gains?: number[]): Promise<void> {
+  for (const [label, field, dflt] of ANALYSE_TILES) {
+    const want: (number | null)[] = field === "difference_gain_dh" && gains?.length ? gains : [k[field] ?? dflt];
+    const shown = async () => frNumber(await kpiValue(page, label).innerText());
+    const ok = await expect.poll(async () => { const v = await shown(); return want.some((w) => near(v, w)); }, { timeout: 10_000 })
+      .toBe(true).then(() => true, () => false);
+    if (!ok) expect(await shown(), `tuile « ${label} » (attendu ${want.join(" ou ")})`).toBe(want[0]);
+  }
+  for (const [label, max, min] of [["Marge moyenne (%)", "marge_pct_max", "marge_pct_min"], ["Marge moyenne (DH)", "marge_dh_max", "marge_dh_min"]]) {
+    if (!k[max] || !k[min]) continue;
+    const text = await kpiValue(page, label).locator("xpath=..").innerText();
+    const sub = text.slice(text.indexOf("Max"));
+    const nums = (sub.match(/-?\u2212?\d{1,3}(?:[\s\u202f\u00a0]\d{3})*(?:,\d+)?/g) ?? []).map((t) => frNumber(t));
+    expect(near(nums[0] ?? null, k[max].value) && near(nums[1] ?? null, k[min].value),
+      `« ${label} » : ${sub} ≠ Max ${k[max].value} · Min ${k[min].value}`).toBe(true);
+  }
 }

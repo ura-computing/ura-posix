@@ -268,71 +268,80 @@ async function ownerVentes(owner: Page, category: string): Promise<Row[]> {
 }
 
 
-test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé", async ({ page, browser }) => {
-  const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
+test.describe("catégories", () => {
+  // A failed check must not leave a suffix behind: later specs (15-imports) compare
+  // the references with the oracle.
+  test.afterEach(async ({ page }) => {
+    for (const r of await apiGet<Row[]>(page, "/category-suffixes")) await apiDelete(page, `/category-suffixes/${r.id}`, 204);
+  });
 
-  const list0 = pageCall(page, "/category-suffixes");
-  await page.goto("/admin/categories");
-  expect(await list0, "aucun suffixe au départ").toEqual([]);
+  test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé", async ({ page, browser }) => {
+    const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
 
-  await page.getByRole("button", { name: "Nouveau mapping" }).click();
-  let dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Catégorie").fill("Parapharmacie");
-  await dialog.getByLabel("Suffixe").fill("-P");
-  await dialog.getByRole("button", { name: "blue", exact: true }).click();
-  const created = pageSend(page, "POST", "/category-suffixes", 201);
-  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
-  const c = await created;
-  expectSame(c, { category: "Parapharmacie", suffix: "-P", color: "blue" }, "POST /category-suffixes");
+    const list0 = pageCall(page, "/category-suffixes");
+    await page.goto("/admin/categories");
+    expect(await list0, "aucun suffixe au départ").toEqual([]);
 
-  await page.getByRole("row", { name: /Parapharmacie/ }).getByRole("button", { name: "Modifier" }).click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Suffixe").fill("-PA");
-  await dialog.getByRole("button", { name: "rose", exact: true }).click();
-  const updated = pageSend(page, "PUT", `/category-suffixes/${c.id}`);
-  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
-  expectSame(await updated, { id: c.id, category: "Parapharmacie", suffix: "-PA", color: "rose" }, "PUT /category-suffixes");
+    await page.getByRole("button", { name: "Nouveau mapping" }).click();
+    let dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Catégorie").fill("Parapharmacie");
+    await dialog.getByLabel("Suffixe").fill("-P");
+    await dialog.getByRole("button", { name: "blue", exact: true }).click();
+    const created = pageSend(page, "POST", "/category-suffixes", 201);
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    const c = await created;
+    expectSame(c, { category: "Parapharmacie", suffix: "-P", color: "blue" }, "POST /category-suffixes");
 
-  const withSuffix = await ownerVentes(owner, "Parapharmacie");
-  expectSame(withSuffix.map((r) => [r.transaction_ref_final, r.transaction_ref_color]),
-    withSuffix.map((r) => [`${r.transaction_ref}-PA`, "rose"]), "référence + suffixe dans /ventes");
-  await expect(owner.getByText("-PA", { exact: true }).first(), "badge « -PA » à l'écran").toBeVisible();
+    await page.getByRole("row", { name: /Parapharmacie/ }).getByRole("button", { name: "Modifier" }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Suffixe").fill("-PA");
+    await dialog.getByRole("button", { name: "rose", exact: true }).click();
+    const updated = pageSend(page, "PUT", `/category-suffixes/${c.id}`);
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    expectSame(await updated, { id: c.id, category: "Parapharmacie", suffix: "-PA", color: "rose" }, "PUT /category-suffixes");
 
-  const deleted = pageSend(page, "DELETE", `/category-suffixes/${c.id}`, 204);
-  const list1 = pageCall(page, "/category-suffixes");
-  await page.getByRole("row", { name: /Parapharmacie/ }).getByRole("button", { name: "Supprimer" }).click();
-  await page.getByRole("dialog", { name: /^Supprimer le mapping/ }).getByRole("button", { name: "Supprimer", exact: true }).click();
-  await deleted;
-  expect(await list1, "plus de suffixe").toEqual([]);
-  await expect(page.getByText("Aucun mapping configuré"), "liste vide à l'écran").toBeVisible();
+    const withSuffix = await ownerVentes(owner, "Parapharmacie");
+    expectSame(withSuffix.map((r) => [r.transaction_ref_final, r.transaction_ref_color]),
+      withSuffix.map((r) => [`${r.transaction_ref}-PA`, "rose"]), "référence + suffixe dans /ventes");
+    await expect(owner.getByText("-PA", { exact: true }).first(), "badge « -PA » à l'écran").toBeVisible();
 
-  const without = await ownerVentes(owner, "Parapharmacie");
-  expect(without.every((r) => r.transaction_ref_final === r.transaction_ref && r.transaction_ref_color === null),
-    "références sans suffixe").toBe(true);
-  await expect(owner.getByText("-PA", { exact: true }), "plus de badge").toHaveCount(0);
-  await owner.context().close();
-});
+    const deleted = pageSend(page, "DELETE", `/category-suffixes/${c.id}`, 204);
+    const list1 = pageCall(page, "/category-suffixes");
+    await page.getByRole("row", { name: /Parapharmacie/ }).getByRole("button", { name: "Supprimer" }).click();
+    await page.getByRole("dialog", { name: /^Supprimer le mapping/ }).getByRole("button", { name: "Supprimer", exact: true }).click();
+    await deleted;
+    expect(await list1, "plus de suffixe").toEqual([]);
+    await expect(page.getByText("Aucun mapping configuré"), "liste vide à l'écran").toBeVisible();
 
-test("catégories : « Médicament » (accent, sans couleur) s'applique aux ventes « Médicament (x%) »", async ({ page, browser }) => {
-  const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
-  await page.goto("/admin/categories");
-  await page.getByRole("button", { name: "Nouveau mapping" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Catégorie").fill("Médicament");
-  await dialog.getByLabel("Suffixe").fill("-M");
-  const created = pageSend(page, "POST", "/category-suffixes", 201);
-  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
-  const c = await created;
-  expectSame(c, { category: "Médicament", suffix: "-M", color: null }, "saved as typed, accent kept");
-  try {
-    const rows = await ownerVentes(owner, "Médicament");
-    expect(rows.map((r) => r.transaction_ref_final), "suffixe sur « Médicament (x%) »")
-      .toEqual(rows.map((r) => `${r.transaction_ref}-M`));
-    await expect(owner.getByText("-M", { exact: true }).first(), "badge gris « -M » à l'écran").toBeVisible();
-  } finally {
-    await apiDelete(page, `/category-suffixes/${c.id}`, 204);
+    const without = await ownerVentes(owner, "Parapharmacie");
+    expect(without.every((r) => r.transaction_ref_final === r.transaction_ref && r.transaction_ref_color === null),
+      "références sans suffixe").toBe(true);
+    await expect(owner.getByText("-PA", { exact: true }), "plus de badge").toHaveCount(0);
     await owner.context().close();
-  }
+  });
+
+  test("catégories : « Médicament » (accent, sans couleur) s'applique aux ventes « Médicament (x%) »", async ({ page, browser }) => {
+    const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
+    await page.goto("/admin/categories");
+    await page.getByRole("button", { name: "Nouveau mapping" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Catégorie").fill("Médicament");
+    await dialog.getByLabel("Suffixe").fill("-M");
+    await dialog.getByRole("button", { name: "Aucune", exact: true }).click();
+    const created = pageSend(page, "POST", "/category-suffixes", 201);
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    const c = await created;
+    try {                                                         // cleanup even if a check fails
+      expectSame(c, { category: "Médicament", suffix: "-M", color: null }, "saved as typed, accent kept, no colour");
+      const rows = await ownerVentes(owner, "Médicament");
+      expect(rows.map((r) => r.transaction_ref_final), "suffixe sur « Médicament (x%) »")
+        .toEqual(rows.map((r) => `${r.transaction_ref}-M`));
+      await expect(owner.getByText("-M", { exact: true }).first(), "badge gris « -M » à l'écran").toBeVisible();
+    } finally {
+      await apiDelete(page, `/category-suffixes/${c.id}`, 204);
+      await owner.context().close();
+    }
+  });
 });
 
 

@@ -35,7 +35,7 @@ help:
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
 	@echo "    make e2e-tests     — every test, headless"
-	@echo "    make e2e-ui        — one test file (or all) in a real browser, slowed down"
+	@echo "    make e2e-ui        — Playwright UI mode: one window, watch / step through tests"
 	@echo ""
 	@echo "  Tests + git hooks:"
 	@echo "    make test          — backend pytest suite"
@@ -164,7 +164,7 @@ install-hooks:
 # Two commands. The script asks for its inputs (Enter = default); with no
 # terminal (git pre-push) it uses the defaults. First run installs Playwright.
 #   make e2e-tests   headless, every test
-#   make e2e-ui      real browser, slowed down; asks which test file
+#   make e2e-ui      Playwright UI mode (one window); asks which test file
 
 e2e-tests:
 	@bash e2e/scripts/run.sh tests

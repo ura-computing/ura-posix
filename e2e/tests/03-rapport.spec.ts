@@ -5,7 +5,7 @@
 import { sessionFile } from "../lib/auth";
 import { CATEGORY_TYPES, checkAnalyse, checkMarginAlerts, checkStats, checkStockSummary } from "../lib/checks";
 import { testWindow } from "../lib/expected";
-import { expect, test } from "../lib/fixtures";
+import { expect, recordCall, test } from "../lib/fixtures";
 import { pageCall, period, pickCategoryType, setPeriod } from "../lib/ui";
 
 
@@ -13,10 +13,22 @@ test.use({ storageState: sessionFile("owner") });
 
 test("rapport: every indicator × Mixte / Pharmacie / Parapharmacie", async ({ page }) => {
   const w = testWindow();
+  // First load (no period yet = whole history), timed for the speed gate: goto → every call
+  // answered → the sections (incl. the Optimisation tile) are on screen.
+  const t0 = Date.now();
+  const noPeriod = { category_type: "all", date_from: null, date_to: null };
+  const first = Promise.all([
+    pageCall(page, "/stats", noPeriod),
+    pageCall(page, "/stats/margin-alerts", noPeriod),
+    pageCall(page, "/stats/analyse-marge", { ...noPeriod, mode: "produit" }),
+  ]);
   const stock = pageCall(page, "/stats/stock-summary");
   await page.goto("/rapport");
   await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord", exact: true })).toBeVisible();
   checkStockSummary(await stock);
+  await first;
+  await expect(page.getByText("Optimisation", { exact: true }).first()).toBeVisible();
+  recordCall({ method: "FLOW", path: "rapport/first-load", status: 200, ms: Date.now() - t0, source: "flow", test: "rapport first load" });
 
   for (const [i, { ct, label }] of CATEGORY_TYPES.entries()) {
     await test.step(label, async () => {

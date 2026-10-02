@@ -13,8 +13,8 @@ ask() {                                 # ask "question" default → answer
   echo "${answer:-$2}"
 }
 
-if [ ! -d node_modules/@playwright/test ]; then
-  echo "▸ First run: installing Playwright…"
+if [ ! -d node_modules/@playwright/test ] || [ ! -d node_modules/xlsx ]; then
+  echo "▸ Installing the E2E packages…"
   npm install --silent
   npx playwright install chromium
 fi
@@ -36,8 +36,7 @@ if [ "$MODE" = ui ]; then
     [ -z "$match" ] && { echo "✗ no test file matches \"$spec\""; ls tests; exit 1; }
     args+=("$match")
   fi
-  export E2E_HEADED=1 E2E_SLOWMO=250
-  args+=(--headed)
+  args+=(--ui)                          # Playwright UI mode: one window, live view, step through
 else
   [ "$(ask "Record a new speed baseline? (y/n)" n)" = y ] && export E2E_UPDATE_BASELINE=1
 fi

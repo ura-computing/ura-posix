@@ -1,6 +1,7 @@
 /** Drive the real UI: type a period like a user, and read back the JSON the
  *  PAGE ITSELF loaded (so the check covers the frontend call + the backend). */
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import * as XLSX from "xlsx";
 
 import { expect } from "./fixtures";
 import { API } from "./paths";
@@ -62,4 +63,49 @@ export const period = (w: { date_from: string; date_to: string }): Match =>
 /** Click the Mixte / Pharmacie / Parapharmacie segment. */
 export async function pickCategoryType(page: Page, label: string): Promise<void> {
   await page.getByRole("button", { name: label, exact: true }).click();
+}
+
+
+// ── Reading what the page SHOWS ─────────────────────────────────────────────
+
+/** A number as the page prints it (« −1 234,56 MAD », « 12,30 % », « 1 200 ») → number;
+ *  « — » or empty → null. */
+export function frNumber(text: string | null): number | null {
+  const t = (text ?? "").replace(/[\s\u00a0\u202f]/g, "").replace(/MAD|DH|%/g, "").replace("\u2212", "-").replace(",", ".");
+  if (!t || t === "—") return null;
+  const n = Number(t);
+  if (Number.isNaN(n)) throw new Error(`not a number: « ${text} »`);
+  return n;
+}
+
+/** The big value of a KPI tile, found by its label. */
+export function kpiValue(page: Page, label: string): Locator {
+  return page.getByText(label, { exact: true })
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]")
+    .locator("span.font-mono.font-bold");
+}
+
+/** Text of every cell of one DataTable column (by its header label) on the current page. */
+export async function columnTexts(page: Page, header: string): Promise<string[]> {
+  const table = page.locator("table").first();
+  const headers = (await table.locator("thead th").allInnerTexts()).map((h) => h.trim().toLowerCase());
+  const i = headers.indexOf(header.toLowerCase());
+  if (i < 0) throw new Error(`no column « ${header} » (${headers.join(" | ")})`);
+  return table.locator(`tbody tr td:nth-child(${i + 1})`).allInnerTexts();
+}
+
+/** « 1 234 résultats » under a DataTable → 1234. */
+export async function resultsCount(page: Page): Promise<number> {
+  const text = await page.getByText(/^[\d\s\u00a0\u202f]+ résultats$/).innerText();
+  return Number(text.replace(/\D/g, ""));
+}
+
+/** Click something that downloads an .xlsx; returns its name + first sheet as rows. */
+export async function downloadXlsx(page: Page, click: () => Promise<void>): Promise<{ filename: string; sheet: string; rows: unknown[][] }> {
+  const download = page.waitForEvent("download");
+  await click();
+  const d = await download;
+  const wb = XLSX.readFile(await d.path());
+  const sheet = wb.SheetNames[0];
+  return { filename: d.suggestedFilename(), sheet, rows: XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: null }) };
 }

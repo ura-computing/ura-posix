@@ -86,11 +86,13 @@ export function useAnalysePage() {
   // no search, the backend KPIs pass through untouched (incl. the
   // Dashboard-aligned CA). Works for liste too: not_found rows carry qty/ca 0
   // and null metrics, so they contribute nothing.
+  // Année: the server already filtered by product → its KPIs are the right ones
+  // (year rows carry no stock / marge fields to recompute from).
   const kpis = useMemo(() => {
     if (!activeData?.kpis) return undefined;
-    if (!search.trim()) return activeData.kpis;
+    if (!search.trim() || mode === "annee") return activeData.kpis;
     return computeKpisFromRows(filteredRows);
-  }, [activeData, filteredRows, search]);
+  }, [activeData, filteredRows, search, mode]);
 
   // Autocomplete — suggest the current mode's labels (products, laboratoires, …)
   // from the FULL loaded row set (not the filtered one), accent/case-insensitive,

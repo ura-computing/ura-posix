@@ -8,7 +8,7 @@ import { sessionFile } from "../lib/auth";
 import { checkLedgerPage, checkLedgerRows, checkSortPage, subsetSummary, type Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
-import { expect, test } from "../lib/fixtures";
+import { expect, recordCall, test } from "../lib/fixtures";
 import { pageCall, period, setPeriod } from "../lib/ui";
 
 
@@ -121,6 +121,8 @@ test("ventes: export Excel — toutes les lignes de la période", async ({ page 
   await openWithPeriod(page);
   const total = expected().ventes_list.rows_total;
   const exported = page.waitForResponse((r) => r.url().includes("/v1/ventes?") && r.url().includes("export=true"));
+  const download = page.waitForEvent("download").catch(() => null);   // none when the export is refused (413)
+  const t0 = Date.now();                                  // timed: click → .xlsx written (speed gate)
   await page.getByRole("button", { name: "Exporter Excel" }).click();
   const res = await exported;
   if (total > 50_000) {                                   // backend cap MAX_EXPORT_ROWS
@@ -128,5 +130,7 @@ test("ventes: export Excel — toutes les lignes de la période", async ({ page 
     return;
   }
   expect(res.status()).toBe(200);
+  await (await download)?.path();
+  recordCall({ method: "FLOW", path: "ventes/export", status: 200, ms: Date.now() - t0, source: "flow", test: "ventes export" });
   checkLedgerRows("ventes", (await res.json()).data, expected().ventes_rows);
 });

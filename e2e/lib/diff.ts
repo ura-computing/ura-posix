@@ -39,13 +39,16 @@ export function expectSame(actual: unknown, expected: unknown, what: string): vo
 
 /** Unordered lists: index both sides by `key`, same key set, then every field. */
 export function expectSameSet(actual: Row[], expected: Row[], key: (r: Row) => string, what: string): void {
+  // One expect for the whole set: a per-row expect is recorded in the trace (×45k on exports).
   const index = (rows: Row[]) => {
     const out: Record<string, Row> = {};
+    const dup: string[] = [];
     for (const r of rows) {
       const k = key(r);
-      expect(out[k], `${what}: duplicate key ${k}`).toBeUndefined();
+      if (k in out) dup.push(k);
       out[k] = r;
     }
+    expect(dup.slice(0, 20), `${what}: duplicate keys`).toEqual([]);
     return out;
   };
   const a = index(actual);

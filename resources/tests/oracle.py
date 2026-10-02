@@ -29,6 +29,10 @@ ANALYSE_MODES = ("produit", "categorie", "laboratoire", "grossiste", "operateur"
 # Search / suggestion queries replayed by the E2E suite (typed in the search box).
 VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042", "00*42"]
 ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042", "00*42"]
+# /analyses search box (client-side, Produit × Mixte): `00*42` = one word, `médicament`
+# matches the category column. Année mode sends the box text as `product` (ILIKE %x%).
+ANALYSE_QUERIES = ["00*42", "médicament"]
+ANNEE_PRODUCT = "PRODUIT 0004"
 
 # Produits spéciaux scenario (e2e/tests/10-exclusions.spec.ts).
 EXCLUDED_SUPPLIER = "Laboratoire WELEDA"
@@ -61,6 +65,11 @@ def month_start(d: date) -> date:
 
 def next_month(d: date) -> date:
     return date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
+
+
+def name_has(p, product: str | None) -> bool:
+    """Backend `Medicament.product ILIKE %product%` (case-insensitive substring)."""
+    return not product or product.strip().lower() in p.name.lower()
 
 
 def cat_ok(p, ct: str) -> bool:
@@ -526,8 +535,8 @@ class Oracle:
 
     # ── Analyses ────────────────────────────────────────────────────────────
 
-    def units_available(self, ct: str) -> int | None:
-        total = sum(p.stock for p in self.stocked if cat_ok(p, ct))
+    def units_available(self, ct: str, product: str | None = None) -> int | None:
+        total = sum(p.stock for p in self.stocked if cat_ok(p, ct) and name_has(p, product))
         return round(total) if total else None
 
     def produit_rows(self, ct: str) -> list[dict]:
@@ -643,10 +652,10 @@ class Oracle:
             "total_achat_cost": r2(cost[s]),
         } for s, r in rows.items()]
 
-    def simple_rows(self, ct: str, mode: str) -> list[dict]:
+    def simple_rows(self, ct: str, mode: str, product: str | None = None) -> list[dict]:
         out: dict = {}
         for v in self.vw:
-            if not cat_ok(v.p, ct):
+            if not cat_ok(v.p, ct) or not name_has(v.p, product):
                 continue
             if mode == "annee":
                 row = out.setdefault(v.day.year, {"annee": v.day.year, **{k: {"qty": 0.0, "ca": 0.0} for k in MONTH_KEYS},
@@ -740,7 +749,8 @@ class Oracle:
         })
         return k, ties
 
-    def analyse(self, ct: str, mode: str) -> dict:
+    def analyse(self, ct: str, mode: str, product: str | None = None) -> dict:
+        """`product` = année-mode search box (ILIKE %product% on the product name)."""
         if mode == "produit":
             rows = self.produit_rows(ct)
         elif mode == "categorie":
@@ -750,13 +760,26 @@ class Oracle:
         elif mode == "laboratoire":
             rows = self.supplier_rows(False, "laboratoire")
         else:
-            rows = self.simple_rows(ct, mode)
-        total = sum(ca(v) for v in self.vw if cat_ok(v.p, ct))
-        kpis, ties = self.kpis_from_rows(rows, total, self.units_available(ct))
+            rows = self.simple_rows(ct, mode, product)
+        total = sum(ca(v) for v in self.vw if cat_ok(v.p, ct) and name_has(v.p, product))
+        kpis, ties = self.kpis_from_rows(rows, total, self.units_available(ct, product))
         return {"rows": rows, "kpis": kpis, "ties": ties}
 
-    def liste(self, items: list[dict]) -> dict:
-        """compute_analyse_liste (items = what parseListeCsv sends)."""
+    def analyse_search(self, q: str) -> dict:
+        """/analyses search box on Produit × Mixte — all in the browser: rows where every
+        token matches the product OR the category (matchesFields), KPIs recomputed from
+        those rows (computeKpisFromRows), suggestions = product names matching."""
+        toks, all_rows = tokenize(q), self.produit_rows("all")
+        hit = lambda r, fields: all(any(token_match(r[f], t, unaccent=True) for f in fields) for t in toks)
+        rows = [r for r in all_rows if hit(r, ("product", "category"))]
+        units = sum(float(r["stock_dispo"] or 0) for r in rows)
+        kpis, ties = self.kpis_from_rows(rows, sum(r["ca"] for r in rows), r2(units) if units else None)
+        return {"rows": rows, "kpis": kpis, "ties": ties,
+                "suggestions": sorted({r["product"] for r in all_rows if hit(r, ("product",))})}
+
+    def liste(self, items: list[dict], ct: str = "all") -> dict:
+        """compute_analyse_liste (items = what parseListeCsv sends). `ct` filters the
+        sales rows; a matched product with no row in it still shows as a 0-sales stub."""
         norm_inputs: dict[str, str] = {}
         item_by_norm: dict[str, dict] = {}
         for it in items:
@@ -781,7 +804,7 @@ class Oracle:
                 matched[found.pid] = found
         matched_norms = {strip_accents(p.name.strip().lower()) for p in matched.values()}
         rows, covered = [], set()
-        for row in self.produit_rows("all"):
+        for row in self.produit_rows(ct):
             n = strip_accents(row["product"].strip().lower())
             if n in matched_norms or any(n == k or n in k or k in n for k in norm_inputs):
                 rows.append({**row, "match_status": "found"})
@@ -930,5 +953,8 @@ class Oracle:
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},
+            "liste_ct": {ct: self.liste(liste_items, ct) for ct in ("pharmacie", "parapharmacie")},
+            "analyse_search": {q: self.analyse_search(q) for q in ANALYSE_QUERIES},
+            "analyse_annee_product": {"q": ANNEE_PRODUCT, **self.analyse("all", "annee", ANNEE_PRODUCT)},
             "exclusions": self.exclusion_scenario(),
         }
