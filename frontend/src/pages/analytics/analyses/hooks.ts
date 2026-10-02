@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { DataTablePagination } from "@/_components/DataTable";
-import { MARGE_MODE_LABELS, QUERY_KEYS } from "@/types";
+import { MARGE_MODE_LABELS } from "@/types";
 import type {
   AnalyseFilters,
   AnalyseMargeResponse,
@@ -22,6 +22,7 @@ import { EXPORT_COLS, MARGE_COLS } from "./constants";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 
 
 const DEFAULT_FILTERS: AnalyseFilters = {
@@ -242,7 +243,7 @@ export function useAnalysePage() {
 
 export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
   return useQuery({
-    queryKey: QUERY_KEYS.ANALYSE_MARGE(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
+    queryKey: QUERIES.stats.analyseMarge(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to,
       category_type: filters.category_type, product: filters.product,

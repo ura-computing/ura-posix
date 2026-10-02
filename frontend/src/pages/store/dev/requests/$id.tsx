@@ -11,16 +11,15 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { useT } from "@/i18n/I18nProvider";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useMe } from "@/hooks/useMe";
-import { QUERY_KEYS } from "@/types";
+
 import type {
   RequestBrief, RequestState, Urgency,
 } from "@/types/storeWebsite";
 import type { WebsiteRequestOut, WebsiteRequestWithCustomizationOut } from "@/types/storeWebsite";
 
 import { RequestDetailPage } from "../_components/RequestDetailPage";
-
-
 
 
 function toBrief(api: WebsiteRequestWithCustomizationOut, meId: string | null): RequestBrief {
@@ -52,7 +51,7 @@ export default function DevRequestDetailRoute() {
   const t        = useT();
 
   const q = useQuery({
-    queryKey: QUERY_KEYS.STORE_REQUEST(id ?? "noop"),
+    queryKey: QUERIES.storeWebsite.request(id ?? "noop"),
     queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(URLS.storeWebsite.request.one(id!)),
     enabled:  !!id,
     retry:    false,
@@ -65,16 +64,16 @@ export default function DevRequestDetailRoute() {
 
   const claimM   = useMutation({
     mutationFn: () => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.claim(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.STORE_REQUEST(id!) }); toast.success(t("store.claimed")); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) }); toast.success(t("store.claimed")); },
   });
   const releaseM = useMutation({
     mutationFn: () => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.release(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.STORE_REQUEST(id!) }); toast.success(t("store.released")); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) }); toast.success(t("store.released")); },
   });
   const stateM   = useMutation({
     mutationFn: (state: RequestState) => api.patch<WebsiteRequestOut>(URLS.storeWebsite.request.state(id!), { state }),
     onSuccess:  (fresh) => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.STORE_REQUEST(id!) });
+      qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) });
       toast.success(t("store.stateUpdated", { state: fresh.state }));
     },
   });

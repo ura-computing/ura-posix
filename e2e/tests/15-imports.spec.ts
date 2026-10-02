@@ -2,7 +2,8 @@
  *  counts. An extra achats file (600 lines = 2 chunks, known products on new
  *  BLs) is cancelled after its first chunk (PATCH batch → its rows removed),
  *  imported again, then deleted from the list (DELETE → rows removed). After
- *  both undos the Rapport and the achats list still equal the oracle. Serial. */
+ *  both undos the Rapport and the achats list still equal the oracle. An import
+ *  marks every cached query stale: /analyses (cached 60 s) refetches after it. Serial. */
 import { basename, resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
@@ -74,11 +75,22 @@ test("annuler un import en cours : les lignes déjà importées sont retirées",
 
 
 test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => {
-  const start = await pickExtraFile(page);
-  await start.click();
+  // In-app links only (no reload) so the TanStack cache survives: /analyses
+  // keeps its answer 60 s, the import must make it stale.
+  const sidebar = page.getByRole("navigation");
+  const first = pageCall(page, "/stats/analyse-marge");
+  await page.goto("/analyses");
+  await first;
+  await sidebar.getByRole("link", { name: "Achats", exact: true }).click();
+  await page.getByRole("link", { name: "Importer", exact: true }).click();
+  await page.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, expected().files.extra_achats.path));
+  await page.getByRole("button", { name: "Importer dans la base" }).click();
   const outcome = page.getByRole("heading", { level: 3, name: /lignes importées$|^Erreur d'importation$|^Import annulé$/ });
   await expect(outcome).toBeVisible({ timeout: 5 * 60_000 });
   expect((await outcome.textContent())?.replace(/\D/g, ""), "lignes importées").toBe("600");
+  const refetch = pageCall(page, "/stats/analyse-marge");
+  await sidebar.getByRole("link", { name: "Analyses", exact: true }).click();
+  await refetch;                     // no request = stale numbers shown after the import
 
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");
@@ -99,6 +111,11 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   expectSame(after, { deleted_by_full_name: OWNER.name, deleted_by_email: OWNER.email }, "import supprimé");
   expect(after.deleted_at, "deleted_at").not.toBeNull();
   await expect(page.getByText(`Supprimé par ${OWNER.name}`, { exact: false })).toBeVisible();
+
+  // Every toast has a close button: the success toast goes before its 4 s auto-close.
+  const toast = page.locator("[data-sonner-toast][data-type=success]").first();
+  await toast.getByRole("button", { name: "Fermer" }).click();
+  await expect(toast).toBeHidden({ timeout: 2_000 });
 });
 
 

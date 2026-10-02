@@ -10,9 +10,10 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useT } from "@/i18n/I18nProvider";
 import { matchesFields } from "@/utils/text";
-import { QUERY_KEYS } from "@/types";
+
 import type { DeveloperAccount } from "@/types/storeWebsite";
 import type { DeveloperAccountOut } from "@/types/storeWebsite";
 
@@ -36,7 +37,7 @@ export default function AdminDevelopersRoute() {
   const [search, setSearch] = useState("");
 
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_DEVELOPERS,
+    queryKey: QUERIES.admin.developers,
     queryFn:  () => api.get<DeveloperAccountOut[]>(URLS.storeWebsite.developers),
   });
 

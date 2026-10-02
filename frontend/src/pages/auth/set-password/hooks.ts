@@ -5,7 +5,8 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { ApiErr, api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { ROUTES, QUERY_KEYS, type ValidateTokenResponse } from "@/types";
+import { QUERIES } from "@/api/queries";
+import { ROUTES, type ValidateTokenResponse } from "@/types";
 
 export function useSetPassword(token: string) {
   const t = useT();
@@ -34,7 +35,7 @@ export function useSetPassword(token: string) {
 
 export function useValidateToken(token: string) {
   const query = useQuery({
-    queryKey: QUERY_KEYS.VALIDATE_TOKEN(token),
+    queryKey: QUERIES.auth.validateToken(token),
     queryFn:  () => api.get<ValidateTokenResponse>(URLS.auth.validateToken, { params: { token } }),
     enabled:  token.length > 0,
     retry:    false,

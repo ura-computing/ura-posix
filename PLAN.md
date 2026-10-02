@@ -115,7 +115,7 @@ sort, pagination, dialog, export file and value shown; test each against the ora
 | FE7 | **i18n gaps** (toasts done) | hardcoded French labels: upload preview / stepper / type cards / filename error, stock statuses, comptabilité payment dialog + ledger headers, produits-spéciaux dialogs, AsyncButton / ConfirmDialog / KebabMenu / PasswordField defaults, AuthLayout brand panel, rapport admin strip + donut | keys in `fr.ts` + `es.ts` |
 | FE8 | **404 in the layout for roles too** | `RequireRole` redirects to `/` (`_components/RequireRole.tsx:23`) | same in-layout 404 as `RequireFeature` |
 | FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
-| FE10 | **Dead code** | `ROUTES.RAPPORTS`, `QUERY_KEYS.DASHBOARD`, `STATUSES` (revoked/pending/rejected), admin margin-alerts / stock-summary hooks (with G8) | removed |
+| FE10 | **Dead code** | `ROUTES.RAPPORTS`, `STATUSES` (revoked/pending/rejected), admin margin-alerts / stock-summary hooks (with G8) | removed |
 
 **Bugs fixed in these steps**
 

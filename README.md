@@ -139,7 +139,7 @@ apcm-pharma/
     └── src/
         ├── main.tsx        providers: Query, I18n, Upload, GlobalDateRange, Router, Toaster
         ├── App.tsx         routes + guards
-        ├── api/            client.ts (api.get/post/…), urls.ts (every /v1 path), errors.ts (ErrorCode)
+        ├── api/            client.ts (api.get/post/…), urls.ts (every /v1 path), queries.ts (every query key), errors.ts (ErrorCode)
         ├── _components/    FLAT, shared by several features: AppLayout (+ Sidebar, Header, nav
         │                   config inside), Require* guards, DataTable, filterBar, ConfirmDialog,
         │                   KpiTile, TabBar, member dialogs, dialog / button primitives, …
@@ -155,7 +155,7 @@ apcm-pharma/
         │   ├── admin/        pharmacies (+ detail/), catalogue, categories, developers (hidden)
         │   └── store/        hidden « Ma boutique » pages: store-website, dev, preview
         ├── i18n/           I18nProvider (useT), config, locales/fr.ts + es.ts
-        ├── types/          index.ts (ROUTES, ROLES, FEATURES, QUERY_KEYS) + one file per domain, same names as backend/schemas/; import from "@/types"
+        ├── types/          index.ts (ROUTES, ROLES, FEATURES) + one file per domain, same names as backend/schemas/; import from "@/types"
         └── utils/          format.tsx, text.ts, dateRange.ts, csv.ts, table.ts, cn.ts
 ```
 
@@ -357,7 +357,9 @@ zod + sonner (toasts) + lucide-react + xlsx. **React Compiler on.**
 - `api/urls.ts` → `URLS`: every backend path. Calls are written inline in `hooks.ts`, no wrapper functions:
   `api.delete(URLS.admin.catalog.one(id))`, `api.get<Row[]>(URLS.ventes.list, { params: filters })`.
   `params`: arrays → repeated keys, null / undefined / "" skipped, booleans sent as "true" / "false".
-- TanStack keys: every key in `QUERY_KEYS` (`types/index.ts`), no local keys. Mutations
+- TanStack keys: every key in `QUERIES` (`api/queries.ts`, grouped like `URLS`: `[group, name, ...args]`), no local keys.
+  `QUERIES.ventes.all` = every ventes query, `QUERIES.stats.mainAll` = every filter combo of one query.
+  After an import / undo: `invalidateQueries({ predicate: changedByImport(docType) })`. Mutations
   invalidate the keys they affect — keep that when adding one.
 
 ### 5.3 Page pattern

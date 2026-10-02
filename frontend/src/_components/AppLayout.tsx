@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigate, Outlet, useLocation, NavLink, Link, useNavigate } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
-import { QUERY_KEYS, ROLES, ROUTES } from "@/types";
+import { ROLES, ROUTES } from "@/types";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -39,6 +39,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
@@ -276,7 +277,7 @@ function Header({ onOpenMobile }: HeaderProps) {
  *  sidebar badge. Refetches every 60s; cheap query. */
 function useUnclassifiedCount(role: Role): number {
   const q = useQuery({
-    queryKey:        QUERY_KEYS.UNCLASSIFIED_COUNT,
+    queryKey:        QUERIES.admin.catalog.unclassifiedCount,
     queryFn:         () => api.get<{ count: number }>(URLS.admin.catalog.unclassifiedCount),
     enabled:         role === ROLES.ADMIN,
     staleTime:       60_000,

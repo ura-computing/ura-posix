@@ -4,8 +4,9 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { QUERY_KEYS } from "@/types";
+
 import type {
   SurveillanceTab, VentesDiscountSummary, VentesFilters, VentesFiltersKey, VentesListResponse,
   VentesSuggestions, VentesSurveillanceCounts,
@@ -61,32 +62,32 @@ export function useVentesPage() {
   }, [filters]);
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.VENTES(filters),
+    queryKey: QUERIES.ventes.list(filters),
     queryFn:  () => api.get<VentesListResponse>(URLS.ventes.list, { params: filters }),
   });
   const counts = useQuery({
-    queryKey: QUERY_KEYS.VENTES_SURVEILLANCE(key),
+    queryKey: QUERIES.ventes.surveillance(key),
     queryFn:  () => api.get<VentesSurveillanceCounts>(URLS.ventes.surveillanceCounts, { params: summaryFilters }),
   });
   const categories = useQuery({
-    queryKey: QUERY_KEYS.VENTES_CATEGORIES,
+    queryKey: QUERIES.ventes.categories,
     queryFn:  () => api.get<string[]>(URLS.ventes.categories),
     staleTime: 5 * 60_000,
   });
   const tvaRates = useQuery({
-    queryKey: QUERY_KEYS.VENTES_TVA_RATES,
+    queryKey: QUERIES.ventes.tvaRates,
     queryFn:  () => api.get<string[]>(URLS.ventes.tvaRates),
     staleTime: 5 * 60_000,
   });
   const suggestions = useQuery({
-    queryKey: QUERY_KEYS.VENTES_SUGGESTIONS(suggestQ),
+    queryKey: QUERIES.ventes.suggestions(suggestQ),
     queryFn:  () => api.get<VentesSuggestions>(URLS.ventes.suggestions, { params: { q: suggestQ } }),
     enabled:  suggestQ.length >= 2,
     staleTime: 60_000,
   });
 
   const discountSummaryQ = useQuery({
-    queryKey: QUERY_KEYS.VENTES_DISCOUNT_SUMMARY(summaryFilters),
+    queryKey: QUERIES.ventes.discountSummary(summaryFilters),
     queryFn:  () => api.get<VentesDiscountSummary>(URLS.ventes.discountSummary, { params: summaryFilters }),
     staleTime: 60_000,
   });

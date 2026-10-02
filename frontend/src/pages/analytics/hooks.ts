@@ -6,7 +6,8 @@ import type { AlertColumn } from "./_components/AlertDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   MarginAlertsResponse, PeremptionsResponse, StatsFilters, StockAbcdResponse, StockFilters, VentesSansAchatResponse,
 } from "@/types";
@@ -169,8 +170,8 @@ export function useStockAbcd(
     filters.class_filter || filters.status || filters.sort_by,
   );
   const queryKey = isFiltered
-    ? QUERY_KEYS.STOCK_ABCD_FILTERED(filters as StockFilters)
-    : QUERY_KEYS.STOCK_ABCD_FULL(filters.date_from ?? null, filters.date_to ?? null);
+    ? QUERIES.stats.stockAbcdFiltered(filters as StockFilters)
+    : QUERIES.stats.stockAbcdFull(filters.date_from ?? null, filters.date_to ?? null);
 
   return useQuery({
     queryKey,
@@ -181,7 +182,7 @@ export function useStockAbcd(
 
 export function usePeremptions() {
   return useQuery({
-    queryKey: QUERY_KEYS.PEREMPTIONS,
+    queryKey: QUERIES.stats.peremptions,
     queryFn:  () => api.get<PeremptionsResponse>(URLS.stats.peremptions),
     staleTime: 60_000,
   });
@@ -192,7 +193,7 @@ export function usePeremptions() {
  *  switching dates / category type refetches cleanly. */
 export function useMarginAlerts(filters: MarginAlertsFilters) {
   return useQuery({
-    queryKey: QUERY_KEYS.MARGIN_ALERTS(
+    queryKey: QUERIES.stats.marginAlerts(
       filters.date_from ?? null,
       filters.date_to   ?? null,
       filters.category_type ?? "all",
@@ -206,7 +207,7 @@ export function useMarginAlerts(filters: MarginAlertsFilters) {
  *  "—" cells for Marge %/DH on /ventes. Same filter shape as MarginAlerts. */
 export function useVentesSansAchat(filters: MarginAlertsFilters) {
   return useQuery({
-    queryKey: QUERY_KEYS.VENTES_SANS_ACHAT(
+    queryKey: QUERIES.stats.ventesSansAchat(
       filters.date_from ?? null,
       filters.date_to   ?? null,
       filters.category_type ?? "all",

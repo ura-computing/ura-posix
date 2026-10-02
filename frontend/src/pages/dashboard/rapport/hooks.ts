@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   AdminPharmacyRow, AdminStatsResponse, AnalyseFilters, AnalyseMargeResponse, CategoryType, MargeMode,
   MarginAlertsResponse, StatsFilters, StatsResponse, StockSummaryResponse,
@@ -13,7 +14,7 @@ import type {
 
 export function useStats(filters: StatsFilters) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.STATS(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
+    queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
     queryFn:  () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
     staleTime: 60_000,
   });
@@ -24,7 +25,7 @@ export function useStats(filters: StatsFilters) {
  *  for the Rapport period + category. Same key + URL as /analyses → shared cache. */
 export function useOptimisationGain(filters: StatsFilters) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ANALYSE_MARGE("produit", filters.date_from, filters.date_to, filters.category_type, null),
+    queryKey: QUERIES.stats.analyseMarge("produit", filters.date_from, filters.date_to, filters.category_type, null),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
       mode: "produit", date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
     } }),
@@ -36,7 +37,7 @@ export function useOptimisationGain(filters: StatsFilters) {
 
 export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.MARGIN_ALERTS(filters.date_from, filters.date_to, filters.category_type),
+    queryKey: QUERIES.stats.marginAlerts(filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<MarginAlertsResponse>(URLS.stats.marginAlerts, { params: filters }),
     staleTime: 60_000,
   });
@@ -46,7 +47,7 @@ export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declare
 
 export function useStockSummary() {
   const q = useQuery({
-    queryKey: QUERY_KEYS.STOCK_SUMMARY,
+    queryKey: QUERIES.stats.stockSummary,
     queryFn:  () => api.get<StockSummaryResponse>(URLS.stats.stockSummary),
     staleTime: 5 * 60_000,    // stock changes less often than ventes
   });
@@ -58,7 +59,7 @@ export function useStockSummary() {
 
 export function useAdminStats() {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_STATS,
+    queryKey: QUERIES.admin.stats,
     queryFn:  () => api.get<AdminStatsResponse>(URLS.admin.stats),
     staleTime: 60_000,
   });
@@ -68,7 +69,7 @@ export function useAdminStats() {
 
 export function useAdminPharmacies() {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_PHARMACIES,
+    queryKey: QUERIES.admin.pharmacies,
     queryFn:  () => api.get<AdminPharmacyRow[]>(URLS.admin.pharmacies),
     staleTime: 5 * 60_000,    // pharmacy list rarely changes
   });
@@ -78,7 +79,7 @@ export function useAdminPharmacies() {
 
 export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsFilters) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_PHARM_STATS(
+    queryKey: QUERIES.admin.pharmacyStats(
       pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared,
     ),
     queryFn:  () => api.get<StatsResponse>(URLS.admin.pharmacy.stats(pharmacyId as number), { params: filters }),
@@ -91,7 +92,7 @@ export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsF
 
 export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters: Omit<StatsFilters, "include_non_declared">) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_PHARM_MARGE(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
+    queryKey: QUERIES.admin.pharmacyMarge(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<MarginAlertsResponse>(URLS.admin.pharmacy.marginAlerts(pharmacyId as number), { params: filters }),
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
@@ -102,7 +103,7 @@ export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters:
 
 export function useAdminPharmacyStockSummary(pharmacyId: number | null) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_PHARM_STOCK(pharmacyId ?? 0),
+    queryKey: QUERIES.admin.pharmacyStock(pharmacyId ?? 0),
     queryFn:  () => api.get<StockSummaryResponse>(URLS.admin.pharmacy.stockSummary(pharmacyId as number)),
     enabled:  pharmacyId !== null,
     staleTime: 5 * 60_000,
@@ -120,7 +121,7 @@ export function useAdminPharmacyAnalyseMarge(
   filters:    AnalyseFilters,
 ) {
   const q = useQuery({
-    queryKey: QUERY_KEYS.ADMIN_PHARM_ANALYSE(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
+    queryKey: QUERIES.admin.pharmacyAnalyse(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.admin.pharmacy.analyseMarge(pharmacyId as number), { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
     } }),

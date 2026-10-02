@@ -11,15 +11,14 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useT } from "@/i18n/I18nProvider";
 import { useMe } from "@/hooks/useMe";
-import { QUERY_KEYS } from "@/types";
+
 import type { DevKpis, DevRequest, Urgency, RequestState } from "@/types/storeWebsite";
 import type { WebsiteRequestOut } from "@/types/storeWebsite";
 
 import { DevDashboard } from "./_components/DevDashboard";
-
-
 
 
 /** Backend row → dashboard's `DevRequest` shape. */
@@ -46,14 +45,14 @@ export default function DevDashboardRoute() {
   const t        = useT();
 
   const q = useQuery({
-    queryKey: QUERY_KEYS.STORE_REQUESTS,
+    queryKey: QUERIES.storeWebsite.requests,
     queryFn:  () => api.get<WebsiteRequestOut[]>(URLS.storeWebsite.requests),
   });
 
   const claimMutation = useMutation({
     mutationFn: (id: string) => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.claim(id)),
     onSuccess:  (fresh) => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.STORE_REQUESTS });
+      qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.requests });
       toast.success(t("store.claimedOpenEditor"));
       navigate(`/requests/${fresh.id}`);
     },

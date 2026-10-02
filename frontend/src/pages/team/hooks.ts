@@ -4,17 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   CreateUserIn, CreateUserOut, MemberOut, MemberStatus, OwnerEmployeesResponse, ResetPasswordOut,
 } from "@/types";
 
 
-
-
 export function useOwnerEmployees() {
   return useQuery({
-    queryKey:  QUERY_KEYS.OWNER_EMPLOYEES,
+    queryKey:  QUERIES.employees.list,
     queryFn:   () => api.get<OwnerEmployeesResponse>(URLS.employees.list),
     staleTime: 30_000,
   });
@@ -24,7 +23,7 @@ export function useCreateEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(URLS.employees.list, body),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.OWNER_EMPLOYEES }); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
   });
 }
 
@@ -33,7 +32,7 @@ export function useSetEmployeePermissions() {
   return useMutation({
     mutationFn: ({ employeeId, permissions }: { employeeId: number; permissions: Record<string, boolean> }) =>
       api.put<MemberOut>(URLS.employees.permissions(employeeId), { permissions }),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.OWNER_EMPLOYEES }); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
   });
 }
 
@@ -42,7 +41,7 @@ export function useSetEmployeeStatus() {
   return useMutation({
     mutationFn: ({ employeeId, status }: { employeeId: number; status: MemberStatus }) =>
       api.patch<MemberOut>(URLS.employees.status(employeeId), { status }),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.OWNER_EMPLOYEES }); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
   });
 }
 
@@ -57,6 +56,6 @@ export function useDeleteEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (employeeId: number) => api.delete(URLS.employees.one(employeeId)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.OWNER_EMPLOYEES }); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
   });
 }

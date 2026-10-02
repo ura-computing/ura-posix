@@ -1,15 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { QUERY_KEYS } from "@/types";
+
 import { toast } from "sonner";
 import { useT } from "@/i18n/I18nProvider";
 import { ApiErr, api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import type { UpdateProfileRequest, ChangePasswordRequest, Me, MeResponse, Session } from "@/types";
 
 export function useSessions(userId: string) {
   const query = useQuery({
-    queryKey: QUERY_KEYS.SESSIONS(userId),
+    queryKey: QUERIES.sessions.list(userId),
     queryFn:  () => api.get<Session[]>(URLS.sessions.list),
     staleTime: 30_000,
   });
@@ -29,14 +30,14 @@ export function useKillSession(userId: string) {
   const mutation = useMutation({
     mutationFn: (sessionId: string) => api.delete(URLS.sessions.one(sessionId)),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SESSIONS(userId) });
+      await queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(userId) });
       toast.success(t("toast.sessionKilled"));
     },
     onError: (err: ApiErr) => {
       if (err.status === 404) {
         // Another tab / device already killed this session. Soft-recover: refresh
         // the list silently and tell the user it's gone, not that something broke.
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SESSIONS(userId) });
+        queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(userId) });
         toast.info(t("toast.sessionAlreadyGone"));
         return;
       }
@@ -59,7 +60,7 @@ export function useRevokeOtherSessions(userId: string) {
   const mutation = useMutation({
     mutationFn: () => api.post<void>(URLS.sessions.revokeOthers),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SESSIONS(userId) });
+      await queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(userId) });
       toast.success(t("toast.allSessionsRevoked"));
     },
     onError: (err: ApiErr) => {
@@ -82,7 +83,7 @@ export function useUpdateProfile() {
   const mutation = useMutation({
     mutationFn: (input: UpdateProfileRequest) => api.patch<MeResponse>(URLS.auth.me, input),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ME });
+      await queryClient.invalidateQueries({ queryKey: QUERIES.auth.me });
       toast.success(t("toast.profileUpdated"));
     },
     onError: (err: ApiErr) => {
@@ -111,10 +112,10 @@ export function useChangePassword(onDone?: () => void) {
       // current device (fix #2). Refresh /me (the response stays the same but
       // the cookie pair changed under us) AND refresh the Sessions tab so it
       // shows the single surviving session.
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ME });
-      const me = queryClient.getQueryData<Me>(QUERY_KEYS.ME);
+      await queryClient.invalidateQueries({ queryKey: QUERIES.auth.me });
+      const me = queryClient.getQueryData<Me>(QUERIES.auth.me);
       if (me?.id) {
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SESSIONS(me.id) });
+        await queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(me.id) });
       }
       toast.success(t("toast.pwdChanged"));
       onDone?.();

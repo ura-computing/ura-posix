@@ -6,7 +6,8 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   BlExclusion, BlExclusionResult, BlReintegrateResult, BlSummary,
   MedicamentSuggestion, SpecialProduct, SpecialProductBulkResult, SpecialProductReintegrateResult,
@@ -23,12 +24,12 @@ export function useProduitsSpeciaux() {
   const [suggestQ, setSuggestQ] = useState("");
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.SPECIAL_PRODUCTS,
+    queryKey: QUERIES.specialProducts.list,
     queryFn:  () => api.get<SpecialProduct[]>(URLS.specialProducts.list),
   });
 
   const suggestions = useQuery({
-    queryKey:  QUERY_KEYS.MEDICAMENT_SUGGESTIONS(suggestQ),
+    queryKey:  QUERIES.specialProducts.suggestions(suggestQ),
     queryFn:   () => api.get<MedicamentSuggestion[]>(URLS.specialProducts.suggestions, { params: { q: suggestQ } }),
     enabled:   suggestQ.trim().length >= 2,
     staleTime: 60_000,
@@ -37,15 +38,15 @@ export function useProduitsSpeciaux() {
   // Invalidate every cache that filters via non_declared_sub — exclusions affect
   // achats / ventes / stats / margin alerts / stock / analyse aggregates.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SPECIAL_PRODUCTS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MARGIN_ALERTS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ANALYSE_MARGE_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_SUMMARY });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FULL_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FILTERED_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VENTES_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACHATS_PREFIX });
+    queryClient.invalidateQueries({ queryKey: QUERIES.specialProducts.list });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
   };
 
   const exclude = useMutation({
@@ -116,12 +117,12 @@ export function useBlExclusions() {
   const [searchQ,  setSearchQ]  = useState("");    // exclude-dialog search box
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.BL_EXCLUSIONS,
+    queryKey: QUERIES.blExclusions.list,
     queryFn:  () => api.get<BlExclusion[]>(URLS.blExclusions.list),
   });
 
   const results = useQuery({
-    queryKey:  QUERY_KEYS.BL_SEARCH(searchQ),
+    queryKey:  QUERIES.blExclusions.search(searchQ),
     queryFn:   () => api.get<BlSummary[]>(URLS.blExclusions.search, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
     staleTime: 30_000,
@@ -130,16 +131,16 @@ export function useBlExclusions() {
   // Excluding/reintegrating a BL shifts every purchase aggregate → invalidate
   // the same caches the product-exclusion flow does.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BL_EXCLUSIONS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.BL_SEARCH_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MARGIN_ALERTS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ANALYSE_MARGE_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_SUMMARY });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FULL_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FILTERED_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACHATS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VENTES_PREFIX });
+    queryClient.invalidateQueries({ queryKey: QUERIES.blExclusions.list });
+    queryClient.invalidateQueries({ queryKey: QUERIES.blExclusions.searchAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
   };
 
   const exclude = useMutation({
@@ -206,12 +207,12 @@ export function useSupplierExclusions() {
   const [searchQ, setSearchQ] = useState("");   // exclude-dialog search box
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.SUPPLIER_EXCLUSIONS,
+    queryKey: QUERIES.supplierExclusions.list,
     queryFn:  () => api.get<SupplierExclusion[]>(URLS.supplierExclusions.list),
   });
 
   const results = useQuery({
-    queryKey:  QUERY_KEYS.SUPPLIER_SEARCH(searchQ),
+    queryKey:  QUERIES.supplierExclusions.search(searchQ),
     queryFn:   () => api.get<SupplierSummary[]>(URLS.supplierExclusions.search, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
     staleTime: 30_000,
@@ -220,16 +221,16 @@ export function useSupplierExclusions() {
   // Excluding/reintegrating a supplier shifts every purchase aggregate →
   // invalidate the same caches the BL-exclusion flow does.
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SUPPLIER_EXCLUSIONS });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.SUPPLIER_SEARCH_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STATS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.MARGIN_ALERTS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ANALYSE_MARGE_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_SUMMARY });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FULL_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.STOCK_ABCD_FILTERED_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ACHATS_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.VENTES_PREFIX });
+    queryClient.invalidateQueries({ queryKey: QUERIES.supplierExclusions.list });
+    queryClient.invalidateQueries({ queryKey: QUERIES.supplierExclusions.searchAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
   };
 
   const exclude = useMutation({

@@ -4,7 +4,8 @@ import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS, ROUTES, type LoginRequest, type MeResponse } from "@/types";
+import { QUERIES } from "@/api/queries";
+import { ROUTES, type LoginRequest, type MeResponse } from "@/types";
 
 export function useLogin() {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export function useLogin() {
   const mutation = useMutation<MeResponse, ApiErr, LoginRequest>({
     mutationFn: (input) => api.post<MeResponse>(URLS.auth.login, input),
     onSuccess: (data) => {
-      queryClient.setQueryData(QUERY_KEYS.ME, data);
+      queryClient.setQueryData(QUERIES.auth.me, data);
       navigate(ROUTES.HOME);
     },
     onError: (err) => {

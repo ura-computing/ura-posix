@@ -32,7 +32,8 @@ import { Dialog, DialogContent } from "@/_components/dialog";
 import { TabBar } from "@/_components/TabBar";
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 
 /** "Exclure un BL" dialog — PG-007. Two steps:
  *   1. Search a delivery note by reference OR by a product it contains → pick one.
@@ -70,7 +71,7 @@ function ExcludeBlDialog({
   }, [open, onSearchChange]);
 
   const detail = useQuery({
-    queryKey: QUERY_KEYS.BL_DETAIL(selected?.delivery_ref ?? ""),
+    queryKey: QUERIES.blExclusions.detail(selected?.delivery_ref ?? ""),
     queryFn:  () => api.get<BlDetail>(URLS.blExclusions.detail, { params: { delivery_ref: selected!.delivery_ref } }),
     enabled:  open && !!selected,
   });

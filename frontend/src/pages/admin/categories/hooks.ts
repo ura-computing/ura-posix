@@ -3,14 +3,15 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useT } from "@/i18n/I18nProvider";
-import { QUERY_KEYS } from "@/types";
+
 import type { CategorySuffixIn, CategorySuffixOut } from "@/types";
 
 
 export function useCategorySuffixes() {
   return useQuery({
-    queryKey: QUERY_KEYS.CATEGORY_SUFFIXES,
+    queryKey: QUERIES.categorySuffixes.list,
     queryFn:  () => api.get<CategorySuffixOut[]>(URLS.categorySuffixes.list),
   });
 }
@@ -21,7 +22,7 @@ export function useCreateCategorySuffix() {
   return useMutation({
     mutationFn: (body: CategorySuffixIn) => api.post<CategorySuffixOut>(URLS.categorySuffixes.list, body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORY_SUFFIXES });
+      qc.invalidateQueries({ queryKey: QUERIES.categorySuffixes.list });
       toast.success(t("categories.toastCreated"));
     },
   });
@@ -34,7 +35,7 @@ export function useUpdateCategorySuffix() {
     mutationFn: ({ id, body }: { id: number; body: CategorySuffixIn }) =>
       api.put<CategorySuffixOut>(URLS.categorySuffixes.one(id), body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORY_SUFFIXES });
+      qc.invalidateQueries({ queryKey: QUERIES.categorySuffixes.list });
       toast.success(t("categories.toastUpdated"));
     },
   });
@@ -46,7 +47,7 @@ export function useDeleteCategorySuffix() {
   return useMutation({
     mutationFn: (id: number) => api.delete(URLS.categorySuffixes.one(id)),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.CATEGORY_SUFFIXES });
+      qc.invalidateQueries({ queryKey: QUERIES.categorySuffixes.list });
       toast.success(t("categories.toastDeleted"));
     },
   });

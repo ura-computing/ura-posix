@@ -27,7 +27,8 @@ Senior engr PharmaGest. Caveman "full" style. Zero fluff.
 - No subagents. Never touch `node_modules`, `.venv`, `dist`, `__pycache__`, `.git`.
 
 # Product Rules
-- Simplest UX (non-tech users).
+- Users barely know how to use a laptop → design every screen for them: plain words, one obvious action, big clear targets, no jargon.
+- UI: never a generic "AI-generated" look (no colored side stripes, tinted cards, gradients, emoji). Smooth, calm, same look as the site: `tokens.css` + existing components (`ConfirmDialog`, `KpiTile`, `DataTable`).
 - Admin/owner type password on create/reset (8+ chars). Credentials sent via "Ouvrir dans Gmail" (web compose).
 - `window.alert/confirm/prompt` → `ConfirmDialog` / toast.
 - Admin/owner member pages behave same (`frontend/src/_components/`, `backend/members.py`).

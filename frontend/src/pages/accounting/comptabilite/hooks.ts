@@ -6,8 +6,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { QUERY_KEYS } from "@/types";
+
 import type {
   PaymentMethod,
   StatsFilters,
@@ -72,7 +73,7 @@ export function useComptabilitePage() {
 
   // KPIs (existing /stats endpoint)
   const statsQ = useQuery({
-    queryKey: QUERY_KEYS.STATS(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
+    queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
     queryFn:  () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
     staleTime: 60_000,
   });
@@ -84,7 +85,7 @@ export function useComptabilitePage() {
   const payments  = paymentsQ.data ?? [];
 
   // Ventes ledger — independent query so changing the page's filters refetches
-  // just the ledger (TanStack cache keyed via QUERY_KEYS.VENTES).
+  // just the ledger (TanStack cache keyed via QUERIES.ventes.list).
   const ventesFilters: VentesFilters = useMemo(() => ({
     page:                 ventesPage,
     limit:                ventesPageSize,
@@ -100,7 +101,7 @@ export function useComptabilitePage() {
   }), [filters, ventesPage, ventesPageSize, ventesSortBy, ventesSortOrder]);
 
   const ventesQ = useQuery({
-    queryKey: QUERY_KEYS.VENTES(ventesFilters),
+    queryKey: QUERIES.ventes.list(ventesFilters),
     queryFn:  () => api.get<VentesListResponse>(URLS.ventes.list, { params: ventesFilters }),
   });
 
@@ -175,7 +176,7 @@ export function useComptabilitePage() {
 /** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
 export function usePayments(month?: string) {
   return useQuery({
-    queryKey: QUERY_KEYS.PAYMENTS(month),
+    queryKey: QUERIES.payments.list(month),
     queryFn:  () => api.get<PaymentEntry[]>(URLS.payments.list, { params: { month } }),
     staleTime: 30_000,
   });
@@ -185,7 +186,7 @@ export function useSavePayment() {
   const qc = useQueryClient();
   return useMutation<PaymentEntry, Error, PaymentEntryIn>({
     mutationFn: (body) => api.post<PaymentEntry>(URLS.payments.list, body),
-    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PAYMENTS_PREFIX }); },
+    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
   });
 }
 
@@ -193,6 +194,6 @@ export function useDeletePayment() {
   const qc = useQueryClient();
   return useMutation<void, Error, number>({
     mutationFn: (id) => api.delete(URLS.payments.one(id)),
-    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERY_KEYS.PAYMENTS_PREFIX }); },
+    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
   });
 }

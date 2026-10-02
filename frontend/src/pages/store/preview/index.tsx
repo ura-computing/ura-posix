@@ -14,7 +14,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type { StoreCategory, StoreTemplate } from "@/types/storeWebsite";
 import { TEMPLATES } from "@/types/storeWebsite";
 import type { PublicPreviewOut } from "@/types/storeWebsite";
@@ -78,7 +79,7 @@ export default function StorePreviewRoute() {
   // Query runs only when a request id is present. Anonymous preview
   // (no ?request=) skips the fetch and renders defaults.
   const q = useQuery({
-    queryKey: QUERY_KEYS.STORE_PREVIEW(requestId),
+    queryKey: QUERIES.storeWebsite.preview(requestId),
     queryFn:  () => api.get<PublicPreviewOut>(URLS.storeWebsite.publicPreview(requestId!)),
     enabled:  !!requestId,
     retry:    false,   // 404 fast-fail — don't hammer for invalid uuids

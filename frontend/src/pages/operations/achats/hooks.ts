@@ -4,8 +4,9 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { QUERY_KEYS } from "@/types";
+
 import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
@@ -40,7 +41,7 @@ export function useAchatsPage() {
   );
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.ACHATS(filters),
+    queryKey: QUERIES.achats.list(filters),
     queryFn: () => api.get<AchatsListResponse>(URLS.achats.list, { params: filters }),
   });
 
@@ -50,22 +51,22 @@ export function useAchatsPage() {
     [filters.date_from, filters.date_to, filters.search, filters.category, filters.tva],
   );
   const supplierSummary = useQuery({
-    queryKey: QUERY_KEYS.ACHATS_SUPPLIER_SUMMARY(summaryKey),
+    queryKey: QUERIES.achats.supplierSummary(summaryKey),
     queryFn: () => api.get<AchatsSupplierSummary>(URLS.achats.supplierSummary, { params: summaryKey }),
   });
 
   const categories = useQuery({
-    queryKey: QUERY_KEYS.ACHATS_CATEGORIES,
+    queryKey: QUERIES.achats.categories,
     queryFn: () => api.get<string[]>(URLS.achats.categories),
     staleTime: 5 * 60_000,
   });
   const tvaRates = useQuery({
-    queryKey: QUERY_KEYS.ACHATS_TVA_RATES,
+    queryKey: QUERIES.achats.tvaRates,
     queryFn: () => api.get<string[]>(URLS.achats.tvaRates),
     staleTime: 5 * 60_000,
   });
   const suggestions = useQuery({
-    queryKey: QUERY_KEYS.ACHATS_SUGGESTIONS(suggestQ),
+    queryKey: QUERIES.achats.suggestions(suggestQ),
     queryFn: () => api.get<AchatsSuggestions>(URLS.achats.suggestions, { params: { q: suggestQ } }),
     enabled: suggestQ.length >= 2,
     staleTime: 60_000,

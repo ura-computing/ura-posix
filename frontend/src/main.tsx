@@ -2,14 +2,16 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import { ApiErr, setUnauthorizedHandler } from "@/api/client";
+import { QUERIES } from "@/api/queries";
 import App from "@/App";
 import { UploadProvider } from "@/hooks/UploadContext";
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
 import { I18nProvider, translate, useT } from "@/i18n/I18nProvider";
-import { QUERY_KEYS } from "@/types";
+
 import "@/styles/globals.css";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 
@@ -69,6 +71,45 @@ function toastError(err: unknown): void {
   toast.error(err instanceof ApiErr ? err.detail : translate("toast.genericError"));
 }
 
+/** Round icon chip, same as ConfirmDialog's. */
+const chip = (Icon: typeof Info, tone: string) => (
+  <span className={`flex size-8 items-center justify-center rounded-full ${tone}`}>
+    <Icon className="size-4" aria-hidden />
+  </span>
+);
+
+const TOAST_ICONS = {
+  success: chip(CircleCheck,   "bg-success-subtle text-success"),
+  error:   chip(CircleAlert,   "bg-error-subtle text-error"),
+  warning: chip(TriangleAlert, "bg-warning-subtle text-warning"),
+  info:    chip(Info,          "bg-info-subtle text-info"),
+  loading: chip(LoaderCircle,  "bg-muted text-muted-foreground [&>svg]:animate-spin"),
+  close:   <X className="size-4" aria-hidden />,
+};
+
+/** Every toast looks like a small ConfirmDialog (card, border, icon chip) + close button. */
+function AppToaster() {
+  const t = useT();
+  return (
+    <Toaster
+      closeButton
+      position="top-right"
+      icons={TOAST_ICONS}
+      toastOptions={{
+        unstyled: true,
+        closeButtonAriaLabel: t("common.close"),
+        classNames: {
+          toast:       "flex w-full items-center gap-3 rounded-lg border border-border bg-card py-3 pl-3 pr-10 shadow-md",
+          content:     "flex min-w-0 flex-col gap-0.5",
+          title:       "text-sm font-medium leading-snug text-foreground",
+          description: "text-sm text-muted-foreground",
+          closeButton: "absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+        },
+      }}
+    />
+  );
+}
+
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: toastError }),
   mutationCache: new MutationCache({
@@ -93,7 +134,7 @@ const queryClient = new QueryClient({
 // triggers a hard reload, which boots without a session cookie and lands on
 // /login through the natural auth-guard path.
 setUnauthorizedHandler(() => {
-  if (queryClient.getQueryData(QUERY_KEYS.ME) !== undefined) {
+  if (queryClient.getQueryData(QUERIES.auth.me) !== undefined) {
     openSessionExpiredDialog();
   }
 });
@@ -108,7 +149,7 @@ createRoot(document.getElementById("root")!).render(
               <App />
             </BrowserRouter>
             <SessionExpiredDialog />
-            <Toaster richColors position="top-right" />
+            <AppToaster />
           </GlobalDateRangeProvider>
         </UploadProvider>
       </I18nProvider>

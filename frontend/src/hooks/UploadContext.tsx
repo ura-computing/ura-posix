@@ -3,13 +3,15 @@ import {
   type ReactNode,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { changedByImport } from "@/api/queries";
 import { translate } from "@/i18n/I18nProvider";
 import { chunk } from "@/utils/csv";
-import type { DocType, UploadStockResult, UploadTxResult } from "@/types";
+import { type DocType, type UploadStockResult, type UploadTxResult } from "@/types";
 
 
 /**
@@ -100,6 +102,7 @@ const UploadContext = createContext<UploadCtxValue | null>(null);
 
 
 export function UploadProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient();
   const [jobs, setJobs] = useState<Map<string, UploadJob>>(() => new Map());
 
   /** Refs that survive across renders. The runner reads jobsRef (not the React
@@ -232,8 +235,11 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
       patchJob(job.id, { phase: "error", batchId, error: detail });
       toast.error(detail);
+    } finally {
+      // Rows added / removed: queries on screen refetch now (Rapport open during an import), others on next visit.
+      if (batchId != null) void qc.invalidateQueries({ predicate: changedByImport(job.docType) });
     }
-  }, [patchJob]);
+  }, [patchJob, qc]);
 
   /** Main loop: drain queued jobs FIFO. Awakened by enqueueUpload via
    *  wakeRunnerRef. Idle when no queued job is found. */

@@ -14,7 +14,8 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   CustomizationOut, CustomizationPatch, WebsiteRequestWithCustomizationOut,
 } from "@/types/storeWebsite";
@@ -36,7 +37,7 @@ export function useEditorCustomization(requestId: string | undefined) {
   const qc = useQueryClient();
 
   const query = useQuery({
-    queryKey: QUERY_KEYS.STORE_REQUEST(requestId ?? "noop"),
+    queryKey: QUERIES.storeWebsite.request(requestId ?? "noop"),
     queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(URLS.storeWebsite.request.one(requestId!)),
     enabled:  !!requestId,
   });
@@ -48,7 +49,7 @@ export function useEditorCustomization(requestId: string | undefined) {
     },
     onMutate: async (patch) => {
       if (!requestId) return;
-      const key = QUERY_KEYS.STORE_REQUEST(requestId);
+      const key = QUERIES.storeWebsite.request(requestId);
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (prev) {
@@ -60,12 +61,12 @@ export function useEditorCustomization(requestId: string | undefined) {
       return { prev };
     },
     onError: (err, _patch, ctx) => {
-      if (requestId && ctx?.prev) qc.setQueryData(QUERY_KEYS.STORE_REQUEST(requestId), ctx.prev);
+      if (requestId && ctx?.prev) qc.setQueryData(QUERIES.storeWebsite.request(requestId), ctx.prev);
       toast.error(err.message);
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERY_KEYS.STORE_REQUEST(requestId);
+      const key = QUERIES.storeWebsite.request(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },
@@ -78,7 +79,7 @@ export function useEditorCustomization(requestId: string | undefined) {
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERY_KEYS.STORE_REQUEST(requestId);
+      const key = QUERIES.storeWebsite.request(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },
@@ -91,7 +92,7 @@ export function useEditorCustomization(requestId: string | undefined) {
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERY_KEYS.STORE_REQUEST(requestId);
+      const key = QUERIES.storeWebsite.request(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },

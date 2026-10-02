@@ -17,7 +17,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   AdminUserRow,
   CreateUserIn,
@@ -31,13 +32,11 @@ import type {
 } from "@/types";
 
 
-
-
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAdminUsers() {
   return useQuery({
-    queryKey:  QUERY_KEYS.ADMIN_USERS,
+    queryKey:  QUERIES.admin.users,
     queryFn:   () => api.get<AdminUserRow[]>(URLS.admin.users),
     staleTime: 30_000,
   });
@@ -45,7 +44,7 @@ export function useAdminUsers() {
 
 export function useAdminPharmaciesList() {
   return useQuery({
-    queryKey:  QUERY_KEYS.ADMIN_PHARMACIES,
+    queryKey:  QUERIES.admin.pharmacies,
     queryFn:   () => api.get<PharmacyListRow[]>(URLS.admin.pharmacies),
     staleTime: 30_000,
   });
@@ -53,7 +52,7 @@ export function useAdminPharmaciesList() {
 
 export function useAdminPharmacy(id: number | null) {
   return useQuery({
-    queryKey:  QUERY_KEYS.ADMIN_PHARMACY(id ?? 0),
+    queryKey:  QUERIES.admin.pharmacy(id ?? 0),
     queryFn:   () => api.get<PharmacyDetail>(URLS.admin.pharmacy.one(id!)),
     enabled:   id != null && id > 0,
     staleTime: 30_000,
@@ -67,7 +66,7 @@ export function useCreatePharmacy() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: PharmacyIn) => api.post<PharmacyDetail>(URLS.admin.pharmacies, body),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES }); },
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies }); },
   });
 }
 
@@ -76,8 +75,8 @@ export function useUpdatePharmacy(id: number) {
   return useMutation({
     mutationFn: (body: PharmacyIn) => api.patch<PharmacyDetail>(URLS.admin.pharmacy.one(id), body),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(id) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
     },
   });
 }
@@ -87,9 +86,9 @@ export function useArchivePharmacy(id: number) {
   return useMutation({
     mutationFn: () => api.delete(URLS.admin.pharmacy.one(id)),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(id) });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }
@@ -100,8 +99,8 @@ export function useSetPharmacyFeatures(id: number) {
     mutationFn: (features: Record<string, boolean>) =>
       api.put<PharmacyDetail>(URLS.admin.pharmacy.features(id), { features }),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(id) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
     },
   });
 }
@@ -115,9 +114,9 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(URLS.admin.pharmacy.users(body.pharmacy_id), body),
     onSuccess:  (_out, body) => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(body.pharmacy_id) });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(body.pharmacy_id) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }
@@ -128,8 +127,8 @@ export function useSetUserPermissions(pharmacyId: number) {
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
       api.put<MemberOut>(URLS.admin.user.permissions(userId), { permissions }),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }
@@ -147,8 +146,8 @@ export function useSetUserStatus(pharmacyId: number) {
     mutationFn: ({ userId, status }: { userId: number; status: MemberStatus }) =>
       api.patch<MemberOut>(URLS.admin.user.status(userId), { status }),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }
@@ -158,9 +157,9 @@ export function useDeleteUser(pharmacyId: number) {
   return useMutation({
     mutationFn: (userId: number) => api.delete(URLS.admin.user.one(userId)),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACY(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }
@@ -172,8 +171,8 @@ export function useAssignPharmacy() {
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number }) =>
       api.patch<AdminUserRow>(URLS.admin.user.pharmacy(userId), { pharmacy_id: pharmacyId }),
     onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_PHARMACIES });      // prefix: every pharmacy detail too
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.ADMIN_USERS });
+      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });      // prefix: every pharmacy detail too
+      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
     },
   });
 }

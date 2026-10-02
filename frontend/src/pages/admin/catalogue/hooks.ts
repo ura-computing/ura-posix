@@ -5,8 +5,9 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
+import { QUERIES } from "@/api/queries";
 import { useT } from "@/i18n/I18nProvider";
-import { QUERY_KEYS } from "@/types";
+
 import type {
   CatalogFilters, CatalogImportResponse, CatalogListResponse, Medicament, MedicamentInput, ProductType,
 } from "@/types";
@@ -29,12 +30,12 @@ export function useCatalogPage() {
   const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
 
   const list = useQuery({
-    queryKey: QUERY_KEYS.CATALOG(filters),
+    queryKey: QUERIES.admin.catalog.list(filters),
     queryFn:  () => api.get<CatalogListResponse>(URLS.admin.catalog.list, { params: filters }),
   });
 
   const categories = useQuery({
-    queryKey:  QUERY_KEYS.CATALOG_CATEGORIES,
+    queryKey:  QUERIES.admin.catalog.categories,
     queryFn:   () => api.get<string[]>(URLS.admin.catalog.categories),
     staleTime: 5 * 60_000,
   });
@@ -58,8 +59,8 @@ export function useCatalogPage() {
   const reset = () => setFilters(DEFAULT_FILTERS);
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CATALOG_PREFIX });
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.CATALOG_CATEGORIES });
+    queryClient.invalidateQueries({ queryKey: QUERIES.admin.catalog.listAll });
+    queryClient.invalidateQueries({ queryKey: QUERIES.admin.catalog.categories });
   };
 
   const create = useMutation({

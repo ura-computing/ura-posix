@@ -148,7 +148,7 @@ logs:
 
 clean:
 	docker compose down -v
-	@echo "✓ Volume removed. Next `make demo` starts from an empty DB."
+	@echo "✓ Volume removed. Next 'make demo' starts from an empty DB."
 
 # ── Tests + git hooks ──────────────────────────────────────────────────────
 

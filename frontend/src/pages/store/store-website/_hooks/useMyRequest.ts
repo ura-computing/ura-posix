@@ -7,31 +7,30 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { URLS } from "@/api/urls";
-import { QUERY_KEYS } from "@/types";
+import { QUERIES } from "@/api/queries";
+
 import type {
   CustomizationOut, WebsiteRequestCreate, WebsiteRequestPatch, WebsiteRequestOut,
 } from "@/types/storeWebsite";
-
-
 
 
 export function useMyRequest() {
   const qc = useQueryClient();
 
   const query = useQuery({
-    queryKey: QUERY_KEYS.STORE_MY_REQUEST,
+    queryKey: QUERIES.storeWebsite.myRequest,
     queryFn:  () => api.get<WebsiteRequestOut | null>(URLS.storeWebsite.myRequest),
   });
 
   const createMutation = useMutation({
     mutationFn: (body: WebsiteRequestCreate) => api.post<WebsiteRequestOut>(URLS.storeWebsite.requests, body),
-    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(QUERY_KEYS.STORE_MY_REQUEST, fresh),
+    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(QUERIES.storeWebsite.myRequest, fresh),
   });
 
   const patchMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: WebsiteRequestPatch }) =>
       api.patch<WebsiteRequestOut>(URLS.storeWebsite.request.one(id), body),
-    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(QUERY_KEYS.STORE_MY_REQUEST, fresh),
+    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(QUERIES.storeWebsite.myRequest, fresh),
   });
 
   const featuredMutation = useMutation({
