@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 import type {
   AdminPharmacyRow, AdminStatsResponse, AnalyseFilters, AnalyseMargeResponse, CategoryType, MargeMode,
@@ -19,8 +18,8 @@ export function useStats(filters: StatsFilters) {
     isError,
     error,
   } = useQuery({
-    queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
-    queryFn:  () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
+    queryKey: API.stats.main.key(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
+    queryFn:  () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
     staleTime: 60_000,
   });
   return {
@@ -35,8 +34,8 @@ export function useStats(filters: StatsFilters) {
  *  for the Rapport period + category. Same key + URL as /analyses → shared cache. */
 export function useOptimisationGain(filters: StatsFilters) {
   const { data } = useQuery({
-    queryKey: QUERIES.stats.analyseMarge("produit", filters.date_from, filters.date_to, filters.category_type, null),
-    queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
+    queryKey: API.stats.analyseMarge.key("produit", filters.date_from, filters.date_to, filters.category_type, null),
+    queryFn:  () => api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, { params: {
       mode: "produit", date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
     } }),
     staleTime: 60_000,
@@ -51,8 +50,8 @@ export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declare
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.stats.marginAlerts(filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<MarginAlertsResponse>(URLS.stats.marginAlerts, { params: filters }),
+    queryKey: API.stats.marginAlerts.key(filters.date_from, filters.date_to, filters.category_type),
+    queryFn:  () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
     staleTime: 60_000,
   });
   return {
@@ -69,8 +68,8 @@ export function useStockSummary() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.stats.stockSummary,
-    queryFn:  () => api.get<StockSummaryResponse>(URLS.stats.stockSummary),
+    queryKey: API.stats.stockSummary.key,
+    queryFn:  () => api.get<StockSummaryResponse>(API.stats.stockSummary.url),
     staleTime: 5 * 60_000,    // stock changes less often than ventes
   });
   return {
@@ -89,8 +88,8 @@ export function useAdminStats() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.admin.stats,
-    queryFn:  () => api.get<AdminStatsResponse>(URLS.admin.stats),
+    queryKey: API.admin.stats.key,
+    queryFn:  () => api.get<AdminStatsResponse>(API.admin.stats.url),
     staleTime: 60_000,
   });
   return {
@@ -106,8 +105,8 @@ export function useAdminPharmacies() {
     data,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.admin.pharmacies,
-    queryFn:  () => api.get<AdminPharmacyRow[]>(URLS.admin.pharmacies),
+    queryKey: API.admin.pharmacies.key,
+    queryFn:  () => api.get<AdminPharmacyRow[]>(API.admin.pharmacies.url),
     staleTime: 5 * 60_000,    // pharmacy list rarely changes
   });
   return {
@@ -123,10 +122,10 @@ export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsF
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.admin.pharmacyStats(
+    queryKey: API.admin.pharmacyStats.key(
       pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared,
     ),
-    queryFn:  () => api.get<StatsResponse>(URLS.admin.pharmacy.stats(pharmacyId as number), { params: filters }),
+    queryFn:  () => api.get<StatsResponse>(API.admin.pharmacyStats.url(pharmacyId as number), { params: filters }),
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
   });
@@ -143,8 +142,8 @@ export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters:
     data,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.admin.pharmacyMarge(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<MarginAlertsResponse>(URLS.admin.pharmacy.marginAlerts(pharmacyId as number), { params: filters }),
+    queryKey: API.admin.pharmacyMarginAlerts.key(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
+    queryFn:  () => api.get<MarginAlertsResponse>(API.admin.pharmacyMarginAlerts.url(pharmacyId as number), { params: filters }),
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
   });
@@ -160,8 +159,8 @@ export function useAdminPharmacyStockSummary(pharmacyId: number | null) {
     data,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.admin.pharmacyStock(pharmacyId ?? 0),
-    queryFn:  () => api.get<StockSummaryResponse>(URLS.admin.pharmacy.stockSummary(pharmacyId as number)),
+    queryKey: API.admin.pharmacyStock.key(pharmacyId ?? 0),
+    queryFn:  () => api.get<StockSummaryResponse>(API.admin.pharmacyStock.url(pharmacyId as number)),
     enabled:  pharmacyId !== null,
     staleTime: 5 * 60_000,
   });
@@ -185,8 +184,8 @@ export function useAdminPharmacyAnalyseMarge(
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.admin.pharmacyAnalyse(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<AnalyseMargeResponse>(URLS.admin.pharmacy.analyseMarge(pharmacyId as number), { params: {
+    queryKey: API.admin.pharmacyAnalyse.key(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
+    queryFn:  () => api.get<AnalyseMargeResponse>(API.admin.pharmacyAnalyse.url(pharmacyId as number), { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
     } }),
     enabled:  pharmacyId !== null,

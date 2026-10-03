@@ -6,7 +6,7 @@ import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from "
 import { Toaster, toast } from "sonner";
 
 import { ApiErr, setUnauthorizedHandler } from "@/api/client";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import App from "@/App";
 import { UploadProvider } from "@/hooks/UploadContext";
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
@@ -143,7 +143,7 @@ const queryClient = new QueryClient({
 // triggers a hard reload, which boots without a session cookie and lands on
 // /login through the natural auth-guard path.
 setUnauthorizedHandler(() => {
-  if (queryClient.getQueryData(QUERIES.auth.me) !== undefined) {
+  if (queryClient.getQueryData(API.auth.me.key) !== undefined) {
     openSessionExpiredDialog();
   }
 });

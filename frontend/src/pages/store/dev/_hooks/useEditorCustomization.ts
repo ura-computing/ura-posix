@@ -13,8 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 import type {
   CustomizationOut, CustomizationPatch, WebsiteRequestWithCustomizationOut,
@@ -37,19 +36,19 @@ export function useEditorCustomization(requestId: string | undefined) {
   const qc = useQueryClient();
 
   const query = useQuery({
-    queryKey: QUERIES.storeWebsite.request(requestId ?? "noop"),
-    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(URLS.storeWebsite.request.one(requestId!)),
+    queryKey: API.storeWebsite.request.key(requestId ?? "noop"),
+    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(requestId!)),
     enabled:  !!requestId,
   });
 
   const patchMutation = useMutation({
     mutationFn: async (patch: CustomizationPatch) => {
       if (!requestId) throw new Error("No requestId");
-      return api.patch<CustomizationOut>(URLS.storeWebsite.request.customization(requestId), patch);
+      return api.patch<CustomizationOut>(API.storeWebsite.customization.url(requestId), patch);
     },
     onMutate: async (patch) => {
       if (!requestId) return;
-      const key = QUERIES.storeWebsite.request(requestId);
+      const key = API.storeWebsite.request.key(requestId);
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (prev) {
@@ -61,12 +60,12 @@ export function useEditorCustomization(requestId: string | undefined) {
       return { prev };
     },
     onError: (err, _patch, ctx) => {
-      if (requestId && ctx?.prev) qc.setQueryData(QUERIES.storeWebsite.request(requestId), ctx.prev);
+      if (requestId && ctx?.prev) qc.setQueryData(API.storeWebsite.request.key(requestId), ctx.prev);
       toast.error(err.message);
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERIES.storeWebsite.request(requestId);
+      const key = API.storeWebsite.request.key(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },
@@ -75,11 +74,11 @@ export function useEditorCustomization(requestId: string | undefined) {
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       if (!requestId) throw new Error("No requestId");
-      return api.upload<CustomizationOut>(URLS.storeWebsite.request.logo(requestId), file);
+      return api.upload<CustomizationOut>(API.storeWebsite.logo.url(requestId), file);
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERIES.storeWebsite.request(requestId);
+      const key = API.storeWebsite.request.key(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },
@@ -88,11 +87,11 @@ export function useEditorCustomization(requestId: string | undefined) {
   const resetMutation = useMutation({
     mutationFn: async () => {
       if (!requestId) throw new Error("No requestId");
-      return api.post<CustomizationOut>(URLS.storeWebsite.request.customizationReset(requestId));
+      return api.post<CustomizationOut>(API.storeWebsite.customizationReset.url(requestId));
     },
     onSuccess: (fresh) => {
       if (!requestId) return;
-      const key = QUERIES.storeWebsite.request(requestId);
+      const key = API.storeWebsite.request.key(requestId);
       const cur = qc.getQueryData<WebsiteRequestWithCustomizationOut>(key);
       if (cur) qc.setQueryData(key, { ...cur, customization: fresh });
     },

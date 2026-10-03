@@ -4,8 +4,7 @@ import { toast } from "sonner";
 import { useT } from "@/i18n/I18nProvider";
 
 import { ApiErr, api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { ROUTES, type ValidateTokenResponse } from "@/types";
 
 export function useSetPassword(token: string) {
@@ -18,7 +17,7 @@ export function useSetPassword(token: string) {
     isError,
     error,
   } = useMutation({
-    mutationFn: (input: { password: string }) => api.post<void>(URLS.auth.setPassword, { token, password: input.password }),
+    mutationFn: (input: { password: string }) => api.post<void>(API.auth.setPassword.url, { token, password: input.password }),
     onSuccess: () => {
       toast.success(t("toast.pwdSaved"));
       navigate(ROUTES.LOGIN, { replace: true });
@@ -44,8 +43,8 @@ export function useValidateToken(token: string) {
     isLoading,
     isSuccess,
   } = useQuery({
-    queryKey: QUERIES.auth.validateToken(token),
-    queryFn:  () => api.get<ValidateTokenResponse>(URLS.auth.validateToken, { params: { token } }),
+    queryKey: API.auth.validateToken.key(token),
+    queryFn:  () => api.get<ValidateTokenResponse>(API.auth.validateToken.url, { params: { token } }),
     enabled:  token.length > 0,
     retry:    false,
     // Matches backend RESET_TOKEN_EXPIRY_MIN. A user who opens the link, walks

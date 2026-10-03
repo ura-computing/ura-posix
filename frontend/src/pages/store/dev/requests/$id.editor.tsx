@@ -17,7 +17,7 @@ import type { FontPairing } from "@/types/storeWebsite";
 import { EditorPage } from "@/pages/store/dev/_components/EditorPage";
 import { useEditorCustomization } from "@/pages/store/dev/_hooks/useEditorCustomization";
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
+import { API } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 
 
@@ -79,7 +79,7 @@ export default function DevEditorRoute() {
   const handleMarkDelivered = async () => {
     if (!hasExport || !id) return;
     try {
-      await api.patch(URLS.storeWebsite.request.state(id), { state: "livree" });
+      await api.patch(API.storeWebsite.state.url(id), { state: "livree" });
       toast.success(t("store.markedDelivered"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("toast.genericError"));

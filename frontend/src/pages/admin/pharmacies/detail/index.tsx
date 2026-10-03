@@ -195,11 +195,11 @@ export default function AdminPharmacyDetail() {
   const {
     setUserPermissions,
     isSavingPermissions: isSavingPerms,
-  } = useSetUserPermissions(id);
+  } = useSetUserPermissions();
   const { createUser } = useCreateUser();
   const { resetUserPassword } = useResetUserPassword();
-  const { setUserStatus } = useSetUserStatus(id);
-  const { deleteUser } = useDeleteUser(id);
+  const { setUserStatus } = useSetUserStatus();
+  const { deleteUser } = useDeleteUser();
 
   const serverFeatures: Record<FeatureKey, boolean> = useMemo(
     () => toFeatureRecord(detail?.enabled_features),

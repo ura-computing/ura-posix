@@ -9,8 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 import { matchesFields } from "@/utils/text";
 
@@ -37,8 +36,8 @@ export default function AdminDevelopersRoute() {
   const [search, setSearch] = useState("");
 
   const q = useQuery({
-    queryKey: QUERIES.admin.developers,
-    queryFn:  () => api.get<DeveloperAccountOut[]>(URLS.storeWebsite.developers),
+    queryKey: API.storeWebsite.developers.key,
+    queryFn:  () => api.get<DeveloperAccountOut[]>(API.storeWebsite.developers.url),
   });
 
   const filtered = useMemo(() => {

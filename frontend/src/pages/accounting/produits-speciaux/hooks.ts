@@ -5,8 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 
 import type {
   BlExclusion, BlExclusionResult, BlReintegrateResult, BlSummary,
@@ -27,48 +26,33 @@ export function useProduitsSpeciaux() {
     data: list,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.specialProducts.list,
-    queryFn:  () => api.get<SpecialProduct[]>(URLS.specialProducts.list),
+    queryKey: API.specialProducts.list.key,
+    queryFn:  () => api.get<SpecialProduct[]>(API.specialProducts.list.url),
   });
 
   const {
     data: suggestions,
     isFetching: suggestionsLoading,
   } = useQuery({
-    queryKey:  QUERIES.specialProducts.suggestions(suggestQ),
-    queryFn:   () => api.get<MedicamentSuggestion[]>(URLS.specialProducts.suggestions, { params: { q: suggestQ } }),
+    queryKey:  API.specialProducts.suggestions.key(suggestQ),
+    queryFn:   () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q: suggestQ } }),
     enabled:   suggestQ.trim().length >= 2,
     staleTime: 60_000,
   });
-
-  // Invalidate every cache that filters via non_declared_sub — exclusions affect
-  // achats / ventes / stats / margin alerts / stock / analyse aggregates.
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERIES.specialProducts.list });
-    queryClient.invalidateQueries({ queryKey: QUERIES.specialProducts.suggestionsAll });   // an excluded product is no longer suggested
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
-  };
 
   const {
     mutate: exclude,
     isPending: excluding,
   } = useMutation({
     mutationFn: (ids: number[]) =>
-      api.post<SpecialProductBulkResult>(URLS.specialProducts.list, { medicament_ids: ids }),
+      api.post<SpecialProductBulkResult>(API.specialProducts.exclude.url, { medicament_ids: ids }),
     onSuccess:  (r) => {
       const n    = r.inserted + r.already_special;
       const s    = r.already_special;
       const tail = s > 0 ? t(s === 1 ? "ps.alreadySpecialOne" : "ps.alreadySpecialMany", { n: s }) : "";
       toast.success(t(n === 1 ? "ps.prodExcludedOne" : "ps.prodExcludedMany", { n }) + tail);
       setSuggestQ("");
-      invalidate();
+      void refresh(queryClient, API.specialProducts.exclude);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -78,11 +62,11 @@ export function useProduitsSpeciaux() {
     isPending: reintegrating,
   } = useMutation({
     mutationFn: (ids: number[]) =>
-      api.post<SpecialProductReintegrateResult>(URLS.specialProducts.reintegrate, { medicament_ids: ids }),
+      api.post<SpecialProductReintegrateResult>(API.specialProducts.reintegrate.url, { medicament_ids: ids }),
     onSuccess:  (r) => {
       const n = r.reintegrated;
       toast.success(t(n === 1 ? "ps.prodReintegratedOne" : "ps.prodReintegratedMany", { n }));
-      invalidate();
+      void refresh(queryClient, API.specialProducts.reintegrate);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -120,7 +104,7 @@ export function useProduitsSpeciaux() {
 /** BL-exclusion state for the "Bons de livraison" tab of Produits Spéciaux.
  *  Owner-managed, reversible. Excluding a BL removes its Achats from every
  *  purchase aggregate (dashboard / analyse / stock) via the backend
- *  achat_bl_filter — so we invalidate the same caches produit-exclusion does. */
+ *  achat_bl_filter — so it refreshes the same reads produit-exclusion does. */
 
 export function useBlExclusions() {
   const t = useT();
@@ -132,45 +116,30 @@ export function useBlExclusions() {
     data: list,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.blExclusions.list,
-    queryFn:  () => api.get<BlExclusion[]>(URLS.blExclusions.list),
+    queryKey: API.blExclusions.list.key,
+    queryFn:  () => api.get<BlExclusion[]>(API.blExclusions.list.url),
   });
 
   const {
     data: results,
     isFetching: resultsLoading,
   } = useQuery({
-    queryKey:  QUERIES.blExclusions.search(searchQ),
-    queryFn:   () => api.get<BlSummary[]>(URLS.blExclusions.search, { params: { q: searchQ } }),
+    queryKey:  API.blExclusions.search.key(searchQ),
+    queryFn:   () => api.get<BlSummary[]>(API.blExclusions.search.url, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
     staleTime: 30_000,
   });
-
-  // Excluding/reintegrating a BL shifts every purchase aggregate → invalidate
-  // the same caches the product-exclusion flow does.
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERIES.blExclusions.list });
-    queryClient.invalidateQueries({ queryKey: QUERIES.blExclusions.searchAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
-  };
 
   const {
     mutate: exclude,
     isPending: excluding,
   } = useMutation({
     mutationFn: (v: { ref: string; notes?: string }) =>
-      api.post<BlExclusionResult>(URLS.blExclusions.list, { delivery_ref: v.ref, notes: v.notes || null }),
+      api.post<BlExclusionResult>(API.blExclusions.exclude.url, { delivery_ref: v.ref, notes: v.notes || null }),
     onSuccess:  (r) => {
       toast.success(r.already_excluded ? t("ps.blAlreadyExcluded") : t("ps.blExcluded", { ref: r.item?.delivery_ref ?? "" }));
       setSearchQ("");
-      invalidate();
+      void refresh(queryClient, API.blExclusions.exclude);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -180,11 +149,11 @@ export function useBlExclusions() {
     isPending: reintegrating,
   } = useMutation({
     mutationFn: (refs: string[]) =>
-      api.post<BlReintegrateResult>(URLS.blExclusions.reintegrate, { delivery_refs: refs }),
+      api.post<BlReintegrateResult>(API.blExclusions.reintegrate.url, { delivery_refs: refs }),
     onSuccess:  (r) => {
       const n = r.reintegrated;
       toast.success(t(n === 1 ? "ps.blReintegratedOne" : "ps.blReintegratedMany", { n }));
-      invalidate();
+      void refresh(queryClient, API.blExclusions.reintegrate);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -221,7 +190,7 @@ export function useBlExclusions() {
 /** Supplier-exclusion state for the "Fournisseurs" tab of Produits Spéciaux.
  *  Owner-managed, reversible. Excluding a supplier removes its Achats from every
  *  purchase aggregate (dashboard / analyse / stock) via the backend
- *  achat_supplier_filter — so we invalidate the same caches BL-exclusion does. */
+ *  achat_supplier_filter — so it refreshes the same reads BL-exclusion does. */
 
 export function useSupplierExclusions() {
   const t = useT();
@@ -233,41 +202,26 @@ export function useSupplierExclusions() {
     data: list,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.supplierExclusions.list,
-    queryFn:  () => api.get<SupplierExclusion[]>(URLS.supplierExclusions.list),
+    queryKey: API.supplierExclusions.list.key,
+    queryFn:  () => api.get<SupplierExclusion[]>(API.supplierExclusions.list.url),
   });
 
   const {
     data: results,
     isFetching: resultsLoading,
   } = useQuery({
-    queryKey:  QUERIES.supplierExclusions.search(searchQ),
-    queryFn:   () => api.get<SupplierSummary[]>(URLS.supplierExclusions.search, { params: { q: searchQ } }),
+    queryKey:  API.supplierExclusions.search.key(searchQ),
+    queryFn:   () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
     staleTime: 30_000,
   });
-
-  // Excluding/reintegrating a supplier shifts every purchase aggregate →
-  // invalidate the same caches the BL-exclusion flow does.
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERIES.supplierExclusions.list });
-    queryClient.invalidateQueries({ queryKey: QUERIES.supplierExclusions.searchAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockSummary });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFullAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.stats.stockAbcdFilteredAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
-  };
 
   const {
     mutate: exclude,
     isPending: excluding,
   } = useMutation({
     mutationFn: (v: { supplier: string; notes?: string }) =>
-      api.post<SupplierExclusionResult>(URLS.supplierExclusions.list, { supplier: v.supplier, notes: v.notes || null }),
+      api.post<SupplierExclusionResult>(API.supplierExclusions.exclude.url, { supplier: v.supplier, notes: v.notes || null }),
     onSuccess:  (r) => {
       toast.success(
         r.already_excluded
@@ -275,7 +229,7 @@ export function useSupplierExclusions() {
           : t("ps.supExcluded", { name: r.item?.supplier ?? "" }),
       );
       setSearchQ("");
-      invalidate();
+      void refresh(queryClient, API.supplierExclusions.exclude);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -285,11 +239,11 @@ export function useSupplierExclusions() {
     isPending: reintegrating,
   } = useMutation({
     mutationFn: (suppliers: string[]) =>
-      api.post<SupplierReintegrateResult>(URLS.supplierExclusions.reintegrate, { suppliers }),
+      api.post<SupplierReintegrateResult>(API.supplierExclusions.reintegrate.url, { suppliers }),
     onSuccess:  (r) => {
       const verb = r.reintegrated === 1 ? t("ps.supReintegratedOne") : t("ps.supReintegratedMany");
       toast.success(`${r.reintegrated} ${verb}`);
-      invalidate();
+      void refresh(queryClient, API.supplierExclusions.reintegrate);
     },
     onError: (e: Error) => toast.error(e.message),
   });

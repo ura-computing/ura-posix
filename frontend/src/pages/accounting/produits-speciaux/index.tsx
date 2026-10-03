@@ -31,8 +31,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { TabBar } from "@/_components/TabBar";
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 
 /** "Exclure un BL" dialog — PG-007. Two steps:
@@ -75,8 +74,8 @@ function ExcludeBlDialog({
     isLoading: detailLoading,
     isError: detailError,
   } = useQuery({
-    queryKey: QUERIES.blExclusions.detail(selected?.delivery_ref ?? ""),
-    queryFn:  () => api.get<BlDetail>(URLS.blExclusions.detail, { params: { delivery_ref: selected!.delivery_ref } }),
+    queryKey: API.blExclusions.detail.key(selected?.delivery_ref ?? ""),
+    queryFn:  () => api.get<BlDetail>(API.blExclusions.detail.url, { params: { delivery_ref: selected!.delivery_ref } }),
     enabled:  open && !!selected,
   });
 

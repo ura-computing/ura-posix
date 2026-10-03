@@ -76,7 +76,7 @@ export interface VentesFilters {
   sort_order:           "asc" | "desc";
 }
 
-/** Stable serialization key used in QUERIES — excludes sort + pagination so a
+/** Stable serialization key used in API query keys — excludes sort + pagination so a
  *  sort change doesn't bust the same-page cache. */
 export type VentesFiltersKey = Omit<VentesFilters, "sort_by" | "sort_order">;
 

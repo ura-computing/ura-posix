@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 
 import type {
@@ -81,29 +80,29 @@ export function useVentesPage() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.ventes.list(filters),
-    queryFn:  () => api.get<VentesListResponse>(URLS.ventes.list, { params: filters }),
+    queryKey: API.ventes.list.key(filters),
+    queryFn:  () => api.get<VentesListResponse>(API.ventes.list.url, { params: filters }),
   });
   const { data: counts } = useQuery({
-    queryKey: QUERIES.ventes.surveillance(key),
-    queryFn:  () => api.get<VentesSurveillanceCounts>(URLS.ventes.surveillanceCounts, { params: summaryFilters }),
+    queryKey: API.ventes.surveillance.key(key),
+    queryFn:  () => api.get<VentesSurveillanceCounts>(API.ventes.surveillance.url, { params: summaryFilters }),
   });
   const { data: categories } = useQuery({
-    queryKey: QUERIES.ventes.categories,
-    queryFn:  () => api.get<string[]>(URLS.ventes.categories),
+    queryKey: API.ventes.categories.key,
+    queryFn:  () => api.get<string[]>(API.ventes.categories.url),
     staleTime: 5 * 60_000,
   });
   const { data: tvaRates } = useQuery({
-    queryKey: QUERIES.ventes.tvaRates,
-    queryFn:  () => api.get<string[]>(URLS.ventes.tvaRates),
+    queryKey: API.ventes.tvaRates.key,
+    queryFn:  () => api.get<string[]>(API.ventes.tvaRates.url),
     staleTime: 5 * 60_000,
   });
   const {
     data: suggestions,
     isFetching: suggestionsLoading,
   } = useQuery({
-    queryKey: QUERIES.ventes.suggestions(suggestQ),
-    queryFn:  () => api.get<VentesSuggestions>(URLS.ventes.suggestions, { params: { q: suggestQ } }),
+    queryKey: API.ventes.suggestions.key(suggestQ),
+    queryFn:  () => api.get<VentesSuggestions>(API.ventes.suggestions.url, { params: { q: suggestQ } }),
     enabled:  suggestQ.length >= 2,
     staleTime: 60_000,
   });
@@ -112,8 +111,8 @@ export function useVentesPage() {
     data: discountSummary,
     isLoading: discountLoading,
   } = useQuery({
-    queryKey: QUERIES.ventes.discountSummary(summaryFilters),
-    queryFn:  () => api.get<VentesDiscountSummary>(URLS.ventes.discountSummary, { params: summaryFilters }),
+    queryKey: API.ventes.discountSummary.key(summaryFilters),
+    queryFn:  () => api.get<VentesDiscountSummary>(API.ventes.discountSummary.url, { params: summaryFilters }),
     staleTime: 60_000,
   });
 
@@ -150,7 +149,7 @@ export function useVentesPage() {
   // and writes an xlsx via the shared helper. 413 → user-facing toast.
   const handleExport = useCallback(async () => {
     try {
-      const { data } = await api.get<VentesListResponse>(URLS.ventes.list, {
+      const { data } = await api.get<VentesListResponse>(API.ventes.list.url, {
         params: { ...filters, page: undefined, limit: undefined, export: true },
       });
       const header = [

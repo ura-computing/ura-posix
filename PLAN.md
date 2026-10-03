@@ -3,8 +3,7 @@
 Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this file when
 `make e2e-tests` is green. Rules: `CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §1 run → §5 frontend → §2 speed → §3 production tools → §6 backend folders.
-(§4 « E2E every page » done: rows in §1 until green.)
+**Order:** §5 frontend → §2 speed → §3 production tools → §6 backend folders.
 
 ---
 
@@ -23,10 +22,6 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
-| /équipe: same email invited twice → refused (`emailTaken`), team unchanged | `12-equipe` |
-| /mon-compte: profile form errors; password form errors + wrong current one (400, no « Session expirée »); « Se déconnecter » on this session; reset link opened twice → « Lien expiré »; old password → error toast (was API only) | `13-compte` |
-| Admin: users / catalogue tiles of « Vue système » after each user change (was API only); users tab « Avec pharmacie » + search; catalogue sort Produit ↓ + next page; ES switch through the header button | `14-admin` |
-| Layout (new): FR ⇄ ES on every owner page + 404, kept after reload; theme Sombre / Clair / Système; sidebar Réduire / Étendre (kept); 401 → « Session expirée » → Plus tard / Actualiser → login, refused login in ES | `16-layout` |
 
 ---
 
@@ -64,7 +59,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 | # | Step | Today | After |
 |---|---|---|---|
-| FE12 | **One `API` object: urls + query keys + what each write refreshes** (decision 2026-10-03; after the E2E pages) | `URLS` + `QUERIES` in 2 files; each hook lists its own `invalidateQueries` → easy to forget one (product suggestions bug) | `API.specialProducts.list = { url, key }`, `API.specialProducts.exclude = { url, refreshes: [...] }`; entries named by action (same url, GET vs POST = 2 entries); `changedByImport` moves in; a test checks every key has an url |
+| FE13 | **`useMemo` / `useCallback` where they count** (your call 2026-10-03) | React Compiler memoizes every component it can compile, but it skips a component with a `react-hooks` lint error: 32 today (`set-state-in-effect` ×15: filterBar, comptabilité, produits-spéciaux, catalogue, catégories, dialogs, analyses hooks; `refs` ×8: filterBar; `exhaustive-deps` ×6: analytics + stock hooks; `static-components` ×3: stock page) → those re-filter / re-sort every render | each lint error fixed (compiler compiles the file again); `useMemo` on heavy derived data (table filter / sort, chart series, totals) and `useCallback` on handlers passed to children or used in effect deps, in every hook; `npx eslint src` = 0 `react-hooks` errors (gate) |
 | FE3b | **One members table** | admin detail + team = 2 tables | `MembersTable` used by both (product rule: same behavior) |
 | FE3c | **Shared form / gauge / exclude pieces** | inline Field/Input ×4 (`_components/CreateUserDialog.tsx:400`, `admin/categories/index.tsx:169`, `admin/pharmacies/_components/PharmacyFormDialog.tsx:127`, `accounting/comptabilite/index.tsx:355`); gauge tiles ×2 (achats, ventes); BL / supplier exclude dialogs ×2 | `FormField`, `GaugeTiles`, `TwoStepExcludeDialog` |
 | FE4 | **One formatter set** | own `num/mad/fmtMad/fmtPct` (`dashboard/rapport/index.tsx:150,154,252,257`); 15 `toLocaleString` / `toFixed` outside `utils/format.tsx` | only `utils/format.tsx` |

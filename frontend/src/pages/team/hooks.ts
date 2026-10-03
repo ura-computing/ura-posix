@@ -4,8 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 
 import type {
   CreateUserIn, CreateUserOut, MemberOut, MemberStatus, OwnerEmployeesResponse, ResetPasswordOut,
@@ -17,8 +16,8 @@ export function useOwnerEmployees() {
     data,
     isLoading,
   } = useQuery({
-    queryKey:  QUERIES.employees.list,
-    queryFn:   () => api.get<OwnerEmployeesResponse>(URLS.employees.list),
+    queryKey:  API.employees.list.key,
+    queryFn:   () => api.get<OwnerEmployeesResponse>(API.employees.list.url),
     staleTime: 30_000,
   });
   return {
@@ -33,8 +32,8 @@ export function useCreateEmployee() {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(URLS.employees.list, body),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
+    mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(API.employees.create.url, body),
+    onSuccess:  () => { void refresh(qc, API.employees.create); },
   });
   return {
     createEmployee: mutateAsync,
@@ -49,8 +48,8 @@ export function useSetEmployeePermissions() {
     isPending,
   } = useMutation({
     mutationFn: ({ employeeId, permissions }: { employeeId: number; permissions: Record<string, boolean> }) =>
-      api.put<MemberOut>(URLS.employees.permissions(employeeId), { permissions }),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
+      api.put<MemberOut>(API.employees.setPermissions.url(employeeId), { permissions }),
+    onSuccess:  () => { void refresh(qc, API.employees.setPermissions); },
   });
   return {
     setEmployeePermissions: mutateAsync,
@@ -65,8 +64,8 @@ export function useSetEmployeeStatus() {
     isPending,
   } = useMutation({
     mutationFn: ({ employeeId, status }: { employeeId: number; status: MemberStatus }) =>
-      api.patch<MemberOut>(URLS.employees.status(employeeId), { status }),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
+      api.patch<MemberOut>(API.employees.setStatus.url(employeeId), { status }),
+    onSuccess:  () => { void refresh(qc, API.employees.setStatus); },
   });
   return {
     setEmployeeStatus: mutateAsync,
@@ -80,7 +79,7 @@ export function useResetEmployeePassword() {
     isPending,
   } = useMutation({
     mutationFn: ({ employeeId, password }: { employeeId: number; password: string }) =>
-      api.post<ResetPasswordOut>(URLS.employees.resetPassword(employeeId), { password }),
+      api.post<ResetPasswordOut>(API.employees.resetPassword.url(employeeId), { password }),
   });
   return {
     resetEmployeePassword: mutateAsync,
@@ -94,8 +93,8 @@ export function useDeleteEmployee() {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (employeeId: number) => api.delete(URLS.employees.one(employeeId)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.employees.list }); },
+    mutationFn: (employeeId: number) => api.delete(API.employees.remove.url(employeeId)),
+    onSuccess:  () => { void refresh(qc, API.employees.remove); },
   });
   return {
     deleteEmployee: mutateAsync,

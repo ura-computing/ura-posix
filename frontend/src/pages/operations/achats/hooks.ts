@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 
 import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types";
@@ -49,8 +48,8 @@ export function useAchatsPage() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.achats.list(filters),
-    queryFn: () => api.get<AchatsListResponse>(URLS.achats.list, { params: filters }),
+    queryKey: API.achats.list.key(filters),
+    queryFn: () => api.get<AchatsListResponse>(API.achats.list.url, { params: filters }),
   });
 
   // Supplier summary ignores pagination + sort — key on the filter slice that matters
@@ -62,26 +61,26 @@ export function useAchatsPage() {
     data: supplierSummary,
     isLoading: supplierLoading,
   } = useQuery({
-    queryKey: QUERIES.achats.supplierSummary(summaryKey),
-    queryFn: () => api.get<AchatsSupplierSummary>(URLS.achats.supplierSummary, { params: summaryKey }),
+    queryKey: API.achats.supplierSummary.key(summaryKey),
+    queryFn: () => api.get<AchatsSupplierSummary>(API.achats.supplierSummary.url, { params: summaryKey }),
   });
 
   const { data: categories } = useQuery({
-    queryKey: QUERIES.achats.categories,
-    queryFn: () => api.get<string[]>(URLS.achats.categories),
+    queryKey: API.achats.categories.key,
+    queryFn: () => api.get<string[]>(API.achats.categories.url),
     staleTime: 5 * 60_000,
   });
   const { data: tvaRates } = useQuery({
-    queryKey: QUERIES.achats.tvaRates,
-    queryFn: () => api.get<string[]>(URLS.achats.tvaRates),
+    queryKey: API.achats.tvaRates.key,
+    queryFn: () => api.get<string[]>(API.achats.tvaRates.url),
     staleTime: 5 * 60_000,
   });
   const {
     data: suggestions,
     isFetching: suggestionsLoading,
   } = useQuery({
-    queryKey: QUERIES.achats.suggestions(suggestQ),
-    queryFn: () => api.get<AchatsSuggestions>(URLS.achats.suggestions, { params: { q: suggestQ } }),
+    queryKey: API.achats.suggestions.key(suggestQ),
+    queryFn: () => api.get<AchatsSuggestions>(API.achats.suggestions.url, { params: { q: suggestQ } }),
     enabled: suggestQ.length >= 2,
     staleTime: 60_000,
   });
@@ -116,7 +115,7 @@ export function useAchatsPage() {
   // and writes an xlsx via the shared helper. 413 → user-facing toast.
   const handleExport = useCallback(async () => {
     try {
-      const { data } = await api.get<AchatsListResponse>(URLS.achats.list, {
+      const { data } = await api.get<AchatsListResponse>(API.achats.list.url, {
         params: { ...filters, page: undefined, limit: undefined, export: true },
       });
       const header = [

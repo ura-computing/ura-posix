@@ -10,8 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 import { useMe } from "@/hooks/useMe";
 
@@ -45,14 +44,14 @@ export default function DevDashboardRoute() {
   const t        = useT();
 
   const q = useQuery({
-    queryKey: QUERIES.storeWebsite.requests,
-    queryFn:  () => api.get<WebsiteRequestOut[]>(URLS.storeWebsite.requests),
+    queryKey: API.storeWebsite.requests.key,
+    queryFn:  () => api.get<WebsiteRequestOut[]>(API.storeWebsite.requests.url),
   });
 
   const claimMutation = useMutation({
-    mutationFn: (id: string) => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.claim(id)),
+    mutationFn: (id: string) => api.post<WebsiteRequestOut>(API.storeWebsite.claim.url(id)),
     onSuccess:  (fresh) => {
-      qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.requests });
+      qc.invalidateQueries({ queryKey: API.storeWebsite.requests.key });
       toast.success(t("store.claimedOpenEditor"));
       navigate(`/requests/${fresh.id}`);
     },

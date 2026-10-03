@@ -6,18 +6,15 @@
  *    useCreatePharmacy() / useUpdatePharmacy() / useArchivePharmacy()
  *    useSetPharmacyFeatures(id)    — Section A bulk save
  *    useCreateUser()               — returns CreateUserOut for the credentials reveal
- *    useSetUserPermissions(userId) — Screen 3 bulk save (owners only)
+ *    useSetUserPermissions()       — Screen 3 bulk save (owners only)
  *    useResetUserPassword() / useSetUserStatus() / useDeleteUser()
  *
- *  Every mutation invalidates the right keys: pharmacy mutations invalidate
- *  both the list AND the detail (member counts + features change). User
- *  mutations invalidate the detail of THEIR pharmacy (membership/permissions
- *  shifted). */
+ *  Every mutation refreshes what its `API.admin.*` entry lists (`refreshes`):
+ *  the pharmacy list + every detail (member counts, features), the users tab. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 
 import type {
   AdminUserRow,
@@ -41,8 +38,8 @@ export function useAdminUsers() {
     isError,
     refetch,
   } = useQuery({
-    queryKey:  QUERIES.admin.users,
-    queryFn:   () => api.get<AdminUserRow[]>(URLS.admin.users),
+    queryKey:  API.admin.users.key,
+    queryFn:   () => api.get<AdminUserRow[]>(API.admin.users.url),
     staleTime: 30_000,
   });
   return {
@@ -60,8 +57,8 @@ export function useAdminPharmaciesList() {
     isError,
     refetch,
   } = useQuery({
-    queryKey:  QUERIES.admin.pharmacies,
-    queryFn:   () => api.get<PharmacyListRow[]>(URLS.admin.pharmacies),
+    queryKey:  API.admin.pharmacies.key,
+    queryFn:   () => api.get<PharmacyListRow[]>(API.admin.pharmacies.url),
     staleTime: 30_000,
   });
   return {
@@ -79,8 +76,8 @@ export function useAdminPharmacy(id: number | null) {
     isError,
     refetch,
   } = useQuery({
-    queryKey:  QUERIES.admin.pharmacy(id ?? 0),
-    queryFn:   () => api.get<PharmacyDetail>(URLS.admin.pharmacy.one(id!)),
+    queryKey:  API.admin.pharmacy.key(id ?? 0),
+    queryFn:   () => api.get<PharmacyDetail>(API.admin.pharmacy.url(id!)),
     enabled:   id != null && id > 0,
     staleTime: 30_000,
   });
@@ -101,8 +98,8 @@ export function useCreatePharmacy() {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (body: PharmacyIn) => api.post<PharmacyDetail>(URLS.admin.pharmacies, body),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies }); },
+    mutationFn: (body: PharmacyIn) => api.post<PharmacyDetail>(API.admin.createPharmacy.url, body),
+    onSuccess:  () => { void refresh(qc, API.admin.createPharmacy); },
   });
   return {
     createPharmacy: mutateAsync,
@@ -116,11 +113,8 @@ export function useUpdatePharmacy(id: number) {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (body: PharmacyIn) => api.patch<PharmacyDetail>(URLS.admin.pharmacy.one(id), body),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
-    },
+    mutationFn: (body: PharmacyIn) => api.patch<PharmacyDetail>(API.admin.updatePharmacy.url(id), body),
+    onSuccess:  () => { void refresh(qc, API.admin.updatePharmacy); },
   });
   return {
     updatePharmacy: mutateAsync,
@@ -134,12 +128,8 @@ export function useArchivePharmacy(id: number) {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: () => api.delete(URLS.admin.pharmacy.one(id)),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+    mutationFn: () => api.delete(API.admin.archivePharmacy.url(id)),
+    onSuccess:  () => { void refresh(qc, API.admin.archivePharmacy); },
   });
   return {
     archivePharmacy: mutateAsync,
@@ -154,11 +144,8 @@ export function useSetPharmacyFeatures(id: number) {
     isPending,
   } = useMutation({
     mutationFn: (features: Record<string, boolean>) =>
-      api.put<PharmacyDetail>(URLS.admin.pharmacy.features(id), { features }),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(id) });
-    },
+      api.put<PharmacyDetail>(API.admin.setPharmacyFeatures.url(id), { features }),
+    onSuccess:  () => { void refresh(qc, API.admin.setPharmacyFeatures); },
   });
   return {
     setPharmacyFeatures: mutateAsync,
@@ -176,12 +163,8 @@ export function useCreateUser() {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(URLS.admin.pharmacy.users(body.pharmacy_id), body),
-    onSuccess:  (_out, body) => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(body.pharmacy_id) });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+    mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(API.admin.createUser.url(body.pharmacy_id), body),
+    onSuccess:  () => { void refresh(qc, API.admin.createUser); },
   });
   return {
     createUser: mutateAsync,
@@ -189,18 +172,15 @@ export function useCreateUser() {
   };
 }
 
-export function useSetUserPermissions(pharmacyId: number) {
+export function useSetUserPermissions() {
   const qc = useQueryClient();
   const {
     mutateAsync,
     isPending,
   } = useMutation({
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
-      api.put<MemberOut>(URLS.admin.user.permissions(userId), { permissions }),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+      api.put<MemberOut>(API.admin.setUserPermissions.url(userId), { permissions }),
+    onSuccess:  () => { void refresh(qc, API.admin.setUserPermissions); },
   });
   return {
     setUserPermissions: mutateAsync,
@@ -214,7 +194,7 @@ export function useResetUserPassword() {
     isPending,
   } = useMutation({
     mutationFn: ({ userId, password }: { userId: number; password: string }) =>
-      api.post<ResetPasswordOut>(URLS.admin.user.resetPassword(userId), { password }),
+      api.post<ResetPasswordOut>(API.admin.resetUserPassword.url(userId), { password }),
   });
   return {
     resetUserPassword: mutateAsync,
@@ -222,18 +202,15 @@ export function useResetUserPassword() {
   };
 }
 
-export function useSetUserStatus(pharmacyId: number) {
+export function useSetUserStatus() {
   const qc = useQueryClient();
   const {
     mutateAsync,
     isPending,
   } = useMutation({
     mutationFn: ({ userId, status }: { userId: number; status: MemberStatus }) =>
-      api.patch<MemberOut>(URLS.admin.user.status(userId), { status }),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+      api.patch<MemberOut>(API.admin.setUserStatus.url(userId), { status }),
+    onSuccess:  () => { void refresh(qc, API.admin.setUserStatus); },
   });
   return {
     setUserStatus: mutateAsync,
@@ -241,18 +218,14 @@ export function useSetUserStatus(pharmacyId: number) {
   };
 }
 
-export function useDeleteUser(pharmacyId: number) {
+export function useDeleteUser() {
   const qc = useQueryClient();
   const {
     mutateAsync,
     isPending,
   } = useMutation({
-    mutationFn: (userId: number) => api.delete(URLS.admin.user.one(userId)),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacy(pharmacyId) });
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+    mutationFn: (userId: number) => api.delete(API.admin.removeUser.url(userId)),
+    onSuccess:  () => { void refresh(qc, API.admin.removeUser); },
   });
   return {
     deleteUser: mutateAsync,
@@ -268,11 +241,8 @@ export function useAssignPharmacy() {
     isPending,
   } = useMutation({
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number }) =>
-      api.patch<AdminUserRow>(URLS.admin.user.pharmacy(userId), { pharmacy_id: pharmacyId }),
-    onSuccess:  () => {
-      qc.invalidateQueries({ queryKey: QUERIES.admin.pharmacies });      // prefix: every pharmacy detail too
-      qc.invalidateQueries({ queryKey: QUERIES.admin.users });
-    },
+      api.patch<AdminUserRow>(API.admin.assignPharmacy.url(userId), { pharmacy_id: pharmacyId }),
+    onSuccess:  () => { void refresh(qc, API.admin.assignPharmacy); },
   });
   return {
     assignPharmacy: mutateAsync,

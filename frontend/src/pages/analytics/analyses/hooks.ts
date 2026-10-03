@@ -21,8 +21,7 @@ import { normalizeText, matchesText, matchesFields } from "@/utils/text";
 import { EXPORT_COLS, MARGE_COLS } from "./constants";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 
 const DEFAULT_FILTERS: AnalyseFilters = {
@@ -257,8 +256,8 @@ export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
     isError,
     error,
   } = useQuery({
-    queryKey: QUERIES.stats.analyseMarge(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
-    queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
+    queryKey: API.stats.analyseMarge.key(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
+    queryFn:  () => api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to,
       category_type: filters.category_type, product: filters.product,
     } }),
@@ -280,7 +279,7 @@ export function useAnalyseListe() {
     isError,
     error,
   } = useMutation({
-    mutationFn: (body: ListeRequest) => api.post<AnalyseMargeResponse>(URLS.stats.analyseListe, body),
+    mutationFn: (body: ListeRequest) => api.post<AnalyseMargeResponse>(API.stats.analyseListe.url, body),
   });
   return {
     runListe: mutate,

@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 import type { Me, MeResponse } from "@/types";
 
@@ -27,8 +26,8 @@ export function useMe() {
     isError,
     error,
   } = useQuery<MeResponse, Error, Me>({
-    queryKey:  QUERIES.auth.me,
-    queryFn:   () => api.get<MeResponse>(URLS.auth.me),
+    queryKey:  API.auth.me.key,
+    queryFn:   () => api.get<MeResponse>(API.auth.me.url),
     select:    toFlat,
     staleTime: 5 * 60 * 1000,
     retry:     false,

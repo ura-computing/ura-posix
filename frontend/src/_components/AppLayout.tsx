@@ -38,8 +38,7 @@ import { PharmagestIcon } from "./PharmagestIcon";
 import { ThemeToggle } from "./ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { Skeleton } from "./Skeleton";
 import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
@@ -284,8 +283,8 @@ function useUnclassifiedCount(role: Role): number {
   const {
     data,
   } = useQuery({
-    queryKey:        QUERIES.admin.catalog.unclassifiedCount,
-    queryFn:         () => api.get<{ count: number }>(URLS.admin.catalog.unclassifiedCount),
+    queryKey:        API.admin.catalog.unclassifiedCount.key,
+    queryFn:         () => api.get<{ count: number }>(API.admin.catalog.unclassifiedCount.url),
     enabled:         role === ROLES.ADMIN,
     staleTime:       60_000,
     refetchInterval: 60_000,

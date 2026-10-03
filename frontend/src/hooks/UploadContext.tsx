@@ -7,8 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { changedByImport } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 import { translate } from "@/i18n/I18nProvider";
 import { chunk } from "@/utils/csv";
 import { type DocType, type UploadStockResult, type UploadTxResult } from "@/types";
@@ -159,13 +158,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     });
 
     const post = (body: { rows: Record<string, string>[]; filename: string; batch_id?: number }) =>
-      api.post<UploadTxResult | UploadStockResult>(URLS.uploads[job.docType], body);
+      api.post<UploadTxResult | UploadStockResult>(API.uploads[job.docType].url, body);
 
     try {
       for (let i = 0; i < chunks.length; i++) {
         if (cancelFlagsRef.current.has(job.id)) {
           if (batchId != null) {
-            await api.patch(URLS.uploads.batch(batchId), { status: "cancelled", error_message: null }).catch(() => undefined);
+            await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "cancelled", error_message: null }).catch(() => undefined);
           }
           patchJob(job.id, { phase: "cancelled", batchId });
           cancelFlagsRef.current.delete(job.id);
@@ -211,7 +210,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       }
       // Last chunk done: the backend refreshes its table statistics (fast Rapport right after).
       if (batchId != null) {
-        await api.patch(URLS.uploads.batch(batchId), { status: "success", error_message: null }).catch(() => undefined);
+        await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "success", error_message: null }).catch(() => undefined);
       }
       const stockResult: UploadStockResult | null = job.docType === "stock" && batchId != null ? {
         inserted,
@@ -236,13 +235,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const detail = err instanceof ApiErr ? err.detail : translate("toast.genericError");
       if (batchId != null) {
-        await api.patch(URLS.uploads.batch(batchId), { status: "error", error_message: detail }).catch(() => undefined);
+        await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "error", error_message: detail }).catch(() => undefined);
       }
       patchJob(job.id, { phase: "error", batchId, error: detail });
       toast.error(detail);
     } finally {
       // Rows added / removed: queries on screen refetch now (Rapport open during an import), others on next visit.
-      if (batchId != null) void qc.invalidateQueries({ predicate: changedByImport(job.docType) });
+      if (batchId != null) void refresh(qc, API.uploads[job.docType]);
     }
   }, [patchJob, qc]);
 

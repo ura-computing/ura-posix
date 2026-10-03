@@ -10,8 +10,7 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { useT } from "@/i18n/I18nProvider";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { useMe } from "@/hooks/useMe";
 
 import type {
@@ -51,8 +50,8 @@ export default function DevRequestDetailRoute() {
   const t        = useT();
 
   const q = useQuery({
-    queryKey: QUERIES.storeWebsite.request(id ?? "noop"),
-    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(URLS.storeWebsite.request.one(id!)),
+    queryKey: API.storeWebsite.request.key(id ?? "noop"),
+    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(id!)),
     enabled:  !!id,
     retry:    false,
   });
@@ -63,17 +62,17 @@ export default function DevRequestDetailRoute() {
   );
 
   const claimM   = useMutation({
-    mutationFn: () => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.claim(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) }); toast.success(t("store.claimed")); },
+    mutationFn: () => api.post<WebsiteRequestOut>(API.storeWebsite.claim.url(id!)),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) }); toast.success(t("store.claimed")); },
   });
   const releaseM = useMutation({
-    mutationFn: () => api.post<WebsiteRequestOut>(URLS.storeWebsite.request.release(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) }); toast.success(t("store.released")); },
+    mutationFn: () => api.post<WebsiteRequestOut>(API.storeWebsite.release.url(id!)),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) }); toast.success(t("store.released")); },
   });
   const stateM   = useMutation({
-    mutationFn: (state: RequestState) => api.patch<WebsiteRequestOut>(URLS.storeWebsite.request.state(id!), { state }),
+    mutationFn: (state: RequestState) => api.patch<WebsiteRequestOut>(API.storeWebsite.state.url(id!), { state }),
     onSuccess:  (fresh) => {
-      qc.invalidateQueries({ queryKey: QUERIES.storeWebsite.request(id!) });
+      qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) });
       toast.success(t("store.stateUpdated", { state: fresh.state }));
     },
   });

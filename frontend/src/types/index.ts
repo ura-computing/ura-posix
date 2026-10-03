@@ -1,4 +1,4 @@
-// Roles, features, routes (query keys: api/queries.ts). Domain shapes live in one file per domain
+// Roles, features, routes (urls + query keys: api/api.ts). Domain shapes live in one file per domain
 // (same names as backend/schemas/) and are re-exported here: import from "@/types".
 
 

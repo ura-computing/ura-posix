@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 import { ROUTES, type LoginRequest, type MeResponse } from "@/types";
 
 export function useLogin() {
@@ -18,9 +17,9 @@ export function useLogin() {
     isSuccess,
     error,
   } = useMutation<MeResponse, ApiErr, LoginRequest>({
-    mutationFn: (input) => api.post<MeResponse>(URLS.auth.login, input),
+    mutationFn: (input) => api.post<MeResponse>(API.auth.login.url, input),
     onSuccess: (data) => {
-      queryClient.setQueryData(QUERIES.auth.me, data);
+      queryClient.setQueryData(API.auth.me.key, data);
       navigate(ROUTES.HOME);
     },
     onError: (err) => {

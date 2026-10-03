@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
-import { URLS } from "@/api/urls";
+import { API } from "@/api/api";
 import { ROUTES } from "@/types";
 
 export function useLogout() {
@@ -14,7 +14,7 @@ export function useLogout() {
     mutate,
     isPending,
   } = useMutation<void, ApiErr>({
-    mutationFn: () => api.post<void>(URLS.auth.logout),
+    mutationFn: () => api.post<void>(API.auth.logout.url),
     onSuccess: () => {
       queryClient.clear();
       navigate(ROUTES.LOGIN);

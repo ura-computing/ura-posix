@@ -90,8 +90,8 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
   return data as T;
 }
 
-/** `api.get<Row[]>(URLS.x.list, { params })`, `api.delete(URLS.x.one(id))`.
- *  Paths live in `api/urls.ts`. */
+/** `api.get<Row[]>(API.x.list.url, { params })`, `api.delete(API.x.remove.url(id))`.
+ *  Paths live in `api/api.ts`. */
 export const api = {
   get:    <T>(path: string, opts?: ApiOptions) => request<T>("GET", path, undefined, opts),
   post:   <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("POST", path, body, opts),

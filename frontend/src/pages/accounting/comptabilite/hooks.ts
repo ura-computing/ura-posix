@@ -5,8 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 
 import type {
@@ -85,8 +84,8 @@ export function useComptabilitePage() {
     data: stats,
     isLoading: statsLoading,
   } = useQuery({
-    queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
-    queryFn: () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
+    queryKey: API.stats.main.key(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
+    queryFn: () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
     staleTime: 60_000,
   });
 
@@ -97,7 +96,7 @@ export function useComptabilitePage() {
   } = usePayments(activeMonth);
 
   // Ventes ledger — independent query so changing the page's filters refetches
-  // just the ledger (TanStack cache keyed via QUERIES.ventes.list).
+  // just the ledger (TanStack cache keyed via API.ventes.list.key).
   const ventesFilters: VentesFilters = useMemo(() => ({
     page: ventesPage,
     limit: ventesPageSize,
@@ -116,8 +115,8 @@ export function useComptabilitePage() {
     data: ventesData,
     isLoading: ventesLoading,
   } = useQuery({
-    queryKey: QUERIES.ventes.list(ventesFilters),
-    queryFn: () => api.get<VentesListResponse>(URLS.ventes.list, { params: ventesFilters }),
+    queryKey: API.ventes.list.key(ventesFilters),
+    queryFn: () => api.get<VentesListResponse>(API.ventes.list.url, { params: ventesFilters }),
   });
 
   /** Toggle order on same key; reset to "desc" on different key.
@@ -185,8 +184,8 @@ export function useComptabilitePage() {
 }
 
 /** Comptabilité — TanStack Query wrappers around the /accounting/payments
- *  endpoints. Mutations invalidate the PAYMENTS_PREFIX so the page card grid
- *  refreshes without a manual refetch. */
+ *  endpoints. Mutations refresh the payment lists (`API.payments.*.refreshes`)
+ *  so the page card grid updates without a manual refetch. */
 
 /** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
 export function usePayments(month?: string) {
@@ -194,8 +193,8 @@ export function usePayments(month?: string) {
     data,
     isLoading,
   } = useQuery({
-    queryKey: QUERIES.payments.list(month),
-    queryFn: () => api.get<PaymentEntry[]>(URLS.payments.list, { params: { month } }),
+    queryKey: API.payments.list.key(month),
+    queryFn: () => api.get<PaymentEntry[]>(API.payments.list.url, { params: { month } }),
     staleTime: 30_000,
   });
   return {
@@ -210,8 +209,8 @@ export function useSavePayment() {
     mutateAsync,
     isPending,
   } = useMutation<PaymentEntry, Error, PaymentEntryIn>({
-    mutationFn: (body) => api.post<PaymentEntry>(URLS.payments.list, body),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
+    mutationFn: (body) => api.post<PaymentEntry>(API.payments.create.url, body),
+    onSuccess: () => { void refresh(qc, API.payments.create); },
   });
   return {
     savePayment: mutateAsync,
@@ -225,8 +224,8 @@ export function useDeletePayment() {
     mutateAsync,
     isPending,
   } = useMutation<void, Error, number>({
-    mutationFn: (id) => api.delete(URLS.payments.one(id)),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
+    mutationFn: (id) => api.delete(API.payments.remove.url(id)),
+    onSuccess: () => { void refresh(qc, API.payments.remove); },
   });
   return {
     deletePayment: mutateAsync,

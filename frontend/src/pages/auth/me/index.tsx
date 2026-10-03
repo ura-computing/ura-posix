@@ -238,8 +238,8 @@ function frRelative(iso: string, t: TFn): string {
 function SessionsTab({ me }: { me: Me }) {
   const t = useT();
   const { sessions, isLoading, isError }                = useSessions(me.id);
-  const { handleKill,         pendingId }               = useKillSession(me.id);
-  const { handleRevokeOthers, isPending: isRevoking }   = useRevokeOtherSessions(me.id);
+  const { handleKill,         pendingId }               = useKillSession();
+  const { handleRevokeOthers, isPending: isRevoking }   = useRevokeOtherSessions();
   const { handleLogout,       isPending: isLoggingOut } = useLogout();
   const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
 

@@ -4,8 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API, refresh } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 
 import type {
@@ -34,13 +33,13 @@ export function useCatalogPage() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERIES.admin.catalog.list(filters),
-    queryFn:  () => api.get<CatalogListResponse>(URLS.admin.catalog.list, { params: filters }),
+    queryKey: API.admin.catalog.list.key(filters),
+    queryFn:  () => api.get<CatalogListResponse>(API.admin.catalog.list.url, { params: filters }),
   });
 
   const { data: categories } = useQuery({
-    queryKey:  QUERIES.admin.catalog.categories,
-    queryFn:   () => api.get<string[]>(URLS.admin.catalog.categories),
+    queryKey:  API.admin.catalog.categories.key,
+    queryFn:   () => api.get<string[]>(API.admin.catalog.categories.url),
     staleTime: 5 * 60_000,
   });
 
@@ -62,17 +61,12 @@ export function useCatalogPage() {
 
   const reset = () => setFilters(DEFAULT_FILTERS);
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: QUERIES.admin.catalog.listAll });
-    queryClient.invalidateQueries({ queryKey: QUERIES.admin.catalog.categories });
-  };
-
   const {
     mutate: create,
     isPending: isCreating,
   } = useMutation({
-    mutationFn: (body: MedicamentInput) => api.post<Medicament>(URLS.admin.catalog.list, body),
-    onSuccess:  () => { toast.success(t("catalogue.toastCreated")); invalidate(); },
+    mutationFn: (body: MedicamentInput) => api.post<Medicament>(API.admin.catalog.create.url, body),
+    onSuccess:  () => { toast.success(t("catalogue.toastCreated")); void refresh(queryClient, API.admin.catalog.create); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
@@ -81,8 +75,8 @@ export function useCatalogPage() {
     isPending: isUpdating,
   } = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Partial<MedicamentInput> }) =>
-      api.put<Medicament>(URLS.admin.catalog.one(id), body),
-    onSuccess:  () => { toast.success(t("catalogue.toastUpdated")); invalidate(); },
+      api.put<Medicament>(API.admin.catalog.update.url(id), body),
+    onSuccess:  () => { toast.success(t("catalogue.toastUpdated")); void refresh(queryClient, API.admin.catalog.update); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
@@ -90,8 +84,8 @@ export function useCatalogPage() {
     mutate: remove,
     isPending: isRemoving,
   } = useMutation({
-    mutationFn: (id: number) => api.delete(URLS.admin.catalog.one(id)),
-    onSuccess:  () => { toast.success(t("catalogue.toastDeleted")); invalidate(); },
+    mutationFn: (id: number) => api.delete(API.admin.catalog.remove.url(id)),
+    onSuccess:  () => { toast.success(t("catalogue.toastDeleted")); void refresh(queryClient, API.admin.catalog.remove); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
@@ -100,10 +94,10 @@ export function useCatalogPage() {
     isPending: isImporting,
     data: lastImport,
   } = useMutation({
-    mutationFn: (file: File) => api.upload<CatalogImportResponse>(URLS.uploads.catalog, file),
+    mutationFn: (file: File) => api.upload<CatalogImportResponse>(API.admin.catalog.importCsv.url, file),
     onSuccess:  (r) => {
       toast.success(t("catalogue.toastImport", { inserted: r.inserted, updated: r.updated, skipped: r.skipped }));
-      invalidate();
+      void refresh(queryClient, API.admin.catalog.importCsv);
     },
     onError: (e: Error) => toast.error(e.message),
   });

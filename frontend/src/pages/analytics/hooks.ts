@@ -5,8 +5,7 @@ import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import type { AlertColumn } from "./_components/AlertDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { URLS } from "@/api/urls";
-import { QUERIES } from "@/api/queries";
+import { API } from "@/api/api";
 
 import type {
   MarginAlertsResponse, PeremptionsResponse, StatsFilters, StockAbcdResponse, StockFilters, VentesSansAchatResponse,
@@ -192,8 +191,8 @@ export function useStockAbcd(
     filters.class_filter || filters.status || filters.sort_by,
   );
   const queryKey = isFiltered
-    ? QUERIES.stats.stockAbcdFiltered(filters as StockFilters)
-    : QUERIES.stats.stockAbcdFull(filters.date_from ?? null, filters.date_to ?? null);
+    ? API.stats.stockAbcdFiltered.key(filters as StockFilters)
+    : API.stats.stockAbcdFull.key(filters.date_from ?? null, filters.date_to ?? null);
 
   const {
     data,
@@ -202,7 +201,7 @@ export function useStockAbcd(
     refetch,
   } = useQuery({
     queryKey,
-    queryFn: () => api.get<StockAbcdResponse>(URLS.stats.stockAbcd, { params: filters }),
+    queryFn: () => api.get<StockAbcdResponse>(API.stats.stockAbcdFull.url, { params: filters }),
     enabled: options.enabled ?? true,
   });
   return {
@@ -220,8 +219,8 @@ export function usePeremptions() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: QUERIES.stats.peremptions,
-    queryFn:  () => api.get<PeremptionsResponse>(URLS.stats.peremptions),
+    queryKey: API.stats.peremptions.key,
+    queryFn:  () => api.get<PeremptionsResponse>(API.stats.peremptions.url),
     staleTime: 60_000,
   });
   return {
@@ -242,12 +241,12 @@ export function useMarginAlerts(filters: MarginAlertsFilters) {
     isError,
     refetch,
   } = useQuery({
-    queryKey: QUERIES.stats.marginAlerts(
+    queryKey: API.stats.marginAlerts.key(
       filters.date_from ?? null,
       filters.date_to   ?? null,
       filters.category_type ?? "all",
     ),
-    queryFn:  () => api.get<MarginAlertsResponse>(URLS.stats.marginAlerts, { params: filters }),
+    queryFn:  () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
     staleTime: 60_000,
   });
   return {
@@ -267,12 +266,12 @@ export function useVentesSansAchat(filters: MarginAlertsFilters) {
     isError,
     refetch,
   } = useQuery({
-    queryKey: QUERIES.stats.ventesSansAchat(
+    queryKey: API.stats.ventesSansAchat.key(
       filters.date_from ?? null,
       filters.date_to   ?? null,
       filters.category_type ?? "all",
     ),
-    queryFn:  () => api.get<VentesSansAchatResponse>(URLS.stats.ventesSansAchat, { params: filters }),
+    queryFn:  () => api.get<VentesSansAchatResponse>(API.stats.ventesSansAchat.url, { params: filters }),
     staleTime: 60_000,
   });
   return {

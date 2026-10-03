@@ -238,9 +238,9 @@ function UsersTab() {
   const [assignTarget, setAssignTarget] = useState<AdminUserRow | null>(null);
 
   // Pharmacy id 0: these hooks also refresh the whole pharmacies cache + this list.
-  const { setUserStatus } = useSetUserStatus(0);
+  const { setUserStatus } = useSetUserStatus();
   const { resetUserPassword } = useResetUserPassword();
-  const { deleteUser } = useDeleteUser(0);
+  const { deleteUser } = useDeleteUser();
 
   const rows = useMemo(() => users ?? [], [users]);
   const orphans  = rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length;
