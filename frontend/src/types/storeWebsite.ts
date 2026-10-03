@@ -257,7 +257,7 @@ export interface DeveloperAccount {
   lastActiveAt: string | null;
 }
 
-// ── API contract for `/v1/store-website/*` (mirrors backend/schemas/store_website.py) ──
+// ── API contract for `/v1/store-website/*` (mirrors backend/app/store_website/schemas.py) ──
 // Wire shapes only — no computed / display fields.
 
 export interface ClaimedByOut {

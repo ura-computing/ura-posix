@@ -1,6 +1,6 @@
 """Oracle v2: every value the app returns for the generated data, field by field.
 
-It pins TODAY'S app behavior (backend/stats_queries.py, analyse_queries.py,
+It pins TODAY'S app behavior (backend/app/analytics/stats_queries.py, analyse_queries.py,
 stock_queries.py, routers/transactions.py) so the refactor can't change any
 number silently. It never imports app code: the formulas are re-written here in
 plain Python from the generated rows. Where today's behavior breaks a business
@@ -131,7 +131,7 @@ def default_abcd_window(today: date) -> tuple[date, date]:
     return date(today.year - 1, 7, 1), date(today.year, 6, 30)
 
 
-# ── Search grammar (backend/search.py) ──────────────────────────────────────
+# ── Search grammar (backend/app/core/search.py) ──────────────────────────────────────
 
 def tokenize(query: str) -> list[str]:
     seen: list[str] = []

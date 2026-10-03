@@ -1,6 +1,6 @@
-/** Rapport / Comptabilité KPIs, alertes, stock, analyse de marge (mirrors backend/schemas/stats.py). */
+/** Rapport / Comptabilité KPIs, alertes, stock, analyse de marge (mirrors backend/app/analytics/schemas.py). */
 
-// ── Rapport / Stats response shapes (mirrors backend/schemas/stats.py) ────
+// ── Rapport / Stats response shapes (mirrors backend/app/analytics/schemas.py) ────
 
 export type CategoryType = "all" | "pharmacie" | "parapharmacie";
 

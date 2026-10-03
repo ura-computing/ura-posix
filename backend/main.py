@@ -4,22 +4,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from config import settings
-from errors import ApiError, api_error_handler, validation_error_handler
-from rate_limit import limiter, rate_limit_handler
-from routers import (
-    accounting,
-    admin_pharmacies,
-    auth,
-    catalog,
-    exclusions,
-    health,
-    imports,
-    owner_employees,
-    stats,
-    store_website,
-    transactions,
-)
+from app.identity.auth import router as auth
+from app.core import health
+from app.identity.members import admin_router as admin_pharmacies, owner_router as owner_employees
+from app.core.config import settings
+from app.core.errors import ApiError, api_error_handler, validation_error_handler
+from app.core.rate_limit import limiter, rate_limit_handler
+from app.accounting.exclusions import router as exclusions
+from app.accounting.payments import router as accounting
+from app.analytics import router as stats
+from app.catalog import router as catalog
+from app.ingestion import router as imports
+from app.ledger import router as transactions
+from app.store_website import router as store_website
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")

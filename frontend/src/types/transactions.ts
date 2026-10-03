@@ -1,4 +1,4 @@
-/** Ventes + achats lists (mirrors backend/schemas/transactions.py). */
+/** Ventes + achats lists (mirrors backend/app/ledger/schemas.py). */
 
 import type { SuffixColor } from "./catalog";
 

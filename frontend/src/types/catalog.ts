@@ -1,4 +1,4 @@
-/** Catalogue: medicaments + category suffixes (mirrors backend/schemas/catalog.py). */
+/** Catalogue: medicaments + category suffixes (mirrors backend/app/catalog/schemas.py). */
 
 import type { ErrorCode } from "@/api/errors";
 

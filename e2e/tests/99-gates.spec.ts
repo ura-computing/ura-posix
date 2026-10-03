@@ -166,10 +166,10 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
 test("gate: same error codes in backend and frontend", () => {
   const values = (file: string, re: RegExp) =>
     [...readFileSync(resolve(REPO_DIR, file), "utf-8").matchAll(re)].map((m) => m[1]).sort();
-  const backend = values("backend/errors.py", /^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm);
+  const backend = values("backend/app/core/errors.py", /^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm);
   const frontend = values("frontend/src/api/errors.ts", /^ {2}[A-Z_]+:\s*"(\w+)",$/gm);
-  expect(backend.length, "codes in backend/errors.py").toBeGreaterThan(0);
-  expect(frontend, "frontend/src/api/errors.ts vs backend/errors.py").toEqual(backend);
+  expect(backend.length, "codes in backend/app/core/errors.py").toBeGreaterThan(0);
+  expect(frontend, "frontend/src/api/errors.ts vs backend/app/core/errors.py").toEqual(backend);
 });
 
 test("gate: the React Compiler compiles every component (0 react-hooks lint errors)", () => {

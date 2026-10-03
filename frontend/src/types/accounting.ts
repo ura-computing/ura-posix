@@ -1,4 +1,4 @@
-/** Comptabilité payment entries (mirrors backend/schemas/accounting.py). */
+/** Comptabilité payment entries (mirrors backend/app/accounting/payments/schemas.py). */
 
 // ── Comptabilité — manual monthly payment-method entries (Page 5) ──────────
 

@@ -1,4 +1,4 @@
-/** Pharmacies + members, admin and owner pages (mirrors backend/schemas/members.py). */
+/** Pharmacies + members, admin and owner pages (mirrors backend/app/identity/members/schemas.py). */
 
 // ── Admin · permission management (/admin/pharmacies) ───────────────────────
 

@@ -1,5 +1,5 @@
 /** Emails in E2E: the backend runs without SMTP and prints each magic link
- *  (`>>> [RESET] MAGIC LINK for <email>: <url>`, see backend/email_service.py)
+ *  (`>>> [RESET] MAGIC LINK for <email>: <url>`, see backend/app/core/email_service.py)
  *  to e2e/.logs/backend.log. */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

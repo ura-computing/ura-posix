@@ -92,12 +92,12 @@ frontend:
 	cd $(FRONTEND_DIR) && npm run dev
 
 migrate: db
-	cd $(BACKEND_DIR) && uv run python bootstrap.py
+	cd $(BACKEND_DIR) && uv run python scripts/bootstrap.py
 
 # Run the same seed.py the docker entrypoint runs — but against the dev DB
 # (the backend's local .env / DATABASE_URL).
 seed: db migrate
-	cd $(BACKEND_DIR) && uv run python seed.py
+	cd $(BACKEND_DIR) && uv run python scripts/seed.py
 
 # ── Build ───────────────────────────────────────────────────────────────────
 

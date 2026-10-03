@@ -1,4 +1,4 @@
-/** Upload wizard + import history (mirrors backend/schemas/imports.py). */
+/** Upload wizard + import history (mirrors backend/app/ingestion/schemas.py). */
 
 // ── Upload-file types ────────────────────────────────────────────────────────
 

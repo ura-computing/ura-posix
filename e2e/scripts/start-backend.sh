@@ -28,6 +28,6 @@ export MAIL_USERNAME=""          # no SMTP: emails (magic links) are printed to 
 export PYTHONUNBUFFERED=1
 export SEED_CATALOG=0            # catalogue = generated products only (every value known)
 export RATE_LIMIT=0              # the suite logs in more than 5 times a minute
-uv run python bootstrap.py
-uv run python seed.py
+uv run python scripts/bootstrap.py
+uv run python scripts/seed.py
 uv run uvicorn main:app --port 8001 2>&1 | tee -a "$LOG"

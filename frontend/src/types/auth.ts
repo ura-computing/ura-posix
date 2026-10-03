@@ -1,4 +1,4 @@
-/** Login, account, sessions (mirrors backend/schemas/auth.py). */
+/** Login, account, sessions (mirrors backend/app/identity/auth/schemas.py). */
 
 import type { Feature, Role, Status } from "./index";
 

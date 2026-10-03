@@ -1,5 +1,5 @@
 // Roles, features, routes (urls + query keys: api/api.ts). Domain shapes live in one file per domain
-// (same names as backend/schemas/) and are re-exported here: import from "@/types".
+// (same names as the backend `schemas.py` files) and are re-exported here: import from "@/types".
 
 export const ROLES = {
   ADMIN: "admin",

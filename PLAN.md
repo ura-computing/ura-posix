@@ -1,9 +1,9 @@
 # PharmaGest — the plan (everything left, in order)
 
 Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this file when
-`make tests` is green. Rules: `CLAUDE.md`. App + setup: `README.md`.
+`make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §5 frontend → §2 speed → §3 production tools → §6 backend folders.
+**Order:** §1 run → §3 production tools (DO console, yours).
 
 ---
 
@@ -22,20 +22,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
-| FE9: one `Page` (`_components/Page.tsx`) on every page in the layout: same h1 + subtitle + actions on the right, same gap. Data pages full width (was 920 / 1100 / 1320 on catégories / équipe + pharmacy detail / pharmacies); `narrow` (`max-w-3xl`) for Mon compte + Importer un fichier. Extra padding over the layout's `p-7` gone (catégories, import). Pharmacy detail: title / address / buttons in the page header (no more header card); import: no icon box | every spec (titles unchanged) |
-
----
-
-## 2. Speed (now, not at the microservice split)
-
-Measured at 100 000 rows (2026-10-02): `FLOW ventes/export` 13.3 s (backend 11.9 s),
-`FLOW achats/export` 4.3 s, `FLOW rapport/first-load` 1.0 s. Right after an import, Rapport calls take
-39 s (`/stats`) and 16 s (margin alerts); the same calls take 0.2–0.5 s once Postgres has table
-statistics. Cause: fresh tables have no statistics until autoanalyze (~1 min later) → bad query plans.
-
-| # | Step | Example |
-|---|---|---|
-| S6 | **Daily pre-aggregates.** Table `daily_sales(pharmacy_id, date, medicament_id, qty, ca)` refreshed after each import (only the touched dates); Rapport trend, Analyses mois / année read it instead of every sale line | 100k lines → ~365 rows per product-year |
+| Backend layout: all code in `backend/app/` (`core/`, `identity/auth` + `identity/members`, `catalog/`, `ingestion/`, `ledger/`, `analytics/`, `accounting/payments` + `accounting/exclusions`, `store_website/`), scripts in `backend/scripts/` (`bootstrap.py`, `seed.py` + `seed.json`, legacy migration). `main.py` stays at the backend root (`uvicorn main:app` unchanged for deployments); scripts: `python scripts/…` (Makefile, `entrypoint.sh`, E2E start script). OpenAPI identical. **Fix**: `entrypoint.sh` still imported `database` / `models` since the `core/` step (Docker + production boot would crash) | every spec; Docker: `make demo` |
 
 ---
 
@@ -47,50 +34,13 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 |---|---|---|---|
 | Now (DO console, once) | `pg_stat_statements`: `CREATE EXTENSION pg_stat_statements;` on the managed DB | list of the slowest real queries in production | read-only, no app change |
 | Now (DO console) | Frontend as an App Platform **static site** (build `npm run build`, output `dist`, catch-all → `index.html`) | served from DO's CDN; hashed assets cached 1 year, `index.html` never cached | needs S2 for small chunks |
+| Later | **S6 daily pre-aggregates**: table `daily_sales(pharmacy_id, date, medicament_id, qty, ca)` refreshed after each import / undo; Rapport trend + Analyses mois / année read it | ~365 rows per product-year instead of every sale line | only if `pg_stat_statements` shows `/stats` / analyse slow: today 248 ms / 88 ms at 100k rows, and a 2nd copy of the sales must stay right after every import, undo, catalogue change |
 | Later | Rapport server cache keyed by a data version (bumped on import, exclusion, catalogue change) | repeat visits only; first view after an import stays the same | add only if `/stats` is still a problem in production (`pg_stat_statements`) |
 | Later | **Valkey** (DO Managed Caching; open-source Redis fork) | shared Rapport cache + shared rate limit (B3) + job queue for all workers | one more paid DO part |
 | Later | **RQ worker** (Python job queue on Valkey) | imports / exports run off the request path (B4); the page polls the status | one more DO component |
 | Later | **PgBouncer** (DO connection pools) | many workers without hitting the DB connection limit | needed once workers × instances × 30 > DB limit |
 | Later | Read replica (DO managed Postgres) | Rapport / Analyses read from it, imports write to the primary | only if DB CPU is high (see `pg_stat_statements`) |
 | Later | **SigNoz** (open source, decision 2026-10-02) | errors with stack traces, slow requests, logs, metrics in one place | self-hosted on a DO Droplet (≥ 4 GB RAM, Docker Compose). App sends OpenTelemetry (`opentelemetry-instrumentation-fastapi`, `-sqlalchemy`); same code works with Grafana (Tempo / Loki / Prometheus) |
-
----
-
-## 5. Frontend consistency
-
-| # | Step | Today | After |
-|---|---|---|---|
-
-**Bugs fixed in these steps**
-
-| Bug | Example | Step |
-|---|---|---|
-
-**Tooling**
-
-| Today | After |
-|---|---|
-
----
-
-## 6. Backend: one folder per domain (moves only)
-
-Like frontend `pages/<feature>/`: one folder per domain → `router.py` + `schemas.py` + its logic
-file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths only: same URLs
-(OpenAPI diff = empty), E2E green after each domain, one domain per step.
-
-| Folder | Gets |
-|---|---|
-| `core/` | `config`, `database`, `main`, `bootstrap`, `seed`, `models` (one Base, one Alembic chain), `errors`, `security`, `permissions`, `rate_limit`, `search`, `utils`, `email_service`, router `health`; `Pagination` + text helpers |
-| `auth/` | routers + schemas `auth` (login, me, password, sessions) |
-| `members/` | routers `admin_pharmacies` + `owner_employees` (one `router.py`), schemas `members`, `members.py` → `service.py` |
-| `catalog/` | routers + schemas `catalog` |
-| `imports/` | routers + schemas `imports`, Sobrus parsing from `csv_parse` |
-| `ledger/` | routers + schemas `transactions` |
-| `stats/` | routers + schemas `stats`, `stats_queries`, `analyse_queries`, `stock_queries`, `query_parts` (+ Rapport cache, S6 pre-aggregates) |
-| `exclusions/` | routers + schemas `exclusions`, `exclusions.py` → `service.py` |
-| `accounting/` | routers + schemas `accounting` |
-| `store_website/` | routers + schemas `store_website` |
 
 ---
 
@@ -125,7 +75,7 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 
 | What | Notes |
 |---|---|
-| Microservices: ingestion + analytics | each = move one §6 folder out; blockers §7; Rapport cache moves to Valkey |
+| Microservices: ingestion + analytics | each = move `backend/app/ingestion/` or `backend/app/analytics/` out; blockers §7; Rapport cache moves to Valkey |
 | « Ma boutique en ligne » | hidden; add its E2E specs the day it is shown (allowlisted in `99-gates.spec.ts`) |
 
 ---

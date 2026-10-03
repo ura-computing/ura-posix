@@ -25,8 +25,8 @@ print("✓ Postgres reachable")
 PY
 
 # 2. Schema bootstrap (extensions + migrations or stamp). Shared with
-#    `make migrate` — single source of truth in bootstrap.py.
-uv run python bootstrap.py
+#    `make migrate` — single source of truth in scripts/bootstrap.py.
+uv run python scripts/bootstrap.py
 
 # 4. Seed admin + owner + catalog. Idempotent: seed.py self-skips if the
 #    admin user already exists. We short-circuit here too so the container
@@ -34,8 +34,8 @@ uv run python bootstrap.py
 #    bootstrap.py already touched the DB and proved tables exist.
 NEEDS_SEED=$(uv run python <<'PY'
 from sqlalchemy import inspect
-from database import engine, SessionLocal
-from models import User
+from app.core.database import engine, SessionLocal
+from app.core.models import User
 
 if not inspect(engine).has_table("users"):
     print("yes")
@@ -50,7 +50,7 @@ PY
 
 if [ "$NEEDS_SEED" = "yes" ]; then
   echo "▸ Seeding accounts + catalogue…"
-  uv run python seed.py
+  uv run python scripts/seed.py
 else
   echo "▸ Admin already present — skipping seed (data preserved)."
 fi

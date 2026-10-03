@@ -258,7 +258,7 @@ export function useAnalyseListe() {
   };
 }
 
-/** Client-side mirror of the backend `_compute_kpis` (backend/analyse_queries.py:532).
+/** Client-side mirror of the backend `_compute_kpis` (backend/app/analytics/analyse_queries.py).
  *
  *  Purpose: the /analyses KPI cards must ADAPT to the client-side text search.
  *  Date/category filters already flow through the API (backend recomputes), but

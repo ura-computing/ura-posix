@@ -1,4 +1,4 @@
-/** Special products, BL and supplier exclusions (mirrors backend/schemas/exclusions.py). */
+/** Special products, BL and supplier exclusions (mirrors backend/app/accounting/exclusions/schemas.py). */
 
 // ── Produits spéciaux (F17 — owner-managed product exclusions) ─────────────
 

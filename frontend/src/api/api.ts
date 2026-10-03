@@ -1,4 +1,4 @@
-/** Every backend call of the app, one entry per action, grouped like backend/routers/.
+/** Every backend call of the app, one entry per action, grouped like the backend `app/<area>/` folders.
  *
  *  - Read (GET):  `{ url, key }` — `key` = its TanStack Query cache slot. A key built
  *    from filters is a function, and `all` = the prefix of every slot of that read.
