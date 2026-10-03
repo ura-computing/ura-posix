@@ -22,9 +22,8 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
-| E2E on the production images: `e2e/docker-compose.e2e.yml` (backend Dockerfile → `entrypoint.sh` → migrations + seed + `uvicorn main:app` 2 workers; frontend Dockerfile → `serve`; Postgres 17 in memory) started / removed by `e2e/scripts/start-stack.sh` (replaces `start-backend.sh` + `vite preview`). `docker-compose.yml`: `backend` service restored (`make demo` had no backend since `72d98fc`). Speed baseline to re-record once (answer `y`) | every spec, `make demo` |
-| Clear errors: (1) any server crash → JSON 500 `serverError` with CORS headers (`CatchServerErrors`, `app/core/errors.py`) → « Le logiciel a rencontré un problème. Réessayez dans quelques minutes. » (was « Serveur injoignable »); 5xx without code (proxy) → same; (2) no network → « Pas de connexion Internet… », server down → « Le logiciel ne répond pas… »; (3) damaged file (control character) refused in the browser with its line « Ce fichier est abîmé (ligne N). Téléchargez-le à nouveau depuis Sobrus… », backend safety net `fileCorrupted` (chunks + catalogue) | `15-imports` (bad files test + API check), `99-gates` (codes) |
-| B6: a chunk no longer marks its batch « success »: only the final PATCH after the last chunk does. Batch `in_progress` with no chunk for 1 min (new column `last_chunk_at`, migration 0020) → API shows `interrupted`, list shows « Interrompu » + « Importez le même fichier à nouveau pour le compléter. » (FR + ES); the list re-reads every 10 s while one is « En cours ». New test: tab closed after chunk 1 → « En cours », 2 000 lines, deleted from the list | `15-imports` (new test before the last one), `02-import` |
+| B4: `upload_catalog` is a plain `def` (thread) + `file.file.read()`: a big catalogue upload no longer freezes the other requests. B9: « today » = pharmacy date (`app/core/utils.py` `today()`, Africa/Casablanca) in `stats_queries` + `stock_queries` (5 places), and `generate.py --today` defaults to the same date | `14-admin` (catalogue CSV), `03`, `04`, `05` (today-based windows) |
+| B5: new products created with `INSERT … ON CONFLICT (pid) DO NOTHING RETURNING pid` + one SELECT (`_batch_resolve_medicaments`, `app/ingestion/router.py`): two imports creating the same new PID at once → no 500; « N nouveaux produits » counts only the ones this import created. New test: 2 chunks sent together with the same unknown PID → created once, 2 lines | `15-imports` (new test before the last one), `02-import` |
 
 ---
 
@@ -62,11 +61,8 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | B1 | One shared DB | import and stats both read `medicaments` + exclusions → start with workers on the same DB and models (§3); don't split the DB |
 | B2 | Auth needs the DB | every request loads user + session + 3 permission layers → a new service needs `JWT_SECRET` + DB, or a gateway |
 | B3 | In-memory rate limit (`app/core/rate_limit.py`) | 2 workers → login limit 10/min instead of 5 → `Limiter(storage_uri=<Valkey URL>)` |
-| B4 | Blocking catalogue upload: `async def upload_catalog` runs sync SQLAlchemy (`app/ingestion/router.py`) | pharmacy A uploads a 50 MB CSV → pharmacy B's Rapport waits → plain `def`, or the RQ worker |
-| B5 | Race on a new product insert | 2 chunks insert PID 12345 at once → UniqueViolation → 500 → `ON CONFLICT (pid) DO NOTHING` + re-select (S7) |
 | B7 | CA = `qty × Medicament.ppv`, and `ppv` is global and mutable | January sold 100 × 15.00 = 1 500; June import sets PPV 16.50 → January becomes 1 650 for every pharmacy → every cache is cleared on catalogue edits |
 | B8 | `Vente.date`, `Achat.delivery_date` are text (`app/core/models.py`) | `cast(date as Date)` can't use the index; « 15/01/2024 » → 500 → real `DATE` columns |
-| B9 | `date.today()` uses the server timezone (`app/analytics/*_queries.py`) | server UTC, pharmacy at 00:30 Casablanca → « today » is yesterday → `TZ=Africa/Casablanca` in every service |
 
 ---
 
@@ -77,6 +73,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | What | Notes |
 |---|---|
 | Microservices: ingestion + analytics | each = move `backend/app/ingestion/` or `backend/app/analytics/` out; blockers §7; Rapport cache moves to Valkey |
+| « Today » per user (pharmacies in Spain / France) | browser sends `X-Timezone`; `app/core/utils.py today()` uses it (Casablanca today). Only near midnight: Péremptions, default ABCD window, trend last point |
 | « Ma boutique en ligne » | hidden; add its E2E specs the day it is shown (allowlisted in `99-gates.spec.ts`) |
 
 ---
@@ -86,3 +83,4 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | # | Question | Example |
 |---|---|---|
 | Q1 | Average PU: some places skip purchase lines with no price or qty ≤ 0 (ventes ledger, stock, top categories, analyse produit), others keep them (Rapport marge, margin alerts, analyse catégorie). Same filter everywhere? Locked formula | qty 5, PU empty kept → Σqty 15 instead of 10 → avg PU lower. Test data has no such line today |
+| Q2 | Currency: everything shows MAD (`formatMAD`, Excel headers « (MAD) »). Pharmacies in Spain / France work in EUR → currency per pharmacy? | Madrid pharmacy: « 1 234,56 MAD » instead of « 1 234,56 € » |

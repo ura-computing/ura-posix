@@ -1,5 +1,17 @@
 import hashlib
 import secrets
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+# Every pharmacy is in Morocco: « today » (expiry windows, 12-month ranges, « aujourd'hui »)
+# is their date, not the server clock (UTC on DigitalOcean) — at 00:30 in Casablanca the
+# server would still say « yesterday ».
+PHARMACY_TZ = ZoneInfo("Africa/Casablanca")
+
+
+def today() -> date:
+    """Today's date for the pharmacies (Africa/Casablanca)."""
+    return datetime.now(PHARMACY_TZ).date()
 
 
 def generate_token(byte_len: int = 32) -> str:

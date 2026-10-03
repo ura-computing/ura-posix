@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models import Achat, Medicament, PharmacyStock, Vente
 from app.analytics.query_parts import avg_pu_subquery
+from app.core.utils import today as pharmacy_today
 
 
 STOCK_SORT_KEYS = {
@@ -102,7 +103,7 @@ def _classify_abcd(units: int, units_4m: int, units_before: int) -> str:
 
 def _resolve_windows(df: str | None, dt: str | None) -> tuple[str, str, str]:
     """Return (start_12m_iso, start_4m_iso, end_iso) honouring partial inputs."""
-    today = date.today()
+    today = pharmacy_today()
     if df and dt:
         start_12m = date.fromisoformat(df)
         end_date = date.fromisoformat(dt)
@@ -302,7 +303,7 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
 
     Products further out than 12 months are skipped — not urgent enough
     to surface here."""
-    today = date.today()
+    today = pharmacy_today()
     boundary_6m = today + timedelta(days=6 * 30)
     boundary_12m = today + timedelta(days=12 * 30)
 

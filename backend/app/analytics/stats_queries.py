@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models import Achat, Medicament, PharmacyStock, Vente
 from app.analytics.query_parts import Filters, avg_pu_subquery, ca_sum, category_filter, pharma_expr
+from app.core.utils import today as pharmacy_today
 
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
@@ -357,7 +358,7 @@ def compute_previous_kpis(
     include_non_declared: bool = True,
 ) -> dict:
     """ventes_total + achats_total + marge_pct for the same window shifted -1 year."""
-    today = date.today()
+    today = pharmacy_today()
     if df and dt:
         d_from = date.fromisoformat(df)
         d_to = date.fromisoformat(dt)
@@ -555,9 +556,9 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         }
 
     # 12-month sales per medicament for this pharmacy.
-    from datetime import date as _date, timedelta as _td
+    from datetime import timedelta as _td
 
-    today = _date.today()
+    today = pharmacy_today()
     start_12m = (today - _td(days=365)).isoformat()
     sales_12m = (
         db.query(
@@ -640,7 +641,7 @@ def build_monthly_trend(
     """Adaptive ventes/achats trend. Returns {"granularity", "points"} where the
     bucket unit (week / month / semester / year) adapts to the selected window so
     a short period still renders a multi-point line. See _trend_granularity()."""
-    today = date.today()
+    today = pharmacy_today()
     gran = _trend_granularity(df, dt)
 
     if df and dt:

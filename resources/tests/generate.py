@@ -34,6 +34,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from oracle import Oracle
@@ -358,8 +359,10 @@ def main() -> None:
     ap.add_argument("--achat-rows", type=int, help="achat lines (default rows / 3)")
     ap.add_argument("--products", type=int, help="distinct products (default max(300, rows / 250))")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--today", type=date.fromisoformat, default=date.today(),
-                    help="reference day, YYYY-MM-DD (default: today)")
+    # Same « today » as the backend (app/core/utils.py: pharmacy time, Africa/Casablanca).
+    ap.add_argument("--today", type=date.fromisoformat,
+                    default=datetime.now(ZoneInfo("Africa/Casablanca")).date(),
+                    help="reference day, YYYY-MM-DD (default: today in Casablanca)")
     args = ap.parse_args()
     if args.rows < 1000:
         ap.error("--rows must be ≥ 1000: below that, the exclusions scenario finds no product "

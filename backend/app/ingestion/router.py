@@ -245,36 +245,51 @@ def _batch_resolve_medicaments(
     by_name = existing_by_name(db, (col(r, COL_PRODUCT) for r in unmatched.values()))
 
     med_for_pid: dict[str, Medicament] = {}
-    new_meds: list[Medicament] = []
-    new_by_name: dict[str, Medicament] = {}  # dedup two new rows of the same name in one batch
+    new_rows: dict[str, dict[str, Any]] = {}  # pid → values of a product to create
+    same_name: dict[str, str] = {}  # pid → pid of a product created in this batch with the same name
+    new_by_name: dict[str, str] = {}  # normalized name → pid created in this batch
     for pid, r in first_row_by_pid.items():
         med = existing.get(pid)
+        nkey = normalized_name(col(r, COL_PRODUCT))
         if med is None:
-            nkey = normalized_name(col(r, COL_PRODUCT))
-            med = by_name.get(nkey) or new_by_name.get(nkey)
+            med = by_name.get(nkey)
+            if med is None and nkey in new_by_name:
+                same_name[pid] = new_by_name[nkey]
+                continue
         if med is not None:
             _update_fields(med, r)
             med_for_pid[pid] = med
             continue
         # F19: leave product_type=NULL — catalog is the source of truth; admin classifies.
-        med = Medicament(
-            pid=pid,
-            product=col(r, COL_PRODUCT) or pid,
-            tva=col(r, COL_TVA),
-            pph=parse_float(col(r, COL_PPH)),
-            ppv=parse_float(col(r, COL_PPV)),
-            category=col(r, COL_CATEGORY),
-            zone=col(r, COL_ZONE),
-        )
-        new_meds.append(med)
-        med_for_pid[pid] = med
-        nkey = normalized_name(col(r, COL_PRODUCT))
+        new_rows[pid] = {
+            "pid": pid,
+            "product": col(r, COL_PRODUCT) or pid,
+            "tva": col(r, COL_TVA),
+            "pph": parse_float(col(r, COL_PPH)),
+            "ppv": parse_float(col(r, COL_PPV)),
+            "category": col(r, COL_CATEGORY),
+            "zone": col(r, COL_ZONE),
+        }
         if nkey:
-            new_by_name[nkey] = med
+            new_by_name[nkey] = pid
 
-    if new_meds:
-        db.add_all(new_meds)
-        db.flush()  # populates .id on every new row in one round-trip
+    new_meds: list[Medicament] = []
+    if new_rows:
+        # Two imports (2 tabs, 2 pharmacies) can create the same new PID at the same moment:
+        # ON CONFLICT keeps whichever came first, the other just reads it back (no 500).
+        created = set(
+            db.execute(
+                pg_insert(Medicament)
+                .values(list(new_rows.values()))
+                .on_conflict_do_nothing(index_elements=["pid"])
+                .returning(Medicament.pid)
+            ).scalars()
+        )
+        for med in db.query(Medicament).filter(Medicament.pid.in_(list(new_rows))).all():
+            med_for_pid[med.pid] = med
+        new_meds = [med_for_pid[pid] for pid in new_rows if pid in created]
+    for pid, first_pid in same_name.items():
+        med_for_pid[pid] = med_for_pid[first_pid]
 
     resolved: dict[str, int] = {pid: med.id for pid, med in med_for_pid.items()}
     return resolved, new_meds
@@ -487,7 +502,7 @@ def _reject_corrupted(rows: list[dict[str, str]]) -> None:
 
 
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
-async def upload_catalog(
+def upload_catalog(
     user: AdminDep,
     db: DbDep,
     file: Annotated[UploadFile, File(description="Sobrus catalogue CSV (comma-delimited)")],
@@ -499,7 +514,9 @@ async def upload_catalog(
 
     Mojibake fix runs automatically via `parse_csv()` → `clean_value()`."""
     _check_csv(file)
-    content = await file.read()
+    # Plain `def` (FastAPI runs it in a thread): the DB work below is blocking, so an
+    # `async def` here froze every other request during a big catalogue upload.
+    content = file.file.read()
     _check_size(content)
     if b"\x00" in content:
         raise ApiError(400, ErrorCode.FILE_CORRUPTED, FILE_CORRUPTED_DETAIL)

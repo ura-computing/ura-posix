@@ -7,7 +7,7 @@
 import { basename, resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
-import { apiPost } from "../lib/api";
+import { apiDelete, apiGet, apiPost } from "../lib/api";
 import { OWNER, loadState, saveState, sessionFile } from "../lib/auth";
 import { checkLedgerPage, checkStats, type Row } from "../lib/checks";
 import { expectSame, expectSameSet } from "../lib/diff";
@@ -300,9 +300,13 @@ test("navigateur fermé pendant un import : « En cours », pas « Réussi » ; 
   await page.route("**/v1/uploads/achat-json", (route) => (++sent === 1 ? route.continue() : route.abort()));
   await page.route("**/v1/uploads/batches/*", (route) => route.abort());
   const chunk1 = page.waitForResponse((r) => r.url().endsWith("/v1/uploads/achat-json"));
+  // The page reports chunk 2's failure with a status call: close only once that call is
+  // dropped too (closing the tab cancels the routes, a pending call would get through).
+  const statusDropped = page.waitForEvent("requestfailed", (r) => r.url().includes("/v1/uploads/batches/"));
   await (await pickExtraFile(page)).click();
   const c1 = await (await chunk1).json();
   expect(c1.inserted, "lot 1").toBe(2000);
+  await statusDropped;
   await page.close();
 
   const again = await context.newPage();
@@ -321,6 +325,29 @@ test("navigateur fermé pendant un import : « En cours », pas « Réussi » ; 
     .getByRole("button", { name: "Supprimer", exact: true })
     .click();
   expect(await deleted, "DELETE /data/imports").toEqual({ id: c1.batch_id, deleted_rows: 2000, file_type: "achat" });
+});
+
+test("deux imports créent le même nouveau produit au même moment : pas d'erreur, un seul produit", async ({ page }) => {
+  // Two chunks sent together (2 backend workers): both name the same unknown PID.
+  const row = (ref: string) => ({
+    "Date Bon de Livraison": "2026-01-02",
+    "Référence de livraison": ref,
+    Fournisseur: "GROSSISTE E2E",
+    PID: "E2E-MEME-PRODUIT",
+    Produit: "E2E PRODUIT EN DOUBLE",
+    Quantité: "1",
+    "Prix unitaire": "10",
+    Total: "10",
+  });
+  const send = (ref: string) =>
+    apiPost(page, "/uploads/achat-json", { rows: [row(ref)], filename: "Sobrus - Achats 2026-01-02 - 2026-01-02.csv" });
+  const [a, b] = await Promise.all([send("BL-MEME-A"), send("BL-MEME-B")]);
+  expect(a.new_medicaments.count + b.new_medicaments.count, "produit créé une seule fois").toBe(1);
+  const lines = (await apiGet(page, "/achats", { search: "E2E PRODUIT EN DOUBLE" })).data as Row[];
+  expect(lines.map((l) => l.pid).sort(), "2 lignes, même produit").toEqual(["E2E-MEME-PRODUIT", "E2E-MEME-PRODUIT"]);
+
+  // Cleanup: the next test checks the Rapport is back to the oracle.
+  for (const id of new Set([a.batch_id, b.batch_id])) await apiDelete(page, `/data/imports/${id}`);
 });
 
 test("après l'annulation et la suppression, rien n'a bougé", async ({ page }) => {
