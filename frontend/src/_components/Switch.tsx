@@ -10,14 +10,12 @@ import type { ButtonHTMLAttributes } from "react";
 
 import { cn } from "@/utils/cn";
 
-
 interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> {
-  checked:   boolean;
+  checked: boolean;
   onChange?: (next: boolean) => void;
   /** Visual size — sm = 32×18, md = 40×22 (default). */
-  size?:     "sm" | "md";
+  size?: "sm" | "md";
 }
-
 
 export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch(
   { checked, onChange, disabled, size = "md", className, ...rest },
@@ -25,8 +23,14 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
 ) {
   const track = size === "sm" ? "h-[18px] w-8" : "h-[22px] w-10";
   const thumb = size === "sm" ? "size-3.5" : "size-[18px]";
-  const slide = size === "sm" ? (checked ? "translate-x-[14px]" : "translate-x-0.5")
-                              : (checked ? "translate-x-[18px]" : "translate-x-0.5");
+  const slide =
+    size === "sm"
+      ? checked
+        ? "translate-x-[14px]"
+        : "translate-x-0.5"
+      : checked
+        ? "translate-x-[18px]"
+        : "translate-x-0.5";
 
   return (
     <button
@@ -48,11 +52,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
     >
       <span
         aria-hidden
-        className={cn(
-          "inline-block rounded-full bg-white shadow transition-transform",
-          thumb,
-          slide,
-        )}
+        className={cn("inline-block rounded-full bg-white shadow transition-transform", thumb, slide)}
       />
     </button>
   );

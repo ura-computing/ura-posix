@@ -7,7 +7,19 @@ from slowapi.errors import RateLimitExceeded
 from config import settings
 from errors import ApiError, api_error_handler, validation_error_handler
 from rate_limit import limiter, rate_limit_handler
-from routers import accounting, admin_pharmacies, auth, catalog, exclusions, health, imports, owner_employees, stats, store_website, transactions
+from routers import (
+    accounting,
+    admin_pharmacies,
+    auth,
+    catalog,
+    exclusions,
+    health,
+    imports,
+    owner_employees,
+    stats,
+    store_website,
+    transactions,
+)
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")
@@ -34,14 +46,14 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.add_exception_handler(ApiError, api_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 
-app.include_router(health.router,           prefix="/v1")
-app.include_router(auth.router,             prefix="/v1")
-app.include_router(stats.router,            prefix="/v1")
-app.include_router(catalog.router,          prefix="/v1")
+app.include_router(health.router, prefix="/v1")
+app.include_router(auth.router, prefix="/v1")
+app.include_router(stats.router, prefix="/v1")
+app.include_router(catalog.router, prefix="/v1")
 app.include_router(admin_pharmacies.router, prefix="/v1")
-app.include_router(owner_employees.router,  prefix="/v1")
-app.include_router(imports.router,          prefix="/v1")
-app.include_router(transactions.router,     prefix="/v1")
-app.include_router(exclusions.router,       prefix="/v1")
-app.include_router(accounting.router,       prefix="/v1")
-app.include_router(store_website.router,    prefix="/v1")
+app.include_router(owner_employees.router, prefix="/v1")
+app.include_router(imports.router, prefix="/v1")
+app.include_router(transactions.router, prefix="/v1")
+app.include_router(exclusions.router, prefix="/v1")
+app.include_router(accounting.router, prefix="/v1")
+app.include_router(store_website.router, prefix="/v1")

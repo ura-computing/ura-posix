@@ -7,47 +7,49 @@ import { appendFileSync, mkdirSync } from "node:fs";
 
 import { API, CALLS_FILE, RESULTS_DIR } from "./paths";
 
-
 export interface CallRecord {
-  method: string;           // GET / POST / … or FLOW for a measured user flow
-  path:   string;           // /v1/stats  ·  flow: import/ventes
+  method: string; // GET / POST / … or FLOW for a measured user flow
+  path: string; // /v1/stats  ·  flow: import/ventes
   status: number;
-  ms:     number;
+  ms: number;
   source: "ui" | "api" | "flow";
-  test:   string;
+  test: string;
 }
-
 
 export function recordCall(rec: CallRecord): void {
   mkdirSync(RESULTS_DIR, { recursive: true });
   appendFileSync(CALLS_FILE, JSON.stringify(rec) + "\n");
 }
 
-
 export const test = base.extend<{ recorder: void }>({
-  recorder: [async ({ page }, use, testInfo) => {
-    const pending: Promise<void>[] = [];
-    const onRequest = (req: Request) => {
-      if (!req.url().startsWith(`${API}/v1/`)) return;
-      pending.push((async () => {
-        // Also on "requestfailed": Chromium reports a 204 No Content fetch as
-        // failed, yet its response (with the 204) is there.
-        const res = await req.response().catch(() => null);
-        recordCall({
-          method: req.method(),
-          path:   new URL(req.url()).pathname,
-          status: res?.status() ?? 0,
-          ms:     Math.round(req.timing().responseEnd),
-          source: "ui",
-          test:   testInfo.title,
-        });
-      })());
-    };
-    page.on("requestfinished", onRequest);
-    page.on("requestfailed",   onRequest);
-    await use();
-    await Promise.all(pending);
-  }, { auto: true }],
+  recorder: [
+    async ({ page }, use, testInfo) => {
+      const pending: Promise<void>[] = [];
+      const onRequest = (req: Request) => {
+        if (!req.url().startsWith(`${API}/v1/`)) return;
+        pending.push(
+          (async () => {
+            // Also on "requestfailed": Chromium reports a 204 No Content fetch as
+            // failed, yet its response (with the 204) is there.
+            const res = await req.response().catch(() => null);
+            recordCall({
+              method: req.method(),
+              path: new URL(req.url()).pathname,
+              status: res?.status() ?? 0,
+              ms: Math.round(req.timing().responseEnd),
+              source: "ui",
+              test: testInfo.title,
+            });
+          })(),
+        );
+      };
+      page.on("requestfinished", onRequest);
+      page.on("requestfailed", onRequest);
+      await use();
+      await Promise.all(pending);
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };

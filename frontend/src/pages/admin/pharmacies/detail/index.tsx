@@ -66,33 +66,38 @@ import { Switch } from "@/_components/Switch";
 
 interface FeatureToggleGridProps {
   /** Pending values — what the user has currently set in the dialog. */
-  values:        Record<FeatureKey, boolean>;
+  values: Record<FeatureKey, boolean>;
   /** Server's current state — used to compute dirty-count. */
-  serverValues:  Record<FeatureKey, boolean>;
-  isSaving?:     boolean;
-  onToggle:      (key: FeatureKey, next: boolean) => void;
-  onEnableAll:   () => void;
-  onDisableAll:  () => void;
-  onSave:        () => void;
-  onCancel:      () => void;
+  serverValues: Record<FeatureKey, boolean>;
+  isSaving?: boolean;
+  onToggle: (key: FeatureKey, next: boolean) => void;
+  onEnableAll: () => void;
+  onDisableAll: () => void;
+  onSave: () => void;
+  onCancel: () => void;
 }
 
 function FeatureToggleGrid({
-  values, serverValues, isSaving, onToggle, onEnableAll, onDisableAll, onSave, onCancel,
+  values,
+  serverValues,
+  isSaving,
+  onToggle,
+  onEnableAll,
+  onDisableAll,
+  onSave,
+  onCancel,
 }: FeatureToggleGridProps) {
   const t = useT();
   const enabledCount = FEATURES.filter((f) => values[f.key]).length;
-  const dirtyCount   = FEATURES.filter((f) => values[f.key] !== serverValues[f.key]).length;
-  const isDirty      = dirtyCount > 0;
+  const dirtyCount = FEATURES.filter((f) => values[f.key] !== serverValues[f.key]).length;
+  const isDirty = dirtyCount > 0;
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex max-w-[620px] flex-col gap-0.5">
           <h2 className="text-base font-semibold text-foreground">{t("adminPharm.pharmacyFeaturesTitle")}</h2>
-          <p className="text-sm text-muted-foreground">
-            {t("adminPharm.pharmacyFeaturesDesc")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("adminPharm.pharmacyFeaturesDesc")}</p>
         </div>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
           {enabledCount} / 9 {t("adminPharm.activatedFem")}
@@ -102,9 +107,9 @@ function FeatureToggleGrid({
       <div className="flex flex-col gap-4 p-5">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => {
-            const on    = values[f.key];
+            const on = values[f.key];
             const dirty = on !== serverValues[f.key];
-            const Icon  = f.icon;
+            const Icon = f.icon;
             return (
               <div
                 key={f.key}
@@ -163,39 +168,29 @@ function FeatureToggleGrid({
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 
-
 export default function AdminPharmacyDetail() {
   const t = useT();
   const { id: idParam } = useParams<{ id: string }>();
   const id = Number(idParam);
   const nav = useNavigate();
 
-  const [editOpen,        setEditOpen]        = useState(false);
-  const [createUserOpen,  setCreateUserOpen]  = useState(false);
-  const [permDialogUser,  setPermDialogUser]  = useState<MemberOut | null>(null);
-  const [deleteOpen,      setDeleteOpen]      = useState(false);
-  const [resetTarget,     setResetTarget]     = useState<MemberOut | null>(null);
-  const [removeTarget,    setRemoveTarget]    = useState<MemberOut | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
 
   // Pending feature toggles — separate from the server values; resets after save.
   const [pendingFeatures, setPendingFeatures] = useState<Record<FeatureKey, boolean> | null>(null);
 
-  const {
-    pharmacy,
-    isLoading,
-  } = useAdminPharmacy(id);
+  const { pharmacy, isLoading } = useAdminPharmacy(id);
   const detail = pharmacy ?? null;
 
   const { updatePharmacy } = useUpdatePharmacy(id);
   const { archivePharmacy } = useArchivePharmacy(id);
-  const {
-    setPharmacyFeatures,
-    isSavingFeatures,
-  } = useSetPharmacyFeatures(id);
-  const {
-    setUserPermissions,
-    isSavingPermissions: isSavingPerms,
-  } = useSetUserPermissions();
+  const { setPharmacyFeatures, isSavingFeatures } = useSetPharmacyFeatures(id);
+  const { setUserPermissions, isSavingPermissions: isSavingPerms } = useSetUserPermissions();
   const { createUser } = useCreateUser();
   const { resetUserPassword } = useResetUserPassword();
   const { setUserStatus } = useSetUserStatus();
@@ -247,7 +242,7 @@ export default function AdminPharmacyDetail() {
     );
   }
 
-  const owners    = detail.members.filter((m) => m.role === "owner");
+  const owners = detail.members.filter((m) => m.role === "owner");
   const employees = detail.members.filter((m) => m.role === "employee");
 
   return (
@@ -263,7 +258,9 @@ export default function AdminPharmacyDetail() {
       </Link>
 
       <nav className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Link to={ROUTES.ADMIN_PHARMACIES} className="hover:text-foreground">{t("adminPharm.pharmacies")}</Link>
+        <Link to={ROUTES.ADMIN_PHARMACIES} className="hover:text-foreground">
+          {t("adminPharm.pharmacies")}
+        </Link>
         <ChevronRight className="size-3" />
         <span className="text-foreground">{detail.name}</span>
       </nav>
@@ -321,9 +318,7 @@ export default function AdminPharmacyDetail() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <Users className="size-5" />
             </span>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              {t("adminPharm.membersEmpty")}
-            </p>
+            <p className="max-w-sm text-sm text-muted-foreground">{t("adminPharm.membersEmpty")}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -353,7 +348,11 @@ export default function AdminPharmacyDetail() {
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-foreground">
-                          {(m.full_name ?? m.email).split(/\s+/).slice(0, 2).map((s: string) => s[0]?.toUpperCase()).join("")}
+                          {(m.full_name ?? m.email)
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((s: string) => s[0]?.toUpperCase())
+                            .join("")}
                         </span>
                         <div className="flex flex-col">
                           <span className="text-[13px] font-semibold text-foreground">{m.full_name ?? "—"}</span>
@@ -362,12 +361,22 @@ export default function AdminPharmacyDetail() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={cn(PILL_BASE, m.role === "owner" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          PILL_BASE,
+                          m.role === "owner" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {t(ROLE_LABEL[m.role])}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={cn(PILL_BASE, m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          PILL_BASE,
+                          m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
+                        )}
+                      >
                         {t(STATUS_LABEL[m.status])}
                       </span>
                     </td>
@@ -398,11 +407,18 @@ export default function AdminPharmacyDetail() {
         open={editOpen}
         onClose={() => setEditOpen(false)}
         initialValues={{
-          name: detail.name, code: detail.code ?? "", city: detail.city ?? "",
-          address: detail.address ?? "", phone: detail.phone ?? "", email: detail.email ?? "",
+          name: detail.name,
+          code: detail.code ?? "",
+          city: detail.city ?? "",
+          address: detail.address ?? "",
+          phone: detail.phone ?? "",
+          email: detail.email ?? "",
         }}
         pharmacyName={detail.name}
-        onSubmit={async (v) => { await handleEdit(v); setEditOpen(false); }}
+        onSubmit={async (v) => {
+          await handleEdit(v);
+          setEditOpen(false);
+        }}
       />
 
       <CreateUserDialog
@@ -433,8 +449,8 @@ export default function AdminPharmacyDetail() {
         ceilings={
           permDialogUser?.role === "employee"
             ? [
-                { label: t("adminPharm.ceilingPharmacy"),  values: serverFeatures },
-                { label: t("adminPharm.ceilingOwners"),    values: toFeatureRecord(detail.owners_union_permissions) },
+                { label: t("adminPharm.ceilingPharmacy"), values: serverFeatures },
+                { label: t("adminPharm.ceilingOwners"), values: toFeatureRecord(detail.owners_union_permissions) },
               ]
             : [{ label: t("adminPharm.ceilingPharmacy"), values: serverFeatures }]
         }
@@ -457,11 +473,12 @@ export default function AdminPharmacyDetail() {
         open={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
         variant="destructive"
-        title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
+        title={t("members.removeTitle", {
+          who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember"),
+        })}
         description={t("members.removeDesc", { pharmacy: detail.name })}
         onConfirm={handleConfirmRemove}
       />
     </div>
   );
 }
-

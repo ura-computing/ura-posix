@@ -4,13 +4,9 @@ import { Button } from "@/_components/button";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { Input } from "./input";
 import { Label } from "./label";
-import {
-  STORE_CATEGORY_COLORS,
-  type StoreCategory,
-} from "@/types/storeWebsite";
+import { STORE_CATEGORY_COLORS, type StoreCategory } from "@/types/storeWebsite";
 
 import { CATEGORY_ICONS, CategoryIcon } from "./categoryIcons";
-
 
 /** Modal — Nouvelle / Modifier catégorie. Opened from Tab 2 AND from the
  *  developer editor (shared source of truth). Fixed palette: 12 icons +
@@ -20,33 +16,29 @@ import { CATEGORY_ICONS, CategoryIcon } from "./categoryIcons";
  *  inline `<Field>` helper backed by `Label + <div>`. */
 
 export interface CategoryValues {
-  name:        string;
+  name: string;
   description: string;
-  icon:        string;
-  color:       string;
+  icon: string;
+  color: string;
 }
 
 export interface CategoryModalProps {
-  open:         boolean;
+  open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Present → edit mode. */
-  category?:    StoreCategory;
-  isSaving?:    boolean;
-  onSubmit:     (values: CategoryValues) => void;
+  category?: StoreCategory;
+  isSaving?: boolean;
+  onSubmit: (values: CategoryValues) => void;
 }
 
-
-export function CategoryModal({
-  open, onOpenChange, category, isSaving, onSubmit,
-}: CategoryModalProps) {
+export function CategoryModal({ open, onOpenChange, category, isSaving, onSubmit }: CategoryModalProps) {
   const [v, setV] = useState<CategoryValues>({
-    name:        category?.name ?? "",
+    name: category?.name ?? "",
     description: category?.description ?? "",
-    icon:        category?.icon ?? CATEGORY_ICONS[0].key,
-    color:       category?.color ?? STORE_CATEGORY_COLORS[0],
+    icon: category?.icon ?? CATEGORY_ICONS[0].key,
+    color: category?.color ?? STORE_CATEGORY_COLORS[0],
   });
-  const set = <K extends keyof CategoryValues>(k: K, val: CategoryValues[K]) =>
-    setV((p) => ({ ...p, [k]: val }));
+  const set = <K extends keyof CategoryValues>(k: K, val: CategoryValues[K]) => setV((p) => ({ ...p, [k]: val }));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -65,9 +57,7 @@ export function CategoryModal({
           >
             <CategoryIcon name={v.icon} className="size-5" />
           </span>
-          <span className="text-sm font-semibold text-foreground">
-            {v.name || "Nom de la catégorie"}
-          </span>
+          <span className="text-sm font-semibold text-foreground">{v.name || "Nom de la catégorie"}</span>
         </div>
 
         <form
@@ -148,24 +138,25 @@ export function CategoryModal({
   );
 }
 
-
 function Field({
-  label, htmlFor, required, optional, children,
+  label,
+  htmlFor,
+  required,
+  optional,
+  children,
 }: {
-  label:     string;
-  htmlFor?:  string;
+  label: string;
+  htmlFor?: string;
   required?: boolean;
   optional?: boolean;
-  children:  ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={htmlFor} className="flex items-center gap-1.5 text-foreground">
         <span>{label}</span>
         {required && <span className="text-error-subtle-foreground">*</span>}
-        {optional && (
-          <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>
-        )}
+        {optional && <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>}
       </Label>
       {children}
     </div>

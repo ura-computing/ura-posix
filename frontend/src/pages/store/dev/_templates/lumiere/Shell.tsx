@@ -8,14 +8,12 @@ import { Sparkles } from "lucide-react";
 import type { TemplateCustomization } from "../_shared/customizationTypes";
 import { lumiereCssVars } from "./tokens";
 
-
 export interface LumiereShellProps {
   customization: TemplateCustomization;
   pharmacyPhone: string;
-  logoUrl:       string | null;
-  children:      ReactNode;
+  logoUrl: string | null;
+  children: ReactNode;
 }
-
 
 export function LumiereShell({ customization, pharmacyPhone, logoUrl, children }: LumiereShellProps) {
   return (
@@ -33,7 +31,6 @@ export function LumiereShell({ customization, pharmacyPhone, logoUrl, children }
   );
 }
 
-
 function Header({ logoUrl }: { logoUrl: string | null }) {
   return (
     <header className="relative z-10 mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-6 sm:px-8 sm:py-8">
@@ -50,13 +47,22 @@ function Header({ logoUrl }: { logoUrl: string | null }) {
         </span>
       </a>
       <nav className="hidden items-center gap-8 md:flex">
-        <a href="#accueil" className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]">
+        <a
+          href="#accueil"
+          className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]"
+        >
           Accueil
         </a>
-        <a href="#catalogue" className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]">
+        <a
+          href="#catalogue"
+          className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]"
+        >
           Catalogue
         </a>
-        <a href="#contact" className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]">
+        <a
+          href="#contact"
+          className="text-sm font-medium text-[var(--lum-ink-soft)] transition hover:text-[var(--lum-ink)]"
+        >
           Contact
         </a>
       </nav>
@@ -67,7 +73,6 @@ function Header({ logoUrl }: { logoUrl: string | null }) {
   );
 }
 
-
 function Footer({ pharmacyPhone }: { pharmacyPhone: string }) {
   return (
     <footer className="relative z-10 mt-16 border-t border-black/[.06] bg-white/60 backdrop-blur">
@@ -76,15 +81,19 @@ function Footer({ pharmacyPhone }: { pharmacyPhone: string }) {
           <span className="font-[family-name:var(--lum-font-display)] text-lg font-semibold text-[var(--lum-ink)]">
             Pharmacie Lumière
           </span>
-          <p className="text-sm text-[var(--lum-ink-soft)]">
-            Votre pharmacie de proximité, animée par la confiance.
-          </p>
+          <p className="text-sm text-[var(--lum-ink-soft)]">Votre pharmacie de proximité, animée par la confiance.</p>
         </div>
         <div className="flex flex-col gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--lum-ink)]/70">Boutique</h4>
-          <a href="#catalogue" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">Catalogue</a>
-          <a href="#soldes" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">SOLDES</a>
-          <a href="#featured" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">Produits en vedette</a>
+          <a href="#catalogue" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">
+            Catalogue
+          </a>
+          <a href="#soldes" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">
+            SOLDES
+          </a>
+          <a href="#featured" className="text-sm text-[var(--lum-ink-soft)] hover:text-[var(--lum-ink)]">
+            Produits en vedette
+          </a>
         </div>
         <div className="flex flex-col gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--lum-ink)]/70">Nous joindre</h4>

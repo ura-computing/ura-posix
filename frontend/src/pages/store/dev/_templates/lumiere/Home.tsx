@@ -14,9 +14,7 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  ArrowRight, ArrowUp, ArrowDown, Eye, EyeOff, Flower2, Leaf, MapPin, Sparkles,
-} from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowDown, Eye, EyeOff, Flower2, Leaf, MapPin, Sparkles } from "lucide-react";
 
 import { MOCK_BRANDS, MOCK_STORE_PRODUCTS, MOCK_TESTIMONIALS, whatsappOrderLink } from "../_shared/mockStore";
 import { blurUpVariants, fadeUpVariants, staggerContainer, viewportOnce } from "../_shared/motion";
@@ -27,7 +25,6 @@ import { lumiereCssVars } from "./tokens";
 import { LumiereShell } from "./Shell";
 import { LumiereStyles } from "./styles";
 
-
 export function LumiereHome(props: TemplateProps) {
   const { customization, editMode, onCustomizationChange, categories, pharmacyPhone } = props;
 
@@ -35,10 +32,7 @@ export function LumiereHome(props: TemplateProps) {
     () => [...customization.sections].sort((a, b) => a.layout.y - b.layout.y),
     [customization.sections],
   );
-  const visibleSections = useMemo(
-    () => (editMode ? ordered : ordered.filter((s) => s.visible)),
-    [ordered, editMode],
-  );
+  const visibleSections = useMemo(() => (editMode ? ordered : ordered.filter((s) => s.visible)), [ordered, editMode]);
 
   const patchContent = (key: SectionKey, slot: string, val: string) => {
     if (!onCustomizationChange) return;
@@ -65,9 +59,7 @@ export function LumiereHome(props: TemplateProps) {
     if (!onCustomizationChange) return;
     onCustomizationChange({
       ...customization,
-      sections: customization.sections.map((s) =>
-        s.key === key ? { ...s, visible: !s.visible } : s,
-      ),
+      sections: customization.sections.map((s) => (s.key === key ? { ...s, visible: !s.visible } : s)),
     });
   };
 
@@ -109,13 +101,15 @@ export function LumiereHome(props: TemplateProps) {
   );
 }
 
-
 // ── Editor toolbar (per-section move + hide) ───────────────────────────────
 
 function SectionEditToolbar(props: {
-  label: string; visible: boolean;
-  isFirst: boolean; isLast: boolean;
-  onMoveUp: () => void; onMoveDown: () => void;
+  label: string;
+  visible: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onToggleVisible: () => void;
 }) {
   return (
@@ -134,8 +128,16 @@ function SectionEditToolbar(props: {
   );
 }
 
-function IconBtn({ children, onClick, disabled, label }: {
-  children: React.ReactNode; onClick: () => void; disabled?: boolean; label: string;
+function IconBtn({
+  children,
+  onClick,
+  disabled,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
 }) {
   return (
     <button
@@ -150,16 +152,15 @@ function IconBtn({ children, onClick, disabled, label }: {
   );
 }
 
-
 // ── Section router ─────────────────────────────────────────────────────────
 
 function SectionRenderer(props: {
-  section:              SectionConfig;
-  editMode:             boolean;
-  categories:           TemplateProps["categories"];
-  pharmacyPhone:        string;
-  featuredCategoryIds:  string[];
-  patchContent:         (key: SectionKey, slot: string, val: string) => void;
+  section: SectionConfig;
+  editMode: boolean;
+  categories: TemplateProps["categories"];
+  pharmacyPhone: string;
+  featuredCategoryIds: string[];
+  patchContent: (key: SectionKey, slot: string, val: string) => void;
 }) {
   const { section: s, editMode } = props;
   return (
@@ -170,28 +171,31 @@ function SectionRenderer(props: {
       viewport={viewportOnce}
       variants={blurUpVariants}
     >
-      {s.key === "hero"                && <Hero {...props} />}
-      {s.key === "brands"              && <Brands {...props} />}
-      {s.key === "catalogue"           && <Categories {...props} />}
-      {s.key === "soldes"              && <Soldes {...props} />}
+      {s.key === "hero" && <Hero {...props} />}
+      {s.key === "brands" && <Brands {...props} />}
+      {s.key === "catalogue" && <Categories {...props} />}
+      {s.key === "soldes" && <Soldes {...props} />}
       {s.key === "featured_categories" && <Featured {...props} />}
-      {s.key === "testimonials"        && <Trust {...props} />}
-      {s.key === "contact"             && <ContactTeaser {...props} />}
-      {s.key === "footer"              && null /* rendered by LumiereShell */}
+      {s.key === "testimonials" && <Trust {...props} />}
+      {s.key === "contact" && <ContactTeaser {...props} />}
+      {s.key === "footer" && null /* rendered by LumiereShell */}
     </motion.section>
   );
 }
-
 
 // ── Sections ───────────────────────────────────────────────────────────────
 
 type SectionProps = React.ComponentProps<typeof SectionRenderer>;
 
-
 function EditableText({
-  editMode, value, onChange, className, as: Tag = "span",
+  editMode,
+  value,
+  onChange,
+  className,
+  as: Tag = "span",
 }: {
-  editMode: boolean; value: string;
+  editMode: boolean;
+  value: string;
   onChange: (v: string) => void;
   className?: string;
   as?: keyof React.JSX.IntrinsicElements;
@@ -209,7 +213,6 @@ function EditableText({
   );
 }
 
-
 function Hero({ section, editMode, patchContent }: SectionProps) {
   return (
     <div className="grid items-center gap-10 py-14 md:grid-cols-[1.15fr_.85fr] md:py-20">
@@ -219,17 +222,32 @@ function Hero({ section, editMode, patchContent }: SectionProps) {
           Pharmacie · Nouveauté
         </span>
         <h1 className="font-[family-name:var(--lum-font-display)] text-[42px] font-semibold leading-[1.05] tracking-tight text-[var(--lum-ink)] sm:text-[54px] md:text-[64px]">
-          <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("hero", "title", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.title ?? ""}
+            onChange={(v) => patchContent("hero", "title", v)}
+          />
         </h1>
         <p className="max-w-lg text-lg leading-relaxed text-[var(--lum-ink-soft)]">
-          <EditableText editMode={editMode} value={section.content.subtitle ?? ""} onChange={(v) => patchContent("hero", "subtitle", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.subtitle ?? ""}
+            onChange={(v) => patchContent("hero", "subtitle", v)}
+          />
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <a href="#catalogue" className="lum-cta">
-            <EditableText editMode={editMode} value={section.content.cta ?? ""} onChange={(v) => patchContent("hero", "cta", v)} />
+            <EditableText
+              editMode={editMode}
+              value={section.content.cta ?? ""}
+              onChange={(v) => patchContent("hero", "cta", v)}
+            />
             <ArrowRight aria-hidden className="size-4" />
           </a>
-          <a href="#contact" className="text-[15px] font-semibold text-[var(--lum-ink)] underline-offset-4 hover:underline">
+          <a
+            href="#contact"
+            className="text-[15px] font-semibold text-[var(--lum-ink)] underline-offset-4 hover:underline"
+          >
             Nous contacter
           </a>
         </div>
@@ -247,10 +265,16 @@ function Hero({ section, editMode, patchContent }: SectionProps) {
           <p className="mt-1 text-sm text-[var(--lum-ink-soft)]">Un peu de douceur pour la gorge.</p>
           <div className="mt-5 flex items-baseline justify-between">
             <div className="flex items-baseline gap-2">
-              <span className="font-[family-name:var(--lum-font-mono)] text-2xl font-semibold text-[var(--lum-primary)]">38 MAD</span>
-              <span className="font-[family-name:var(--lum-font-mono)] text-sm text-[var(--lum-ink-soft)] line-through">45 MAD</span>
+              <span className="font-[family-name:var(--lum-font-mono)] text-2xl font-semibold text-[var(--lum-primary)]">
+                38 MAD
+              </span>
+              <span className="font-[family-name:var(--lum-font-mono)] text-sm text-[var(--lum-ink-soft)] line-through">
+                45 MAD
+              </span>
             </div>
-            <span className="rounded-full bg-[var(--lum-primary)]/12 px-2.5 py-1 text-[11px] font-semibold text-[var(--lum-primary)]">En stock</span>
+            <span className="rounded-full bg-[var(--lum-primary)]/12 px-2.5 py-1 text-[11px] font-semibold text-[var(--lum-primary)]">
+              En stock
+            </span>
           </div>
         </div>
       </div>
@@ -258,17 +282,22 @@ function Hero({ section, editMode, patchContent }: SectionProps) {
   );
 }
 
-
 function Brands({ section, editMode, patchContent }: SectionProps) {
   return (
     <div className="flex flex-col gap-4 py-8">
       <h3 className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[var(--lum-ink-soft)]">
-        <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("brands", "title", v)} />
+        <EditableText
+          editMode={editMode}
+          value={section.content.title ?? ""}
+          onChange={(v) => patchContent("brands", "title", v)}
+        />
       </h3>
       <motion.div
         className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4"
         variants={staggerContainer}
-        initial="hidden" whileInView="show" viewport={viewportOnce}
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
       >
         {MOCK_BRANDS.map((b) => (
           <motion.span
@@ -284,26 +313,36 @@ function Brands({ section, editMode, patchContent }: SectionProps) {
   );
 }
 
-
 function Categories({ section, categories, editMode, patchContent, featuredCategoryIds }: SectionProps) {
-  const featured = featuredCategoryIds.length > 0
-    ? categories.filter((c) => featuredCategoryIds.includes(c.id))
-    : categories.filter((c) => !c.isDefault).slice(0, 6);
+  const featured =
+    featuredCategoryIds.length > 0
+      ? categories.filter((c) => featuredCategoryIds.includes(c.id))
+      : categories.filter((c) => !c.isDefault).slice(0, 6);
 
   return (
     <div className="flex flex-col gap-8 py-14">
       <header className="flex flex-col items-center gap-2 text-center">
         <h2 className="font-[family-name:var(--lum-font-display)] text-3xl font-semibold text-[var(--lum-ink)] sm:text-4xl">
-          <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("catalogue", "title", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.title ?? ""}
+            onChange={(v) => patchContent("catalogue", "title", v)}
+          />
         </h2>
         <p className="max-w-md text-sm text-[var(--lum-ink-soft)]">
-          <EditableText editMode={editMode} value={section.content.sub ?? ""} onChange={(v) => patchContent("catalogue", "sub", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.sub ?? ""}
+            onChange={(v) => patchContent("catalogue", "sub", v)}
+          />
         </p>
       </header>
       <motion.div
         className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
         variants={staggerContainer}
-        initial="hidden" whileInView="show" viewport={viewportOnce}
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
       >
         {featured.map((c) => (
           <motion.a
@@ -329,7 +368,6 @@ function Categories({ section, categories, editMode, patchContent, featuredCateg
   );
 }
 
-
 function Soldes({ section, editMode, patchContent, pharmacyPhone }: SectionProps) {
   const soldes = MOCK_STORE_PRODUCTS.filter((p) => p.solde != null);
   return (
@@ -339,16 +377,26 @@ function Soldes({ section, editMode, patchContent, pharmacyPhone }: SectionProps
           Offres du moment
         </span>
         <h2 className="font-[family-name:var(--lum-font-display)] text-3xl font-semibold text-[var(--lum-ink)] sm:text-4xl">
-          <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("soldes", "title", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.title ?? ""}
+            onChange={(v) => patchContent("soldes", "title", v)}
+          />
         </h2>
         <p className="max-w-lg text-sm text-[var(--lum-ink-soft)]">
-          <EditableText editMode={editMode} value={section.content.sub ?? ""} onChange={(v) => patchContent("soldes", "sub", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.sub ?? ""}
+            onChange={(v) => patchContent("soldes", "sub", v)}
+          />
         </p>
       </header>
       <motion.div
         className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"
         variants={staggerContainer}
-        initial="hidden" whileInView="show" viewport={viewportOnce}
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
       >
         {soldes.map((p) => {
           const pct = Math.round((1 - p.solde! / p.ppv) * 100);
@@ -379,7 +427,8 @@ function Soldes({ section, editMode, patchContent, pharmacyPhone }: SectionProps
                 </div>
                 <a
                   href={whatsappOrderLink(pharmacyPhone, p.name)}
-                  target="_blank" rel="noopener"
+                  target="_blank"
+                  rel="noopener"
                   className="rounded-full bg-[var(--lum-primary)] px-3 py-1.5 text-[11px] font-semibold text-white transition-transform hover:scale-105"
                 >
                   Commander
@@ -393,23 +442,32 @@ function Soldes({ section, editMode, patchContent, pharmacyPhone }: SectionProps
   );
 }
 
-
 function Featured({ section, editMode, patchContent, pharmacyPhone }: SectionProps) {
   const featured = MOCK_STORE_PRODUCTS.slice(0, 6);
   return (
     <div className="flex flex-col gap-8 py-14">
       <header className="flex flex-col gap-2">
         <h2 className="font-[family-name:var(--lum-font-display)] text-3xl font-semibold text-[var(--lum-ink)] sm:text-4xl">
-          <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("featured_categories", "title", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.title ?? ""}
+            onChange={(v) => patchContent("featured_categories", "title", v)}
+          />
         </h2>
         <p className="max-w-lg text-sm text-[var(--lum-ink-soft)]">
-          <EditableText editMode={editMode} value={section.content.sub ?? ""} onChange={(v) => patchContent("featured_categories", "sub", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.sub ?? ""}
+            onChange={(v) => patchContent("featured_categories", "sub", v)}
+          />
         </p>
       </header>
       <motion.div
         className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
         variants={staggerContainer}
-        initial="hidden" whileInView="show" viewport={viewportOnce}
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
       >
         {featured.map((p) => (
           <motion.article
@@ -431,7 +489,8 @@ function Featured({ section, editMode, patchContent, pharmacyPhone }: SectionPro
               </span>
               <a
                 href={whatsappOrderLink(pharmacyPhone, p.name)}
-                target="_blank" rel="noopener"
+                target="_blank"
+                rel="noopener"
                 className="rounded-full border border-[var(--lum-primary)] px-3 py-1.5 text-[11px] font-semibold text-[var(--lum-primary)] transition hover:bg-[var(--lum-primary)] hover:text-white"
               >
                 Commander
@@ -444,17 +503,22 @@ function Featured({ section, editMode, patchContent, pharmacyPhone }: SectionPro
   );
 }
 
-
 function Trust({ section, editMode, patchContent }: SectionProps) {
   return (
     <div className="flex flex-col gap-6 py-14">
       <h3 className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-[var(--lum-ink-soft)]">
-        <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("testimonials", "title", v)} />
+        <EditableText
+          editMode={editMode}
+          value={section.content.title ?? ""}
+          onChange={(v) => patchContent("testimonials", "title", v)}
+        />
       </h3>
       <motion.div
         className="grid grid-cols-1 gap-5 md:grid-cols-3"
         variants={staggerContainer}
-        initial="hidden" whileInView="show" viewport={viewportOnce}
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
       >
         {MOCK_TESTIMONIALS.map((t, i) => (
           <motion.figure
@@ -465,9 +529,7 @@ function Trust({ section, editMode, patchContent }: SectionProps) {
             <blockquote className="font-[family-name:var(--lum-font-display)] text-lg italic leading-snug text-[var(--lum-ink)]">
               « {t.quote} »
             </blockquote>
-            <figcaption className="text-xs font-semibold text-[var(--lum-ink-soft)]">
-              — {t.author}
-            </figcaption>
+            <figcaption className="text-xs font-semibold text-[var(--lum-ink-soft)]">— {t.author}</figcaption>
           </motion.figure>
         ))}
       </motion.div>
@@ -475,21 +537,34 @@ function Trust({ section, editMode, patchContent }: SectionProps) {
   );
 }
 
-
 function ContactTeaser({ section, editMode, patchContent, pharmacyPhone }: SectionProps) {
   return (
     <div className="grid gap-6 rounded-[32px] bg-white/85 p-8 shadow-[0_30px_70px_-40px_rgba(0,0,0,.15)] ring-1 ring-black/[.04] backdrop-blur md:grid-cols-[1fr_1fr] md:p-12">
       <div className="flex flex-col gap-4">
         <h2 className="font-[family-name:var(--lum-font-display)] text-3xl font-semibold text-[var(--lum-ink)]">
-          <EditableText editMode={editMode} value={section.content.title ?? ""} onChange={(v) => patchContent("contact", "title", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.title ?? ""}
+            onChange={(v) => patchContent("contact", "title", v)}
+          />
         </h2>
         <p className="text-[var(--lum-ink-soft)]">
-          <EditableText editMode={editMode} value={section.content.sub ?? ""} onChange={(v) => patchContent("contact", "sub", v)} />
+          <EditableText
+            editMode={editMode}
+            value={section.content.sub ?? ""}
+            onChange={(v) => patchContent("contact", "sub", v)}
+          />
         </p>
         <div className="flex flex-col gap-2 text-sm text-[var(--lum-ink)]">
-          <p><strong>Adresse :</strong> 12 rue des Fleurs, Bouskoura</p>
-          <p><strong>Téléphone :</strong> {pharmacyPhone}</p>
-          <p><strong>Horaires :</strong> Lun–Sam · 8h—20h</p>
+          <p>
+            <strong>Adresse :</strong> 12 rue des Fleurs, Bouskoura
+          </p>
+          <p>
+            <strong>Téléphone :</strong> {pharmacyPhone}
+          </p>
+          <p>
+            <strong>Horaires :</strong> Lun–Sam · 8h—20h
+          </p>
         </div>
         <a href={`tel:${pharmacyPhone}`} className="lum-cta w-fit">
           Nous appeler
@@ -502,19 +577,34 @@ function ContactTeaser({ section, editMode, patchContent, pharmacyPhone }: Secti
   );
 }
 
-
 // ── Ambient bg (blooms + leaves) ───────────────────────────────────────────
 
 function AmbientBackground() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div className="lum-bloom lum-bloomA absolute -left-24 top-1/4 size-96" style={{ background: "var(--lum-secondary)" }} />
-      <div className="lum-bloom lum-bloomB absolute -right-24 bottom-1/4 size-96" style={{ background: "var(--lum-primary)" }} />
-      <Leaf aria-hidden className="lum-leaf lum-leaf1 absolute left-[10%] top-[20%] size-8 text-[var(--lum-primary)]" strokeWidth={1.5} />
-      <Leaf aria-hidden className="lum-leaf lum-leaf2 absolute right-[15%] top-[60%] size-7 text-[var(--lum-primary)]" strokeWidth={1.5} />
-      <Leaf aria-hidden className="lum-leaf lum-leaf3 absolute left-[70%] top-[85%] size-8 text-[var(--lum-primary)]" strokeWidth={1.5} />
+      <div
+        className="lum-bloom lum-bloomA absolute -left-24 top-1/4 size-96"
+        style={{ background: "var(--lum-secondary)" }}
+      />
+      <div
+        className="lum-bloom lum-bloomB absolute -right-24 bottom-1/4 size-96"
+        style={{ background: "var(--lum-primary)" }}
+      />
+      <Leaf
+        aria-hidden
+        className="lum-leaf lum-leaf1 absolute left-[10%] top-[20%] size-8 text-[var(--lum-primary)]"
+        strokeWidth={1.5}
+      />
+      <Leaf
+        aria-hidden
+        className="lum-leaf lum-leaf2 absolute right-[15%] top-[60%] size-7 text-[var(--lum-primary)]"
+        strokeWidth={1.5}
+      />
+      <Leaf
+        aria-hidden
+        className="lum-leaf lum-leaf3 absolute left-[70%] top-[85%] size-8 text-[var(--lum-primary)]"
+        strokeWidth={1.5}
+      />
     </div>
   );
 }
-
-

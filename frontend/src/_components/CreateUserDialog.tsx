@@ -24,46 +24,48 @@ import { Dialog, DialogContent } from "./dialog";
 import { ROLE_LABEL } from "./memberConstants";
 import type { CreateUserIn, CreateUserOut, MemberOut, MemberRole } from "@/types";
 
-
 export interface PharmacyOption {
-  id:    number;
-  name:  string;
-  city:  string | null;
+  id: number;
+  name: string;
+  city: string | null;
 }
 
-
 export interface CreateUserDialogProps {
-  open:              boolean;
-  onClose:           () => void;
-  pharmacies:        PharmacyOption[];
+  open: boolean;
+  onClose: () => void;
+  pharmacies: PharmacyOption[];
   /** Preselect a pharmacy when opened from Screen 2 for a specific one. */
   defaultPharmacyId?: number;
   /** When set, hide the Rôle radio and force every create to this role.
    *  Owner pages pass "employee" — owner can't create co-owners. */
-  roleLocked?:       MemberRole;
-  isSaving?:         boolean;
+  roleLocked?: MemberRole;
+  isSaving?: boolean;
   /** Submit fires the POST mutation; on success the parent passes back the
    *  CreateUserOut so this dialog flips to the reveal state. */
-  onSubmit:          (values: CreateUserIn) => Promise<CreateUserOut>;
+  onSubmit: (values: CreateUserIn) => Promise<CreateUserOut>;
 }
 
-
 const ROLE_DESC: Record<MemberRole, string> = {
-  owner:    "adminPharm.roleDescOwner",
+  owner: "adminPharm.roleDescOwner",
   employee: "adminPharm.roleDescEmployee",
 };
 
-
 export function CreateUserDialog({
-  open, onClose, pharmacies, defaultPharmacyId, roleLocked, isSaving, onSubmit,
+  open,
+  onClose,
+  pharmacies,
+  defaultPharmacyId,
+  roleLocked,
+  isSaving,
+  onSubmit,
 }: CreateUserDialogProps) {
   const t = useT();
   const initialRole: MemberRole = roleLocked ?? "employee";
   const initialValues: CreateUserIn = {
-    full_name:   "",
-    email:       "",
-    password:    "",
-    role:        initialRole,
+    full_name: "",
+    email: "",
+    password: "",
+    role: initialRole,
     pharmacy_id: defaultPharmacyId ?? pharmacies[0]?.id ?? 0,
   };
 
@@ -92,13 +94,15 @@ export function CreateUserDialog({
     setRevealed({ member: result.member, password: values.password });
   };
 
-  const assignHint =
-    values.role === "owner"
-      ? t("adminPharm.assignHintOwner")
-      : t("adminPharm.assignHintEmployee");
+  const assignHint = values.role === "owner" ? t("adminPharm.assignHintOwner") : t("adminPharm.assignHintEmployee");
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHead
           icon={revealed ? <CheckCircle2 className="size-4" /> : <UserPlus className="size-4" />}
@@ -111,11 +115,22 @@ export function CreateUserDialog({
         {!revealed && (
           <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
             <Field label={t("adminPharm.fullName")} required>
-              <Input value={values.full_name ?? ""} onChange={(v) => set("full_name", v)} placeholder="Karim Bennani" required />
+              <Input
+                value={values.full_name ?? ""}
+                onChange={(v) => set("full_name", v)}
+                placeholder="Karim Bennani"
+                required
+              />
             </Field>
 
             <Field label={t("adminPharm.email")} required>
-              <Input type="email" value={values.email} onChange={(v) => set("email", v)} placeholder="karim.bennani@pharmacentre.ma" required />
+              <Input
+                type="email"
+                value={values.email}
+                onChange={(v) => set("email", v)}
+                placeholder="karim.bennani@pharmacentre.ma"
+                required
+              />
             </Field>
 
             <PasswordField
@@ -199,23 +214,21 @@ export function CreateUserDialog({
   );
 }
 
-
 export interface ResetPasswordDialogProps {
   /** Member whose password is being reset; null = closed. */
-  member:   MemberOut | null;
-  onClose:  () => void;
+  member: MemberOut | null;
+  onClose: () => void;
   /** Fires the reset mutation with the typed password; on success the
    *  dialog flips to the reveal state. */
   onSubmit: (password: string) => Promise<unknown>;
 }
 
-
 /** Two states like CreateUserDialog: A. new-password form → B. reveal. */
 export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPasswordDialogProps) {
   const t = useT();
   const [password, setPassword] = useState("");
-  const [saving,   setSaving]   = useState(false);
-  const [done,     setDone]     = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
 
   // Reset on (re)open — same derive-from-prop pattern as CreateUserDialog.
   const [prevMember, setPrevMember] = useState(member);
@@ -238,7 +251,12 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
   };
 
   return (
-    <Dialog open={member !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={member !== null}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHead
           icon={done ? <CheckCircle2 className="size-4" /> : <KeyRound className="size-4" />}
@@ -283,8 +301,17 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
   );
 }
 
-
-function DialogHead({ icon, title, subtitle, onClose }: { icon: React.ReactNode; title: string; subtitle: string; onClose: () => void }) {
+function DialogHead({
+  icon,
+  title,
+  subtitle,
+  onClose,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onClose: () => void;
+}) {
   const t = useT();
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -297,25 +324,33 @@ function DialogHead({ icon, title, subtitle, onClose }: { icon: React.ReactNode;
           <span className="text-xs text-muted-foreground">{subtitle}</span>
         </div>
       </div>
-      <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("common.close")}
+        className="cursor-pointer text-muted-foreground hover:text-foreground"
+      >
         <X className="size-4" />
       </button>
     </div>
   );
 }
 
-
 type MailKind = "create" | "reset";
 
 /** Banner + the password just set (copy) + Gmail / close footer. */
 function CredentialsReveal({
-  member, tempPassword, banner, kind, onClose,
+  member,
+  tempPassword,
+  banner,
+  kind,
+  onClose,
 }: {
-  member:       MemberOut;
+  member: MemberOut;
   tempPassword: string;
-  banner:       string;
-  kind:         MailKind;
-  onClose:      () => void;
+  banner: string;
+  kind: MailKind;
+  onClose: () => void;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -367,7 +402,6 @@ function CredentialsReveal({
   );
 }
 
-
 /** Gmail web compose URL with the credentials prefilled. The admin reviews +
  *  sends from Gmail in a new tab of the current browser. */
 function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, t: TFn): string {
@@ -383,21 +417,32 @@ function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, 
   ].join("\n");
   const params = new URLSearchParams({
     view: "cm",
-    fs:   "1",
-    to:   member.email,
-    su:   t(kind === "create" ? "adminPharm.mailSubject" : "adminPharm.mailResetSubject"),
+    fs: "1",
+    to: member.email,
+    su: t(kind === "create" ? "adminPharm.mailSubject" : "adminPharm.mailResetSubject"),
     body,
   });
   return `https://mail.google.com/mail/?${params.toString()}`;
 }
-
 
 // ─── Tiny inline form primitives (kept inline to avoid one-off shared/ files) ──
 
 /** `group`: children are buttons (role cards, picker, copy) — render a
  *  div role="group", not a <label>: a <label> names its first button after the
  *  whole block (the Propriétaire card was announced "Rôle* Employé…"). */
-function Field({ label, required, hint, group, children }: { label: string; required?: boolean; hint?: string; group?: boolean; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  group,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  group?: boolean;
+  children: React.ReactNode;
+}) {
   const Tag = group ? "div" : "label";
   return (
     <Tag className="flex flex-col gap-1.5" {...(group ? { role: "group", "aria-label": label } : {})}>
@@ -411,7 +456,14 @@ function Field({ label, required, hint, group, children }: { label: string; requ
   );
 }
 
-function Input({ value, onChange, ...rest }: { value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+function Input({
+  value,
+  onChange,
+  ...rest
+}: { value: string; onChange: (v: string) => void } & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+>) {
   return (
     <input
       {...rest}

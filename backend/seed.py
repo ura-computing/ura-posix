@@ -7,6 +7,7 @@ email up-front and skips everything if it's already there.
 Called by the docker entrypoint AFTER `alembic upgrade head`. Safe to run
 manually too: `uv run python seed.py`.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,10 +27,10 @@ from models import ALLOWED_FEATURES, Medicament, Pharmacy, PharmacyFeature, User
 from security import hash_password
 
 
-ROLE_ADMIN     = "admin"
-ROLE_OWNER     = "owner"
+ROLE_ADMIN = "admin"
+ROLE_OWNER = "owner"
 ROLE_DEVELOPER = "developer"
-STATUS_OK      = "active"
+STATUS_OK = "active"
 
 SEED_FILE = Path(__file__).parent / "seed.json"
 # Two known locations: bundled in the image at backend/catalog.csv, or in the
@@ -58,10 +59,12 @@ def _import_catalog(db: Session, csv_path: Path) -> int:
 
     inserted = 0
     for row in rows:
-        db.add(Medicament(
-            **row,
-            product_type=classify_product_type(row.get("category")),
-        ))
+        db.add(
+            Medicament(
+                **row,
+                product_type=classify_product_type(row.get("category")),
+            )
+        )
         inserted += 1
     db.commit()
     return inserted
@@ -75,14 +78,16 @@ def _seed_simple_user(db: Session, cfg: dict | None, role: str) -> str | None:
     """Insert a pharmacy-less user (admin or developer) if absent."""
     if not cfg or _user_exists(db, cfg["email"]):
         return None
-    db.add(User(
-        email=cfg["email"],
-        name=cfg["name"],
-        phone=cfg.get("phone"),
-        password_hash=hash_password(cfg["password"]),
-        role=role,
-        status=STATUS_OK,
-    ))
+    db.add(
+        User(
+            email=cfg["email"],
+            name=cfg["name"],
+            phone=cfg.get("phone"),
+            password_hash=hash_password(cfg["password"]),
+            role=role,
+            status=STATUS_OK,
+        )
+    )
     db.flush()
     return cfg["email"]
 
@@ -95,15 +100,18 @@ def _seed_owner_with_pharmacy(db: Session, cfg: dict | None) -> tuple[str, str] 
         return None
     city = cfg.get("pharmacy_city")
     pharmacy = Pharmacy(
-        name=cfg["pharmacy_name"], address=cfg.get("pharmacy_address"), city=city,
+        name=cfg["pharmacy_name"],
+        address=cfg.get("pharmacy_address"),
+        city=city,
         code=generate_pharmacy_code(db, city) if city else None,
     )
     db.add(pharmacy)
     db.flush()
     for feature in ALLOWED_FEATURES:
         db.add(PharmacyFeature(pharmacy_id=pharmacy.id, feature=feature, enabled=True))
-    owner = create_member(db, email=cfg["email"], name=cfg["name"], password=cfg["password"],
-                          role=ROLE_OWNER, pharmacy_id=pharmacy.id)
+    owner = create_member(
+        db, email=cfg["email"], name=cfg["name"], password=cfg["password"], role=ROLE_OWNER, pharmacy_id=pharmacy.id
+    )
     owner.phone = cfg.get("phone")
     db.flush()
     return cfg["email"], cfg["pharmacy_name"]

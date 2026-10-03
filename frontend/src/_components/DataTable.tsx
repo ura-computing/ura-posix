@@ -16,7 +16,6 @@ import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 
-
 // Pagination footer sits below the (possibly long) table; without this, changing
 // page leaves the viewport scrolled down at the footer with no visual cue that
 // the table above just changed. Walk up to the nearest scrollable ancestor
@@ -35,53 +34,57 @@ function scrollNearestAncestorToTop(el: HTMLElement | null) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-
 export interface ColumnDef<R, K extends string = string> {
-  key:       K;
-  label:     string;
-  width?:    number;             // px; sets style.width + minWidth
-  align?:    "left" | "right";   // default "left"; right adds tabular-nums + font-mono on cells
-  sortable?: boolean;            // default true; non-sortable headers skip the button + icon
-  render:    (row: R) => ReactNode;
+  key: K;
+  label: string;
+  width?: number; // px; sets style.width + minWidth
+  align?: "left" | "right"; // default "left"; right adds tabular-nums + font-mono on cells
+  sortable?: boolean; // default true; non-sortable headers skip the button + icon
+  render: (row: R) => ReactNode;
 }
-
 
 export interface DataTablePagination {
-  page:       number;
-  pageSize:   number;
-  total:      number;
-  onPage:     (p: number) => void;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (p: number) => void;
   onPageSize: (n: number) => void;
-  pageSizes?: number[];          // default [10, 25, 50]
+  pageSizes?: number[]; // default [10, 25, 50]
 }
-
 
 export interface DataTableProps<R, K extends string = string> {
-  rows:        R[];
-  columns:     ColumnDef<R, K>[];
-  isLoading?:  boolean;
-  sortBy?:     K | null;
-  sortOrder?:  "asc" | "desc";
-  onSort?:     (key: K) => void;
+  rows: R[];
+  columns: ColumnDef<R, K>[];
+  isLoading?: boolean;
+  sortBy?: K | null;
+  sortOrder?: "asc" | "desc";
+  onSort?: (key: K) => void;
   pagination?: DataTablePagination;
-  emptyTitle?: string;           // default "Aucun résultat"
-  emptyHint?:  string;
-  topBanner?:  ReactNode;        // Stock's filter banner; renders above the table shell
+  emptyTitle?: string; // default "Aucun résultat"
+  emptyHint?: string;
+  topBanner?: ReactNode; // Stock's filter banner; renders above the table shell
   /** Optional unique row key extractor. Defaults to index. */
-  rowKey?:     (row: R, index: number) => string | number;
-  className?:  string;
+  rowKey?: (row: R, index: number) => string | number;
+  className?: string;
 }
-
 
 function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" }) {
   if (!active) return <ArrowUpDown className="size-3 text-muted-foreground/60" />;
   return order === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />;
 }
 
-
 export function DataTable<R, K extends string = string>({
-  rows, columns, isLoading, sortBy, sortOrder = "desc", onSort,
-  pagination, emptyTitle, emptyHint, topBanner, rowKey,
+  rows,
+  columns,
+  isLoading,
+  sortBy,
+  sortOrder = "desc",
+  onSort,
+  pagination,
+  emptyTitle,
+  emptyHint,
+  topBanner,
+  rowKey,
   className,
 }: DataTableProps<R, K>) {
   const t = useT();
@@ -211,16 +214,23 @@ export function DataTable<R, K extends string = string>({
       {pagination && (
         <PaginationFooter
           {...pagination}
-          onPage={(p) => { scrollNearestAncestorToTop(rootRef.current); pagination.onPage(p); }}
+          onPage={(p) => {
+            scrollNearestAncestorToTop(rootRef.current);
+            pagination.onPage(p);
+          }}
         />
       )}
     </div>
   );
 }
 
-
 function PaginationFooter({
-  page, pageSize, total, onPage, onPageSize, pageSizes = [10, 25, 50],
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+  pageSizes = [10, 25, 50],
 }: DataTablePagination) {
   const t = useT();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -249,7 +259,9 @@ function PaginationFooter({
           <ChevronLeft className="size-4" />
           <span className="ml-1">{t("common.previous")}</span>
         </AsyncButton>
-        <span className="text-muted-foreground">{t("common.page")} {page} / {pageCount}</span>
+        <span className="text-muted-foreground">
+          {t("common.page")} {page} / {pageCount}
+        </span>
         <AsyncButton
           variant="ghost"
           disabled={page >= pageCount}
@@ -264,7 +276,10 @@ function PaginationFooter({
           label=""
           options={pageSizeOptions}
           value={String(pageSize)}
-          onChange={(v) => { onPageSize(Number(v)); onPage(1); }}
+          onChange={(v) => {
+            onPageSize(Number(v));
+            onPage(1);
+          }}
           placement="top"
           align="end"
         />

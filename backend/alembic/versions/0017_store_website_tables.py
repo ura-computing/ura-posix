@@ -16,6 +16,7 @@ Constraint: partial unique index guarantees one active (non-cloturee)
 request per pharmacy. Owners with a closed prior request can open a
 fresh one.
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -32,27 +33,26 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "store_website_requests",
-        sa.Column("id",            postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("pharmacy_id",   sa.Integer(), sa.ForeignKey("pharmacies.id"), nullable=False),
-        sa.Column("owner_id",      sa.Integer(), sa.ForeignKey("users.id"),      nullable=False),
-        sa.Column("store_name",    sa.String(),  nullable=False),
-        sa.Column("slogan",        sa.String(),  nullable=True),
-        sa.Column("brand_palette", sa.JSON(),    nullable=False, server_default="[]"),
-        sa.Column("phone",         sa.String(),  nullable=False),
-        sa.Column("custom_domain", sa.String(),  nullable=True),
-        sa.Column("urgency",       sa.String(),  nullable=False),
-        sa.Column("vision",        sa.String(),  nullable=True),
-        sa.Column("state",         sa.String(),  nullable=False, server_default="soumise"),
-        sa.Column("claimed_by_id", sa.Integer(),
-                  sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("claimed_at",    sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at",    sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at",    sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("pharmacy_id", sa.Integer(), sa.ForeignKey("pharmacies.id"), nullable=False),
+        sa.Column("owner_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("store_name", sa.String(), nullable=False),
+        sa.Column("slogan", sa.String(), nullable=True),
+        sa.Column("brand_palette", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("phone", sa.String(), nullable=False),
+        sa.Column("custom_domain", sa.String(), nullable=True),
+        sa.Column("urgency", sa.String(), nullable=False),
+        sa.Column("vision", sa.String(), nullable=True),
+        sa.Column("state", sa.String(), nullable=False, server_default="soumise"),
+        sa.Column("claimed_by_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
     op.create_index("ix_store_website_requests_pharmacy_id", "store_website_requests", ["pharmacy_id"])
-    op.create_index("ix_store_website_requests_owner_id",    "store_website_requests", ["owner_id"])
-    op.create_index("ix_store_website_requests_state",       "store_website_requests", ["state"])
-    op.create_index("ix_store_website_requests_claimed_by",  "store_website_requests", ["claimed_by_id"])
+    op.create_index("ix_store_website_requests_owner_id", "store_website_requests", ["owner_id"])
+    op.create_index("ix_store_website_requests_state", "store_website_requests", ["state"])
+    op.create_index("ix_store_website_requests_claimed_by", "store_website_requests", ["claimed_by_id"])
     # One active (non-closed) request per pharmacy. A closed prior request
     # is fine — owner can spin up a fresh one when they want a redesign.
     op.create_index(
@@ -65,24 +65,27 @@ def upgrade() -> None:
 
     op.create_table(
         "store_customizations",
-        sa.Column("request_id",           postgresql.UUID(as_uuid=True),
-                  sa.ForeignKey("store_website_requests.id", ondelete="CASCADE"),
-                  primary_key=True),
-        sa.Column("template",             sa.String(), nullable=False, server_default="lumiere"),
-        sa.Column("sections",             sa.JSON(),   nullable=False, server_default="{}"),
-        sa.Column("brand_colors",         sa.JSON(),   nullable=False, server_default="{}"),
-        sa.Column("logo_url",             sa.String(), nullable=True),
-        sa.Column("font_pairing",         sa.String(), nullable=False, server_default="moderne"),
-        sa.Column("featured_category_ids", sa.JSON(),  nullable=False, server_default="[]"),
-        sa.Column("updated_at",           sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "request_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("store_website_requests.id", ondelete="CASCADE"),
+            primary_key=True,
+        ),
+        sa.Column("template", sa.String(), nullable=False, server_default="lumiere"),
+        sa.Column("sections", sa.JSON(), nullable=False, server_default="{}"),
+        sa.Column("brand_colors", sa.JSON(), nullable=False, server_default="{}"),
+        sa.Column("logo_url", sa.String(), nullable=True),
+        sa.Column("font_pairing", sa.String(), nullable=False, server_default="moderne"),
+        sa.Column("featured_category_ids", sa.JSON(), nullable=False, server_default="[]"),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
 
 
 def downgrade() -> None:
     op.drop_table("store_customizations")
-    op.drop_index("uq_one_active_request_per_pharmacy",     table_name="store_website_requests")
-    op.drop_index("ix_store_website_requests_claimed_by",   table_name="store_website_requests")
-    op.drop_index("ix_store_website_requests_state",        table_name="store_website_requests")
-    op.drop_index("ix_store_website_requests_owner_id",     table_name="store_website_requests")
-    op.drop_index("ix_store_website_requests_pharmacy_id",  table_name="store_website_requests")
+    op.drop_index("uq_one_active_request_per_pharmacy", table_name="store_website_requests")
+    op.drop_index("ix_store_website_requests_claimed_by", table_name="store_website_requests")
+    op.drop_index("ix_store_website_requests_state", table_name="store_website_requests")
+    op.drop_index("ix_store_website_requests_owner_id", table_name="store_website_requests")
+    op.drop_index("ix_store_website_requests_pharmacy_id", table_name="store_website_requests")
     op.drop_table("store_website_requests")

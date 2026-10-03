@@ -13,65 +13,64 @@ import { useT } from "@/i18n/I18nProvider";
 import { API } from "@/api/api";
 import { useMe } from "@/hooks/useMe";
 
-import type {
-  RequestBrief, RequestState, Urgency,
-} from "@/types/storeWebsite";
+import type { RequestBrief, RequestState, Urgency } from "@/types/storeWebsite";
 import type { WebsiteRequestOut, WebsiteRequestWithCustomizationOut } from "@/types/storeWebsite";
 
 import { RequestDetailPage } from "../_components/RequestDetailPage";
 
-
 function toBrief(api: WebsiteRequestWithCustomizationOut, meId: string | null): RequestBrief {
   return {
-    id:           api.id,
+    id: api.id,
     pharmacyName: api.store_name,
-    ownerName:    "Propriétaire",   // owner_name isn't in the safe list — dev calls the phone anyway
-    ownerPhone:   api.phone,
-    storeName:    api.store_name,
-    slogan:       api.slogan ?? "",
-    logoUrl:      api.customization.logo_url,
+    ownerName: "Propriétaire", // owner_name isn't in the safe list — dev calls the phone anyway
+    ownerPhone: api.phone,
+    storeName: api.store_name,
+    slogan: api.slogan ?? "",
+    logoUrl: api.customization.logo_url,
     brandPalette: api.brand_palette,
     customDomain: api.custom_domain,
-    urgency:      api.urgency as Urgency,
-    vision:       api.vision ?? "",
-    state:        api.state as RequestState,
-    claimedByMe:  api.claimed_by ? String(api.claimed_by.id) === meId : false,
-    categories:   [],       // categories now live on the owner-managed featured list; fetched separately
-    soldes:       [],       // owner Tab 3 products not wired to backend yet
+    urgency: api.urgency as Urgency,
+    vision: api.vision ?? "",
+    state: api.state as RequestState,
+    claimedByMe: api.claimed_by ? String(api.claimed_by.id) === meId : false,
+    categories: [], // categories now live on the owner-managed featured list; fetched separately
+    soldes: [], // owner Tab 3 products not wired to backend yet
   };
 }
 
-
 export default function DevRequestDetailRoute() {
-  const { id }   = useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const qc       = useQueryClient();
-  const { me }   = useMe();
-  const t        = useT();
+  const qc = useQueryClient();
+  const { me } = useMe();
+  const t = useT();
 
   const q = useQuery({
     queryKey: API.storeWebsite.request.key(id ?? "noop"),
-    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(id!)),
-    enabled:  !!id,
-    retry:    false,
+    queryFn: () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(id!)),
+    enabled: !!id,
+    retry: false,
   });
 
-  const brief = useMemo(
-    () => (q.data ? toBrief(q.data, me ? String(me.id) : null) : null),
-    [q.data, me],
-  );
+  const brief = useMemo(() => (q.data ? toBrief(q.data, me ? String(me.id) : null) : null), [q.data, me]);
 
-  const claimM   = useMutation({
+  const claimM = useMutation({
     mutationFn: () => api.post<WebsiteRequestOut>(API.storeWebsite.claim.url(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) }); toast.success(t("store.claimed")); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) });
+      toast.success(t("store.claimed"));
+    },
   });
   const releaseM = useMutation({
     mutationFn: () => api.post<WebsiteRequestOut>(API.storeWebsite.release.url(id!)),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) }); toast.success(t("store.released")); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) });
+      toast.success(t("store.released"));
+    },
   });
-  const stateM   = useMutation({
+  const stateM = useMutation({
     mutationFn: (state: RequestState) => api.patch<WebsiteRequestOut>(API.storeWebsite.state.url(id!), { state }),
-    onSuccess:  (fresh) => {
+    onSuccess: (fresh) => {
       qc.invalidateQueries({ queryKey: API.storeWebsite.request.key(id!) });
       toast.success(t("store.stateUpdated", { state: fresh.state }));
     },
@@ -93,11 +92,11 @@ export default function DevRequestDetailRoute() {
   return (
     <RequestDetailPage
       brief={brief}
-      onClaim={          () => claimM.mutate()}
-      onRelease={        () => releaseM.mutate()}
-      onMarkInProgress={ () => stateM.mutate("en_cours")}
-      onMarkDelivered={  () => stateM.mutate("livree")}
-      onClose={          () => stateM.mutate("cloturee")}
+      onClaim={() => claimM.mutate()}
+      onRelease={() => releaseM.mutate()}
+      onMarkInProgress={() => stateM.mutate("en_cours")}
+      onMarkDelivered={() => stateM.mutate("livree")}
+      onClose={() => stateM.mutate("cloturee")}
       onOpenEditor={(rid) => navigate(`/requests/${rid}/editor`)}
     />
   );

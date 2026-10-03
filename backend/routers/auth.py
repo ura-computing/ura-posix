@@ -1,4 +1,5 @@
 """Login / logout, my account, password flows, my sessions (other devices)."""
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Response, status
@@ -44,7 +45,7 @@ router = APIRouter(tags=["auth"])
 
 # ═══ Auth ════════════════════════════════════════════════════════════════════
 
-RESET_TOKEN_EXPIRY_MIN = 60     # decision #4
+RESET_TOKEN_EXPIRY_MIN = 60  # decision #4
 INVALID_TOKEN_DETAIL = "Lien invalide ou expiré"
 BAD_CREDS_DETAIL = "Email ou mot de passe incorrect"
 
@@ -105,7 +106,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
         raise ApiError(status.HTTP_401_UNAUTHORIZED, ErrorCode.BAD_CREDENTIALS, BAD_CREDS_DETAIL)
     if user.status != "active":
         raise ApiError(
-            status.HTTP_401_UNAUTHORIZED, ErrorCode.ACCOUNT_DISABLED,
+            status.HTTP_401_UNAUTHORIZED,
+            ErrorCode.ACCOUNT_DISABLED,
             "Votre compte a été désactivé. Contactez votre administrateur.",
         )
 
@@ -124,7 +126,7 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
         expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
     )
     db.add(session_row)
-    db.commit()      # commit so session_row.id is populated before signing the JWT
+    db.commit()  # commit so session_row.id is populated before signing the JWT
     db.refresh(user)
 
     _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
@@ -240,13 +242,14 @@ def set_password(body: SetPasswordRequest, db: DbDep) -> None:
     user.password_hash = hash_password(body.password)
     user.reset_token = None
     user.reset_token_expires = None
-    user.token_version += 1     # kills any pre-existing sessions defensively (decision #105)
+    user.token_version += 1  # kills any pre-existing sessions defensively (decision #105)
     # Wipe zombie session rows whose JWTs were just invalidated above.
     db.query(UserSession).filter(UserSession.user_id == user.id).delete()
     db.commit()
 
 
 # ═══ Sessions ════════════════════════════════════════════════════════════════
+
 
 def _to_out(s: UserSession, current_hash: str | None) -> SessionOut:
     return SessionOut(
@@ -265,12 +268,7 @@ def list_my_sessions(
     session_token: SessionCookieDep = None,
 ) -> list[SessionOut]:
     current_hash = hash_token(session_token) if session_token else None
-    rows = (
-        db.query(UserSession)
-        .filter(UserSession.user_id == user.id)
-        .order_by(UserSession.last_used_at.desc())
-        .all()
-    )
+    rows = db.query(UserSession).filter(UserSession.user_id == user.id).order_by(UserSession.last_used_at.desc()).all()
     return [_to_out(s, current_hash) for s in rows]
 
 
@@ -282,11 +280,7 @@ def kill_session(
 ) -> None:
     """Kill a specific session belonging to the caller. Use POST /auth/logout to
     end the CURRENT session — this endpoint is for killing other devices."""
-    deleted = (
-        db.query(UserSession)
-        .filter(UserSession.id == session_id, UserSession.user_id == user.id)
-        .delete()
-    )
+    deleted = db.query(UserSession).filter(UserSession.id == session_id, UserSession.user_id == user.id).delete()
     if not deleted:
         raise ApiError(status.HTTP_404_NOT_FOUND, ErrorCode.SESSION_NOT_FOUND, "Session introuvable")
     db.commit()

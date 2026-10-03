@@ -17,6 +17,7 @@ Three-layer permission model:
               (per locked spec); an employee inheriting from "any owner has it"
               matches the typical UX where the owner who hired you grants access.
 """
+
 from __future__ import annotations
 
 from typing import Annotated, Any
@@ -51,8 +52,10 @@ def effective_permissions(db: Session, user: User) -> list[str]:
         return []
 
     pharm_set = {
-        f.feature for f in db.query(PharmacyFeature)
-        .filter(PharmacyFeature.pharmacy_id == user.pharmacy_id, PharmacyFeature.enabled.is_(True)).all()
+        f.feature
+        for f in db.query(PharmacyFeature)
+        .filter(PharmacyFeature.pharmacy_id == user.pharmacy_id, PharmacyFeature.enabled.is_(True))
+        .all()
     }
     user_set = _user_enabled_perms(db, [user.id])
 
@@ -61,11 +64,14 @@ def effective_permissions(db: Session, user: User) -> list[str]:
 
     # Employee: also intersect with the union of active owners' permissions.
     owner_ids = [
-        u.id for u in db.query(User.id).filter(
+        u.id
+        for u in db.query(User.id)
+        .filter(
             User.pharmacy_id == user.pharmacy_id,
             User.role == "owner",
             User.status == "active",
-        ).all()
+        )
+        .all()
     ]
     if not owner_ids:
         # An orphan employee (no active owner) sees nothing — defensive default
@@ -79,7 +85,8 @@ def require_feature(feature: str, user: User, db: Session) -> None:
     """Raise 403 if the user doesn't have `feature` in their effective permission set."""
     if feature not in effective_permissions(db, user):
         raise ApiError(
-            status.HTTP_403_FORBIDDEN, ErrorCode.FEATURE_DISABLED,
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.FEATURE_DISABLED,
             f"Accès refusé : la fonctionnalité « {feature} » n'est pas activée pour votre compte.",
             feature=feature,
         )
@@ -89,7 +96,8 @@ def require_admin(user: User) -> None:
     """Raise 403 for non-admin callers. Use on endpoints that manage system-wide state."""
     if user.role != "admin":
         raise ApiError(
-            status.HTTP_403_FORBIDDEN, ErrorCode.ADMIN_ONLY,
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.ADMIN_ONLY,
             "Réservé aux administrateurs.",
         )
 
@@ -100,7 +108,8 @@ def require_developer(user: User) -> None:
     edit customization, mark delivered)."""
     if user.role != "developer":
         raise ApiError(
-            status.HTTP_403_FORBIDDEN, ErrorCode.DEVELOPER_ONLY,
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.DEVELOPER_ONLY,
             "Réservé aux développeurs.",
         )
 
@@ -115,12 +124,14 @@ def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = Non
     """
     if user.role == "admin":
         raise ApiError(
-            status.HTTP_403_FORBIDDEN, ErrorCode.ADMIN_USE_ADMIN_ROUTES,
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.ADMIN_USE_ADMIN_ROUTES,
             "Les admins utilisent /v1/admin/... (à venir).",
         )
     if user.role not in ("owner", "employee"):
         raise ApiError(
-            status.HTTP_403_FORBIDDEN, ErrorCode.FORBIDDEN,
+            status.HTTP_403_FORBIDDEN,
+            ErrorCode.FORBIDDEN,
             "Ce compte n'a pas accès à cette ressource.",
         )
     if user.pharmacy_id is None:
@@ -132,14 +143,17 @@ def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = Non
 
 # ─── FastAPI dependencies ───────────────────────────────────────────────────
 
+
 def member(*features: str) -> Any:
     """`pharmacy_id: Annotated[int, member("import", "achats")]` → owner or
     employee of a pharmacy holding every listed feature; gives the pharmacy id."""
+
     def dep(user: CurrentUserDep, db: DbDep) -> int:
         pharmacy_id = require_pharmacy_owner(user, db)
         for feature in features:
             require_feature(feature, user, db)
         return pharmacy_id
+
     return Depends(dep)
 
 
@@ -160,8 +174,8 @@ def _developer(user: CurrentUserDep) -> User:
     return user
 
 
-MemberDep    = Annotated[int, member()]
-OwnerDep     = Annotated[int, Depends(_owner)]
-AdminDep     = Annotated[User, Depends(_admin)]
+MemberDep = Annotated[int, member()]
+OwnerDep = Annotated[int, Depends(_owner)]
+AdminDep = Annotated[User, Depends(_admin)]
 DeveloperDep = Annotated[User, Depends(_developer)]
-admin_only   = Depends(_admin)
+admin_only = Depends(_admin)

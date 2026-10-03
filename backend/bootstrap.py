@@ -17,6 +17,7 @@ FRESH DB this fails — there's no `pharmacies` table to alter. Three paths:
 
 Also CREATEs `pg_trgm` + `unaccent` extensions (idempotent — IF NOT EXISTS).
 Run from the `backend/` directory; relies on database/models imports."""
+
 from __future__ import annotations
 
 import subprocess
@@ -45,13 +46,15 @@ def _ensure_extensions() -> None:
         # Schema-qualified body: Postgres 17+ runs index expressions (CREATE
         # INDEX, REINDEX, ANALYZE) with search_path = pg_catalog, pg_temp.
         # Runs on every boot, so it also repairs DBs created with the old body.
-        conn.execute(text("""
+        conn.execute(
+            text("""
             CREATE OR REPLACE FUNCTION immutable_unaccent(text)
             RETURNS text AS
             $$
                 SELECT public.unaccent('public.unaccent'::regdictionary, $1)
             $$ LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT;
-        """))
+        """)
+        )
         conn.commit()
 
         # Self-check under that same restricted search_path — makes a local
@@ -81,7 +84,7 @@ def main() -> None:
 
     insp = inspect(engine)
     has_pharmacies = insp.has_table("pharmacies")
-    has_alembic    = insp.has_table("alembic_version")
+    has_alembic = insp.has_table("alembic_version")
 
     # 3-way classification — all branches are NON-DESTRUCTIVE; data persists
     # across container restarts.

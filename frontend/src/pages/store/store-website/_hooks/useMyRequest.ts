@@ -9,27 +9,29 @@ import { api } from "@/api/client";
 import { API } from "@/api/api";
 
 import type {
-  CustomizationOut, WebsiteRequestCreate, WebsiteRequestPatch, WebsiteRequestOut,
+  CustomizationOut,
+  WebsiteRequestCreate,
+  WebsiteRequestPatch,
+  WebsiteRequestOut,
 } from "@/types/storeWebsite";
-
 
 export function useMyRequest() {
   const qc = useQueryClient();
 
   const query = useQuery({
     queryKey: API.storeWebsite.myRequest.key,
-    queryFn:  () => api.get<WebsiteRequestOut | null>(API.storeWebsite.myRequest.url),
+    queryFn: () => api.get<WebsiteRequestOut | null>(API.storeWebsite.myRequest.url),
   });
 
   const createMutation = useMutation({
     mutationFn: (body: WebsiteRequestCreate) => api.post<WebsiteRequestOut>(API.storeWebsite.requests.url, body),
-    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(API.storeWebsite.myRequest.key, fresh),
+    onSuccess: (fresh: WebsiteRequestOut) => qc.setQueryData(API.storeWebsite.myRequest.key, fresh),
   });
 
   const patchMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: WebsiteRequestPatch }) =>
       api.patch<WebsiteRequestOut>(API.storeWebsite.request.url(id), body),
-    onSuccess:  (fresh: WebsiteRequestOut) => qc.setQueryData(API.storeWebsite.myRequest.key, fresh),
+    onSuccess: (fresh: WebsiteRequestOut) => qc.setQueryData(API.storeWebsite.myRequest.key, fresh),
   });
 
   const featuredMutation = useMutation({
@@ -40,20 +42,18 @@ export function useMyRequest() {
   });
 
   return {
-    request:   query.data ?? null,
+    request: query.data ?? null,
     isLoading: query.isLoading,
-    isError:   query.isError,
+    isError: query.isError,
 
-    createRequest:            (body: WebsiteRequestCreate) => createMutation.mutateAsync(body),
-    isCreating:               createMutation.isPending,
-    createError:              createMutation.error,
+    createRequest: (body: WebsiteRequestCreate) => createMutation.mutateAsync(body),
+    isCreating: createMutation.isPending,
+    createError: createMutation.error,
 
-    patchRequest:             (id: string, body: WebsiteRequestPatch) =>
-                                patchMutation.mutateAsync({ id, body }),
-    isPatching:               patchMutation.isPending,
+    patchRequest: (id: string, body: WebsiteRequestPatch) => patchMutation.mutateAsync({ id, body }),
+    isPatching: patchMutation.isPending,
 
-    patchFeaturedCategories:  (id: string, ids: string[]) =>
-                                featuredMutation.mutateAsync({ id, ids }),
-    isFeaturedSaving:         featuredMutation.isPending,
+    patchFeaturedCategories: (id: string, ids: string[]) => featuredMutation.mutateAsync({ id, ids }),
+    isFeaturedSaving: featuredMutation.isPending,
   };
 }

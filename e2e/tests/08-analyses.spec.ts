@@ -39,14 +39,7 @@ import {
 
 test.use({ storageState: sessionFile("owner") });
 
-const OTHER_MODES = [
-  "categorie",
-  "laboratoire",
-  "grossiste",
-  "operateur",
-  "mois",
-  "annee",
-] as const;
+const OTHER_MODES = ["categorie", "laboratoire", "grossiste", "operateur", "mois", "annee"] as const;
 const SEARCH_PH = "Rechercher dans les résultats…";
 
 async function open(page: Page): Promise<void> {
@@ -79,9 +72,7 @@ async function openWithPeriod(page: Page): Promise<Row> {
 
 /** Same, plus the no-period answer the page loaded first. TanStack keeps it cached: clearing
  *  the period later shows it again WITHOUT a new request. */
-async function openWithPeriodAndDefault(
-  page: Page,
-): Promise<{ a: Row; noDates: Row }> {
+async function openWithPeriodAndDefault(page: Page): Promise<{ a: Row; noDates: Row }> {
   const first = pageCall(page, "/stats/analyse-marge", {
     mode: "produit",
     category_type: "all",
@@ -97,15 +88,9 @@ async function openWithPeriodAndDefault(
   return { a, noDates };
 }
 
-async function openTab(
-  page: Page,
-  mode: AnalyseMode,
-  ct: string,
-): Promise<Row> {
+async function openTab(page: Page, mode: AnalyseMode, ct: string): Promise<Row> {
   const res = call(page, mode, ct);
-  await page
-    .getByRole("tab", { name: ANALYSE_MODES[mode].tab, exact: true })
-    .click();
+  await page.getByRole("tab", { name: ANALYSE_MODES[mode].tab, exact: true }).click();
   return res;
 }
 
@@ -135,11 +120,7 @@ const shown = (r: Row, f: string): string | number | null =>
         ? r[f] || null
         : (r[f] ?? null);
 const raw = (r: Row, f: string): string | number | null =>
-  TEXT.has(f)
-    ? (r[f] ?? "")
-    : f === "qty" || f === "ca"
-      ? (r[f] ?? 0)
-      : (r[f] ?? null);
+  TEXT.has(f) ? (r[f] ?? "") : f === "qty" || f === "ca" ? (r[f] ?? 0) : (r[f] ?? null);
 
 /** The sort the page must do: the WHOLE row set, empties last in both directions. */
 function sortedRows(rows: Row[], f: string, order: "asc" | "desc"): Row[] {
@@ -150,19 +131,13 @@ function sortedRows(rows: Row[], f: string, order: "asc" | "desc"): Row[] {
     const ae = va === null || va === "",
       be = vb === null || vb === "";
     if (ae || be) return Number(ae) - Number(be);
-    if (typeof va === "number" && typeof vb === "number")
-      return (va - vb) * dir;
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
     return String(va).localeCompare(String(vb), "fr") * dir;
   });
 }
 
 /** The column `header` shows `rows` (in that order) on the current page. */
-async function expectColumn(
-  page: Page,
-  header: string,
-  field: string,
-  rows: Row[],
-): Promise<void> {
+async function expectColumn(page: Page, header: string, field: string, rows: Row[]): Promise<void> {
   const want = rows.map((r) => shown(r, field));
   const same = (got: string[]) =>
     got.length === want.length &&
@@ -172,9 +147,7 @@ async function expectColumn(
         : (() => {
             const n = frNumber(t),
               w = want[i] as number | null;
-            return n === null || w === null
-              ? n === w
-              : Math.abs(n - w) <= 0.006;
+            return n === null || w === null ? n === w : Math.abs(n - w) <= 0.006;
           })(),
     );
   const ok = await expect
@@ -186,39 +159,18 @@ async function expectColumn(
       () => true,
       () => false,
     );
-  if (!ok)
-    expect(await columnTexts(page, header), `colonne « ${header} »`).toEqual(
-      want.map(String),
-    );
+  if (!ok) expect(await columnTexts(page, header), `colonne « ${header} »`).toEqual(want.map(String));
 }
 
 const headerButton = (page: Page, label: string) =>
-  page
-    .locator("table thead")
-    .getByRole("button", {
-      name: new RegExp(
-        `^${label.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&")}$`,
-        "i",
-      ),
-    });
+  page.locator("table thead").getByRole("button", {
+    name: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\%]/g, "\\$&")}$`, "i"),
+  });
 
 // ── Excel export (constants.tsx EXPORT_COLS: old-app headers) ───────────────
 
 type Col = [string, (r: Row) => unknown];
-const MONTHS = [
-  "Jan",
-  "Fév",
-  "Mar",
-  "Avr",
-  "Mai",
-  "Juin",
-  "Juil",
-  "Août",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Déc",
-];
+const MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
 const AGG_TAIL: Col[] = [
   ["Prix max", (r) => r.prix_max],
   ["Prix min", (r) => r.prix_min],
@@ -266,15 +218,7 @@ const EXPORT: Record<AnalyseMode | "liste", Col[]> = {
     ["Total CA", (r) => r.ca ?? 0],
   ],
   liste: [
-    [
-      "Statut",
-      (r) =>
-        r.match_status === "found"
-          ? "Trouvé"
-          : r.match_status === "not_found"
-            ? "Introuvable"
-            : "",
-    ],
+    ["Statut", (r) => (r.match_status === "found" ? "Trouvé" : r.match_status === "not_found" ? "Introuvable" : "")],
     ["Produit", (r) => r.product ?? ""],
     ["Stock dispo", (r) => r.stock_dispo],
     ["Ventes", (r) => r.qty ?? 0],
@@ -288,25 +232,13 @@ const EXPORT: Record<AnalyseMode | "liste", Col[]> = {
 
 /** « Exporter Excel » → APCM - ANALYSE <MODE> <from> - <to>.xlsx, sheet « Analyse »,
  *  French headers, one line per row in the page's order, every cell = the row's value. */
-async function checkExport(
-  page: Page,
-  mode: AnalyseMode | "liste",
-  rows: Row[],
-): Promise<void> {
+async function checkExport(page: Page, mode: AnalyseMode | "liste", rows: Row[]): Promise<void> {
   const w = testWindow();
-  const x = await downloadXlsx(page, () =>
-    page.getByRole("button", { name: "Exporter Excel" }).click(),
-  );
-  expect(x.filename, "nom du fichier").toBe(
-    `APCM - ANALYSE ${mode.toUpperCase()} ${w.date_from} - ${w.date_to}.xlsx`,
-  );
+  const x = await downloadXlsx(page, () => page.getByRole("button", { name: "Exporter Excel" }).click());
+  expect(x.filename, "nom du fichier").toBe(`APCM - ANALYSE ${mode.toUpperCase()} ${w.date_from} - ${w.date_to}.xlsx`);
   expect(x.sheet, "feuille").toBe("Analyse");
-  expect(x.rows[0], `${mode}: en-têtes`).toEqual(
-    EXPORT[mode].map(([label]) => label),
-  );
-  expect(x.rows.slice(1), `${mode}: cellules`).toEqual(
-    rows.map((r) => EXPORT[mode].map(([, v]) => v(r) ?? "")),
-  );
+  expect(x.rows[0], `${mode}: en-têtes`).toEqual(EXPORT[mode].map(([label]) => label));
+  expect(x.rows.slice(1), `${mode}: cellules`).toEqual(rows.map((r) => EXPORT[mode].map(([, v]) => v(r) ?? "")));
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -319,8 +251,7 @@ test("analyses: chaque onglet × Mixte / Pharmacie / Parapharmacie (lignes, KPI,
   for (const [i, { ct, label }] of CATEGORY_TYPES.entries()) {
     await test.step(label, async () => {
       // Back on Produit first (already cached for the previous category → no request).
-      if (i > 0)
-        await page.getByRole("tab", { name: "Produit", exact: true }).click();
+      if (i > 0) await page.getByRole("tab", { name: "Produit", exact: true }).click();
       const produit = call(page, "produit", ct);
       if (i === 0) await setPeriod(page, w.date_from, w.date_to);
       else await pickCategoryType(page, label);
@@ -338,13 +269,9 @@ test("analyses: chaque onglet × Mixte / Pharmacie / Parapharmacie (lignes, KPI,
   }
 });
 
-test("analyses: Produit — pagination (suivante, 50 / page) et nombre de résultats", async ({
-  page,
-}) => {
+test("analyses: Produit — pagination (suivante, 50 / page) et nombre de résultats", async ({ page }) => {
   const rows = (await openWithPeriod(page)).rows as Row[];
-  await expect
-    .poll(() => resultsCount(page), "nombre de résultats")
-    .toBe(rows.length);
+  await expect.poll(() => resultsCount(page), "nombre de résultats").toBe(rows.length);
   await expectColumn(page, "Produit", "product", rows.slice(0, 25));
   await page.getByRole("button", { name: "Page suivante" }).click();
   await expectColumn(page, "Produit", "product", rows.slice(25, 50));
@@ -353,20 +280,13 @@ test("analyses: Produit — pagination (suivante, 50 / page) et nombre de résul
   await expectColumn(page, "Produit", "product", rows.slice(0, 50)); // back on page 1
 });
 
-test("analyses: Produit — tri de chaque colonne (desc puis asc), sur toutes les lignes", async ({
-  page,
-}) => {
+test("analyses: Produit — tri de chaque colonne (desc puis asc), sur toutes les lignes", async ({ page }) => {
   const rows = (await openWithPeriod(page)).rows as Row[];
   for (const [header, field] of PRODUIT_COLS) {
     await test.step(header, async () => {
       for (const order of ["desc", "asc"] as const) {
         await headerButton(page, header).click();
-        await expectColumn(
-          page,
-          header,
-          field,
-          sortedRows(rows, field, order).slice(0, 25),
-        );
+        await expectColumn(page, header, field, sortedRows(rows, field, order).slice(0, 25));
       }
     });
   }
@@ -383,32 +303,21 @@ test("analyses: recherche (Produit × Mixte) — lignes, tuiles, suggestions, ch
       await box.fill(q);
       if (e.suggestions.length) {
         await expect
-          .poll(
-            async () =>
-              (await dropdown.getByRole("button").allInnerTexts()).sort(),
-            "suggestions",
-          )
+          .poll(async () => (await dropdown.getByRole("button").allInnerTexts()).sort(), "suggestions")
           .toEqual(e.suggestions);
       } else {
-        await expect(dropdown, "aucune suggestion").toContainText(
-          "Aucun résultat",
-        );
+        await expect(dropdown, "aucune suggestion").toContainText("Aucun résultat");
       }
       await page.getByRole("heading", { level: 1 }).click(); // close the dropdown
       if (e.rows.length) {
-        await expect
-          .poll(() => resultsCount(page), "lignes trouvées")
-          .toBe(e.rows.length);
+        await expect.poll(() => resultsCount(page), "lignes trouvées").toBe(e.rows.length);
         const want = new Set((e.rows as Row[]).map((r) => r.product));
         expect(
           (await columnTexts(page, "Produit")).every((p) => want.has(p)),
           "chaque ligne correspond",
         ).toBe(true);
       } else {
-        await expect(
-          page.getByText("Aucun résultat").first(),
-          "tableau vide",
-        ).toBeVisible();
+        await expect(page.getByText("Aucun résultat").first(), "tableau vide").toBeVisible();
       }
       await checkKpiTiles(page, e.kpis, e.ties.difference_gain_dh);
     });
@@ -425,18 +334,12 @@ test("analyses: recherche (Produit × Mixte) — lignes, tuiles, suggestions, ch
   await test.step("tout réinitialiser → plus de recherche ni de période", async () => {
     await page.getByRole("button", { name: "Tout réinitialiser" }).click();
     await expect(box).toHaveValue("");
-    await expect
-      .poll(() => resultsCount(page), "lignes sans période (en cache)")
-      .toBe(noDates.rows.length);
-    await expect(
-      page.locator("span.rounded-full").filter({ hasText: "Période :" }),
-    ).toHaveCount(0);
+    await expect.poll(() => resultsCount(page), "lignes sans période (en cache)").toBe(noDates.rows.length);
+    await expect(page.locator("span.rounded-full").filter({ hasText: "Période :" })).toHaveCount(0);
   });
 });
 
-test("analyses: Année — la recherche filtre les ventes par produit (côté serveur)", async ({
-  page,
-}) => {
+test("analyses: Année — la recherche filtre les ventes par produit (côté serveur)", async ({ page }) => {
   await openWithPeriod(page);
   const annee = await openTab(page, "annee", "all");
   checkAnalyse(annee, "all", "annee");
@@ -453,37 +356,24 @@ test("analyses: Année — la recherche filtre les ventes par produit (côté se
   await checkKpiTiles(page, a.kpis);
 });
 
-test("analyses: puces de filtre — retirer la catégorie, retirer la période", async ({
-  page,
-}) => {
+test("analyses: puces de filtre — retirer la catégorie, retirer la période", async ({ page }) => {
   const { noDates } = await openWithPeriodAndDefault(page);
-  const chip = (start: string) =>
-    page.locator("span.rounded-full").filter({ hasText: start });
+  const chip = (start: string) => page.locator("span.rounded-full").filter({ hasText: start });
   const pharma = call(page, "produit", "pharmacie");
   await pickCategoryType(page, "Pharmacie");
   checkAnalyse(await pharma, "pharmacie", "produit");
   await expect(chip("Catégorie :")).toContainText("Pharmacie");
 
-  await chip("Catégorie :")
-    .getByRole("button", { name: "Supprimer le filtre" })
-    .click(); // Mixte again (cached)
+  await chip("Catégorie :").getByRole("button", { name: "Supprimer le filtre" }).click(); // Mixte again (cached)
   await expect(chip("Catégorie :")).toHaveCount(0);
-  await expect
-    .poll(() => resultsCount(page), "lignes Mixte")
-    .toBe(expected().analyse.all.produit.rows.length);
+  await expect.poll(() => resultsCount(page), "lignes Mixte").toBe(expected().analyse.all.produit.rows.length);
 
-  await chip("Période :")
-    .getByRole("button", { name: "Supprimer le filtre" })
-    .click();
+  await chip("Période :").getByRole("button", { name: "Supprimer le filtre" }).click();
   await expect(chip("Période :")).toHaveCount(0);
-  await expect
-    .poll(() => resultsCount(page), "lignes sans période (en cache)")
-    .toBe(noDates.rows.length);
+  await expect.poll(() => resultsCount(page), "lignes sans période (en cache)").toBe(noDates.rows.length);
 });
 
-test("analyses: export Excel de chaque onglet — nom, feuille, en-têtes, chaque cellule", async ({
-  page,
-}) => {
+test("analyses: export Excel de chaque onglet — nom, feuille, en-têtes, chaque cellule", async ({ page }) => {
   const produit = await openWithPeriod(page);
   await test.step("Produit", () => checkExport(page, "produit", produit.rows));
   for (const mode of OTHER_MODES) {
@@ -512,19 +402,12 @@ test("analyses: Liste — bouton « Importer une liste », état, lignes + tuile
   const a = await posted;
   checkListe(a);
   await expect(
-    page.getByText(
-      `${basename(file)} · ${expected().liste.items.length} produits`,
-    ),
+    page.getByText(`${basename(file)} · ${expected().liste.items.length} produits`),
     "ligne d'état",
   ).toBeVisible();
   await expect.poll(() => resultsCount(page), "lignes").toBe(a.rows.length);
-  const statuses = (a.rows as Row[])
-    .slice(0, 25)
-    .map((r) => (r.match_status === "found" ? "Trouvé" : "Introuvable"));
-  expect(
-    await columnTexts(page, "Statut"),
-    "badges Trouvé / Introuvable",
-  ).toEqual(statuses);
+  const statuses = (a.rows as Row[]).slice(0, 25).map((r) => (r.match_status === "found" ? "Trouvé" : "Introuvable"));
+  expect(await columnTexts(page, "Statut"), "badges Trouvé / Introuvable").toEqual(statuses);
   await checkKpiTiles(page, a.kpis);
   await test.step("Excel", () => checkExport(page, "liste", a.rows));
 
@@ -539,9 +422,7 @@ test("analyses: Liste — bouton « Importer une liste », état, lignes + tuile
   }
 });
 
-test("analyses: Liste — fichier sans produit → message, aucun appel", async ({
-  page,
-}) => {
+test("analyses: Liste — fichier sans produit → message, aucun appel", async ({ page }) => {
   await open(page);
   await page.getByRole("tab", { name: "Liste", exact: true }).click();
   let posted = false;
@@ -557,9 +438,7 @@ test("analyses: Liste — fichier sans produit → message, aucun appel", async 
     mimeType: "text/csv",
     buffer: Buffer.from("Produit;PID\n"),
   });
-  await expect(
-    page.getByText("Aucun produit détecté dans le fichier."),
-  ).toBeVisible();
+  await expect(page.getByText("Aucun produit détecté dans le fichier.")).toBeVisible();
   expect(posted, "aucun POST /stats/analyse-liste").toBe(false);
 });
 

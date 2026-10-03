@@ -14,19 +14,14 @@ import type { StoreTemplate } from "@/types/storeWebsite";
 import { TEMPLATE_LABEL } from "@/types/storeWebsite";
 
 import type { StorePage, TemplateProps } from "./_shared/customizationTypes";
-import {
-  LumiereCatalogue, LumiereContact, LumiereHome, LumiereProduit,
-} from "./lumiere";
-
+import { LumiereCatalogue, LumiereContact, LumiereHome, LumiereProduit } from "./lumiere";
 
 type Renderer = (props: TemplateProps) => React.ReactElement;
-
 
 export interface TemplateEntry {
   ready: boolean;
   pages: Record<StorePage, Renderer>;
 }
-
 
 function comingSoonPage(template: StoreTemplate): Renderer {
   return function ComingSoon() {
@@ -40,15 +35,13 @@ function comingSoonPage(template: StoreTemplate): Renderer {
             {TEMPLATE_LABEL[template]} — bientôt disponible
           </h1>
           <p className="text-sm text-muted-foreground">
-            Ce modèle est en cours de développement. Lumière est déjà entièrement
-            fonctionnel — testez-le en attendant.
+            Ce modèle est en cours de développement. Lumière est déjà entièrement fonctionnel — testez-le en attendant.
           </p>
         </div>
       </div>
     );
   };
 }
-
 
 function comingSoonEntry(template: StoreTemplate): TemplateEntry {
   const page = comingSoonPage(template);
@@ -58,29 +51,23 @@ function comingSoonEntry(template: StoreTemplate): TemplateEntry {
   };
 }
 
-
 export const TEMPLATE_REGISTRY: Record<StoreTemplate, TemplateEntry> = {
   lumiere: {
     ready: true,
     pages: {
-      home:      LumiereHome,
+      home: LumiereHome,
       catalogue: LumiereCatalogue,
-      produit:   LumiereProduit,
-      contact:   LumiereContact,
+      produit: LumiereProduit,
+      contact: LumiereContact,
     },
   },
   classique: comingSoonEntry("classique"),
-  moderne:   comingSoonEntry("moderne"),
+  moderne: comingSoonEntry("moderne"),
   apotheose: comingSoonEntry("apotheose"),
-  elegance:  comingSoonEntry("elegance"),
+  elegance: comingSoonEntry("elegance"),
 };
 
-
-export function renderTemplate(
-  template: StoreTemplate,
-  page: StorePage,
-  props: TemplateProps,
-): React.ReactElement {
+export function renderTemplate(template: StoreTemplate, page: StorePage, props: TemplateProps): React.ReactElement {
   const entry = TEMPLATE_REGISTRY[template];
   const Renderer = entry.pages[page];
   return <Renderer {...props} />;

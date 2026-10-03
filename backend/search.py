@@ -13,6 +13,7 @@ accent-insensitive on text (name, supplier, client, reference: "societe" finds
 
 Use `product_search_clauses` / `supplier_search_clauses` (Postgres unaccent).
 """
+
 from __future__ import annotations
 
 import re
@@ -25,8 +26,8 @@ from csv_parse import strip_accents
 from models import Medicament
 
 
-_TOKEN_SPLIT = re.compile(r"\s+")   # split on whitespace only — `*` is grammar, not a separator here
-_LIKE_ESCAPE = "\\"                  # ILIKE escape char for literal % and _
+_TOKEN_SPLIT = re.compile(r"\s+")  # split on whitespace only — `*` is grammar, not a separator here
+_LIKE_ESCAPE = "\\"  # ILIKE escape char for literal % and _
 
 
 def tokenize_search(query: str | None) -> list[str]:
@@ -35,7 +36,7 @@ def tokenize_search(query: str | None) -> list[str]:
     if not query:
         return []
     seen: set[str] = set()
-    out:  list[str] = []
+    out: list[str] = []
     for raw in _TOKEN_SPLIT.split(query.strip()):
         tok = raw.strip().lower()
         if tok and tok not in seen:
@@ -69,8 +70,8 @@ def _pattern_ilike(column, token: str, *, unaccent: bool) -> ColumnElement[bool]
     col = func.unaccent(column) if unaccent else column
     parts = _parts(tok)
     if not parts:
-        return true()                                 # lone "*" → no constraint
-    if len(parts) > 1:                                # ra*ol → inside ONE word (\m … \M)
+        return true()  # lone "*" → no constraint
+    if len(parts) > 1:  # ra*ol → inside ONE word (\m … \M)
         return col.op("~*")(r"\m" + r"[^[:space:]]*".join(re.escape(p) for p in parts) + r"\M")
     seg = _like_escape(parts[0])
     return col.ilike(f"{seg}%" if _starts_with(tok) else f"%{seg}%", escape=_LIKE_ESCAPE)
@@ -99,8 +100,8 @@ def product_search_clauses(
     extra = list(extra_columns)
     for tok in tokens:
         ors: list[ColumnElement[bool]] = [
-            _pattern_ilike(Medicament.product,  tok, unaccent=True),
-            _pattern_ilike(Medicament.pid,      tok, unaccent=False),
+            _pattern_ilike(Medicament.product, tok, unaccent=True),
+            _pattern_ilike(Medicament.pid, tok, unaccent=False),
             _pattern_ilike(Medicament.barcode1, tok, unaccent=False),
             _pattern_ilike(Medicament.barcode2, tok, unaccent=False),
         ]

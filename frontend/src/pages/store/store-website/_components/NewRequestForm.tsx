@@ -7,7 +7,6 @@ import { Label } from "./label";
 import { Textarea } from "./textarea";
 import { URGENCY_LABEL, type BrandColors, type Urgency } from "@/types/storeWebsite";
 
-
 /** /store-website/new — single-page form (not multi-step).
  *
  *  Validation:
@@ -18,63 +17,56 @@ import { URGENCY_LABEL, type BrandColors, type Urgency } from "@/types/storeWebs
  *    - submit disabled while invalid */
 
 export interface NewRequestValues {
-  storeName:    string;
-  slogan:       string;
-  logoFile:     File | null;
-  brand:        BrandColors;
-  phone:        string;
+  storeName: string;
+  slogan: string;
+  logoFile: File | null;
+  brand: BrandColors;
+  phone: string;
   customDomain: string;
-  urgency:      Urgency;
-  vision:       string;
+  urgency: Urgency;
+  vision: string;
 }
 
 export interface NewRequestFormProps {
   /** Pre-fill (profile phone, or values copied from a past request via "refaire"). */
   initialValues?: Partial<NewRequestValues>;
-  isSubmitting?:  boolean;
+  isSubmitting?: boolean;
   /** Server-side error to display below the submit buttons (e.g. 409 conflict). */
-  submitError?:   string | null;
-  onSubmit:       (values: NewRequestValues) => void;
-  onCancel:       () => void;
+  submitError?: string | null;
+  onSubmit: (values: NewRequestValues) => void;
+  onCancel: () => void;
 }
 
-
-const SLOGAN_MAX     = 280;
-const LOGO_MAX_BYTES = 2 * 1024 * 1024;            // 2 MB
-const LOGO_ACCEPT    = ["image/png", "image/svg+xml", "image/jpeg"];
+const SLOGAN_MAX = 280;
+const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const LOGO_ACCEPT = ["image/png", "image/svg+xml", "image/jpeg"];
 const DEFAULT_PALETTE = ["#0E9E8C", "#34CBB7"];
 const MA_PHONE = /^(?:\+212|0)\s?[5-7](?:[\s.-]?\d){8}$/;
 
-
-export function NewRequestForm({
-  initialValues, isSubmitting, submitError, onSubmit, onCancel,
-}: NewRequestFormProps) {
+export function NewRequestForm({ initialValues, isSubmitting, submitError, onSubmit, onCancel }: NewRequestFormProps) {
   const [v, setV] = useState<NewRequestValues>({
-    storeName:    "",
-    slogan:       "",
-    logoFile:     null,
-    brand:        { palette: DEFAULT_PALETTE },
-    phone:        "",
+    storeName: "",
+    slogan: "",
+    logoFile: null,
+    brand: { palette: DEFAULT_PALETTE },
+    phone: "",
     customDomain: "",
-    urgency:      "ce_mois",
-    vision:       "",
+    urgency: "ce_mois",
+    vision: "",
     ...initialValues,
   });
   const [logoError, setLogoError] = useState<string | null>(null);
 
-  const set = <K extends keyof NewRequestValues>(k: K, val: NewRequestValues[K]) =>
-    setV((p) => ({ ...p, [k]: val }));
+  const set = <K extends keyof NewRequestValues>(k: K, val: NewRequestValues[K]) => setV((p) => ({ ...p, [k]: val }));
 
   const phoneValid = MA_PHONE.test(v.phone.trim());
-  const canSubmit  = v.storeName.trim().length > 0 && phoneValid && !isSubmitting;
+  const canSubmit = v.storeName.trim().length > 0 && phoneValid && !isSubmitting;
 
-  const setColor    = (i: number, hex: string) =>
+  const setColor = (i: number, hex: string) =>
     set("brand", { palette: v.brand.palette.map((c, idx) => (idx === i ? hex : c)) });
-  const addColor    = () => v.brand.palette.length < 3 &&
-    set("brand", { palette: [...v.brand.palette, "#F59E0B"] });
+  const addColor = () => v.brand.palette.length < 3 && set("brand", { palette: [...v.brand.palette, "#F59E0B"] });
   const removeColor = (i: number) =>
-    v.brand.palette.length > 2 &&
-    set("brand", { palette: v.brand.palette.filter((_, idx) => idx !== i) });
+    v.brand.palette.length > 2 && set("brand", { palette: v.brand.palette.filter((_, idx) => idx !== i) });
 
   const acceptLogo = (file: File | null) => {
     if (!file) {
@@ -103,9 +95,7 @@ export function NewRequestForm({
       }}
     >
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Nouvelle demande de boutique
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Nouvelle demande de boutique</h1>
         <p className="text-sm text-muted-foreground">
           Décrivez votre boutique idéale. Nos développeurs s'occupent du reste.
         </p>
@@ -258,18 +248,22 @@ export function NewRequestForm({
   );
 }
 
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function Field({
-  label, htmlFor, required, optional, hint, children,
+  label,
+  htmlFor,
+  required,
+  optional,
+  hint,
+  children,
 }: {
-  label:     string;
-  htmlFor?:  string;
+  label: string;
+  htmlFor?: string;
   required?: boolean;
   optional?: boolean;
-  hint?:     ReactNode;
-  children:  ReactNode;
+  hint?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -277,9 +271,7 @@ function Field({
         <Label htmlFor={htmlFor} className="flex items-center gap-1.5 text-foreground">
           <span>{label}</span>
           {required && <span className="text-error-subtle-foreground">*</span>}
-          {optional && (
-            <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>
-          )}
+          {optional && <span className="text-xs font-normal text-muted-foreground">(optionnel)</span>}
         </Label>
         {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
@@ -288,12 +280,14 @@ function Field({
   );
 }
 
-
 function LogoDropzone({ file, onFile }: { file: File | null; onFile: (f: File | null) => void }) {
   const [over, setOver] = useState(false);
   return (
     <label
-      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => {
         e.preventDefault();

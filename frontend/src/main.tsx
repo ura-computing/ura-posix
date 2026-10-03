@@ -79,12 +79,12 @@ const chip = (Icon: typeof Info, tone: string) => (
 );
 
 const TOAST_ICONS = {
-  success: chip(CircleCheck,   "bg-success-subtle text-success"),
-  error:   chip(CircleAlert,   "bg-error-subtle text-error"),
+  success: chip(CircleCheck, "bg-success-subtle text-success"),
+  error: chip(CircleAlert, "bg-error-subtle text-error"),
   warning: chip(TriangleAlert, "bg-warning-subtle text-warning"),
-  info:    chip(Info,          "bg-info-subtle text-info"),
-  loading: chip(LoaderCircle,  "bg-muted text-muted-foreground [&>svg]:animate-spin"),
-  close:   <X className="size-4" aria-hidden />,
+  info: chip(Info, "bg-info-subtle text-info"),
+  loading: chip(LoaderCircle, "bg-muted text-muted-foreground [&>svg]:animate-spin"),
+  close: <X className="size-4" aria-hidden />,
 };
 
 /** Every toast looks like a small ConfirmDialog (card, border, icon chip) + close button. */
@@ -99,11 +99,12 @@ function AppToaster() {
         unstyled: true,
         closeButtonAriaLabel: t("common.close"),
         classNames: {
-          toast:       "flex w-full items-center gap-3 rounded-lg border border-border bg-card py-3 pl-3 pr-10 shadow-md",
-          content:     "flex min-w-0 flex-col gap-0.5",
-          title:       "text-sm font-medium leading-snug text-foreground",
+          toast: "flex w-full items-center gap-3 rounded-lg border border-border bg-card py-3 pl-3 pr-10 shadow-md",
+          content: "flex min-w-0 flex-col gap-0.5",
+          title: "text-sm font-medium leading-snug text-foreground",
           description: "text-sm text-muted-foreground",
-          closeButton: "absolute right-2 top-1/2 flex size-7 cursor-pointer -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+          closeButton:
+            "absolute right-2 top-1/2 flex size-7 cursor-pointer -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         },
       }}
     />
@@ -113,7 +114,7 @@ function AppToaster() {
 // After a deploy, an open tab asks for page files that no longer exist (new
 // hashed names): reload once per tab to get the new version instead of a blank page.
 window.addEventListener("vite:preloadError", (event) => {
-  if (sessionStorage.getItem("reloadedAfterDeploy")) return;   // reloaded already: show the error
+  if (sessionStorage.getItem("reloadedAfterDeploy")) return; // reloaded already: show the error
   event.preventDefault();
   sessionStorage.setItem("reloadedAfterDeploy", "1");
   window.location.reload();

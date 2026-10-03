@@ -17,8 +17,7 @@ export const ABCD_COLORS: Record<AbcdClass, string> = {
 export const ABCD_ORDER: AbcdClass[] = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"];
 
 /** Letter size scales with label length so "C-N" still fits the 64px circle. */
-export const abcdFontSize = (k: AbcdClass): number =>
-  k.length >= 3 ? 12 : k.length === 2 ? 15 : 19;
+export const abcdFontSize = (k: AbcdClass): number => (k.length >= 3 ? 12 : k.length === 2 ? 15 : 19);
 
 /** Status filter options — values are EXACT backend strings ("" = no filter).
  *  Label = t(`stockStatus.<value>`) + the day range when there is one. */
@@ -33,10 +32,7 @@ export const STATUS_OPTIONS: { value: string; days?: string }[] = [
 ];
 
 /** Status pill styling — low-opacity bg + readable text, light + dark. Label: t(`stockStatus.<status>`). */
-export const STATUS_META: Record<
-  StockRow["status"],
-  { pill: string; dot: string }
-> = {
+export const STATUS_META: Record<StockRow["status"], { pill: string; dot: string }> = {
   "sous-stock": {
     pill: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
     dot: "bg-red-500",

@@ -8,10 +8,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import {
-  EDITOR_SECTION_LABEL,
-  type EditorSectionKey, type StoreTemplate,
-} from "@/types/storeWebsite";
+import { EDITOR_SECTION_LABEL, type EditorSectionKey, type StoreTemplate } from "@/types/storeWebsite";
 import type { FontPairing } from "@/types/storeWebsite";
 
 import { EditorPage } from "@/pages/store/dev/_components/EditorPage";
@@ -20,18 +17,26 @@ import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 
-
 const SECTION_KEYS = Object.keys(EDITOR_SECTION_LABEL) as EditorSectionKey[];
-
 
 export default function DevEditorRoute() {
   const { id } = useParams<{ id: string }>();
   const t = useT();
   const {
-    request, customization, isLoading, isError,
-    isSaving, isUploading, isResetting,
-    autoSave, hasUnsaved, setAutoSave, save, reset,
-    patch, uploadLogo,
+    request,
+    customization,
+    isLoading,
+    isError,
+    isSaving,
+    isUploading,
+    isResetting,
+    autoSave,
+    hasUnsaved,
+    setAutoSave,
+    save,
+    reset,
+    patch,
+    uploadLogo,
   } = useEditorCustomization(id);
 
   const [exporting, setExporting] = useState(false);
@@ -43,16 +48,19 @@ export default function DevEditorRoute() {
     // a key on some legacy row).
     const src = customization?.sections ?? {};
     return SECTION_KEYS.map((k) => ({
-      key:     k,
+      key: k,
       visible: src[k]?.visible ?? true,
     }));
   }, [customization?.sections]);
 
-  const brandColors = useMemo(() => ({
-    primary:   customization?.brand_colors.primary   ?? "#0E9E8C",
-    secondary: customization?.brand_colors.secondary ?? "#34CBB7",
-    accent:    customization?.brand_colors.accent    ?? "#F59E0B",
-  }), [customization?.brand_colors]);
+  const brandColors = useMemo(
+    () => ({
+      primary: customization?.brand_colors.primary ?? "#0E9E8C",
+      secondary: customization?.brand_colors.secondary ?? "#34CBB7",
+      accent: customization?.brand_colors.accent ?? "#F59E0B",
+    }),
+    [customization?.brand_colors],
+  );
 
   const previewUrl = useMemo(() => {
     if (!id || !customization) return "#";

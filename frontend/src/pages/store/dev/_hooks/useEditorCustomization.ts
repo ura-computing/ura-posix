@@ -15,30 +15,25 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-import type {
-  CustomizationOut, CustomizationPatch, WebsiteRequestWithCustomizationOut,
-} from "@/types/storeWebsite";
+import type { CustomizationOut, CustomizationPatch, WebsiteRequestWithCustomizationOut } from "@/types/storeWebsite";
 
-
-const DEBOUNCE_MS       = 500;
-const AUTOSAVE_LS_KEY   = "editor.autoSave";
-
+const DEBOUNCE_MS = 500;
+const AUTOSAVE_LS_KEY = "editor.autoSave";
 
 function readAutoSavePref(): boolean {
   if (typeof window === "undefined") return true;
   const raw = window.localStorage.getItem(AUTOSAVE_LS_KEY);
-  if (raw === null) return true;   // default ON
+  if (raw === null) return true; // default ON
   return raw === "true";
 }
-
 
 export function useEditorCustomization(requestId: string | undefined) {
   const qc = useQueryClient();
 
   const query = useQuery({
     queryKey: API.storeWebsite.request.key(requestId ?? "noop"),
-    queryFn:  () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(requestId!)),
-    enabled:  !!requestId,
+    queryFn: () => api.get<WebsiteRequestWithCustomizationOut>(API.storeWebsite.request.url(requestId!)),
+    enabled: !!requestId,
   });
 
   const patchMutation = useMutation({
@@ -106,7 +101,7 @@ export function useEditorCustomization(requestId: string | undefined) {
   //               enable/disable the Save button.
   //
   const bufferRef = useRef<CustomizationPatch | null>(null);
-  const timerRef  = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
   const [bufferTick, setBufferTick] = useState(0);
   const bumpTick = useCallback(() => setBufferTick((t) => t + 1), []);
 
@@ -126,14 +121,17 @@ export function useEditorCustomization(requestId: string | undefined) {
   /** Merge the incoming partial into the buffer. In auto-save mode, kick
    *  the debounced flush. In manual mode, sit tight until save() is
    *  called explicitly. */
-  const patch = useCallback((partial: CustomizationPatch) => {
-    bufferRef.current = mergePatch(bufferRef.current, partial);
-    bumpTick();
-    if (autoSave) {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(flush, DEBOUNCE_MS);
-    }
-  }, [autoSave, flush, bumpTick]);
+  const patch = useCallback(
+    (partial: CustomizationPatch) => {
+      bufferRef.current = mergePatch(bufferRef.current, partial);
+      bumpTick();
+      if (autoSave) {
+        if (timerRef.current) window.clearTimeout(timerRef.current);
+        timerRef.current = window.setTimeout(flush, DEBOUNCE_MS);
+      }
+    },
+    [autoSave, flush, bumpTick],
+  );
 
   /** Explicit user-initiated flush (Save button). Also used as the shared
    *  path from the debounce callback. */
@@ -157,25 +155,31 @@ export function useEditorCustomization(requestId: string | undefined) {
    *    auto-save on shouldn't leave stale unsaved edits sitting around.
    *  - Disabling (on → off) cancels any pending debounce without flushing —
    *    that pending edit will only leave via a future save() call. */
-  const setAutoSave = useCallback((on: boolean) => {
-    setAutoSaveState(on);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(AUTOSAVE_LS_KEY, on ? "true" : "false");
-    }
-    if (on) {
-      if (bufferRef.current) flush();
-    } else if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, [flush]);
+  const setAutoSave = useCallback(
+    (on: boolean) => {
+      setAutoSaveState(on);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(AUTOSAVE_LS_KEY, on ? "true" : "false");
+      }
+      if (on) {
+        if (bufferRef.current) flush();
+      } else if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    },
+    [flush],
+  );
 
   // Flush on unmount so a fast-navigation-away doesn't drop a pending edit
   // while auto-save is ON. In manual mode we deliberately DON'T flush on
   // unmount — the developer chose to hold changes; respect that.
-  useEffect(() => () => {
-    if (autoSave && bufferRef.current) flush();
-  }, [autoSave, flush]);
+  useEffect(
+    () => () => {
+      if (autoSave && bufferRef.current) flush();
+    },
+    [autoSave, flush],
+  );
 
   // Beforeunload guard — warn if the buffer is dirty. The browser only
   // honors it when the user has interacted with the page; that's fine.
@@ -191,42 +195,53 @@ export function useEditorCustomization(requestId: string | undefined) {
   }, []);
 
   const hasUnsaved = bufferRef.current !== null;
-  void bufferTick;   // reference so the `useMemo` deps below actually re-run
+  void bufferTick; // reference so the `useMemo` deps below actually re-run
 
   // Overlay the pending buffer on top of the fetched customization so the UI
   // reflects the developer's edits immediately — otherwise a controlled input
   // (e.g. <input type="color">) would snap back to the last-persisted value on
   // the next re-render because `query.data.customization` hasn't caught up.
   const displayedCustomization = query.data?.customization
-    ? (bufferRef.current
-        ? mergeCustomization(query.data.customization, bufferRef.current)
-        : query.data.customization)
+    ? bufferRef.current
+      ? mergeCustomization(query.data.customization, bufferRef.current)
+      : query.data.customization
     : null;
 
-  return useMemo(() => ({
-    request:         query.data ?? null,
-    customization:   displayedCustomization,
-    isLoading:       query.isLoading,
-    isError:         query.isError,
-    patch,
-    save,
-    reset,
-    hasUnsaved,
-    autoSave,
-    setAutoSave,
-    uploadLogo:      (file: File) => uploadMutation.mutate(file),
-    isUploading:     uploadMutation.isPending,
-    isSaving:        patchMutation.isPending,
-    isResetting:     resetMutation.isPending,
-  }), [
-    query.data, displayedCustomization, query.isLoading, query.isError,
-    patch, save, reset, hasUnsaved, autoSave, setAutoSave,
-    uploadMutation, patchMutation.isPending,
-    resetMutation.isPending,
-    bufferTick,
-  ]);
+  return useMemo(
+    () => ({
+      request: query.data ?? null,
+      customization: displayedCustomization,
+      isLoading: query.isLoading,
+      isError: query.isError,
+      patch,
+      save,
+      reset,
+      hasUnsaved,
+      autoSave,
+      setAutoSave,
+      uploadLogo: (file: File) => uploadMutation.mutate(file),
+      isUploading: uploadMutation.isPending,
+      isSaving: patchMutation.isPending,
+      isResetting: resetMutation.isPending,
+    }),
+    [
+      query.data,
+      displayedCustomization,
+      query.isLoading,
+      query.isError,
+      patch,
+      save,
+      reset,
+      hasUnsaved,
+      autoSave,
+      setAutoSave,
+      uploadMutation,
+      patchMutation.isPending,
+      resetMutation.isPending,
+      bufferTick,
+    ],
+  );
 }
-
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -237,17 +252,16 @@ function mergePatch(a: CustomizationPatch | null, b: CustomizationPatch): Custom
     ...b,
     // Special-case JSON objects: shallow-merge instead of overwriting so
     // ".patch({sections: {hero: {visible: false}}})" doesn't wipe other keys.
-    sections:     b.sections     ? { ...(a.sections     ?? {}), ...b.sections     } : a.sections,
+    sections: b.sections ? { ...(a.sections ?? {}), ...b.sections } : a.sections,
     brand_colors: b.brand_colors ? { ...(a.brand_colors ?? {}), ...b.brand_colors } : a.brand_colors,
   };
 }
-
 
 function mergeCustomization(cur: CustomizationOut, patch: CustomizationPatch): CustomizationOut {
   return {
     ...cur,
     ...patch,
-    sections:     patch.sections     ? { ...cur.sections,     ...patch.sections     } : cur.sections,
+    sections: patch.sections ? { ...cur.sections, ...patch.sections } : cur.sections,
     brand_colors: patch.brand_colors ? { ...cur.brand_colors, ...patch.brand_colors } : cur.brand_colors,
     featured_category_ids: patch.featured_category_ids ?? cur.featured_category_ids,
   };

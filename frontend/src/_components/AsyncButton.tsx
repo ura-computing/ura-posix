@@ -5,16 +5,16 @@ import { cn } from "@/utils/cn";
 import { useT } from "@/i18n/I18nProvider";
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  isLoading?:  boolean;
+  isLoading?: boolean;
   loadingText?: string;
-  variant?:    "primary" | "secondary" | "ghost" | "destructive";
-  children:    ReactNode;
+  variant?: "primary" | "secondary" | "ghost" | "destructive";
+  children: ReactNode;
 }
 
 const variants = {
-  primary:     "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
-  secondary:   "bg-secondary text-secondary-foreground hover:bg-muted",
-  ghost:       "bg-transparent text-foreground hover:bg-muted",
+  primary: "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
+  secondary: "bg-secondary text-secondary-foreground hover:bg-muted",
+  ghost: "bg-transparent text-foreground hover:bg-muted",
   destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
 } as const;
 

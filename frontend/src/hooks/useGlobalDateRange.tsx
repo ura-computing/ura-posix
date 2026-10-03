@@ -11,20 +11,17 @@
  */
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 
-
 interface GlobalDateRange {
-  from:      string | null;
-  to:        string | null;
-  setRange:  (from: string | null, to: string | null) => void;
+  from: string | null;
+  to: string | null;
+  setRange: (from: string | null, to: string | null) => void;
 }
-
 
 const Ctx = createContext<GlobalDateRange | null>(null);
 
-
 export function GlobalDateRangeProvider({ children }: { children: ReactNode }) {
   const [from, setFrom] = useState<string | null>(null);
-  const [to,   setTo]   = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
 
   const setRange = useCallback((f: string | null, t: string | null) => {
     setFrom(f);
@@ -33,7 +30,6 @@ export function GlobalDateRangeProvider({ children }: { children: ReactNode }) {
 
   return <Ctx.Provider value={{ from, to, setRange }}>{children}</Ctx.Provider>;
 }
-
 
 export function useGlobalDateRange(): GlobalDateRange {
   const v = useContext(Ctx);

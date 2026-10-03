@@ -5,9 +5,7 @@ import type { Page } from "@playwright/test";
 import { expect, recordCall } from "./fixtures";
 import { API } from "./paths";
 
-
 type Params = Record<string, string | number | boolean | null | undefined>;
-
 
 function url(path: string, params: Params = {}): URL {
   const u = new URL(`${API}/v1${path}`);
@@ -17,9 +15,14 @@ function url(path: string, params: Params = {}): URL {
   return u;
 }
 
-
-async function call<T>(page: Page, method: "GET" | "POST" | "DELETE", path: string, params: Params,
-                       body?: unknown, status = 200): Promise<T> {
+async function call<T>(
+  page: Page,
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+  params: Params,
+  body?: unknown,
+  status = 200,
+): Promise<T> {
   const u = url(path, params);
   const t0 = performance.now();
   const res = await page.request.fetch(u.toString(), { method, data: body });
@@ -29,8 +32,9 @@ async function call<T>(page: Page, method: "GET" | "POST" | "DELETE", path: stri
   return (status === 204 ? null : res.json()) as Promise<T>;
 }
 
-
-export const apiGet    = <T = any>(page: Page, path: string, params: Params = {}) => call<T>(page, "GET", path, params);
-export const apiPost   = <T = any>(page: Page, path: string, body: unknown, params: Params = {}, status = 200) => call<T>(page, "POST", path, params, body, status);
+export const apiGet = <T = any>(page: Page, path: string, params: Params = {}) => call<T>(page, "GET", path, params);
+export const apiPost = <T = any>(page: Page, path: string, body: unknown, params: Params = {}, status = 200) =>
+  call<T>(page, "POST", path, params, body, status);
 /** Cleanup helper (the UI deletes are tested with pageSend); `status` = what the route answers. */
-export const apiDelete = (page: Page, path: string, status = 200) => call<unknown>(page, "DELETE", path, {}, undefined, status);
+export const apiDelete = (page: Page, path: string, status = 200) =>
+  call<unknown>(page, "DELETE", path, {}, undefined, status);

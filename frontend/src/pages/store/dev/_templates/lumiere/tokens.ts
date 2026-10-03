@@ -5,19 +5,17 @@
 
 import type { TemplateCustomization } from "../_shared/customizationTypes";
 
-
 export const LUMIERE_TOKENS = {
   fonts: {
-    moderne:   { display: "'Fraunces', Georgia, serif",           body: "'Plus Jakarta Sans', system-ui, sans-serif" },
+    moderne: { display: "'Fraunces', Georgia, serif", body: "'Plus Jakarta Sans', system-ui, sans-serif" },
     classique: { display: "'Cormorant Garamond', Georgia, serif", body: "'Spectral', Georgia, serif" },
-    editorial: { display: "'Playfair Display', Georgia, serif",   body: "'Inter', system-ui, sans-serif" },
+    editorial: { display: "'Playfair Display', Georgia, serif", body: "'Inter', system-ui, sans-serif" },
   },
-  ink:       "#1B3A34",
-  inkSoft:   "#5B7A72",
-  cream:     "#FBFCFB",
-  mono:      "'JetBrains Mono', monospace",
+  ink: "#1B3A34",
+  inkSoft: "#5B7A72",
+  cream: "#FBFCFB",
+  mono: "'JetBrains Mono', monospace",
 } as const;
-
 
 /** Build the inline CSS var block from a customization. Rendered on the
  *  outer template wrapper so Tailwind arbitrary vars + our own inline
@@ -26,16 +24,16 @@ export function lumiereCssVars(c: TemplateCustomization): React.CSSProperties {
   const fonts = LUMIERE_TOKENS.fonts[c.fontPairing];
   return {
     // brand
-    "--lum-primary":       c.brandColors.primary,
-    "--lum-secondary":     c.brandColors.secondary,
-    "--lum-accent":        c.brandColors.accent,
+    "--lum-primary": c.brandColors.primary,
+    "--lum-secondary": c.brandColors.secondary,
+    "--lum-accent": c.brandColors.accent,
     // base
-    "--lum-ink":           LUMIERE_TOKENS.ink,
-    "--lum-ink-soft":      LUMIERE_TOKENS.inkSoft,
-    "--lum-cream":         LUMIERE_TOKENS.cream,
+    "--lum-ink": LUMIERE_TOKENS.ink,
+    "--lum-ink-soft": LUMIERE_TOKENS.inkSoft,
+    "--lum-cream": LUMIERE_TOKENS.cream,
     // typography
-    "--lum-font-display":  fonts.display,
-    "--lum-font-body":     fonts.body,
-    "--lum-font-mono":     LUMIERE_TOKENS.mono,
+    "--lum-font-display": fonts.display,
+    "--lum-font-body": fonts.body,
+    "--lum-font-mono": LUMIERE_TOKENS.mono,
   } as React.CSSProperties;
 }

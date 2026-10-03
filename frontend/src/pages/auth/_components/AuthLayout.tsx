@@ -13,12 +13,8 @@ function BrandPanel() {
         <span className="text-2xl font-semibold tracking-tight">PharmaGest</span>
       </div>
       <div className="space-y-3">
-        <h2 className="text-3xl font-semibold leading-tight max-w-md">
-          {t("auth.brandTitle")}
-        </h2>
-        <p className="text-base opacity-80 max-w-md">
-          {t("auth.brandText")}
-        </p>
+        <h2 className="text-3xl font-semibold leading-tight max-w-md">{t("auth.brandTitle")}</h2>
+        <p className="text-base opacity-80 max-w-md">{t("auth.brandText")}</p>
       </div>
       <p className="text-sm opacity-60">© 2026 PharmaGest</p>
     </aside>

@@ -13,6 +13,7 @@ APPLICATION RULE (user decision 2026-08-01): applied ONLY in Comptabilité
 (`include_non_declared=False`). Every other page includes everything, so callers
 add `vente_filter()` / `achat_filter()` only when `include_non_declared` is False.
 """
+
 from sqlalchemy import func, select, union
 from sqlalchemy.orm import Session
 

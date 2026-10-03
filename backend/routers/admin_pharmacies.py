@@ -15,6 +15,7 @@ Member lifecycle (create / status / reset-password) + shared helpers live in
 members.py (also used by owner_employees.py); this router only does the admin
 auth + lookup checks.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -74,6 +75,7 @@ DEFAULT_ENABLED_FEATURES = ALLOWED_FEATURES
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _enabled_features(db, pharmacy_id: int) -> list[str]:
     rows = (
         db.query(PharmacyFeature.feature)
@@ -104,8 +106,7 @@ def _apply_features_bulk(db, pharmacy_id: int, features: dict[str, bool]) -> Non
     """Upsert one PharmacyFeature row per key in `features`. Unknown keys are
     silently ignored (we trust the frontend to only send ALLOWED_FEATURES)."""
     existing = {
-        f.feature: f for f in db.query(PharmacyFeature)
-        .filter(PharmacyFeature.pharmacy_id == pharmacy_id).all()
+        f.feature: f for f in db.query(PharmacyFeature).filter(PharmacyFeature.pharmacy_id == pharmacy_id).all()
     }
     for key, enabled in features.items():
         if key not in ALLOWED_FEATURES:
@@ -126,9 +127,10 @@ def _get_member_or_404(db, user_id: int) -> User:
 
 # ── List + Detail ────────────────────────────────────────────────────────────
 
+
 @router.get("/admin/pharmacies", response_model=list[PharmacyListRow])
 def list_pharmacies(
-    db:   DbDep,
+    db: DbDep,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[PharmacyListRow]:
     """All pharmacies + members count + enabled-features summary. Archived
@@ -189,7 +191,7 @@ def list_pharmacies(
 
 @router.get("/admin/pharmacies/{pharmacy_id}", response_model=PharmacyDetail)
 def get_pharmacy(
-    db:   DbDep,
+    db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Full pharmacy payload — info + enabled features + every member with
@@ -230,6 +232,7 @@ def get_pharmacy(
 
 # ── Create / update / soft-delete ────────────────────────────────────────────
 
+
 @router.post("/admin/pharmacies", response_model=PharmacyDetail)
 def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
     """Create + auto-enable DEFAULT_ENABLED_FEATURES. The pharmacy `code` is
@@ -241,8 +244,12 @@ def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
     for _ in range(5):
         code = generate_pharmacy_code(db, body.city)
         pharm = Pharmacy(
-            name=body.name, code=code, city=body.city,
-            address=body.address, phone=body.phone, email=body.email,
+            name=body.name,
+            code=code,
+            city=body.city,
+            address=body.address,
+            phone=body.phone,
+            email=body.email,
         )
         db.add(pharm)
         try:
@@ -254,7 +261,8 @@ def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
             continue
     if pharm is None:
         raise ApiError(
-            status.HTTP_503_SERVICE_UNAVAILABLE, ErrorCode.PHARMACY_CODE_FAILED,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            ErrorCode.PHARMACY_CODE_FAILED,
             "Impossible de générer un code unique pour cette ville. Réessayez.",
         )
 
@@ -267,24 +275,24 @@ def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
 @router.patch("/admin/pharmacies/{pharmacy_id}", response_model=PharmacyDetail)
 def update_pharmacy(
     body: PharmacyIn,
-    db:   DbDep,
+    db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Edit pharmacy info — name/code/city/address/phone/email."""
     pharm = _get_pharmacy_or_404(db, pharmacy_id)
-    pharm.name    = body.name
-    pharm.code    = body.code
-    pharm.city    = body.city
+    pharm.name = body.name
+    pharm.code = body.code
+    pharm.city = body.city
     pharm.address = body.address
-    pharm.phone   = body.phone
-    pharm.email   = body.email
+    pharm.phone = body.phone
+    pharm.email = body.email
     db.commit()
     return get_pharmacy(db, pharm.id)
 
 
 @router.delete("/admin/pharmacies/{pharmacy_id}", status_code=204)
 def archive_pharmacy(
-    db:   DbDep,
+    db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> None:
     """Soft-delete: set archived_at. Reversible via PATCH (clear archived_at
@@ -297,10 +305,11 @@ def archive_pharmacy(
 
 # ── Bulk-set toggles ─────────────────────────────────────────────────────────
 
+
 @router.put("/admin/pharmacies/{pharmacy_id}/features", response_model=PharmacyDetail)
 def set_pharmacy_features(
     body: FeaturesBulkSet,
-    db:   DbDep,
+    db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
     """Single bulk write of the 9 PharmacyFeature toggles. Frontend builds
@@ -315,7 +324,7 @@ def set_pharmacy_features(
 @router.put("/admin/users/{user_id}/permissions", response_model=MemberOut)
 def set_user_permissions(
     body: PermissionsBulkSet,
-    db:   DbDep,
+    db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Admin sets one user's 9 permissions in bulk — owners OR employees.
@@ -326,7 +335,8 @@ def set_user_permissions(
     target = _get_member_or_404(db, user_id)
     if target.role == "admin":
         raise ApiError(
-            400, ErrorCode.ADMIN_NO_PERMISSIONS,
+            400,
+            ErrorCode.ADMIN_NO_PERMISSIONS,
             "Les administrateurs n'ont pas de permissions configurables.",
         )
     apply_permissions_bulk(db, target.id, body.permissions)
@@ -336,10 +346,11 @@ def set_user_permissions(
 
 # ── Member CRUD ──────────────────────────────────────────────────────────────
 
+
 @router.post("/admin/pharmacies/{pharmacy_id}/users", response_model=CreateUserOut)
 def create_user(
     body: CreateUserIn,
-    db:   DbDep,
+    db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> CreateUserOut:
     """Admin creates an owner or employee account directly, with the password
@@ -352,8 +363,12 @@ def create_user(
         raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
 
     new_user = create_member(
-        db, email=body.email, name=body.full_name, password=body.password,
-        role=body.role, pharmacy_id=pharmacy_id,
+        db,
+        email=body.email,
+        name=body.full_name,
+        password=body.password,
+        role=body.role,
+        pharmacy_id=pharmacy_id,
     )
     return CreateUserOut(member=member_out(db, new_user))
 
@@ -361,7 +376,7 @@ def create_user(
 @router.post("/admin/users/{user_id}/reset-password", response_model=ResetPasswordOut)
 def reset_user_password(
     body: ResetPasswordIn,
-    db:   DbDep,
+    db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
     """Set the password the admin typed. Invalidates active sessions via
@@ -374,7 +389,7 @@ def reset_user_password(
 @router.patch("/admin/users/{user_id}/status", response_model=MemberOut)
 def set_user_status(
     body: StatusPatchIn,
-    db:   DbDep,
+    db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Toggle active <-> inactive. Going inactive also bumps token_version
@@ -388,14 +403,24 @@ def set_user_status(
 
 # ── « Utilisateurs » tab: every account ──────────────────────────────────────
 
+
 def _user_row(u: User, granted: list[str]) -> AdminUserRow:
     p = u.pharmacy
     return AdminUserRow(
-        id=u.id, full_name=u.name, email=u.email, phone=u.phone, role=u.role, status=u.status,
+        id=u.id,
+        full_name=u.name,
+        email=u.email,
+        phone=u.phone,
+        role=u.role,
+        status=u.status,
         pharmacy=UserPharmacyRef(
-            id=p.id, name=p.name, code=p.code,
+            id=p.id,
+            name=p.name,
+            code=p.code,
             archived_at=p.archived_at.isoformat() if p.archived_at else None,
-        ) if p else None,
+        )
+        if p
+        else None,
         last_login_at=u.last_login_at,
         granted_permissions=granted,
     )
@@ -419,7 +444,7 @@ def list_users(db: DbDep) -> list[AdminUserRow]:
 @router.patch("/admin/users/{user_id}/pharmacy", response_model=AdminUserRow)
 def assign_user_pharmacy(
     body: AssignPharmacyIn,
-    db:   DbDep,
+    db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> AdminUserRow:
     """Attach an owner / employee to an active pharmacy — the fix for accounts
@@ -428,7 +453,8 @@ def assign_user_pharmacy(
     target = _get_member_or_404(db, user_id)
     if target.role not in ("owner", "employee"):
         raise ApiError(
-            400, ErrorCode.ONLY_MEMBERS_HAVE_PHARMACY,
+            400,
+            ErrorCode.ONLY_MEMBERS_HAVE_PHARMACY,
             "Seuls les propriétaires et les employés ont une pharmacie.",
         )
     pharm = _get_pharmacy_or_404(db, body.pharmacy_id)
@@ -444,7 +470,7 @@ def assign_user_pharmacy(
 
 @router.delete("/admin/users/{user_id}", status_code=204)
 def delete_user(
-    db:   DbDep,
+    db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> None:
     """Hard-delete a non-admin user. Cascades drop UserPermission rows (FK

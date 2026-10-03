@@ -15,12 +15,12 @@ import { useSetPassword, useValidateToken } from "./hooks";
 const makeSetPasswordSchema = (t: TFn) =>
   z
     .object({
-      password:        z.string().min(8, t("auth.min8Chars")),
+      password: z.string().min(8, t("auth.min8Chars")),
       confirmPassword: z.string().min(1, t("auth.confirmRequired")),
     })
     .refine((data) => data.password === data.confirmPassword, {
       message: t("auth.passwordMismatch"),
-      path:    ["confirmPassword"],
+      path: ["confirmPassword"],
     });
 
 type SetPasswordValues = z.infer<ReturnType<typeof makeSetPasswordSchema>>;
@@ -48,9 +48,7 @@ function ExpiredState() {
       </span>
       <div className="flex flex-col gap-2">
         <h2 className="text-xl font-semibold tracking-tight text-foreground">{t("auth.expiredTitle")}</h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {t("auth.expiredDesc")}
-        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{t("auth.expiredDesc")}</p>
       </div>
       <Link
         to={ROUTES.FORGOT_PASSWORD}
@@ -75,11 +73,25 @@ export default function SetPasswordPage() {
     resolver: zodResolver(setPasswordSchema),
     defaultValues: { password: "", confirmPassword: "" },
   });
-  const { register, handleSubmit: rhfHandleSubmit, formState: { errors } } = form;
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+  } = form;
   const handleSetPasswordSubmit = rhfHandleSubmit((data) => handleSetPassword({ password: data.password }));
 
-  if (isValidating) return <AuthLayout><FormSkeleton /></AuthLayout>;
-  if (!isValid)     return <AuthLayout><ExpiredState /></AuthLayout>;
+  if (isValidating)
+    return (
+      <AuthLayout>
+        <FormSkeleton />
+      </AuthLayout>
+    );
+  if (!isValid)
+    return (
+      <AuthLayout>
+        <ExpiredState />
+      </AuthLayout>
+    );
 
   return (
     <AuthLayout>
@@ -88,11 +100,7 @@ export default function SetPasswordPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {isSetup ? t("auth.welcome", { name: fullName ?? "" }) : t("auth.resetTitle")}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {isSetup
-              ? t("auth.setupDesc")
-              : t("auth.resetDesc")}
-          </p>
+          <p className="text-sm text-muted-foreground">{isSetup ? t("auth.setupDesc") : t("auth.resetDesc")}</p>
         </header>
 
         <form className="flex flex-col gap-6" onSubmit={handleSetPasswordSubmit} noValidate>

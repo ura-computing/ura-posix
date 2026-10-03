@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs e2e-tests e2e-ui
+.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format e2e-tests e2e-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -31,6 +31,9 @@ help:
 	@echo "    make down      — stop containers (DB volume survives)"
 	@echo "    make logs      — tail container logs"
 	@echo "    make clean     — DESTRUCTIVE: stop + wipe ALL DB volumes (dev, demo, old Postgres 16 backup)"
+	@echo ""
+	@echo "  Code style:"
+	@echo "    make format    — format the whole repo (Prettier: frontend + e2e, ruff: backend)"
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
 	@echo "    make e2e-tests     — every test, headless"
@@ -139,6 +142,14 @@ logs:
 clean:
 	docker compose down -v
 	@echo "✓ Volume removed. Next 'make demo' starts from an empty DB."
+
+# ── Code style ──────────────────────────────────────────────────────────────
+# One style everywhere: Prettier for frontend + e2e (.prettierrc.json, width 120),
+# ruff for the backend (pyproject.toml, line-length 120). Rewrites only spacing,
+# wrapping and quotes, never what the code does.
+format:
+	cd $(FRONTEND_DIR) && npx prettier --write --log-level warn --ignore-path ../.prettierignore . ../e2e
+	cd $(BACKEND_DIR) && uv run ruff format .
 
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
 # Two commands. The script asks for its inputs (Enter = default); with no

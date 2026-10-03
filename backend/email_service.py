@@ -7,6 +7,7 @@ Failures are caught + logged, never raised: the forgot-password endpoint MUST
 stay 200 even when SMTP is broken, so the response doesn't leak whether the
 account exists.
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,12 +23,12 @@ log = logging.getLogger(__name__)
 
 def _render_magic_link_html(name: str, magic_link: str, is_setup: bool) -> str:
     """One template, two greetings. Vital Teal CTA, white card on neutral bg."""
-    greeting = f"Bienvenue, {name} 👋"          if is_setup else f"Bonjour {name},"
-    body     = (
+    greeting = f"Bienvenue, {name} 👋" if is_setup else f"Bonjour {name},"
+    body = (
         "Un compte a été créé pour vous. Cliquez sur le bouton ci-dessous "
         "pour définir votre mot de passe et activer votre accès."
-        if is_setup else
-        "Vous avez demandé la réinitialisation de votre mot de passe. "
+        if is_setup
+        else "Vous avez demandé la réinitialisation de votre mot de passe. "
         "Cliquez sur le bouton ci-dessous pour en choisir un nouveau."
     )
     cta = "Activer mon compte" if is_setup else "Réinitialiser mon mot de passe"
@@ -57,13 +58,16 @@ def send_magic_link(*, to: str, name: str, magic_link: str, is_setup: bool) -> N
         print(f"\n>>> [{flow}] MAGIC LINK for {to}: {magic_link}\n", flush=True)
         return
 
-    subject = "Bienvenue sur PharmaGest — Activez votre compte" if is_setup \
+    subject = (
+        "Bienvenue sur PharmaGest — Activez votre compte"
+        if is_setup
         else "Réinitialisation de votre mot de passe PharmaGest"
+    )
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"]    = settings.MAIL_FROM or settings.MAIL_USERNAME
-    msg["To"]      = to
+    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+    msg["To"] = to
     msg.set_content(f"{subject}\n\nLien d'activation : {magic_link}\n\n(Ce lien expire dans 60 minutes.)")
     msg.add_alternative(_render_magic_link_html(name=name, magic_link=magic_link, is_setup=is_setup), subtype="html")
 

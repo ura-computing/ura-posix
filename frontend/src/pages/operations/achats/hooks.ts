@@ -10,7 +10,6 @@ import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSuppli
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
 
-
 // Local filter state — same shape as AchatsFilters minus the two date fields
 // that now live in the cross-route GlobalDateRangeProvider.
 type LocalAchatsFilters = Omit<AchatsFilters, "date_from" | "date_to">;
@@ -25,14 +24,9 @@ const DEFAULT_LOCAL: LocalAchatsFilters = {
   sort_order: "desc",
 };
 
-
 export function useAchatsPage() {
   const t = useT();
-  const {
-    from: dateFrom,
-    to: dateTo,
-    setRange,
-  } = useGlobalDateRange();
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [localFilters, setLocal] = useState<LocalAchatsFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
 
@@ -54,13 +48,16 @@ export function useAchatsPage() {
 
   // Supplier summary ignores pagination + sort — key on the filter slice that matters
   const summaryKey = useMemo(
-    () => ({ date_from: filters.date_from, date_to: filters.date_to, search: filters.search, category: filters.category, tva: filters.tva }),
+    () => ({
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      search: filters.search,
+      category: filters.category,
+      tva: filters.tva,
+    }),
     [filters.date_from, filters.date_to, filters.search, filters.category, filters.tva],
   );
-  const {
-    data: supplierSummary,
-    isLoading: supplierLoading,
-  } = useQuery({
+  const { data: supplierSummary, isLoading: supplierLoading } = useQuery({
     queryKey: API.achats.supplierSummary.key(summaryKey),
     queryFn: () => api.get<AchatsSupplierSummary>(API.achats.supplierSummary.url, { params: summaryKey }),
   });
@@ -75,10 +72,7 @@ export function useAchatsPage() {
     queryFn: () => api.get<string[]>(API.achats.tvaRates.url),
     staleTime: 5 * 60_000,
   });
-  const {
-    data: suggestions,
-    isFetching: suggestionsLoading,
-  } = useQuery({
+  const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
     queryKey: API.achats.suggestions.key(suggestQ),
     queryFn: () => api.get<AchatsSuggestions>(API.achats.suggestions.url, { params: { q: suggestQ } }),
     enabled: suggestQ.length >= 2,
@@ -87,8 +81,7 @@ export function useAchatsPage() {
 
   // Local-filter patch resets pagination; sort + page do not. Date range
   // is the only filter routed through the global context.
-  const patch = (next: Partial<LocalAchatsFilters>) =>
-    setLocal((p) => ({ ...p, ...next, page: 1 }));
+  const patch = (next: Partial<LocalAchatsFilters>) => setLocal((p) => ({ ...p, ...next, page: 1 }));
 
   const setSearch = (search: string) => patch({ search });
   const setDateRange = (date_from: string | null, date_to: string | null) => setRange(date_from, date_to);
@@ -119,8 +112,18 @@ export function useAchatsPage() {
         params: { ...filters, page: undefined, limit: undefined, export: true },
       });
       const header = [
-        "Date BL", "Référence", "Fournisseur", "Produit", "Catégorie",
-        "Type", "TVA", "Qté", "PPH", "PU achat", "Péremption", "Total",
+        "Date BL",
+        "Référence",
+        "Fournisseur",
+        "Produit",
+        "Catégorie",
+        "Type",
+        "TVA",
+        "Qté",
+        "PPH",
+        "PU achat",
+        "Péremption",
+        "Total",
       ];
       const body = data.map((r) => [
         r.delivery_date ?? "",
@@ -128,9 +131,7 @@ export function useAchatsPage() {
         r.supplier ?? "",
         r.product ?? "",
         r.category ?? "",
-        r.category_type === "pharmacie" ? "Pharmacie"
-          : r.category_type === "parapharmacie" ? "Parapharmacie"
-            : "",
+        r.category_type === "pharmacie" ? "Pharmacie" : r.category_type === "parapharmacie" ? "Parapharmacie" : "",
         r.tva ?? "",
         r.quantity ?? 0,
         r.pph ?? 0,
@@ -138,10 +139,7 @@ export function useAchatsPage() {
         r.expiry_date ?? "",
         r.total ?? 0,
       ]);
-      await downloadXlsx(
-        [header, ...body],
-        exportFilename("ACHAT", "xlsx", filters.date_from, filters.date_to),
-      );
+      await downloadXlsx([header, ...body], exportFilename("ACHAT", "xlsx", filters.date_from, filters.date_to));
     } catch (e) {
       const msg = e instanceof Error ? e.message : t("achats.exportFailed");
       toast.error(msg);
@@ -150,11 +148,22 @@ export function useAchatsPage() {
 
   return {
     filters,
-    setSearch, setDateRange, setCategories, setTva, setSort, setPage, setPageSize, reset,
-    suggestQ, setSuggestQ,
+    setSearch,
+    setDateRange,
+    setCategories,
+    setTva,
+    setSort,
+    setPage,
+    setPageSize,
+    reset,
+    suggestQ,
+    setSuggestQ,
     handleExport,
-    list, isLoading, isError,
-    supplierSummary, supplierLoading,
+    list,
+    isLoading,
+    isError,
+    supplierSummary,
+    supplierLoading,
     categories: categories ?? [],
     tvaRates: tvaRates ?? [],
     suggestions: suggestions ?? null,

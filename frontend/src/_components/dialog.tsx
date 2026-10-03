@@ -17,19 +17,19 @@ import { useEffect, type ReactNode } from "react";
 
 import { cn } from "@/utils/cn";
 
-
 export interface DialogProps {
-  open:          boolean;
-  onOpenChange:  (open: boolean) => void;
-  children:      ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
 }
-
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   // Esc to close
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChange(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
@@ -39,7 +39,9 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   if (!open) return null;
@@ -59,12 +61,10 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   );
 }
 
-
 export interface DialogContentProps {
   className?: string;
-  children:   ReactNode;
+  children: ReactNode;
 }
-
 
 export function DialogContent({ className, children }: DialogContentProps) {
   return (

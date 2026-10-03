@@ -5,9 +5,8 @@
 
 export interface DateRange {
   from: string;
-  to:   string;
+  to: string;
 }
-
 
 const fmt = (d: Date): string => {
   const y = d.getFullYear();
@@ -16,18 +15,15 @@ const fmt = (d: Date): string => {
   return `${y}-${m}-${dd}`;
 };
 
-
 /** Today as ISO YYYY-MM-DD. */
 export function todayIso(now: Date = new Date()): string {
   return fmt(now);
 }
 
-
 /** ISO date `n` years before today (same month/day). */
 export function yearsAgo(n: number, now: Date = new Date()): string {
   return fmt(new Date(now.getFullYear() - n, now.getMonth(), now.getDate()));
 }
-
 
 /** ISO date `n` months before today (same day, clamped to month length).
  *  e.g. monthsAgo(2) on 2026-07-31 → 2026-05-31,
@@ -35,12 +31,11 @@ export function yearsAgo(n: number, now: Date = new Date()): string {
  */
 export function monthsAgo(n: number, now: Date = new Date()): string {
   const day = now.getDate();
-  const d   = new Date(now.getFullYear(), now.getMonth() - n, 1);
+  const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
   const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   d.setDate(Math.min(day, lastDay));
   return fmt(d);
 }
-
 
 /** First day of current month → today. */
 export function currentMonth(now: Date = new Date()): DateRange {
@@ -48,30 +43,27 @@ export function currentMonth(now: Date = new Date()): DateRange {
   return { from: fmt(from), to: fmt(now) };
 }
 
-
 /** Full previous calendar month (1st → last day). */
 export function previousMonth(now: Date = new Date()): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const to   = new Date(now.getFullYear(), now.getMonth(),     0); // day 0 = last day of prev month
+  const to = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of prev month
   return { from: fmt(from), to: fmt(to) };
 }
-
 
 /** Full previous calendar quarter (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec). */
 export function previousQuarter(now: Date = new Date()): DateRange {
   const currentQ = Math.floor(now.getMonth() / 3); // 0..3
   let prevQ = currentQ - 1;
-  let year  = now.getFullYear();
+  let year = now.getFullYear();
   if (prevQ < 0) {
     prevQ = 3;
     year -= 1;
   }
   const startMonth = prevQ * 3; // 0, 3, 6, 9
-  const from = new Date(year, startMonth,     1);
-  const to   = new Date(year, startMonth + 3, 0); // last day of last month in quarter
+  const from = new Date(year, startMonth, 1);
+  const to = new Date(year, startMonth + 3, 0); // last day of last month in quarter
   return { from: fmt(from), to: fmt(to) };
 }
-
 
 /** Full previous calendar year (Jan 1 → Dec 31). */
 export function previousYear(now: Date = new Date()): DateRange {
@@ -79,18 +71,16 @@ export function previousYear(now: Date = new Date()): DateRange {
   return { from: `${y}-01-01`, to: `${y}-12-31` };
 }
 
-
 /** Full current calendar year (Jan 1 → today). */
 export function currentYear(now: Date = new Date()): DateRange {
   const y = now.getFullYear();
   return { from: `${y}-01-01`, to: fmt(now) };
 }
 
-
 export const DATE_PRESETS = [
-  { key: "current-year",     label: "datePreset.currentYear",     get: currentYear },
-  { key: "current-month",    label: "datePreset.currentMonth",         get: currentMonth },
-  { key: "previous-month",   label: "datePreset.previousMonth",      get: previousMonth },
+  { key: "current-year", label: "datePreset.currentYear", get: currentYear },
+  { key: "current-month", label: "datePreset.currentMonth", get: currentMonth },
+  { key: "previous-month", label: "datePreset.previousMonth", get: previousMonth },
   { key: "previous-quarter", label: "datePreset.previousQuarter", get: previousQuarter },
-  { key: "previous-year",    label: "datePreset.previousYear",    get: previousYear },
+  { key: "previous-year", label: "datePreset.previousYear", get: previousYear },
 ] as const;

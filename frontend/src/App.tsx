@@ -67,7 +67,9 @@ const VentesPage = lazy(PAGES.VentesPage);
 export default function App() {
   // 2 s after the first screen: fetch every page's file, so later clicks don't wait.
   useEffect(() => {
-    const t = window.setTimeout(() => { for (const load of Object.values(PAGES)) void load(); }, 2000);
+    const t = window.setTimeout(() => {
+      for (const load of Object.values(PAGES)) void load();
+    }, 2000);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -83,25 +85,25 @@ export default function App() {
 
         {/* Auth routes: only accessible to UNauthenticated visitors */}
         <Route element={<RequireGuest />}>
-          <Route path={ROUTES.LOGIN}           element={<LoginPage />} />
+          <Route path={ROUTES.LOGIN} element={<LoginPage />} />
           <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
-          <Route path={ROUTES.SET_PASSWORD}    element={<SetPasswordPage />} />
+          <Route path={ROUTES.SET_PASSWORD} element={<SetPasswordPage />} />
         </Route>
 
         {/* App routes: only accessible to AUTHENTICATED users */}
         <Route element={<AppLayout />}>
-          <Route path={ROUTES.ME}          element={<MePage />} />
+          <Route path={ROUTES.ME} element={<MePage />} />
 
           {/* Feature-gated routes — admin bypasses; non-admin without the
               feature in their effective permission set redirects to /404. */}
           <Route element={<RequireFeature feature="rapports" />}>
-            <Route path={ROUTES.RAPPORT}   element={<RapportPage />} />
+            <Route path={ROUTES.RAPPORT} element={<RapportPage />} />
           </Route>
           <Route element={<RequireFeature feature="alertes" />}>
-            <Route path={ROUTES.ALERTES}   element={<AlertesPage />} />
+            <Route path={ROUTES.ALERTES} element={<AlertesPage />} />
           </Route>
           <Route element={<RequireFeature feature="import" />}>
-            <Route path={ROUTES.IMPORTS}     element={<ImportsPage />} />
+            <Route path={ROUTES.IMPORTS} element={<ImportsPage />} />
             <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
           </Route>
           <Route element={<RequireFeature feature="achats" />}>
@@ -124,17 +126,17 @@ export default function App() {
           </Route>
 
           <Route element={<RequireRole role={ROLES.ADMIN} />}>
-            <Route path={ROUTES.ADMIN_CATALOGUE}  element={<CataloguePage />} />
+            <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
             <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
             <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
-            <Route path={ROUTES.ADMIN_PHARMACY}   element={<AdminPharmacyDetail />} />
+            <Route path={ROUTES.ADMIN_PHARMACY} element={<AdminPharmacyDetail />} />
             {/* HIDDEN 2026-07-03 — admin/developers panel.
             <Route path={ROUTES.ADMIN_DEVELOPERS} element={<AdminDevelopersPage />} />
             */}
           </Route>
 
           <Route element={<RequireRole role={ROLES.OWNER} />}>
-            <Route path={ROUTES.OWNER_EMPLOYEES}   element={<OwnerEmployeesPage />} />
+            <Route path={ROUTES.OWNER_EMPLOYEES} element={<OwnerEmployeesPage />} />
             {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
             <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
             <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />

@@ -52,15 +52,10 @@ function PharmaciesTab() {
   const nav = useNavigate();
 
   const [search, setSearch] = useState("");
-  const [createOpen,     setCreateOpen]     = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
 
-  const {
-    pharmacies,
-    isLoading,
-    isError,
-    reload,
-  } = useAdminPharmaciesList();
+  const { pharmacies, isLoading, isError, reload } = useAdminPharmaciesList();
   const rows: PharmacyListRow[] = useMemo(() => pharmacies ?? [], [pharmacies]);
 
   const { createPharmacy } = useCreatePharmacy();
@@ -114,7 +109,10 @@ function PharmaciesTab() {
       render: (p) => (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); nav(`/admin/pharmacies/${p.id}`); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            nav(`/admin/pharmacies/${p.id}`);
+          }}
           className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
         >
           {t("adminPharm.open")}
@@ -135,8 +133,18 @@ function PharmaciesTab() {
           onPick: () => {},
         }}
         rightActions={[
-          { label: t("adminPharm.newUser"),     variant: "outline", icon: <UserPlus className="size-4" />, onClick: () => setCreateUserOpen(true) },
-          { label: t("adminPharm.newPharmacy"), variant: "primary", icon: <Plus className="size-4" />,     onClick: () => setCreateOpen(true) },
+          {
+            label: t("adminPharm.newUser"),
+            variant: "outline",
+            icon: <UserPlus className="size-4" />,
+            onClick: () => setCreateUserOpen(true),
+          },
+          {
+            label: t("adminPharm.newPharmacy"),
+            variant: "primary",
+            icon: <Plus className="size-4" />,
+            onClick: () => setCreateOpen(true),
+          },
         ]}
       />
 
@@ -162,7 +170,10 @@ function PharmaciesTab() {
       <PharmacyFormDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onSubmit={async (v) => { await handleCreate(v); setCreateOpen(false); }}
+        onSubmit={async (v) => {
+          await handleCreate(v);
+          setCreateOpen(false);
+        }}
       />
 
       <CreateUserDialog
@@ -217,23 +228,22 @@ const SCOPE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 const isMember = (u: AdminUserRow) => u.role === "owner" || u.role === "employee";
 const hasActivePharmacy = (u: AdminUserRow) => !!u.pharmacy && !u.pharmacy.archived_at;
 const toMember = (u: AdminUserRow): MemberOut => ({
-  id: u.id, full_name: u.full_name, email: u.email, granted_permissions: u.granted_permissions,
-  role: u.role as MemberRole, status: u.status as MemberStatus,
+  id: u.id,
+  full_name: u.full_name,
+  email: u.email,
+  granted_permissions: u.granted_permissions,
+  role: u.role as MemberRole,
+  status: u.status as MemberStatus,
 });
 
 function UsersTab() {
   const t = useT();
-  const {
-    users,
-    isLoading: usersLoading,
-    isError: usersError,
-    reload: reloadUsers,
-  } = useAdminUsers();
-  const { pharmacies } = useAdminPharmaciesList();   // active ones only → assign targets
+  const { users, isLoading: usersLoading, isError: usersError, reload: reloadUsers } = useAdminUsers();
+  const { pharmacies } = useAdminPharmaciesList(); // active ones only → assign targets
 
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<Scope>("all");
-  const [resetTarget,  setResetTarget]  = useState<MemberOut | null>(null);
+  const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
   const [removeTarget, setRemoveTarget] = useState<AdminUserRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<AdminUserRow | null>(null);
 
@@ -243,15 +253,21 @@ function UsersTab() {
   const { deleteUser } = useDeleteUser();
 
   const rows = useMemo(() => users ?? [], [users]);
-  const orphans  = rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length;
+  const orphans = rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length;
   const inactive = rows.filter((u) => u.status !== "active").length;
 
   // « Sans pharmacie » = no ACTIVE pharmacy (none, or an archived one).
-  const filtered = useMemo(() => rows.filter((u) => {
-    if (scope === "with" && !hasActivePharmacy(u)) return false;
-    if (scope === "without" && hasActivePharmacy(u)) return false;
-    return !search.trim() || matchesFields([u.full_name, u.email, u.phone, u.pharmacy?.name, u.pharmacy?.code], search);
-  }), [rows, scope, search]);
+  const filtered = useMemo(
+    () =>
+      rows.filter((u) => {
+        if (scope === "with" && !hasActivePharmacy(u)) return false;
+        if (scope === "without" && hasActivePharmacy(u)) return false;
+        return (
+          !search.trim() || matchesFields([u.full_name, u.email, u.phone, u.pharmacy?.name, u.pharmacy?.code], search)
+        );
+      }),
+    [rows, scope, search],
+  );
 
   const roleLabel = (role: string) => (KNOWN_ROLES.includes(role) ? t(`roles.${role}`) : role);
   const statusLabel = (status: string) =>
@@ -259,7 +275,9 @@ function UsersTab() {
 
   const columns: ColumnDef<AdminUserRow>[] = [
     {
-      key: "user", label: t("adminUsers.colUser"), sortable: false,
+      key: "user",
+      label: t("adminUsers.colUser"),
+      sortable: false,
       render: (u) => (
         <div className="flex flex-col">
           <span className="text-[13px] font-semibold text-foreground">{u.full_name ?? "—"}</span>
@@ -269,34 +287,53 @@ function UsersTab() {
       ),
     },
     {
-      key: "role", label: t("adminUsers.colRole"), sortable: false,
+      key: "role",
+      label: t("adminUsers.colRole"),
+      sortable: false,
       render: (u) => <span className={cn(PILL, "bg-muted text-muted-foreground")}>{roleLabel(u.role)}</span>,
     },
     {
-      key: "status", label: t("adminUsers.colStatus"), sortable: false,
+      key: "status",
+      label: t("adminUsers.colStatus"),
+      sortable: false,
       render: (u) => (
-        <span className={cn(PILL, u.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground")}>
+        <span
+          className={cn(
+            PILL,
+            u.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
+          )}
+        >
           {statusLabel(u.status)}
         </span>
       ),
     },
     {
-      key: "pharmacy", label: t("adminUsers.colPharmacy"), sortable: false,
-      render: (u) => u.pharmacy ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Link to={`/admin/pharmacies/${u.pharmacy.id}`} className="text-sm font-medium text-primary hover:underline">
-            {[u.pharmacy.code, u.pharmacy.name].filter(Boolean).join(" · ")}
-          </Link>
-          {u.pharmacy.archived_at && <span className={cn(PILL, "bg-warning-subtle text-warning")}>{t("adminUsers.archived")}</span>}
-        </div>
-      ) : (
-        <span className={cn(PILL, isMember(u) ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground")}>
-          {t("adminUsers.noPharmacy")}
-        </span>
-      ),
+      key: "pharmacy",
+      label: t("adminUsers.colPharmacy"),
+      sortable: false,
+      render: (u) =>
+        u.pharmacy ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Link
+              to={`/admin/pharmacies/${u.pharmacy.id}`}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              {[u.pharmacy.code, u.pharmacy.name].filter(Boolean).join(" · ")}
+            </Link>
+            {u.pharmacy.archived_at && (
+              <span className={cn(PILL, "bg-warning-subtle text-warning")}>{t("adminUsers.archived")}</span>
+            )}
+          </div>
+        ) : (
+          <span className={cn(PILL, isMember(u) ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground")}>
+            {t("adminUsers.noPharmacy")}
+          </span>
+        ),
     },
     {
-      key: "last_login_at", label: t("adminUsers.colLastLogin"), sortable: false,
+      key: "last_login_at",
+      label: t("adminUsers.colLastLogin"),
+      sortable: false,
       render: (u) => (
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
           {u.last_login_at
@@ -306,31 +343,46 @@ function UsersTab() {
       ),
     },
     {
-      key: "perms", label: t("adminUsers.colPerms"), sortable: false,
-      render: (u) => isMember(u) ? <FeaturePills features={u.granted_permissions} maxShown={3} /> : <span className="text-muted-foreground">—</span>,
+      key: "perms",
+      label: t("adminUsers.colPerms"),
+      sortable: false,
+      render: (u) =>
+        isMember(u) ? (
+          <FeaturePills features={u.granted_permissions} maxShown={3} />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
-      key: "actions", label: t("adminUsers.colActions"), align: "right", sortable: false,
-      render: (u) => !isMember(u) ? <span className="text-muted-foreground">—</span> : (
-        <div className="flex items-center justify-end gap-1.5">
-          {!hasActivePharmacy(u) && (
-            <button
-              type="button"
-              onClick={() => setAssignTarget(u)}
-              className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
-            >
-              <Building2 className="size-3.5" />
-              {t("adminUsers.assign")}
-            </button>
-          )}
-          <MemberKebab
-            member={toMember(u)}
-            onResetPassword={() => setResetTarget(toMember(u))}
-            onToggleStatus={() => void setUserStatus({ userId: u.id, status: u.status === "active" ? "inactive" : "active" })}
-            onRemove={() => setRemoveTarget(u)}
-          />
-        </div>
-      ),
+      key: "actions",
+      label: t("adminUsers.colActions"),
+      align: "right",
+      sortable: false,
+      render: (u) =>
+        !isMember(u) ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <div className="flex items-center justify-end gap-1.5">
+            {!hasActivePharmacy(u) && (
+              <button
+                type="button"
+                onClick={() => setAssignTarget(u)}
+                className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
+              >
+                <Building2 className="size-3.5" />
+                {t("adminUsers.assign")}
+              </button>
+            )}
+            <MemberKebab
+              member={toMember(u)}
+              onResetPassword={() => setResetTarget(toMember(u))}
+              onToggleStatus={() =>
+                void setUserStatus({ userId: u.id, status: u.status === "active" ? "inactive" : "active" })
+              }
+              onRemove={() => setRemoveTarget(u)}
+            />
+          </div>
+        ),
     },
   ];
 
@@ -342,8 +394,8 @@ function UsersTab() {
           value: scope,
           onChange: setScope,
           options: [
-            { value: "all",     label: t("adminUsers.scopeAll"),     activeBg: SCOPE_ACTIVE },
-            { value: "with",    label: t("adminUsers.scopeWith"),    activeBg: SCOPE_ACTIVE },
+            { value: "all", label: t("adminUsers.scopeAll"), activeBg: SCOPE_ACTIVE },
+            { value: "with", label: t("adminUsers.scopeWith"), activeBg: SCOPE_ACTIVE },
             { value: "without", label: t("adminUsers.scopeWithout"), activeBg: SCOPE_ACTIVE },
           ],
         }}
@@ -386,7 +438,9 @@ function UsersTab() {
         open={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
         variant="destructive"
-        title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
+        title={t("members.removeTitle", {
+          who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember"),
+        })}
         description={t("members.removeDesc", { pharmacy: removeTarget?.pharmacy?.name ?? "—" })}
         onConfirm={async () => {
           if (removeTarget) await deleteUser(removeTarget.id);
@@ -396,7 +450,10 @@ function UsersTab() {
 
       <AssignPharmacyDialog
         user={assignTarget}
-        pharmacies={(pharmacies ?? []).map((p) => ({ value: String(p.id), label: [p.code, p.name].filter(Boolean).join(" · ") }))}
+        pharmacies={(pharmacies ?? []).map((p) => ({
+          value: String(p.id),
+          label: [p.code, p.name].filter(Boolean).join(" · "),
+        }))}
         onClose={() => setAssignTarget(null)}
       />
     </>
@@ -405,17 +462,16 @@ function UsersTab() {
 
 /** Pick an active pharmacy for an account that has none (or an archived one). */
 function AssignPharmacyDialog({
-  user, pharmacies, onClose,
+  user,
+  pharmacies,
+  onClose,
 }: {
-  user:       AdminUserRow | null;
+  user: AdminUserRow | null;
   pharmacies: { value: string; label: string }[];
-  onClose:    () => void;
+  onClose: () => void;
 }) {
   const t = useT();
-  const {
-    assignPharmacy,
-    isAssigning,
-  } = useAssignPharmacy();
+  const { assignPharmacy, isAssigning } = useAssignPharmacy();
   const [pharmacyId, setPharmacyId] = useState("");
 
   // Reset on (re)open — derive-from-prop pattern (no effect).
@@ -433,7 +489,12 @@ function AssignPharmacyDialog({
   };
 
   return (
-    <Dialog open={user !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={user !== null}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <div className="flex flex-col gap-4 p-5">
           <header className="flex flex-col gap-1">
@@ -477,7 +538,7 @@ export default function AdminPharmaciesIndex() {
       <TabBar
         tabs={[
           { id: "pharmacies", label: t("adminUsers.tabPharmacies") },
-          { id: "users",      label: t("adminUsers.tabUsers") },
+          { id: "users", label: t("adminUsers.tabUsers") },
         ]}
         activeId={tab}
         onChange={(id) => setParams(id === "users" ? { tab: "utilisateurs" } : {})}

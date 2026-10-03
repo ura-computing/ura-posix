@@ -63,19 +63,17 @@ function formatYearMonth(year: number, monthIdx: number): string {
 
 interface MonthPopoverProps {
   /** Current value as "YYYY-MM". */
-  value:     string;
-  onChange:  (next: string) => void;
+  value: string;
+  onChange: (next: string) => void;
   /** Label shown before the value in the trigger ("Mois" by default). Pass ""
    *  to show only the value (e.g. inside a header). */
-  label?:    string;
+  label?: string;
   /** Where the panel opens — matches SingleSelectPopover's API. */
   placement?: "top" | "bottom";
-  align?:     "start" | "end";
+  align?: "start" | "end";
 }
 
-function MonthPopover({
-  value, onChange, label = "", placement = "bottom", align = "start",
-}: MonthPopoverProps) {
+function MonthPopover({ value, onChange, label = "", placement = "bottom", align = "start" }: MonthPopoverProps) {
   const t = useT();
   const MONTHS_FR = useMonths();
   const MONTHS_FR_SHORT = useMonthsShort();
@@ -89,7 +87,9 @@ function MonthPopover({
 
   // Reset the panel's displayed year when the bound value changes or the
   // panel reopens, so we always start from the selected year.
-  useEffect(() => { if (open) setDisplayYear(valueY); }, [open, valueY]);
+  useEffect(() => {
+    if (open) setDisplayYear(valueY);
+  }, [open, valueY]);
 
   // Outside-click close
   useEffect(() => {
@@ -107,11 +107,7 @@ function MonthPopover({
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={POPOVER_TRIGGER}
-      >
+      <button type="button" onClick={() => setOpen(!open)} className={POPOVER_TRIGGER}>
         <span>
           {label}
           <span className={cn("font-semibold text-foreground", label && "ml-1")}>
@@ -181,35 +177,47 @@ function MonthPopover({
  */
 function KpiCards({ stats }: { stats: StatsResponse }) {
   const t = useT();
-  const ca       = stats.kpis.ventes_total;
-  const achats   = stats.kpis.achats_total;
+  const ca = stats.kpis.ventes_total;
+  const achats = stats.kpis.achats_total;
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
       <Card icon={<Wallet className="size-5" />} title={t("comptabilite.kpiCA")} tone="primary">
-        <Row label={t("comptabilite.ventesTotal")}   value={formatMAD(ca)} hero />
-        <Row label={t("comptabilite.marge")}           value={formatPct(stats.marge.marge_pct)} />
-        <Row label={t("comptabilite.tvaEncaissee")}   value={formatMAD(stats.tva.tva_encaissee)} />
+        <Row label={t("comptabilite.ventesTotal")} value={formatMAD(ca)} hero />
+        <Row label={t("comptabilite.marge")} value={formatPct(stats.marge.marge_pct)} />
+        <Row label={t("comptabilite.tvaEncaissee")} value={formatMAD(stats.tva.tva_encaissee)} />
       </Card>
 
       <Card icon={<Receipt className="size-5" />} title={t("comptabilite.kpiAchats")} tone="warning">
-        <Row label={t("kpi.totalAchats")}    value={formatMAD(achats)} hero />
-        <Row label={t("comptabilite.operations")}      value={String(stats.kpis.achats_count)} />
-        <Row label={t("comptabilite.tvaPayee")}       value={formatMAD(stats.tva.tva_payee)} />
+        <Row label={t("kpi.totalAchats")} value={formatMAD(achats)} hero />
+        <Row label={t("comptabilite.operations")} value={String(stats.kpis.achats_count)} />
+        <Row label={t("comptabilite.tvaPayee")} value={formatMAD(stats.tva.tva_payee)} />
       </Card>
 
       <Card icon={<BarChart3 className="size-5" />} title={t("comptabilite.bilanTva")} tone="info">
         <Row label={t("comptabilite.resultat")} value={formatMAD(stats.marge.marge_brute_dh)} hero />
-        <Row label={t("comptabilite.tvaADeclarer")}      value={formatMAD(stats.tva.tva_a_declarer)} />
-        <Row label={t("comptabilite.soldeTva", { year: new Date().getFullYear() })} value={formatMAD(stats.tva.tva_a_declarer)} subtle />
+        <Row label={t("comptabilite.tvaADeclarer")} value={formatMAD(stats.tva.tva_a_declarer)} />
+        <Row
+          label={t("comptabilite.soldeTva", { year: new Date().getFullYear() })}
+          value={formatMAD(stats.tva.tva_a_declarer)}
+          subtle
+        />
       </Card>
     </div>
   );
 }
 
 function Card({
-  icon, title, tone, children,
-}: { icon: React.ReactNode; title: string; tone: "primary" | "warning" | "info"; children: React.ReactNode }) {
+  icon,
+  title,
+  tone,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  tone: "primary" | "warning" | "info";
+  children: React.ReactNode;
+}) {
   const tint = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : "text-info";
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -222,7 +230,17 @@ function Card({
   );
 }
 
-function Row({ label, value, hero, subtle }: { label: React.ReactNode; value: React.ReactNode; hero?: boolean; subtle?: boolean }) {
+function Row({
+  label,
+  value,
+  hero,
+  subtle,
+}: {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  hero?: boolean;
+  subtle?: boolean;
+}) {
   if (hero) {
     return (
       <div className="flex flex-col gap-0.5 pb-2 border-b border-border">
@@ -234,7 +252,11 @@ function Row({ label, value, hero, subtle }: { label: React.ReactNode; value: Re
   return (
     <div className="flex items-center justify-between gap-3 text-base">
       <span className={subtle ? "text-sm text-muted-foreground" : "text-muted-foreground"}>{label}</span>
-      <span className={`font-mono tabular-nums ${subtle ? "text-sm text-muted-foreground" : "font-semibold text-foreground"}`}>{value}</span>
+      <span
+        className={`font-mono tabular-nums ${subtle ? "text-sm text-muted-foreground" : "font-semibold text-foreground"}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -250,34 +272,31 @@ function Row({ label, value, hero, subtle }: { label: React.ReactNode; value: Re
  */
 
 const METHOD_KEY: Record<PaymentMethod, string> = {
-  especes: "comptabilite.especes", cheques: "comptabilite.cheques", virement: "comptabilite.virement", tpe: "comptabilite.tpe",
+  especes: "comptabilite.especes",
+  cheques: "comptabilite.cheques",
+  virement: "comptabilite.virement",
+  tpe: "comptabilite.tpe",
 };
 
 interface PaymentEditDialogProps {
-  open:    boolean;
+  open: boolean;
   onClose: () => void;
-  method:  PaymentMethod | null;     // null when closed
-  month:   string;                    // YYYY-MM
-  entry:   PaymentEntry | null;       // existing row, if any
+  method: PaymentMethod | null; // null when closed
+  month: string; // YYYY-MM
+  entry: PaymentEntry | null; // existing row, if any
 }
 
 function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditDialogProps) {
   const t = useT();
-  const {
-    savePayment,
-    isSaving,
-  }   = useSavePayment();
-  const {
-    deletePayment,
-    isDeleting,
-  } = useDeletePayment();
+  const { savePayment, isSaving } = useSavePayment();
+  const { deletePayment, isDeleting } = useDeletePayment();
 
   // Form state — initialized from `entry` when the dialog opens. Reset on
   // method/month/open change so reopening on a different card shows the
   // right starting values.
-  const [pharm,  setPharm]  = useState("0");
-  const [para,   setPara]   = useState("0");
-  const [cnt,    setCnt]    = useState("0");
+  const [pharm, setPharm] = useState("0");
+  const [para, setPara] = useState("0");
+  const [cnt, setCnt] = useState("0");
   const [monthV, setMonthV] = useState(month);
 
   useEffect(() => {
@@ -292,11 +311,11 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
 
   const handleSave = async () => {
     await savePayment({
-      month:                monthV,
+      month: monthV,
       method,
-      pharmacie_amount:     Number(pharm) || 0,
-      parapharmacie_amount: Number(para)  || 0,
-      count:                Number(cnt)   || 0,
+      pharmacie_amount: Number(pharm) || 0,
+      parapharmacie_amount: Number(para) || 0,
+      count: Number(cnt) || 0,
     });
     onClose();
   };
@@ -308,13 +327,23 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-semibold text-foreground">
             {t(METHOD_KEY[method])} — {monthV}
           </h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="cursor-pointer text-muted-foreground hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -349,7 +378,9 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
               <Trash2 className="size-4" />
               Supprimer
             </AsyncButton>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
           <AsyncButton variant="primary" onClick={handleSave} isLoading={isSaving}>
             Enregistrer
           </AsyncButton>
@@ -368,7 +399,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function NumberInput({ value, onChange, integer }: { value: string; onChange: (v: string) => void; integer?: boolean }) {
+function NumberInput({
+  value,
+  onChange,
+  integer,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  integer?: boolean;
+}) {
   return (
     <input
       type="number"
@@ -392,25 +431,26 @@ function NumberInput({ value, onChange, integer }: { value: string; onChange: (v
  */
 
 const METHOD_ICON: Record<PaymentMethod, React.ReactNode> = {
-  tpe:      <CreditCard className="size-5" />,
-  especes:  <Banknote className="size-5" />,
-  cheques:  <Receipt className="size-5" />,
+  tpe: <CreditCard className="size-5" />,
+  especes: <Banknote className="size-5" />,
+  cheques: <Receipt className="size-5" />,
   virement: <ArrowRightLeft className="size-5" />,
 };
 
 /** Tailwind-friendly tint per method. Light bg + dark icon, mirrors the old
  *  apcm-pharma color story (blue / green / purple / amber). */
 const METHOD_TINT: Record<PaymentMethod, { bg: string; fg: string; border: string }> = {
-  tpe:      { bg: "bg-blue-50",   fg: "text-blue-600",   border: "border-blue-200" },
-  especes:  { bg: "bg-green-50",  fg: "text-green-600",  border: "border-green-200" },
-  cheques:  { bg: "bg-purple-50", fg: "text-purple-600", border: "border-purple-200" },
-  virement: { bg: "bg-amber-50",  fg: "text-amber-600",  border: "border-amber-200" },
+  tpe: { bg: "bg-blue-50", fg: "text-blue-600", border: "border-blue-200" },
+  especes: { bg: "bg-green-50", fg: "text-green-600", border: "border-green-200" },
+  cheques: { bg: "bg-purple-50", fg: "text-purple-600", border: "border-purple-200" },
+  virement: { bg: "bg-amber-50", fg: "text-amber-600", border: "border-amber-200" },
 };
 
 function PaymentMethodGrid({
-  payments, onOpenMethod,
+  payments,
+  onOpenMethod,
 }: {
-  payments:     PaymentEntry[];
+  payments: PaymentEntry[];
   onOpenMethod: (method: PaymentMethod) => void;
 }) {
   /** Map method → entry for O(1) lookup; missing keys render the empty (add) state. */
@@ -431,10 +471,16 @@ function PaymentMethodGrid({
 }
 
 function MethodCard({
-  method, entry, onClick,
-}: { method: PaymentMethod; entry: PaymentEntry | null; onClick: () => void }) {
+  method,
+  entry,
+  onClick,
+}: {
+  method: PaymentMethod;
+  entry: PaymentEntry | null;
+  onClick: () => void;
+}) {
   const t = useT();
-  const tint  = METHOD_TINT[method];
+  const tint = METHOD_TINT[method];
   const total = entry ? entry.pharmacie_amount + entry.parapharmacie_amount : 0;
 
   return (
@@ -454,12 +500,14 @@ function MethodCard({
 
       {entry ? (
         <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">
-            {formatMAD(total)}
-          </span>
+          <span className="font-mono text-2xl font-semibold tabular-nums text-foreground">{formatMAD(total)}</span>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{t("comptabilite.phAbbr")} {formatMAD(entry.pharmacie_amount)}</span>
-            <span>{t("comptabilite.paraAbbr")} {formatMAD(entry.parapharmacie_amount)}</span>
+            <span>
+              {t("comptabilite.phAbbr")} {formatMAD(entry.pharmacie_amount)}
+            </span>
+            <span>
+              {t("comptabilite.paraAbbr")} {formatMAD(entry.parapharmacie_amount)}
+            </span>
           </div>
           <span className="text-xs text-muted-foreground">
             {entry.count} {entry.count > 1 ? t("comptabilite.transactionsWord") : t("comptabilite.transactionWord")}
@@ -506,7 +554,9 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
     sortable: false,
     render: (r) => (
       <div className="flex flex-col">
-        <span className="truncate" title={r.product ?? ""}>{r.product ?? "—"}</span>
+        <span className="truncate" title={r.product ?? ""}>
+          {r.product ?? "—"}
+        </span>
         {r.pid && <span className="text-[10px] text-muted-foreground">{r.pid}</span>}
       </div>
     ),
@@ -533,12 +583,12 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
 ];
 
 interface VentesLedgerProps {
-  rows:        VenteRow[];
-  isLoading:   boolean;
-  sortBy:      string | null;
-  sortOrder:   "asc" | "desc";
-  onSort:      (key: string) => void;
-  pagination:  DataTablePagination;
+  rows: VenteRow[];
+  isLoading: boolean;
+  sortBy: string | null;
+  sortOrder: "asc" | "desc";
+  onSort: (key: string) => void;
+  pagination: DataTablePagination;
 }
 
 function VentesLedger({ rows, isLoading, sortBy, sortOrder, onSort, pagination }: VentesLedgerProps) {
@@ -558,9 +608,10 @@ function VentesLedger({ rows, isLoading, sortBy, sortOrder, onSort, pagination }
 }
 
 const CATEGORY_KEY: Record<StatsFilters["category_type"], string> = {
-  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
+  all: "category.mixte",
+  pharmacie: "category.pharmacie",
+  parapharmacie: "category.parapharmacie",
 };
-
 
 export default function ComptabilitePage() {
   const t = useT();
@@ -589,61 +640,76 @@ export default function ComptabilitePage() {
   const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
-    (filters.date_from || filters.date_to) ? {
-      key:   "dates",
-      label: <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
-      onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
-    } : null,
-    filters.category_type !== "all" ? {
-      key:   "cat",
-      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
-      onClear: () => setFilters({ ...filters, category_type: "all" }),
-    } : null,
-    filters.include_non_declared ? {
-      key:   "nd",
-      label: <>{t("comptabilite.avecSpeciaux")}</>,
-      onClear: () => setFilters({ ...filters, include_non_declared: false }),
-    } : null,
+    filters.date_from || filters.date_to
+      ? {
+          key: "dates",
+          label: (
+            <>
+              {t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
+            </>
+          ),
+          onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
+        }
+      : null,
+    filters.category_type !== "all"
+      ? {
+          key: "cat",
+          label: (
+            <>
+              {t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}
+            </>
+          ),
+          onClear: () => setFilters({ ...filters, category_type: "all" }),
+        }
+      : null,
+    filters.include_non_declared
+      ? {
+          key: "nd",
+          label: <>{t("comptabilite.avecSpeciaux")}</>,
+          onClear: () => setFilters({ ...filters, include_non_declared: false }),
+        }
+      : null,
   ].filter(Boolean) as ActiveFilter[];
 
   // Active entry for the open method (drives the dialog's initial values).
-  const activeEntry = openMethod
-    ? (payments.find((e) => e.method === openMethod) ?? null)
-    : null;
+  const activeEntry = openMethod ? (payments.find((e) => e.method === openMethod) ?? null) : null;
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.comptabilite")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("comptabilite.pageSubtitle")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("comptabilite.pageSubtitle")}</p>
       </header>
 
       <FilterBar<StatsFilters["category_type"]>
         dateRange={{
-          from:     filters.date_from,
-          to:       filters.date_to,
+          from: filters.date_from,
+          to: filters.date_to,
           onChange: (from, to) => setFilters({ ...filters, date_from: from, date_to: to }),
         }}
         segment={{
-          value:    filters.category_type,
+          value: filters.category_type,
           onChange: (v) => setFilters({ ...filters, category_type: v }),
-          options:  categoryTypeOptions,
+          options: categoryTypeOptions,
         }}
         rightActions={[
           {
-            label:    t("common.export"),
-            icon:     <Download className="size-4" />,
-            variant:  "outline",
-            onClick:  handleExport,
+            label: t("common.export"),
+            icon: <Download className="size-4" />,
+            variant: "outline",
+            onClick: handleExport,
             disabled: !stats,
           },
         ]}
         activeFilters={activeFilters}
-        onResetAll={() => setFilters({
-          date_from: null, date_to: null, category_type: "all", include_non_declared: false,
-        })}
+        onResetAll={() =>
+          setFilters({
+            date_from: null,
+            date_to: null,
+            category_type: "all",
+            include_non_declared: false,
+          })
+        }
       />
 
       {/* Non-declared toggle — secondary control, lives outside the FilterBar */}
@@ -658,11 +724,15 @@ export default function ComptabilitePage() {
       </label>
 
       {/* KPI cards (3) */}
-      {statsLoading || !stats
-        ? <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {[0,1,2].map((i) => <div key={i} className="h-44 animate-pulse rounded-xl border border-border bg-card" />)}
-          </div>
-        : <KpiCards stats={stats} />}
+      {statsLoading || !stats ? (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-44 animate-pulse rounded-xl border border-border bg-card" />
+          ))}
+        </div>
+      ) : (
+        <KpiCards stats={stats} />
+      )}
 
       {/* Payment method cards (4) for the active month */}
       <section className="flex flex-col gap-3">
@@ -670,12 +740,7 @@ export default function ComptabilitePage() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             {t("comptabilite.paymentMethods")}
           </h2>
-          <MonthPopover
-            label=""
-            value={activeMonth}
-            onChange={setActiveMonth}
-            align="end"
-          />
+          <MonthPopover label="" value={activeMonth} onChange={setActiveMonth} align="end" />
         </div>
         <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
       </section>
@@ -692,10 +757,10 @@ export default function ComptabilitePage() {
           sortOrder={ventesSortOrder}
           onSort={setVentesSort}
           pagination={{
-            page:       ventesPage,
-            pageSize:   ventesPageSize,
-            total:      ventesTotal,
-            onPage:     setVentesPage,
+            page: ventesPage,
+            pageSize: ventesPageSize,
+            total: ventesTotal,
+            onPage: setVentesPage,
             onPageSize: setVentesPageSize,
           }}
         />

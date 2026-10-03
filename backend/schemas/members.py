@@ -1,6 +1,7 @@
 """Pharmacy + member shapes. The admin pages (/admin/pharmacies) and the owner page
 (/owner/employees) share them: a user has the same shape whoever looks at it.
 Statuses: "active" | "inactive"."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -17,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # statuses are "active" or "inactive" (per locked spec — no "pending" since
 # there's no signup workflow).
 
-MemberRole   = Literal["owner", "employee"]
+MemberRole = Literal["owner", "employee"]
 MemberStatus = Literal["active", "inactive"]
 
 
@@ -25,44 +26,48 @@ class MemberOut(BaseModel):
     """One user on a pharmacy's Membres table. `granted_permissions` is the
     raw UserPermission(enabled=True) set — NOT the effective intersection
     (which the frontend can compute by intersecting with pharmacy features)."""
-    id:                  int
-    full_name:           str | None
-    email:               str
-    role:                MemberRole
-    status:              MemberStatus
+
+    id: int
+    full_name: str | None
+    email: str
+    role: MemberRole
+    status: MemberStatus
     granted_permissions: list[str]
     model_config = ConfigDict(from_attributes=True)
 
 
 # ── Pharmacy list / detail ────────────────────────────────────────────────────
 
+
 class PharmacyListRow(BaseModel):
     """One row in Screen 1 (Pharmacies index). Superset of the picker-dropdown
     shape — extra fields (members_count, enabled_features, etc.) are ignored
     by the dropdown consumer."""
-    id:                int
-    name:              str
-    code:              str | None
-    city:              str | None
-    members_count:     int
-    member_initials:   list[str]
-    enabled_features:  list[str]
-    archived_at:       str | None      # ISO timestamp or null (excluded from default list, surfaced if ?include_archived=true)
+
+    id: int
+    name: str
+    code: str | None
+    city: str | None
+    members_count: int
+    member_initials: list[str]
+    enabled_features: list[str]
+    archived_at: str | None  # ISO timestamp or null (excluded from default list, surfaced if ?include_archived=true)
 
 
 class PharmacyDetail(BaseModel):
     """Full payload for Screen 2 (Pharmacy detail). One round-trip = info +
     features + members. Saves a second request on every page load."""
-    id:                       int
-    name:                     str
-    code:                     str | None
-    city:                     str | None
-    address:                  str | None
-    phone:                    str | None
-    email:                    str | None
-    archived_at:              str | None
-    enabled_features:         list[str]
-    members:                  list[MemberOut]
+
+    id: int
+    name: str
+    code: str | None
+    city: str | None
+    address: str | None
+    phone: str | None
+    email: str | None
+    archived_at: str | None
+    enabled_features: list[str]
+    members: list[MemberOut]
     # Union of every active owner's enabled permissions in this pharmacy.
     # Powers the second ceiling pill in the admin's permission dialog when
     # editing employees — so admin sees up-front whether their grant will
@@ -81,12 +86,13 @@ class PharmacyIn(BaseModel):
     Empty-string coercion: the frontend posts "" (not null) for cleared
     inputs. Coerce blanks to None on the other optional fields so the unique
     constraint on `code` treats them as distinct NULLs."""
-    name:    str           = Field(..., min_length=1, max_length=200)
-    city:    str           = Field(..., min_length=1, max_length=200)
-    code:    str | None    = None
-    address: str | None    = None
-    phone:   str | None    = None
-    email:   str | None    = None
+
+    name: str = Field(..., min_length=1, max_length=200)
+    city: str = Field(..., min_length=1, max_length=200)
+    code: str | None = None
+    address: str | None = None
+    phone: str | None = None
+    email: str | None = None
 
     @field_validator("code", "address", "phone", "email", mode="before")
     @classmethod
@@ -108,40 +114,47 @@ class PharmacyIn(BaseModel):
 
 # ── Bulk-set toggles ─────────────────────────────────────────────────────────
 
+
 class FeaturesBulkSet(BaseModel):
     """Bulk-set the 9 PharmacyFeature rows. Keys not present in `features`
     are left untouched — send the full set to fully replace."""
+
     features: dict[str, bool]
 
 
 class PermissionsBulkSet(BaseModel):
     """Bulk-set the 9 UserPermission rows for one user. Same shape + semantics
     as FeaturesBulkSet."""
+
     permissions: dict[str, bool]
 
 
 # ── User CRUD (admin path) ────────────────────────────────────────────────────
+
 
 class CreateUserIn(BaseModel):
     """Admin (or owner) creates an owner / employee for a pharmacy and types
     the password themselves (client decision 2026-09-29 — end users aren't
     tech-savvy, so the creator hands them a password they chose). Stored
     hashed only."""
-    full_name:   str | None    = Field(None, max_length=200)
-    email:       str           = Field(..., max_length=200)
-    password:    str           = Field(..., min_length=8, max_length=128)
-    role:        MemberRole
+
+    full_name: str | None = Field(None, max_length=200)
+    email: str = Field(..., max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+    role: MemberRole
     pharmacy_id: int
 
 
 class CreateUserOut(BaseModel):
     """Create-user response."""
+
     member: MemberOut
 
 
 class ResetPasswordIn(BaseModel):
     """'Réinitialiser le mot de passe' — the admin / owner types the new one.
     Same length rule as ChangePasswordRequest."""
+
     password: str = Field(..., min_length=8, max_length=128)
 
 
@@ -151,15 +164,17 @@ class ResetPasswordOut(BaseModel):
 
 class StatusPatchIn(BaseModel):
     """Toggle a user between active and inactive."""
+
     status: MemberStatus
 
 
 # ── « Utilisateurs » tab (every account) ─────────────────────────────────────
 
+
 class UserPharmacyRef(BaseModel):
-    id:          int
-    name:        str
-    code:        str | None
+    id: int
+    name: str
+    code: str | None
     archived_at: str | None
 
 
@@ -167,14 +182,15 @@ class AdminUserRow(BaseModel):
     """One row of the admin « Utilisateurs » tab — EVERY account, whatever its
     role or pharmacy. `role` / `status` are the raw stored strings: legacy rows
     may hold values outside MemberRole / MemberStatus and must still show."""
-    id:                  int
-    full_name:           str | None
-    email:               str
-    phone:               str | None
-    role:                str
-    status:              str
-    pharmacy:            UserPharmacyRef | None
-    last_login_at:       datetime | None
+
+    id: int
+    full_name: str | None
+    email: str
+    phone: str | None
+    role: str
+    status: str
+    pharmacy: UserPharmacyRef | None
+    last_login_at: datetime | None
     granted_permissions: list[str]
 
 
@@ -192,6 +208,7 @@ class AssignPharmacyIn(BaseModel):
 # permissions) in one round-trip, so the EmployeePermissionsDialog can render
 # its 2-layer ceiling without a second fetch.
 
+
 class OwnerEmployeesResponse(BaseModel):
     """One-shot payload for /owner/employees:
       - employees: members of the caller's pharmacy with role="employee"
@@ -199,6 +216,7 @@ class OwnerEmployeesResponse(BaseModel):
       - my_permissions: the calling owner's own granted permissions (ceiling layer 2)
     Together the two ceiling lists let the frontend disable any employee
     permission toggle that EITHER layer doesn't allow."""
-    employees:         list[MemberOut]
+
+    employees: list[MemberOut]
     pharmacy_features: list[str]
-    my_permissions:    list[str]
+    my_permissions: list[str]

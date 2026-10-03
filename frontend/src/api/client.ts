@@ -73,16 +73,19 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
 
   const text = await res.text();
   let data: ReturnType<typeof JSON.parse> = null;
-  try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body (proxy error page) */ }
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    /* non-JSON body (proxy error page) */
+  }
 
   if (!res.ok) {
     // `{detail, code, params}` (backend errors.py) → `errors.<code>` in the UI language.
     // Unknown code → the French `detail`, else a generic message.
     const key = `errors.${data?.code}`;
     const text = translate(key, data?.params);
-    const detail = text !== key ? text
-      : typeof data?.detail === "string" ? data.detail
-      : translate("toast.genericError");
+    const detail =
+      text !== key ? text : typeof data?.detail === "string" ? data.detail : translate("toast.genericError");
     if (res.status === 401) onUnauthorized?.();
     throw new ApiErr(res.status, detail);
   }
@@ -93,10 +96,10 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
 /** `api.get<Row[]>(API.x.list.url, { params })`, `api.delete(API.x.remove.url(id))`.
  *  Paths live in `api/api.ts`. */
 export const api = {
-  get:    <T>(path: string, opts?: ApiOptions) => request<T>("GET", path, undefined, opts),
-  post:   <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("POST", path, body, opts),
-  put:    <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("PUT", path, body, opts),
-  patch:  <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("PATCH", path, body, opts),
+  get: <T>(path: string, opts?: ApiOptions) => request<T>("GET", path, undefined, opts),
+  post: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("POST", path, body, opts),
+  put: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("PUT", path, body, opts),
+  patch: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>("PATCH", path, body, opts),
   delete: <T = void>(path: string, opts?: ApiOptions) => request<T>("DELETE", path, undefined, opts),
   /** Multipart POST of one file under the "file" field. */
   upload: <T>(path: string, file: File) => {

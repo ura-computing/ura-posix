@@ -14,18 +14,10 @@ import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 
-
 /** Room (px) the menu needs below its trigger; with less, it opens upward. */
 const MENU_SPACE = 180;
 
-
-export function KebabMenu({
-  label,
-  children,
-}: {
-  label?:   string;
-  children: (close: () => void) => React.ReactNode;
-}) {
+export function KebabMenu({ label, children }: { label?: string; children: (close: () => void) => React.ReactNode }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
@@ -36,12 +28,14 @@ export function KebabMenu({
   const toggle = () => {
     if (!open && triggerRef.current) {
       const r = triggerRef.current.getBoundingClientRect();
-      const right = window.innerWidth - r.right;   // right-aligned to the trigger
+      const right = window.innerWidth - r.right; // right-aligned to the trigger
       // Below the trigger — or above it near the window's bottom edge: a fixed
       // menu placed off-screen can't be scrolled to (last rows of a table).
-      setPos(window.innerHeight - r.bottom < MENU_SPACE
-        ? { bottom: window.innerHeight - r.top + 4, right }
-        : { top: r.bottom + 4, right });
+      setPos(
+        window.innerHeight - r.bottom < MENU_SPACE
+          ? { bottom: window.innerHeight - r.top + 4, right }
+          : { top: r.bottom + 4, right },
+      );
     }
     setOpen((p) => !p);
   };
@@ -64,19 +58,21 @@ export function KebabMenu({
       >
         <MoreVertical className="size-4" />
       </button>
-      {open && pos && createPortal(
-        <>
-          <div className="fixed inset-0 z-[90]" onClick={close} />
-          <div
-            role="menu"
-            style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right }}
-            className="z-[91] w-56 rounded-md border border-border bg-card p-1 shadow-lg"
-          >
-            {children(close)}
-          </div>
-        </>,
-        document.body,
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 z-[90]" onClick={close} />
+            <div
+              role="menu"
+              style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right }}
+              className="z-[91] w-56 rounded-md border border-border bg-card p-1 shadow-lg"
+            >
+              {children(close)}
+            </div>
+          </>,
+          document.body,
+        )}
     </>
   );
 }

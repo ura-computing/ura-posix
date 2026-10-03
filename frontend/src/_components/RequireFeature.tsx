@@ -16,7 +16,6 @@ import NotFoundPage from "@/pages/auth/not-found";
 import { ROLES, ROUTES } from "@/types";
 import type { Feature } from "@/types";
 
-
 export function RequireFeature({ feature }: { feature: Feature }) {
   const { me, isLoading } = useMe();
   if (isLoading) return null;

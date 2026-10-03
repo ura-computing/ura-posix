@@ -46,10 +46,10 @@ import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
 import { formatQty } from "@/utils/format";
 
 interface NavItem {
-  label:  string;
-  to:     string;
-  icon:   LucideIcon;
-  roles:  Role[];
+  label: string;
+  to: string;
+  icon: LucideIcon;
+  roles: Role[];
   /** Render disabled (cursor-not-allowed, opacity-45) until the page exists. */
   ready?: boolean;
   /** Hide for non-admin users who don't have this feature in their effective
@@ -59,35 +59,56 @@ interface NavItem {
 }
 interface NavGroup {
   title?: string;
-  items:  NavItem[];
+  items: NavItem[];
 }
 
-const ALL:       Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE];
+const ALL: Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE];
 const ALL_HUMAN: Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE, ROLES.DEVELOPER];
-const DATA:      Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
+const DATA: Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 
 const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: "nav.dashboard", to: ROUTES.RAPPORT, icon: LayoutDashboard, roles: ALL, ready: true, feature: "rapports" },
+      {
+        label: "nav.dashboard",
+        to: ROUTES.RAPPORT,
+        icon: LayoutDashboard,
+        roles: ALL,
+        ready: true,
+        feature: "rapports",
+      },
     ],
   },
   {
     title: "nav.groupExploitation",
     items: [
-      { label: "nav.achats",             to: ROUTES.ACHATS,            icon: ShoppingCart,   roles: DATA, ready: true, feature: "achats" },
-      { label: "nav.ventes",             to: ROUTES.VENTES,            icon: TrendingUp,     roles: DATA, ready: true, feature: "ventes" },
-      { label: "nav.stock",              to: ROUTES.STOCK,             icon: Boxes,          roles: DATA, ready: true, feature: "stock" },
-      { label: "nav.analyses",           to: ROUTES.ANALYSES,          icon: BarChart3,      roles: DATA, ready: true, feature: "analyse" },
-      { label: "nav.alertes",            to: ROUTES.ALERTES,           icon: Bell,           roles: DATA, ready: true, feature: "alertes" },
-      { label: "nav.comptabilite",       to: ROUTES.COMPTABILITE,      icon: Coins,          roles: DATA, ready: true, feature: "accounting" },
-      { label: "nav.produitsSpeciaux",  to: ROUTES.PRODUITS_SPECIAUX, icon: Star,           roles: DATA, ready: true, feature: "special_products" },
+      { label: "nav.achats", to: ROUTES.ACHATS, icon: ShoppingCart, roles: DATA, ready: true, feature: "achats" },
+      { label: "nav.ventes", to: ROUTES.VENTES, icon: TrendingUp, roles: DATA, ready: true, feature: "ventes" },
+      { label: "nav.stock", to: ROUTES.STOCK, icon: Boxes, roles: DATA, ready: true, feature: "stock" },
+      { label: "nav.analyses", to: ROUTES.ANALYSES, icon: BarChart3, roles: DATA, ready: true, feature: "analyse" },
+      { label: "nav.alertes", to: ROUTES.ALERTES, icon: Bell, roles: DATA, ready: true, feature: "alertes" },
+      {
+        label: "nav.comptabilite",
+        to: ROUTES.COMPTABILITE,
+        icon: Coins,
+        roles: DATA,
+        ready: true,
+        feature: "accounting",
+      },
+      {
+        label: "nav.produitsSpeciaux",
+        to: ROUTES.PRODUITS_SPECIAUX,
+        icon: Star,
+        roles: DATA,
+        ready: true,
+        feature: "special_products",
+      },
     ],
   },
   {
     title: "nav.groupGestion",
     items: [
-      { label: "nav.equipe",  to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
+      { label: "nav.equipe", to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
       // HIDDEN 2026-07-03 — restore when the store-website feature ships.
       // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],
@@ -104,9 +125,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "nav.groupAdministration",
     items: [
-      { label: "nav.pharmacies",  to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
-      { label: "nav.catalogue",   to: ROUTES.ADMIN_CATALOGUE,  icon: BookOpen,  roles: [ROLES.ADMIN], ready: true },
-      { label: "nav.categories",  to: ROUTES.ADMIN_CATEGORIES, icon: Tags,      roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.pharmacies", to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.catalogue", to: ROUTES.ADMIN_CATALOGUE, icon: BookOpen, roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.categories", to: ROUTES.ADMIN_CATEGORIES, icon: Tags, roles: [ROLES.ADMIN], ready: true },
       // HIDDEN 2026-07-03 — admin/developers panel.
       // { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2, roles: [ROLES.ADMIN], ready: true },
     ],
@@ -114,12 +135,20 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const SETTINGS_ITEM: NavItem = {
-  label: "nav.imports", to: ROUTES.IMPORTS, icon: Settings, roles: ALL, ready: true,
+  label: "nav.imports",
+  to: ROUTES.IMPORTS,
+  icon: Settings,
+  roles: ALL,
+  ready: true,
   feature: "import",
 };
 
 const ACCOUNT_ITEM: NavItem = {
-  label: "nav.compte", to: ROUTES.ME, icon: CircleUser, roles: ALL_HUMAN, ready: true,
+  label: "nav.compte",
+  to: ROUTES.ME,
+  icon: CircleUser,
+  roles: ALL_HUMAN,
+  ready: true,
 };
 
 /** Filter the nav for a given user. Admin sees every entry their role allows
@@ -129,17 +158,15 @@ const ACCOUNT_ITEM: NavItem = {
 function visibleGroups(role: Role, permissions: readonly string[] = []): NavGroup[] {
   const perms = new Set(permissions);
   const isAdmin = role === ROLES.ADMIN;
-  return NAV_GROUPS
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((i) => {
-        if (!i.roles.includes(role)) return false;
-        if (isAdmin) return true;
-        if (!i.feature) return true;
-        return perms.has(i.feature);
-      }),
-    }))
-    .filter((g) => g.items.length > 0);
+  return NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => {
+      if (!i.roles.includes(role)) return false;
+      if (isAdmin) return true;
+      if (!i.feature) return true;
+      return perms.has(i.feature);
+    }),
+  })).filter((g) => g.items.length > 0);
 }
 
 function navTitle(pathname: string): string {
@@ -150,13 +177,12 @@ function navTitle(pathname: string): string {
 
 /** FR / ES segmented switch — mirrors ThemeToggle, sits next to it in the Header. */
 function LanguageToggle() {
-  const {
-    lang,
-    setLang,
-    t,
-  } = useI18n();
+  const { lang, setLang, t } = useI18n();
   return (
-    <div className="flex items-center gap-0.5 rounded-[9px] border border-border bg-surface-subtle p-0.5" aria-label={t("lang.label")}>
+    <div
+      className="flex items-center gap-0.5 rounded-[9px] border border-border bg-surface-subtle p-0.5"
+      aria-label={t("lang.label")}
+    >
       {LANGS.map((l) => {
         const active = lang === l;
         return (
@@ -168,9 +194,7 @@ function LanguageToggle() {
             aria-pressed={active}
             className={cn(
               "flex h-7 w-[30px] cursor-pointer items-center justify-center rounded-md text-[11px] font-bold transition-colors",
-              active
-                ? "bg-card text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+              active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {LANG_LABELS[l]}
@@ -209,9 +233,9 @@ interface HeaderProps {
 }
 
 const ROLE_KEYS: Record<Role, string> = {
-  [ROLES.ADMIN]:     "roles.admin",
-  [ROLES.OWNER]:     "roles.owner",
-  [ROLES.EMPLOYEE]:  "roles.employee",
+  [ROLES.ADMIN]: "roles.admin",
+  [ROLES.OWNER]: "roles.owner",
+  [ROLES.EMPLOYEE]: "roles.employee",
   [ROLES.DEVELOPER]: "roles.developer",
 };
 
@@ -235,10 +259,10 @@ function Header({ onOpenMobile }: HeaderProps) {
           <Menu className="size-[22px]" />
         </button>
         <div className="hidden min-w-0 flex-col md:flex">
-          <span className="truncate text-sm font-semibold leading-tight tracking-tight">
-            {title}
+          <span className="truncate text-sm font-semibold leading-tight tracking-tight">{title}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {t("header.home")} · {title}
           </span>
-          <span className="text-[11px] text-muted-foreground">{t("header.home")} · {title}</span>
         </div>
         <PharmagestWordmark className="md:hidden" iconSize={22} />
       </div>
@@ -252,8 +276,8 @@ function Header({ onOpenMobile }: HeaderProps) {
             <span
               className="rounded-full border px-[11px] py-1 text-xs font-semibold"
               style={{
-                background:  `color-mix(in srgb, var(--role-${me.role}) 14%, transparent)`,
-                color:       `var(--role-${me.role})`,
+                background: `color-mix(in srgb, var(--role-${me.role}) 14%, transparent)`,
+                color: `var(--role-${me.role})`,
                 borderColor: `color-mix(in srgb, var(--role-${me.role}) 38%, transparent)`,
               }}
               aria-label={roleLabel}
@@ -280,37 +304,33 @@ function Header({ onOpenMobile }: HeaderProps) {
 /** Admin-only count of unclassified medicaments. Drives the "Catalogue"
  *  sidebar badge. Refetches every 60s; cheap query. */
 function useUnclassifiedCount(role: Role): number {
-  const {
-    data,
-  } = useQuery({
-    queryKey:        API.admin.catalog.unclassifiedCount.key,
-    queryFn:         () => api.get<{ count: number }>(API.admin.catalog.unclassifiedCount.url),
-    enabled:         role === ROLES.ADMIN,
-    staleTime:       60_000,
+  const { data } = useQuery({
+    queryKey: API.admin.catalog.unclassifiedCount.key,
+    queryFn: () => api.get<{ count: number }>(API.admin.catalog.unclassifiedCount.url),
+    enabled: role === ROLES.ADMIN,
+    staleTime: 60_000,
     refetchInterval: 60_000,
   });
   return data?.count ?? 0;
 }
 
 interface SidebarProps {
-  role:             Role;
+  role: Role;
   /** User's effective permissions (3-layer intersection from /me). Drives the
    *  feature-flag filter on nav items. Admin's bypass is handled inside
    *  visibleGroups; this prop is still required (pass [] for admin). */
-  permissions:      readonly string[];
-  collapsed:        boolean;
+  permissions: readonly string[];
+  collapsed: boolean;
   onToggleCollapse: () => void;
-  mobileOpen:       boolean;
-  onCloseMobile:    () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
 function itemClasses(isActive: boolean, collapsed: boolean) {
   return cn(
     "flex items-center gap-[11px] rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors max-md:py-3 max-md:text-sm",
     collapsed && "md:justify-center md:px-0",
-    isActive
-      ? "bg-accent text-primary"
-      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    isActive ? "bg-accent text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
 
@@ -322,9 +342,7 @@ function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
       className={cn(
         "inline-flex min-w-[18px] items-center justify-center rounded-full bg-warning px-1.5 text-[10px] font-bold tabular-nums text-warning-foreground",
         // When collapsed, dot floats top-right of the icon instead of inline.
-        collapsed
-          ? "absolute right-0 top-0 size-[14px] min-w-0 px-0 text-[9px]"
-          : "ml-auto",
+        collapsed ? "absolute right-0 top-0 size-[14px] min-w-0 px-0 text-[9px]" : "ml-auto",
       )}
       title={t("nav.pendingTitle", { n })}
       aria-label={t("nav.unclassifiedAria", { n })}
@@ -341,32 +359,32 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
   // Mobile keeps native title since hover doesn't apply there.
   const tooltipLabel = collapsed ? (item.ready === false ? `${label} · ${t("nav.soon")}` : label) : "";
 
-  const inner = item.ready === false ? (
-    <div
-      aria-disabled
-      className={cn(itemClasses(false, collapsed), "cursor-not-allowed opacity-45")}
-    >
-      <item.icon className="size-[18px] shrink-0" aria-hidden />
-      <span className={collapsed ? "md:hidden" : ""}>{label}</span>
-    </div>
-  ) : (
-    <NavLink
-      to={item.to}
-      end={item.to === ROUTES.RAPPORT}
-      className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
-    >
-      <item.icon className="size-[18px] shrink-0" aria-hidden />
-      <span className={collapsed ? "md:hidden" : ""}>{label}</span>
-      {badge != null && <CountBadge n={badge} collapsed={collapsed} />}
-    </NavLink>
-  );
+  const inner =
+    item.ready === false ? (
+      <div aria-disabled className={cn(itemClasses(false, collapsed), "cursor-not-allowed opacity-45")}>
+        <item.icon className="size-[18px] shrink-0" aria-hidden />
+        <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+      </div>
+    ) : (
+      <NavLink
+        to={item.to}
+        end={item.to === ROUTES.RAPPORT}
+        className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
+      >
+        <item.icon className="size-[18px] shrink-0" aria-hidden />
+        <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+        {badge != null && <CountBadge n={badge} collapsed={collapsed} />}
+      </NavLink>
+    );
 
-  return <Tooltip label={tooltipLabel} placement="right" className="relative block">{inner}</Tooltip>;
+  return (
+    <Tooltip label={tooltipLabel} placement="right" className="relative block">
+      {inner}
+    </Tooltip>
+  );
 }
 
-function Sidebar({
-  role, permissions, collapsed, onToggleCollapse, mobileOpen, onCloseMobile,
-}: SidebarProps) {
+function Sidebar({ role, permissions, collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
   const t = useT();
   const { handleLogout } = useLogout();
   const groups = visibleGroups(role, permissions);
@@ -413,10 +431,7 @@ function Sidebar({
           {collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
         </button>
 
-        <Link
-          to={ROUTES.HOME}
-          className="flex h-16 shrink-0 items-center gap-[11px] border-b border-border px-4"
-        >
+        <Link to={ROUTES.HOME} className="flex h-16 shrink-0 items-center gap-[11px] border-b border-border px-4">
           {collapsed ? (
             <PharmagestIcon className="size-[26px] text-primary md:mx-auto" />
           ) : (
@@ -428,7 +443,9 @@ function Sidebar({
           {groups.map((group, gi) => (
             <div key={group.title ?? gi} className="flex flex-col gap-0.5">
               {group.title && (
-                <span className={`px-3 pb-0.5 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground ${collapsed ? "md:hidden" : ""}`}>
+                <span
+                  className={`px-3 pb-0.5 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground ${collapsed ? "md:hidden" : ""}`}
+                >
                   {t(group.title)}
                 </span>
               )}
@@ -476,7 +493,9 @@ function Sidebar({
  */
 
 const TYPE_LABEL: Record<DocType, string> = {
-  achat: "upload.typeAchat", vente: "upload.typeVente", stock: "upload.typeStock",
+  achat: "upload.typeAchat",
+  vente: "upload.typeVente",
+  stock: "upload.typeStock",
 };
 
 /** Cap visible cards — older finished ones drop off the bottom of the stack.
@@ -485,30 +504,20 @@ const TYPE_LABEL: Record<DocType, string> = {
 const MAX_VISIBLE = 5;
 
 function UploadProgressWidget() {
-  const {
-    jobs,
-    cancelUpload,
-    dismissJob,
-  } = useUploadCtx();
+  const { jobs, cancelUpload, dismissJob } = useUploadCtx();
   const nav = useNavigate();
 
   if (jobs.length === 0) return null;
 
   // Queued jobs sorted FIFO so we can label them "1ᵉʳ en file / 2e / …".
-  const queuedOrdered = jobs
-    .filter((j) => j.phase === "queued")
-    .sort((a, b) => a.createdAt - b.createdAt);
+  const queuedOrdered = jobs.filter((j) => j.phase === "queued").sort((a, b) => a.createdAt - b.createdAt);
 
   // Newest first in the visual stack so the running job stays at the top while
   // pending ones pile up below.
   const visible = [...jobs].sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_VISIBLE);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex w-[320px] flex-col gap-2"
-    >
+    <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-50 flex w-[320px] flex-col gap-2">
       {visible.map((job) => (
         <JobCard
           key={job.id}
@@ -524,40 +533,41 @@ function UploadProgressWidget() {
 }
 
 function JobCard({
-  job, queuePosition, onOpenWizard, onCancel, onDismiss,
+  job,
+  queuePosition,
+  onOpenWizard,
+  onCancel,
+  onDismiss,
 }: {
-  job:           UploadJob;
+  job: UploadJob;
   queuePosition: number | null;
-  onOpenWizard:  () => void;
-  onCancel:      () => void;
-  onDismiss:     () => void;
+  onOpenWizard: () => void;
+  onCancel: () => void;
+  onDismiss: () => void;
 }) {
-  const t      = useT();
-  const tint   = `var(--color-doc-${job.docType})`;
+  const t = useT();
+  const tint = `var(--color-doc-${job.docType})`;
   const tintBg = `var(--color-doc-${job.docType}-bg)`;
   const border = `var(--color-doc-${job.docType}-border)`;
-  const pct    = job.progress.total
-    ? Math.round((job.progress.current / job.progress.total) * 100)
-    : 0;
+  const pct = job.progress.total ? Math.round((job.progress.current / job.progress.total) * 100) : 0;
 
   return (
-    <div
-      className="rounded-2xl border bg-card shadow-lg"
-      style={{ borderColor: border }}
-    >
+    <div className="rounded-2xl border bg-card shadow-lg" style={{ borderColor: border }}>
       <button
         type="button"
         onClick={onOpenWizard}
         className="flex w-full cursor-pointer items-center gap-3 px-4 pt-3 text-left"
       >
-        <div
-          className="flex size-9 items-center justify-center rounded-xl"
-          style={{ background: tintBg, color: tint }}
-        >
-          {job.phase === "uploading" ? <Loader2 className="size-4 animate-spin" />
-            : job.phase === "success" ? <CheckCircle2 className="size-4" />
-            : job.phase === "queued"  ? <Clock className="size-4" />
-            : <FileSpreadsheet className="size-4" />}
+        <div className="flex size-9 items-center justify-center rounded-xl" style={{ background: tintBg, color: tint }}>
+          {job.phase === "uploading" ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : job.phase === "success" ? (
+            <CheckCircle2 className="size-4" />
+          ) : job.phase === "queued" ? (
+            <Clock className="size-4" />
+          ) : (
+            <FileSpreadsheet className="size-4" />
+          )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-2">
@@ -590,7 +600,9 @@ function JobCard({
             />
           </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{pct}% · {formatQty(job.progress.inserted)} {t("upload.inserted")}</span>
+            <span>
+              {pct}% · {formatQty(job.progress.inserted)} {t("upload.inserted")}
+            </span>
             <button
               type="button"
               onClick={onCancel}
@@ -620,14 +632,24 @@ function JobCard({
       {job.phase === "success" && (
         <p className="px-4 pb-3 text-xs text-muted-foreground">
           {formatQty(job.progress.inserted)} {t("upload.linesImported")}
-          {job.progress.skipped > 0 ? <> · {formatQty(job.progress.skipped)} {t("upload.skipped")}</> : null}
+          {job.progress.skipped > 0 ? (
+            <>
+              {" "}
+              · {formatQty(job.progress.skipped)} {t("upload.skipped")}
+            </>
+          ) : null}
         </p>
       )}
 
       {job.phase === "cancelled" && (
         <div className="flex items-center justify-between px-4 pb-3 text-xs">
           <span className="text-warning">{t("upload.cancelled")}</span>
-          <button type="button" onClick={onDismiss} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label={t("common.close")}
+            className="cursor-pointer text-muted-foreground hover:text-foreground"
+          >
             <X className="size-3.5" />
           </button>
         </div>
@@ -636,7 +658,12 @@ function JobCard({
       {job.phase === "error" && (
         <div className="flex items-start justify-between gap-2 px-4 pb-3 text-xs">
           <span className="text-error">{job.error ?? t("upload.importError")}</span>
-          <button type="button" onClick={onDismiss} aria-label={t("common.close")} className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label={t("common.close")}
+            className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+          >
             <X className="size-3.5" />
           </button>
         </div>
@@ -648,14 +675,8 @@ function JobCard({
 const COLLAPSE_KEY = "pg-sidebar-collapsed";
 
 export function AppLayout() {
-  const {
-    me,
-    isLoading,
-    isError,
-  } = useMe();
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSE_KEY) === "1",
-  );
+  const { me, isLoading, isError } = useMe();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === "1");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (isLoading) return null;
@@ -692,7 +713,6 @@ export function AppLayout() {
     </div>
   );
 }
-
 
 /** Placeholder while a page's code downloads (first visit only): page title + body. */
 function PageLoading() {

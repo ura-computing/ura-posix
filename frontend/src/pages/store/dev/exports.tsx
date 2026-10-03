@@ -8,13 +8,7 @@ import { toast } from "sonner";
 import { useT } from "@/i18n/I18nProvider";
 import { ExportsTable } from "./_components/ExportsTable";
 
-
 export default function DevExportsRoute() {
   const t = useT();
-  return (
-    <ExportsTable
-      rows={[]}
-      onRedownload={() => toast.info(t("store.redownloadSoon"))}
-    />
-  );
+  return <ExportsTable rows={[]} onRedownload={() => toast.info(t("store.redownloadSoon"))} />;
 }

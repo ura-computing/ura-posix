@@ -44,12 +44,17 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
           <header>
             <h2 className="text-base font-semibold tracking-tight text-foreground">{t("catalogue.importTitle")}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("catalogue.importHelp", { headers: "Nom, Categorie, TVA, PPV, PPH, Code barre 1, Code barre 2, Laboratoire" })}
+              {t("catalogue.importHelp", {
+                headers: "Nom, Categorie, TVA, PPV, PPH, Code barre 1, Code barre 2, Laboratoire",
+              })}
             </p>
           </header>
 
           <label
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             className={cn(
@@ -83,10 +88,16 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
               <Stat label={t("catalogue.statRead")} value={lastResult.total_rows} />
               <Stat label={t("catalogue.statInserted")} value={lastResult.inserted} tone="success" />
               <Stat label={t("catalogue.statUpdated")} value={lastResult.updated} tone="info" />
-              <Stat label={t("catalogue.statSkipped")} value={lastResult.skipped} tone={lastResult.skipped > 0 ? "warning" : "muted"} />
+              <Stat
+                label={t("catalogue.statSkipped")}
+                value={lastResult.skipped}
+                tone={lastResult.skipped > 0 ? "warning" : "muted"}
+              />
               {lastResult.errors.length > 0 && (
                 <div className="sm:col-span-4 mt-1 max-h-32 overflow-auto rounded-md bg-warning/10 p-2 text-xs text-warning">
-                  {lastResult.errors.map((e, i) => <div key={i}>• {t(`errors.${e.code}`, e.params)}</div>)}
+                  {lastResult.errors.map((e, i) => (
+                    <div key={i}>• {t(`errors.${e.code}`, e.params)}</div>
+                  ))}
                 </div>
               )}
             </div>
@@ -113,7 +124,15 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
   );
 }
 
-function Stat({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "info" | "warning" | "muted" }) {
+function Stat({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: number;
+  tone?: "default" | "success" | "info" | "warning" | "muted";
+}) {
   const cls = {
     default: "text-foreground",
     success: "text-success",
@@ -134,22 +153,35 @@ function Stat({ label, value, tone = "default" }: { label: string; value: number
 interface MedicamentFormDialogProps {
   open: boolean;
   onClose: () => void;
-  initial: Medicament | null;     // null → create mode; non-null → edit mode
+  initial: Medicament | null; // null → create mode; non-null → edit mode
   onSubmit: (body: MedicamentInput) => void;
   isLoading: boolean;
 }
 
 function blank(): MedicamentInput {
   return {
-    product: "", tva: null, pph: null, ppv: null, category: null,
-    barcode1: null, barcode2: null, laboratoire: null, product_type: null,
+    product: "",
+    tva: null,
+    pph: null,
+    ppv: null,
+    category: null,
+    barcode1: null,
+    barcode2: null,
+    laboratoire: null,
+    product_type: null,
   };
 }
 
 function fromMedicament(m: Medicament): MedicamentInput {
   return {
-    product: m.product, tva: m.tva, pph: m.pph, ppv: m.ppv, category: m.category,
-    barcode1: m.barcode1, barcode2: m.barcode2, laboratoire: m.laboratoire,
+    product: m.product,
+    tva: m.tva,
+    pph: m.pph,
+    ppv: m.ppv,
+    category: m.category,
+    barcode1: m.barcode1,
+    barcode2: m.barcode2,
+    laboratoire: m.laboratoire,
     product_type: m.product_type,
   };
 }
@@ -166,9 +198,7 @@ function tvaPercent(tva: string | null | undefined): number {
   return m ? parseFloat(m[0]) : 0;
 }
 
-function MedicamentFormDialog({
-  open, onClose, initial, onSubmit, isLoading,
-}: MedicamentFormDialogProps) {
+function MedicamentFormDialog({ open, onClose, initial, onSubmit, isLoading }: MedicamentFormDialogProps) {
   const t = useT();
   const [form, setForm] = useState<MedicamentInput>(blank());
   const [error, setError] = useState<string | null>(null);
@@ -180,8 +210,7 @@ function MedicamentFormDialog({
     setTvaConfirmOpen(false);
   }, [initial, open]);
 
-  const setField = <K extends keyof MedicamentInput>(k: K, v: MedicamentInput[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const setField = <K extends keyof MedicamentInput>(k: K, v: MedicamentInput[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   // A "Médicament" should be exonéré (0 % TVA). Warn when it isn't.
   const tvaWarning = looksLikeMedicament(form.category) && tvaPercent(form.tva) !== 0;
@@ -207,9 +236,7 @@ function MedicamentFormDialog({
             <h2 className="text-base font-semibold tracking-tight text-foreground">
               {initial ? t("catalogue.editTitle") : t("catalogue.addTitle")}
             </h2>
-            {initial && (
-              <p className="mt-0.5 font-mono text-xs text-muted-foreground">PID : {initial.pid}</p>
-            )}
+            {initial && <p className="mt-0.5 font-mono text-xs text-muted-foreground">PID : {initial.pid}</p>}
           </header>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -289,9 +316,7 @@ function MedicamentFormDialog({
                     {pt === "pharmacie" ? t("catalogue.pharmacie") : t("catalogue.parapharmacie")}
                   </button>
                 ))}
-                <span className="self-center text-xs text-muted-foreground">
-                  {t("catalogue.autoDetectHint")}
-                </span>
+                <span className="self-center text-xs text-muted-foreground">{t("catalogue.autoDetectHint")}</span>
               </div>
             </div>
           </div>
@@ -300,7 +325,11 @@ function MedicamentFormDialog({
             <div className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
               <span>
-                {t("catalogue.tvaWarnPre")}<b>{formatPct(tvaPercent(form.tva))}</b>{t("catalogue.tvaWarnMid")}<b>{t("catalogue.tvaWarnExonere")}</b>{t("catalogue.tvaWarnPost")}
+                {t("catalogue.tvaWarnPre")}
+                <b>{formatPct(tvaPercent(form.tva))}</b>
+                {t("catalogue.tvaWarnMid")}
+                <b>{t("catalogue.tvaWarnExonere")}</b>
+                {t("catalogue.tvaWarnPost")}
               </span>
             </div>
           )}
@@ -326,7 +355,10 @@ function MedicamentFormDialog({
           open={tvaConfirmOpen}
           onClose={() => setTvaConfirmOpen(false)}
           title={t("catalogue.tvaConfirm", { percent: tvaPercent(form.tva) })}
-          onConfirm={() => { setTvaConfirmOpen(false); onSubmit(form); }}
+          onConfirm={() => {
+            setTvaConfirmOpen(false);
+            onSubmit(form);
+          }}
         />
       </DialogContent>
     </Dialog>
@@ -364,59 +396,116 @@ export default function CataloguePage() {
   const [importing, setImporting] = useState(false);
 
   const activeFilters: ActiveFilter[] = [
-    filters.search ? {
-      key: "search",
-      label: <>{t("catalogue.filterSearch", { value: filters.search })}</>,
-      onClear: () => setSearch(""),
-    } : null,
-    filters.category.length > 0 ? {
-      key: "category",
-      label: <>{t("col.categorie")} : {filters.category[0]}{filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}</>,
-      onClear: () => setCategories([]),
-    } : null,
-    filters.type ? {
-      key: "type",
-      label: <>{t("col.type")} : {filters.type === "pharmacie" ? t("catalogue.pharmacie") : filters.type === "parapharmacie" ? t("catalogue.parapharmacie") : t("catalogue.nonClasses")}</>,
-      onClear: () => setType(null),
-    } : null,
+    filters.search
+      ? {
+          key: "search",
+          label: <>{t("catalogue.filterSearch", { value: filters.search })}</>,
+          onClear: () => setSearch(""),
+        }
+      : null,
+    filters.category.length > 0
+      ? {
+          key: "category",
+          label: (
+            <>
+              {t("col.categorie")} : {filters.category[0]}
+              {filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}
+            </>
+          ),
+          onClear: () => setCategories([]),
+        }
+      : null,
+    filters.type
+      ? {
+          key: "type",
+          label: (
+            <>
+              {t("col.type")} :{" "}
+              {filters.type === "pharmacie"
+                ? t("catalogue.pharmacie")
+                : filters.type === "parapharmacie"
+                  ? t("catalogue.parapharmacie")
+                  : t("catalogue.nonClasses")}
+            </>
+          ),
+          onClear: () => setType(null),
+        }
+      : null,
   ].filter(Boolean) as ActiveFilter[];
 
   const COLUMNS: ColumnDef<Medicament>[] = [
     {
-      key: "product", label: t("col.produit"), width: 280,
+      key: "product",
+      label: t("col.produit"),
+      width: 280,
       render: (m) => (
         <div className="flex flex-col">
-          <span className="truncate text-sm" title={m.product}>{m.product}</span>
+          <span className="truncate text-sm" title={m.product}>
+            {m.product}
+          </span>
           <span className="truncate font-mono text-[10px] text-muted-foreground">{m.pid}</span>
         </div>
-      )
+      ),
     },
     {
-      key: "category", label: t("col.categorie"), width: 180,
-      render: (m) => <span className="block max-w-[170px] truncate text-xs text-muted-foreground">{m.category ?? "—"}</span>
+      key: "category",
+      label: t("col.categorie"),
+      width: 180,
+      render: (m) => (
+        <span className="block max-w-[170px] truncate text-xs text-muted-foreground">{m.category ?? "—"}</span>
+      ),
     },
     {
-      key: "type", label: t("col.type"), width: 120, sortable: false,
-      render: (m) => <TypeBadge type={m.product_type} />
+      key: "type",
+      label: t("col.type"),
+      width: 120,
+      sortable: false,
+      render: (m) => <TypeBadge type={m.product_type} />,
     },
     {
-      key: "tva", label: t("catalogue.tva"), width: 90,
-      render: (m) => m.tva ? <span className="font-mono text-[11px] text-muted-foreground">{m.tva}</span> : <span className="text-muted-foreground">—</span>
+      key: "tva",
+      label: t("catalogue.tva"),
+      width: 90,
+      render: (m) =>
+        m.tva ? (
+          <span className="font-mono text-[11px] text-muted-foreground">{m.tva}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
-      key: "pph", label: t("col.pph"), width: 100, align: "right",
-      render: (m) => <span className="text-muted-foreground">{m.pph != null ? formatMAD(m.pph) : "—"}</span>
+      key: "pph",
+      label: t("col.pph"),
+      width: 100,
+      align: "right",
+      render: (m) => <span className="text-muted-foreground">{m.pph != null ? formatMAD(m.pph) : "—"}</span>,
     },
     {
-      key: "ppv", label: t("col.ppv"), width: 100, align: "right",
-      render: (m) => m.ppv != null ? formatMAD(m.ppv) : "—"
+      key: "ppv",
+      label: t("col.ppv"),
+      width: 100,
+      align: "right",
+      render: (m) => (m.ppv != null ? formatMAD(m.ppv) : "—"),
     },
     {
-      key: "laboratoire", label: t("col.laboratoire"), width: 170,
-      render: (m) => m.laboratoire ? <span className="truncate text-xs" title={m.laboratoire}>{m.laboratoire}</span> : <span className="text-muted-foreground">—</span>
+      key: "laboratoire",
+      label: t("col.laboratoire"),
+      width: 170,
+      render: (m) =>
+        m.laboratoire ? (
+          <span className="truncate text-xs" title={m.laboratoire}>
+            {m.laboratoire}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
-      key: "actions", label: "", width: 90, align: "right", sortable: false,
+      key: "actions",
+      label: "",
+      width: 90,
+      align: "right",
+      sortable: false,
       render: (m) => (
         <div className="flex justify-end gap-1">
           <button
@@ -436,7 +525,7 @@ export default function CataloguePage() {
             <Trash2 className="size-3.5" />
           </button>
         </div>
-      )
+      ),
     },
   ];
 
@@ -469,8 +558,18 @@ export default function CataloguePage() {
           onChange: (v) => setType((v === "" ? null : v) as ProductType | "unclassified" | null),
         }}
         rightActions={[
-          { label: t("catalogue.importCsv"), icon: <UploadCloud className="size-4" />, variant: "outline", onClick: () => setImporting(true) },
-          { label: t("common.add"), icon: <Plus className="size-4" />, variant: "primary", onClick: () => setCreating(true) },
+          {
+            label: t("catalogue.importCsv"),
+            icon: <UploadCloud className="size-4" />,
+            variant: "outline",
+            onClick: () => setImporting(true),
+          },
+          {
+            label: t("common.add"),
+            icon: <Plus className="size-4" />,
+            variant: "primary",
+            onClick: () => setCreating(true),
+          },
         ]}
         activeFilters={activeFilters}
         onResetAll={reset}
@@ -524,7 +623,12 @@ export default function CataloguePage() {
       <ConfirmDialog
         open={!!removing}
         onClose={() => setRemoving(null)}
-        onConfirm={() => { if (removing) { remove(removing.id); setRemoving(null); } }}
+        onConfirm={() => {
+          if (removing) {
+            remove(removing.id);
+            setRemoving(null);
+          }
+        }}
         title={t("catalogue.deleteTitle")}
         description={removing ? t("catalogue.deleteDescription", { product: removing.product }) : undefined}
         variant="destructive"

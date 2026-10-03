@@ -27,47 +27,30 @@ import {
   setPeriod,
 } from "../lib/ui";
 
-const close = (got: number | null, want: number) =>
-  got != null && Math.abs(got - want) <= 0.011;
+const close = (got: number | null, want: number) => got != null && Math.abs(got - want) <= 0.011;
 
 /** Number under a label inside a card / chip (label span, value = next span). */
-async function valueAfter(
-  page: Page,
-  label: string,
-  within = page.locator("body"),
-): Promise<number | null> {
+async function valueAfter(page: Page, label: string, within = page.locator("body")): Promise<number | null> {
   return frNumber(
-    await within
-      .getByText(label, { exact: true })
-      .first()
-      .locator("xpath=following-sibling::span[1]")
-      .innerText(),
+    await within.getByText(label, { exact: true }).first().locator("xpath=following-sibling::span[1]").innerText(),
   );
 }
 
 /** Click a card → its dialog lists exactly these products; Escape closes it. */
-async function checkList(
-  page: Page,
-  card: string,
-  products: Row[],
-): Promise<void> {
+async function checkList(page: Page, card: string, products: Row[]): Promise<void> {
   if (products.length === 0) return; // empty card is disabled
   await page.getByText(card, { exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const names = await columnTexts(page, "Produit", dialog.locator("table"));
-  expect([...names].sort(), `« ${card} » : produits`).toEqual(
-    products.map((r) => r.product).sort(),
-  );
+  expect([...names].sort(), `« ${card} » : produits`).toEqual(products.map((r) => r.product).sort());
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 }
 
 test.use({ storageState: sessionFile("owner") });
 
-test("alertes: marges, ventes sans achat, péremptions, stock", async ({
-  page,
-}) => {
+test("alertes: marges, ventes sans achat, péremptions, stock", async ({ page }) => {
   const w = testWindow();
   const perem = pageCall(page, "/stats/peremptions");
   const abcdDefault = pageCall(page, "/stats/stock-abcd", {
@@ -75,9 +58,7 @@ test("alertes: marges, ventes sans achat, péremptions, stock", async ({
     date_to: null,
   });
   await page.goto("/alertes");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Alertes", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Alertes", exact: true })).toBeVisible();
   checkPeremptions(await perem);
   checkStockAbcd(await abcdDefault, "default");
 
@@ -86,8 +67,7 @@ test("alertes: marges, ventes sans achat, péremptions, stock", async ({
       const q = { ...period(w), category_type: ct };
       const margin = pageCall(page, "/stats/margin-alerts", q);
       const vsa = pageCall(page, "/stats/ventes-sans-achat", q);
-      const abcd =
-        i === 0 ? pageCall(page, "/stats/stock-abcd", period(w)) : null;
+      const abcd = i === 0 ? pageCall(page, "/stats/stock-abcd", period(w)) : null;
       if (i === 0) await setPeriod(page, w.date_from, w.date_to);
       else await pickCategoryType(page, label);
       const m = await margin;
@@ -136,10 +116,7 @@ async function checkScreen(
       ["Stock excessif", sur.length],
     ];
     // poll: the numbers of the previous period stay a moment after the API answer.
-    for (const [label, want] of chips)
-      await expect
-        .poll(() => valueAfter(page, label), `« ${label} »`)
-        .toBe(want);
+    for (const [label, want] of chips) await expect.poll(() => valueAfter(page, label), `« ${label} »`).toBe(want);
   });
 
   await test.step("cartes : valeurs", async () => {
@@ -150,11 +127,7 @@ async function checkScreen(
     ];
     for (const [label, want] of tiles) {
       await expect
-        .poll(
-          async () =>
-            close(frNumber(await kpiValue(page, label).innerText()), want),
-          `« ${label} » = ${want}`,
-        )
+        .poll(async () => close(frNumber(await kpiValue(page, label).innerText()), want), `« ${label} » = ${want}`)
         .toBe(true);
     }
     const perem: [string, string][] = [
@@ -168,47 +141,26 @@ async function checkScreen(
         .getByText(label, { exact: true })
         .first()
         .locator("xpath=ancestor::*[contains(@class, 'rounded-2xl')][1]");
-      await expect
-        .poll(() => valueAfter(page, "Unités", card), `« ${label} » unités`)
-        .toBe(p[key].total_units);
+      await expect.poll(() => valueAfter(page, "Unités", card), `« ${label} » unités`).toBe(p[key].total_units);
       await expect
         .poll(
-          async () =>
-            close(
-              await valueAfter(page, "Valeur achat", card),
-              p[key].purchase_value,
-            ),
+          async () => close(await valueAfter(page, "Valeur achat", card), p[key].purchase_value),
           `« ${label} » valeur achat = ${p[key].purchase_value}`,
         )
         .toBe(true);
     }
     const ppv = (rows: Row[], gap: (r: Row) => number) =>
-      rows.reduce(
-        (s, r) => (r.ppv != null ? s + r.ppv * Math.max(0, gap(r)) : s),
-        0,
-      );
+      rows.reduce((s, r) => (r.ppv != null ? s + r.ppv * Math.max(0, gap(r)) : s), 0);
     const stockTiles: [string, number][] = [
       [
         "Unités en négatif",
-        neg.reduce(
-          (s, r) =>
-            s +
-            (r.current_stock != null && r.current_stock < 0
-              ? -r.current_stock
-              : 0),
-          0,
-        ),
+        neg.reduce((s, r) => s + (r.current_stock != null && r.current_stock < 0 ? -r.current_stock : 0), 0),
       ],
       ["PPV potentiel", ppv(sous, (r) => r.stock_min - (r.current_stock ?? 0))],
       ["PPV immobilisé", ppv(sur, (r) => (r.current_stock ?? 0) - r.stock_max)],
     ];
     for (const [label, want] of stockTiles) {
-      await expect
-        .poll(
-          async () => close(await valueAfter(page, label), want),
-          `« ${label} » = ${want}`,
-        )
-        .toBe(true);
+      await expect.poll(async () => close(await valueAfter(page, label), want), `« ${label} » = ${want}`).toBe(true);
     }
   });
 
@@ -226,25 +178,15 @@ async function checkScreen(
   });
 
   await test.step("liste : tri par Produit + Excel", async () => {
-    const [card, rows] =
-      sous.length > 1 ? ["Sous-stock", sous] : ["Sur-stock", sur];
+    const [card, rows] = sous.length > 1 ? ["Sous-stock", sous] : ["Sur-stock", sur];
     if (rows.length < 2) return;
     await page.getByText(card, { exact: true }).first().click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByRole("columnheader", { name: "Produit", exact: true })
-      .getByRole("button")
-      .click();
+    await dialog.getByRole("columnheader", { name: "Produit", exact: true }).getByRole("button").click();
     const names = await columnTexts(page, "Produit", dialog.locator("table"));
-    expect(names, "tri Produit croissant").toEqual(
-      [...names].sort((a, b) => a.localeCompare(b, "fr")),
-    );
-    const x = await downloadXlsx(page, () =>
-      dialog.getByRole("button", { name: "Exporter Excel" }).click(),
-    );
-    expect(x.filename, "nom du fichier").toBe(
-      `APCM - ALERTES ${card} ${w.date_from} - ${w.date_to}.xlsx`,
-    );
+    expect(names, "tri Produit croissant").toEqual([...names].sort((a, b) => a.localeCompare(b, "fr")));
+    const x = await downloadXlsx(page, () => dialog.getByRole("button", { name: "Exporter Excel" }).click());
+    expect(x.filename, "nom du fichier").toBe(`APCM - ALERTES ${card} ${w.date_from} - ${w.date_to}.xlsx`);
     expect(x.rows[0][0], "1re colonne en français").toBe("Produit");
     expect(
       (x.rows[0] as string[]).filter((h) => /^[a-z]+\.[a-zA-Z]+$/.test(h)),

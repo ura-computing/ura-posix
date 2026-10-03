@@ -37,11 +37,7 @@ const SORTABLE = [
 ] as const;
 
 /** Footer « … (filtres actifs) : X · … : Y » = the list summary (all filtered rows). */
-async function checkFooter(
-  page: Page,
-  first: string,
-  values: number[],
-): Promise<void> {
+async function checkFooter(page: Page, first: string, values: number[]): Promise<void> {
   const nums = page
     .locator("div")
     .filter({ hasText: new RegExp(`^${first}`) })
@@ -49,10 +45,7 @@ async function checkFooter(
     .locator("span.font-mono");
   await expect
     .poll(
-      async () =>
-        (await nums.allInnerTexts())
-          .map(frNumber)
-          .map((v, i) => Math.abs((v ?? NaN) - values[i]) <= 0.011),
+      async () => (await nums.allInnerTexts()).map(frNumber).map((v, i) => Math.abs((v ?? NaN) - values[i]) <= 0.011),
       `pied de tableau ${values}`,
     )
     .toEqual(values.map(() => true));
@@ -77,18 +70,14 @@ async function checkXlsx(
   const bad = rows.flatMap((r, i) =>
     JSON.stringify(r) === JSON.stringify(sheet[i + 1])
       ? []
-      : [
-          `ligne ${i + 1}: ${JSON.stringify(sheet[i + 1])} ≠ ${JSON.stringify(r)}`,
-        ],
+      : [`ligne ${i + 1}: ${JSON.stringify(sheet[i + 1])} ≠ ${JSON.stringify(r)}`],
   );
   expect(bad.slice(0, 10), "cellules").toEqual([]);
 }
 
 async function open(page: Page): Promise<void> {
   await page.goto("/achats");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Achats", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Achats", exact: true })).toBeVisible();
 }
 
 async function openWithPeriod(page: Page): Promise<Row> {
@@ -101,9 +90,7 @@ async function openWithPeriod(page: Page): Promise<Row> {
   return list;
 }
 
-test("achats: liste, pagination, catégories, TVA, grossistes / direct labo", async ({
-  page,
-}) => {
+test("achats: liste, pagination, catégories, TVA, grossistes / direct labo", async ({ page }) => {
   const e = expected();
   const w = testWindow();
   const cats = pageCall(page, "/achats/categories");
@@ -134,10 +121,7 @@ test("achats: liste, pagination, catégories, TVA, grossistes / direct labo", as
       ],
       "jauge grossistes",
     );
-    await checkFooter(page, "TVA payé", [
-      l1.summary.tva_payee,
-      l1.summary.grand_total,
-    ]);
+    await checkFooter(page, "TVA payé", [l1.summary.tva_payee, l1.summary.grand_total]);
   });
 
   const page2 = pageCall(page, "/achats", { ...period(w), page: "2" });
@@ -157,10 +141,7 @@ test("achats: tri de chaque colonne (desc puis asc)", async ({ page }) => {
           sort_by: key,
           sort_order: order,
         });
-        await page
-          .getByRole("columnheader", { name: label, exact: true })
-          .getByRole("button")
-          .click();
+        await page.getByRole("columnheader", { name: label, exact: true }).getByRole("button").click();
         checkSortPage("achats", await list, key, order);
       });
     }
@@ -203,9 +184,7 @@ test("achats: filtre catégorie « Médicament »", async ({ page }) => {
   checkLedgerPage(
     "achats",
     await list,
-    subsetSummary("achats", (r) =>
-      r.category.toLowerCase().startsWith("médicament"),
-    ),
+    subsetSummary("achats", (r) => r.category.toLowerCase().startsWith("médicament")),
     1,
   );
 });
@@ -217,9 +196,7 @@ test("achats: filtre TVA « TVA (20.00%) »", async ({ page }) => {
     tva: "TVA (20.00%)",
   });
   await page.getByRole("button", { name: "TVA", exact: true }).click();
-  await page
-    .getByRole("checkbox", { name: "TVA (20.00%)", exact: true })
-    .check();
+  await page.getByRole("checkbox", { name: "TVA (20.00%)", exact: true }).check();
   checkLedgerPage(
     "achats",
     await list,
@@ -228,14 +205,10 @@ test("achats: filtre TVA « TVA (20.00%) »", async ({ page }) => {
   );
 });
 
-test("achats: export Excel — toutes les lignes de la période", async ({
-  page,
-}) => {
+test("achats: export Excel — toutes les lignes de la période", async ({ page }) => {
   await openWithPeriod(page);
   const total = expected().achats_list.rows_total;
-  const exported = page.waitForResponse(
-    (r) => r.url().includes("/v1/achats?") && r.url().includes("export=true"),
-  );
+  const exported = page.waitForResponse((r) => r.url().includes("/v1/achats?") && r.url().includes("export=true"));
   const download = page.waitForEvent("download").catch(() => null); // none when the export is refused (413)
   const t0 = Date.now(); // timed: click → .xlsx written (speed gate)
   await page.getByRole("button", { name: "Exporter Excel" }).click();
@@ -258,12 +231,7 @@ test("achats: export Excel — toutes les lignes de la période", async ({
   });
   const data: Row[] = (await res.json()).data;
   checkLedgerRows("achats", data, expected().achats_rows);
-  const type = (c: string | null) =>
-    c === "pharmacie"
-      ? "Pharmacie"
-      : c === "parapharmacie"
-        ? "Parapharmacie"
-        : "";
+  const type = (c: string | null) => (c === "pharmacie" ? "Pharmacie" : c === "parapharmacie" ? "Parapharmacie" : "");
   await checkXlsx(
     path!,
     [

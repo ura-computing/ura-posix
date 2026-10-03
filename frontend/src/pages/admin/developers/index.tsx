@@ -18,18 +18,16 @@ import type { DeveloperAccountOut } from "@/types/storeWebsite";
 
 import { DevelopersPage } from "./_components/DevelopersPage";
 
-
 function toAccount(out: DeveloperAccountOut): DeveloperAccount {
   return {
-    id:             out.id,
-    name:           out.name,
-    email:          out.email,
-    status:         out.status,
+    id: out.id,
+    name: out.name,
+    email: out.email,
+    status: out.status,
     activeRequests: out.active_requests,
-    lastActiveAt:   out.last_active_at,
+    lastActiveAt: out.last_active_at,
   };
 }
-
 
 export default function AdminDevelopersRoute() {
   const t = useT();
@@ -37,7 +35,7 @@ export default function AdminDevelopersRoute() {
 
   const q = useQuery({
     queryKey: API.storeWebsite.developers.key,
-    queryFn:  () => api.get<DeveloperAccountOut[]>(API.storeWebsite.developers.url),
+    queryFn: () => api.get<DeveloperAccountOut[]>(API.storeWebsite.developers.url),
   });
 
   const filtered = useMemo(() => {

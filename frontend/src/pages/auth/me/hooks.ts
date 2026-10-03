@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-
 import { toast } from "sonner";
 import { useT } from "@/i18n/I18nProvider";
 import { ApiErr, api } from "@/api/client";
@@ -8,19 +7,14 @@ import { API, refresh } from "@/api/api";
 import type { UpdateProfileRequest, ChangePasswordRequest, MeResponse, Session } from "@/types";
 
 export function useSessions(userId: string) {
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: API.sessions.list.key(userId),
-    queryFn:  () => api.get<Session[]>(API.sessions.list.url),
+    queryFn: () => api.get<Session[]>(API.sessions.list.url),
     staleTime: 30_000,
   });
 
   return {
-    sessions:  data ?? [],
+    sessions: data ?? [],
     isLoading,
     isError,
     error,
@@ -31,11 +25,7 @@ export function useKillSession() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    variables,
-    isPending,
-  } = useMutation({
+  const { mutate, variables, isPending } = useMutation({
     mutationFn: (sessionId: string) => api.delete(API.sessions.end.url(sessionId)),
     onSuccess: async () => {
       await refresh(queryClient, API.sessions.end);
@@ -57,7 +47,7 @@ export function useKillSession() {
 
   return {
     handleKill,
-    pendingId: isPending ? variables ?? null : null,
+    pendingId: isPending ? (variables ?? null) : null,
   };
 }
 
@@ -65,10 +55,7 @@ export function useRevokeOtherSessions() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    isPending,
-  } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: () => api.post<void>(API.sessions.endOthers.url),
     onSuccess: async () => {
       await refresh(queryClient, API.sessions.endOthers);
@@ -91,12 +78,7 @@ export function useUpdateProfile() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    isPending,
-    isError,
-    error,
-  } = useMutation({
+  const { mutate, isPending, isError, error } = useMutation({
     mutationFn: (input: UpdateProfileRequest) => api.patch<MeResponse>(API.auth.updateProfile.url, input),
     onSuccess: async () => {
       await refresh(queryClient, API.auth.updateProfile);
@@ -121,12 +103,7 @@ export function useChangePassword(onDone?: () => void) {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    isPending,
-    isError,
-    error,
-  } = useMutation({
+  const { mutate, isPending, isError, error } = useMutation({
     mutationFn: (input: ChangePasswordRequest) => api.post<void>(API.auth.changePassword.url, input),
     onSuccess: async () => {
       // Backend wiped every session row of this user + re-issued cookies for the

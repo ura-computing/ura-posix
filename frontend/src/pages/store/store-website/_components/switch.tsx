@@ -2,15 +2,13 @@
  *  existing apcm `<Switch checked onChange>` primitive. */
 import { Switch as SharedSwitch } from "@/_components/Switch";
 
-
 export interface SwitchProps {
-  checked:           boolean;
-  onCheckedChange?:  (next: boolean) => void;
-  disabled?:         boolean;
-  className?:        string;
-  "aria-label"?:     string;
+  checked: boolean;
+  onCheckedChange?: (next: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+  "aria-label"?: string;
 }
-
 
 export function Switch({ onCheckedChange, ...rest }: SwitchProps) {
   return <SharedSwitch {...rest} onChange={onCheckedChange} />;

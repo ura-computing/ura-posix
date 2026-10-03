@@ -12,6 +12,7 @@ Stock status bands (days_of_coverage = current_stock × 365 / units_sold_12m):
     sous-stock ≤45 · idéal 46-60 · à surveiller 61-99 · sur-stock ≥100
     inconnu when no 12m sales · negatif when current_stock < 0
 """
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -24,8 +25,15 @@ from query_parts import avg_pu_subquery
 
 
 STOCK_SORT_KEYS = {
-    "product", "category", "units_sold_12m", "stock_min", "stock_max",
-    "current_stock", "ppv", "avg_pu", "status",
+    "product",
+    "category",
+    "units_sold_12m",
+    "stock_min",
+    "stock_max",
+    "current_stock",
+    "ppv",
+    "avg_pu",
+    "status",
 }
 
 STOCK_STATUS_KEYS = ("sous-stock", "ideal", "a-surveiller", "sur-stock", "inconnu", "negatif")
@@ -52,9 +60,12 @@ def _stock_status_from_coverage(current_stock: int | None, units_sold_12m: int) 
     if not units_sold_12m or units_sold_12m <= 0:
         return "inconnu"
     days = current_stock * 365.0 / units_sold_12m
-    if days <= 45:  return "sous-stock"
-    if days <= 60:  return "ideal"
-    if days <= 99:  return "a-surveiller"
+    if days <= 45:
+        return "sous-stock"
+    if days <= 60:
+        return "ideal"
+    if days <= 99:
+        return "a-surveiller"
     return "sur-stock"
 
 
@@ -73,11 +84,16 @@ def _stock_max_for(units_sold_12m: int) -> int:
 
 
 def _classify_abcd(units: int, units_4m: int, units_before: int) -> str:
-    if units >= 300:  return "A"
-    if units >= 250:  return "A-"
-    if units >= 200:  return "B+"
-    if units >= 48:   return "B"
-    if units >= 6:    return "C"
+    if units >= 300:
+        return "A"
+    if units >= 250:
+        return "A-"
+    if units >= 200:
+        return "B+"
+    if units >= 48:
+        return "B"
+    if units >= 6:
+        return "C"
     if 1 <= units <= 5:
         # C-N when product was ONLY sold in the last 4 months (new product)
         return "C-N" if (units_before == 0 and units_4m >= 1) else "C-"
@@ -89,11 +105,11 @@ def _resolve_windows(df: str | None, dt: str | None) -> tuple[str, str, str]:
     today = date.today()
     if df and dt:
         start_12m = date.fromisoformat(df)
-        end_date  = date.fromisoformat(dt)
+        end_date = date.fromisoformat(dt)
     elif not df and not dt:
         start_12m, end_date = stock_abcd_window(today)
     else:
-        end_date  = date.fromisoformat(dt) if dt else today
+        end_date = date.fromisoformat(dt) if dt else today
         start_12m = date.fromisoformat(df) if df else end_date - timedelta(days=365)
     start_4m = end_date - timedelta(days=120)
     return start_12m.isoformat(), start_4m.isoformat(), end_date.isoformat()
@@ -124,9 +140,9 @@ def compute_stock_abcd(
     dt: str | None,
     *,
     class_filter: str | None = None,
-    status:       str | None = None,
-    sort_by:      str | None = None,
-    sort_order:   str | None = None,
+    status: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
 ) -> dict:
     """Return { distribution, total_references, ppv_potentiel, products[] }.
 
@@ -135,17 +151,18 @@ def compute_stock_abcd(
     """
     start_12m, start_4m, end_date = _resolve_windows(df, dt)
 
-    sales_12m         = _vente_units_subq(pharmacy_id, start_12m, end_date, db)
-    sales_4m          = _vente_units_subq(pharmacy_id, start_4m,  end_date, db)
+    sales_12m = _vente_units_subq(pharmacy_id, start_12m, end_date, db)
+    sales_4m = _vente_units_subq(pharmacy_id, start_4m, end_date, db)
     sales_before_4m_q = (
         db.query(Vente.medicament_id, func.sum(Vente.quantity).label("units"))
         .filter(
             Vente.pharmacy_id == pharmacy_id,
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
-            Vente.date <  start_4m,
+            Vente.date < start_4m,
         )
-        .group_by(Vente.medicament_id).subquery()
+        .group_by(Vente.medicament_id)
+        .subquery()
     )
 
     stock_sub = (
@@ -173,13 +190,15 @@ def compute_stock_abcd(
             Vente.medicament_id.isnot(None),
             Vente.date >= start_12m,
             Vente.date <= end_date,
-        ).distinct()
+        )
+        .distinct()
     )
     stocked_ids = (
         db.query(PharmacyStock.medicament_id)
         .filter(
             PharmacyStock.pharmacy_id == pharmacy_id,
-        ).distinct()
+        )
+        .distinct()
     )
     all_med_ids = {r[0] for r in sold_ids.all()} | {r[0] for r in stocked_ids.all()}
 
@@ -191,52 +210,54 @@ def compute_stock_abcd(
             Medicament.id,
             Medicament.product,
             Medicament.ppv,
-            func.coalesce(sales_12m.c.units,         0).label("units_sold_12m"),
-            func.coalesce(sales_4m.c.units,          0).label("units_sold_4m"),
+            func.coalesce(sales_12m.c.units, 0).label("units_sold_12m"),
+            func.coalesce(sales_4m.c.units, 0).label("units_sold_4m"),
             func.coalesce(sales_before_4m_q.c.units, 0).label("units_before_4m"),
             stock_sub.c.current_stock,
             avg_pu_sub.c.avg_pu,
         )
-        .outerjoin(sales_12m,         Medicament.id == sales_12m.c.medicament_id)
-        .outerjoin(sales_4m,          Medicament.id == sales_4m.c.medicament_id)
+        .outerjoin(sales_12m, Medicament.id == sales_12m.c.medicament_id)
+        .outerjoin(sales_4m, Medicament.id == sales_4m.c.medicament_id)
         .outerjoin(sales_before_4m_q, Medicament.id == sales_before_4m_q.c.medicament_id)
-        .outerjoin(stock_sub,         Medicament.id == stock_sub.c.medicament_id)
-        .outerjoin(avg_pu_sub,        Medicament.id == avg_pu_sub.c.medicament_id)
+        .outerjoin(stock_sub, Medicament.id == stock_sub.c.medicament_id)
+        .outerjoin(avg_pu_sub, Medicament.id == avg_pu_sub.c.medicament_id)
         .filter(Medicament.id.in_(all_med_ids))
         .all()
     )
 
-    distribution:  dict[str, int] = {c: 0 for c in _ABCD_CLASSES}
-    products:      list[dict]     = []
-    ppv_potentiel: float          = 0.0
+    distribution: dict[str, int] = {c: 0 for c in _ABCD_CLASSES}
+    products: list[dict] = []
+    ppv_potentiel: float = 0.0
 
     for r in rows:
-        units        = int(r.units_sold_12m  or 0)
-        units_4m     = int(r.units_sold_4m   or 0)
+        units = int(r.units_sold_12m or 0)
+        units_4m = int(r.units_sold_4m or 0)
         units_before = int(r.units_before_4m or 0)
 
-        cat           = _classify_abcd(units, units_4m, units_before)
+        cat = _classify_abcd(units, units_4m, units_before)
         current_stock = int(r.current_stock) if r.current_stock is not None else None
-        status_val    = _stock_status_from_coverage(current_stock, units)
+        status_val = _stock_status_from_coverage(current_stock, units)
 
         if current_stock is not None and current_stock > 0 and r.ppv is not None:
             ppv_potentiel += float(r.ppv) * current_stock
 
         distribution[cat] += 1
-        products.append({
-            "product":        r.product or "---",
-            "category":       cat,
-            "units_sold_12m": units,
-            "stock_min":      _stock_min_for(units),
-            "stock_max":      _stock_max_for(units),
-            "current_stock":  current_stock,
-            "ppv":            round(float(r.ppv),    2) if r.ppv    is not None else None,
-            "avg_pu":         round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
-            "status":         status_val,
-        })
+        products.append(
+            {
+                "product": r.product or "---",
+                "category": cat,
+                "units_sold_12m": units,
+                "stock_min": _stock_min_for(units),
+                "stock_max": _stock_max_for(units),
+                "current_stock": current_stock,
+                "ppv": round(float(r.ppv), 2) if r.ppv is not None else None,
+                "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
+                "status": status_val,
+            }
+        )
 
     total_references = len(products)
-    distribution     = {k: v for k, v in distribution.items() if v > 0}
+    distribution = {k: v for k, v in distribution.items() if v > 0}
 
     # Optional filters
     if class_filter:
@@ -257,14 +278,15 @@ def compute_stock_abcd(
         products.sort(key=lambda p: p["units_sold_12m"], reverse=True)
 
     return {
-        "distribution":     distribution,
+        "distribution": distribution,
         "total_references": total_references,
-        "ppv_potentiel":    round(ppv_potentiel, 2),
-        "products":         products,
+        "ppv_potentiel": round(ppv_potentiel, 2),
+        "products": products,
     }
 
 
 # ── Peremptions ──────────────────────────────────────────────────────────────
+
 
 def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
     """4 mutually exclusive buckets keyed on expiry proximity — ports the
@@ -280,8 +302,8 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
 
     Products further out than 12 months are skipped — not urgent enough
     to surface here."""
-    today        = date.today()
-    boundary_6m  = today + timedelta(days=6 * 30)
+    today = date.today()
+    boundary_6m = today + timedelta(days=6 * 30)
     boundary_12m = today + timedelta(days=12 * 30)
 
     rows = (
@@ -301,10 +323,10 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
     )
 
     brackets: dict[str, dict] = {
-        "expired":    {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
+        "expired": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
         "very_close": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
-        "close":      {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
-        "no_date":    {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
+        "close": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
+        "no_date": {"count": 0, "total_units": 0, "purchase_value": 0.0, "sale_value": 0.0, "products": []},
     }
 
     for product_name, expiry, qty, ppv, pph in rows:
@@ -324,16 +346,18 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
         pph_val = float(pph or 0)
 
         b = brackets[key]
-        b["count"]          += 1
-        b["total_units"]    += qty_int
+        b["count"] += 1
+        b["total_units"] += qty_int
         b["purchase_value"] += pph_val * qty_int
-        b["sale_value"]     += ppv_val * qty_int
-        b["products"].append({
-            "product":     product_name or "---",
-            "expiry_date": expiry.isoformat() if expiry else None,
-            "quantity":    qty_int,
-            "ppv":         ppv_val,
-        })
+        b["sale_value"] += ppv_val * qty_int
+        b["products"].append(
+            {
+                "product": product_name or "---",
+                "expiry_date": expiry.isoformat() if expiry else None,
+                "quantity": qty_int,
+                "ppv": ppv_val,
+            }
+        )
 
     # date-bucketed lists sort by expiry asc; no_date sorts by product name
     for key in ("expired", "very_close", "close"):
@@ -341,6 +365,6 @@ def compute_peremptions(db: Session, pharmacy_id: int) -> dict:
     brackets["no_date"]["products"].sort(key=lambda p: p["product"])
     for key in brackets:
         brackets[key]["purchase_value"] = round(brackets[key]["purchase_value"], 2)
-        brackets[key]["sale_value"]     = round(brackets[key]["sale_value"],     2)
+        brackets[key]["sale_value"] = round(brackets[key]["sale_value"], 2)
 
     return brackets

@@ -15,7 +15,7 @@ import { useLogin } from "./hooks";
 
 const makeLoginSchema = (t: TFn) =>
   z.object({
-    email:    z.string().min(1, t("misc.emailRequired")).email(t("misc.emailInvalid")),
+    email: z.string().min(1, t("misc.emailRequired")).email(t("misc.emailInvalid")),
     password: z.string().min(1, t("misc.passwordRequired")),
   });
 
@@ -43,12 +43,8 @@ export default function LoginPage() {
     <AuthLayout>
       <div className="flex w-full max-w-[360px] flex-col gap-6">
         <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {t("misc.loginTitle")}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {t("misc.loginSubtitle")}
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("misc.loginTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("misc.loginSubtitle")}</p>
         </header>
 
         <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>

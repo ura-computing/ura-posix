@@ -1,15 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import {
-  Building2,
-  FileText,
-  Package,
-  Plus,
-  Undo2,
-  ArrowLeft,
-  Loader2,
-  Search,
-  X,
-} from "lucide-react";
+import { Building2, FileText, Package, Plus, Undo2, ArrowLeft, Loader2, Search, X } from "lucide-react";
 
 import { AsyncButton } from "@/_components/AsyncButton";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
@@ -33,7 +23,6 @@ import { TabBar } from "@/_components/TabBar";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-
 /** "Exclure un BL" dialog — PG-007. Two steps:
  *   1. Search a delivery note by reference OR by a product it contains → pick one.
  *   2. Review the BL (supplier, date, product lines, total), add an optional
@@ -41,13 +30,13 @@ import { API } from "@/api/api";
  */
 
 interface ExcludeBlDialogProps {
-  open:           boolean;
-  onClose:        () => void;
-  onSubmit:       (deliveryRef: string, notes?: string) => void;
-  isLoading:      boolean;
-  results:        BlSummary[];
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (deliveryRef: string, notes?: string) => void;
+  isLoading: boolean;
+  results: BlSummary[];
   resultsLoading: boolean;
-  searchQ:        string;
+  searchQ: string;
   onSearchChange: (q: string) => void;
 }
 
@@ -58,15 +47,25 @@ function frDate(iso: string | null): string {
 }
 
 function ExcludeBlDialog({
-  open, onClose, onSubmit, isLoading,
-  results, resultsLoading, searchQ, onSearchChange,
+  open,
+  onClose,
+  onSubmit,
+  isLoading,
+  results,
+  resultsLoading,
+  searchQ,
+  onSearchChange,
 }: ExcludeBlDialogProps) {
   const t = useT();
   const [selected, setSelected] = useState<BlSummary | null>(null);
-  const [notes,    setNotes]    = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (!open) { setSelected(null); setNotes(""); onSearchChange(""); }
+    if (!open) {
+      setSelected(null);
+      setNotes("");
+      onSearchChange("");
+    }
   }, [open, onSearchChange]);
 
   const {
@@ -75,8 +74,8 @@ function ExcludeBlDialog({
     isError: detailError,
   } = useQuery({
     queryKey: API.blExclusions.detail.key(selected?.delivery_ref ?? ""),
-    queryFn:  () => api.get<BlDetail>(API.blExclusions.detail.url, { params: { delivery_ref: selected!.delivery_ref } }),
-    enabled:  open && !!selected,
+    queryFn: () => api.get<BlDetail>(API.blExclusions.detail.url, { params: { delivery_ref: selected!.delivery_ref } }),
+    enabled: open && !!selected,
   });
 
   return (
@@ -84,9 +83,7 @@ function ExcludeBlDialog({
       <DialogContent className="max-w-xl">
         <div className="flex flex-col gap-4 p-5">
           <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              {t("ps.blTitle")}
-            </h2>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.blTitle")}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.blDesc")}</p>
           </header>
 
@@ -94,7 +91,10 @@ function ExcludeBlDialog({
           {!selected ? (
             <>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
                 <input
                   type="text"
                   autoFocus
@@ -107,17 +107,13 @@ function ExcludeBlDialog({
 
               <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
                 {searchQ.trim().length < 2 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    {t("ps.blMin2")}
-                  </p>
+                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.blMin2")}</p>
                 ) : resultsLoading ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : results.length === 0 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    {t("ps.blNoResult")}
-                  </p>
+                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.blNoResult")}</p>
                 ) : (
                   <ul className="divide-y divide-border">
                     {results.map((b) => (
@@ -131,9 +127,13 @@ function ExcludeBlDialog({
                           <FileText className="size-4 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="truncate font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span>
+                              <span className="truncate font-mono text-sm font-medium text-foreground">
+                                {b.delivery_ref}
+                              </span>
                               {b.already_excluded && (
-                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t("ps.dejaExclu")}</span>
+                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                  {t("ps.dejaExclu")}
+                                </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -141,17 +141,24 @@ function ExcludeBlDialog({
                               <span>·</span>
                               <span>{frDate(b.delivery_date)}</span>
                               <span>·</span>
-                              <span>{formatQty(b.nb_products)} {t("ps.ref")}</span>
+                              <span>
+                                {formatQty(b.nb_products)} {t("ps.ref")}
+                              </span>
                             </div>
                             {/* When found via a product search, show the matched product(s) so
                                 the user recognises the BL by what they bought. */}
                             {b.matched_products.length > 0 && (
-                              <div className="mt-0.5 truncate text-[11px] text-primary" title={b.matched_products.join(", ")}>
+                              <div
+                                className="mt-0.5 truncate text-[11px] text-primary"
+                                title={b.matched_products.join(", ")}
+                              >
                                 {t("ps.contient")} {b.matched_products.join(", ")}
                               </div>
                             )}
                           </div>
-                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">{formatMAD(b.total)}</span>
+                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
+                            {formatMAD(b.total)}
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -171,14 +178,18 @@ function ExcludeBlDialog({
               <div className="rounded-md border border-border bg-surface-subtle/50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-sm font-semibold text-foreground">{selected.delivery_ref}</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatMAD(selected.total)}</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                    {formatMAD(selected.total)}
+                  </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="truncate">{selected.supplier ?? "—"}</span>
                   <span>·</span>
                   <span>{frDate(selected.delivery_date)}</span>
                   <span>·</span>
-                  <span>{formatQty(selected.nb_lines)} {selected.nb_lines > 1 ? t("ps.lignesWord") : t("ps.ligne")}</span>
+                  <span>
+                    {formatQty(selected.nb_lines)} {selected.nb_lines > 1 ? t("ps.lignesWord") : t("ps.ligne")}
+                  </span>
                 </div>
               </div>
 
@@ -202,10 +213,18 @@ function ExcludeBlDialog({
                     <tbody className="divide-y divide-border">
                       {(detail?.lines ?? []).map((ln, i) => (
                         <tr key={i}>
-                          <td className="max-w-[220px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>{ln.product ?? "—"}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">{ln.quantity != null ? formatQty(ln.quantity) : "—"}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">{ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}</td>
-                          <td className="px-3 py-1.5 text-right font-medium tabular-nums">{ln.total != null ? formatMAD(ln.total) : "—"}</td>
+                          <td className="max-w-[220px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>
+                            {ln.product ?? "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right tabular-nums">
+                            {ln.quantity != null ? formatQty(ln.quantity) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right tabular-nums">
+                            {ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                            {ln.total != null ? formatMAD(ln.total) : "—"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -214,7 +233,9 @@ function ExcludeBlDialog({
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="bl-note" className="text-xs font-medium text-muted-foreground">{t("ps.noteOptionnelle")}</label>
+                <label htmlFor="bl-note" className="text-xs font-medium text-muted-foreground">
+                  {t("ps.noteOptionnelle")}
+                </label>
                 <textarea
                   id="bl-note"
                   value={notes}
@@ -252,20 +273,25 @@ function ExcludeBlDialog({
  *  one shot. Picked items persist across query changes (key UX). */
 
 interface ExcludeProductDialogProps {
-  open:               boolean;
-  onClose:            () => void;
-  onSubmit:           (medicamentIds: number[]) => void;
-  isLoading:          boolean;
-  suggestions:        MedicamentSuggestion[];
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (medicamentIds: number[]) => void;
+  isLoading: boolean;
+  suggestions: MedicamentSuggestion[];
   suggestionsLoading: boolean;
-  query:              string;
-  onQueryChange:      (q: string) => void;
+  query: string;
+  onQueryChange: (q: string) => void;
 }
 
 function ExcludeProductDialog({
-  open, onClose, onSubmit, isLoading,
-  suggestions, suggestionsLoading,
-  query, onQueryChange,
+  open,
+  onClose,
+  onSubmit,
+  isLoading,
+  suggestions,
+  suggestionsLoading,
+  query,
+  onQueryChange,
 }: ExcludeProductDialogProps) {
   const t = useT();
   // Multi-pick state: keyed by med id so dedup is automatic. Persists across
@@ -274,17 +300,25 @@ function ExcludeProductDialog({
 
   // Reset on dialog close.
   useEffect(() => {
-    if (!open) { setPicked(new Map()); onQueryChange(""); }
+    if (!open) {
+      setPicked(new Map());
+      onQueryChange("");
+    }
   }, [open, onQueryChange]);
 
   const togglePick = (s: MedicamentSuggestion) =>
     setPicked((p) => {
       const n = new Map(p);
-      if (n.has(s.id)) n.delete(s.id); else n.set(s.id, s);
+      if (n.has(s.id)) n.delete(s.id);
+      else n.set(s.id, s);
       return n;
     });
   const removePicked = (id: number) =>
-    setPicked((p) => { const n = new Map(p); n.delete(id); return n; });
+    setPicked((p) => {
+      const n = new Map(p);
+      n.delete(id);
+      return n;
+    });
   const clearAll = () => setPicked(new Map());
 
   // Hide already-picked rows from the suggestion list.
@@ -298,13 +332,8 @@ function ExcludeProductDialog({
       <DialogContent className="max-w-xl">
         <div className="flex flex-col gap-4 p-5">
           <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              {t("ps.exclureProduits")}
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("ps.prodDesc")}
-              
-            </p>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.exclureProduits")}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.prodDesc")}</p>
           </header>
 
           {/* Chips row — only when ≥1 picked */}
@@ -315,7 +344,9 @@ function ExcludeProductDialog({
                   key={s.id}
                   className="inline-flex max-w-[220px] items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
                 >
-                  <span className="truncate" title={s.product}>{s.product}</span>
+                  <span className="truncate" title={s.product}>
+                    {s.product}
+                  </span>
                   <button
                     type="button"
                     onClick={() => removePicked(s.id)}
@@ -336,13 +367,17 @@ function ExcludeProductDialog({
                 </button>
               )}
               <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-                {count} {t("ps.selectionne")}{count > 1 ? "s" : ""}
+                {count} {t("ps.selectionne")}
+                {count > 1 ? "s" : ""}
               </span>
             </div>
           )}
 
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <input
               type="text"
               autoFocus
@@ -365,9 +400,7 @@ function ExcludeProductDialog({
               </div>
             ) : visibleSuggestions.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
-                {suggestions.length === 0
-                  ? t("ps.aucunProduit")
-                  : t("ps.tousSelectionnes")}
+                {suggestions.length === 0 ? t("ps.aucunProduit") : t("ps.tousSelectionnes")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -383,7 +416,9 @@ function ExcludeProductDialog({
                       </span>
                       <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground" title={s.product}>{s.product}</div>
+                        <div className="truncate text-sm font-medium text-foreground" title={s.product}>
+                          {s.product}
+                        </div>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                           <span className="font-mono">{s.pid}</span>
                           {s.category && (
@@ -406,11 +441,7 @@ function ExcludeProductDialog({
 
           <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
             <span className="text-xs text-muted-foreground">
-              {count === 0
-                ? t("ps.clickToSelect")
-                : count === 1
-                ? t("ps.unSelected")
-                : t("ps.nSelected", { n: count })}
+              {count === 0 ? t("ps.clickToSelect") : count === 1 ? t("ps.unSelected") : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">
               <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
@@ -441,26 +472,36 @@ function ExcludeProductDialog({
  */
 
 interface ExcludeSupplierDialogProps {
-  open:           boolean;
-  onClose:        () => void;
-  onSubmit:       (supplier: string, notes?: string) => void;
-  isLoading:      boolean;
-  results:        SupplierSummary[];
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (supplier: string, notes?: string) => void;
+  isLoading: boolean;
+  results: SupplierSummary[];
   resultsLoading: boolean;
-  searchQ:        string;
+  searchQ: string;
   onSearchChange: (q: string) => void;
 }
 
 function ExcludeSupplierDialog({
-  open, onClose, onSubmit, isLoading,
-  results, resultsLoading, searchQ, onSearchChange,
+  open,
+  onClose,
+  onSubmit,
+  isLoading,
+  results,
+  resultsLoading,
+  searchQ,
+  onSearchChange,
 }: ExcludeSupplierDialogProps) {
   const t = useT();
   const [selected, setSelected] = useState<SupplierSummary | null>(null);
-  const [notes,    setNotes]    = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (!open) { setSelected(null); setNotes(""); onSearchChange(""); }
+    if (!open) {
+      setSelected(null);
+      setNotes("");
+      onSearchChange("");
+    }
   }, [open, onSearchChange]);
 
   return (
@@ -468,9 +509,7 @@ function ExcludeSupplierDialog({
       <DialogContent className="max-w-xl">
         <div className="flex flex-col gap-4 p-5">
           <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              {t("ps.supTitle")}
-            </h2>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.supTitle")}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.supDesc")}</p>
           </header>
 
@@ -478,7 +517,10 @@ function ExcludeSupplierDialog({
           {!selected ? (
             <>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
                 <input
                   type="text"
                   autoFocus
@@ -491,17 +533,13 @@ function ExcludeSupplierDialog({
 
               <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
                 {searchQ.trim().length < 2 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    {t("ps.supMin2")}
-                  </p>
+                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.supMin2")}</p>
                 ) : resultsLoading ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : results.length === 0 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">
-                    {t("ps.supNoResult")}
-                  </p>
+                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.supNoResult")}</p>
                 ) : (
                   <ul className="divide-y divide-border">
                     {results.map((s) => (
@@ -517,18 +555,26 @@ function ExcludeSupplierDialog({
                             <div className="flex items-center gap-2">
                               <span className="truncate text-sm font-medium text-foreground">{s.supplier}</span>
                               {s.already_excluded && (
-                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{t("ps.dejaExclu")}</span>
+                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                  {t("ps.dejaExclu")}
+                                </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>{formatQty(s.nb_lines)} {t("ps.lignesWord")}</span>
+                              <span>
+                                {formatQty(s.nb_lines)} {t("ps.lignesWord")}
+                              </span>
                               <span>·</span>
-                              <span>{formatQty(s.nb_products)} {t("common.wProduits")}</span>
+                              <span>
+                                {formatQty(s.nb_products)} {t("common.wProduits")}
+                              </span>
                               <span>·</span>
                               <span>{frDate(s.last_date)}</span>
                             </div>
                           </div>
-                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">{formatMAD(s.total)}</span>
+                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
+                            {formatMAD(s.total)}
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -548,19 +594,27 @@ function ExcludeSupplierDialog({
               <div className="rounded-md border border-border bg-surface-subtle/50 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-semibold text-foreground">{selected.supplier}</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatMAD(selected.total)}</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                    {formatMAD(selected.total)}
+                  </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{formatQty(selected.nb_lines)} {t("ps.lignesWord")}</span>
+                  <span>
+                    {formatQty(selected.nb_lines)} {t("ps.lignesWord")}
+                  </span>
                   <span>·</span>
-                  <span>{formatQty(selected.nb_products)} {t("common.wProduits")}</span>
+                  <span>
+                    {formatQty(selected.nb_products)} {t("common.wProduits")}
+                  </span>
                   <span>·</span>
                   <span>{frDate(selected.last_date)}</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="sup-note" className="text-xs font-medium text-muted-foreground">{t("ps.noteOptionnelle")}</label>
+                <label htmlFor="sup-note" className="text-xs font-medium text-muted-foreground">
+                  {t("ps.noteOptionnelle")}
+                </label>
                 <textarea
                   id="sup-note"
                   value={notes}
@@ -598,10 +652,10 @@ function ExcludeSupplierDialog({
  *  per-keystroke API call needed. */
 
 interface ReintegrateProductsDialogProps {
-  open:            boolean;
-  onClose:         () => void;
-  onSubmit:        (medicamentIds: number[]) => void;
-  isLoading:       boolean;
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (medicamentIds: number[]) => void;
+  isLoading: boolean;
   specialProducts: SpecialProduct[];
 }
 
@@ -611,15 +665,22 @@ function norm(s: string): string {
 }
 
 function ReintegrateProductsDialog({
-  open, onClose, onSubmit, isLoading, specialProducts,
+  open,
+  onClose,
+  onSubmit,
+  isLoading,
+  specialProducts,
 }: ReintegrateProductsDialogProps) {
   const t = useT();
   const [picked, setPicked] = useState<Map<number, SpecialProduct>>(new Map());
-  const [query,  setQuery]  = useState("");
+  const [query, setQuery] = useState("");
 
   // Reset on dialog close.
   useEffect(() => {
-    if (!open) { setPicked(new Map()); setQuery(""); }
+    if (!open) {
+      setPicked(new Map());
+      setQuery("");
+    }
   }, [open]);
 
   // Drop picks that no longer exist in the spéciaux list (e.g. someone else
@@ -631,7 +692,10 @@ function ReintegrateProductsDialog({
       let changed = false;
       const n = new Map(p);
       for (const id of n.keys()) {
-        if (!validIds.has(id)) { n.delete(id); changed = true; }
+        if (!validIds.has(id)) {
+          n.delete(id);
+          changed = true;
+        }
       }
       return changed ? n : p;
     });
@@ -645,7 +709,11 @@ function ReintegrateProductsDialog({
       return n;
     });
   const removePicked = (id: number) =>
-    setPicked((p) => { const n = new Map(p); n.delete(id); return n; });
+    setPicked((p) => {
+      const n = new Map(p);
+      n.delete(id);
+      return n;
+    });
   const clearAll = () => setPicked(new Map());
 
   // Filter the visible list — local, no API call. Hide already-picked rows.
@@ -653,10 +721,8 @@ function ReintegrateProductsDialog({
     const base = specialProducts.filter((sp) => !picked.has(sp.medicament_id));
     if (!query.trim()) return base;
     const q = norm(query.trim());
-    return base.filter((sp) =>
-      norm(sp.product).includes(q) ||
-      norm(sp.pid).includes(q) ||
-      norm(sp.category ?? "").includes(q),
+    return base.filter(
+      (sp) => norm(sp.product).includes(q) || norm(sp.pid).includes(q) || norm(sp.category ?? "").includes(q),
     );
   }, [specialProducts, picked, query]);
 
@@ -668,12 +734,8 @@ function ReintegrateProductsDialog({
       <DialogContent className="max-w-xl">
         <div className="flex flex-col gap-4 p-5">
           <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              {t("ps.reintegrerProduits")}
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("ps.reintegrerHint")}
-            </p>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.reintegrerProduits")}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.reintegrerHint")}</p>
           </header>
 
           {/* Chips row — only when ≥1 picked */}
@@ -684,7 +746,9 @@ function ReintegrateProductsDialog({
                   key={sp.medicament_id}
                   className="inline-flex max-w-[220px] items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
                 >
-                  <span className="truncate" title={sp.product}>{sp.product}</span>
+                  <span className="truncate" title={sp.product}>
+                    {sp.product}
+                  </span>
                   <button
                     type="button"
                     onClick={() => removePicked(sp.medicament_id)}
@@ -711,7 +775,10 @@ function ReintegrateProductsDialog({
           )}
 
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
             <input
               type="text"
               autoFocus
@@ -724,14 +791,10 @@ function ReintegrateProductsDialog({
 
           <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
             {specialProducts.length === 0 ? (
-              <p className="p-4 text-center text-xs text-muted-foreground">
-                {t("ps.noExcluded")}
-              </p>
+              <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.noExcluded")}</p>
             ) : visible.length === 0 ? (
               <p className="p-4 text-center text-xs text-muted-foreground">
-                {query.trim()
-                  ? t("ps.noFilterResult")
-                  : t("ps.allReintSelected")}
+                {query.trim() ? t("ps.noFilterResult") : t("ps.allReintSelected")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -745,7 +808,9 @@ function ReintegrateProductsDialog({
                       <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-input bg-card" />
                       <Package className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground" title={sp.product}>{sp.product}</div>
+                        <div className="truncate text-sm font-medium text-foreground" title={sp.product}>
+                          {sp.product}
+                        </div>
                         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                           <span className="font-mono">{sp.pid}</span>
                           {sp.category && (
@@ -765,11 +830,7 @@ function ReintegrateProductsDialog({
 
           <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
             <span className="text-xs text-muted-foreground">
-              {count === 0
-                ? t("ps.clickToSelect")
-                : count === 1
-                ? t("ps.unSelected")
-                : t("ps.nSelected", { n: count })}
+              {count === 0 ? t("ps.clickToSelect") : count === 1 ? t("ps.unSelected") : t("ps.nSelected", { n: count })}
             </span>
             <div className="flex gap-2">
               <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
@@ -799,26 +860,42 @@ function formatRelative(iso: string): string {
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-
 const buildProductColumns = (t: TFn): ColumnDef<SpecialProduct>[] => [
-  { key: "product", label: t("col.produit"), width: 320,
+  {
+    key: "product",
+    label: t("col.produit"),
+    width: 320,
     render: (sp) => (
       <div className="flex flex-col">
-        <span className="truncate text-sm" title={sp.product}>{sp.product}</span>
+        <span className="truncate text-sm" title={sp.product}>
+          {sp.product}
+        </span>
         <span className="truncate font-mono text-[10px] text-muted-foreground">{sp.pid}</span>
       </div>
-    ) },
-  { key: "category", label: t("col.categorie"), width: 200, sortable: false,
-    render: (sp) => sp.category
-      ? <span className="block max-w-[190px] truncate text-xs text-muted-foreground">{sp.category}</span>
-      : <span className="text-muted-foreground">—</span> },
-  { key: "created_at", label: t("ps.exclusLe"), width: 160, sortable: false,
-    render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span> },
+    ),
+  },
+  {
+    key: "category",
+    label: t("col.categorie"),
+    width: 200,
+    sortable: false,
+    render: (sp) =>
+      sp.category ? (
+        <span className="block max-w-[190px] truncate text-xs text-muted-foreground">{sp.category}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+  },
+  {
+    key: "created_at",
+    label: t("ps.exclusLe"),
+    width: 160,
+    sortable: false,
+    render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span>,
+  },
 ];
 
-
 type Tab = "produits" | "bl" | "fournisseurs";
-
 
 export default function ProduitsSpeciauxPage() {
   const t = useT();
@@ -866,25 +943,62 @@ export default function ProduitsSpeciauxPage() {
     setSupplierSearchQ,
   } = useSupplierExclusions();
   const [tab, setTab] = useState<Tab>("produits");
-  const [excluding, setExcluding]         = useState(false);
+  const [excluding, setExcluding] = useState(false);
   const [reintegrating, setReintegrating] = useState(false);
-  const [excludingBl, setExcludingBl]     = useState(false);
-  const [excludingSup, setExcludingSup]   = useState(false);
+  const [excludingBl, setExcludingBl] = useState(false);
+  const [excludingSup, setExcludingSup] = useState(false);
 
   const supplierColumns: ColumnDef<SupplierExclusion>[] = [
-    { key: "supplier", label: t("col.fournisseur"), width: 260, sortable: false,
-      render: (s) => <span className="text-sm font-medium text-foreground">{s.supplier}</span> },
-    { key: "nb_lines", label: t("ps.lignes"), width: 90, align: "right", sortable: false,
-      render: (s) => <span className="tabular-nums text-sm">{formatQty(s.nb_lines)}</span> },
-    { key: "total", label: t("col.total"), width: 130, align: "right", sortable: false,
-      render: (s) => <span className="font-mono text-sm tabular-nums">{formatMAD(s.total)}</span> },
-    { key: "notes", label: t("ps.note"), width: 220, sortable: false,
-      render: (s) => s.notes
-        ? <span className="block max-w-[210px] truncate text-xs text-muted-foreground" title={s.notes}>{s.notes}</span>
-        : <span className="text-muted-foreground">—</span> },
-    { key: "created_at", label: t("ps.exclusLe"), width: 130, sortable: false,
-      render: (s) => <span className="text-xs text-muted-foreground">{formatRelative(s.created_at)}</span> },
-    { key: "_action", label: "", width: 130, sortable: false, align: "right",
+    {
+      key: "supplier",
+      label: t("col.fournisseur"),
+      width: 260,
+      sortable: false,
+      render: (s) => <span className="text-sm font-medium text-foreground">{s.supplier}</span>,
+    },
+    {
+      key: "nb_lines",
+      label: t("ps.lignes"),
+      width: 90,
+      align: "right",
+      sortable: false,
+      render: (s) => <span className="tabular-nums text-sm">{formatQty(s.nb_lines)}</span>,
+    },
+    {
+      key: "total",
+      label: t("col.total"),
+      width: 130,
+      align: "right",
+      sortable: false,
+      render: (s) => <span className="font-mono text-sm tabular-nums">{formatMAD(s.total)}</span>,
+    },
+    {
+      key: "notes",
+      label: t("ps.note"),
+      width: 220,
+      sortable: false,
+      render: (s) =>
+        s.notes ? (
+          <span className="block max-w-[210px] truncate text-xs text-muted-foreground" title={s.notes}>
+            {s.notes}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "created_at",
+      label: t("ps.exclusLe"),
+      width: 130,
+      sortable: false,
+      render: (s) => <span className="text-xs text-muted-foreground">{formatRelative(s.created_at)}</span>,
+    },
+    {
+      key: "_action",
+      label: "",
+      width: 130,
+      sortable: false,
+      align: "right",
       render: (s) => (
         <AsyncButton
           variant="ghost"
@@ -894,27 +1008,79 @@ export default function ProduitsSpeciauxPage() {
         >
           <Undo2 className="size-3.5" /> {t("ps.reintegrer")}
         </AsyncButton>
-      ) },
+      ),
+    },
   ];
 
   const blColumns: ColumnDef<BlExclusion>[] = [
-    { key: "delivery_ref", label: t("col.reference"), width: 200, sortable: false,
-      render: (b) => <span className="font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span> },
-    { key: "supplier", label: t("col.fournisseur"), width: 200, sortable: false,
-      render: (b) => <span className="block max-w-[190px] truncate text-sm text-muted-foreground" title={b.supplier ?? ""}>{b.supplier ?? "—"}</span> },
-    { key: "delivery_date", label: t("col.dateBL"), width: 120, sortable: false,
-      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.delivery_date ?? "")}</span> },
-    { key: "nb_lines", label: t("ps.lignes"), width: 80, align: "right", sortable: false,
-      render: (b) => <span className="tabular-nums text-sm">{formatQty(b.nb_lines)}</span> },
-    { key: "total", label: t("col.total"), width: 120, align: "right", sortable: false,
-      render: (b) => <span className="font-mono text-sm tabular-nums">{formatMAD(b.total)}</span> },
-    { key: "notes", label: t("ps.note"), width: 220, sortable: false,
-      render: (b) => b.notes
-        ? <span className="block max-w-[210px] truncate text-xs text-muted-foreground" title={b.notes}>{b.notes}</span>
-        : <span className="text-muted-foreground">—</span> },
-    { key: "created_at", label: t("ps.exclusLe"), width: 130, sortable: false,
-      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.created_at)}</span> },
-    { key: "_action", label: "", width: 130, sortable: false, align: "right",
+    {
+      key: "delivery_ref",
+      label: t("col.reference"),
+      width: 200,
+      sortable: false,
+      render: (b) => <span className="font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span>,
+    },
+    {
+      key: "supplier",
+      label: t("col.fournisseur"),
+      width: 200,
+      sortable: false,
+      render: (b) => (
+        <span className="block max-w-[190px] truncate text-sm text-muted-foreground" title={b.supplier ?? ""}>
+          {b.supplier ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "delivery_date",
+      label: t("col.dateBL"),
+      width: 120,
+      sortable: false,
+      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.delivery_date ?? "")}</span>,
+    },
+    {
+      key: "nb_lines",
+      label: t("ps.lignes"),
+      width: 80,
+      align: "right",
+      sortable: false,
+      render: (b) => <span className="tabular-nums text-sm">{formatQty(b.nb_lines)}</span>,
+    },
+    {
+      key: "total",
+      label: t("col.total"),
+      width: 120,
+      align: "right",
+      sortable: false,
+      render: (b) => <span className="font-mono text-sm tabular-nums">{formatMAD(b.total)}</span>,
+    },
+    {
+      key: "notes",
+      label: t("ps.note"),
+      width: 220,
+      sortable: false,
+      render: (b) =>
+        b.notes ? (
+          <span className="block max-w-[210px] truncate text-xs text-muted-foreground" title={b.notes}>
+            {b.notes}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      key: "created_at",
+      label: t("ps.exclusLe"),
+      width: 130,
+      sortable: false,
+      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.created_at)}</span>,
+    },
+    {
+      key: "_action",
+      label: "",
+      width: 130,
+      sortable: false,
+      align: "right",
       render: (b) => (
         <AsyncButton
           variant="ghost"
@@ -924,33 +1090,62 @@ export default function ProduitsSpeciauxPage() {
         >
           <Undo2 className="size-3.5" /> {t("ps.reintegrer")}
         </AsyncButton>
-      ) },
+      ),
+    },
   ];
 
   const productFilters: ActiveFilter[] = productSearch
-    ? [{ key: "search", label: <>{t("common.recherche")} {productSearch}</>, onClear: () => setProductSearch("") }]
+    ? [
+        {
+          key: "search",
+          label: (
+            <>
+              {t("common.recherche")} {productSearch}
+            </>
+          ),
+          onClear: () => setProductSearch(""),
+        },
+      ]
     : [];
   const blFilters: ActiveFilter[] = blSearch
-    ? [{ key: "search", label: <>{t("common.recherche")} {blSearch}</>, onClear: () => setBlSearch("") }]
+    ? [
+        {
+          key: "search",
+          label: (
+            <>
+              {t("common.recherche")} {blSearch}
+            </>
+          ),
+          onClear: () => setBlSearch(""),
+        },
+      ]
     : [];
   const supFilters: ActiveFilter[] = supplierSearch
-    ? [{ key: "search", label: <>{t("common.recherche")} {supplierSearch}</>, onClear: () => setSupplierSearch("") }]
+    ? [
+        {
+          key: "search",
+          label: (
+            <>
+              {t("common.recherche")} {supplierSearch}
+            </>
+          ),
+          onClear: () => setSupplierSearch(""),
+        },
+      ]
     : [];
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.produitsSpeciaux")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("ps.subtitle")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("ps.subtitle")}</p>
       </header>
 
       {/* Tabs */}
       <TabBar<Tab>
         tabs={[
-          { id: "produits",     label: t("ps.tabProduits"),     icon: <Package className="size-4" /> },
-          { id: "bl",           label: t("ps.tabBL"),           icon: <FileText className="size-4" /> },
+          { id: "produits", label: t("ps.tabProduits"), icon: <Package className="size-4" /> },
+          { id: "bl", label: t("ps.tabBL"), icon: <FileText className="size-4" /> },
           { id: "fournisseurs", label: t("ps.tabFournisseurs"), icon: <Building2 className="size-4" /> },
         ]}
         activeId={tab}
@@ -962,16 +1157,25 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       productSearch,
-              onChange:    setProductSearch,
+              value: productSearch,
+              onChange: setProductSearch,
               placeholder: t("ps.searchProdPh"),
               suggestions: null,
             }}
             rightActions={[
-              { label: t("ps.reintegrerProduits"), icon: <Undo2 className="size-4" />, variant: "outline",
-                onClick: () => setReintegrating(true), disabled: specialProducts.length === 0 },
-              { label: t("ps.exclureProduits"), icon: <Plus className="size-4" />, variant: "primary",
-                onClick: () => setExcluding(true) },
+              {
+                label: t("ps.reintegrerProduits"),
+                icon: <Undo2 className="size-4" />,
+                variant: "outline",
+                onClick: () => setReintegrating(true),
+                disabled: specialProducts.length === 0,
+              },
+              {
+                label: t("ps.exclureProduits"),
+                icon: <Plus className="size-4" />,
+                variant: "primary",
+                onClick: () => setExcluding(true),
+              },
             ]}
             activeFilters={productFilters}
             onResetAll={() => setProductSearch("")}
@@ -993,14 +1197,18 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       blSearch,
-              onChange:    setBlSearch,
+              value: blSearch,
+              onChange: setBlSearch,
               placeholder: t("ps.searchBlPh"),
               suggestions: null,
             }}
             rightActions={[
-              { label: t("ps.exclureBl"), icon: <Plus className="size-4" />, variant: "primary",
-                onClick: () => setExcludingBl(true) },
+              {
+                label: t("ps.exclureBl"),
+                icon: <Plus className="size-4" />,
+                variant: "primary",
+                onClick: () => setExcludingBl(true),
+              },
             ]}
             activeFilters={blFilters}
             onResetAll={() => setBlSearch("")}
@@ -1022,14 +1230,18 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       supplierSearch,
-              onChange:    setSupplierSearch,
+              value: supplierSearch,
+              onChange: setSupplierSearch,
               placeholder: t("ps.searchSupPh"),
               suggestions: null,
             }}
             rightActions={[
-              { label: t("ps.exclureFournisseur"), icon: <Plus className="size-4" />, variant: "primary",
-                onClick: () => setExcludingSup(true) },
+              {
+                label: t("ps.exclureFournisseur"),
+                icon: <Plus className="size-4" />,
+                variant: "primary",
+                onClick: () => setExcludingSup(true),
+              },
             ]}
             activeFilters={supFilters}
             onResetAll={() => setSupplierSearch("")}
@@ -1050,7 +1262,10 @@ export default function ProduitsSpeciauxPage() {
       <ExcludeProductDialog
         open={excluding}
         onClose={() => setExcluding(false)}
-        onSubmit={(ids) => { excludeProducts(ids); setExcluding(false); }}
+        onSubmit={(ids) => {
+          excludeProducts(ids);
+          setExcluding(false);
+        }}
         isLoading={isExcludingProducts}
         suggestions={suggestions}
         suggestionsLoading={suggestionsLoading}
@@ -1061,7 +1276,10 @@ export default function ProduitsSpeciauxPage() {
       <ReintegrateProductsDialog
         open={reintegrating}
         onClose={() => setReintegrating(false)}
-        onSubmit={(ids) => { reintegrateProducts(ids); setReintegrating(false); }}
+        onSubmit={(ids) => {
+          reintegrateProducts(ids);
+          setReintegrating(false);
+        }}
         isLoading={isReintegratingProducts}
         specialProducts={specialProducts}
       />
@@ -1069,7 +1287,10 @@ export default function ProduitsSpeciauxPage() {
       <ExcludeBlDialog
         open={excludingBl}
         onClose={() => setExcludingBl(false)}
-        onSubmit={(ref, notes) => { excludeBl(ref, notes); setExcludingBl(false); }}
+        onSubmit={(ref, notes) => {
+          excludeBl(ref, notes);
+          setExcludingBl(false);
+        }}
         isLoading={isExcludingBl}
         results={blResults}
         resultsLoading={blResultsLoading}
@@ -1080,7 +1301,10 @@ export default function ProduitsSpeciauxPage() {
       <ExcludeSupplierDialog
         open={excludingSup}
         onClose={() => setExcludingSup(false)}
-        onSubmit={(supplier, notes) => { excludeSupplier(supplier, notes); setExcludingSup(false); }}
+        onSubmit={(supplier, notes) => {
+          excludeSupplier(supplier, notes);
+          setExcludingSup(false);
+        }}
         isLoading={isExcludingSupplier}
         results={supplierResults}
         resultsLoading={supplierResultsLoading}

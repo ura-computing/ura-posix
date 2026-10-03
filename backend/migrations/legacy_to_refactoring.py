@@ -23,6 +23,7 @@ Usage:
 For the demo DB (`apcm_demo`):
     APP_ENV=demo uv run python migrations/legacy_to_refactoring.py
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -44,10 +45,11 @@ import models  # noqa: F401 — registers every table on Base.metadata
 # causing the initial connection to hang on GSSAPI negotiation. Setting them
 # via connect_args guarantees psycopg2 sees them.
 import os
+
 _MIGRATION_CONNECT_ARGS = {
     "connect_timeout": 60,
-    "gssencmode":      "disable",
-    "sslmode":         "require",
+    "gssencmode": "disable",
+    "sslmode": "require",
     "application_name": "legacy_to_refactoring",
 }
 database.engine = create_engine(
@@ -66,9 +68,16 @@ FEATURE_KEY_RENAMES = {"achat": "achats"}
 
 # Refactoring's feature-flag names.
 REFACTORING_FEATURES = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting",
-    "bl_exclusions", "special_products", "alertes",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
+    "special_products",
+    "alertes",
 )
 
 # Dev only had these 5 features. Refactoring adds analyse / accounting /
@@ -86,19 +95,27 @@ NEW_FEATURES_TO_GRANT = ("analyse", "accounting", "special_products", "alertes")
 # active owner + every pharmacy. Idempotent: skips rows that already exist.
 GRANT_OWNER_BASELINE = True
 BASELINE_FEATURES = (
-    "rapports", "import", "achats", "ventes", "stock",
-    "analyse", "accounting", "special_products", "alertes",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "special_products",
+    "alertes",
 )
 
 
 # ── Pre-check ───────────────────────────────────────────────────────────────
+
 
 def _pre_check() -> dict:
     """Snapshot the DB state; abort if the DB is in a state this script
     isn't designed for."""
     insp = inspect(engine)
     has_pharmacies = insp.has_table("pharmacies")
-    has_alembic    = insp.has_table("alembic_version")
+    has_alembic = insp.has_table("alembic_version")
 
     if not has_pharmacies:
         print("✗ No `pharmacies` table found. This looks like an EMPTY database.")
@@ -111,11 +128,13 @@ def _pre_check() -> dict:
 
     with engine.connect() as c:
         snap = {
-            "pharmacies":  c.execute(text("SELECT COUNT(*) FROM pharmacies")).scalar(),
-            "users":       c.execute(text("SELECT COUNT(*) FROM users")).scalar(),
-            "medicaments": c.execute(text("SELECT COUNT(*) FROM medicaments")).scalar() if insp.has_table("medicaments") else 0,
-            "achats":      c.execute(text("SELECT COUNT(*) FROM achats")).scalar()      if insp.has_table("achats")      else 0,
-            "ventes":      c.execute(text("SELECT COUNT(*) FROM ventes")).scalar()      if insp.has_table("ventes")      else 0,
+            "pharmacies": c.execute(text("SELECT COUNT(*) FROM pharmacies")).scalar(),
+            "users": c.execute(text("SELECT COUNT(*) FROM users")).scalar(),
+            "medicaments": c.execute(text("SELECT COUNT(*) FROM medicaments")).scalar()
+            if insp.has_table("medicaments")
+            else 0,
+            "achats": c.execute(text("SELECT COUNT(*) FROM achats")).scalar() if insp.has_table("achats") else 0,
+            "ventes": c.execute(text("SELECT COUNT(*) FROM ventes")).scalar() if insp.has_table("ventes") else 0,
         }
         if insp.has_table("payment_entries"):
             snap["payment_entries"] = c.execute(text("SELECT COUNT(*) FROM payment_entries")).scalar()
@@ -125,6 +144,7 @@ def _pre_check() -> dict:
 
 
 # ── Schema-alignment helpers ────────────────────────────────────────────────
+
 
 def _ensure_extensions() -> None:
     """Postgres extensions needed by search.py. IF NOT EXISTS = idempotent."""
@@ -160,16 +180,20 @@ def _add_missing_columns() -> None:
         c.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by    INT NULL"))
         # Add the self-FK only if it doesn't already exist. `information_schema`
         # lookup, then conditional ALTER.
-        exists = c.execute(text("""
+        exists = c.execute(
+            text("""
             SELECT 1 FROM information_schema.table_constraints
             WHERE table_name = 'users' AND constraint_name = 'users_created_by_fkey'
-        """)).first()
+        """)
+        ).first()
         if not exists:
-            c.execute(text("""
+            c.execute(
+                text("""
                 ALTER TABLE users
                 ADD CONSTRAINT users_created_by_fkey
                 FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-            """))
+            """)
+            )
         # 0011 — users reset_token + reset_token_expires
         c.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token         VARCHAR NULL"))
         c.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ NULL"))
@@ -185,17 +209,26 @@ def _add_missing_columns() -> None:
             ("fk_import_batches_created_by_user_id_users", "created_by_user_id"),
             ("fk_import_batches_deleted_by_user_id_users", "deleted_by_user_id"),
         ):
-            exists = c.execute(text("""
+            exists = c.execute(
+                text("""
                 SELECT 1 FROM information_schema.table_constraints
                 WHERE table_name = 'import_batches' AND constraint_name = :name
-            """), {"name": name}).first()
+            """),
+                {"name": name},
+            ).first()
             if not exists:
-                c.execute(text(f"""
+                c.execute(
+                    text(f"""
                     ALTER TABLE import_batches
                     ADD CONSTRAINT {name}
                     FOREIGN KEY ({col}) REFERENCES users(id) ON DELETE SET NULL
-                """))
-        c.execute(text("CREATE INDEX IF NOT EXISTS ix_import_batches_created_by_user_id ON import_batches (created_by_user_id)"))
+                """)
+                )
+        c.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_import_batches_created_by_user_id ON import_batches (created_by_user_id)"
+            )
+        )
 
 
 def _create_missing_tables() -> None:
@@ -212,34 +245,42 @@ def _add_payment_entries_unique() -> None:
     which means the unique constraint on (pharmacy_id, month, method)
     was never added. Adding it explicitly. Guard on existence check."""
     with engine.begin() as c:
-        exists = c.execute(text("""
+        exists = c.execute(
+            text("""
             SELECT 1 FROM information_schema.table_constraints
             WHERE table_name = 'payment_entries'
               AND constraint_name = 'uq_payment_entries_pharmacy_month_method'
-        """)).first()
+        """)
+        ).first()
         if not exists:
             # Check for existing duplicates that would block the constraint.
-            dupes = c.execute(text("""
+            dupes = c.execute(
+                text("""
                 SELECT COUNT(*) FROM (
                     SELECT pharmacy_id, month, method
                     FROM payment_entries
                     GROUP BY pharmacy_id, month, method
                     HAVING COUNT(*) > 1
                 ) d
-            """)).scalar()
+            """)
+            ).scalar()
             if dupes and dupes > 0:
                 print(f"  ⚠ Found {dupes} duplicate (pharmacy_id, month, method) groups in payment_entries.")
                 print("    Cannot add the unique constraint. De-dup first, then re-run.")
                 return
-            c.execute(text("""
+            c.execute(
+                text("""
                 ALTER TABLE payment_entries
                 ADD CONSTRAINT uq_payment_entries_pharmacy_month_method
                 UNIQUE (pharmacy_id, month, method)
-            """))
-        c.execute(text("""
+            """)
+            )
+        c.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS ix_payment_entries_pharmacy_month
             ON payment_entries (pharmacy_id, month)
-        """))
+        """)
+        )
 
 
 def _add_check_constraints() -> None:
@@ -249,9 +290,17 @@ def _add_check_constraints() -> None:
     features_sql = "', '".join(REFACTORING_FEATURES)
     with engine.begin() as c:
         c.execute(text("ALTER TABLE pharmacy_features DROP CONSTRAINT IF EXISTS ck_pharmacy_features_feature"))
-        c.execute(text(f"ALTER TABLE pharmacy_features ADD CONSTRAINT ck_pharmacy_features_feature CHECK (feature IN ('{features_sql}'))"))
+        c.execute(
+            text(
+                f"ALTER TABLE pharmacy_features ADD CONSTRAINT ck_pharmacy_features_feature CHECK (feature IN ('{features_sql}'))"
+            )
+        )
         c.execute(text("ALTER TABLE user_permissions DROP CONSTRAINT IF EXISTS ck_user_permissions_permission"))
-        c.execute(text(f"ALTER TABLE user_permissions ADD CONSTRAINT ck_user_permissions_permission CHECK (permission IN ('{features_sql}'))"))
+        c.execute(
+            text(
+                f"ALTER TABLE user_permissions ADD CONSTRAINT ck_user_permissions_permission CHECK (permission IN ('{features_sql}'))"
+            )
+        )
 
 
 def _add_store_website_partial_index() -> None:
@@ -259,18 +308,22 @@ def _add_store_website_partial_index() -> None:
     postgresql_where predicates, so we add it explicitly. IF NOT EXISTS
     for idempotency."""
     with engine.begin() as c:
-        c.execute(text("""
+        c.execute(
+            text("""
             CREATE UNIQUE INDEX IF NOT EXISTS uq_one_active_request_per_pharmacy
             ON store_website_requests (pharmacy_id)
             WHERE state <> 'cloturee'
-        """))
+        """)
+        )
 
 
 # ── Backfills ───────────────────────────────────────────────────────────────
 
+
 def _rename_json_key(conn, table: str, col: str, old: str, new: str) -> int:
     """Rename a top-level key inside a JSON column across every row."""
-    result = conn.execute(text(f"""
+    result = conn.execute(
+        text(f"""
         UPDATE {table}
         SET {col} = (
             (({col})::jsonb - :old)
@@ -278,7 +331,9 @@ def _rename_json_key(conn, table: str, col: str, old: str, new: str) -> int:
         )::json
         WHERE {col} IS NOT NULL
           AND ({col})::jsonb ? :old
-    """), {"old": old, "new": new})
+    """),
+        {"old": old, "new": new},
+    )
     return result.rowcount
 
 
@@ -290,14 +345,15 @@ def _rename_legacy_feature_keys() -> tuple[int, int]:
         p, u = 0, 0
         for old, new in FEATURE_KEY_RENAMES.items():
             p += _rename_json_key(c, "pharmacies", "options", old, new)
-            u += _rename_json_key(c, "users",      "permissions", old, new)
+            u += _rename_json_key(c, "users", "permissions", old, new)
     return p, u
 
 
 def _backfill_pharmacy_features() -> int:
     """Unpack pharmacies.options JSON into pharmacy_features rows."""
     with engine.begin() as c:
-        result = c.execute(text("""
+        result = c.execute(
+            text("""
             INSERT INTO pharmacy_features (pharmacy_id, feature, enabled)
             SELECT p.id, kv.key, COALESCE((kv.value)::boolean, false)
             FROM pharmacies p, LATERAL json_each_text(p.options) AS kv
@@ -308,14 +364,16 @@ def _backfill_pharmacy_features() -> int:
                 SELECT 1 FROM pharmacy_features pf
                 WHERE pf.pharmacy_id = p.id AND pf.feature = kv.key
               )
-        """))
+        """)
+        )
     return result.rowcount
 
 
 def _backfill_user_permissions() -> int:
     """Unpack users.permissions JSON into user_permissions rows."""
     with engine.begin() as c:
-        result = c.execute(text("""
+        result = c.execute(
+            text("""
             INSERT INTO user_permissions (user_id, permission, enabled)
             SELECT u.id, kv.key, COALESCE((kv.value)::boolean, false)
             FROM users u, LATERAL json_each_text(u.permissions) AS kv
@@ -326,7 +384,8 @@ def _backfill_user_permissions() -> int:
                 SELECT 1 FROM user_permissions up
                 WHERE up.user_id = u.id AND up.permission = kv.key
               )
-        """))
+        """)
+        )
     return result.rowcount
 
 
@@ -341,7 +400,8 @@ def _grant_new_features() -> tuple[int, int]:
         pf_total = 0
         up_total = 0
         for feat in NEW_FEATURES_TO_GRANT:
-            r = c.execute(text("""
+            r = c.execute(
+                text("""
                 INSERT INTO pharmacy_features (pharmacy_id, feature, enabled)
                 SELECT DISTINCT pf.pharmacy_id, :feat, TRUE
                 FROM pharmacy_features pf
@@ -350,9 +410,12 @@ def _grant_new_features() -> tuple[int, int]:
                     SELECT 1 FROM pharmacy_features pf2
                     WHERE pf2.pharmacy_id = pf.pharmacy_id AND pf2.feature = :feat
                   )
-            """), {"feat": feat})
+            """),
+                {"feat": feat},
+            )
             pf_total += r.rowcount
-            r = c.execute(text("""
+            r = c.execute(
+                text("""
                 INSERT INTO user_permissions (user_id, permission, enabled)
                 SELECT DISTINCT up.user_id, :feat, TRUE
                 FROM user_permissions up
@@ -361,7 +424,9 @@ def _grant_new_features() -> tuple[int, int]:
                     SELECT 1 FROM user_permissions up2
                     WHERE up2.user_id = up.user_id AND up2.permission = :feat
                   )
-            """), {"feat": feat})
+            """),
+                {"feat": feat},
+            )
             up_total += r.rowcount
     return pf_total, up_total
 
@@ -376,7 +441,8 @@ def _grant_owner_baseline() -> tuple[int, int]:
         pf_total = 0
         up_total = 0
         for feat in BASELINE_FEATURES:
-            r = c.execute(text("""
+            r = c.execute(
+                text("""
                 INSERT INTO pharmacy_features (pharmacy_id, feature, enabled)
                 SELECT p.id, :feat, TRUE
                 FROM pharmacies p
@@ -384,9 +450,12 @@ def _grant_owner_baseline() -> tuple[int, int]:
                     SELECT 1 FROM pharmacy_features pf
                     WHERE pf.pharmacy_id = p.id AND pf.feature = :feat
                 )
-            """), {"feat": feat})
+            """),
+                {"feat": feat},
+            )
             pf_total += r.rowcount
-            r = c.execute(text("""
+            r = c.execute(
+                text("""
                 INSERT INTO user_permissions (user_id, permission, enabled)
                 SELECT u.id, :feat, TRUE
                 FROM users u
@@ -395,7 +464,9 @@ def _grant_owner_baseline() -> tuple[int, int]:
                     SELECT 1 FROM user_permissions up
                     WHERE up.user_id = u.id AND up.permission = :feat
                   )
-            """), {"feat": feat})
+            """),
+                {"feat": feat},
+            )
             up_total += r.rowcount
     return pf_total, up_total
 
@@ -404,17 +475,21 @@ def _backfill_product_type() -> int:
     """Migration 0010: classify medicaments as pharmacie / parapharmacie
     based on category regex."""
     with engine.begin() as c:
-        r1 = c.execute(text("""
+        r1 = c.execute(
+            text("""
             UPDATE medicaments
             SET product_type = 'pharmacie'
             WHERE product_type IS NULL
               AND lower(category) ~ '(edicament|édicament|oméopath|omeopath|iététique|ietetique)'
-        """))
-        r2 = c.execute(text("""
+        """)
+        )
+        r2 = c.execute(
+            text("""
             UPDATE medicaments
             SET product_type = 'parapharmacie'
             WHERE product_type IS NULL
-        """))
+        """)
+        )
     return r1.rowcount + r2.rowcount
 
 
@@ -423,7 +498,8 @@ def _backfill_import_batch_creators() -> int:
     pharmacy's unique active owner. Skipped for pharmacies with 0 or 2+
     active owners (ambiguous)."""
     with engine.begin() as c:
-        result = c.execute(text("""
+        result = c.execute(
+            text("""
             UPDATE import_batches
             SET    created_by_user_id = sub.owner_id
             FROM (
@@ -435,11 +511,13 @@ def _backfill_import_batch_creators() -> int:
             ) sub
             WHERE  import_batches.pharmacy_id = sub.pharmacy_id
               AND  import_batches.created_by_user_id IS NULL
-        """))
+        """)
+        )
     return result.rowcount
 
 
 # ── Finalization ────────────────────────────────────────────────────────────
+
 
 def _stamp_alembic_head() -> None:
     """Mark the DB as being at alembic head (0017). After this, future
@@ -459,16 +537,16 @@ def _post_check(before: dict) -> None:
     """Verify no legacy data was lost + print the new counts."""
     with engine.connect() as c:
         after = {
-            "pharmacies":         c.execute(text("SELECT COUNT(*) FROM pharmacies")).scalar(),
-            "users":              c.execute(text("SELECT COUNT(*) FROM users")).scalar(),
-            "medicaments":        c.execute(text("SELECT COUNT(*) FROM medicaments")).scalar(),
-            "achats":             c.execute(text("SELECT COUNT(*) FROM achats")).scalar(),
-            "ventes":             c.execute(text("SELECT COUNT(*) FROM ventes")).scalar(),
-            "payment_entries":    c.execute(text("SELECT COUNT(*) FROM payment_entries")).scalar(),
-            "import_batches":     c.execute(text("SELECT COUNT(*) FROM import_batches")).scalar(),
-            "pharmacy_features":  c.execute(text("SELECT COUNT(*) FROM pharmacy_features")).scalar(),
-            "user_permissions":   c.execute(text("SELECT COUNT(*) FROM user_permissions")).scalar(),
-            "sessions":           c.execute(text("SELECT COUNT(*) FROM sessions")).scalar(),
+            "pharmacies": c.execute(text("SELECT COUNT(*) FROM pharmacies")).scalar(),
+            "users": c.execute(text("SELECT COUNT(*) FROM users")).scalar(),
+            "medicaments": c.execute(text("SELECT COUNT(*) FROM medicaments")).scalar(),
+            "achats": c.execute(text("SELECT COUNT(*) FROM achats")).scalar(),
+            "ventes": c.execute(text("SELECT COUNT(*) FROM ventes")).scalar(),
+            "payment_entries": c.execute(text("SELECT COUNT(*) FROM payment_entries")).scalar(),
+            "import_batches": c.execute(text("SELECT COUNT(*) FROM import_batches")).scalar(),
+            "pharmacy_features": c.execute(text("SELECT COUNT(*) FROM pharmacy_features")).scalar(),
+            "user_permissions": c.execute(text("SELECT COUNT(*) FROM user_permissions")).scalar(),
+            "sessions": c.execute(text("SELECT COUNT(*) FROM sessions")).scalar(),
         }
 
     print()
@@ -484,14 +562,14 @@ def _post_check(before: dict) -> None:
     for k in ("pharmacies", "users", "medicaments", "achats", "ventes"):
         if k in before:
             assert after[k] == before[k], (
-                f"DATA LOSS on {k}: {before[k]} → {after[k]}. "
-                "This should NEVER happen — investigate immediately."
+                f"DATA LOSS on {k}: {before[k]} → {after[k]}. This should NEVER happen — investigate immediately."
             )
     print()
     print("✓ Legacy row counts preserved. No data lost.")
 
 
 # ── main ────────────────────────────────────────────────────────────────────
+
 
 def main() -> None:
     print("=" * 60)
@@ -513,12 +591,10 @@ def main() -> None:
     print("▸ 2/10  ADD COLUMN IF NOT EXISTS on shared tables")
     _add_missing_columns()
 
-    print("▸ 3/10  create_all — new tables (sessions, pharmacy_features, "
-          "user_permissions, store_website_*)")
+    print("▸ 3/10  create_all — new tables (sessions, pharmacy_features, user_permissions, store_website_*)")
     _create_missing_tables()
 
-    print("▸ 4/10  Add missing payment_entries unique constraint (migration 0012 "
-          "skipped on legacy DBs)")
+    print("▸ 4/10  Add missing payment_entries unique constraint (migration 0012 skipped on legacy DBs)")
     _add_payment_entries_unique()
 
     print("▸ 5/10  Rename legacy JSON key `achat` → `achats` before backfill")
@@ -555,8 +631,7 @@ def main() -> None:
     n = _backfill_import_batch_creators()
     print(f"       import_batches updated: {n}")
 
-    print("▸ 10/11 Add CHECK constraints + store-website partial unique index + "
-          "alembic stamp head")
+    print("▸ 10/11 Add CHECK constraints + store-website partial unique index + alembic stamp head")
     _add_check_constraints()
     _add_store_website_partial_index()
     _stamp_alembic_head()

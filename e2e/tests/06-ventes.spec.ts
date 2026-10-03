@@ -45,11 +45,7 @@ const TABS = [
 ] as const;
 
 /** Footer « … (filtres actifs) : X · … : Y » = the list summary (all filtered rows). */
-async function checkFooter(
-  page: Page,
-  first: string,
-  values: number[],
-): Promise<void> {
+async function checkFooter(page: Page, first: string, values: number[]): Promise<void> {
   const nums = page
     .locator("div")
     .filter({ hasText: new RegExp(`^${first}`) })
@@ -57,10 +53,7 @@ async function checkFooter(
     .locator("span.font-mono");
   await expect
     .poll(
-      async () =>
-        (await nums.allInnerTexts())
-          .map(frNumber)
-          .map((v, i) => Math.abs((v ?? NaN) - values[i]) <= 0.011),
+      async () => (await nums.allInnerTexts()).map(frNumber).map((v, i) => Math.abs((v ?? NaN) - values[i]) <= 0.011),
       `pied de tableau ${values}`,
     )
     .toEqual(values.map(() => true));
@@ -85,18 +78,14 @@ async function checkXlsx(
   const bad = rows.flatMap((r, i) =>
     JSON.stringify(r) === JSON.stringify(sheet[i + 1])
       ? []
-      : [
-          `ligne ${i + 1}: ${JSON.stringify(sheet[i + 1])} ≠ ${JSON.stringify(r)}`,
-        ],
+      : [`ligne ${i + 1}: ${JSON.stringify(sheet[i + 1])} ≠ ${JSON.stringify(r)}`],
   );
   expect(bad.slice(0, 10), "cellules").toEqual([]);
 }
 
 async function open(page: Page): Promise<void> {
   await page.goto("/ventes");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Ventes", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Ventes", exact: true })).toBeVisible();
 }
 
 /** Open /ventes and type the period; resolves with the page-1 list for it. */
@@ -110,9 +99,7 @@ async function openWithPeriod(page: Page): Promise<Row> {
   return list;
 }
 
-test("ventes: liste, pagination, catégories, TVA, surveillance, remises", async ({
-  page,
-}) => {
+test("ventes: liste, pagination, catégories, TVA, surveillance, remises", async ({ page }) => {
   const e = expected();
   const w = testWindow();
   const cats = pageCall(page, "/ventes/categories");
@@ -145,18 +132,10 @@ test("ventes: liste, pagination, catégories, TVA, surveillance, remises", async
       "jauge remises",
     );
     for (const [field, name] of TABS) {
-      const digits = (
-        await page.getByRole("button", { name }).innerText()
-      ).replace(/\D/g, "");
-      expect(
-        digits.endsWith(String(e.surveillance_counts[field])),
-        `onglet ${name}: ${digits}`,
-      ).toBe(true);
+      const digits = (await page.getByRole("button", { name }).innerText()).replace(/\D/g, "");
+      expect(digits.endsWith(String(e.surveillance_counts[field])), `onglet ${name}: ${digits}`).toBe(true);
     }
-    await checkFooter(page, "TVA encaissée", [
-      l1.summary.tva_collected,
-      l1.summary.grand_total,
-    ]);
+    await checkFooter(page, "TVA encaissée", [l1.summary.tva_collected, l1.summary.grand_total]);
   });
 
   const page2 = pageCall(page, "/ventes", { ...period(w), page: "2" });
@@ -166,19 +145,14 @@ test("ventes: liste, pagination, catégories, TVA, surveillance, remises", async
   await checkLedgerScreen(page, "ventes", l2.data);
 });
 
-test("ventes: filtres actifs — retirer la période, tout réinitialiser", async ({
-  page,
-}) => {
+test("ventes: filtres actifs — retirer la période, tout réinitialiser", async ({ page }) => {
   await openWithPeriod(page);
   const noDates = pageCall(page, "/ventes", {
     date_from: null,
     date_to: null,
     page: "1",
   });
-  await page
-    .getByRole("button", { name: "Supprimer le filtre" })
-    .first()
-    .click(); // the « Période » chip
+  await page.getByRole("button", { name: "Supprimer le filtre" }).first().click(); // the « Période » chip
   const all = (await noDates).data;
   await checkLedgerScreen(page, "ventes", all); // whole history: screen = API answer
   const withCat = pageCall(page, "/ventes", { category: "Médicament" });
@@ -187,10 +161,7 @@ test("ventes: filtres actifs — retirer la période, tout réinitialiser", asyn
   await withCat;
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Tout réinitialiser" }).click();
-  await expect(
-    page.getByRole("button", { name: "Supprimer le filtre" }),
-    "plus aucun filtre",
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Supprimer le filtre" }), "plus aucun filtre").toHaveCount(0);
   await checkLedgerScreen(page, "ventes", all); // back to the no-filter list
 });
 
@@ -203,12 +174,7 @@ test("ventes: onglets « à surveiller »", async ({ page }) => {
         surveillance: tab,
       });
       await page.getByRole("button", { name }).click();
-      checkLedgerPage(
-        "ventes",
-        await list,
-        expected().surveillance_lists[tab],
-        1,
-      );
+      checkLedgerPage("ventes", await list, expected().surveillance_lists[tab], 1);
     });
   }
 });
@@ -223,10 +189,7 @@ test("ventes: tri de chaque colonne (desc puis asc)", async ({ page }) => {
           sort_by: key,
           sort_order: order,
         });
-        await page
-          .getByRole("columnheader", { name: label, exact: true })
-          .getByRole("button")
-          .click();
+        await page.getByRole("columnheader", { name: label, exact: true }).getByRole("button").click();
         checkSortPage("ventes", await list, key, order);
       });
     }
@@ -269,9 +232,7 @@ test("ventes: filtre catégorie « Médicament »", async ({ page }) => {
   checkLedgerPage(
     "ventes",
     await list,
-    subsetSummary("ventes", (r) =>
-      r.category.toLowerCase().startsWith("médicament"),
-    ),
+    subsetSummary("ventes", (r) => r.category.toLowerCase().startsWith("médicament")),
     1,
   );
 });
@@ -283,9 +244,7 @@ test("ventes: filtre TVA « TVA (20.00%) »", async ({ page }) => {
     tva: "TVA (20.00%)",
   });
   await page.getByRole("button", { name: "TVA", exact: true }).click();
-  await page
-    .getByRole("checkbox", { name: "TVA (20.00%)", exact: true })
-    .check();
+  await page.getByRole("checkbox", { name: "TVA (20.00%)", exact: true }).check();
   checkLedgerPage(
     "ventes",
     await list,
@@ -294,14 +253,10 @@ test("ventes: filtre TVA « TVA (20.00%) »", async ({ page }) => {
   );
 });
 
-test("ventes: export Excel — toutes les lignes de la période", async ({
-  page,
-}) => {
+test("ventes: export Excel — toutes les lignes de la période", async ({ page }) => {
   await openWithPeriod(page);
   const total = expected().ventes_list.rows_total;
-  const exported = page.waitForResponse(
-    (r) => r.url().includes("/v1/ventes?") && r.url().includes("export=true"),
-  );
+  const exported = page.waitForResponse((r) => r.url().includes("/v1/ventes?") && r.url().includes("export=true"));
   const download = page.waitForEvent("download").catch(() => null); // none when the export is refused (413)
   const t0 = Date.now(); // timed: click → .xlsx written (speed gate)
   await page.getByRole("button", { name: "Exporter Excel" }).click();
@@ -324,12 +279,7 @@ test("ventes: export Excel — toutes les lignes de la période", async ({
   });
   const data: Row[] = (await res.json()).data;
   checkLedgerRows("ventes", data, expected().ventes_rows);
-  const type = (c: string | null) =>
-    c === "pharmacie"
-      ? "Pharmacie"
-      : c === "parapharmacie"
-        ? "Parapharmacie"
-        : "";
+  const type = (c: string | null) => (c === "pharmacie" ? "Pharmacie" : c === "parapharmacie" ? "Parapharmacie" : "");
   await checkXlsx(
     path!,
     [

@@ -17,7 +17,7 @@ JWT_ALGORITHM = "HS256"
 SESSION_COOKIE_NAME = "session_token"
 SESSION_EXPIRY_DAYS = 30
 
-AccessCookieDep  = Annotated[str | None, Cookie(alias="access_token")]
+AccessCookieDep = Annotated[str | None, Cookie(alias="access_token")]
 SessionCookieDep = Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)]
 
 
@@ -40,7 +40,8 @@ def create_access_token(user_id: int, token_version: int, session_id: int) -> st
 
 def get_current_user(db: DbDep, access_token: AccessCookieDep = None) -> User:
     creds_exc = ApiError(
-        status.HTTP_401_UNAUTHORIZED, ErrorCode.SESSION_EXPIRED,
+        status.HTTP_401_UNAUTHORIZED,
+        ErrorCode.SESSION_EXPIRED,
         "Session expirée, veuillez vous reconnecter",
     )
     if not access_token:

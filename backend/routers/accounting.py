@@ -5,6 +5,7 @@ data lives in `payment_entries` and is independent of Sobrus CSV imports.
 
 Endpoints all gated by the `accounting` feature (`member("accounting")`).
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/accounting", tags=["accounting"])
 @router.get("/payments", response_model=list[PaymentEntryOut])
 def list_payments(
     pharmacy_id: Annotated[int, member("accounting")],
-    db:   DbDep,
+    db: DbDep,
     month: Annotated[str | None, Query(pattern=r"^\d{4}-\d{2}$")] = None,
 ) -> list[PaymentEntry]:
     """All payment entries for the caller's pharmacy, newest month first.
@@ -41,13 +42,19 @@ def save_payment(body: PaymentEntryIn, pharmacy_id: Annotated[int, member("accou
     """Upsert by (pharmacy_id, month, method) — POST always succeeds whether
     the row exists or not. Simpler than separate POST/PUT, matches the
     apcm-pharma contract the frontend expects."""
-    existing = db.query(PaymentEntry).filter_by(
-        pharmacy_id=pharmacy_id, month=body.month, method=body.method,
-    ).first()
+    existing = (
+        db.query(PaymentEntry)
+        .filter_by(
+            pharmacy_id=pharmacy_id,
+            month=body.month,
+            method=body.method,
+        )
+        .first()
+    )
     if existing:
-        existing.pharmacie_amount     = body.pharmacie_amount
+        existing.pharmacie_amount = body.pharmacie_amount
         existing.parapharmacie_amount = body.parapharmacie_amount
-        existing.count                = body.count
+        existing.count = body.count
         db.commit()
         db.refresh(existing)
         return existing
@@ -62,7 +69,7 @@ def save_payment(body: PaymentEntryIn, pharmacy_id: Annotated[int, member("accou
 def delete_payment(
     entry_id: Annotated[int, Path(ge=1)],
     pharmacy_id: Annotated[int, member("accounting")],
-    db:   DbDep,
+    db: DbDep,
 ) -> None:
     entry = db.query(PaymentEntry).filter_by(id=entry_id, pharmacy_id=pharmacy_id).first()
     if not entry:

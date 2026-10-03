@@ -11,13 +11,7 @@ import type { AbcdClass, StockRow } from "@/types";
 import { translateFr } from "@/i18n/I18nProvider";
 
 export type StockSortKey =
-  | "product"
-  | "category"
-  | "units_sold_12m"
-  | "stock_min"
-  | "stock_max"
-  | "current_stock"
-  | "status";
+  "product" | "category" | "units_sold_12m" | "stock_min" | "stock_max" | "current_stock" | "status";
 
 /**
  * Orchestrates the Stock page: DUAL fetch (full = distribution/gauge/alerts,
@@ -29,15 +23,15 @@ export function useStockPage() {
   // (class, status, sort, pagination) stay page-local.
   // Stock date range is LOCAL (independent from Dashboard, Achats, Ventes, etc.)
   const [localFrom, setLocalFrom] = useState<string | null>(null);
-  const [localTo,   setLocalTo]   = useState<string | null>(null);
+  const [localTo, setLocalTo] = useState<string | null>(null);
   // Stock-only default: trailing 12 months → today.
   const defaultFrom = useMemo(() => monthsAgo(12), []);
-  const defaultTo   = useMemo(() => todayIso(), []);
+  const defaultTo = useMemo(() => todayIso(), []);
   const isDateDefault = localFrom === null && localTo === null;
   const dateFrom = localFrom ?? defaultFrom;
-  const dateTo   = localTo   ?? defaultTo;
+  const dateTo = localTo ?? defaultTo;
   const setDateFrom = (v: string) => setLocalFrom(v || null);
-  const setDateTo   = (v: string) => setLocalTo(v || null);
+  const setDateTo = (v: string) => setLocalTo(v || null);
   // Default class = "A" so pharmacists land on their best-sellers immediately.
   // "Tout réinitialiser" / "Fermer" still clear to null — the default only applies on first mount.
   const [classFilter, setClassFilter] = useState<AbcdClass | null>("A");
@@ -51,25 +45,16 @@ export function useStockPage() {
   const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
   /** Table renders only when at least one of these is active. */
-  const hasTableFilter =
-    classFilter !== null || status !== "";
+  const hasTableFilter = classFilter !== null || status !== "";
 
   // ---- 1) FULL fetch: drives circles + gauge + alert cards (NO class/status) ----
-  const {
-    abcd,
-    isLoading,
-    isError,
-    reload,
-  } = useStockAbcd({
+  const { abcd, isLoading, isError, reload } = useStockAbcd({
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   });
 
   // ---- 2) FILTERED fetch: drives ONLY the conditional table ----
-  const {
-    abcd: filtered,
-    isLoading: isTableLoading,
-  } = useStockAbcd(
+  const { abcd: filtered, isLoading: isTableLoading } = useStockAbcd(
     {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
@@ -97,9 +82,7 @@ export function useStockPage() {
   const toggleSort = useCallback((key: StockSortKey) => {
     setPage(1);
     setSortBy((prevKey) => {
-      setSortOrder((prevOrder) =>
-        prevKey === key && prevOrder === "asc" ? "desc" : "asc",
-      );
+      setSortOrder((prevOrder) => (prevKey === key && prevOrder === "asc" ? "desc" : "asc"));
       return key;
     });
   }, []);
@@ -146,9 +129,7 @@ export function useStockPage() {
       "PU moyen",
       "Statut",
     ];
-    const rowsToExport = hasTableFilter
-      ? (filtered?.products ?? [])
-      : fullProducts;
+    const rowsToExport = hasTableFilter ? (filtered?.products ?? []) : fullProducts;
     const body = rowsToExport.map((r) => [
       r.product,
       r.category,
@@ -158,17 +139,17 @@ export function useStockPage() {
       r.stock_max,
       r.ppv ?? 0,
       r.avg_pu ?? 0,
-      translateFr(`stockStatus.${r.status}`),   // « À surveiller », not the code « a-surveiller »
+      translateFr(`stockStatus.${r.status}`), // « À surveiller », not the code « a-surveiller »
     ]);
-    downloadXlsx(
-      [header, ...body],
-      exportFilename("STOCK", "xlsx", dateFrom, dateTo),
-    );
+    downloadXlsx([header, ...body], exportFilename("STOCK", "xlsx", dateFrom, dateTo));
   }, [fullProducts, filtered, hasTableFilter, dateFrom, dateTo]);
 
   return {
     // queries
-    abcd, isLoading, isError, reload,         // full fetch: circles + gauge + alert cards (no class / status)
+    abcd,
+    isLoading,
+    isError,
+    reload, // full fetch: circles + gauge + alert cards (no class / status)
     tableRows: filtered?.products ?? [],
     isTableLoading,
     peremptions,
@@ -202,7 +183,7 @@ export function useStockPage() {
     handleExport,
     // peremption dialog
     dialog,
-    openDialog:  setDialog,
+    openDialog: setDialog,
     closeDialog: () => setDialog(null),
   };
 }

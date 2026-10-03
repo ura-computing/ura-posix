@@ -6,7 +6,6 @@ import { CategoriesTab, type CategoriesTabProps } from "./CategoriesTab";
 import { DemandeTab, type DemandeTabProps } from "./DemandeTab";
 import { ProduitsVisiblesTab, type ProduitsVisiblesTabProps } from "./ProduitsVisiblesTab";
 
-
 /** Owner-facing shell for /store-website. 3 tabs, deep-linkable via `?tab=`.
  *  Each tab is independent — the parent passes typed props per tab; the
  *  shell only owns the active-tab state. */
@@ -15,22 +14,18 @@ export type StoreTab = "demande" | "categories" | "produits";
 
 export interface StoreWebsitePageProps {
   initialTab?: StoreTab;
-  demande:    DemandeTabProps;
+  demande: DemandeTabProps;
   categories: CategoriesTabProps;
-  produits:   ProduitsVisiblesTabProps;
+  produits: ProduitsVisiblesTabProps;
 }
 
-
 const TABS: TabItem[] = [
-  { id: "demande",    label: "Demande" },
+  { id: "demande", label: "Demande" },
   { id: "categories", label: "Catégories" },
-  { id: "produits",   label: "Produits visibles" },
+  { id: "produits", label: "Produits visibles" },
 ];
 
-
-export function StoreWebsitePage({
-  initialTab = "demande", demande, categories, produits,
-}: StoreWebsitePageProps) {
+export function StoreWebsitePage({ initialTab = "demande", demande, categories, produits }: StoreWebsitePageProps) {
   const [tab, setTab] = useState<StoreTab>(initialTab);
 
   return (
@@ -42,9 +37,9 @@ export function StoreWebsitePage({
 
       <TabBar tabs={TABS} activeId={tab} onChange={(id) => setTab(id as StoreTab)} />
 
-      {tab === "demande"    && <DemandeTab {...demande} />}
+      {tab === "demande" && <DemandeTab {...demande} />}
       {tab === "categories" && <CategoriesTab {...categories} />}
-      {tab === "produits"   && <ProduitsVisiblesTab {...produits} />}
+      {tab === "produits" && <ProduitsVisiblesTab {...produits} />}
     </div>
   );
 }

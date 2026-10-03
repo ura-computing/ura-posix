@@ -43,8 +43,8 @@ function useTheme() {
 }
 
 const OPTIONS: { mode: ThemeMode; key: string; icon: LucideIcon }[] = [
-  { mode: THEME_MODES.LIGHT,  key: "theme.light",  icon: Sun },
-  { mode: THEME_MODES.DARK,   key: "theme.dark",   icon: Moon },
+  { mode: THEME_MODES.LIGHT, key: "theme.light", icon: Sun },
+  { mode: THEME_MODES.DARK, key: "theme.dark", icon: Moon },
   { mode: THEME_MODES.SYSTEM, key: "theme.system", icon: Monitor },
 ];
 
@@ -64,9 +64,7 @@ export function ThemeToggle() {
             aria-pressed={active}
             className={cn(
               "flex h-7 w-[30px] cursor-pointer items-center justify-center rounded-md transition-colors",
-              active
-                ? "bg-card text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+              active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
           >
             <opt.icon className="size-[15px]" aria-hidden />

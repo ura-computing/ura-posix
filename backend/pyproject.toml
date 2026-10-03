@@ -24,3 +24,6 @@ dev = [
     "ruff>=0.4",
 ]
 
+
+[tool.ruff]
+line-length = 120

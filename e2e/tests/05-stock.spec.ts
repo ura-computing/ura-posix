@@ -14,14 +14,7 @@ import { checkPeremptions, checkStockAbcd, type Row } from "../lib/checks";
 import { expectSameSet } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
-import {
-  columnTexts,
-  downloadXlsx,
-  frNumber,
-  pageCall,
-  period,
-  setPeriod,
-} from "../lib/ui";
+import { columnTexts, downloadXlsx, frNumber, pageCall, period, setPeriod } from "../lib/ui";
 
 test.use({ storageState: sessionFile("owner") });
 
@@ -37,43 +30,28 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const oracle = () => expected().stock_abcd_window;
-const productsWhere = (keep: (r: Row) => boolean): Row[] =>
-  (oracle().products as Row[]).filter(keep);
+const productsWhere = (keep: (r: Row) => boolean): Row[] => (oracle().products as Row[]).filter(keep);
 
 /** The table's API answer = the oracle's products of that filter; the banner
  *  count and the first page show it, in the API order. */
-async function checkTable(
-  page: Page,
-  api: Row,
-  want: Row[],
-  what: string,
-): Promise<void> {
+async function checkTable(page: Page, api: Row, want: Row[], what: string): Promise<void> {
   expectSameSet(api.products, want, (r) => r.product, `${what}: lignes`);
   const banner = page.getByText(/^·\s*[\d\s  ]+\s+produits$/);
   await expect
     .poll(
-      async () =>
-        frNumber(
-          (await banner.innerText()).replace("produits", "").replace("·", ""),
-        ),
+      async () => frNumber((await banner.innerText()).replace("produits", "").replace("·", "")),
       `${what}: nombre affiché`,
     )
     .toBe(want.length);
   if (want.length === 0) return;
-  await expect(page.locator("table tbody tr").first()).toContainText(
-    api.products[0].product,
-  );
+  await expect(page.locator("table tbody tr").first()).toContainText(api.products[0].product);
   expect(await columnTexts(page, "Produit"), `${what}: page 1`).toEqual(
     (api.products as Row[]).slice(0, PAGE_SIZE).map((r) => r.product),
   );
 }
 
 /** One alert card: its 4 numbers = aggregate of the oracle rows (same formula as the page). */
-async function checkAlertCard(
-  page: Page,
-  title: string,
-  rows: Row[],
-): Promise<void> {
+async function checkAlertCard(page: Page, title: string, rows: Row[]): Promise<void> {
   const card: Locator = page
     .getByText(title, { exact: true })
     .locator("xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]")
@@ -84,34 +62,15 @@ async function checkAlertCard(
     ["Unités totales", rows.reduce((s, r) => s + stock(r), 0)],
     [
       "Valeur achats",
-      rows.reduce(
-        (s, r) =>
-          r.avg_pu != null && r.current_stock != null
-            ? s + r.avg_pu * stock(r)
-            : s,
-        0,
-      ),
+      rows.reduce((s, r) => (r.avg_pu != null && r.current_stock != null ? s + r.avg_pu * stock(r) : s), 0),
     ],
-    [
-      "PPV potentiel",
-      rows.reduce(
-        (s, r) =>
-          r.ppv != null && r.current_stock != null ? s + r.ppv * stock(r) : s,
-        0,
-      ),
-    ],
+    ["PPV potentiel", rows.reduce((s, r) => (r.ppv != null && r.current_stock != null ? s + r.ppv * stock(r) : s), 0)],
   ];
   for (const [label, value] of want) {
     const shown = frNumber(
-      await card
-        .getByText(label, { exact: true })
-        .locator("xpath=following-sibling::span[1]")
-        .innerText(),
+      await card.getByText(label, { exact: true }).locator("xpath=following-sibling::span[1]").innerText(),
     );
-    expect(
-      Math.abs((shown ?? NaN) - value),
-      `« ${title} » ${label}: ${shown} ≠ ${value}`,
-    ).toBeLessThanOrEqual(0.011);
+    expect(Math.abs((shown ?? NaN) - value), `« ${title} » ${label}: ${shown} ≠ ${value}`).toBeLessThanOrEqual(0.011);
   }
 }
 
@@ -119,9 +78,7 @@ test("stock: ABCD + péremptions", async ({ page }) => {
   const w = testWindow();
   const perem = pageCall(page, "/stats/peremptions");
   await page.goto("/stock");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Stock", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Stock", exact: true })).toBeVisible();
   checkPeremptions(await perem);
 
   // The "full" fetch (no class filter) drives the ABCD circles + gauge + alert cards;
@@ -140,8 +97,7 @@ test("stock: ABCD + péremptions", async ({ page }) => {
   const fullApi = await full;
   checkStockAbcd(fullApi, "window");
   // Alert cards add up many products: compare with the page's own answer (same floats), checked = oracle above.
-  const apiWhere = (keep: (r: Row) => boolean): Row[] =>
-    (fullApi.products as Row[]).filter(keep);
+  const apiWhere = (keep: (r: Row) => boolean): Row[] => (fullApi.products as Row[]).filter(keep);
 
   await test.step("les 8 cercles de classe", async () => {
     const dist = oracle().distribution as Record<string, number>;
@@ -194,17 +150,10 @@ test("stock: ABCD + péremptions", async ({ page }) => {
       sort_by: "current_stock",
       sort_order: "asc",
     });
-    await page
-      .getByRole("columnheader", { name: "Stock actuel", exact: true })
-      .getByRole("button")
-      .click();
+    await page.getByRole("columnheader", { name: "Stock actuel", exact: true }).getByRole("button").click();
     const s = await sorted;
-    const stocks = (s.products as Row[])
-      .map((r) => r.current_stock)
-      .filter((v) => v != null);
-    expect(stocks, "tri Stock actuel croissant").toEqual(
-      [...stocks].sort((a, b) => a - b),
-    );
+    const stocks = (s.products as Row[]).map((r) => r.current_stock).filter((v) => v != null);
+    expect(stocks, "tri Stock actuel croissant").toEqual([...stocks].sort((a, b) => a - b));
     await checkTable(
       page,
       s,
@@ -214,13 +163,9 @@ test("stock: ABCD + péremptions", async ({ page }) => {
 
     if (s.products.length > PAGE_SIZE) {
       await page.getByRole("button", { name: "Page suivante" }).click();
-      await expect(page.locator("table tbody tr").first()).toContainText(
-        s.products[PAGE_SIZE].product,
-      );
+      await expect(page.locator("table tbody tr").first()).toContainText(s.products[PAGE_SIZE].product);
       expect(await columnTexts(page, "Produit"), "page 2").toEqual(
-        (s.products as Row[])
-          .slice(PAGE_SIZE, 2 * PAGE_SIZE)
-          .map((r) => r.product),
+        (s.products as Row[]).slice(PAGE_SIZE, 2 * PAGE_SIZE).map((r) => r.product),
       );
     }
   });
@@ -228,9 +173,7 @@ test("stock: ABCD + péremptions", async ({ page }) => {
   let shownRows: Row[] = [];
   await test.step("filtre Statut (+ classe)", async () => {
     const status = Object.keys(STATUS_LABEL).find(
-      (st) =>
-        productsWhere((r) => r.category === other && r.status === st).length >
-        0,
+      (st) => productsWhere((r) => r.category === other && r.status === st).length > 0,
     )!;
     const byStatus = pageCall(page, "/stats/stock-abcd", {
       ...period(w),
@@ -260,12 +203,8 @@ test("stock: ABCD + péremptions", async ({ page }) => {
 
   await test.step("Excel du tableau", async () => {
     // The file = the filtered table (all its rows, not just the page), statuses in French words.
-    const x = await downloadXlsx(page, () =>
-      page.getByRole("button", { name: "Exporter Excel" }).click(),
-    );
-    expect(x.filename, "nom du fichier").toBe(
-      `APCM - STOCK ${w.date_from} - ${w.date_to}.xlsx`,
-    );
+    const x = await downloadXlsx(page, () => page.getByRole("button", { name: "Exporter Excel" }).click());
+    expect(x.filename, "nom du fichier").toBe(`APCM - STOCK ${w.date_from} - ${w.date_to}.xlsx`);
     expect(x.rows[0], "en-têtes").toEqual([
       "Produit",
       "Classe",
@@ -310,11 +249,7 @@ test("stock: ABCD + péremptions", async ({ page }) => {
     await checkAlertCard(
       page,
       "Sous-stock top références",
-      apiWhere(
-        (r) =>
-          (r.category === "A" || r.category === "A-") &&
-          r.status === "sous-stock",
-      ),
+      apiWhere((r) => (r.category === "A" || r.category === "A-") && r.status === "sous-stock"),
     );
     await checkAlertCard(
       page,
@@ -331,17 +266,12 @@ test("stock: ABCD + péremptions", async ({ page }) => {
       ["no_date", "Sans date"],
     ] as const;
     for (const [key, title] of cards) {
-      const want = (expected().peremptions[key].products as Row[])
-        .map((r) => r.product)
-        .sort();
+      const want = (expected().peremptions[key].products as Row[]).map((r) => r.product).sort();
       if (want.length === 0) continue; // empty card is disabled
       await page.getByText(title, { exact: true }).click();
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      expect(
-        (await columnTexts(page, "Produit", dialog.locator("table"))).sort(),
-        `${title}: produits`,
-      ).toEqual(want);
+      expect((await columnTexts(page, "Produit", dialog.locator("table"))).sort(), `${title}: produits`).toEqual(want);
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
     }

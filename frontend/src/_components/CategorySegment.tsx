@@ -10,26 +10,21 @@
 import { cn } from "@/utils/cn";
 import { useT } from "@/i18n/I18nProvider";
 
-
 export interface SegmentOption<V extends string> {
-  value:    V;
-  label:    string;
+  value: V;
+  label: string;
   /** Tailwind classes applied when this option is active. */
   activeBg: string;
 }
 
-
 export interface CategorySegmentProps<V extends string> {
-  value:    V;
-  options:  SegmentOption<V>[];
+  value: V;
+  options: SegmentOption<V>[];
   onChange: (v: V) => void;
   className?: string;
 }
 
-
-export function CategorySegment<V extends string>({
-  value, options, onChange, className,
-}: CategorySegmentProps<V>) {
+export function CategorySegment<V extends string>({ value, options, onChange, className }: CategorySegmentProps<V>) {
   return (
     <div
       className={cn(
@@ -59,13 +54,12 @@ export function CategorySegment<V extends string>({
   );
 }
 
-
 /** Standard 3-option set for "Catégorie" filter — Mixte / Pharmacie / Parapharmacie.
  *  Locked palette: primary teal for Mixte, indigo for Pharmacie, orange for
  *  Parapharmacie (matches the tokens.css category trio). */
 const CATEGORY_TYPE_STYLES = {
-  all:           "bg-primary text-primary-foreground shadow-sm",
-  pharmacie:     "bg-pharmacie-bg text-pharmacie-fg border border-pharmacie-border",
+  all: "bg-primary text-primary-foreground shadow-sm",
+  pharmacie: "bg-pharmacie-bg text-pharmacie-fg border border-pharmacie-border",
   parapharmacie: "bg-parapharmacie-bg text-parapharmacie-fg border border-parapharmacie-border",
 } as const;
 
@@ -73,8 +67,8 @@ const CATEGORY_TYPE_STYLES = {
 export function useCategoryTypeOptions(): SegmentOption<"all" | "pharmacie" | "parapharmacie">[] {
   const t = useT();
   return [
-    { value: "all",           label: t("category.mixte"),         activeBg: CATEGORY_TYPE_STYLES.all },
-    { value: "pharmacie",     label: t("category.pharmacie"),     activeBg: CATEGORY_TYPE_STYLES.pharmacie },
+    { value: "all", label: t("category.mixte"), activeBg: CATEGORY_TYPE_STYLES.all },
+    { value: "pharmacie", label: t("category.pharmacie"), activeBg: CATEGORY_TYPE_STYLES.pharmacie },
     { value: "parapharmacie", label: t("category.parapharmacie"), activeBg: CATEGORY_TYPE_STYLES.parapharmacie },
   ];
 }

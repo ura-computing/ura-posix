@@ -1,14 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
 
 import {
-  ACHAT_FILENAME_RE, STOCK_FILENAME_RE, VENTE_FILENAME_RE,
-  parseDatesFromFilename, parseSobrusCsv, readFileText,
+  ACHAT_FILENAME_RE,
+  STOCK_FILENAME_RE,
+  VENTE_FILENAME_RE,
+  parseDatesFromFilename,
+  parseSobrusCsv,
+  readFileText,
 } from "@/utils/csv";
 import type { DocType } from "@/types";
 
 import { useUploadCtx, type UploadPhase } from "@/hooks/UploadContext";
 import { translate } from "@/i18n/I18nProvider";
-
 
 /**
  * Wizard state machine — owns step navigation + selected doc-type + parsed
@@ -30,7 +33,6 @@ import { translate } from "@/i18n/I18nProvider";
 
 export type Step = 1 | 2 | 3;
 
-
 const FILENAME_REGEX: Record<DocType, RegExp> = {
   achat: ACHAT_FILENAME_RE,
   vente: VENTE_FILENAME_RE,
@@ -43,7 +45,6 @@ const EXAMPLE_FILENAME: Record<DocType, string> = {
   stock: "Sobrus - Stock 20260622.csv",
 };
 
-
 /** Columns a Sobrus file of this type must have. Compared on ASCII letters only, so
  *  « Référence » and a broken « RÃ©fÃ©rence » both match. */
 const REQUIRED_COLUMNS: Record<DocType, string[]> = {
@@ -54,20 +55,15 @@ const REQUIRED_COLUMNS: Record<DocType, string[]> = {
 const asciiKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export function useUpload(initialDocType: DocType | null = null) {
-  const {
-    jobs,
-    cancelUpload,
-    dismissJob,
-    enqueueUpload,
-  } = useUploadCtx();
+  const { jobs, cancelUpload, dismissJob, enqueueUpload } = useUploadCtx();
 
   // Local-only wizard scaffolding. Lost on unmount — that's OK because the
   // state card pulls everything from the rehydrated job below.
-  const [localStep,    setStep]    = useState<Step>(initialDocType ? 2 : 1);
+  const [localStep, setStep] = useState<Step>(initialDocType ? 2 : 1);
   const [localDocType, setDocType] = useState<DocType | null>(initialDocType);
-  const [file,         setFile]    = useState<File | null>(null);
-  const [headers,      setHeaders] = useState<string[]>([]);
-  const [allRows,      setAllRows] = useState<Record<string, string>[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [allRows, setAllRows] = useState<Record<string, string>[]>([]);
   const [filenameError, setFilenameError] = useState<string | null>(null);
 
   // One-shot "user clicked Nouvel import while the upload was running"
@@ -85,18 +81,18 @@ export function useUpload(initialDocType: DocType | null = null) {
   // the local file/headers belong to a different intent).
   // From `jobs` (state), not getJobByDocType (reads a ref): the React Compiler caches a
   // call whose inputs never change, so the wizard would never see the job progress.
-  const job = localDocType ? [...jobs].reverse().find((j) => j.docType === localDocType) ?? null : null;
+  const job = localDocType ? ([...jobs].reverse().find((j) => j.docType === localDocType) ?? null) : null;
 
   // Render priority: local file-preview > active/recent job for this docType > wizard
   // - localStep=3 + file: user is on the confirmation step with a freshly-picked file
   // - else if job (and not session-dismissed): show the rehydrated job's state card
   // - else:               normal wizard step 1 or 2
   const showJobCard = !file && job !== null && !dismissedRunningCard;
-  const step:    Step           = showJobCard ? 3 : localStep;
+  const step: Step = showJobCard ? 3 : localStep;
   const docType: DocType | null = localDocType;
 
   const previewRows = useMemo(() => allRows.slice(0, 8), [allRows]);
-  const fileDates   = useMemo(() => (file ? parseDatesFromFilename(file.name) : null), [file]);
+  const fileDates = useMemo(() => (file ? parseDatesFromFilename(file.name) : null), [file]);
 
   const pickType = useCallback((t: DocType) => {
     setDocType(t);
@@ -120,7 +116,7 @@ export function useUpload(initialDocType: DocType | null = null) {
       return;
     }
     setFilenameError(null);
-    const text   = await readFileText(f);
+    const text = await readFileText(f);
     const parsed = parseSobrusCsv(text);
     if (parsed.rows.length === 0) {
       setFilenameError(translate("uploadFile.emptyFile"));
@@ -128,7 +124,8 @@ export function useUpload(initialDocType: DocType | null = null) {
     }
     const have = new Set(parsed.headers.map(asciiKey));
     const missing = REQUIRED_COLUMNS[t].filter((c) => !have.has(asciiKey(c)));
-    if (missing.length > 0) {            // e.g. a Ventes file renamed « Achats »
+    if (missing.length > 0) {
+      // e.g. a Ventes file renamed « Achats »
       setFilenameError(translate("uploadFile.missingColumns", { columns: missing.join(", ") }));
       return;
     }
@@ -185,19 +182,29 @@ export function useUpload(initialDocType: DocType | null = null) {
 
   return {
     // shell state (rehydration scoped per-doc-type via `job`)
-    step, docType, file,
-    headers, previewRows, totalRows: allRows.length, fileDates, filenameError,
+    step,
+    docType,
+    file,
+    headers,
+    previewRows,
+    totalRows: allRows.length,
+    fileDates,
+    filenameError,
     examples: EXAMPLE_FILENAME,
     // shell actions
-    pickType, backToType, acceptFile, changeFile, startImport,
+    pickType,
+    backToType,
+    acceptFile,
+    changeFile,
+    startImport,
     clearFilenameError: () => setFilenameError(null),
     // job state (null when no job for this doc-type) — the state card reads from here
-    phase:       (job?.phase       ?? "idle") as UploadPhase | "idle",
-    progress:    job?.progress    ?? { current: 0, total: 0, inserted: 0, skipped: 0 },
-    batchId:     job?.batchId     ?? null,
-    error:       job?.error       ?? null,
+    phase: (job?.phase ?? "idle") as UploadPhase | "idle",
+    progress: job?.progress ?? { current: 0, total: 0, inserted: 0, skipped: 0 },
+    batchId: job?.batchId ?? null,
+    error: job?.error ?? null,
     stockResult: job?.stockResult ?? null,
-    filename:    job?.filename    ?? null,
+    filename: job?.filename ?? null,
     cancel,
     reset,
   };

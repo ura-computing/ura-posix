@@ -14,7 +14,6 @@ import type { TemplateProps } from "../_shared/customizationTypes";
 import { LumiereShell } from "./Shell";
 import { LumiereStyles } from "./styles";
 
-
 export function LumiereCatalogue(props: TemplateProps) {
   const { customization, categories, pharmacyPhone } = props;
   const [activeCat, setActiveCat] = useState<string | null>(null);
@@ -24,19 +23,14 @@ export function LumiereCatalogue(props: TemplateProps) {
     return MOCK_STORE_PRODUCTS.filter((p) => (p.storeCategoryId ?? "cat-default") === activeCat);
   }, [activeCat]);
 
-  const chips = [
-    { id: null,        name: "Tout" },
-    ...categories.map((c) => ({ id: c.id, name: c.name })),
-  ];
+  const chips = [{ id: null, name: "Tout" }, ...categories.map((c) => ({ id: c.id, name: c.name }))];
 
   return (
     <LumiereShell customization={customization} pharmacyPhone={pharmacyPhone} logoUrl={customization.logoUrl}>
       <LumiereStyles />
       <div className="mx-auto max-w-[1200px] px-5 py-10 sm:px-8 sm:py-14">
         <header className="mb-8 flex flex-col gap-3">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--lum-primary)]">
-            Catalogue
-          </span>
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--lum-primary)]">Catalogue</span>
           <h1 className="font-[family-name:var(--lum-font-display)] text-4xl font-semibold text-[var(--lum-ink)] sm:text-5xl">
             Chaque produit, choisi avec soin
           </h1>
@@ -66,9 +60,14 @@ export function LumiereCatalogue(props: TemplateProps) {
           <AnimatePresence mode="popLayout">
             {products.map((p) => {
               const stockLabel = p.stock === 0 ? "Rupture" : p.stock <= 5 ? "Stock limité" : "En stock";
-              const stockTone  = p.stock === 0 ? "text-rose-600 bg-rose-500/10" : p.stock <= 5 ? "text-amber-600 bg-amber-500/10" : "text-emerald-600 bg-emerald-500/10";
+              const stockTone =
+                p.stock === 0
+                  ? "text-rose-600 bg-rose-500/10"
+                  : p.stock <= 5
+                    ? "text-amber-600 bg-amber-500/10"
+                    : "text-emerald-600 bg-emerald-500/10";
               const onSale = p.solde != null;
-              const price  = p.solde ?? p.ppv;
+              const price = p.solde ?? p.ppv;
               return (
                 <motion.article
                   key={p.id}
@@ -110,7 +109,8 @@ export function LumiereCatalogue(props: TemplateProps) {
                     </div>
                     <a
                       href={whatsappOrderLink(pharmacyPhone, p.name)}
-                      target="_blank" rel="noopener"
+                      target="_blank"
+                      rel="noopener"
                       className="rounded-full bg-[var(--lum-primary)] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:scale-105"
                     >
                       Commander

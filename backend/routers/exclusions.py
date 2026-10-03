@@ -1,5 +1,6 @@
 """Owner exclusions: special products, BLs, suppliers. They only change Comptabilité
 (`exclusions.py` at the backend root); nothing is deleted, réintégrer restores it."""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -57,13 +58,14 @@ router = APIRouter(tags=["exclusions"])
 # Feature gate: special_products. Owner toggles per-user via UserPermission;
 # admin grants/revokes at pharmacy level via PharmacyFeature.
 
+
 def _to_out(status_row, med: Medicament) -> dict:
     return {
         "medicament_id": med.id,
-        "product":       med.product,
-        "pid":           med.pid,
-        "category":      med.category,
-        "created_at":    status_row.created_at.isoformat() if status_row.created_at else "",
+        "product": med.product,
+        "pid": med.pid,
+        "category": med.category,
+        "created_at": status_row.created_at.isoformat() if status_row.created_at else "",
     }
 
 
@@ -87,29 +89,33 @@ def list_special_products(pharmacy_id: Annotated[int, member("special_products")
 def exclude_products(
     body: SpecialProductCreate,
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
+    db: DbDep,
 ) -> dict:
     """Bulk-mark medicaments as spécial for this pharmacy. Idempotent —
     medicament_ids already flagged are counted as `already_special` rather
     than erroring. Atomic: if any id is bogus the whole request returns 404
     with the offending ids surfaced; nothing is committed."""
-    ids = list(dict.fromkeys(body.medicament_ids))      # dedupe, keep order
+    ids = list(dict.fromkeys(body.medicament_ids))  # dedupe, keep order
 
-    existing_meds = {m.id: m for m in
-        db.query(Medicament).filter(Medicament.id.in_(ids)).all()}
+    existing_meds = {m.id: m for m in db.query(Medicament).filter(Medicament.id.in_(ids)).all()}
     bad = [i for i in ids if i not in existing_meds]
     if bad:
         raise ApiError(
-            404, ErrorCode.MEDICAMENTS_NOT_FOUND,
+            404,
+            ErrorCode.MEDICAMENTS_NOT_FOUND,
             f"Médicament(s) introuvable(s) : {bad}",
             ids=", ".join(map(str, bad)),
         )
 
-    existing_status = {s.medicament_id: s for s in
-        db.query(PharmacyMedicamentStatus).filter(
+    existing_status = {
+        s.medicament_id: s
+        for s in db.query(PharmacyMedicamentStatus)
+        .filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
             PharmacyMedicamentStatus.medicament_id.in_(ids),
-        ).all()}
+        )
+        .all()
+    }
 
     inserted = already = 0
     touched: list[PharmacyMedicamentStatus] = []
@@ -117,23 +123,27 @@ def exclude_products(
         s = existing_status.get(med_id)
         if s:
             if s.declared is False:
-                already += 1                # already spécial → no-op
+                already += 1  # already spécial → no-op
             else:
-                s.declared = False          # was re-declared previously → flip
+                s.declared = False  # was re-declared previously → flip
                 inserted += 1
             touched.append(s)
         else:
             s = PharmacyMedicamentStatus(
-                pharmacy_id=pharmacy_id, medicament_id=med_id, declared=False,
+                pharmacy_id=pharmacy_id,
+                medicament_id=med_id,
+                declared=False,
             )
-            db.add(s); touched.append(s); inserted += 1
+            db.add(s)
+            touched.append(s)
+            inserted += 1
     db.commit()
     for s in touched:
         db.refresh(s)
     return {
-        "inserted":        inserted,
+        "inserted": inserted,
         "already_special": already,
-        "products":        [_to_out(s, existing_meds[s.medicament_id]) for s in touched],
+        "products": [_to_out(s, existing_meds[s.medicament_id]) for s in touched],
     }
 
 
@@ -141,13 +151,13 @@ def exclude_products(
 def reintegrate_products(
     body: SpecialProductReintegrate,
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
+    db: DbDep,
 ) -> dict:
     """Bulk-réintégrer — remove the spécial flag on N medicaments at once.
     Products return to Comptabilité on the next query. Idempotent: ids
     that aren't currently spécial are silently counted as `not_special`
     (no 404 — owner might be acting on stale UI state)."""
-    ids = list(dict.fromkeys(body.medicament_ids))      # dedupe, keep order
+    ids = list(dict.fromkeys(body.medicament_ids))  # dedupe, keep order
 
     rows = (
         db.query(PharmacyMedicamentStatus)
@@ -163,8 +173,8 @@ def reintegrate_products(
         db.delete(r)
     db.commit()
     return {
-        "reintegrated":   len(rows),
-        "not_special":    len([i for i in ids if i not in found]),
+        "reintegrated": len(rows),
+        "not_special": len([i for i in ids if i not in found]),
         "medicament_ids": ids,
     }
 
@@ -172,8 +182,8 @@ def reintegrate_products(
 @router.get("/special-products/suggestions", response_model=list[MedicamentSuggestion])
 def medicament_suggestions(
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
-    q:    Annotated[str, Query(min_length=2, description="≥2 chars; tokenized + accent-insensitive")],
+    db: DbDep,
+    q: Annotated[str, Query(min_length=2, description="≥2 chars; tokenized + accent-insensitive")],
 ) -> list[dict]:
     """Autocomplete: medicaments the pharmacy actually has Achats OR Ventes for,
     minus those already marked spécial. Limit 10."""
@@ -182,12 +192,14 @@ def medicament_suggestions(
     achat_meds = (
         db.query(Achat.medicament_id)
         .filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id.isnot(None))
-        .distinct().scalar_subquery()
+        .distinct()
+        .scalar_subquery()
     )
     vente_meds = (
         db.query(Vente.medicament_id)
         .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id.isnot(None))
-        .distinct().scalar_subquery()
+        .distinct()
+        .scalar_subquery()
     )
     excluded = (
         db.query(PharmacyMedicamentStatus.medicament_id)
@@ -211,7 +223,10 @@ def medicament_suggestions(
 
     qry = (
         db.query(
-            Medicament.id, Medicament.pid, Medicament.product, Medicament.category,
+            Medicament.id,
+            Medicament.pid,
+            Medicament.product,
+            Medicament.category,
             func.coalesce(sales_sub.c.nb_ventes, 0).label("nb_ventes"),
         )
         .outerjoin(sales_sub, sales_sub.c.med_id == Medicament.id)
@@ -223,13 +238,16 @@ def medicament_suggestions(
         qry = qry.filter(clause)
 
     rows = qry.order_by(Medicament.product.asc()).all()
-    return [{
-        "id":        r.id,
-        "pid":       r.pid,
-        "product":   r.product,
-        "category":  r.category,
-        "nb_ventes": int(r.nb_ventes or 0),
-    } for r in rows]
+    return [
+        {
+            "id": r.id,
+            "pid": r.pid,
+            "product": r.product,
+            "category": r.category,
+            "nb_ventes": int(r.nb_ventes or 0),
+        }
+        for r in rows
+    ]
 
 
 # ═══ BL exclusions ═══════════════════════════════════════════════════════════
@@ -245,32 +263,33 @@ def medicament_suggestions(
 #
 # Feature gate: special_products (same page as product exclusions).
 
+
 def _bl_aggregate(db, pharmacy_id: int, refs: list[str] | None = None):
     """Group this pharmacy's Achats by delivery_ref → one row per BL with
     supplier / date / total / line & product counts. NULL refs are ignored
     (they can't be excluded)."""
-    q = (
-        db.query(
-            Achat.delivery_ref.label("ref"),
-            func.max(Achat.supplier).label("supplier"),
-            func.max(Achat.delivery_date).label("delivery_date"),
-            func.coalesce(func.sum(Achat.total), 0.0).label("total"),
-            func.count(Achat.id).label("nb_lines"),
-            func.count(func.distinct(Achat.medicament_id)).label("nb_products"),
-        )
-        .filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None))
-    )
+    q = db.query(
+        Achat.delivery_ref.label("ref"),
+        func.max(Achat.supplier).label("supplier"),
+        func.max(Achat.delivery_date).label("delivery_date"),
+        func.coalesce(func.sum(Achat.total), 0.0).label("total"),
+        func.count(Achat.id).label("nb_lines"),
+        func.count(func.distinct(Achat.medicament_id)).label("nb_products"),
+    ).filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None))
     if refs is not None:
         q = q.filter(Achat.delivery_ref.in_(refs))
     return q.group_by(Achat.delivery_ref)
 
 
 def _excluded_refs(db, pharmacy_id: int) -> set[str]:
-    return {r[0] for r in db.query(PharmacyBlExclusion.delivery_ref)
-            .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id).all()}
+    return {
+        r[0]
+        for r in db.query(PharmacyBlExclusion.delivery_ref).filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id).all()
+    }
 
 
 # ─── List current exclusions ──────────────────────────────────────────────────
+
 
 @router.get("/bl-exclusions/", response_model=list[BlExclusionOut])
 def list_bl_exclusions(pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> list[dict]:
@@ -288,25 +307,28 @@ def list_bl_exclusions(pharmacy_id: Annotated[int, member("special_products")], 
     out = []
     for r in rows:
         a = agg.get(r.delivery_ref)
-        out.append({
-            "delivery_ref":  r.delivery_ref,
-            "supplier":      a.supplier if a else None,
-            "delivery_date": a.delivery_date if a else None,
-            "total":         round(float(a.total), 2) if a else 0.0,
-            "nb_lines":      int(a.nb_lines) if a else 0,
-            "notes":         r.notes,
-            "created_at":    r.created_at.isoformat() if r.created_at else "",
-        })
+        out.append(
+            {
+                "delivery_ref": r.delivery_ref,
+                "supplier": a.supplier if a else None,
+                "delivery_date": a.delivery_date if a else None,
+                "total": round(float(a.total), 2) if a else 0.0,
+                "nb_lines": int(a.nb_lines) if a else 0,
+                "notes": r.notes,
+                "created_at": r.created_at.isoformat() if r.created_at else "",
+            }
+        )
     return out
 
 
 # ─── Search BLs to exclude (by ref or by product) ─────────────────────────────
 
+
 @router.get("/bl-exclusions/search", response_model=list[BlSummary])
 def search_bls(
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
-    q:    Annotated[str, Query(min_length=2, description="BL reference (substring) or product name")],
+    db: DbDep,
+    q: Annotated[str, Query(min_length=2, description="BL reference (substring) or product name")],
 ) -> list[dict]:
     """Find BLs matching `q` either by delivery reference (substring, accent/case
     insensitive) OR by a product they contain. Returns BL summaries so the user
@@ -318,10 +340,7 @@ def search_bls(
     # (prefix `LVC*`, suffix `*2606`, infix `LV*06`) via the shared search helper.
     refs: set[str] = set()
     if tokens:
-        ref_rows = (
-            db.query(Achat.delivery_ref)
-            .filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None))
-        )
+        ref_rows = db.query(Achat.delivery_ref).filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None))
         for clause in supplier_search_clauses(tokens, [Achat.delivery_ref]):
             ref_rows = ref_rows.filter(clause)
         refs = {r[0] for r in ref_rows.distinct().all()}
@@ -347,30 +366,30 @@ def search_bls(
     if not refs:
         return []
 
-    rows = (
-        _bl_aggregate(db, pharmacy_id, list(refs))
-        .order_by(func.max(Achat.delivery_date).desc())
-        .all()
-    )
+    rows = _bl_aggregate(db, pharmacy_id, list(refs)).order_by(func.max(Achat.delivery_date).desc()).all()
     excluded = _excluded_refs(db, pharmacy_id)
-    return [{
-        "delivery_ref":     r.ref,
-        "supplier":         r.supplier,
-        "delivery_date":    r.delivery_date,
-        "total":            round(float(r.total), 2),
-        "nb_lines":         int(r.nb_lines),
-        "nb_products":      int(r.nb_products),
-        "already_excluded": r.ref in excluded,
-        "matched_products": matched_by_ref.get(r.ref, []),
-    } for r in rows]
+    return [
+        {
+            "delivery_ref": r.ref,
+            "supplier": r.supplier,
+            "delivery_date": r.delivery_date,
+            "total": round(float(r.total), 2),
+            "nb_lines": int(r.nb_lines),
+            "nb_products": int(r.nb_products),
+            "already_excluded": r.ref in excluded,
+            "matched_products": matched_by_ref.get(r.ref, []),
+        }
+        for r in rows
+    ]
 
 
 # ─── BL detail (product lines) for the confirmation step ──────────────────────
 
+
 @router.get("/bl-exclusions/detail", response_model=BlDetail)
 def bl_detail(
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
+    db: DbDep,
     delivery_ref: Annotated[str, Query(min_length=1)],
 ) -> dict:
     """All product lines of one BL, so the user confirms it's the right one."""
@@ -384,26 +403,30 @@ def bl_detail(
         raise ApiError(404, ErrorCode.BL_NOT_FOUND, f"Bon de livraison introuvable : {delivery_ref}", ref=delivery_ref)
 
     supplier = next((a.supplier for a, _ in rows if a.supplier), None)
-    date     = next((a.delivery_date for a, _ in rows if a.delivery_date), None)
-    total    = round(sum(float(a.total or 0) for a, _ in rows), 2)
-    lines = [{
-        "product":    m.product if m else None,
-        "pid":        m.pid if m else None,
-        "quantity":   a.quantity,
-        "unit_price": a.unit_price,
-        "total":      a.total,
-    } for a, m in rows]
+    date = next((a.delivery_date for a, _ in rows if a.delivery_date), None)
+    total = round(sum(float(a.total or 0) for a, _ in rows), 2)
+    lines = [
+        {
+            "product": m.product if m else None,
+            "pid": m.pid if m else None,
+            "quantity": a.quantity,
+            "unit_price": a.unit_price,
+            "total": a.total,
+        }
+        for a, m in rows
+    ]
     return {
-        "delivery_ref":  delivery_ref,
-        "supplier":      supplier,
+        "delivery_ref": delivery_ref,
+        "supplier": supplier,
         "delivery_date": date,
-        "total":         total,
-        "nb_lines":      len(rows),
-        "lines":         lines,
+        "total": total,
+        "nb_lines": len(rows),
+        "lines": lines,
     }
 
 
 # ─── Exclude a BL ─────────────────────────────────────────────────────────────
+
 
 @router.post("/bl-exclusions/", response_model=BlExclusionResult, status_code=201)
 def exclude_bl(body: BlExclusionCreate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> dict:
@@ -419,14 +442,13 @@ def exclude_bl(body: BlExclusionCreate, pharmacy_id: Annotated[int, member("spec
 
     existing = (
         db.query(PharmacyBlExclusion)
-        .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id,
-                PharmacyBlExclusion.delivery_ref == ref)
+        .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id, PharmacyBlExclusion.delivery_ref == ref)
         .first()
     )
     already = 0
     if existing:
         already = 1
-        if body.notes is not None:        # allow updating the note on re-exclude
+        if body.notes is not None:  # allow updating the note on re-exclude
             existing.notes = body.notes
         row = existing
     else:
@@ -435,21 +457,22 @@ def exclude_bl(body: BlExclusionCreate, pharmacy_id: Annotated[int, member("spec
     db.commit()
     db.refresh(row)
     return {
-        "excluded":         0 if already else 1,
+        "excluded": 0 if already else 1,
         "already_excluded": already,
         "item": {
-            "delivery_ref":  ref,
-            "supplier":      agg.supplier,
+            "delivery_ref": ref,
+            "supplier": agg.supplier,
             "delivery_date": agg.delivery_date,
-            "total":         round(float(agg.total), 2),
-            "nb_lines":      int(agg.nb_lines),
-            "notes":         row.notes,
-            "created_at":    row.created_at.isoformat() if row.created_at else "",
+            "total": round(float(agg.total), 2),
+            "nb_lines": int(agg.nb_lines),
+            "notes": row.notes,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
         },
     }
 
 
 # ─── Réintégrer (un-exclude) ──────────────────────────────────────────────────
+
 
 @router.post("/bl-exclusions/reintegrate", response_model=BlReintegrateResult)
 def reintegrate_bls(body: BlReintegrate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> dict:
@@ -458,8 +481,7 @@ def reintegrate_bls(body: BlReintegrate, pharmacy_id: Annotated[int, member("spe
     refs = list(dict.fromkeys(r.strip() for r in body.delivery_refs if r.strip()))
     rows = (
         db.query(PharmacyBlExclusion)
-        .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id,
-                PharmacyBlExclusion.delivery_ref.in_(refs))
+        .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id, PharmacyBlExclusion.delivery_ref.in_(refs))
         .all()
     )
     found = {r.delivery_ref for r in rows}
@@ -467,8 +489,8 @@ def reintegrate_bls(body: BlReintegrate, pharmacy_id: Annotated[int, member("spe
         db.delete(r)
     db.commit()
     return {
-        "reintegrated":  len(rows),
-        "not_excluded":  len([r for r in refs if r not in found]),
+        "reintegrated": len(rows),
+        "not_excluded": len([r for r in refs if r not in found]),
         "delivery_refs": refs,
     }
 
@@ -483,6 +505,7 @@ def reintegrate_bls(body: BlReintegrate, pharmacy_id: Annotated[int, member("spe
 #
 # Feature gate: special_products (same page as product / BL exclusions).
 
+
 def _norm(name: str | None) -> str:
     return strip_accents(name or "").lower().strip()
 
@@ -490,16 +513,13 @@ def _norm(name: str | None) -> str:
 def _supplier_aggregate(db, pharmacy_id: int, suppliers: list[str] | None = None):
     """Group this pharmacy's Achats by supplier → one row per supplier with
     total / line & product counts / last date. NULL suppliers are ignored."""
-    q = (
-        db.query(
-            Achat.supplier.label("supplier"),
-            func.coalesce(func.sum(Achat.total), 0.0).label("total"),
-            func.count(Achat.id).label("nb_lines"),
-            func.count(func.distinct(Achat.medicament_id)).label("nb_products"),
-            func.max(Achat.delivery_date).label("last_date"),
-        )
-        .filter(Achat.pharmacy_id == pharmacy_id, Achat.supplier.isnot(None))
-    )
+    q = db.query(
+        Achat.supplier.label("supplier"),
+        func.coalesce(func.sum(Achat.total), 0.0).label("total"),
+        func.count(Achat.id).label("nb_lines"),
+        func.count(func.distinct(Achat.medicament_id)).label("nb_products"),
+        func.max(Achat.delivery_date).label("last_date"),
+    ).filter(Achat.pharmacy_id == pharmacy_id, Achat.supplier.isnot(None))
     if suppliers is not None:
         q = q.filter(Achat.supplier.in_(suppliers))
     return q.group_by(Achat.supplier)
@@ -508,12 +528,15 @@ def _supplier_aggregate(db, pharmacy_id: int, suppliers: list[str] | None = None
 def _excluded_norm_set(db, pharmacy_id: int) -> set[str]:
     """Normalized (accent/case-insensitive) set of currently-excluded supplier names."""
     return {
-        _norm(r[0]) for r in db.query(PharmacySupplierExclusion.supplier)
-        .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id).all()
+        _norm(r[0])
+        for r in db.query(PharmacySupplierExclusion.supplier)
+        .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
+        .all()
     }
 
 
 # ─── List current exclusions ──────────────────────────────────────────────────
+
 
 @router.get("/supplier-exclusions/", response_model=list[SupplierExclusionOut])
 def list_supplier_exclusions(pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> list[dict]:
@@ -531,25 +554,28 @@ def list_supplier_exclusions(pharmacy_id: Annotated[int, member("special_product
     out = []
     for r in rows:
         a = agg.get(r.supplier)
-        out.append({
-            "supplier":    r.supplier,
-            "total":       round(float(a.total), 2) if a else 0.0,
-            "nb_lines":    int(a.nb_lines) if a else 0,
-            "nb_products": int(a.nb_products) if a else 0,
-            "last_date":   a.last_date if a else None,
-            "notes":       r.notes,
-            "created_at":  r.created_at.isoformat() if r.created_at else "",
-        })
+        out.append(
+            {
+                "supplier": r.supplier,
+                "total": round(float(a.total), 2) if a else 0.0,
+                "nb_lines": int(a.nb_lines) if a else 0,
+                "nb_products": int(a.nb_products) if a else 0,
+                "last_date": a.last_date if a else None,
+                "notes": r.notes,
+                "created_at": r.created_at.isoformat() if r.created_at else "",
+            }
+        )
     return out
 
 
 # ─── Search suppliers to exclude (by name) ────────────────────────────────────
 
+
 @router.get("/supplier-exclusions/search", response_model=list[SupplierSummary])
 def search_suppliers(
     pharmacy_id: Annotated[int, member("special_products")],
-    db:   DbDep,
-    q:    Annotated[str, Query(min_length=2, description="Supplier name (accent/case-insensitive, `*` wildcard)")],
+    db: DbDep,
+    q: Annotated[str, Query(min_length=2, description="Supplier name (accent/case-insensitive, `*` wildcard)")],
 ) -> list[dict]:
     """Find suppliers matching `q` (accent/case-insensitive, `*`-aware) with their
     aggregated purchase totals so the user can pick one; already-excluded
@@ -564,20 +590,26 @@ def search_suppliers(
     rows = agg.order_by(func.sum(Achat.total).desc()).all()
 
     excluded = _excluded_norm_set(db, pharmacy_id)
-    return [{
-        "supplier":         r.supplier,
-        "total":            round(float(r.total), 2),
-        "nb_lines":         int(r.nb_lines),
-        "nb_products":      int(r.nb_products),
-        "last_date":        r.last_date,
-        "already_excluded": _norm(r.supplier) in excluded,
-    } for r in rows]
+    return [
+        {
+            "supplier": r.supplier,
+            "total": round(float(r.total), 2),
+            "nb_lines": int(r.nb_lines),
+            "nb_products": int(r.nb_products),
+            "last_date": r.last_date,
+            "already_excluded": _norm(r.supplier) in excluded,
+        }
+        for r in rows
+    ]
 
 
 # ─── Exclude a supplier ───────────────────────────────────────────────────────
 
+
 @router.post("/supplier-exclusions/", response_model=SupplierExclusionResult, status_code=201)
-def exclude_supplier(body: SupplierExclusionCreate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> dict:
+def exclude_supplier(
+    body: SupplierExclusionCreate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep
+) -> dict:
     """Exclude one supplier by name (+ optional note). Idempotent — an already
     excluded supplier is a no-op. 404 if the supplier has no Achats in this pharmacy."""
     supplier = body.supplier.strip()
@@ -590,14 +622,17 @@ def exclude_supplier(body: SupplierExclusionCreate, pharmacy_id: Annotated[int, 
 
     # Same name ignoring case / accents = same supplier (the search flags it the same way).
     existing = next(
-        (r for r in db.query(PharmacySupplierExclusion).filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
-         if _norm(r.supplier) == _norm(supplier)),
+        (
+            r
+            for r in db.query(PharmacySupplierExclusion).filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
+            if _norm(r.supplier) == _norm(supplier)
+        ),
         None,
     )
     already = 0
     if existing:
         already = 1
-        if body.notes is not None:        # allow updating the note on re-exclude
+        if body.notes is not None:  # allow updating the note on re-exclude
             existing.notes = body.notes
         row = existing
     else:
@@ -606,31 +641,33 @@ def exclude_supplier(body: SupplierExclusionCreate, pharmacy_id: Annotated[int, 
     db.commit()
     db.refresh(row)
     return {
-        "excluded":         0 if already else 1,
+        "excluded": 0 if already else 1,
         "already_excluded": already,
         "item": {
-            "supplier":    supplier,
-            "total":       round(float(agg.total), 2),
-            "nb_lines":    int(agg.nb_lines),
+            "supplier": supplier,
+            "total": round(float(agg.total), 2),
+            "nb_lines": int(agg.nb_lines),
             "nb_products": int(agg.nb_products),
-            "last_date":   agg.last_date,
-            "notes":       row.notes,
-            "created_at":  row.created_at.isoformat() if row.created_at else "",
+            "last_date": agg.last_date,
+            "notes": row.notes,
+            "created_at": row.created_at.isoformat() if row.created_at else "",
         },
     }
 
 
 # ─── Réintégrer (un-exclude) ──────────────────────────────────────────────────
 
+
 @router.post("/supplier-exclusions/reintegrate", response_model=SupplierReintegrateResult)
-def reintegrate_suppliers(body: SupplierReintegrate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> dict:
+def reintegrate_suppliers(
+    body: SupplierReintegrate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep
+) -> dict:
     """Remove the exclusion on N suppliers — their products return to Comptabilité
     on the next query. Idempotent: names not currently excluded count as not_excluded."""
     suppliers = list(dict.fromkeys(s.strip() for s in body.suppliers if s.strip()))
     rows = (
         db.query(PharmacySupplierExclusion)
-        .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id,
-                PharmacySupplierExclusion.supplier.in_(suppliers))
+        .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id, PharmacySupplierExclusion.supplier.in_(suppliers))
         .all()
     )
     found = {r.supplier for r in rows}
@@ -640,5 +677,5 @@ def reintegrate_suppliers(body: SupplierReintegrate, pharmacy_id: Annotated[int,
     return {
         "reintegrated": len(rows),
         "not_excluded": len([s for s in suppliers if s not in found]),
-        "suppliers":    suppliers,
+        "suppliers": suppliers,
     }

@@ -5,9 +5,7 @@
 /** MAD with French formatting: 1 234,56 MAD. */
 export function formatMAD(n: number): string {
   return (
-    n
-      .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      .replace(/ | /g, " ") + " MAD"
+    n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/ | /g, " ") + " MAD"
   );
 }
 

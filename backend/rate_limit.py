@@ -8,6 +8,7 @@ Platform. If we ever scale horizontally, swap for Redis via
 RATE_LIMIT=0 turns the limits off — only the E2E suite does that (it logs in
 more than 5 times a minute). Default: on.
 """
+
 import os
 
 from fastapi import Request

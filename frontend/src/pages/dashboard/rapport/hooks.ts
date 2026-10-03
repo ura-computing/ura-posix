@@ -4,22 +4,29 @@ import { api } from "@/api/client";
 import { API } from "@/api/api";
 
 import type {
-  AdminPharmacyRow, AdminStatsResponse, AnalyseFilters, AnalyseMargeResponse, CategoryType, MargeMode,
-  MarginAlertsResponse, StatsFilters, StatsResponse, StockSummaryResponse,
+  AdminPharmacyRow,
+  AdminStatsResponse,
+  AnalyseFilters,
+  AnalyseMargeResponse,
+  CategoryType,
+  MargeMode,
+  MarginAlertsResponse,
+  StatsFilters,
+  StatsResponse,
+  StockSummaryResponse,
 } from "@/types";
-
 
 // ── Owner ────────────────────────────────────────────────────────────────────
 
 export function useStats(filters: StatsFilters) {
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: API.stats.main.key(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
-    queryFn:  () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: API.stats.main.key(
+      filters.date_from,
+      filters.date_to,
+      filters.category_type,
+      filters.include_non_declared,
+    ),
+    queryFn: () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
     staleTime: 60_000,
   });
   return {
@@ -35,23 +42,24 @@ export function useStats(filters: StatsFilters) {
 export function useOptimisationGain(filters: StatsFilters) {
   const { data } = useQuery({
     queryKey: API.stats.analyseMarge.key("produit", filters.date_from, filters.date_to, filters.category_type, null),
-    queryFn:  () => api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, { params: {
-      mode: "produit", date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
-    } }),
+    queryFn: () =>
+      api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, {
+        params: {
+          mode: "produit",
+          date_from: filters.date_from,
+          date_to: filters.date_to,
+          category_type: filters.category_type,
+        },
+      }),
     staleTime: 60_000,
   });
   return data?.kpis.difference_gain_dh ?? null;
 }
 
-
 export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">) {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: API.stats.marginAlerts.key(filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
+    queryFn: () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
     staleTime: 60_000,
   });
   return {
@@ -61,16 +69,11 @@ export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declare
   };
 }
 
-
 export function useStockSummary() {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: API.stats.stockSummary.key,
-    queryFn:  () => api.get<StockSummaryResponse>(API.stats.stockSummary.url),
-    staleTime: 5 * 60_000,    // stock changes less often than ventes
+    queryFn: () => api.get<StockSummaryResponse>(API.stats.stockSummary.url),
+    staleTime: 5 * 60_000, // stock changes less often than ventes
   });
   return {
     stock: data,
@@ -79,17 +82,12 @@ export function useStockSummary() {
   };
 }
 
-
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 export function useAdminStats() {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: API.admin.stats.key,
-    queryFn:  () => api.get<AdminStatsResponse>(API.admin.stats.url),
+    queryFn: () => api.get<AdminStatsResponse>(API.admin.stats.url),
     staleTime: 60_000,
   });
   return {
@@ -99,15 +97,11 @@ export function useAdminStats() {
   };
 }
 
-
 export function useAdminPharmacies() {
-  const {
-    data,
-    isLoading,
-  } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: API.admin.pharmacies.key,
-    queryFn:  () => api.get<AdminPharmacyRow[]>(API.admin.pharmacies.url),
-    staleTime: 5 * 60_000,    // pharmacy list rarely changes
+    queryFn: () => api.get<AdminPharmacyRow[]>(API.admin.pharmacies.url),
+    staleTime: 5 * 60_000, // pharmacy list rarely changes
   });
   return {
     pharmacies: data ?? [],
@@ -115,18 +109,17 @@ export function useAdminPharmacies() {
   };
 }
 
-
 export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsFilters) {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: API.admin.pharmacyStats.key(
-      pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared,
+      pharmacyId ?? 0,
+      filters.date_from,
+      filters.date_to,
+      filters.category_type,
+      filters.include_non_declared,
     ),
-    queryFn:  () => api.get<StatsResponse>(API.admin.pharmacyStats.url(pharmacyId as number), { params: filters }),
-    enabled:  pharmacyId !== null,
+    queryFn: () => api.get<StatsResponse>(API.admin.pharmacyStats.url(pharmacyId as number), { params: filters }),
+    enabled: pharmacyId !== null,
     staleTime: 60_000,
   });
   return {
@@ -136,15 +129,20 @@ export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsF
   };
 }
 
-
-export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters: Omit<StatsFilters, "include_non_declared">) {
-  const {
-    data,
-    isLoading,
-  } = useQuery({
-    queryKey: API.admin.pharmacyMarginAlerts.key(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<MarginAlertsResponse>(API.admin.pharmacyMarginAlerts.url(pharmacyId as number), { params: filters }),
-    enabled:  pharmacyId !== null,
+export function useAdminPharmacyMarginAlerts(
+  pharmacyId: number | null,
+  filters: Omit<StatsFilters, "include_non_declared">,
+) {
+  const { data, isLoading } = useQuery({
+    queryKey: API.admin.pharmacyMarginAlerts.key(
+      pharmacyId ?? 0,
+      filters.date_from,
+      filters.date_to,
+      filters.category_type,
+    ),
+    queryFn: () =>
+      api.get<MarginAlertsResponse>(API.admin.pharmacyMarginAlerts.url(pharmacyId as number), { params: filters }),
+    enabled: pharmacyId !== null,
     staleTime: 60_000,
   });
   return {
@@ -153,15 +151,11 @@ export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters:
   };
 }
 
-
 export function useAdminPharmacyStockSummary(pharmacyId: number | null) {
-  const {
-    data,
-    isLoading,
-  } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: API.admin.pharmacyStock.key(pharmacyId ?? 0),
-    queryFn:  () => api.get<StockSummaryResponse>(API.admin.pharmacyStock.url(pharmacyId as number)),
-    enabled:  pharmacyId !== null,
+    queryFn: () => api.get<StockSummaryResponse>(API.admin.pharmacyStock.url(pharmacyId as number)),
+    enabled: pharmacyId !== null,
     staleTime: 5 * 60_000,
   });
   return {
@@ -174,21 +168,25 @@ export function useAdminPharmacyStockSummary(pharmacyId: number | null) {
  *  marge tab table. Mirrors the owner-side analyse hook signature but the
  *  pharmacy_id comes from the path (admin can pick any). */
 
-export function useAdminPharmacyAnalyseMarge(
-  pharmacyId: number | null,
-  mode:       MargeMode,
-  filters:    AnalyseFilters,
-) {
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: API.admin.pharmacyAnalyse.key(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
-    queryFn:  () => api.get<AnalyseMargeResponse>(API.admin.pharmacyAnalyse.url(pharmacyId as number), { params: {
-      mode, date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
-    } }),
-    enabled:  pharmacyId !== null,
+export function useAdminPharmacyAnalyseMarge(pharmacyId: number | null, mode: MargeMode, filters: AnalyseFilters) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: API.admin.pharmacyAnalyse.key(
+      pharmacyId ?? 0,
+      mode,
+      filters.date_from,
+      filters.date_to,
+      filters.category_type,
+    ),
+    queryFn: () =>
+      api.get<AnalyseMargeResponse>(API.admin.pharmacyAnalyse.url(pharmacyId as number), {
+        params: {
+          mode,
+          date_from: filters.date_from,
+          date_to: filters.date_to,
+          category_type: filters.category_type,
+        },
+      }),
+    enabled: pharmacyId !== null,
     staleTime: 60_000,
   });
   return {

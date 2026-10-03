@@ -13,6 +13,7 @@ The Owner never sees the dev's WIP customization; the "featured
 categories" list belongs to the owner via a dedicated endpoint (moved
 out of the dev editor per user-locked decision 2026-06-27).
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -51,25 +52,25 @@ LOGO_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 LOGO_ALLOWED_TYPES = frozenset({"image/png", "image/jpeg", "image/svg+xml", "image/webp"})
 
 DEFAULT_SECTIONS: dict[str, dict] = {
-    "hero":                 {"visible": True},
-    "brands":               {"visible": True},
-    "catalogue":            {"visible": True},
-    "soldes":               {"visible": True},
-    "featured_categories":  {"visible": True},
-    "testimonials":         {"visible": True},
-    "contact":              {"visible": True},
-    "footer":               {"visible": True},
+    "hero": {"visible": True},
+    "brands": {"visible": True},
+    "catalogue": {"visible": True},
+    "soldes": {"visible": True},
+    "featured_categories": {"visible": True},
+    "testimonials": {"visible": True},
+    "contact": {"visible": True},
+    "footer": {"visible": True},
 }
 
 # Which transitions are allowed for a given source state. Developers advance
 # forward through the lifecycle; releasing a claim goes through the dedicated
 # /release endpoint, not the state one.
 ALLOWED_STATE_TRANSITIONS: dict[str, frozenset[str]] = {
-    "soumise":         frozenset({"prise_en_charge"}),
-    "prise_en_charge": frozenset({"en_cours", "soumise"}),   # can revert if released
-    "en_cours":        frozenset({"livree"}),
-    "livree":          frozenset({"cloturee"}),
-    "cloturee":        frozenset(),
+    "soumise": frozenset({"prise_en_charge"}),
+    "prise_en_charge": frozenset({"en_cours", "soumise"}),  # can revert if released
+    "en_cours": frozenset({"livree"}),
+    "livree": frozenset({"cloturee"}),
+    "cloturee": frozenset(),
 }
 
 # Customization fields stored as dict-shaped JSON columns. PATCH merges into
@@ -79,6 +80,7 @@ _JSON_MERGE_FIELDS = ("brand_colors", "sections")
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
+
 
 def _deep_merge(a: dict, b: dict) -> dict:
     """Return a new dict where keys in `b` override `a`. Nested dicts are
@@ -91,6 +93,7 @@ def _deep_merge(a: dict, b: dict) -> dict:
         else:
             out[k] = v
     return out
+
 
 def _out(req: StoreWebsiteRequest, db: DbDep) -> WebsiteRequestOut:
     """Build the owner-facing / dev-queue row shape from a model row."""
@@ -133,9 +136,9 @@ def _customization_out(cust: StoreCustomization) -> CustomizationOut:
 def _default_brand_colors(palette: list[str]) -> dict[str, str]:
     """Bootstrap the customization's brand_colors from the request's palette."""
     return {
-        "primary":   palette[0] if len(palette) > 0 else "#1FA97E",
+        "primary": palette[0] if len(palette) > 0 else "#1FA97E",
         "secondary": palette[1] if len(palette) > 1 else "#F4C9D9",
-        "accent":    palette[2] if len(palette) > 2 else "#E9C887",
+        "accent": palette[2] if len(palette) > 2 else "#E9C887",
     }
 
 
@@ -156,6 +159,7 @@ def _get_active_request_for_pharmacy(db: DbDep, pharmacy_id: int) -> StoreWebsit
 
 # ─── Owner endpoints ────────────────────────────────────────────────────────
 
+
 @router.get("/my-request", response_model=WebsiteRequestOut | None)
 def get_my_request(pharmacy_id: MemberDep, db: DbDep) -> WebsiteRequestOut | None:
     """Owner's currently active (non-cloturee) request, or null."""
@@ -164,7 +168,9 @@ def get_my_request(pharmacy_id: MemberDep, db: DbDep) -> WebsiteRequestOut | Non
 
 
 @router.post("/requests", response_model=WebsiteRequestOut, status_code=http_status.HTTP_201_CREATED)
-def create_request(body: WebsiteRequestCreate, pharmacy_id: MemberDep, user: CurrentUserDep, db: DbDep) -> WebsiteRequestOut:
+def create_request(
+    body: WebsiteRequestCreate, pharmacy_id: MemberDep, user: CurrentUserDep, db: DbDep
+) -> WebsiteRequestOut:
     """Owner creates a new landing-page request.
 
     Enforces one-active-per-pharmacy: if an existing request is still open
@@ -192,14 +198,16 @@ def create_request(body: WebsiteRequestCreate, pharmacy_id: MemberDep, user: Cur
 
     # Bootstrap the customization row with sensible defaults so the dev's
     # editor has something to render on first open (no null-handling).
-    db.add(StoreCustomization(
-        request_id=req.id,
-        template="lumiere",
-        sections=DEFAULT_SECTIONS,
-        brand_colors=_default_brand_colors(body.brand_palette),
-        font_pairing="moderne",
-        featured_category_ids=[],
-    ))
+    db.add(
+        StoreCustomization(
+            request_id=req.id,
+            template="lumiere",
+            sections=DEFAULT_SECTIONS,
+            brand_colors=_default_brand_colors(body.brand_palette),
+            font_pairing="moderne",
+            featured_category_ids=[],
+        )
+    )
 
     db.commit()
     db.refresh(req)
@@ -257,6 +265,7 @@ def patch_featured_categories(
 
 # ─── Developer endpoints ────────────────────────────────────────────────────
 
+
 @router.get("/requests", response_model=list[WebsiteRequestOut])
 def list_requests(user: DeveloperDep, db: DbDep) -> list[WebsiteRequestOut]:
     """Every non-cloturee request, all queues in one list. Frontend splits
@@ -300,7 +309,7 @@ def claim_request(
         raise ApiError(409, ErrorCode.REQUEST_CLAIMED, "Demande déjà réclamée par un autre développeur.")
 
     req.claimed_by_id = user.id
-    req.claimed_at    = datetime.now(tz=timezone.utc)
+    req.claimed_at = datetime.now(tz=timezone.utc)
     if req.state == "soumise":
         req.state = "prise_en_charge"
     db.commit()
@@ -319,7 +328,7 @@ def release_request(
     if req.claimed_by_id != user.id:
         raise ApiError(403, ErrorCode.NOT_ASSIGNED_DEVELOPER, "Vous n'êtes pas le développeur assigné à cette demande.")
     req.claimed_by_id = None
-    req.claimed_at    = None
+    req.claimed_at = None
     if req.state == "prise_en_charge":
         req.state = "soumise"
     db.commit()
@@ -341,9 +350,11 @@ def transition_state(
     allowed = ALLOWED_STATE_TRANSITIONS.get(req.state, frozenset())
     if body.state not in allowed:
         raise ApiError(
-            409, ErrorCode.TRANSITION_NOT_ALLOWED,
+            409,
+            ErrorCode.TRANSITION_NOT_ALLOWED,
             f"Transition {req.state} → {body.state} non autorisée.",
-            from_state=req.state, to_state=body.state,
+            from_state=req.state,
+            to_state=body.state,
         )
     req.state = body.state
     db.commit()
@@ -392,11 +403,11 @@ def reset_customization(
     if cust is None:
         raise ApiError(500, ErrorCode.CUSTOMIZATION_MISSING, "Personnalisation absente.")
 
-    cust.template              = "lumiere"
-    cust.sections              = dict(DEFAULT_SECTIONS)
-    cust.brand_colors          = _default_brand_colors(list(req.brand_palette or []))
-    cust.font_pairing          = "moderne"
-    cust.logo_url              = None
+    cust.template = "lumiere"
+    cust.sections = dict(DEFAULT_SECTIONS)
+    cust.brand_colors = _default_brand_colors(list(req.brand_palette or []))
+    cust.font_pairing = "moderne"
+    cust.logo_url = None
     cust.featured_category_ids = []
     db.commit()
     db.refresh(cust)
@@ -440,6 +451,7 @@ async def upload_logo(
 
 # ─── Public endpoint ────────────────────────────────────────────────────────
 
+
 @router.get("/public/preview/{request_id}", response_model=PublicPreviewOut)
 def public_preview(request_id: Annotated[UUID, PathParam()], db: DbDep) -> PublicPreviewOut:
     """Unauthenticated preview surface. Safe subset of the customization
@@ -462,6 +474,7 @@ def public_preview(request_id: Annotated[UUID, PathParam()], db: DbDep) -> Publi
 
 
 # ─── Admin endpoint — developer directory ──────────────────────────────────
+
 
 @router.get("/admin/developers", response_model=list[DeveloperAccountOut])
 def list_developers(user: AdminDep, db: DbDep) -> list[DeveloperAccountOut]:
@@ -494,9 +507,9 @@ def list_developers(user: AdminDep, db: DbDep) -> list[DeveloperAccountOut]:
             id=str(u.id),
             name=u.name or u.email,
             email=u.email,
-            status=status_map.get(u.status, "desactive"),   # type: ignore[arg-type]
+            status=status_map.get(u.status, "desactive"),  # type: ignore[arg-type]
             active_requests=int(cnt or 0),
-            last_active_at=None,   # last-active-at not tracked yet
+            last_active_at=None,  # last-active-at not tracked yet
         )
         for u, cnt in rows
     ]

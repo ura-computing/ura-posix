@@ -13,6 +13,7 @@ Hardening invariants baked in here (mirror PG-* tickets from apcm-pharma):
 - PG-004: previous-window marge uses the SAME weighted formula as the current marge
   so the variation badge compares like-for-like.
 """
+
 from __future__ import annotations
 
 import calendar
@@ -29,7 +30,7 @@ from query_parts import Filters, avg_pu_subquery, ca_sum, category_filter, pharm
 
 # ─── String helpers (small ports — keeps stats_queries self-contained) ─────────
 
-_PCT_RE = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")   # margin suffix, e.g. "(33.930%)"
+_PCT_RE = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")  # margin suffix, e.g. "(33.930%)"
 
 
 def _strip_pct(s: str | None) -> str:
@@ -56,6 +57,7 @@ def _parse_tva_rate(tva_str) -> float:
 
 # ─── Date arithmetic ──────────────────────────────────────────────────────────
 
+
 def _subtract_years(d: date, years: int) -> date:
     """Subtract *years* from *d*, clamping Feb 29 → Feb 28 in non-leap years."""
     year = d.year - years
@@ -69,8 +71,7 @@ def _subtract_years(d: date, years: int) -> date:
 # line instead of a single dot:
 #     < 2 months → week    ·   2 months–1 year → month
 #     1–4 years  → semester ·  > 4 years        → year
-_FR_SHORT_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun",
-                    "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+_FR_SHORT_MONTHS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
 
 # SQL date_trunc unit used to fetch each granularity. Postgres has no "semester"
 # bucket, so we fetch monthly rows and fold them into half-years in Python.
@@ -80,7 +81,7 @@ _TREND_SQL_UNIT = {"week": "week", "month": "month", "semester": "month", "year"
 def _trend_granularity(df: Optional[str], dt: Optional[str]) -> str:
     """Pick the bucket unit from the selected window length (see table above)."""
     if not df or not dt:
-        return "month"                       # default: trailing 12 months
+        return "month"  # default: trailing 12 months
     span_days = (date.fromisoformat(dt) - date.fromisoformat(df)).days
     if span_days < 60:
         return "week"
@@ -94,7 +95,7 @@ def _trend_granularity(df: Optional[str], dt: Optional[str]) -> str:
 def _bucket_start(d: date, gran: str) -> date:
     """First day of the bucket that contains `d` for the given granularity."""
     if gran == "week":
-        return d - timedelta(days=d.weekday())            # Monday (matches date_trunc)
+        return d - timedelta(days=d.weekday())  # Monday (matches date_trunc)
     if gran == "month":
         return d.replace(day=1)
     if gran == "semester":
@@ -121,17 +122,18 @@ def _bucket_label(d: date, gran: str) -> str:
     """Human x-axis label for a bucket start date."""
     month = _FR_SHORT_MONTHS[d.month - 1]
     if gran == "week":
-        return f"{d.day:02d} {month}"                     # "10 Jun" (week start)
+        return f"{d.day:02d} {month}"  # "10 Jun" (week start)
     if gran == "month":
-        return month                                      # "Jun"
+        return month  # "Jun"
     if gran == "semester":
-        return f"S{1 if d.month <= 6 else 2} {d.year}"    # "S1 2025"
+        return f"S{1 if d.month <= 6 else 2} {d.year}"  # "S1 2025"
     if gran == "year":
-        return str(d.year)                                # "2026"
+        return str(d.year)  # "2026"
     return d.isoformat()
 
 
 # ─── Top categories ────────────────────────────────────────────────────────────
+
 
 def merge_top_categories(rows) -> list[dict]:
     """Merge rows that share the same stripped category name; sort by total desc."""
@@ -142,21 +144,21 @@ def merge_top_categories(rows) -> list[dict]:
             merged[key] = {"total": 0.0, "pu_sum": 0.0, "ppv_sum": 0.0, "qty_sum": 0.0}
         m = merged[key]
         m["total"] += float(r.total or 0)
-        qty    = float(getattr(r, "qty", 0) or 0)
+        qty = float(getattr(r, "qty", 0) or 0)
         pu_raw = getattr(r, "avg_pu", None)
-        ppv    = float(getattr(r, "avg_ppv", 0) or 0)
+        ppv = float(getattr(r, "avg_ppv", 0) or 0)
         # PG-013: rows without a real purchase price (no achats for the whole
         # category) are excluded from the marge weighting — treating NULL pu as
         # 0 would fabricate a 100% margin. Their CA still counts in `total`.
         if pu_raw is not None:
-            m["pu_sum"]  += float(pu_raw) * qty
+            m["pu_sum"] += float(pu_raw) * qty
             m["ppv_sum"] += ppv * qty
             m["qty_sum"] += qty
     result: list[dict] = []
     for k, m in merged.items():
         marge_pct: Optional[float] = None
         if m["qty_sum"] > 0 and m["ppv_sum"] > 0:
-            avg_pu  = m["pu_sum"]  / m["qty_sum"]
+            avg_pu = m["pu_sum"] / m["qty_sum"]
             avg_ppv = m["ppv_sum"] / m["qty_sum"]
             if avg_ppv > 0:
                 marge_pct = round((1 - avg_pu / avg_ppv) * 100, 3)
@@ -165,6 +167,7 @@ def merge_top_categories(rows) -> list[dict]:
 
 
 # ─── Marge for a window (PG-013, PG-007 safe) ─────────────────────────────────
+
 
 def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_filter_v: list) -> dict:
     """Weighted marge over (Vente, Achat) for the supplied filters.
@@ -188,20 +191,17 @@ def marge_for_window(db: Session, base_filter_v: list, base_filter_a: list, cat_
         .filter(*base_filter_v)
         .filter(*cat_filter_v)
         .filter(Medicament.ppv.isnot(None))
-        .filter(avg_pu_sub.c.avg_pu.isnot(None))   # was: r.pu is not None (Python-side)
+        .filter(avg_pu_sub.c.avg_pu.isnot(None))  # was: r.pu is not None (Python-side)
         .group_by(Medicament.tva)
         .all()
     )
     sum_ppv = sum(float(r.sum_ppv or 0) for r in marge_rows)
-    sum_pu  = sum(float(r.sum_pu  or 0) for r in marge_rows)
+    sum_pu = sum(float(r.sum_pu or 0) for r in marge_rows)
     marge_brute = sum_ppv - sum_pu
-    marge_pct   = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
-    marge_nette = sum(
-        (float(r.sum_ppv or 0) - float(r.sum_pu or 0)) / (1 + _parse_tva_rate(r.tva))
-        for r in marge_rows
-    )
+    marge_pct = (1 - sum_pu / sum_ppv) * 100 if sum_ppv else 0
+    marge_nette = sum((float(r.sum_ppv or 0) - float(r.sum_pu or 0)) / (1 + _parse_tva_rate(r.tva)) for r in marge_rows)
     return {
-        "marge_pct":      round(marge_pct, 3),
+        "marge_pct": round(marge_pct, 3),
         "marge_brute_dh": round(marge_brute, 2),
         "marge_nette_dh": round(marge_nette, 2),
     }
@@ -222,7 +222,7 @@ def reconcile_marge_to_ca(marge: dict, ca: float) -> None:
     """
     brute_old = marge.get("marge_brute_dh") or 0.0
     nette_old = marge.get("marge_nette_dh") or 0.0
-    ratio     = (nette_old / brute_old) if brute_old else 0.0
+    ratio = (nette_old / brute_old) if brute_old else 0.0
     brute_new = round(ca * (marge.get("marge_pct") or 0.0) / 100, 2)
     marge["marge_brute_dh"] = brute_new
     marge["marge_nette_dh"] = round(brute_new * ratio, 2)
@@ -230,8 +230,16 @@ def reconcile_marge_to_ca(marge: dict, ca: float) -> None:
 
 # ─── Aggregate KPIs (advanced + tva + marge + type_breakdown) ─────────────────
 
-def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt: str | None,
-                        category_type: str = "all", *, include_non_declared: bool = True) -> dict:
+
+def compute_extra_stats(
+    db: Session,
+    pharmacy_id: int | None,
+    df: str | None,
+    dt: str | None,
+    category_type: str = "all",
+    *,
+    include_non_declared: bool = True,
+) -> dict:
     """Returns the bundle: advanced_kpis (best/worst day, ticket_moyen), tva, marge, type_breakdown.
 
     include_non_declared=True (default): specials + excluded BLs/suppliers are
@@ -242,22 +250,21 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     cat_filter_v = cat_filter_a = category_filter(category_type)
 
     # Daily aggregates (best/worst day, ticket moyen, vente moy/jour)
-    daily_q = (
-        db.query(Vente.date, ca_sum(), func.count(Vente.id))
-        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
+    daily_q = db.query(Vente.date, ca_sum(), func.count(Vente.id)).join(
+        Medicament, Vente.medicament_id == Medicament.id, isouter=True
     )
     if cat_filter_v:
         daily_q = daily_q.filter(*cat_filter_v)
     daily = daily_q.filter(*base_filter_v).group_by(Vente.date).all()
 
     if daily:
-        best_dh   = max(daily, key=lambda r: r[1] or 0)
-        worst_dh  = min(daily, key=lambda r: r[1] or 0)
-        best_cnt  = max(daily, key=lambda r: r[2] or 0)
+        best_dh = max(daily, key=lambda r: r[1] or 0)
+        worst_dh = min(daily, key=lambda r: r[1] or 0)
+        best_cnt = max(daily, key=lambda r: r[2] or 0)
         worst_cnt = min(daily, key=lambda r: r[2] or 0)
-        total_v   = sum(r[1] or 0 for r in daily)
+        total_v = sum(r[1] or 0 for r in daily)
         total_cnt = sum(r[2] or 0 for r in daily)
-        ticket_moyen   = total_v / total_cnt if total_cnt else 0
+        ticket_moyen = total_v / total_cnt if total_cnt else 0
         vente_moy_jour = total_v / len(daily)
     else:
         best_dh = worst_dh = best_cnt = worst_cnt = None
@@ -266,10 +273,10 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     advanced_kpis = {
         "ticket_moyen": round(ticket_moyen, 2),
         "vente_moyenne_par_jour": round(vente_moy_jour, 2),
-        "best_day_dh":     {"date": str(best_dh[0]),   "total": float(best_dh[1]  or 0)} if best_dh   else None,
-        "worst_day_dh":    {"date": str(worst_dh[0]),  "total": float(worst_dh[1] or 0)} if worst_dh  else None,
-        "best_day_count":  {"date": str(best_cnt[0]),  "count": int(best_cnt[2]   or 0)} if best_cnt  else None,
-        "worst_day_count": {"date": str(worst_cnt[0]), "count": int(worst_cnt[2]  or 0)} if worst_cnt else None,
+        "best_day_dh": {"date": str(best_dh[0]), "total": float(best_dh[1] or 0)} if best_dh else None,
+        "worst_day_dh": {"date": str(worst_dh[0]), "total": float(worst_dh[1] or 0)} if worst_dh else None,
+        "best_day_count": {"date": str(best_cnt[0]), "count": int(best_cnt[2] or 0)} if best_cnt else None,
+        "worst_day_count": {"date": str(worst_cnt[0]), "count": int(worst_cnt[2] or 0)} if worst_cnt else None,
     }
 
     # TVA — aggregated in SQL per distinct tva label (a handful of groups) instead of
@@ -296,8 +303,8 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
     tva_payee = sum((r.total or 0) * _parse_tva_rate(r.tva) for r in achat_tva_rows)
 
     tva = {
-        "tva_encaissee":  round(tva_encaissee, 2),
-        "tva_payee":      round(tva_payee, 2),
+        "tva_encaissee": round(tva_encaissee, 2),
+        "tva_payee": round(tva_payee, 2),
         "tva_a_declarer": round(tva_encaissee - tva_payee, 2),
     }
 
@@ -330,13 +337,14 @@ def compute_extra_stats(db: Session, pharmacy_id: int | None, df: str | None, dt
         "tva": tva,
         "marge": marge,
         "type_breakdown": {
-            "pharmacie":     {"ventes_total": round(float(pharm_total), 2)},
+            "pharmacie": {"ventes_total": round(float(pharm_total), 2)},
             "parapharmacie": {"ventes_total": round(float(para_total), 2)},
         },
     }
 
 
 # ─── Previous-period KPIs (PG-004: same weighted formula as current) ──────────
+
 
 def compute_previous_kpis(
     db: Session,
@@ -351,17 +359,22 @@ def compute_previous_kpis(
     """ventes_total + achats_total + marge_pct for the same window shifted -1 year."""
     today = date.today()
     if df and dt:
-        d_from = date.fromisoformat(df); d_to = date.fromisoformat(dt)
-        prev_df = _subtract_years(d_from, 1); prev_dt = _subtract_years(d_to, 1)
+        d_from = date.fromisoformat(df)
+        d_to = date.fromisoformat(dt)
+        prev_df = _subtract_years(d_from, 1)
+        prev_dt = _subtract_years(d_to, 1)
     elif df:
         d_from = date.fromisoformat(df)
-        prev_df = _subtract_years(d_from, 1); prev_dt = _subtract_years(today, 1)
+        prev_df = _subtract_years(d_from, 1)
+        prev_dt = _subtract_years(today, 1)
     elif dt:
         d_to = date.fromisoformat(dt)
-        prev_df = _subtract_years(d_to.replace(day=1), 1); prev_dt = _subtract_years(d_to, 1)
+        prev_df = _subtract_years(d_to.replace(day=1), 1)
+        prev_dt = _subtract_years(d_to, 1)
     else:
         first_of_month = today.replace(day=1)
-        prev_df = _subtract_years(first_of_month, 1); prev_dt = _subtract_years(today, 1)
+        prev_df = _subtract_years(first_of_month, 1)
+        prev_dt = _subtract_years(today, 1)
 
     f = Filters(pharmacy_id, prev_df.strftime("%Y-%m-%d"), prev_dt.strftime("%Y-%m-%d"), include_non_declared)
     prev_base_filter_v = f.ventes(db)
@@ -375,7 +388,8 @@ def compute_previous_kpis(
     )
 
     aq = db.query(func.sum(Achat.total))
-    if cat_filter_a: aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
+    if cat_filter_a:
+        aq = aq.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     prev_achats = aq.filter(*prev_base_filter_a).scalar()
 
     # PG-004: previous marge via same per-medicament weighted formula as current.
@@ -384,7 +398,7 @@ def compute_previous_kpis(
     return {
         "ventes_total": float(prev_ventes or 0),
         "achats_total": float(prev_achats or 0),
-        "marge_pct":    prev_marge["marge_pct"],
+        "marge_pct": prev_marge["marge_pct"],
     }
 
 
@@ -396,24 +410,28 @@ def compute_previous_kpis(
 # A product's marge_pct lands in the bracket where min <= marge_pct < max (or matches
 # the open ends). Order matters — we iterate top-to-bottom.
 MARGIN_BRACKETS: dict[str, tuple[float | None, float | None]] = {
-    "negative":  (None, 0),
-    "low":       (0,    10),
-    "medium":    (10,   60),
-    "high":      (60,   90),
-    "very_high": (90,   None),
+    "negative": (None, 0),
+    "low": (0, 10),
+    "medium": (10, 60),
+    "high": (60, 90),
+    "very_high": (90, None),
 }
 
 
 def _bracket_for(marge_pct: float) -> str | None:
     for key, (lo, hi) in MARGIN_BRACKETS.items():
-        if lo is None and hi is not None and marge_pct < hi:                  return key
-        if hi is None and lo is not None and marge_pct >= lo:                 return key
-        if lo is not None and hi is not None and lo <= marge_pct < hi:        return key
+        if lo is None and hi is not None and marge_pct < hi:
+            return key
+        if hi is None and lo is not None and marge_pct >= lo:
+            return key
+        if lo is not None and hi is not None and lo <= marge_pct < hi:
+            return key
     return None
 
 
-def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str],
-                          dt: Optional[str], category_type: str = "all") -> dict:
+def compute_margin_alerts(
+    db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str], category_type: str = "all"
+) -> dict:
     """Group products by margin brackets. Each bracket returns {count, total_ca,
     total_margin_dh, products[]}. `products` is sorted by abs(marge_pct) desc so the
     drill-down lists the most extreme cases first."""
@@ -439,7 +457,8 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
 
     out: dict = {k: {"count": 0, "total_ca": 0.0, "total_margin_dh": 0.0, "products": []} for k in MARGIN_BRACKETS}
     for r in rows:
-        ppv = float(r.ppv or 0); pu = float(r.pu or 0)
+        ppv = float(r.ppv or 0)
+        pu = float(r.pu or 0)
         if not ppv or not pu:
             continue
         marge_pct = round((1 - pu / ppv) * 100, 3)
@@ -461,8 +480,9 @@ def compute_margin_alerts(db: Session, pharmacy_id: int | None, df: Optional[str
     return out
 
 
-def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional[str],
-                              dt: Optional[str], category_type: str = "all") -> dict:
+def compute_ventes_sans_achat(
+    db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str], category_type: str = "all"
+) -> dict:
     """List products with ventes in the [df, dt] window whose medicament has NO
     matching achat in the same window for the same pharmacy — the root cause of
     Marge %/DH rendering "—" on /ventes for those rows.
@@ -474,12 +494,7 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
     base_filter_v = f.ventes(db)
     cat_filter = category_filter(category_type)
 
-    achat_meds_sub = (
-        db.query(Achat.medicament_id)
-        .filter(*f.achats(db))
-        .distinct()
-        .scalar_subquery()
-    )
+    achat_meds_sub = db.query(Achat.medicament_id).filter(*f.achats(db)).distinct().scalar_subquery()
     ca_expr = ca_sum()
     rows = (
         db.query(
@@ -497,25 +512,29 @@ def compute_ventes_sans_achat(db: Session, pharmacy_id: int | None, df: Optional
         .limit(500)
         .all()
     )
-    products = [{
-        "product":         r.product or "—",
-        "category":        r.category,
-        "ppv":             float(r.ppv) if r.ppv is not None else None,
-        "units_sold":      round(float(r.units_sold or 0), 2),
-        "ca":              round(float(r.ca or 0), 2),
-        "last_vente_date": r.last_vente_date,
-    } for r in rows]
+    products = [
+        {
+            "product": r.product or "—",
+            "category": r.category,
+            "ppv": float(r.ppv) if r.ppv is not None else None,
+            "units_sold": round(float(r.units_sold or 0), 2),
+            "ca": round(float(r.ca or 0), 2),
+            "last_vente_date": r.last_vente_date,
+        }
+        for r in rows
+    ]
     return {
-        "count":            len(products),
-        "total_ca":         round(sum(p["ca"] for p in products), 2),
+        "count": len(products),
+        "total_ca": round(sum(p["ca"] for p in products), 2),
         "total_units_sold": round(sum(p["units_sold"] for p in products), 2),
-        "products":         products,
+        "products": products,
     }
 
 
 # ─── Stock summary (Rapport Section 8 — 4 tiles) ─────────────────────────────
 # Lightweight — returns just the 4 tile numbers the Rapport needs.
 # The full ABCD classification ports later when /stock page is built.
+
 
 def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
     """Returns {total_references, ppv_potentiel, sous_stock_count, sur_stock_count,
@@ -526,12 +545,18 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
     matching apcm-pharma's `(ventes_12m / 300) × {14, 15}` formula).
     """
     if not pharmacy_id:
-        return {"total_references": 0, "ppv_potentiel": 0.0,
-                "sous_stock_count": 0, "sur_stock_count": 0,
-                "in_band_count": 0, "health_pct": 0.0}
+        return {
+            "total_references": 0,
+            "ppv_potentiel": 0.0,
+            "sous_stock_count": 0,
+            "sur_stock_count": 0,
+            "in_band_count": 0,
+            "health_pct": 0.0,
+        }
 
     # 12-month sales per medicament for this pharmacy.
     from datetime import date as _date, timedelta as _td
+
     today = _date.today()
     start_12m = (today - _td(days=365)).isoformat()
     sales_12m = (
@@ -566,7 +591,7 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
     sous_stock = sur_stock = in_band = 0
     for r in rows:
         stock = int(r.current_stock or 0)
-        ppv   = float(r.ppv or 0)
+        ppv = float(r.ppv or 0)
         ppv_potentiel += stock * ppv
         units_12m = float(r.units_12m or 0)
         if units_12m <= 0:
@@ -574,9 +599,12 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         # Match apcm-pharma: stock_min = (ventes_12m / 300) × 14, stock_max = × 15
         stock_min = (units_12m / 300) * 14
         stock_max = (units_12m / 300) * 15
-        if   stock < stock_min: sous_stock += 1
-        elif stock > stock_max: sur_stock  += 1
-        else:                   in_band    += 1
+        if stock < stock_min:
+            sous_stock += 1
+        elif stock > stock_max:
+            sur_stock += 1
+        else:
+            in_band += 1
 
     classified = sous_stock + sur_stock + in_band
     # "Santé du stock" = share of references adequately stocked (NOT at rupture risk).
@@ -591,17 +619,24 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
 
     return {
         "total_references": total_refs,
-        "ppv_potentiel":    round(ppv_potentiel, 2),
+        "ppv_potentiel": round(ppv_potentiel, 2),
         "sous_stock_count": sous_stock,
-        "sur_stock_count":  sur_stock,
-        "in_band_count":    in_band,
-        "health_pct":       health_pct,
+        "sur_stock_count": sur_stock,
+        "in_band_count": in_band,
+        "health_pct": health_pct,
     }
 
 
-def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str], dt: Optional[str],
-                        cat_filter_v=None, cat_filter_a=None,
-                        *, include_non_declared: bool = True) -> dict:
+def build_monthly_trend(
+    db: Session,
+    pharmacy_id: int | None,
+    df: Optional[str],
+    dt: Optional[str],
+    cat_filter_v=None,
+    cat_filter_a=None,
+    *,
+    include_non_declared: bool = True,
+) -> dict:
     """Adaptive ventes/achats trend. Returns {"granularity", "points"} where the
     bucket unit (week / month / semester / year) adapts to the selected window so
     a short period still renders a multi-point line. See _trend_granularity()."""
@@ -610,14 +645,14 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
 
     if df and dt:
         first_bucket = _bucket_start(date.fromisoformat(df), gran)
-        last_bucket  = _bucket_start(date.fromisoformat(dt), gran)
+        last_bucket = _bucket_start(date.fromisoformat(dt), gran)
     else:
         # Default (no filter): trailing 12 months, monthly — unchanged behaviour.
-        last_bucket  = _bucket_start(today, gran)
+        last_bucket = _bucket_start(today, gran)
         first_bucket = _bucket_start(today.replace(day=1) - timedelta(days=335), gran)
 
     win_start_str = first_bucket.strftime("%Y-%m-%d")
-    win_end_str   = _next_bucket(last_bucket, gran).strftime("%Y-%m-%d")
+    win_end_str = _next_bucket(last_bucket, gran).strftime("%Y-%m-%d")
 
     sql_unit = _TREND_SQL_UNIT[gran]
     v_q = (
@@ -628,15 +663,14 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(Vente.date >= win_start_str, Vente.date < win_end_str)
     )
-    a_q = (
-        db.query(
-            func.date_trunc(sql_unit, func.cast(Achat.delivery_date, Date)).label("bucket"),
-            func.sum(Achat.total).label("total"),
-        )
-        .filter(Achat.delivery_date >= win_start_str, Achat.delivery_date < win_end_str)
-    )
-    if cat_filter_v: v_q = v_q.filter(*cat_filter_v)
-    if cat_filter_a: a_q = a_q.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
+    a_q = db.query(
+        func.date_trunc(sql_unit, func.cast(Achat.delivery_date, Date)).label("bucket"),
+        func.sum(Achat.total).label("total"),
+    ).filter(Achat.delivery_date >= win_start_str, Achat.delivery_date < win_end_str)
+    if cat_filter_v:
+        v_q = v_q.filter(*cat_filter_v)
+    if cat_filter_a:
+        a_q = a_q.join(Medicament, Achat.medicament_id == Medicament.id, isouter=True).filter(*cat_filter_a)
     # Pharmacy + exclusions only: the bucket window above replaces the date filter.
     f = Filters(pharmacy_id, include_non_declared=include_non_declared)
     v_q = v_q.filter(*f.ventes(db))
@@ -657,17 +691,20 @@ def build_monthly_trend(db: Session, pharmacy_id: int | None, df: Optional[str],
     points: list[dict] = []
     cursor = first_bucket
     while cursor <= last_bucket:
-        points.append({
-            "label":  _bucket_label(cursor, gran),
-            "ventes": v_by_bucket.get(cursor, 0.0),
-            "achats": a_by_bucket.get(cursor, 0.0),
-        })
+        points.append(
+            {
+                "label": _bucket_label(cursor, gran),
+                "ventes": v_by_bucket.get(cursor, 0.0),
+                "achats": a_by_bucket.get(cursor, 0.0),
+            }
+        )
         cursor = _next_bucket(cursor, gran)
 
     return {"granularity": gran, "points": points}
 
 
 # ─── Full /stats payload (Rapport + Comptabilité, owner + admin) ─────────────
+
 
 def _topline_kpis(db, f: Filters, cat_filter: list) -> dict:
     """ventes_total/count + achats_total/count for the window."""
@@ -695,7 +732,11 @@ def _top_categories(db, f: Filters, cat_filter: list) -> list[dict]:
     The category marge uses the ALL-TIME average PU (no date window)."""
     all_time = Filters(f.pharmacy_id, include_non_declared=f.include_non_declared)
     avg_pu_sub = avg_pu_subquery(
-        db, Achat.quantity > 0, Achat.unit_price.isnot(None), *all_time.achats(db), label="pu",
+        db,
+        Achat.quantity > 0,
+        Achat.unit_price.isnot(None),
+        *all_time.achats(db),
+        label="pu",
     )
 
     q = (
@@ -728,20 +769,21 @@ def build_stats_payload(
     f = Filters(pharmacy_id, df, dt, include_non_declared)
     cat_filter = category_filter(category_type)
 
-    trend = build_monthly_trend(db, pharmacy_id, df, dt, cat_filter, cat_filter,
-                                include_non_declared=include_non_declared)
-    kpis  = _topline_kpis(db, f, cat_filter)
-    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type,
-                                include_non_declared=include_non_declared)
+    trend = build_monthly_trend(
+        db, pharmacy_id, df, dt, cat_filter, cat_filter, include_non_declared=include_non_declared
+    )
+    kpis = _topline_kpis(db, f, cat_filter)
+    extra = compute_extra_stats(db, pharmacy_id, df, dt, category_type, include_non_declared=include_non_declared)
     # Single source of truth: reconcile the aggregate marge to the FULL CA so every
     # margin display agrees (marge_brute_dh / ventes_total == marge_pct, exactly).
     reconcile_marge_to_ca(extra["marge"], kpis["ventes_total"])
     return {
-        "kpis":           kpis,
-        "previous_kpis":  compute_previous_kpis(db, pharmacy_id, df, dt, cat_filter, cat_filter,
-                                                include_non_declared=include_non_declared),
+        "kpis": kpis,
+        "previous_kpis": compute_previous_kpis(
+            db, pharmacy_id, df, dt, cat_filter, cat_filter, include_non_declared=include_non_declared
+        ),
         **extra,
-        "monthly_trend":     trend["points"],
+        "monthly_trend": trend["points"],
         "trend_granularity": trend["granularity"],
         "top_categories": _top_categories(db, f, cat_filter),
     }

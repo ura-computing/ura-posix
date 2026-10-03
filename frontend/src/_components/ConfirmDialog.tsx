@@ -8,22 +8,31 @@ import { cn } from "@/utils/cn";
 import { useT } from "@/i18n/I18nProvider";
 
 interface ConfirmDialogProps {
-  open:          boolean;
-  onClose:       () => void;
-  onConfirm:     () => void;
-  title:         string;
-  description?:  string;
-  bullets?:      string[];
-  variant?:      "default" | "destructive";
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description?: string;
+  bullets?: string[];
+  variant?: "default" | "destructive";
   confirmLabel?: string;
   loadingLabel?: string;
-  cancelLabel?:  string;
-  isLoading?:    boolean;
+  cancelLabel?: string;
+  isLoading?: boolean;
 }
 
 export function ConfirmDialog({
-  open, onClose, onConfirm, title, description, bullets,
-  variant = "default", confirmLabel, loadingLabel, cancelLabel, isLoading = false,
+  open,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  bullets,
+  variant = "default",
+  confirmLabel,
+  loadingLabel,
+  cancelLabel,
+  isLoading = false,
 }: ConfirmDialogProps) {
   const t = useT();
   useEffect(() => {
@@ -66,14 +75,8 @@ export function ConfirmDialog({
                 <Icon className="size-[18px]" aria-hidden />
               </span>
               <div className="flex flex-col gap-2">
-                <h2 className="text-base font-semibold tracking-tight text-foreground">
-                  {title}
-                </h2>
-                {description && (
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {description}
-                  </p>
-                )}
+                <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+                {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
                 {bullets && bullets.length > 0 && (
                   <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
                     {bullets.map((b) => (

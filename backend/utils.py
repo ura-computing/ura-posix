@@ -19,18 +19,30 @@ def parse_user_agent(ua: str | None) -> str:
     if not ua:
         return "Inconnu"
 
-    if   "Mac OS X" in ua or "Macintosh" in ua: os_name = "Mac"
-    elif "Windows" in ua:                       os_name = "Windows"
-    elif "Android" in ua:                       os_name = "Android"
-    elif "iPhone"  in ua:                       os_name = "iPhone"
-    elif "iPad"    in ua:                       os_name = "iPad"
-    elif "Linux"   in ua:                       os_name = "Linux"
-    else:                                       os_name = "Inconnu"
+    if "Mac OS X" in ua or "Macintosh" in ua:
+        os_name = "Mac"
+    elif "Windows" in ua:
+        os_name = "Windows"
+    elif "Android" in ua:
+        os_name = "Android"
+    elif "iPhone" in ua:
+        os_name = "iPhone"
+    elif "iPad" in ua:
+        os_name = "iPad"
+    elif "Linux" in ua:
+        os_name = "Linux"
+    else:
+        os_name = "Inconnu"
 
-    if   "Edg/"     in ua:                                       browser = "Edge"
-    elif "Chrome/"  in ua and "Chromium" not in ua:              browser = "Chrome"
-    elif "Firefox/" in ua:                                       browser = "Firefox"
-    elif "Safari/"  in ua and "Chrome"   not in ua:              browser = "Safari"
-    else:                                                        browser = "Navigateur"
+    if "Edg/" in ua:
+        browser = "Edge"
+    elif "Chrome/" in ua and "Chromium" not in ua:
+        browser = "Chrome"
+    elif "Firefox/" in ua:
+        browser = "Firefox"
+    elif "Safari/" in ua and "Chrome" not in ua:
+        browser = "Safari"
+    else:
+        browser = "Navigateur"
 
     return f"{browser} sur {os_name}"

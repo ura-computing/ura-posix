@@ -1,4 +1,5 @@
 """Import shapes: JSON chunks from the browser wizard, batch status PATCH, import history."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,8 +13,9 @@ from schemas.transactions import Pagination
 # ═══ Uploads ═════════════════════════════════════════════════════════════════
 # Import bodies: JSON chunks from the browser wizard + batch status PATCH.
 
+
 class JsonUploadBody(BaseModel):
-    rows:     list[dict[str, str]]    # the extension serializes one row as {label: value, ...}
+    rows: list[dict[str, str]]  # the extension serializes one row as {label: value, ...}
     filename: str | None = None
     batch_id: int | None = None
 
@@ -26,29 +28,30 @@ class JsonUploadBody(BaseModel):
 
 
 class PatchBatchBody(BaseModel):
-    status:        str
+    status: str
     error_message: str | None = None
 
 
 # ═══ Import history ══════════════════════════════════════════════════════════
 # Import history (/data/imports) shapes.
 
+
 class ImportRow(BaseModel):
-    id:                    int
-    file_type:             str
-    filename:              str | None
-    rows_inserted:         int
-    rows_skipped:          int
-    status:                str
-    error_message:         str | None
-    imported_at:           datetime
-    created_by_full_name:  str | None
-    created_by_email:      str | None
-    deleted_at:            datetime | None
-    deleted_by_full_name:  str | None
-    deleted_by_email:      str | None
+    id: int
+    file_type: str
+    filename: str | None
+    rows_inserted: int
+    rows_skipped: int
+    status: str
+    error_message: str | None
+    imported_at: datetime
+    created_by_full_name: str | None
+    created_by_email: str | None
+    deleted_at: datetime | None
+    deleted_by_full_name: str | None
+    deleted_by_email: str | None
 
 
 class ImportsListResponse(BaseModel):
-    data:       list[ImportRow]
+    data: list[ImportRow]
     pagination: Pagination

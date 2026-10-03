@@ -11,15 +11,21 @@ import { columnTexts, frNumber, kpiValue } from "./ui";
 export type { Row } from "./diff";
 export type CategoryType = "all" | "pharmacie" | "parapharmacie";
 export const CATEGORY_TYPES: { ct: CategoryType; label: string }[] = [
-  { ct: "all", label: "Mixte" }, { ct: "pharmacie", label: "Pharmacie" }, { ct: "parapharmacie", label: "Parapharmacie" },
+  { ct: "all", label: "Mixte" },
+  { ct: "pharmacie", label: "Pharmacie" },
+  { ct: "parapharmacie", label: "Parapharmacie" },
 ];
-
 
 // ── Rapport ────────────────────────────────────────────────────────────────
 
 function expectDay(actual: Row | null, e: Row | null, field: "total" | "count", what: string): void {
-  if (e === null) { expect(actual, what).toBeNull(); return; }
-  expect(Math.abs(Number(actual?.[field]) - e.value), `${what}: ${actual?.[field]} ≠ ${e.value}`).toBeLessThanOrEqual(TOL);
+  if (e === null) {
+    expect(actual, what).toBeNull();
+    return;
+  }
+  expect(Math.abs(Number(actual?.[field]) - e.value), `${what}: ${actual?.[field]} ≠ ${e.value}`).toBeLessThanOrEqual(
+    TOL,
+  );
   expect(e.dates, `${what}: date ${actual?.date}`).toContain(actual?.date);
 }
 
@@ -36,7 +42,11 @@ export function checkStats(s: Row, ct: CategoryType, e: Row = expected().stats[c
 
   const a = s.advanced_kpis;
   const ea = e.advanced_kpis;
-  expectSame({ t: a.ticket_moyen, v: a.vente_moyenne_par_jour }, { t: ea.ticket_moyen, v: ea.vente_moyenne_par_jour }, `stats[${ct}] ticket / jour`);
+  expectSame(
+    { t: a.ticket_moyen, v: a.vente_moyenne_par_jour },
+    { t: ea.ticket_moyen, v: ea.vente_moyenne_par_jour },
+    `stats[${ct}] ticket / jour`,
+  );
   expectDay(a.best_day_dh, ea.best_day_dh, "total", `stats[${ct}] meilleure journée DH`);
   expectDay(a.worst_day_dh, ea.worst_day_dh, "total", `stats[${ct}] moins bonne journée DH`);
   expectDay(a.best_day_count, ea.best_day_count, "count", `stats[${ct}] meilleure journée (opé)`);
@@ -55,7 +65,6 @@ export function checkMarginAlerts(s: Row, ct: CategoryType): void {
 export function checkStockSummary(s: Row): void {
   expectSame(s, expected().stock_summary, "stock-summary");
 }
-
 
 // ── Alertes / Stock ────────────────────────────────────────────────────────
 
@@ -80,13 +89,14 @@ export function checkPeremptions(s: Row): void {
   }
 }
 
-
 // ── Ventes / Achats ────────────────────────────────────────────────────────
 
 export type Ledger = "ventes" | "achats";
 
-export const ledgerKey = (kind: Ledger) => (r: Row): string =>
-  kind === "ventes" ? `${r.transaction_ref}|${r.pid}` : `${r.delivery_ref}|${r.pid}`;
+export const ledgerKey =
+  (kind: Ledger) =>
+  (r: Row): string =>
+    kind === "ventes" ? `${r.transaction_ref}|${r.pid}` : `${r.delivery_ref}|${r.pid}`;
 
 function withoutSeq(r: Row): Row {
   const { seq: _s, ...rest } = r;
@@ -104,20 +114,28 @@ export function checkLedgerRows(kind: Ledger, rows: Row[], expectedRows: Row[]):
 
 /** One list page: summary, pagination, and exactly the expected rows in order. */
 export function checkLedgerPage(kind: Ledger, s: Row, summary: Row, page: number, limit = 20): void {
-  const totals = kind === "ventes"
-    ? { rows_total: summary.rows_total, grand_total: summary.grand_total, tva_collected: summary.tva_collected }
-    : { rows_total: summary.rows_total, grand_total: summary.grand_total, tva_payee: summary.tva_payee };
+  const totals =
+    kind === "ventes"
+      ? { rows_total: summary.rows_total, grand_total: summary.grand_total, tva_collected: summary.tva_collected }
+      : { rows_total: summary.rows_total, grand_total: summary.grand_total, tva_payee: summary.tva_payee };
   expectSame(s.summary, totals, `${kind} summary`);
-  expectSame(s.pagination, {
-    page, limit, total: summary.rows_total,
-    total_pages: summary.rows_total ? Math.max(1, Math.ceil(summary.rows_total / limit)) : 0,
-  }, `${kind} pagination`);
+  expectSame(
+    s.pagination,
+    {
+      page,
+      limit,
+      total: summary.rows_total,
+      total_pages: summary.rows_total ? Math.max(1, Math.ceil(summary.rows_total / limit)) : 0,
+    },
+    `${kind} pagination`,
+  );
   const bySeq = new Map<number, Row>(expected()[`${kind}_rows`].map((r: Row) => [r.seq, r]));
-  const want = summary.top_seq.slice((page - 1) * limit, page * limit).map((seq: number) => withoutSeq(bySeq.get(seq)!));
+  const want = summary.top_seq
+    .slice((page - 1) * limit, page * limit)
+    .map((seq: number) => withoutSeq(bySeq.get(seq)!));
   expect(s.data.map(ledgerKey(kind)), `${kind} page ${page} order`).toEqual(want.map(ledgerKey(kind)));
   expectSame(s.data, want, `${kind} page ${page} rows`);
 }
-
 
 /** Summary (same shape as the oracle's) for the rows matching `keep` — used for
  *  filters whose expectation is a plain subset of the window rows. */
@@ -129,10 +147,12 @@ export function subsetSummary(kind: Ledger, keep: (r: Row) => boolean): Row {
     rows_total: rows.length,
     grand_total: sum((r) => r.total),
     [kind === "ventes" ? "tva_collected" : "tva_payee"]: sum((r) => r.total * rate(r.tva)),
-    top_seq: rows.map((r) => r.seq).sort((a, b) => b - a).slice(0, 50),
+    top_seq: rows
+      .map((r) => r.seq)
+      .sort((a, b) => b - a)
+      .slice(0, 50),
   };
 }
-
 
 // ── Sorting (page 1 of every sortable column) ──────────────────────────────
 
@@ -147,7 +167,12 @@ export function sortValue(kind: Ledger, r: Row, key: string): string | number | 
 
 /** Postgres order: plain columns NULLS LAST asc / FIRST desc; joined + computed
  *  columns (product, category, ppv, marge) always NULLS LAST. */
-export function expectedSortPage(kind: Ledger, key: string, order: "asc" | "desc", limit = 20): (string | number | null)[] {
+export function expectedSortPage(
+  kind: Ledger,
+  key: string,
+  order: "asc" | "desc",
+  limit = 20,
+): (string | number | null)[] {
   const nullsLastAlways = ["product", "category", "ppv", "pph", "marge_dh", "marge_pct"].includes(key);
   const values = expected()[`${kind}_rows`].map((r: Row) => sortValue(kind, r, key));
   const cmp = (a: string | number, b: string | number) =>
@@ -164,39 +189,52 @@ export function checkSortPage(kind: Ledger, s: Row, key: string, order: "asc" | 
   expectSame(got, expectedSortPage(kind, key, order), `${kind} sorted by ${key} ${order}`);
 }
 
-
 // ── Analyses ───────────────────────────────────────────────────────────────
 
 export const ANALYSE_MODES = {
-  produit:     { tab: "Produit",     key: (r: Row) => r.product },
-  categorie:   { tab: "Catégorie",   key: (r: Row) => r.category },
+  produit: { tab: "Produit", key: (r: Row) => r.product },
+  categorie: { tab: "Catégorie", key: (r: Row) => r.category },
   laboratoire: { tab: "Laboratoire", key: (r: Row) => r.laboratoire },
-  grossiste:   { tab: "Grossistes",  key: (r: Row) => r.grossiste },
-  operateur:   { tab: "Client",      key: (r: Row) => r.client },
-  mois:        { tab: "Mois",        key: (r: Row) => r.mois },
-  annee:       { tab: "Année",       key: (r: Row) => String(r.annee) },
+  grossiste: { tab: "Grossistes", key: (r: Row) => r.grossiste },
+  operateur: { tab: "Client", key: (r: Row) => r.client },
+  mois: { tab: "Mois", key: (r: Row) => r.mois },
+  annee: { tab: "Année", key: (r: Row) => String(r.annee) },
 } as const;
 
 export type AnalyseMode = keyof typeof ANALYSE_MODES;
 
 function checkKpis(k: Row, e: Row, ties: Row, what: string): void {
   const picks = ["marge_pct_max", "marge_pct_min", "marge_dh_max", "marge_dh_min"];
-  const scalars = Object.fromEntries(Object.entries(e).filter(([n]) => !picks.includes(n) && n !== "difference_gain_dh"));
+  const scalars = Object.fromEntries(
+    Object.entries(e).filter(([n]) => !picks.includes(n) && n !== "difference_gain_dh"),
+  );
   expectSame(k, scalars, `${what}.kpis`);
   for (const n of picks) expectTiedPick(k[n], e[n]?.value, ties[n], `${what}.kpis.${n}`);
   if (e.difference_gain_dh === null && !ties.difference_gain_dh) {
     expect(k.difference_gain_dh, `${what}.kpis.difference_gain_dh`).toBeNull();
   } else {
     const ok = (ties.difference_gain_dh as number[]).some((v) => Math.abs(v - Number(k.difference_gain_dh)) <= TOL);
-    expect(ok, `${what}.kpis.difference_gain_dh ${k.difference_gain_dh} not in ${JSON.stringify(ties.difference_gain_dh)}`).toBe(true);
+    expect(
+      ok,
+      `${what}.kpis.difference_gain_dh ${k.difference_gain_dh} not in ${JSON.stringify(ties.difference_gain_dh)}`,
+    ).toBe(true);
   }
 }
 
 /** `e` defaults to the oracle's analyse[ct][mode]; pass another oracle answer of the
  *  same shape (e.g. Année filtered by a product). */
-export function checkAnalyse(s: Row, ct: CategoryType, mode: AnalyseMode, e: Row = expected().analyse[ct][mode],
-                             what = `analyse[${ct}][${mode}]`): void {
-  if (mode === "annee") expect(s.rows.map((r: Row) => r.annee), `${what} order`).toEqual(e.rows.map((r: Row) => r.annee));
+export function checkAnalyse(
+  s: Row,
+  ct: CategoryType,
+  mode: AnalyseMode,
+  e: Row = expected().analyse[ct][mode],
+  what = `analyse[${ct}][${mode}]`,
+): void {
+  if (mode === "annee")
+    expect(
+      s.rows.map((r: Row) => r.annee),
+      `${what} order`,
+    ).toEqual(e.rows.map((r: Row) => r.annee));
   expectSameSet(s.rows, e.rows, ANALYSE_MODES[mode].key, `${what}.rows`);
   checkKpis(s.kpis, e.kpis, e.ties, what);
 }
@@ -206,18 +244,25 @@ export function checkListe(s: Row, e: Row = expected().liste, what = "liste"): v
   const notFound = (rows: Row[]) => rows.filter((r) => r.match_status === "not_found");
   expectSameSet(found(s.rows), found(e.rows), (r) => r.product, `${what} found rows`);
   expectSame(notFound(s.rows), notFound(e.rows), `${what} not-found rows (in input order, last)`);
-  expect(s.rows.slice(-notFound(e.rows).length).every((r: Row) => r.match_status === "not_found"), `${what}: not-found rows are last`).toBe(true);
+  expect(
+    s.rows.slice(-notFound(e.rows).length).every((r: Row) => r.match_status === "not_found"),
+    `${what}: not-found rows are last`,
+  ).toBe(true);
   checkKpis(s.kpis, e.kpis, e.ties, what);
 }
 
-
 // ── /analyses KPI tiles: what the page SHOWS ────────────────────────────────
 
-const ANALYSE_TILES: [string, string, number | null][] = [   // label, kpi, shown when the kpi is null
-  ["Chiffre d'affaires", "total_ventes_dh", 0], ["Marge moyenne (%)", "marge_pct_avg", null],
-  ["Marge moyenne (DH)", "marge_dh_avg", null], ["Optimisation", "difference_gain_dh", null],
-  ["Unités vendues", "total_ventes_unites", 0], ["Unités disponibles", "total_units_available", null],
-  ["Prix unitaires achetés", "total_pu_purchased", null], ["PPV disponibles", "ppv_total_available", null],
+const ANALYSE_TILES: [string, string, number | null][] = [
+  // label, kpi, shown when the kpi is null
+  ["Chiffre d'affaires", "total_ventes_dh", 0],
+  ["Marge moyenne (%)", "marge_pct_avg", null],
+  ["Marge moyenne (DH)", "marge_dh_avg", null],
+  ["Optimisation", "difference_gain_dh", null],
+  ["Unités vendues", "total_ventes_unites", 0],
+  ["Unités disponibles", "total_units_available", null],
+  ["Prix unitaires achetés", "total_pu_purchased", null],
+  ["PPV disponibles", "ppv_total_available", null],
 ];
 const near = (a: number | null, b: number | null) => (a === null || b === null ? a === b : Math.abs(a - b) <= 0.006);
 
@@ -228,39 +273,71 @@ export async function checkKpiTiles(page: Page, k: Row, gains?: number[]): Promi
   for (const [label, field, dflt] of ANALYSE_TILES) {
     const want: (number | null)[] = field === "difference_gain_dh" && gains?.length ? gains : [k[field] ?? dflt];
     const shown = async () => frNumber(await kpiValue(page, label).innerText());
-    const ok = await expect.poll(async () => { const v = await shown(); return want.some((w) => near(v, w)); }, { timeout: 10_000 })
-      .toBe(true).then(() => true, () => false);
+    const ok = await expect
+      .poll(
+        async () => {
+          const v = await shown();
+          return want.some((w) => near(v, w));
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(true)
+      .then(
+        () => true,
+        () => false,
+      );
     if (!ok) expect(await shown(), `tuile « ${label} » (attendu ${want.join(" ou ")})`).toBe(want[0]);
   }
-  for (const [label, max, min] of [["Marge moyenne (%)", "marge_pct_max", "marge_pct_min"], ["Marge moyenne (DH)", "marge_dh_max", "marge_dh_min"]]) {
+  for (const [label, max, min] of [
+    ["Marge moyenne (%)", "marge_pct_max", "marge_pct_min"],
+    ["Marge moyenne (DH)", "marge_dh_max", "marge_dh_min"],
+  ]) {
     if (!k[max] || !k[min]) continue;
     const text = await kpiValue(page, label).locator("xpath=..").innerText();
     const sub = text.slice(text.indexOf("Max"));
     const nums = (sub.match(/-?\u2212?\d{1,3}(?:[\s\u202f\u00a0]\d{3})*(?:,\d+)?/g) ?? []).map((t) => frNumber(t));
-    expect(near(nums[0] ?? null, k[max].value) && near(nums[1] ?? null, k[min].value),
-      `« ${label} » : ${sub} ≠ Max ${k[max].value} · Min ${k[min].value}`).toBe(true);
+    expect(
+      near(nums[0] ?? null, k[max].value) && near(nums[1] ?? null, k[min].value),
+      `« ${label} » : ${sub} ≠ Max ${k[max].value} · Min ${k[min].value}`,
+    ).toBe(true);
   }
 }
 
-
 type Cell = [header: string, value: (r: Row) => string | number | null, kind: "text" | "num" | "starts"];
 const marge = (r: Row, mode: "pct" | "dh"): number | null =>
-  r.ppv == null || r.avg_pu == null || r.ppv === 0 ? null : mode === "pct" ? (1 - r.avg_pu / r.ppv) * 100 : r.ppv - r.avg_pu;
+  r.ppv == null || r.avg_pu == null || r.ppv === 0
+    ? null
+    : mode === "pct"
+      ? (1 - r.avg_pu / r.ppv) * 100
+      : r.ppv - r.avg_pu;
 const LEDGER_CELLS: Record<Ledger, Cell[]> = {
   ventes: [
-    ["Date", (r) => r.date ?? "—", "text"], ["N° Transaction", (r) => r.transaction_ref ?? "—", "starts"],
-    ["Client", (r) => r.client || "Anonyme", "text"], ["Produit", (r) => r.product ?? "—", "text"],
-    ["Catégorie", (r) => r.category ?? "—", "text"], ["TVA", (r) => r.tva ?? "—", "text"],
-    ["Qté", (r) => r.quantity, "num"], ["Remise", (r) => (r.discount && r.discount > 0 ? r.discount : 0), "num"],
-    ["PPV", (r) => r.ppv, "num"], ["Sous-total", (r) => r.subtotal, "num"], ["Total", (r) => r.total, "num"],
-    ["Marge %", (r) => marge(r, "pct"), "num"], ["Marge DH", (r) => marge(r, "dh"), "num"],
+    ["Date", (r) => r.date ?? "—", "text"],
+    ["N° Transaction", (r) => r.transaction_ref ?? "—", "starts"],
+    ["Client", (r) => r.client || "Anonyme", "text"],
+    ["Produit", (r) => r.product ?? "—", "text"],
+    ["Catégorie", (r) => r.category ?? "—", "text"],
+    ["TVA", (r) => r.tva ?? "—", "text"],
+    ["Qté", (r) => r.quantity, "num"],
+    ["Remise", (r) => (r.discount && r.discount > 0 ? r.discount : 0), "num"],
+    ["PPV", (r) => r.ppv, "num"],
+    ["Sous-total", (r) => r.subtotal, "num"],
+    ["Total", (r) => r.total, "num"],
+    ["Marge %", (r) => marge(r, "pct"), "num"],
+    ["Marge DH", (r) => marge(r, "dh"), "num"],
   ],
   achats: [
-    ["Date BL", (r) => r.delivery_date ?? "—", "text"], ["Référence", (r) => r.delivery_ref ?? "—", "starts"],
-    ["Fournisseur", (r) => r.supplier ?? "—", "text"], ["Produit", (r) => r.product ?? "—", "text"],
-    ["Catégorie", (r) => r.category ?? "—", "text"], ["TVA", (r) => r.tva ?? "—", "text"],
-    ["Qté", (r) => r.quantity, "num"], ["PPH", (r) => r.pph, "num"], ["PU (achat)", (r) => r.unit_price, "num"],
-    ["Péremption", (r) => r.expiry_date ?? "—", "text"], ["Total", (r) => r.total, "num"],
+    ["Date BL", (r) => r.delivery_date ?? "—", "text"],
+    ["Référence", (r) => r.delivery_ref ?? "—", "starts"],
+    ["Fournisseur", (r) => r.supplier ?? "—", "text"],
+    ["Produit", (r) => r.product ?? "—", "text"],
+    ["Catégorie", (r) => r.category ?? "—", "text"],
+    ["TVA", (r) => r.tva ?? "—", "text"],
+    ["Qté", (r) => r.quantity, "num"],
+    ["PPH", (r) => r.pph, "num"],
+    ["PU (achat)", (r) => r.unit_price, "num"],
+    ["Péremption", (r) => r.expiry_date ?? "—", "text"],
+    ["Total", (r) => r.total, "num"],
   ],
 };
 
@@ -278,8 +355,14 @@ export async function checkLedgerScreen(page: Page, kind: Ledger, rows: Row[]): 
     rows.forEach((r, i) => {
       const want = value(r);
       const shown = (cells[i] ?? "").split("\n")[0].trim();
-      const ok = how === "num" ? (want == null ? shown === "—" : Math.abs((frNumber(shown) ?? NaN) - (want as number)) <= 0.011)
-        : how === "starts" ? shown.startsWith(String(want)) : shown === String(want);
+      const ok =
+        how === "num"
+          ? want == null
+            ? shown === "—"
+            : Math.abs((frNumber(shown) ?? NaN) - (want as number)) <= 0.011
+          : how === "starts"
+            ? shown.startsWith(String(want))
+            : shown === String(want);
       if (!ok) bad.push(`${header}[${i}]: « ${shown} » ≠ ${want}`);
     });
   }
@@ -290,7 +373,8 @@ export async function checkLedgerScreen(page: Page, kind: Ledger, rows: Row[]): 
 export async function checkTileValues(page: Page, tiles: [string, number][], what: string): Promise<void> {
   for (const [label, want] of tiles) {
     const value = page.getByText(label, { exact: true }).first().locator("xpath=following-sibling::*[1]");
-    await expect.poll(async () => Math.abs((frNumber(await value.innerText()) ?? NaN) - want), `${what} « ${label} » = ${want}`)
+    await expect
+      .poll(async () => Math.abs((frNumber(await value.innerText()) ?? NaN) - want), `${what} « ${label} » = ${want}`)
       .toBeLessThanOrEqual(0.011);
   }
 }

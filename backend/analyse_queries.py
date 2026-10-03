@@ -9,6 +9,7 @@ via `pharma_expr()`. Exclusions never apply here (Comptabilité only).
 Total CA = Σ qty × coalesce(PPV, unit_price) — matches Dashboard /stats so Rapport
 ↔ Analyse parity holds (locked by previous fix c0536f1).
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -35,6 +36,7 @@ def _sanitize_barcode(s: str | None) -> str | None:
 
 
 # ─── Main dispatch ────────────────────────────────────────────────────────────
+
 
 def compute_analyse_marge(
     db: Session,
@@ -109,7 +111,10 @@ def _compute_total_units_available(
 
 # ─── Mode: produit ────────────────────────────────────────────────────────────
 
-def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, base_filter_a: list, cat_filter: list) -> list[dict]:
+
+def _mode_produit(
+    db: Session, pharmacy_id: int | None, base_filter_v: list, base_filter_a: list, cat_filter: list
+) -> list[dict]:
     """Per-medicament rows: stock_dispo + qty + ca + avg/min/max PU + marge + best/worst margin."""
     achat_prices_sub = (
         db.query(
@@ -131,7 +136,10 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
 
     q = (
         db.query(
-            Medicament.product, Medicament.category, Medicament.tva, Medicament.ppv,
+            Medicament.product,
+            Medicament.category,
+            Medicament.tva,
+            Medicament.ppv,
             achat_prices_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
             func.sum(Vente.total).label("ca"),
@@ -146,47 +154,56 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
         .outerjoin(latest_stock_sub, Medicament.id == latest_stock_sub.c.medicament_id)
         .filter(*base_filter_v, *cat_filter)
         .group_by(
-            Medicament.id, Medicament.product, Medicament.category, Medicament.tva, Medicament.ppv,
-            achat_prices_sub.c.avg_pu, achat_prices_sub.c.pu_max, achat_prices_sub.c.pu_min,
-            achat_prices_sub.c.total_achat_cost, latest_stock_sub.c.current_stock,
+            Medicament.id,
+            Medicament.product,
+            Medicament.category,
+            Medicament.tva,
+            Medicament.ppv,
+            achat_prices_sub.c.avg_pu,
+            achat_prices_sub.c.pu_max,
+            achat_prices_sub.c.pu_min,
+            achat_prices_sub.c.total_achat_cost,
+            latest_stock_sub.c.current_stock,
         )
     )
 
     raw_rows: list[dict] = []
     for r in q.all():
         ppv = float(r.ppv or 0)
-        pu  = float(r.pu  or 0)
+        pu = float(r.pu or 0)
         stock_dispo = int(r.stock_dispo) if r.stock_dispo is not None else None
         prix_max = float(r.prix_max or 0)
         prix_min = float(r.prix_min or 0)
         marge_pct = round((1 - pu / ppv) * 100, 3) if ppv and pu else None
-        marge_dh  = round(ppv - pu, 4) if ppv and pu else None
-        marge_pct_best  = round((1 - prix_min / ppv) * 100, 3) if ppv and prix_min else marge_pct
+        marge_dh = round(ppv - pu, 4) if ppv and pu else None
+        marge_pct_best = round((1 - prix_min / ppv) * 100, 3) if ppv and prix_min else marge_pct
         marge_pct_worst = round((1 - prix_max / ppv) * 100, 3) if ppv and prix_max else marge_pct
-        marge_dh_best   = round(ppv - prix_min, 4) if ppv and prix_min else marge_dh
-        marge_dh_worst  = round(ppv - prix_max, 4) if ppv and prix_max else marge_dh
+        marge_dh_best = round(ppv - prix_min, 4) if ppv and prix_min else marge_dh
+        marge_dh_worst = round(ppv - prix_max, 4) if ppv and prix_max else marge_dh
         ppv_potentiel = round(ppv * stock_dispo, 2) if ppv > 0 and stock_dispo and stock_dispo > 0 else None
-        raw_rows.append({
-            "product":          r.product or "—",
-            "category":         _strip_pct(r.category or ""),
-            "tva":              r.tva or "—",
-            "ppv":              round(ppv, 4) if ppv else None,
-            "pu":               round(pu, 4) if pu else None,
-            "prix_max":         round(prix_max, 4),
-            "prix_min":         round(prix_min, 4),
-            "prix_avg":         round(float(r.prix_avg or 0), 4),
-            "qty":              round(float(r.qty or 0), 2),
-            "ca":               round(float(r.ca or 0), 2),
-            "marge_pct":        marge_pct,
-            "marge_dh":         marge_dh,
-            "marge_pct_best":   marge_pct_best,
-            "marge_pct_worst":  marge_pct_worst,
-            "marge_dh_best":    marge_dh_best,
-            "marge_dh_worst":   marge_dh_worst,
-            "stock_dispo":      stock_dispo,
-            "ppv_potentiel":    ppv_potentiel,
-            "total_achat_cost": round(float(r.total_achat_cost or 0), 2) if r.total_achat_cost else None,
-        })
+        raw_rows.append(
+            {
+                "product": r.product or "—",
+                "category": _strip_pct(r.category or ""),
+                "tva": r.tva or "—",
+                "ppv": round(ppv, 4) if ppv else None,
+                "pu": round(pu, 4) if pu else None,
+                "prix_max": round(prix_max, 4),
+                "prix_min": round(prix_min, 4),
+                "prix_avg": round(float(r.prix_avg or 0), 4),
+                "qty": round(float(r.qty or 0), 2),
+                "ca": round(float(r.ca or 0), 2),
+                "marge_pct": marge_pct,
+                "marge_dh": marge_dh,
+                "marge_pct_best": marge_pct_best,
+                "marge_pct_worst": marge_pct_worst,
+                "marge_dh_best": marge_dh_best,
+                "marge_dh_worst": marge_dh_worst,
+                "stock_dispo": stock_dispo,
+                "ppv_potentiel": ppv_potentiel,
+                "total_achat_cost": round(float(r.total_achat_cost or 0), 2) if r.total_achat_cost else None,
+            }
+        )
 
     # Merge rows that share the same product name (multiple ids → same display name).
     merged: OrderedDict[str, list[dict]] = OrderedDict()
@@ -198,38 +215,43 @@ def _mode_produit(db: Session, pharmacy_id: int | None, base_filter_v: list, bas
         if len(group) == 1:
             out.append(group[0])
         else:
-            total_qty   = sum(r["qty"] or 0 for r in group)
-            total_ca    = sum(r["ca"]  or 0 for r in group)
-            all_ppv     = [r["ppv"]         for r in group if r["ppv"]]
-            all_stock   = [r["stock_dispo"] for r in group if r["stock_dispo"] is not None]
-            ppv         = all_ppv[0] if all_ppv else None
+            total_qty = sum(r["qty"] or 0 for r in group)
+            total_ca = sum(r["ca"] or 0 for r in group)
+            all_ppv = [r["ppv"] for r in group if r["ppv"]]
+            all_stock = [r["stock_dispo"] for r in group if r["stock_dispo"] is not None]
+            ppv = all_ppv[0] if all_ppv else None
             pu_num = sum((r["pu"] or 0) * (r["qty"] or 0) for r in group if r["pu"])
             pu_den = sum(r["qty"] or 0 for r in group if r["pu"])
             avg_pu = round(pu_num / pu_den, 4) if pu_den > 0 else None
             marge_pct = round((1 - avg_pu / ppv) * 100, 3) if ppv and avg_pu else None
-            marge_dh  = round(ppv - avg_pu, 4) if ppv and avg_pu else None
+            marge_dh = round(ppv - avg_pu, 4) if ppv and avg_pu else None
             total_stock = sum(all_stock) if all_stock else None
             ppv_pot = round(ppv * total_stock, 2) if ppv and total_stock and total_stock > 0 else None
-            out.append({
-                "product": product_name,
-                "category": group[0]["category"],
-                "tva":      group[0]["tva"],
-                "ppv":      ppv,
-                "pu":       avg_pu,
-                "prix_max": max(r["prix_max"] for r in group),
-                "prix_min": min(r["prix_min"] for r in group),
-                "prix_avg": round(sum((r["prix_avg"] or 0) * (r["qty"] or 0) for r in group) / total_qty, 4) if total_qty > 0 else 0,
-                "qty":      round(total_qty, 2),
-                "ca":       round(total_ca, 2),
-                "marge_pct": marge_pct,
-                "marge_dh":  marge_dh,
-                "stock_dispo":  total_stock,
-                "ppv_potentiel": ppv_pot,
-            })
+            out.append(
+                {
+                    "product": product_name,
+                    "category": group[0]["category"],
+                    "tva": group[0]["tva"],
+                    "ppv": ppv,
+                    "pu": avg_pu,
+                    "prix_max": max(r["prix_max"] for r in group),
+                    "prix_min": min(r["prix_min"] for r in group),
+                    "prix_avg": round(sum((r["prix_avg"] or 0) * (r["qty"] or 0) for r in group) / total_qty, 4)
+                    if total_qty > 0
+                    else 0,
+                    "qty": round(total_qty, 2),
+                    "ca": round(total_ca, 2),
+                    "marge_pct": marge_pct,
+                    "marge_dh": marge_dh,
+                    "stock_dispo": total_stock,
+                    "ppv_potentiel": ppv_pot,
+                }
+            )
     return out
 
 
 # ─── Mode: categorie ──────────────────────────────────────────────────────────
+
 
 def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_filter: list) -> list[dict]:
     q = (
@@ -249,7 +271,8 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
     avg_pu_sub = avg_pu_subquery(db, *base_filter_a)
     med_marge_q = (
         db.query(
-            Medicament.category, Medicament.ppv,
+            Medicament.category,
+            Medicament.ppv,
             avg_pu_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
         )
@@ -265,24 +288,32 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
         key = _strip_pct(m.category or "")
         qty = float(m.qty or 0)
         ppv = float(m.ppv or 0)
-        pu  = float(m.pu  or 0)
+        pu = float(m.pu or 0)
         cat_margin.setdefault(key, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
         marge_pct = (1 - pu / ppv) * 100 if ppv else 0
         cat_margin[key]["sum_qty_pct"] += qty * marge_pct
-        cat_margin[key]["sum_qty_dh"]  += qty * (ppv - pu)
-        cat_margin[key]["total_qty"]   += qty
+        cat_margin[key]["sum_qty_dh"] += qty * (ppv - pu)
+        cat_margin[key]["total_qty"] += qty
 
     # One row per category label: "Médicament (33.930%)" and "Médicament (30.000%)"
     # merge into one « Médicament » row (same key as the margins above).
     groups: dict[str, dict] = {}
     for r in q.all():
-        g = groups.setdefault(_strip_pct(r.category or ""), {
-            "qty": 0.0, "ca": 0.0, "max": None, "min": None, "pu_sum": 0.0, "pu_n": 0,
-        })
-        g["qty"]    += float(r.qty or 0)
-        g["ca"]     += float(r.ca or 0)
+        g = groups.setdefault(
+            _strip_pct(r.category or ""),
+            {
+                "qty": 0.0,
+                "ca": 0.0,
+                "max": None,
+                "min": None,
+                "pu_sum": 0.0,
+                "pu_n": 0,
+            },
+        )
+        g["qty"] += float(r.qty or 0)
+        g["ca"] += float(r.ca or 0)
         g["pu_sum"] += float(r.pu_sum or 0)
-        g["pu_n"]   += int(r.pu_n or 0)
+        g["pu_n"] += int(r.pu_n or 0)
         if r.prix_max is not None:
             g["max"] = r.prix_max if g["max"] is None else max(g["max"], r.prix_max)
         if r.prix_min is not None:
@@ -292,23 +323,31 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
     for key, g in groups.items():
         m = cat_margin.get(key)
         total_qty = m["total_qty"] if m else 0
-        out.append({
-            "category":      key or "—",
-            "prix_max":      round(float(g["max"] or 0), 4),
-            "prix_min":      round(float(g["min"] or 0), 4),
-            "prix_avg":      round(g["pu_sum"] / g["pu_n"], 4) if g["pu_n"] else 0.0,
-            "qty":           round(g["qty"], 2),
-            "ca":            round(g["ca"], 2),
-            "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
-            "marge_dh_avg":  round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
-        })
+        out.append(
+            {
+                "category": key or "—",
+                "prix_max": round(float(g["max"] or 0), 4),
+                "prix_min": round(float(g["min"] or 0), 4),
+                "prix_avg": round(g["pu_sum"] / g["pu_n"], 4) if g["pu_n"] else 0.0,
+                "qty": round(g["qty"], 2),
+                "ca": round(g["ca"], 2),
+                "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
+                "marge_dh_avg": round(m["sum_qty_dh"] / total_qty, 2) if m and total_qty else None,
+            }
+        )
     return out
 
 
 # ─── Mode: grossiste (PG-010) ─────────────────────────────────────────────────
 
+
 def _supplier_axis(
-    db: Session, base_filter_v: list, base_filter_a: list, *, supplier_clause, key: str,
+    db: Session,
+    base_filter_v: list,
+    base_filter_a: list,
+    *,
+    supplier_clause,
+    key: str,
 ) -> list[dict]:
     """Marge grouped by `Achat.supplier` — the shared engine behind the Grossiste
     and Laboratoire tabs (the two supplier axes). `supplier_clause` selects which
@@ -350,8 +389,9 @@ def _supplier_axis(
         .join(Medicament, Medicament.id == supplier_med_sub.c.medicament_id)
         .join(Vente, Vente.medicament_id == supplier_med_sub.c.medicament_id)
         .filter(*base_filter_v, Medicament.ppv.isnot(None))
-        .group_by(supplier_med_sub.c.supplier, supplier_med_sub.c.medicament_id,
-                  Medicament.ppv, supplier_med_sub.c.avg_pu)
+        .group_by(
+            supplier_med_sub.c.supplier, supplier_med_sub.c.medicament_id, Medicament.ppv, supplier_med_sub.c.avg_pu
+        )
     )
     margin: dict = {}
     for m in med_marge_q.all():
@@ -361,20 +401,17 @@ def _supplier_axis(
         if not ppv:
             continue
         qty = float(m.qty or 0)
-        pu  = float(m.pu  or 0)
+        pu = float(m.pu or 0)
         bucket = margin.setdefault(m.supplier, {"sum_qty_pct": 0.0, "sum_qty_dh": 0.0, "total_qty": 0.0})
         marge_pct = (1 - pu / ppv) * 100
         bucket["sum_qty_pct"] += qty * marge_pct
-        bucket["sum_qty_dh"]  += qty * (ppv - pu)
-        bucket["total_qty"]   += qty
+        bucket["sum_qty_dh"] += qty * (ppv - pu)
+        bucket["total_qty"] += qty
 
-    cost_q = (
-        db.query(
-            supplier_med_sub.c.supplier.label("supplier"),
-            func.sum(supplier_med_sub.c.total_cost).label("total_cost"),
-        )
-        .group_by(supplier_med_sub.c.supplier)
-    )
+    cost_q = db.query(
+        supplier_med_sub.c.supplier.label("supplier"),
+        func.sum(supplier_med_sub.c.total_cost).label("total_cost"),
+    ).group_by(supplier_med_sub.c.supplier)
     total_cost = {r.supplier: float(r.total_cost or 0) for r in cost_q.all()}
 
     out: list[dict] = []
@@ -382,23 +419,27 @@ def _supplier_axis(
         name = getattr(r, key) or "—"
         m = margin.get(name)
         total_qty = m["total_qty"] if m else 0
-        out.append({
-            key:                name,
-            "prix_max":         round(float(r.prix_max or 0), 4),
-            "prix_min":         round(float(r.prix_min or 0), 4),
-            "prix_avg":         round(float(r.prix_avg or 0), 4),
-            "qty":              round(float(r.qty or 0), 2),
-            "ca":               round(float(r.ca or 0), 2),
-            "marge_pct_avg":    round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
-            "marge_dh_avg":     round(m["sum_qty_dh"]  / total_qty, 2) if m and total_qty else None,
-            "total_achat_cost": round(total_cost.get(name, 0.0), 2),
-        })
+        out.append(
+            {
+                key: name,
+                "prix_max": round(float(r.prix_max or 0), 4),
+                "prix_min": round(float(r.prix_min or 0), 4),
+                "prix_avg": round(float(r.prix_avg or 0), 4),
+                "qty": round(float(r.qty or 0), 2),
+                "ca": round(float(r.ca or 0), 2),
+                "marge_pct_avg": round(m["sum_qty_pct"] / total_qty, 3) if m and total_qty else None,
+                "marge_dh_avg": round(m["sum_qty_dh"] / total_qty, 2) if m and total_qty else None,
+                "total_achat_cost": round(total_cost.get(name, 0.0), 2),
+            }
+        )
     return out
 
 
 def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> list[dict]:
     return _supplier_axis(
-        db, base_filter_v, base_filter_a,
+        db,
+        base_filter_v,
+        base_filter_a,
         supplier_clause=func.upper(Achat.supplier).like("GROSSISTE%"),
         key="grossiste",
     )
@@ -412,7 +453,9 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
 # axis the pharmacist actually purchases from, per the /analyses redesign.)
 def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list) -> list[dict]:
     return _supplier_axis(
-        db, base_filter_v, base_filter_a,
+        db,
+        base_filter_v,
+        base_filter_a,
         supplier_clause=and_(
             Achat.supplier.isnot(None),
             func.upper(Achat.supplier).notlike("GROSSISTE%"),
@@ -422,6 +465,7 @@ def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list) -> 
 
 
 # ─── Mode: operateur (client) ─────────────────────────────────────────────────
+
 
 def _mode_operateur(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]:
     q = (
@@ -435,15 +479,19 @@ def _mode_operateur(db: Session, base_filter_v: list, cat_filter: list) -> list[
         .filter(*base_filter_v, *cat_filter)
         .group_by(Vente.client)
     )
-    return [{
-        "client":          r.client or "Anonyme",
-        "nb_transactions": r.nb_transactions or 0,
-        "qty":             round(float(r.qty or 0), 2),
-        "ca":              round(float(r.ca or 0), 2),
-    } for r in q.all()]
+    return [
+        {
+            "client": r.client or "Anonyme",
+            "nb_transactions": r.nb_transactions or 0,
+            "qty": round(float(r.qty or 0), 2),
+            "ca": round(float(r.ca or 0), 2),
+        }
+        for r in q.all()
+    ]
 
 
 # ─── Mode: mois ───────────────────────────────────────────────────────────────
+
 
 def _mode_mois(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]:
     q = (
@@ -458,15 +506,19 @@ def _mode_mois(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]
         .group_by("mois")
         .order_by("mois")
     )
-    return [{
-        "mois":            r.mois or "—",
-        "nb_transactions": r.nb_transactions or 0,
-        "qty":             round(float(r.qty or 0), 2),
-        "ca":              round(float(r.ca or 0), 2),
-    } for r in q.all()]
+    return [
+        {
+            "mois": r.mois or "—",
+            "nb_transactions": r.nb_transactions or 0,
+            "qty": round(float(r.qty or 0), 2),
+            "ca": round(float(r.ca or 0), 2),
+        }
+        for r in q.all()
+    ]
 
 
 # ─── Mode: annee (pivot) ──────────────────────────────────────────────────────
+
 
 def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict]:
     # Product filtering (for the search box in année mode) is applied upstream via
@@ -474,7 +526,7 @@ def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict
     # stay consistent. Each month cell is {"qty", "ca"}.
     q = (
         db.query(
-            func.extract("year",  func.cast(Vente.date, Date)).label("annee"),
+            func.extract("year", func.cast(Vente.date, Date)).label("annee"),
             func.extract("month", func.cast(Vente.date, Date)).label("mois"),
             ca_sum().label("ca"),
             func.sum(Vente.quantity).label("qty"),
@@ -495,17 +547,18 @@ def _mode_annee(db: Session, base_filter_v: list, cat_filter: list) -> list[dict
         )
         row[_MONTH_KEYS[mo - 1]] = {
             "qty": round(float(r.qty or 0), 2),
-            "ca":  round(float(r.ca or 0), 2),
+            "ca": round(float(r.ca or 0), 2),
         }
-        row["ca"]  += float(r.ca or 0)
+        row["ca"] += float(r.ca or 0)
         row["qty"] += float(r.qty or 0)
     for row in bucket.values():
-        row["ca"]  = round(row["ca"], 2)
+        row["ca"] = round(row["ca"], 2)
         row["qty"] = round(row["qty"], 2)
     return sorted(bucket.values(), key=lambda r: r["annee"], reverse=True)
 
 
 # ─── KPI computation (shared across all modes) ────────────────────────────────
+
 
 def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: list[dict]) -> dict:
     # Parity with Dashboard /stats: same CA formula so totals match for the same window.
@@ -514,24 +567,28 @@ def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: 
         .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v, *cat_filter)
     )
-    total_ventes_dh     = float(_ca_q.scalar() or 0)
+    total_ventes_dh = float(_ca_q.scalar() or 0)
     total_ventes_unites = sum(float(r.get("qty") or 0) for r in rows_out)
 
-    total_units_available = sum(float(r.get("stock_dispo")      or 0) for r in rows_out)
-    total_pu_purchased    = sum(float(r.get("total_achat_cost") or 0) for r in rows_out)
-    ppv_total_available   = sum(float(r.get("ppv_potentiel")    or 0) for r in rows_out)
+    total_units_available = sum(float(r.get("stock_dispo") or 0) for r in rows_out)
+    total_pu_purchased = sum(float(r.get("total_achat_cost") or 0) for r in rows_out)
+    ppv_total_available = sum(float(r.get("ppv_potentiel") or 0) for r in rows_out)
 
-    marge_rows     = [r for r in rows_out if r.get("marge_pct")     is not None]
+    marge_rows = [r for r in rows_out if r.get("marge_pct") is not None]
     marge_avg_rows = [r for r in rows_out if r.get("marge_pct_avg") is not None]
 
     kpis: dict = {
-        "total_ventes_dh":       round(total_ventes_dh, 2),
-        "total_ventes_unites":   round(total_ventes_unites, 2),
+        "total_ventes_dh": round(total_ventes_dh, 2),
+        "total_ventes_unites": round(total_ventes_unites, 2),
         "total_units_available": round(total_units_available, 2) if total_units_available else None,
-        "total_pu_purchased":    round(total_pu_purchased, 2)    if total_pu_purchased    else None,
-        "ppv_total_available":   round(ppv_total_available, 2)   if ppv_total_available   else None,
-        "marge_pct_avg": None, "marge_pct_min": None, "marge_pct_max": None,
-        "marge_dh_avg":  None, "marge_dh_min":  None, "marge_dh_max":  None,
+        "total_pu_purchased": round(total_pu_purchased, 2) if total_pu_purchased else None,
+        "ppv_total_available": round(ppv_total_available, 2) if ppv_total_available else None,
+        "marge_pct_avg": None,
+        "marge_pct_min": None,
+        "marge_pct_max": None,
+        "marge_dh_avg": None,
+        "marge_dh_min": None,
+        "marge_dh_max": None,
         "difference_gain_dh": None,
     }
 
@@ -540,25 +597,43 @@ def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: 
         if total_qty:
             # Marge moyenne (%) matches Dashboard's "marge mixte": (1 − Σqty·PU / Σqty·PPV) × 100.
             sum_qty_ppv = sum(float(r["qty"] or 0) * float(r["ppv"] or 0) for r in marge_rows)
-            sum_qty_pu  = sum(float(r["qty"] or 0) * float(r["pu"]  or 0) for r in marge_rows)
+            sum_qty_pu = sum(float(r["qty"] or 0) * float(r["pu"] or 0) for r in marge_rows)
             kpis["marge_pct_avg"] = round((1 - sum_qty_pu / sum_qty_ppv) * 100, 3) if sum_qty_ppv else None
-            kpis["marge_dh_avg"]  = round(
-                sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2)
-        best_pct_key  = "marge_pct_best"  if "marge_pct_best"  in marge_rows[0] else "marge_pct"
+            kpis["marge_dh_avg"] = round(
+                sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2
+            )
+        best_pct_key = "marge_pct_best" if "marge_pct_best" in marge_rows[0] else "marge_pct"
         worst_pct_key = "marge_pct_worst" if "marge_pct_worst" in marge_rows[0] else "marge_pct"
-        best_dh_key   = "marge_dh_best"   if "marge_dh_best"   in marge_rows[0] else "marge_dh"
-        worst_dh_key  = "marge_dh_worst"  if "marge_dh_worst"  in marge_rows[0] else "marge_dh"
-        best_pct  = max(marge_rows, key=lambda r: float(r.get(best_pct_key)  or r["marge_pct"]))
+        best_dh_key = "marge_dh_best" if "marge_dh_best" in marge_rows[0] else "marge_dh"
+        worst_dh_key = "marge_dh_worst" if "marge_dh_worst" in marge_rows[0] else "marge_dh"
+        best_pct = max(marge_rows, key=lambda r: float(r.get(best_pct_key) or r["marge_pct"]))
         worst_pct = min(marge_rows, key=lambda r: float(r.get(worst_pct_key) or r["marge_pct"]))
-        best_dh   = max(marge_rows, key=lambda r: float(r.get(best_dh_key)   or r["marge_dh"]))
-        worst_dh  = min(marge_rows, key=lambda r: float(r.get(worst_dh_key)  or r["marge_dh"]))
-        kpis["marge_pct_max"] = {"label": best_pct["product"],  "value": float(best_pct.get(best_pct_key)  or best_pct["marge_pct"]),  "qty": best_pct["qty"]}
-        kpis["marge_pct_min"] = {"label": worst_pct["product"], "value": float(worst_pct.get(worst_pct_key) or worst_pct["marge_pct"]), "qty": worst_pct["qty"]}
-        kpis["marge_dh_max"]  = {"label": best_dh["product"],   "value": float(best_dh.get(best_dh_key)    or best_dh["marge_dh"]),   "qty": best_dh["qty"]}
-        kpis["marge_dh_min"]  = {"label": worst_dh["product"],  "value": float(worst_dh.get(worst_dh_key)  or worst_dh["marge_dh"]),  "qty": worst_dh["qty"]}
+        best_dh = max(marge_rows, key=lambda r: float(r.get(best_dh_key) or r["marge_dh"]))
+        worst_dh = min(marge_rows, key=lambda r: float(r.get(worst_dh_key) or r["marge_dh"]))
+        kpis["marge_pct_max"] = {
+            "label": best_pct["product"],
+            "value": float(best_pct.get(best_pct_key) or best_pct["marge_pct"]),
+            "qty": best_pct["qty"],
+        }
+        kpis["marge_pct_min"] = {
+            "label": worst_pct["product"],
+            "value": float(worst_pct.get(worst_pct_key) or worst_pct["marge_pct"]),
+            "qty": worst_pct["qty"],
+        }
+        kpis["marge_dh_max"] = {
+            "label": best_dh["product"],
+            "value": float(best_dh.get(best_dh_key) or best_dh["marge_dh"]),
+            "qty": best_dh["qty"],
+        }
+        kpis["marge_dh_min"] = {
+            "label": worst_dh["product"],
+            "value": float(worst_dh.get(worst_dh_key) or worst_dh["marge_dh"]),
+            "qty": worst_dh["qty"],
+        }
         kpis["difference_gain_dh"] = round(
             float(best_dh["qty"] or 0) * float(best_dh["marge_dh"] or 0)
-            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh"] or 0), 2,
+            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh"] or 0),
+            2,
         )
     elif marge_avg_rows:
         sample = marge_avg_rows[0]
@@ -566,26 +641,38 @@ def _compute_kpis(db: Session, base_filter_v: list, cat_filter: list, rows_out: 
         total_qty = sum(float(r["qty"] or 0) for r in marge_avg_rows)
         if total_qty:
             kpis["marge_pct_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_pct_avg"] or 0) for r in marge_avg_rows) / total_qty, 3)
-            kpis["marge_dh_avg"]  = round(
-                sum(float(r["qty"] or 0) * float(r["marge_dh_avg"]  or 0) for r in marge_avg_rows) / total_qty, 2)
-        best_pct  = max(marge_avg_rows, key=lambda r: r["marge_pct_avg"])
+                sum(float(r["qty"] or 0) * float(r["marge_pct_avg"] or 0) for r in marge_avg_rows) / total_qty, 3
+            )
+            kpis["marge_dh_avg"] = round(
+                sum(float(r["qty"] or 0) * float(r["marge_dh_avg"] or 0) for r in marge_avg_rows) / total_qty, 2
+            )
+        best_pct = max(marge_avg_rows, key=lambda r: r["marge_pct_avg"])
         worst_pct = min(marge_avg_rows, key=lambda r: r["marge_pct_avg"])
-        best_dh   = max(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
-        worst_dh  = min(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
-        kpis["marge_pct_max"] = {"label": best_pct[label_key],  "value": best_pct["marge_pct_avg"],  "qty": best_pct["qty"]}
-        kpis["marge_pct_min"] = {"label": worst_pct[label_key], "value": worst_pct["marge_pct_avg"], "qty": worst_pct["qty"]}
-        kpis["marge_dh_max"]  = {"label": best_dh[label_key],   "value": best_dh["marge_dh_avg"],   "qty": best_dh["qty"]}
-        kpis["marge_dh_min"]  = {"label": worst_dh[label_key],  "value": worst_dh["marge_dh_avg"],  "qty": worst_dh["qty"]}
+        best_dh = max(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
+        worst_dh = min(marge_avg_rows, key=lambda r: r["marge_dh_avg"])
+        kpis["marge_pct_max"] = {
+            "label": best_pct[label_key],
+            "value": best_pct["marge_pct_avg"],
+            "qty": best_pct["qty"],
+        }
+        kpis["marge_pct_min"] = {
+            "label": worst_pct[label_key],
+            "value": worst_pct["marge_pct_avg"],
+            "qty": worst_pct["qty"],
+        }
+        kpis["marge_dh_max"] = {"label": best_dh[label_key], "value": best_dh["marge_dh_avg"], "qty": best_dh["qty"]}
+        kpis["marge_dh_min"] = {"label": worst_dh[label_key], "value": worst_dh["marge_dh_avg"], "qty": worst_dh["qty"]}
         kpis["difference_gain_dh"] = round(
             float(best_dh["qty"] or 0) * float(best_dh["marge_dh_avg"] or 0)
-            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh_avg"] or 0), 2,
+            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh_avg"] or 0),
+            2,
         )
 
     return kpis
 
 
 # ─── Liste mode: CSV-upload match against catalogue ───────────────────────────
+
 
 def compute_analyse_liste(
     db: Session,
@@ -615,13 +702,19 @@ def compute_analyse_liste(
         return {"kpis": _empty_kpis(), "rows": []}
 
     med_rows = db.query(
-        Medicament.id, Medicament.product, Medicament.pid,
-        Medicament.barcode1, Medicament.barcode2,
-        Medicament.category, Medicament.tva, Medicament.ppv, Medicament.pph,
+        Medicament.id,
+        Medicament.product,
+        Medicament.pid,
+        Medicament.barcode1,
+        Medicament.barcode2,
+        Medicament.category,
+        Medicament.tva,
+        Medicament.ppv,
+        Medicament.pph,
     ).all()
 
-    med_lookup     = {strip_accents((m.product or "").strip().lower()): m for m in med_rows}
-    pid_to_med     = {str(m.pid).strip(): m for m in med_rows if m.pid}
+    med_lookup = {strip_accents((m.product or "").strip().lower()): m for m in med_rows}
+    pid_to_med = {str(m.pid).strip(): m for m in med_rows if m.pid}
     barcode_to_med: dict[str, Any] = {}
     for m in med_rows:
         for bc in (_sanitize_barcode(m.barcode1), _sanitize_barcode(m.barcode2)):
@@ -633,26 +726,32 @@ def compute_analyse_liste(
     for norm_name, original_name in normalized_inputs.items():
         found = False
         if norm_name in med_lookup:
-            matched_ids.add(med_lookup[norm_name].id); found = True
+            matched_ids.add(med_lookup[norm_name].id)
+            found = True
         else:
             for db_norm, m in med_lookup.items():
                 if norm_name in db_norm or db_norm in norm_name:
-                    matched_ids.add(m.id); found = True; break
+                    matched_ids.add(m.id)
+                    found = True
+                    break
         it = item_by_norm.get(norm_name)
         if not found and it:
             if it.pid and str(it.pid).strip() in pid_to_med:
-                matched_ids.add(pid_to_med[str(it.pid).strip()].id); found = True
+                matched_ids.add(pid_to_med[str(it.pid).strip()].id)
+                found = True
             else:
                 for bc in (_sanitize_barcode(it.barcode1), _sanitize_barcode(it.barcode2)):
                     if bc and bc in barcode_to_med:
-                        matched_ids.add(barcode_to_med[bc].id); found = True; break
+                        matched_ids.add(barcode_to_med[bc].id)
+                        found = True
+                        break
         if not found:
             unmatched.append(original_name)
 
     # Run produit mode then filter to matched ids
     full = compute_analyse_marge(db, pharmacy_id, df, dt, category_type, "produit")
     matched_meds_by_id = {m.id: m for m in med_rows if m.id in matched_ids}
-    matched_norms_db   = {strip_accents((m.product or "").strip().lower()) for m in matched_meds_by_id.values()}
+    matched_norms_db = {strip_accents((m.product or "").strip().lower()) for m in matched_meds_by_id.values()}
 
     matched_rows: list[dict] = []
     covered_norms: set[str] = set()
@@ -664,36 +763,63 @@ def compute_analyse_liste(
             covered_norms.add(norm)
 
     # Stock-only products (no vente in window): synthesize a stub row.
-    uncovered = [m for m in matched_meds_by_id.values()
-                 if strip_accents((m.product or "").strip().lower()) not in covered_norms]
+    uncovered = [
+        m for m in matched_meds_by_id.values() if strip_accents((m.product or "").strip().lower()) not in covered_norms
+    ]
     if uncovered:
         stock_map = dict(
             db.query(PharmacyStock.medicament_id, PharmacyStock.current_stock)
-            .filter(PharmacyStock.pharmacy_id == pharmacy_id,
-                    PharmacyStock.medicament_id.in_([m.id for m in uncovered]))
+            .filter(
+                PharmacyStock.pharmacy_id == pharmacy_id, PharmacyStock.medicament_id.in_([m.id for m in uncovered])
+            )
             .all()
         )
         for m in uncovered:
             stock_dispo = stock_map.get(m.id)
             ppv = float(m.ppv or 0)
             ppv_potentiel = round(ppv * stock_dispo, 2) if ppv and stock_dispo else None
-            matched_rows.append({
-                "product": m.product or "—", "category": _strip_pct(m.category or ""),
-                "tva": m.tva, "ppv": round(ppv, 4) if ppv else None,
-                "pu": None, "prix_max": None, "prix_min": None, "prix_avg": None,
-                "qty": 0, "ca": 0, "marge_pct": None, "marge_dh": None,
-                "stock_dispo": stock_dispo, "ppv_potentiel": ppv_potentiel,
-                "total_achat_cost": None, "match_status": "found",
-            })
+            matched_rows.append(
+                {
+                    "product": m.product or "—",
+                    "category": _strip_pct(m.category or ""),
+                    "tva": m.tva,
+                    "ppv": round(ppv, 4) if ppv else None,
+                    "pu": None,
+                    "prix_max": None,
+                    "prix_min": None,
+                    "prix_avg": None,
+                    "qty": 0,
+                    "ca": 0,
+                    "marge_pct": None,
+                    "marge_dh": None,
+                    "stock_dispo": stock_dispo,
+                    "ppv_potentiel": ppv_potentiel,
+                    "total_achat_cost": None,
+                    "match_status": "found",
+                }
+            )
 
     for name in unmatched:
-        matched_rows.append({
-            "product": name, "match_status": "not_found",
-            "category": None, "tva": None, "ppv": None, "pu": None,
-            "prix_max": None, "prix_min": None, "prix_avg": None,
-            "qty": 0, "ca": 0, "marge_pct": None, "marge_dh": None,
-            "stock_dispo": None, "ppv_potentiel": None, "total_achat_cost": None,
-        })
+        matched_rows.append(
+            {
+                "product": name,
+                "match_status": "not_found",
+                "category": None,
+                "tva": None,
+                "ppv": None,
+                "pu": None,
+                "prix_max": None,
+                "prix_min": None,
+                "prix_avg": None,
+                "qty": 0,
+                "ca": 0,
+                "marge_pct": None,
+                "marge_dh": None,
+                "stock_dispo": None,
+                "ppv_potentiel": None,
+                "total_achat_cost": None,
+            }
+        )
 
     # Recompute KPIs from FOUND rows only (not global)
     found_rows = [r for r in matched_rows if r.get("match_status") == "found"]
@@ -702,49 +828,67 @@ def compute_analyse_liste(
 
 
 def _compute_kpis_from_liste(found_rows: list[dict]) -> dict:
-    total_ventes_dh       = sum(float(r.get("ca") or 0) for r in found_rows)
-    total_ventes_unites   = sum(float(r.get("qty") or 0) for r in found_rows)
+    total_ventes_dh = sum(float(r.get("ca") or 0) for r in found_rows)
+    total_ventes_unites = sum(float(r.get("qty") or 0) for r in found_rows)
     total_units_available = sum(float(r.get("stock_dispo") or 0) for r in found_rows)
-    total_pu_purchased    = sum(float(r.get("total_achat_cost") or 0) for r in found_rows)
-    ppv_total_available   = sum(float(r.get("ppv_potentiel") or 0) for r in found_rows)
+    total_pu_purchased = sum(float(r.get("total_achat_cost") or 0) for r in found_rows)
+    ppv_total_available = sum(float(r.get("ppv_potentiel") or 0) for r in found_rows)
     marge_rows = [r for r in found_rows if r.get("marge_pct") is not None]
     kpis = {
-        "total_ventes_dh":       round(total_ventes_dh, 2),
-        "total_ventes_unites":   round(total_ventes_unites, 2),
+        "total_ventes_dh": round(total_ventes_dh, 2),
+        "total_ventes_unites": round(total_ventes_unites, 2),
         "total_units_available": round(total_units_available, 2) if total_units_available else None,
-        "total_pu_purchased":    round(total_pu_purchased, 2)    if total_pu_purchased    else None,
-        "ppv_total_available":   round(ppv_total_available, 2)   if ppv_total_available   else None,
-        "marge_pct_avg": None, "marge_pct_min": None, "marge_pct_max": None,
-        "marge_dh_avg":  None, "marge_dh_min":  None, "marge_dh_max":  None,
+        "total_pu_purchased": round(total_pu_purchased, 2) if total_pu_purchased else None,
+        "ppv_total_available": round(ppv_total_available, 2) if ppv_total_available else None,
+        "marge_pct_avg": None,
+        "marge_pct_min": None,
+        "marge_pct_max": None,
+        "marge_dh_avg": None,
+        "marge_dh_min": None,
+        "marge_dh_max": None,
         "difference_gain_dh": None,
     }
     if marge_rows:
         total_qty = sum(float(r["qty"] or 0) for r in marge_rows)
         if total_qty:
             kpis["marge_pct_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 3)
+                sum(float(r["qty"] or 0) * float(r["marge_pct"] or 0) for r in marge_rows) / total_qty, 3
+            )
             kpis["marge_dh_avg"] = round(
-                sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2)
-        best_pct  = max(marge_rows, key=lambda r: float(r["marge_pct"]))
+                sum(float(r["qty"] or 0) * float(r["marge_dh"] or 0) for r in marge_rows) / total_qty, 2
+            )
+        best_pct = max(marge_rows, key=lambda r: float(r["marge_pct"]))
         worst_pct = min(marge_rows, key=lambda r: float(r["marge_pct"]))
-        best_dh   = max(marge_rows, key=lambda r: float(r["marge_dh"]))
-        worst_dh  = min(marge_rows, key=lambda r: float(r["marge_dh"]))
-        kpis["marge_pct_max"] = {"label": best_pct["product"],  "value": best_pct["marge_pct"],  "qty": best_pct["qty"]}
-        kpis["marge_pct_min"] = {"label": worst_pct["product"], "value": worst_pct["marge_pct"], "qty": worst_pct["qty"]}
-        kpis["marge_dh_max"]  = {"label": best_dh["product"],   "value": best_dh["marge_dh"],   "qty": best_dh["qty"]}
-        kpis["marge_dh_min"]  = {"label": worst_dh["product"],  "value": worst_dh["marge_dh"],  "qty": worst_dh["qty"]}
+        best_dh = max(marge_rows, key=lambda r: float(r["marge_dh"]))
+        worst_dh = min(marge_rows, key=lambda r: float(r["marge_dh"]))
+        kpis["marge_pct_max"] = {"label": best_pct["product"], "value": best_pct["marge_pct"], "qty": best_pct["qty"]}
+        kpis["marge_pct_min"] = {
+            "label": worst_pct["product"],
+            "value": worst_pct["marge_pct"],
+            "qty": worst_pct["qty"],
+        }
+        kpis["marge_dh_max"] = {"label": best_dh["product"], "value": best_dh["marge_dh"], "qty": best_dh["qty"]}
+        kpis["marge_dh_min"] = {"label": worst_dh["product"], "value": worst_dh["marge_dh"], "qty": worst_dh["qty"]}
         kpis["difference_gain_dh"] = round(
             float(best_dh["qty"] or 0) * float(best_dh["marge_dh"] or 0)
-            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh"] or 0), 2,
+            - float(worst_dh["qty"] or 0) * float(worst_dh["marge_dh"] or 0),
+            2,
         )
     return kpis
 
 
 def _empty_kpis() -> dict:
     return {
-        "total_ventes_dh": 0.0, "total_ventes_unites": 0.0,
-        "total_units_available": None, "total_pu_purchased": None, "ppv_total_available": None,
-        "marge_pct_avg": None, "marge_pct_min": None, "marge_pct_max": None,
-        "marge_dh_avg":  None, "marge_dh_min":  None, "marge_dh_max":  None,
+        "total_ventes_dh": 0.0,
+        "total_ventes_unites": 0.0,
+        "total_units_available": None,
+        "total_pu_purchased": None,
+        "ppv_total_available": None,
+        "marge_pct_avg": None,
+        "marge_pct_min": None,
+        "marge_pct_max": None,
+        "marge_dh_avg": None,
+        "marge_dh_min": None,
+        "marge_dh_max": None,
         "difference_gain_dh": None,
     }

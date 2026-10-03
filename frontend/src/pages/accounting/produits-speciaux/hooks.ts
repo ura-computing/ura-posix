@@ -8,47 +8,46 @@ import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 
 import type {
-  BlExclusion, BlExclusionResult, BlReintegrateResult, BlSummary,
-  MedicamentSuggestion, SpecialProduct, SpecialProductBulkResult, SpecialProductReintegrateResult,
-  SupplierExclusion, SupplierExclusionResult, SupplierReintegrateResult, SupplierSummary,
+  BlExclusion,
+  BlExclusionResult,
+  BlReintegrateResult,
+  BlSummary,
+  MedicamentSuggestion,
+  SpecialProduct,
+  SpecialProductBulkResult,
+  SpecialProductReintegrateResult,
+  SupplierExclusion,
+  SupplierExclusionResult,
+  SupplierReintegrateResult,
+  SupplierSummary,
 } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { matchesFields } from "@/utils/text";
 
-
 export function useProduitsSpeciaux() {
   const t = useT();
   const queryClient = useQueryClient();
-  const [search,   setSearch]   = useState("");
+  const [search, setSearch] = useState("");
   const [suggestQ, setSuggestQ] = useState("");
 
-  const {
-    data: list,
-    isLoading,
-  } = useQuery({
+  const { data: list, isLoading } = useQuery({
     queryKey: API.specialProducts.list.key,
-    queryFn:  () => api.get<SpecialProduct[]>(API.specialProducts.list.url),
+    queryFn: () => api.get<SpecialProduct[]>(API.specialProducts.list.url),
   });
 
-  const {
-    data: suggestions,
-    isFetching: suggestionsLoading,
-  } = useQuery({
-    queryKey:  API.specialProducts.suggestions.key(suggestQ),
-    queryFn:   () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q: suggestQ } }),
-    enabled:   suggestQ.trim().length >= 2,
+  const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
+    queryKey: API.specialProducts.suggestions.key(suggestQ),
+    queryFn: () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q: suggestQ } }),
+    enabled: suggestQ.trim().length >= 2,
     staleTime: 60_000,
   });
 
-  const {
-    mutate: exclude,
-    isPending: excluding,
-  } = useMutation({
+  const { mutate: exclude, isPending: excluding } = useMutation({
     mutationFn: (ids: number[]) =>
       api.post<SpecialProductBulkResult>(API.specialProducts.exclude.url, { medicament_ids: ids }),
-    onSuccess:  (r) => {
-      const n    = r.inserted + r.already_special;
-      const s    = r.already_special;
+    onSuccess: (r) => {
+      const n = r.inserted + r.already_special;
+      const s = r.already_special;
       const tail = s > 0 ? t(s === 1 ? "ps.alreadySpecialOne" : "ps.alreadySpecialMany", { n: s }) : "";
       toast.success(t(n === 1 ? "ps.prodExcludedOne" : "ps.prodExcludedMany", { n }) + tail);
       setSuggestQ("");
@@ -57,13 +56,10 @@ export function useProduitsSpeciaux() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const {
-    mutate: reintegrate,
-    isPending: reintegrating,
-  } = useMutation({
+  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
     mutationFn: (ids: number[]) =>
       api.post<SpecialProductReintegrateResult>(API.specialProducts.reintegrate.url, { medicament_ids: ids }),
-    onSuccess:  (r) => {
+    onSuccess: (r) => {
       const n = r.reintegrated;
       toast.success(t(n === 1 ? "ps.prodReintegratedOne" : "ps.prodReintegratedMany", { n }));
       void refresh(queryClient, API.specialProducts.reintegrate);
@@ -77,10 +73,8 @@ export function useProduitsSpeciaux() {
     const all = list ?? [];
     if (!search.trim()) return all;
     const q = norm(search.trim());
-    return all.filter((p) =>
-      norm(p.product).includes(q) ||
-      norm(p.pid).includes(q) ||
-      norm(p.category ?? "").includes(q),
+    return all.filter(
+      (p) => norm(p.product).includes(q) || norm(p.pid).includes(q) || norm(p.category ?? "").includes(q),
     );
   }, [list, search]);
 
@@ -109,48 +103,38 @@ export function useProduitsSpeciaux() {
 export function useBlExclusions() {
   const t = useT();
   const queryClient = useQueryClient();
-  const [search,   setSearch]   = useState("");   // filters the excluded-BL table
-  const [searchQ,  setSearchQ]  = useState("");    // exclude-dialog search box
+  const [search, setSearch] = useState(""); // filters the excluded-BL table
+  const [searchQ, setSearchQ] = useState(""); // exclude-dialog search box
 
-  const {
-    data: list,
-    isLoading,
-  } = useQuery({
+  const { data: list, isLoading } = useQuery({
     queryKey: API.blExclusions.list.key,
-    queryFn:  () => api.get<BlExclusion[]>(API.blExclusions.list.url),
+    queryFn: () => api.get<BlExclusion[]>(API.blExclusions.list.url),
   });
 
-  const {
-    data: results,
-    isFetching: resultsLoading,
-  } = useQuery({
-    queryKey:  API.blExclusions.search.key(searchQ),
-    queryFn:   () => api.get<BlSummary[]>(API.blExclusions.search.url, { params: { q: searchQ } }),
-    enabled:   searchQ.trim().length >= 2,
+  const { data: results, isFetching: resultsLoading } = useQuery({
+    queryKey: API.blExclusions.search.key(searchQ),
+    queryFn: () => api.get<BlSummary[]>(API.blExclusions.search.url, { params: { q: searchQ } }),
+    enabled: searchQ.trim().length >= 2,
     staleTime: 30_000,
   });
 
-  const {
-    mutate: exclude,
-    isPending: excluding,
-  } = useMutation({
+  const { mutate: exclude, isPending: excluding } = useMutation({
     mutationFn: (v: { ref: string; notes?: string }) =>
       api.post<BlExclusionResult>(API.blExclusions.exclude.url, { delivery_ref: v.ref, notes: v.notes || null }),
-    onSuccess:  (r) => {
-      toast.success(r.already_excluded ? t("ps.blAlreadyExcluded") : t("ps.blExcluded", { ref: r.item?.delivery_ref ?? "" }));
+    onSuccess: (r) => {
+      toast.success(
+        r.already_excluded ? t("ps.blAlreadyExcluded") : t("ps.blExcluded", { ref: r.item?.delivery_ref ?? "" }),
+      );
       setSearchQ("");
       void refresh(queryClient, API.blExclusions.exclude);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const {
-    mutate: reintegrate,
-    isPending: reintegrating,
-  } = useMutation({
+  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
     mutationFn: (refs: string[]) =>
       api.post<BlReintegrateResult>(API.blExclusions.reintegrate.url, { delivery_refs: refs }),
-    onSuccess:  (r) => {
+    onSuccess: (r) => {
       const n = r.reintegrated;
       toast.success(t(n === 1 ? "ps.blReintegratedOne" : "ps.blReintegratedMany", { n }));
       void refresh(queryClient, API.blExclusions.reintegrate);
@@ -163,10 +147,8 @@ export function useBlExclusions() {
     const all = list ?? [];
     if (!search.trim()) return all;
     const q = norm(search.trim());
-    return all.filter((b) =>
-      norm(b.delivery_ref).includes(q) ||
-      norm(b.supplier ?? "").includes(q) ||
-      norm(b.notes ?? "").includes(q),
+    return all.filter(
+      (b) => norm(b.delivery_ref).includes(q) || norm(b.supplier ?? "").includes(q) || norm(b.notes ?? "").includes(q),
     );
   }, [list, search]);
 
@@ -195,38 +177,30 @@ export function useBlExclusions() {
 export function useSupplierExclusions() {
   const t = useT();
   const queryClient = useQueryClient();
-  const [search,  setSearch]  = useState("");   // filters the excluded-supplier table
-  const [searchQ, setSearchQ] = useState("");   // exclude-dialog search box
+  const [search, setSearch] = useState(""); // filters the excluded-supplier table
+  const [searchQ, setSearchQ] = useState(""); // exclude-dialog search box
 
-  const {
-    data: list,
-    isLoading,
-  } = useQuery({
+  const { data: list, isLoading } = useQuery({
     queryKey: API.supplierExclusions.list.key,
-    queryFn:  () => api.get<SupplierExclusion[]>(API.supplierExclusions.list.url),
+    queryFn: () => api.get<SupplierExclusion[]>(API.supplierExclusions.list.url),
   });
 
-  const {
-    data: results,
-    isFetching: resultsLoading,
-  } = useQuery({
-    queryKey:  API.supplierExclusions.search.key(searchQ),
-    queryFn:   () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q: searchQ } }),
-    enabled:   searchQ.trim().length >= 2,
+  const { data: results, isFetching: resultsLoading } = useQuery({
+    queryKey: API.supplierExclusions.search.key(searchQ),
+    queryFn: () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q: searchQ } }),
+    enabled: searchQ.trim().length >= 2,
     staleTime: 30_000,
   });
 
-  const {
-    mutate: exclude,
-    isPending: excluding,
-  } = useMutation({
+  const { mutate: exclude, isPending: excluding } = useMutation({
     mutationFn: (v: { supplier: string; notes?: string }) =>
-      api.post<SupplierExclusionResult>(API.supplierExclusions.exclude.url, { supplier: v.supplier, notes: v.notes || null }),
-    onSuccess:  (r) => {
+      api.post<SupplierExclusionResult>(API.supplierExclusions.exclude.url, {
+        supplier: v.supplier,
+        notes: v.notes || null,
+      }),
+    onSuccess: (r) => {
       toast.success(
-        r.already_excluded
-          ? t("ps.supAlreadyExcluded")
-          : t("ps.supExcluded", { name: r.item?.supplier ?? "" }),
+        r.already_excluded ? t("ps.supAlreadyExcluded") : t("ps.supExcluded", { name: r.item?.supplier ?? "" }),
       );
       setSearchQ("");
       void refresh(queryClient, API.supplierExclusions.exclude);
@@ -234,13 +208,10 @@ export function useSupplierExclusions() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const {
-    mutate: reintegrate,
-    isPending: reintegrating,
-  } = useMutation({
+  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
     mutationFn: (suppliers: string[]) =>
       api.post<SupplierReintegrateResult>(API.supplierExclusions.reintegrate.url, { suppliers }),
-    onSuccess:  (r) => {
+    onSuccess: (r) => {
       const verb = r.reintegrated === 1 ? t("ps.supReintegratedOne") : t("ps.supReintegratedMany");
       toast.success(`${r.reintegrated} ${verb}`);
       void refresh(queryClient, API.supplierExclusions.reintegrate);

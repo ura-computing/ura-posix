@@ -14,6 +14,7 @@ Seeds `alertes=true` on every existing pharmacy + non-admin user so they
 don't suddenly lose access to /alertes (which was previously role-only,
 not feature-gated) when the route + section gates land.
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -30,14 +31,27 @@ depends_on: Union[str, Sequence[str], None] = None
 # `bl_exclusions` in the DB CHECK even though the Python const drops it,
 # so any orphan rows in pharmacy_features / user_permissions stay valid.
 _FEATURES_OLD = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
     "special_products",
 )
 _FEATURES_NEW = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
-    "special_products", "alertes",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
+    "special_products",
+    "alertes",
 )
 
 
@@ -63,7 +77,8 @@ def upgrade() -> None:
     )
 
     # 2. Seed `alertes=true` for every pharmacy that doesn't already have a row.
-    conn.execute(text("""
+    conn.execute(
+        text("""
         INSERT INTO pharmacy_features (pharmacy_id, feature, enabled)
         SELECT p.id, 'alertes', TRUE
         FROM   pharmacies p
@@ -71,11 +86,13 @@ def upgrade() -> None:
             SELECT 1 FROM pharmacy_features pf
             WHERE  pf.pharmacy_id = p.id AND pf.feature = 'alertes'
         )
-    """))
+    """)
+    )
 
     # 3. Seed `alertes=true` for every active non-admin user without an
     #    existing row — preserves their pre-migration access to /alertes.
-    conn.execute(text("""
+    conn.execute(
+        text("""
         INSERT INTO user_permissions (user_id, permission, enabled)
         SELECT u.id, 'alertes', TRUE
         FROM   users u
@@ -85,7 +102,8 @@ def upgrade() -> None:
             SELECT 1 FROM user_permissions up
             WHERE  up.user_id = u.id AND up.permission = 'alertes'
           )
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

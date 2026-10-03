@@ -21,33 +21,36 @@ import { cn } from "@/utils/cn";
 
 import { POPOVER_ALIGN, POPOVER_OPTION, POPOVER_PANEL, POPOVER_POSITION, POPOVER_TRIGGER } from "./filterBar";
 
-
 export interface SingleSelectOption {
   value: string;
   label: string;
 }
 
-
 export interface SingleSelectPopoverProps {
-  label:        string;
-  options:      SingleSelectOption[];
-  value:        string;
-  onChange:     (v: string) => void;
+  label: string;
+  options: SingleSelectOption[];
+  value: string;
+  onChange: (v: string) => void;
   /** The "no filter" sentinel — when value === emptyValue, the trigger shows
    *  just the label without ": …". Defaults to "" (empty string). */
-  emptyValue?:  string;
+  emptyValue?: string;
   /** Where the panel opens relative to the trigger. Use "top" when the trigger
    *  is near the viewport bottom (e.g. sticky pagination footer). Default "bottom". */
-  placement?:   "top" | "bottom";
+  placement?: "top" | "bottom";
   /** Horizontal anchor of the panel. "start" pins panel-left to trigger-left
    *  (panel grows rightward — default). "end" pins panel-right to trigger-right
    *  (panel grows leftward — use when trigger is near the viewport's right edge). */
-  align?:       "start" | "end";
+  align?: "start" | "end";
 }
 
-
 export function SingleSelectPopover({
-  label, options, value, onChange, emptyValue = "", placement = "bottom", align = "start",
+  label,
+  options,
+  value,
+  onChange,
+  emptyValue = "",
+  placement = "bottom",
+  align = "start",
 }: SingleSelectPopoverProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -71,11 +74,7 @@ export function SingleSelectPopover({
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={POPOVER_TRIGGER}
-      >
+      <button type="button" onClick={() => setOpen(!open)} className={POPOVER_TRIGGER}>
         <span>
           {label}
           {isFiltering && (
@@ -88,7 +87,9 @@ export function SingleSelectPopover({
       </button>
       {open && (
         <div className={cn(POPOVER_PANEL, POPOVER_POSITION[placement], POPOVER_ALIGN[align])}>
-          {options.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>}
+          {options.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>
+          )}
           {options.map((opt) => {
             const active = opt.value === value;
             return (

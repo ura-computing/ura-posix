@@ -11,13 +11,9 @@ export function useSetPassword(token: string) {
   const t = useT();
   const navigate = useNavigate();
 
-  const {
-    mutate,
-    isPending,
-    isError,
-    error,
-  } = useMutation({
-    mutationFn: (input: { password: string }) => api.post<void>(API.auth.setPassword.url, { token, password: input.password }),
+  const { mutate, isPending, isError, error } = useMutation({
+    mutationFn: (input: { password: string }) =>
+      api.post<void>(API.auth.setPassword.url, { token, password: input.password }),
     onSuccess: () => {
       toast.success(t("toast.pwdSaved"));
       navigate(ROUTES.LOGIN, { replace: true });
@@ -38,15 +34,11 @@ export function useSetPassword(token: string) {
 }
 
 export function useValidateToken(token: string) {
-  const {
-    data,
-    isLoading,
-    isSuccess,
-  } = useQuery({
+  const { data, isLoading, isSuccess } = useQuery({
     queryKey: API.auth.validateToken.key(token),
-    queryFn:  () => api.get<ValidateTokenResponse>(API.auth.validateToken.url, { params: { token } }),
-    enabled:  token.length > 0,
-    retry:    false,
+    queryFn: () => api.get<ValidateTokenResponse>(API.auth.validateToken.url, { params: { token } }),
+    enabled: token.length > 0,
+    retry: false,
     // Matches backend RESET_TOKEN_EXPIRY_MIN. A user who opens the link, walks
     // away for >60 min, then refocuses the tab triggers a refetch which will
     // 400 the now-expired token and render the "expired link" state instead of
@@ -56,8 +48,8 @@ export function useValidateToken(token: string) {
 
   return {
     isValidating: token.length > 0 && isLoading,
-    isValid:      isSuccess,
-    isSetup:      data?.is_setup  ?? false,
-    fullName:     data?.full_name ?? "",
+    isValid: isSuccess,
+    isSetup: data?.is_setup ?? false,
+    fullName: data?.full_name ?? "",
   };
 }

@@ -4,9 +4,9 @@ import type { InputHTMLAttributes } from "react";
 import { cn } from "@/utils/cn";
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
-  label:      string;
-  error?:     string;
-  hint?:      string;
+  label: string;
+  error?: string;
+  hint?: string;
   /** Slot rendered inside the input's right edge (e.g. eye toggle). */
   rightSlot?: React.ReactNode;
 }
@@ -40,14 +40,12 @@ export const TextField = forwardRef<HTMLInputElement, Props>(function TextField(
           )}
           {...rest}
         />
-        {rightSlot && (
-          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-            {rightSlot}
-          </div>
-        )}
+        {rightSlot && <div className="absolute inset-y-0 right-0 flex items-center pr-2">{rightSlot}</div>}
       </div>
       {error ? (
-        <p id={errorId} className="text-xs text-error-subtle-foreground">{error}</p>
+        <p id={errorId} className="text-xs text-error-subtle-foreground">
+          {error}
+        </p>
       ) : hint ? (
         <p className="text-xs text-muted-foreground">{hint}</p>
       ) : null}

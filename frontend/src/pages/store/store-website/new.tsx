@@ -14,7 +14,6 @@ import { useMe } from "@/hooks/useMe";
 import { NewRequestForm, type NewRequestValues } from "./_components/NewRequestForm";
 import { useMyRequest } from "./_hooks/useMyRequest";
 
-
 export default function StoreWebsiteNewRoute() {
   const navigate = useNavigate();
   const { me } = useMe();
@@ -26,13 +25,13 @@ export default function StoreWebsiteNewRoute() {
     setError(null);
     try {
       await createRequest({
-        store_name:    values.storeName,
-        slogan:        values.slogan.trim() || null,
+        store_name: values.storeName,
+        slogan: values.slogan.trim() || null,
         brand_palette: values.brand.palette,
-        phone:         values.phone,
+        phone: values.phone,
         custom_domain: values.customDomain.trim() || null,
-        urgency:       values.urgency,
-        vision:        values.vision.trim() || null,
+        urgency: values.urgency,
+        vision: values.vision.trim() || null,
       });
       // Logo upload is deferred: only the DEV uploads the logo (via the
       // editor's logo box). Owners can add one later if we open that surface.

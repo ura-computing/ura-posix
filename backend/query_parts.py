@@ -2,6 +2,7 @@
 Analyses, Stock, ventes ledger). One definition per formula so pages can't drift.
 Moves into backend/analytics/ with the domain split (PLAN.md §6).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -76,6 +77,7 @@ def avg_pu_subquery(db: Session, *filters, id_label: str = "medicament_id", labe
 class Filters:
     """Pharmacy + inclusive date window + Comptabilité exclusions, for Vente and
     Achat rows. Exclusions apply only when include_non_declared is False."""
+
     pharmacy_id: int | None
     date_from: str | None = None
     date_to: str | None = None

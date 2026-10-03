@@ -21,16 +21,16 @@ export default defineConfig({
   globalSetup: require.resolve("./global-setup"),
   fullyParallel: false,
   workers: 1,
-  timeout: 60_000,                    // any stuck test fails in 1 min (imports raise their own limit)
+  timeout: 60_000, // any stuck test fails in 1 min (imports raise their own limit)
   expect: { timeout: 20_000 },
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   use: {
     baseURL: WEB,
     viewport: HEADED ? null : { width: 1920, height: 1080 },
-    actionTimeout: 15_000,            // a missing button fails in 15 s, not after the 20-min test timeout
+    actionTimeout: 15_000, // a missing button fails in 15 s, not after the 20-min test timeout
     navigationTimeout: 30_000,
     launchOptions: {
-      slowMo: Number(process.env.E2E_SLOWMO ?? 0),                    // make e2e-ui: slow enough to follow
+      slowMo: Number(process.env.E2E_SLOWMO ?? 0), // make e2e-ui: slow enough to follow
       args: HEADED ? ["--start-maximized"] : [],
     },
     locale: "fr-FR",
@@ -55,7 +55,8 @@ export default defineConfig({
     },
     {
       // Production build (= what DigitalOcean serves); VITE_BACKEND_URL is read at build time.
-      command: "npm --prefix ../frontend run build -- --outDir ../e2e/dist --emptyOutDir && npm --prefix ../frontend run preview -- --outDir ../e2e/dist --port 5174 --strictPort",
+      command:
+        "npm --prefix ../frontend run build -- --outDir ../e2e/dist --emptyOutDir && npm --prefix ../frontend run preview -- --outDir ../e2e/dist --port 5174 --strictPort",
       url: WEB,
       env: { VITE_BACKEND_URL: API },
       timeout: 5 * 60_000,

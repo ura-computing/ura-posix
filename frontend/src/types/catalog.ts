@@ -11,78 +11,77 @@ export type SuffixColor = (typeof SUFFIX_COLORS)[number];
 // to render the colored suffix pill on each row.
 
 export interface CategorySuffixOut {
-  id:       number;
+  id: number;
   category: string;
-  suffix:   string;
-  color:    SuffixColor | null;
+  suffix: string;
+  color: SuffixColor | null;
 }
 
 export interface CategorySuffixIn {
   category: string;
-  suffix:   string;
-  color:    SuffixColor | null;
+  suffix: string;
+  color: SuffixColor | null;
 }
-
 
 // ── Admin Catalog (F5 — Medicament CRUD + CSV import) ──────────────────────
 
 export type ProductType = "pharmacie" | "parapharmacie";
 
 export interface Medicament {
-  id:           number;
-  pid:          string;
-  product:      string;
-  tva:          string | null;
-  pph:          number | null;
-  ppv:          number | null;
-  category:     string | null;
-  barcode1:     string | null;
-  barcode2:     string | null;
-  laboratoire:  string | null;
+  id: number;
+  pid: string;
+  product: string;
+  tva: string | null;
+  pph: number | null;
+  ppv: number | null;
+  category: string | null;
+  barcode1: string | null;
+  barcode2: string | null;
+  laboratoire: string | null;
   product_type: ProductType | null;
-  created_at:   string;
-  updated_at:   string | null;
+  created_at: string;
+  updated_at: string | null;
 }
 
 export interface MedicamentInput {
-  product:      string;
-  tva?:         string | null;
-  pph?:         number | null;
-  ppv?:         number | null;
-  category?:    string | null;
-  barcode1?:    string | null;
-  barcode2?:    string | null;
+  product: string;
+  tva?: string | null;
+  pph?: number | null;
+  ppv?: number | null;
+  category?: string | null;
+  barcode1?: string | null;
+  barcode2?: string | null;
   laboratoire?: string | null;
   product_type?: ProductType | null;
 }
 
 export interface CatalogFilters {
-  search:     string;
-  category:   string[];
+  search: string;
+  category: string[];
   /** "unclassified" surfaces rows where product_type IS NULL (admin queue). */
-  type:       ProductType | "unclassified" | null;
-  sort_by:    string;
+  type: ProductType | "unclassified" | null;
+  sort_by: string;
   sort_order: "asc" | "desc";
-  page:       number;
-  limit:      number;
+  page: number;
+  limit: number;
 }
 
 export interface CatalogListResponse {
-  data:       Medicament[];
+  data: Medicament[];
   pagination: { page: number; limit: number; total: number; total_pages: number };
 }
 
 /** One row-level import error — same shape as an API error (`errors.<code>`). */
 export interface RowError {
   detail: string;
-  code:   ErrorCode;
+  code: ErrorCode;
   params: Record<string, string | number>;
 }
 
 export interface CatalogImportResponse {
   total_rows: number;
-  inserted:   number;
-  updated:    number;
-  skipped:    number;
-  errors:     RowError[];
+  inserted: number;
+  updated: number;
+  skipped: number;
+  errors: RowError[];
 }

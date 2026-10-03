@@ -4,16 +4,10 @@ import { Search, Eye, EyeOff } from "lucide-react";
 import { SingleSelectPopover, type SingleSelectOption } from "@/_components/SingleSelectPopover";
 import { Button } from "@/_components/button";
 import { Switch } from "./switch";
-import {
-  soldeLockFor,
-  type RequestState,
-  type StoreCategory,
-  type VisibleProduct,
-} from "@/types/storeWebsite";
+import { soldeLockFor, type RequestState, type StoreCategory, type VisibleProduct } from "@/types/storeWebsite";
 import { cn } from "@/utils/cn";
 
 import { discountPct, formatMAD } from "../_format";
-
 
 /** TAB 3 — PRODUITS VISIBLES.
  *
@@ -26,21 +20,20 @@ import { discountPct, formatMAD } from "../_format";
  *    {prise_en_charge, en_cours}). */
 
 export interface ProduitsVisiblesTabProps {
-  products:            VisibleProduct[];
-  categories:          StoreCategory[];
+  products: VisibleProduct[];
+  categories: StoreCategory[];
   /** Active request state (null when no request). Drives the lock banner. */
-  requestState:        RequestState | null;
-  isLoading?:          boolean;
-  search:              string;
-  onSearch:            (q: string) => void;
+  requestState: RequestState | null;
+  isLoading?: boolean;
+  search: string;
+  onSearch: (q: string) => void;
   selectedCategoryIds: string[];
   onSelectedCategories: (ids: string[]) => void;
-  onToggleVisible:     (productId: string, visible: boolean) => void;
-  onBulkVisibility:    (visible: boolean) => void;
-  onAssignCategory:    (productId: string, categoryId: string | null) => void;
-  onSetSolde:          (productId: string, solde: number | null) => void;
+  onToggleVisible: (productId: string, visible: boolean) => void;
+  onBulkVisibility: (visible: boolean) => void;
+  onAssignCategory: (productId: string, categoryId: string | null) => void;
+  onSetSolde: (productId: string, solde: number | null) => void;
 }
-
 
 export function ProduitsVisiblesTab(props: ProduitsVisiblesTabProps) {
   const { products, categories, requestState, isLoading } = props;
@@ -52,9 +45,7 @@ export function ProduitsVisiblesTab(props: ProduitsVisiblesTabProps) {
   const categoryOptions: SingleSelectOption[] = useMemo(
     () => [
       { value: "", label: "Autres" },
-      ...categories
-        .filter((c) => !c.isDefault)
-        .map((c) => ({ value: c.id, label: c.name })),
+      ...categories.filter((c) => !c.isDefault).map((c) => ({ value: c.id, label: c.name })),
     ],
     [categories],
   );
@@ -64,7 +55,7 @@ export function ProduitsVisiblesTab(props: ProduitsVisiblesTabProps) {
   }
 
   const visibleCount = products.filter((p) => p.visible).length;
-  const soldeCount   = products.filter((p) => p.solde != null).length;
+  const soldeCount = products.filter((p) => p.solde != null).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -155,15 +146,16 @@ export function ProduitsVisiblesTab(props: ProduitsVisiblesTabProps) {
   );
 }
 
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function CategoryChips({
-  categories, selected, onChange,
+  categories,
+  selected,
+  onChange,
 }: {
   categories: StoreCategory[];
-  selected:   string[];
-  onChange:   (ids: string[]) => void;
+  selected: string[];
+  onChange: (ids: string[]) => void;
 }) {
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
@@ -188,19 +180,18 @@ function CategoryChips({
   );
 }
 
-
 function SoldeBanner({ lock }: { lock: ReturnType<typeof soldeLockFor> }) {
   const BANNERS = {
     editable: {
-      cls:  "border-success-border bg-success-subtle text-success-subtle-foreground",
+      cls: "border-success-border bg-success-subtle text-success-subtle-foreground",
       text: "Vous pouvez modifier les SOLDES.",
     },
     locked_dev: {
-      cls:  "border-warning-border bg-warning-subtle text-warning-subtle-foreground",
+      cls: "border-warning-border bg-warning-subtle text-warning-subtle-foreground",
       text: "Le développeur travaille sur votre site, les SOLDES sont verrouillés jusqu'à la livraison.",
     },
     live: {
-      cls:  "border-success-border bg-success-subtle text-success-subtle-foreground",
+      cls: "border-success-border bg-success-subtle text-success-subtle-foreground",
       text: "Modifications visibles sur votre site dès la prochaine visite.",
     },
   } as const;
@@ -208,23 +199,19 @@ function SoldeBanner({ lock }: { lock: ReturnType<typeof soldeLockFor> }) {
   return <p className={`rounded-lg border px-3 py-2 text-sm font-medium ${b.cls}`}>{b.text}</p>;
 }
 
-
 interface RowProps {
-  product:           VisibleProduct;
-  categoryOptions:   SingleSelectOption[];
-  soldeDisabled:     boolean;
-  onToggleVisible:   (id: string, v: boolean) => void;
-  onAssignCategory:  (id: string, categoryId: string | null) => void;
-  onSetSolde:        (id: string, solde: number | null) => void;
+  product: VisibleProduct;
+  categoryOptions: SingleSelectOption[];
+  soldeDisabled: boolean;
+  onToggleVisible: (id: string, v: boolean) => void;
+  onAssignCategory: (id: string, categoryId: string | null) => void;
+  onSetSolde: (id: string, solde: number | null) => void;
 }
-
 
 /** Composite SOLDE cell: a single input with the discount % tucked inside
  *  the input's right edge (no more two-pill cramped layout). */
-function PriceCell({
-  product, soldeDisabled, onSetSolde,
-}: Pick<RowProps, "product" | "soldeDisabled" | "onSetSolde">) {
-  const onSale  = product.solde != null;
+function PriceCell({ product, soldeDisabled, onSetSolde }: Pick<RowProps, "product" | "soldeDisabled" | "onSetSolde">) {
+  const onSale = product.solde != null;
   const pctText = onSale ? discountPct(product.ppv, product.solde!) : null;
 
   return (
@@ -270,7 +257,6 @@ function PriceCell({
   );
 }
 
-
 function ProductRow(props: RowProps) {
   const { product, categoryOptions, soldeDisabled, onToggleVisible, onAssignCategory, onSetSolde } = props;
   const onSale = product.solde != null;
@@ -295,9 +281,7 @@ function ProductRow(props: RowProps) {
           align="start"
         />
       </td>
-      <td className="px-4 py-3 text-right font-mono text-sm tabular-nums text-muted-foreground">
-        {product.stock}
-      </td>
+      <td className="px-4 py-3 text-right font-mono text-sm tabular-nums text-muted-foreground">{product.stock}</td>
       <td className="px-4 py-3 text-right font-mono text-sm tabular-nums">
         <span className={onSale ? "text-muted-foreground line-through" : "text-foreground"}>
           {formatMAD(product.ppv)}
@@ -309,7 +293,6 @@ function ProductRow(props: RowProps) {
     </tr>
   );
 }
-
 
 function ProductCard(props: RowProps) {
   const { product, categoryOptions, soldeDisabled, onToggleVisible, onAssignCategory, onSetSolde } = props;
@@ -332,9 +315,7 @@ function ProductCard(props: RowProps) {
           placement="bottom"
           align="start"
         />
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          Stock {product.stock}
-        </span>
+        <span className="font-mono text-xs tabular-nums text-muted-foreground">Stock {product.stock}</span>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
         <span

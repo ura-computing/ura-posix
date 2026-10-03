@@ -23,40 +23,27 @@ const extraName = (): string => basename(expected().files.extra_achats.path);
 /** /upload-file?type=achat with the extra file picked; returns the start button. */
 async function pickExtraFile(page: Page) {
   await page.goto("/upload-file?type=achat");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles(resolve(REPO_DIR, expected().files.extra_achats.path));
+  await page.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, expected().files.extra_achats.path));
   const start = page.getByRole("button", { name: "Importer dans la base" });
   await expect(start).toBeVisible();
   return start;
 }
 
-test("nom de fichier invalide : le message s'affiche puis se ferme", async ({
-  page,
-}) => {
+test("nom de fichier invalide : le message s'affiche puis se ferme", async ({ page }) => {
   await page.goto("/upload-file?type=achat");
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "achats.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from("a;b\n1;2\n"),
-    });
-  const error = page.getByText(
-    /^Nom de fichier invalide\. Format attendu : « .+ »$/,
-  );
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "achats.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("a;b\n1;2\n"),
+  });
+  const error = page.getByText(/^Nom de fichier invalide\. Format attendu : « .+ »$/);
   await expect(error).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Importer dans la base" }),
-    "pas d'aperçu",
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Importer dans la base" }), "pas d'aperçu").toHaveCount(0);
   await error.locator("..").getByRole("button", { name: "Fermer" }).click();
   await expect(error).toBeHidden();
 });
 
-test("fichier vide ou d'un autre type : message, pas d'aperçu", async ({
-  page,
-}) => {
+test("fichier vide ou d'un autre type : message, pas d'aperçu", async ({ page }) => {
   await page.goto("/upload-file?type=achat");
   const input = page.locator('input[type="file"]');
   const name = "Sobrus - Achats 2026-01-01 - 2026-01-31.csv"; // a valid Achats name
@@ -89,10 +76,9 @@ test("fichier vide ou d'un autre type : message, pas d'aperçu", async ({
     ),
   });
   await expect(
-    page.getByText(
-      "Ce fichier ne correspond pas à ce type d'import. Colonnes manquantes : Référence de livraison",
-      { exact: true },
-    ),
+    page.getByText("Ce fichier ne correspond pas à ce type d'import. Colonnes manquantes : Référence de livraison", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(importButton, "pas d'aperçu").toHaveCount(0);
 });
@@ -100,9 +86,7 @@ test("fichier vide ou d'un autre type : message, pas d'aperçu", async ({
 test("liste : les 3 imports du départ", async ({ page }) => {
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Gestion des imports" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Gestion des imports" })).toBeVisible();
   const e = expected();
   const state = loadState();
   const want = (
@@ -126,9 +110,7 @@ test("liste : les 3 imports du départ", async ({ page }) => {
   expectSameSet((await list).data, want, (r) => r.file_type, "imports");
 });
 
-test("annuler un import en cours : les lignes déjà importées sont retirées", async ({
-  page,
-}) => {
+test("annuler un import en cours : les lignes déjà importées sont retirées", async ({ page }) => {
   // Chunk 1 is held until « Annuler l'import » is clicked, so the cancel always
   // lands between chunk 1 and chunk 2.
   let release!: () => void;
@@ -145,9 +127,7 @@ test("annuler un import en cours : les lignes déjà importées sont retirées",
   });
 
   const start = await pickExtraFile(page);
-  const chunk1 = page.waitForResponse((r) =>
-    r.url().endsWith("/v1/uploads/achat-json"),
-  );
+  const chunk1 = page.waitForResponse((r) => r.url().endsWith("/v1/uploads/achat-json"));
   const patched = pageSend(page, "PATCH", /^\/v1\/uploads\/batches\/\d+$/);
   await start.click();
   await page.getByRole("button", { name: "Annuler l'import" }).click();
@@ -165,9 +145,7 @@ test("annuler un import en cours : les lignes déjà importées sont retirées",
     },
     "PATCH /uploads/batches",
   );
-  await expect(
-    page.getByRole("heading", { name: "Import annulé" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Import annulé" })).toBeVisible();
   saveState({ cancelledBatch: c1.batch_id });
 });
 
@@ -180,19 +158,14 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   await first;
   await sidebar.getByRole("link", { name: "Achats", exact: true }).click();
   await page.getByRole("link", { name: "Importer", exact: true }).click();
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles(resolve(REPO_DIR, expected().files.extra_achats.path));
+  await page.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, expected().files.extra_achats.path));
   await page.getByRole("button", { name: "Importer dans la base" }).click();
   const outcome = page.getByRole("heading", {
     level: 3,
     name: /lignes importées$|^Erreur d'importation$|^Import annulé$/,
   });
   await expect(outcome).toBeVisible({ timeout: 5 * 60_000 });
-  expect(
-    (await outcome.textContent())?.replace(/\D/g, ""),
-    "lignes importées",
-  ).toBe("2400");
+  expect((await outcome.textContent())?.replace(/\D/g, ""), "lignes importées").toBe("2400");
   const refetch = pageCall(page, "/stats/analyse-marge");
   await sidebar.getByRole("link", { name: "Analyses", exact: true }).click();
   await refetch; // no request = stale numbers shown after the import
@@ -201,28 +174,15 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   const again = pageSend(page, "POST", "/uploads/achat-json");
   await (await pickExtraFile(page)).click();
   await expect(outcome).toBeVisible({ timeout: 5 * 60_000 });
-  expect(
-    (await outcome.textContent())?.replace(/\D/g, ""),
-    "même fichier une 2e fois : lignes importées",
-  ).toBe("0");
-  expectSame(
-    await again,
-    { inserted: 0, skipped: 2000, skipped_duplicate: 2000 },
-    "1er lot du même fichier",
-  );
+  expect((await outcome.textContent())?.replace(/\D/g, ""), "même fichier une 2e fois : lignes importées").toBe("0");
+  expectSame(await again, { inserted: 0, skipped: 2000, skipped_duplicate: 2000 }, "1er lot du même fichier");
 
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");
-  const extra = (await list).data.filter(
-    (r: Row) => r.filename === extraName(),
-  );
+  const extra = (await list).data.filter((r: Row) => r.filename === extraName());
   const cancelled = extra.find((r: Row) => r.status === "cancelled");
-  const done = extra.find(
-    (r: Row) => r.status === "success" && r.rows_inserted > 0,
-  );
-  const twice = extra.find(
-    (r: Row) => r.status === "success" && r.rows_inserted === 0,
-  );
+  const done = extra.find((r: Row) => r.status === "success" && r.rows_inserted > 0);
+  const twice = extra.find((r: Row) => r.status === "success" && r.rows_inserted === 0);
   expectSame(
     twice,
     {
@@ -291,15 +251,9 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
     file_type: "achat",
   });
   const after = (await list2).data.find((r: Row) => r.id === done.id);
-  expectSame(
-    after,
-    { deleted_by_full_name: OWNER.name, deleted_by_email: OWNER.email },
-    "import supprimé",
-  );
+  expectSame(after, { deleted_by_full_name: OWNER.name, deleted_by_email: OWNER.email }, "import supprimé");
   expect(after.deleted_at, "deleted_at").not.toBeNull();
-  await expect(
-    page.getByText(`Supprimé par ${OWNER.name}`, { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText(`Supprimé par ${OWNER.name}`, { exact: false })).toBeVisible();
 
   // Every toast has a close button: the success toast goes before its 4 s auto-close.
   const toast = page.locator("[data-sonner-toast][data-type=success]").first();
@@ -307,9 +261,7 @@ test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => 
   await expect(toast).toBeHidden({ timeout: 2_000 });
 });
 
-test("après l'annulation et la suppression, rien n'a bougé", async ({
-  page,
-}) => {
+test("après l'annulation et la suppression, rien n'a bougé", async ({ page }) => {
   // On screen: the Rapport, then Achats (sidebar link, the period stays) = the oracle.
   const w = testWindow();
   const stats = pageCall(page, "/stats", {
@@ -320,9 +272,6 @@ test("après l'annulation et la suppression, rien n'a bougé", async ({
   await setPeriod(page, w.date_from, w.date_to);
   checkStats(await stats, "all");
   const list = pageCall(page, "/achats", { ...period(w), page: "1" });
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Achats", exact: true })
-    .click();
+  await page.getByRole("navigation").getByRole("link", { name: "Achats", exact: true }).click();
   checkLedgerPage("achats", await list, expected().achats_list, 1);
 });

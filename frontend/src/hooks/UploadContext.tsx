@@ -1,7 +1,4 @@
-import {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -11,7 +8,6 @@ import { API, refresh } from "@/api/api";
 import { translate } from "@/i18n/I18nProvider";
 import { chunk } from "@/utils/csv";
 import { type DocType, type UploadStockResult, type UploadTxResult } from "@/types";
-
 
 /**
  * Multi-upload queue (strict FIFO, concurrency=1). Provider lives at the app
@@ -33,45 +29,41 @@ const CHUNK_SIZE = 2000;
  *  cancelled/error/queued so the user has time to read what happened. */
 const AUTO_DISMISS_MS = 4_000;
 
-
 export type UploadPhase = "queued" | "uploading" | "success" | "cancelled" | "error";
 
-
 export interface UploadProgress {
-  current:  number;   // chunks finished
-  total:    number;   // total chunks
+  current: number; // chunks finished
+  total: number; // total chunks
   inserted: number;
-  skipped:  number;
+  skipped: number;
   /** Per-reason skip breakdown for achat/vente (zero for stock — stock surfaces
    *  unknowns via `UploadStockResult.skipped_unknown` already). */
-  skipped_no_pid?:        number;
+  skipped_no_pid?: number;
   skipped_no_medicament?: number;
-  skipped_duplicate?:     number;
+  skipped_duplicate?: number;
   /** F19: products created during this import that weren't in the catalogue. */
   new_medicaments?: { count: number; sample: string[] };
 }
 
-
 export interface UploadJob {
-  id:          string;
-  docType:     DocType;
-  filename:    string;
+  id: string;
+  docType: DocType;
+  filename: string;
   /** Parsed rows held in memory until the runner picks this job up. Released
    *  after the chunked loop completes (or fails / is cancelled). */
-  rows:        Record<string, string>[];
-  phase:       UploadPhase;
-  progress:    UploadProgress;
-  batchId:     number | null;
-  error:       string | null;
+  rows: Record<string, string>[];
+  phase: UploadPhase;
+  progress: UploadProgress;
+  batchId: number | null;
+  error: string | null;
   stockResult: UploadStockResult | null;
   /** Monotonic timestamp used for stable sort. */
-  createdAt:   number;
+  createdAt: number;
   /** Timestamp the job transitioned to "success" — used for the auto-dismiss
    *  countdown. Distinct from createdAt because the queue can stall a job
    *  for arbitrary minutes before it runs. */
-  successAt:   number | null;
+  successAt: number | null;
 }
-
 
 interface UploadCtxValue {
   /** All non-dismissed jobs. Iteration order = enqueue order (FIFO). */
@@ -97,9 +89,7 @@ interface UploadCtxValue {
   getJobByDocType: (docType: DocType) => UploadJob | null;
 }
 
-
 const UploadContext = createContext<UploadCtxValue | null>(null);
-
 
 export function UploadProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
@@ -110,8 +100,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
    *  current queue. Updated SYNCHRONOUSLY in upsertJob/patchJob alongside the
    *  setJobs call — never in the render body, which would race with React's
    *  commit phase and break the queueMicrotask wake-up in enqueueUpload. */
-  const jobsRef         = useRef(jobs);
-  const cancelFlagsRef  = useRef<Set<string>>(new Set());
+  const jobsRef = useRef(jobs);
+  const cancelFlagsRef = useRef<Set<string>>(new Set());
   const runnerActiveRef = useRef(false);
   /** Auto-dismiss timer ids per job, so we don't re-schedule on every render. */
   const dismissTimersRef = useRef<Map<string, number>>(new Map());
@@ -139,111 +129,129 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   /** Run a single chunked upload, mirroring the previous single-state loop.
    *  All state mutations route through patchJob(id, …) so each job has its
    *  own progress/error/stockResult. */
-  const runChunkedUpload = useCallback(async (job: UploadJob): Promise<void> => {
-    const chunks = chunk(job.rows, CHUNK_SIZE);
-    const total = chunks.length;
-    let batchId: number | null = null;
-    let inserted = 0;
-    let skipped = 0;
-    let skippedNoPid = 0;
-    let skippedNoMed = 0;
-    let skippedDup   = 0;
-    let newMedCount = 0;
-    const newMedSample: string[] = [];
-    const skippedUnknownAcc: { pid: string; product: string | null }[] = [];
+  const runChunkedUpload = useCallback(
+    async (job: UploadJob): Promise<void> => {
+      const chunks = chunk(job.rows, CHUNK_SIZE);
+      const total = chunks.length;
+      let batchId: number | null = null;
+      let inserted = 0;
+      let skipped = 0;
+      let skippedNoPid = 0;
+      let skippedNoMed = 0;
+      let skippedDup = 0;
+      let newMedCount = 0;
+      const newMedSample: string[] = [];
+      const skippedUnknownAcc: { pid: string; product: string | null }[] = [];
 
-    patchJob(job.id, {
-      phase: "uploading",
-      progress: { current: 0, total, inserted: 0, skipped: 0 },
-    });
+      patchJob(job.id, {
+        phase: "uploading",
+        progress: { current: 0, total, inserted: 0, skipped: 0 },
+      });
 
-    const post = (body: { rows: Record<string, string>[]; filename: string; batch_id?: number }) =>
-      api.post<UploadTxResult | UploadStockResult>(API.uploads[job.docType].url, body);
+      const post = (body: { rows: Record<string, string>[]; filename: string; batch_id?: number }) =>
+        api.post<UploadTxResult | UploadStockResult>(API.uploads[job.docType].url, body);
 
-    try {
-      for (let i = 0; i < chunks.length; i++) {
-        if (cancelFlagsRef.current.has(job.id)) {
-          if (batchId != null) {
-            await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "cancelled", error_message: null }).catch(() => undefined);
+      try {
+        for (let i = 0; i < chunks.length; i++) {
+          if (cancelFlagsRef.current.has(job.id)) {
+            if (batchId != null) {
+              await api
+                .patch(API.uploads.setBatchStatus.url(batchId), { status: "cancelled", error_message: null })
+                .catch(() => undefined);
+            }
+            patchJob(job.id, { phase: "cancelled", batchId });
+            cancelFlagsRef.current.delete(job.id);
+            return;
           }
-          patchJob(job.id, { phase: "cancelled", batchId });
-          cancelFlagsRef.current.delete(job.id);
-          return;
-        }
-        const result = await post({
-          rows:     chunks[i],
-          filename: job.filename,
-          batch_id: batchId ?? undefined,
-        });
-        if (batchId == null) batchId = result.batch_id;
-        inserted += result.inserted;
-        if ("skipped_unknown" in result) {
-          skipped += result.skipped_unknown.length;
-          for (const item of result.skipped_unknown) {
-            if (skippedUnknownAcc.length >= 100) break;
-            skippedUnknownAcc.push(item);
+          const result = await post({
+            rows: chunks[i],
+            filename: job.filename,
+            batch_id: batchId ?? undefined,
+          });
+          if (batchId == null) batchId = result.batch_id;
+          inserted += result.inserted;
+          if ("skipped_unknown" in result) {
+            skipped += result.skipped_unknown.length;
+            for (const item of result.skipped_unknown) {
+              if (skippedUnknownAcc.length >= 100) break;
+              skippedUnknownAcc.push(item);
+            }
+          } else {
+            skipped += result.skipped;
+            skippedNoPid += result.skipped_no_pid;
+            skippedNoMed += result.skipped_no_medicament;
+            skippedDup += result.skipped_duplicate;
           }
-        } else {
-          skipped      += result.skipped;
-          skippedNoPid += result.skipped_no_pid;
-          skippedNoMed += result.skipped_no_medicament;
-          skippedDup   += result.skipped_duplicate;
-        }
-        if (result.new_medicaments) {
-          newMedCount += result.new_medicaments.count;
-          for (const name of result.new_medicaments.sample) {
-            if (newMedSample.length >= 10) break;
-            if (!newMedSample.includes(name)) newMedSample.push(name);
+          if (result.new_medicaments) {
+            newMedCount += result.new_medicaments.count;
+            for (const name of result.new_medicaments.sample) {
+              if (newMedSample.length >= 10) break;
+              if (!newMedSample.includes(name)) newMedSample.push(name);
+            }
           }
+          patchJob(job.id, {
+            phase: "uploading",
+            progress: {
+              current: i + 1,
+              total,
+              inserted,
+              skipped,
+              skipped_no_pid: skippedNoPid,
+              skipped_no_medicament: skippedNoMed,
+              skipped_duplicate: skippedDup,
+              new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
+            },
+            batchId,
+          });
         }
+        // Last chunk done: the backend refreshes its table statistics (fast Rapport right after).
+        if (batchId != null) {
+          await api
+            .patch(API.uploads.setBatchStatus.url(batchId), { status: "success", error_message: null })
+            .catch(() => undefined);
+        }
+        const stockResult: UploadStockResult | null =
+          job.docType === "stock" && batchId != null
+            ? {
+                inserted,
+                skipped_unknown: skippedUnknownAcc.slice(),
+                total_rows: job.rows.length,
+                batch_id: batchId,
+                new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
+              }
+            : null;
         patchJob(job.id, {
-          phase: "uploading",
+          phase: "success",
           progress: {
-            current: i + 1, total, inserted, skipped,
-            skipped_no_pid:        skippedNoPid,
+            current: total,
+            total,
+            inserted,
+            skipped,
+            skipped_no_pid: skippedNoPid,
             skipped_no_medicament: skippedNoMed,
-            skipped_duplicate:     skippedDup,
+            skipped_duplicate: skippedDup,
             new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
           },
           batchId,
+          stockResult,
+          successAt: Date.now(),
         });
+      } catch (err) {
+        const detail = err instanceof ApiErr ? err.detail : translate("toast.genericError");
+        if (batchId != null) {
+          await api
+            .patch(API.uploads.setBatchStatus.url(batchId), { status: "error", error_message: detail })
+            .catch(() => undefined);
+        }
+        patchJob(job.id, { phase: "error", batchId, error: detail });
+        toast.error(detail);
+      } finally {
+        // Rows added / removed: queries on screen refetch now (Rapport open during an import), others on next visit.
+        if (batchId != null) void refresh(qc, API.uploads[job.docType]);
       }
-      // Last chunk done: the backend refreshes its table statistics (fast Rapport right after).
-      if (batchId != null) {
-        await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "success", error_message: null }).catch(() => undefined);
-      }
-      const stockResult: UploadStockResult | null = job.docType === "stock" && batchId != null ? {
-        inserted,
-        skipped_unknown: skippedUnknownAcc.slice(),
-        total_rows:      job.rows.length,
-        batch_id:        batchId,
-        new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
-      } : null;
-      patchJob(job.id, {
-        phase: "success",
-        progress: {
-          current: total, total, inserted, skipped,
-          skipped_no_pid:        skippedNoPid,
-          skipped_no_medicament: skippedNoMed,
-          skipped_duplicate:     skippedDup,
-          new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
-        },
-        batchId,
-        stockResult,
-        successAt: Date.now(),
-      });
-    } catch (err) {
-      const detail = err instanceof ApiErr ? err.detail : translate("toast.genericError");
-      if (batchId != null) {
-        await api.patch(API.uploads.setBatchStatus.url(batchId), { status: "error", error_message: detail }).catch(() => undefined);
-      }
-      patchJob(job.id, { phase: "error", batchId, error: detail });
-      toast.error(detail);
-    } finally {
-      // Rows added / removed: queries on screen refetch now (Rapport open during an import), others on next visit.
-      if (batchId != null) void refresh(qc, API.uploads[job.docType]);
-    }
-  }, [patchJob, qc]);
+    },
+    [patchJob, qc],
+  );
 
   /** Main loop: drain queued jobs FIFO. Awakened by enqueueUpload via
    *  wakeRunnerRef. Idle when no queued job is found. */
@@ -266,15 +274,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   // Wake the runner whenever the jobs map changes (enqueue, cancel, etc).
   // Effects run AFTER React commits, so jobsRef is already current — no race
   // with the runner's `findNextQueued` scan. Idempotent thanks to runnerActiveRef.
-  useEffect(() => { void runner(); }, [jobs, runner]);
+  useEffect(() => {
+    void runner();
+  }, [jobs, runner]);
 
   // ── Public API ───────────────────────────────────────────────────────────
 
   /** Cheap monotonic id. Native crypto.randomUUID isn't on every browser we
    *  support, so prefer Date.now + perf for uniqueness; the only requirement
    *  is per-session distinctness. */
-  const newId = (): string =>
-    `up_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const newId = (): string => `up_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
   const enqueueUpload = useCallback<UploadCtxValue["enqueueUpload"]>(
     (docType, rows, filename) => {
@@ -300,16 +309,19 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     [upsertJob],
   );
 
-  const cancelUpload = useCallback<UploadCtxValue["cancelUpload"]>((id) => {
-    const job = jobsRef.current.get(id);
-    if (!job) return;
-    if (job.phase === "queued") {
-      patchJob(id, { phase: "cancelled" });
-    } else if (job.phase === "uploading") {
-      // Runner picks up the flag between chunks.
-      cancelFlagsRef.current.add(id);
-    }
-  }, [patchJob]);
+  const cancelUpload = useCallback<UploadCtxValue["cancelUpload"]>(
+    (id) => {
+      const job = jobsRef.current.get(id);
+      if (!job) return;
+      if (job.phase === "queued") {
+        patchJob(id, { phase: "cancelled" });
+      } else if (job.phase === "uploading") {
+        // Runner picks up the flag between chunks.
+        cancelFlagsRef.current.add(id);
+      }
+    },
+    [patchJob],
+  );
 
   const dismissJob = useCallback<UploadCtxValue["dismissJob"]>((id) => {
     if (!jobsRef.current.has(id)) return;
@@ -322,15 +334,12 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setJobs(next);
   }, []);
 
-  const getJobByDocType = useCallback<UploadCtxValue["getJobByDocType"]>(
-    (docType) => {
-      const matching = [...jobsRef.current.values()]
-        .filter((j) => j.docType === docType)
-        .sort((a, b) => b.createdAt - a.createdAt);
-      return matching[0] ?? null;
-    },
-    [],
-  );
+  const getJobByDocType = useCallback<UploadCtxValue["getJobByDocType"]>((docType) => {
+    const matching = [...jobsRef.current.values()]
+      .filter((j) => j.docType === docType)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    return matching[0] ?? null;
+  }, []);
 
   // ── Auto-dismiss successful cards ───────────────────────────────────────
   // Scheduling is keyed on job.id in dismissTimersRef so we don't re-schedule
@@ -359,10 +368,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   // ── Memoize the list view + provide ─────────────────────────────────────
 
-  const jobsList = useMemo(
-    () => [...jobs.values()].sort((a, b) => a.createdAt - b.createdAt),
-    [jobs],
-  );
+  const jobsList = useMemo(() => [...jobs.values()].sort((a, b) => a.createdAt - b.createdAt), [jobs]);
 
   const value = useMemo<UploadCtxValue>(
     () => ({ jobs: jobsList, enqueueUpload, cancelUpload, dismissJob, getJobByDocType }),
@@ -371,7 +377,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   return <UploadContext.Provider value={value}>{children}</UploadContext.Provider>;
 }
-
 
 export function useUploadCtx(): UploadCtxValue {
   const ctx = useContext(UploadContext);

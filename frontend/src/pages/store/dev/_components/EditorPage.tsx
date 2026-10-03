@@ -1,18 +1,18 @@
 import { useState, type ReactNode } from "react";
-import {
-  CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload,
-} from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload } from "lucide-react";
 
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { Button } from "@/_components/button";
 import {
-  EDITOR_SECTION_LABEL, FONT_PAIRINGS, TEMPLATES,
-  type EditorSectionKey, type StoreTemplate,
+  EDITOR_SECTION_LABEL,
+  FONT_PAIRINGS,
+  TEMPLATES,
+  type EditorSectionKey,
+  type StoreTemplate,
 } from "@/types/storeWebsite";
 import { cn } from "@/utils/cn";
 
 import { TemplateCard } from "./TemplateCard";
-
 
 /** /requests/:id/editor — developer editor, redesigned 2026-06-27.
  *
@@ -31,50 +31,48 @@ import { TemplateCard } from "./TemplateCard";
  *        * `Enregistré` (briefly) after a successful flush. */
 
 export interface EditorPageProps {
-  pharmacyName:      string;
-  template:          StoreTemplate;
-  sections:          { key: EditorSectionKey; visible: boolean }[];
-  brandColors:       { primary: string; secondary: string; accent: string };
-  fontPairing:       string;
-  logoUrl:           string | null;
+  pharmacyName: string;
+  template: StoreTemplate;
+  sections: { key: EditorSectionKey; visible: boolean }[];
+  brandColors: { primary: string; secondary: string; accent: string };
+  fontPairing: string;
+  logoUrl: string | null;
 
-  autoSave:          boolean;
-  hasUnsaved:        boolean;
-  isSaving?:         boolean;
-  isUploading?:      boolean;
-  isResetting?:      boolean;
-  exporting?:        boolean;
-  hasExport?:        boolean;
+  autoSave: boolean;
+  hasUnsaved: boolean;
+  isSaving?: boolean;
+  isUploading?: boolean;
+  isResetting?: boolean;
+  exporting?: boolean;
+  hasExport?: boolean;
 
-  onSelectTemplate:  (t: StoreTemplate) => void;
-  onToggleSection:   (key: EditorSectionKey, visible: boolean) => void;
-  onBrandColor:      (which: "primary" | "secondary" | "accent", hex: string) => void;
-  onFontPairing:     (id: string) => void;
-  onLogoUpload:      (file: File) => void;
-  onSetAutoSave:     (on: boolean) => void;
-  onSave:            () => void;
-  onReset:           () => void;
-  onOpenPreview:     () => void;
-  onExport:          () => void;
-  onMarkDelivered:   () => void;
+  onSelectTemplate: (t: StoreTemplate) => void;
+  onToggleSection: (key: EditorSectionKey, visible: boolean) => void;
+  onBrandColor: (which: "primary" | "secondary" | "accent", hex: string) => void;
+  onFontPairing: (id: string) => void;
+  onLogoUpload: (file: File) => void;
+  onSetAutoSave: (on: boolean) => void;
+  onSave: () => void;
+  onReset: () => void;
+  onOpenPreview: () => void;
+  onExport: () => void;
+  onMarkDelivered: () => void;
 }
-
 
 export function EditorPage(props: EditorPageProps) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <TopBar {...props} />
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 sm:px-6">
-        <TemplateSection    {...props} />
-        <SectionsSection    {...props} />
+        <TemplateSection {...props} />
+        <SectionsSection {...props} />
         <BrandColorsSection {...props} />
-        <LogoSection        {...props} />
-        <TypographySection  {...props} />
+        <LogoSection {...props} />
+        <TypographySection {...props} />
       </main>
     </div>
   );
 }
-
 
 // ── TOP BAR ─────────────────────────────────────────────────────────────────
 
@@ -95,7 +93,10 @@ function TopBar(props: EditorPageProps) {
         variant="destructive"
         title="Réinitialiser la personnalisation ?"
         description="Toutes les modifications (modèle, sections, couleurs, logo, typographie) seront restaurées aux valeurs par défaut. Cette action est irréversible."
-        onConfirm={() => { setResetOpen(false); props.onReset(); }}
+        onConfirm={() => {
+          setResetOpen(false);
+          props.onReset();
+        }}
       />
       {/* Breadcrumb + save state indicator */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -122,12 +123,8 @@ function TopBar(props: EditorPageProps) {
           disabled={props.isResetting}
           title="Réinitialiser la personnalisation"
         >
-          {props.isResetting
-            ? <Loader2 className="size-4 animate-spin" />
-            : <RotateCcw className="size-4" />}
-          <span className="hidden sm:inline">
-            {props.isResetting ? "Réinitialisation…" : "Réinitialiser"}
-          </span>
+          {props.isResetting ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+          <span className="hidden sm:inline">{props.isResetting ? "Réinitialisation…" : "Réinitialiser"}</span>
         </Button>
 
         <Button variant="outline" size="sm" onClick={props.onOpenPreview} title="Ouvrir l'aperçu">
@@ -142,20 +139,11 @@ function TopBar(props: EditorPageProps) {
           disabled={props.exporting}
           title="Exporter le projet"
         >
-          {props.exporting
-            ? <Loader2 className="size-4 animate-spin" />
-            : <Download className="size-4" />}
-          <span className="hidden sm:inline">
-            {props.exporting ? "Génération…" : "Exporter"}
-          </span>
+          {props.exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          <span className="hidden sm:inline">{props.exporting ? "Génération…" : "Exporter"}</span>
         </Button>
 
-        <Button
-          size="sm"
-          onClick={props.onMarkDelivered}
-          disabled={!props.hasExport}
-          title="Marquer comme livrée"
-        >
+        <Button size="sm" onClick={props.onMarkDelivered} disabled={!props.hasExport} title="Marquer comme livrée">
           <CheckCircle2 className="size-4" />
           <span className="hidden sm:inline">Livrée</span>
         </Button>
@@ -164,10 +152,15 @@ function TopBar(props: EditorPageProps) {
   );
 }
 
-
 function SaveIndicator({
-  hasUnsaved, isSaving, autoSave,
-}: { hasUnsaved: boolean; isSaving?: boolean; autoSave: boolean }) {
+  hasUnsaved,
+  isSaving,
+  autoSave,
+}: {
+  hasUnsaved: boolean;
+  isSaving?: boolean;
+  autoSave: boolean;
+}) {
   if (isSaving) {
     return (
       <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
@@ -186,10 +179,7 @@ function SaveIndicator({
   return null;
 }
 
-
-function AutoSaveToggle({
-  checked, onChange,
-}: { checked: boolean; onChange: (on: boolean) => void }) {
+function AutoSaveToggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
   return (
     <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
       <input
@@ -203,7 +193,6 @@ function AutoSaveToggle({
   );
 }
 
-
 // ── SECTIONS ────────────────────────────────────────────────────────────────
 
 function TemplateSection(props: EditorPageProps) {
@@ -211,18 +200,12 @@ function TemplateSection(props: EditorPageProps) {
     <SectionShell title="Modèle">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
         {TEMPLATES.map((t) => (
-          <TemplateCard
-            key={t}
-            template={t}
-            active={props.template === t}
-            onClick={() => props.onSelectTemplate(t)}
-          />
+          <TemplateCard key={t} template={t} active={props.template === t} onClick={() => props.onSelectTemplate(t)} />
         ))}
       </div>
     </SectionShell>
   );
 }
-
 
 function SectionsSection(props: EditorPageProps) {
   return (
@@ -233,9 +216,7 @@ function SectionsSection(props: EditorPageProps) {
             key={sec.key}
             className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:bg-surface-subtle/50"
           >
-            <span className="flex-1 truncate text-sm font-medium text-foreground">
-              {EDITOR_SECTION_LABEL[sec.key]}
-            </span>
+            <span className="flex-1 truncate text-sm font-medium text-foreground">{EDITOR_SECTION_LABEL[sec.key]}</span>
             <button
               type="button"
               onClick={() => props.onToggleSection(sec.key, !sec.visible)}
@@ -254,7 +235,6 @@ function SectionsSection(props: EditorPageProps) {
     </SectionShell>
   );
 }
-
 
 function BrandColorsSection(props: EditorPageProps) {
   return (
@@ -278,19 +258,13 @@ function BrandColorsSection(props: EditorPageProps) {
   );
 }
 
-
 function LogoSection(props: EditorPageProps) {
   return (
     <SectionShell title="Logo">
-      <LogoRow
-        currentUrl={props.logoUrl}
-        isUploading={props.isUploading}
-        onFile={props.onLogoUpload}
-      />
+      <LogoRow currentUrl={props.logoUrl} isUploading={props.isUploading} onFile={props.onLogoUpload} />
     </SectionShell>
   );
 }
-
 
 function TypographySection(props: EditorPageProps) {
   return (
@@ -316,34 +290,31 @@ function TypographySection(props: EditorPageProps) {
   );
 }
 
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const COLOR_LABELS = {
-  primary:   "Principale",
+  primary: "Principale",
   secondary: "Secondaire",
-  accent:    "Accent",
+  accent: "Accent",
 } as const;
-
 
 function SectionShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
       {children}
     </section>
   );
 }
 
-
 function LogoRow({
-  currentUrl, isUploading, onFile,
+  currentUrl,
+  isUploading,
+  onFile,
 }: {
-  currentUrl:  string | null;
+  currentUrl: string | null;
   isUploading?: boolean;
-  onFile:      (file: File) => void;
+  onFile: (file: File) => void;
 }) {
   const [hover, setHover] = useState(false);
   return (
@@ -361,16 +332,10 @@ function LogoRow({
         />
       )}
       <span className="flex flex-1 items-center gap-2 text-muted-foreground data-[hover=true]:text-foreground">
-        {isUploading
-          ? <Loader2 className="size-4 animate-spin" />
-          : <Upload  className="size-4" />}
-        {isUploading
-          ? "Téléversement…"
-          : currentUrl ? "Remplacer le logo" : "Téléverser un logo"}
+        {isUploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+        {isUploading ? "Téléversement…" : currentUrl ? "Remplacer le logo" : "Téléverser un logo"}
       </span>
-      <span className="hidden text-xs text-muted-foreground sm:inline">
-        PNG · JPG · SVG · WEBP · 2 Mo max
-      </span>
+      <span className="hidden text-xs text-muted-foreground sm:inline">PNG · JPG · SVG · WEBP · 2 Mo max</span>
       <input
         type="file"
         accept="image/png,image/jpeg,image/svg+xml,image/webp"

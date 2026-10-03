@@ -8,6 +8,7 @@ Revises: 0003
 Create Date: 2026-06-20
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,8 +21,14 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 ALLOWED_FEATURES = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
 )
 
 

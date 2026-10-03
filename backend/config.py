@@ -35,11 +35,11 @@ class Settings(BaseSettings):
     # to stdout (useful for tests + when no SMTP creds are configured yet).
     MAIL_USERNAME: str = ""
     MAIL_PASSWORD: str = ""
-    MAIL_FROM:     str = ""
-    MAIL_SERVER:   str = "smtp.gmail.com"
-    MAIL_PORT:     int = 587
+    MAIL_FROM: str = ""
+    MAIL_SERVER: str = "smtp.gmail.com"
+    MAIL_PORT: int = 587
     MAIL_STARTTLS: bool = True
-    MAIL_SSL_TLS:  bool = False
+    MAIL_SSL_TLS: bool = False
 
 
 settings = Settings()  # type: ignore[call-arg]

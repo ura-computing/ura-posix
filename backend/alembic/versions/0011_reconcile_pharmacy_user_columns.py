@@ -17,6 +17,7 @@ Inspector.has_column so it's idempotent against:
   - fresh refactor DBs that took the create_all+stamp path (no-op — columns
     already exist on the model-shaped table)
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -30,15 +31,15 @@ depends_on = None
 
 
 _PHARMACY_COLS = (
-    ("city",    sa.Column("city",    sa.String(), nullable=True)),
-    ("code",    sa.Column("code",    sa.String(), nullable=True)),
+    ("city", sa.Column("city", sa.String(), nullable=True)),
+    ("code", sa.Column("code", sa.String(), nullable=True)),
     ("address", sa.Column("address", sa.String(), nullable=True)),
-    ("phone",   sa.Column("phone",   sa.String(), nullable=True)),
-    ("email",   sa.Column("email",   sa.String(), nullable=True)),
+    ("phone", sa.Column("phone", sa.String(), nullable=True)),
+    ("email", sa.Column("email", sa.String(), nullable=True)),
 )
 
 _USER_COLS = (
-    ("reset_token",         sa.Column("reset_token",         sa.String(), nullable=True)),
+    ("reset_token", sa.Column("reset_token", sa.String(), nullable=True)),
     ("reset_token_expires", sa.Column("reset_token_expires", sa.DateTime(timezone=True), nullable=True)),
 )
 

@@ -9,6 +9,7 @@ is already allowed to act on `target`.
 Passwords are typed by the admin / owner (create + reset); only the hash is
 stored.
 """
+
 from __future__ import annotations
 
 import unicodedata
@@ -56,10 +57,7 @@ def member_out(db: Session, u: User) -> MemberOut:
 def apply_permissions_bulk(db: Session, user_id: int, permissions: dict[str, bool]) -> None:
     """Upsert one UserPermission row per key in `permissions`. Unknown keys are
     silently ignored (we trust the frontend to only send ALLOWED_FEATURES)."""
-    existing = {
-        p.permission: p for p in db.query(UserPermission)
-        .filter(UserPermission.user_id == user_id).all()
-    }
+    existing = {p.permission: p for p in db.query(UserPermission).filter(UserPermission.user_id == user_id).all()}
     for key, enabled in permissions.items():
         if key not in ALLOWED_FEATURES:
             continue
@@ -70,7 +68,13 @@ def apply_permissions_bulk(db: Session, user_id: int, permissions: dict[str, boo
 
 
 def create_member(
-    db: Session, *, email: str, name: str | None, password: str, role: str, pharmacy_id: int,
+    db: Session,
+    *,
+    email: str,
+    name: str | None,
+    password: str,
+    role: str,
+    pharmacy_id: int,
 ) -> User:
     """Create an active owner/employee with EVERY permission granted (client
     decision 2026-09-28 — effective access is still capped by the pharmacy /
@@ -121,13 +125,13 @@ def generate_pharmacy_code(db: Session, city: str) -> str:
     A concurrent create with the same prefix can race on the unique index;
     `create_pharmacy` wraps this in a retry loop to handle that.
     """
-    norm = "".join(
-        c for c in unicodedata.normalize("NFD", city)
-        if not unicodedata.combining(c)
-    ).upper()
+    norm = "".join(c for c in unicodedata.normalize("NFD", city) if not unicodedata.combining(c)).upper()
     prefix = "".join(c for c in norm if c.isalpha())[:3].ljust(3, "X")
 
-    max_seq = db.query(
-        func.max(func.cast(func.substr(Pharmacy.code, 4), Integer))
-    ).filter(Pharmacy.code.like(f"{prefix}%")).scalar() or 0
+    max_seq = (
+        db.query(func.max(func.cast(func.substr(Pharmacy.code, 4), Integer)))
+        .filter(Pharmacy.code.like(f"{prefix}%"))
+        .scalar()
+        or 0
+    )
     return f"{prefix}{max_seq + 1:04d}"

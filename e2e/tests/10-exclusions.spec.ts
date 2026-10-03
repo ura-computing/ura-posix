@@ -9,23 +9,11 @@ import type { Page } from "@playwright/test";
 
 import { apiGet, apiPost } from "../lib/api";
 import { sessionFile } from "../lib/auth";
-import {
-  CATEGORY_TYPES,
-  checkLedgerPage,
-  checkStats,
-  subsetSummary,
-  type Row,
-} from "../lib/checks";
+import { CATEGORY_TYPES, checkLedgerPage, checkStats, subsetSummary, type Row } from "../lib/checks";
 import { expectSame, expectSameSet } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
-import {
-  pageCall,
-  pageSend,
-  period,
-  pickCategoryType,
-  setPeriod,
-} from "../lib/ui";
+import { pageCall, pageSend, period, pickCategoryType, setPeriod } from "../lib/ui";
 
 test.use({ storageState: sessionFile("owner") });
 test.describe.configure({ mode: "serial" });
@@ -37,12 +25,7 @@ const scenario = (): Row => expected().exclusions;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Open an exclude dialog, type `q`; resolves with the search / suggestions answer. */
-async function searchInDialog(
-  page: Page,
-  button: string,
-  path: string,
-  q: string,
-): Promise<Row[]> {
+async function searchInDialog(page: Page, button: string, path: string, q: string): Promise<Row[]> {
   const answer = pageCall<Row[]>(page, path, { q });
   if (!(await page.getByRole("dialog").isVisible()))
     await page.getByRole("button", { name: button, exact: true }).click();
@@ -51,10 +34,7 @@ async function searchInDialog(
 }
 
 /** Open /produits-speciaux (its 3 lists load on mount) and pick a tab. */
-async function openPs(
-  page: Page,
-  tab?: "Bons de livraison" | "Fournisseurs",
-): Promise<void> {
+async function openPs(page: Page, tab?: "Bons de livraison" | "Fournisseurs"): Promise<void> {
   await page.goto("/produits-speciaux");
   await expect(
     page.getByRole("heading", {
@@ -69,21 +49,14 @@ async function openPs(
 test.afterAll(async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: sessionFile("owner") });
   const page = await ctx.newPage();
-  const ids = (await apiGet<Row[]>(page, "/special-products/")).map(
-    (r) => r.medicament_id,
-  );
-  const refs = (await apiGet<Row[]>(page, "/bl-exclusions/")).map(
-    (r) => r.delivery_ref,
-  );
-  const sups = (await apiGet<Row[]>(page, "/supplier-exclusions/")).map(
-    (r) => r.supplier,
-  );
+  const ids = (await apiGet<Row[]>(page, "/special-products/")).map((r) => r.medicament_id);
+  const refs = (await apiGet<Row[]>(page, "/bl-exclusions/")).map((r) => r.delivery_ref);
+  const sups = (await apiGet<Row[]>(page, "/supplier-exclusions/")).map((r) => r.supplier);
   if (ids.length)
     await apiPost(page, "/special-products/reintegrate", {
       medicament_ids: ids,
     });
-  if (refs.length)
-    await apiPost(page, "/bl-exclusions/reintegrate", { delivery_refs: refs });
+  if (refs.length) await apiPost(page, "/bl-exclusions/reintegrate", { delivery_refs: refs });
   if (sups.length)
     await apiPost(page, "/supplier-exclusions/reintegrate", {
       suppliers: sups,
@@ -97,9 +70,7 @@ test("exclure un produit : recherche → choix → exclure", async ({ page }) =>
   await openPs(page);
   expect(await list0, "aucun produit exclu au départ").toEqual([]);
 
-  await page
-    .getByRole("button", { name: "Exclure des produits", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Exclure des produits", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const suggest = pageCall(page, "/special-products/suggestions", {
     q: x.query,
@@ -107,15 +78,11 @@ test("exclure un produit : recherche → choix → exclure", async ({ page }) =>
   await dialog.getByRole("textbox").fill(x.query);
   const found = await suggest;
   expectSame(found, x.suggestions, `suggestions « ${x.query} »`);
-  await dialog
-    .getByRole("button", { name: new RegExp(`^${x.product}`) })
-    .click();
+  await dialog.getByRole("button", { name: new RegExp(`^${x.product}`) }).click();
 
   const posted = pageSend(page, "POST", "/special-products/", 201);
   const list1 = pageCall(page, "/special-products/");
-  await dialog
-    .getByRole("button", { name: "Exclure des produits (1)", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Exclure des produits (1)", exact: true }).click();
   const item = {
     medicament_id: found[0].id,
     pid: x.pid,
@@ -123,11 +90,7 @@ test("exclure un produit : recherche → choix → exclure", async ({ page }) =>
     category: x.category,
   };
   const res = await posted;
-  expectSame(
-    res,
-    { inserted: 1, already_special: 0, products: [item] },
-    "POST special-products",
-  );
+  expectSame(res, { inserted: 1, already_special: 0, products: [item] }, "POST special-products");
   const list = await list1;
   expectSame(list, [item], "produits exclus");
   expect(list[0].created_at, "created_at").toMatch(/^\d{4}-\d{2}-\d{2}T/);
@@ -143,19 +106,11 @@ test("exclure un produit : recherche → choix → exclure", async ({ page }) =>
 
   // An excluded product is no longer suggested: same search in the dialog → « Aucun produit trouvé ».
   expect(
-    await searchInDialog(
-      page,
-      "Exclure des produits",
-      "/special-products/suggestions",
-      x.query,
-    ),
+    await searchInDialog(page, "Exclure des produits", "/special-products/suggestions", x.query),
     "suggestions après exclusion",
   ).toEqual([]);
   await expect(page.getByRole("dialog")).toContainText("Aucun produit trouvé.");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Annuler", exact: true })
-    .click();
+  await page.getByRole("dialog").getByRole("button", { name: "Annuler", exact: true }).click();
 });
 
 test("exclure un BL trouvé par un de ses produits", async ({ page }) => {
@@ -164,23 +119,14 @@ test("exclure un BL trouvé par un de ses produits", async ({ page }) => {
   await openPs(page, "Bons de livraison");
   expect(await list0, "aucun BL exclu au départ").toEqual([]);
 
-  await page
-    .getByRole("button", { name: "Exclure un BL", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Exclure un BL", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const search = pageCall(page, "/bl-exclusions/search", { q: x.query });
   await dialog.getByRole("textbox").fill(x.query);
   const found = await search;
-  expectSameSet(
-    found,
-    x.search,
-    (r) => r.delivery_ref,
-    `BL contenant « ${x.query} »`,
-  );
+  expectSameSet(found, x.search, (r) => r.delivery_ref, `BL contenant « ${x.query} »`);
   const dates = found.map((r: Row) => r.delivery_date);
-  expect(dates, "BL du plus récent au plus ancien").toEqual(
-    [...dates].sort().reverse(),
-  );
+  expect(dates, "BL du plus récent au plus ancien").toEqual([...dates].sort().reverse());
 
   const detail = pageCall(page, "/bl-exclusions/detail", {
     delivery_ref: x.ref,
@@ -196,19 +142,11 @@ test("exclure un BL trouvé par un de ses produits", async ({ page }) => {
   await dialog.getByLabel("Note (optionnelle)").fill(NOTE_BL);
   const posted = pageSend(page, "POST", "/bl-exclusions/", 201);
   const list1 = pageCall(page, "/bl-exclusions/");
-  await dialog
-    .getByRole("button", { name: "Exclure ce BL", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Exclure ce BL", exact: true }).click();
   const item = { ...head, notes: NOTE_BL };
-  expectSame(
-    await posted,
-    { excluded: 1, already_excluded: 0, item },
-    "POST bl-exclusions",
-  );
+  expectSame(await posted, { excluded: 1, already_excluded: 0, item }, "POST bl-exclusions");
   expectSame(await list1, [item], "BL exclus");
-  await expect(
-    page.getByRole("cell", { name: x.ref, exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: x.ref, exact: true })).toBeVisible();
 
   // Search by reference in the dialog: the same BL, now « déjà exclu » and not clickable.
   expectSame(
@@ -216,14 +154,9 @@ test("exclure un BL trouvé par un de ses produits", async ({ page }) => {
     x.search_by_ref.map((r: Row) => ({ ...r, already_excluded: true })),
     `BL « ${x.ref} » après exclusion`,
   );
-  const row = page
-    .getByRole("dialog")
-    .getByRole("button", { name: new RegExp(`^${esc(x.ref)}\\s*déjà exclu`) });
+  const row = page.getByRole("dialog").getByRole("button", { name: new RegExp(`^${esc(x.ref)}\\s*déjà exclu`) });
   await expect(row).toBeDisabled();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Annuler", exact: true })
-    .click();
+  await page.getByRole("dialog").getByRole("button", { name: "Annuler", exact: true }).click();
 });
 
 test("exclure un fournisseur", async ({ page }) => {
@@ -232,9 +165,7 @@ test("exclure un fournisseur", async ({ page }) => {
   await openPs(page, "Fournisseurs");
   expect(await list0, "aucun fournisseur exclu au départ").toEqual([]);
 
-  await page
-    .getByRole("button", { name: "Exclure un fournisseur", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Exclure un fournisseur", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const search = pageCall(page, "/supplier-exclusions/search", { q: x.query });
   await dialog.getByRole("textbox").fill(x.query);
@@ -244,29 +175,16 @@ test("exclure un fournisseur", async ({ page }) => {
   await dialog.getByLabel("Note (optionnelle)").fill(NOTE_SUP);
   const posted = pageSend(page, "POST", "/supplier-exclusions/", 201);
   const list1 = pageCall(page, "/supplier-exclusions/");
-  await dialog
-    .getByRole("button", { name: "Exclure ce fournisseur", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Exclure ce fournisseur", exact: true }).click();
   const { already_excluded: _a, ...totals } = x.search[0];
   const item = { ...totals, notes: NOTE_SUP };
-  expectSame(
-    await posted,
-    { excluded: 1, already_excluded: 0, item },
-    "POST supplier-exclusions",
-  );
+  expectSame(await posted, { excluded: 1, already_excluded: 0, item }, "POST supplier-exclusions");
   expectSame(await list1, [item], "fournisseurs exclus");
-  await expect(
-    page.getByRole("cell", { name: x.name, exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("cell", { name: x.name, exact: true })).toBeVisible();
 
   // In the dialog: « grossiste » lists several suppliers (ordered by purchase total), each shown;
   // the excluded one comes back « déjà exclu » and not clickable.
-  const gros = await searchInDialog(
-    page,
-    "Exclure un fournisseur",
-    "/supplier-exclusions/search",
-    "grossiste",
-  );
+  const gros = await searchInDialog(page, "Exclure un fournisseur", "/supplier-exclusions/search", "grossiste");
   expectSame(gros, x.search_grossiste, "fournisseurs « grossiste »");
   for (const s of gros)
     await expect(
@@ -276,38 +194,24 @@ test("exclure un fournisseur", async ({ page }) => {
         .first(),
     ).toBeVisible();
   expectSame(
-    await searchInDialog(
-      page,
-      "Exclure un fournisseur",
-      "/supplier-exclusions/search",
-      x.query,
-    ),
+    await searchInDialog(page, "Exclure un fournisseur", "/supplier-exclusions/search", x.query),
     [{ ...x.search[0], already_excluded: true }],
     `fournisseurs « ${x.query} » après exclusion`,
   );
   await expect(
-    page
-      .getByRole("dialog")
-      .getByRole("button", {
-        name: new RegExp(`^${esc(x.name)}\\s*déjà exclu`),
-      }),
+    page.getByRole("dialog").getByRole("button", {
+      name: new RegExp(`^${esc(x.name)}\\s*déjà exclu`),
+    }),
   ).toBeDisabled();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Annuler", exact: true })
-    .click();
+  await page.getByRole("dialog").getByRole("button", { name: "Annuler", exact: true }).click();
 });
 
-test("comptabilité : les 3 exclusions retirent leurs produits (KPI + journal)", async ({
-  page,
-}) => {
+test("comptabilité : les 3 exclusions retirent leurs produits (KPI + journal)", async ({ page }) => {
   const x = scenario();
   const w = testWindow();
   const gone = new Set<string>(x.excluded_pids);
   await page.goto("/comptabilite");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Comptabilité", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Comptabilité", exact: true })).toBeVisible();
 
   const ledger = pageCall(page, "/ventes", {
     ...period(w),
@@ -361,34 +265,24 @@ test("comptabilité : les 3 exclusions retirent leurs produits (KPI + journal)",
       ...period(w),
       category_type: "all",
     });
-    await page
-      .getByRole("link", { name: "Tableau de bord", exact: true })
-      .click(); // sidebar: the period stays
+    await page.getByRole("link", { name: "Tableau de bord", exact: true }).click(); // sidebar: the period stays
     checkStats(await stats, "all");
   });
 });
 
-test("réintégrer produit, BL et fournisseur → comptabilité complète", async ({
-  page,
-}) => {
+test("réintégrer produit, BL et fournisseur → comptabilité complète", async ({ page }) => {
   const x = scenario();
   const list0 = pageCall<Row[]>(page, "/special-products/");
   await openPs(page);
   const id = (await list0)[0].medicament_id;
 
   await test.step("produit (dialogue « Réintégrer des produits »)", async () => {
-    await page
-      .getByRole("button", { name: "Réintégrer des produits", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Réintégrer des produits", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByRole("button", { name: new RegExp(`^${x.special.product}`) })
-      .click();
+    await dialog.getByRole("button", { name: new RegExp(`^${x.special.product}`) }).click();
     const posted = pageSend(page, "POST", "/special-products/reintegrate");
     const list = pageCall(page, "/special-products/");
-    await dialog
-      .getByRole("button", { name: "Réintégrer (1)", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Réintégrer (1)", exact: true }).click();
     expectSame(
       await posted,
       { reintegrated: 1, not_special: 0, medicament_ids: [id] },
@@ -398,9 +292,7 @@ test("réintégrer produit, BL et fournisseur → comptabilité complète", asyn
   });
 
   await test.step("BL (bouton de la ligne)", async () => {
-    await page
-      .getByRole("tab", { name: "Bons de livraison", exact: true })
-      .click();
+    await page.getByRole("tab", { name: "Bons de livraison", exact: true }).click();
     const posted = pageSend(page, "POST", "/bl-exclusions/reintegrate");
     const list = pageCall(page, "/bl-exclusions/");
     await page.getByRole("button", { name: "Réintégrer", exact: true }).click();

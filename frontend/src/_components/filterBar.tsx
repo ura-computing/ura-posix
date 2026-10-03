@@ -20,22 +20,10 @@ import { cn } from "@/utils/cn";
 import { useT } from "@/i18n/I18nProvider";
 
 import { CategorySegment, type SegmentOption } from "./CategorySegment";
-import {
-  SingleSelectPopover,
-  type SingleSelectOption,
-} from "./SingleSelectPopover";
+import { SingleSelectPopover, type SingleSelectOption } from "./SingleSelectPopover";
 import { DayPicker, type DateRange as DPRange } from "react-day-picker";
 import { fr } from "date-fns/locale";
-import {
-  autoUpdate,
-  flip,
-  offset,
-  shift,
-  size,
-  useDismiss,
-  useFloating,
-  useInteractions,
-} from "@floating-ui/react";
+import { autoUpdate, flip, offset, shift, size, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
 import { DATE_PRESETS, type DateRange as IsoRange } from "@/utils/dateRange";
 
 /** Date-range filter: 2 labelled segmented inputs ("DATE DÉBUT" / "DATE FIN")
@@ -52,13 +40,17 @@ import { DATE_PRESETS, type DateRange as IsoRange } from "@/utils/dateRange";
 // NOTE: do NOT import "react-day-picker/dist/style.css" — its default styles
 // fight our Tailwind overrides and cause weekday/day-grid layout breakage.
 
-type Side  = "from" | "to";
+type Side = "from" | "to";
 type Field = "d" | "m" | "y";
-type Segs  = { d: string; m: string; y: string };
+type Segs = { d: string; m: string; y: string };
 
 const FIELD_ORDER: { side: Side; field: Field }[] = [
-  { side: "from", field: "d" }, { side: "from", field: "m" }, { side: "from", field: "y" },
-  { side: "to",   field: "d" }, { side: "to",   field: "m" }, { side: "to",   field: "y" },
+  { side: "from", field: "d" },
+  { side: "from", field: "m" },
+  { side: "from", field: "y" },
+  { side: "to", field: "d" },
+  { side: "to", field: "m" },
+  { side: "to", field: "y" },
 ];
 
 // ─── ISO ↔ segs helpers ──────────────────────────────────────────────────────
@@ -78,8 +70,8 @@ const segsToIso = (s: Segs): string | null => {
   const yyyy = parseInt(s.y, 10);
   if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
   if (yyyy < 1900 || yyyy > 2999) return null;
-  if (mm < 1 || mm > 12)         return null;
-  if (dd < 1 || dd > 31)         return null;
+  if (mm < 1 || mm > 12) return null;
+  if (dd < 1 || dd > 31) return null;
   const dt = new Date(yyyy, mm - 1, dd);
   if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
   return `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
@@ -91,24 +83,22 @@ const segsEqual = (a: Segs, b: Segs) => a.d === b.d && a.m === b.m && a.y === b.
 
 interface DateRangePopoverProps {
   /** YYYY-MM-DD or "" / null when unset. */
-  from:        string | null;
-  to:          string | null;
+  from: string | null;
+  to: string | null;
   /** Called with both values whenever either side changes. */
-  onChange:    (from: string | null, to: string | null) => void;
+  onChange: (from: string | null, to: string | null) => void;
   showPresets?: boolean;
-  className?:   string;
+  className?: string;
 }
 
-function DateRangePopover({
-  from, to, onChange, showPresets = true, className,
-}: DateRangePopoverProps) {
+function DateRangePopover({ from, to, onChange, showPresets = true, className }: DateRangePopoverProps) {
   const t = useT();
   const fromIso = from ?? "";
-  const toIso   = to   ?? "";
+  const toIso = to ?? "";
 
   const [fromSegs, setFromSegs] = useState<Segs>(() => isoToSegs(fromIso));
-  const [toSegs,   setToSegs]   = useState<Segs>(() => isoToSegs(toIso));
-  const [invalid,  setInvalid]  = useState({ from: false, to: false });
+  const [toSegs, setToSegs] = useState<Segs>(() => isoToSegs(toIso));
+  const [invalid, setInvalid] = useState({ from: false, to: false });
   const [open, setOpen] = useState(false);
 
   const refs = useRef<Array<HTMLInputElement | null>>([null, null, null, null, null, null]);
@@ -118,13 +108,13 @@ function DateRangePopover({
   // left/right to fit within the viewport, clamps max-width on narrow screens.
   // `autoUpdate` re-positions on scroll, resize, transforms — for free.
   const {
-    refs:           floatRefs,
+    refs: floatRefs,
     floatingStyles,
     context,
   } = useFloating({
     open,
     onOpenChange: setOpen,
-    placement:    "bottom-start",
+    placement: "bottom-start",
     middleware: [
       offset(8),
       flip({ padding: 16 }),
@@ -133,7 +123,7 @@ function DateRangePopover({
         padding: 16,
         apply({ availableWidth, availableHeight, elements }) {
           Object.assign(elements.floating.style, {
-            maxWidth:  `${Math.min(availableWidth, 680)}px`,
+            maxWidth: `${Math.min(availableWidth, 680)}px`,
             maxHeight: `${availableHeight}px`,
           });
         },
@@ -161,8 +151,7 @@ function DateRangePopover({
     el.focus();
     if (opts?.selectAll) el.select();
   };
-  const idxOf = (side: Side, field: Field) =>
-    FIELD_ORDER.findIndex((f) => f.side === side && f.field === field);
+  const idxOf = (side: Side, field: Field) => FIELD_ORDER.findIndex((f) => f.side === side && f.field === field);
 
   const commit = useCallback(
     (side: Side, segs: Segs) => {
@@ -173,39 +162,48 @@ function DateRangePopover({
       }
       setInvalid((v) => ({ ...v, [side]: false }));
       if (side === "from") onChange(iso || null, toIso || null);
-      else                 onChange(fromIso || null, iso || null);
+      else onChange(fromIso || null, iso || null);
     },
     [onChange, fromIso, toIso],
   );
 
   const updateSeg = (side: Side, field: Field, raw: string) => {
-    const digits  = raw.replace(/\D/g, "");
-    const maxLen  = field === "y" ? 4 : 2;
+    const digits = raw.replace(/\D/g, "");
+    const maxLen = field === "y" ? 4 : 2;
     const trimmed = digits.slice(0, maxLen);
 
-    const cur  = side === "from" ? fromSegs : toSegs;
+    const cur = side === "from" ? fromSegs : toSegs;
     const next: Segs = { ...cur, [field]: trimmed };
-    if (side === "from") setFromSegs(next); else setToSegs(next);
+    if (side === "from") setFromSegs(next);
+    else setToSegs(next);
 
     // Auto-advance + zero-pad on single-digit overflow (e.g. "5" in day → "05" + next)
     let advance = false;
-    let padded  = trimmed;
+    let padded = trimmed;
     if (field === "d") {
       if (trimmed.length === 2) advance = true;
-      else if (trimmed.length === 1 && /^[4-9]$/.test(trimmed)) { advance = true; padded = "0" + trimmed; }
+      else if (trimmed.length === 1 && /^[4-9]$/.test(trimmed)) {
+        advance = true;
+        padded = "0" + trimmed;
+      }
     } else if (field === "m") {
       if (trimmed.length === 2) advance = true;
-      else if (trimmed.length === 1 && /^[2-9]$/.test(trimmed)) { advance = true; padded = "0" + trimmed; }
+      else if (trimmed.length === 1 && /^[2-9]$/.test(trimmed)) {
+        advance = true;
+        padded = "0" + trimmed;
+      }
     } else if (field === "y") {
       if (trimmed.length === 4) advance = true;
     }
 
     if (padded !== trimmed) {
       const padNext: Segs = { ...next, [field]: padded };
-      if (side === "from") setFromSegs(padNext); else setToSegs(padNext);
+      if (side === "from") setFromSegs(padNext);
+      else setToSegs(padNext);
       const iso = segsToIso(padNext);
       if (iso !== null) commit(side, padNext);
-      else setInvalid((v) => ({ ...v, [side]: padNext.d.length > 0 && padNext.m.length > 0 && padNext.y.length === 4 }));
+      else
+        setInvalid((v) => ({ ...v, [side]: padNext.d.length > 0 && padNext.m.length > 0 && padNext.y.length === 4 }));
     } else {
       if (next.d.length >= 1 && next.m.length >= 1 && next.y.length === 4) {
         const iso = segsToIso(next);
@@ -217,7 +215,7 @@ function DateRangePopover({
       // Empty everywhere → commit ""
       if (next.d === "" && next.m === "" && next.y === "" && (side === "from" ? fromIso : toIso) !== "") {
         if (side === "from") onChange(null, toIso || null);
-        else                 onChange(fromIso || null, null);
+        else onChange(fromIso || null, null);
       }
     }
 
@@ -234,19 +232,28 @@ function DateRangePopover({
     const value = cur[field];
 
     if (e.key === "ArrowRight") {
-      if (target.selectionStart === value.length && target.selectionEnd === value.length && idx + 1 < FIELD_ORDER.length) {
-        e.preventDefault(); focusIdx(idx + 1, { selectAll: true });
+      if (
+        target.selectionStart === value.length &&
+        target.selectionEnd === value.length &&
+        idx + 1 < FIELD_ORDER.length
+      ) {
+        e.preventDefault();
+        focusIdx(idx + 1, { selectAll: true });
       }
     } else if (e.key === "ArrowLeft") {
       if (target.selectionStart === 0 && target.selectionEnd === 0 && idx > 0) {
-        e.preventDefault(); focusIdx(idx - 1, { selectAll: true });
+        e.preventDefault();
+        focusIdx(idx - 1, { selectAll: true });
       }
     } else if (e.key === "Backspace") {
-      if (value === "" && idx > 0) { e.preventDefault(); focusIdx(idx - 1, { selectAll: true }); }
+      if (value === "" && idx > 0) {
+        e.preventDefault();
+        focusIdx(idx - 1, { selectAll: true });
+      }
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
       const dir = e.key === "ArrowUp" ? 1 : -1;
-      const n   = parseInt(value || "0", 10) + dir;
+      const n = parseInt(value || "0", 10) + dir;
       const max = field === "y" ? 2999 : field === "m" ? 12 : 31;
       const min = field === "y" ? 1900 : 1;
       if (n >= min && n <= max) {
@@ -254,7 +261,8 @@ function DateRangePopover({
         updateSeg(side, field, String(n).padStart(padLen, "0"));
       }
     } else if (e.key === "Enter") {
-      e.preventDefault(); target.blur();
+      e.preventDefault();
+      target.blur();
     } else if (e.key === "Escape") {
       e.preventDefault();
       setFromSegs(isoToSegs(fromIso));
@@ -276,16 +284,19 @@ function DateRangePopover({
 
   // Calendar selection (range mode — first click = start, second click = end + close)
   const fromDate = fromIso ? new Date(fromIso + "T00:00:00") : undefined;
-  const toDate   = toIso   ? new Date(toIso   + "T00:00:00") : undefined;
+  const toDate = toIso ? new Date(toIso + "T00:00:00") : undefined;
 
   const handleRangeSelect = (range: DPRange | undefined) => {
     if (!range) {
       onChange(null, null);
       return;
     }
-    const fmtDate = (d?: Date) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : null);
+    const fmtDate = (d?: Date) =>
+      d
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+        : null;
     const newFrom = fmtDate(range.from);
-    const newTo   = fmtDate(range.to);
+    const newTo = fmtDate(range.to);
     onChange(newFrom, range.from && !range.to ? null : newTo);
     if (range.from && range.to) setOpen(false);
   };
@@ -301,13 +312,31 @@ function DateRangePopover({
       {...getReferenceProps()}
       className={cn("inline-flex items-center gap-2", className)}
     >
-      <DateField side="from" label={t("shared.dateStart")} segs={fromSegs} invalid={invalid.from}
-        registerRef={(field, el) => { refs.current[idxOf("from", field)] = el; }}
-        onUpdate={updateSeg} onKeyDown={handleKeyDown} onBlur={() => handleBlur("from")} />
+      <DateField
+        side="from"
+        label={t("shared.dateStart")}
+        segs={fromSegs}
+        invalid={invalid.from}
+        registerRef={(field, el) => {
+          refs.current[idxOf("from", field)] = el;
+        }}
+        onUpdate={updateSeg}
+        onKeyDown={handleKeyDown}
+        onBlur={() => handleBlur("from")}
+      />
       <span className="text-sm text-muted-foreground">→</span>
-      <DateField side="to" label={t("shared.dateEnd")} segs={toSegs} invalid={invalid.to}
-        registerRef={(field, el) => { refs.current[idxOf("to", field)] = el; }}
-        onUpdate={updateSeg} onKeyDown={handleKeyDown} onBlur={() => handleBlur("to")} />
+      <DateField
+        side="to"
+        label={t("shared.dateEnd")}
+        segs={toSegs}
+        invalid={invalid.to}
+        registerRef={(field, el) => {
+          refs.current[idxOf("to", field)] = el;
+        }}
+        onUpdate={updateSeg}
+        onKeyDown={handleKeyDown}
+        onBlur={() => handleBlur("to")}
+      />
 
       {/* Calendar icon button — clicking toggles the popover, anchored to this whole wrapper */}
       <button
@@ -331,39 +360,39 @@ function DateRangePopover({
           style={floatingStyles}
           className="z-50 flex flex-col overflow-auto rounded-xl border border-border bg-card shadow-2xl"
         >
-            {showPresets && (
-              <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">
-                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  {t("shared.quickPeriods")}
-                </div>
-                <div className="grid grid-cols-2 gap-1">
-                  {DATE_PRESETS.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => applyPreset(p.get())}
-                      className="cursor-pointer rounded-md px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                    >
-                      {t(p.label)}
-                    </button>
-                  ))}
-                </div>
+          {showPresets && (
+            <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                {t("shared.quickPeriods")}
               </div>
-            )}
-            <div className="p-3">
-              <DayPicker
-                mode="range"
-                numberOfMonths={2}
-                locale={fr}
-                selected={{ from: fromDate, to: toDate }}
-                onSelect={handleRangeSelect}
-                weekStartsOn={1}
-                showOutsideDays
-                defaultMonth={fromDate ?? new Date()}
-                classNames={DAY_PICKER_CLASSES}
-                modifiersClassNames={DAY_PICKER_MODIFIERS}
-              />
+              <div className="grid grid-cols-2 gap-1">
+                {DATE_PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => applyPreset(p.get())}
+                    className="cursor-pointer rounded-md px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  >
+                    {t(p.label)}
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
+          <div className="p-3">
+            <DayPicker
+              mode="range"
+              numberOfMonths={2}
+              locale={fr}
+              selected={{ from: fromDate, to: toDate }}
+              onSelect={handleRangeSelect}
+              weekStartsOn={1}
+              showOutsideDays
+              defaultMonth={fromDate ?? new Date()}
+              classNames={DAY_PICKER_CLASSES}
+              modifiersClassNames={DAY_PICKER_MODIFIERS}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -373,14 +402,14 @@ function DateRangePopover({
 // ─── Single date field (label above + 3 segmented inputs DD/MM/YYYY) ─────────
 
 interface DateFieldProps {
-  side:        Side;
-  label:       string;
-  segs:        Segs;
-  invalid:     boolean;
+  side: Side;
+  label: string;
+  segs: Segs;
+  invalid: boolean;
   registerRef: (field: Field, el: HTMLInputElement | null) => void;
-  onUpdate:    (side: Side, field: Field, value: string) => void;
-  onKeyDown:   (e: React.KeyboardEvent<HTMLInputElement>, side: Side, field: Field) => void;
-  onBlur:      () => void;
+  onUpdate: (side: Side, field: Field, value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, side: Side, field: Field) => void;
+  onBlur: () => void;
 }
 
 function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDown, onBlur }: DateFieldProps) {
@@ -404,47 +433,47 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
         invalid && "border-error",
       )}
     >
-        <input
-          ref={(el) => registerRef("d", el)}
-          value={segs.d}
-          onChange={(e) => onUpdate(side, "d", e.target.value)}
-          onKeyDown={(e) => onKeyDown(e, side, "d")}
-          onBlur={onBlur}
-          onFocus={(e) => e.target.select()}
-          inputMode="numeric"
-          maxLength={2}
-          placeholder={t("shared.dayAbbr")}
-          aria-label={`${label} ${t("shared.day")}`}
-          className={segClass("w-[1.6em]")}
-        />
-        <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
-        <input
-          ref={(el) => registerRef("m", el)}
-          value={segs.m}
-          onChange={(e) => onUpdate(side, "m", e.target.value)}
-          onKeyDown={(e) => onKeyDown(e, side, "m")}
-          onBlur={onBlur}
-          onFocus={(e) => e.target.select()}
-          inputMode="numeric"
-          maxLength={2}
-          placeholder={t("shared.monthAbbr")}
-          aria-label={`${label} ${t("shared.month")}`}
-          className={segClass("w-[1.6em]")}
-        />
-        <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
-        <input
-          ref={(el) => registerRef("y", el)}
-          value={segs.y}
-          onChange={(e) => onUpdate(side, "y", e.target.value)}
-          onKeyDown={(e) => onKeyDown(e, side, "y")}
-          onBlur={onBlur}
-          onFocus={(e) => e.target.select()}
-          inputMode="numeric"
-          maxLength={4}
-          placeholder={t("shared.yearAbbr")}
-          aria-label={`${label} ${t("shared.year")}`}
-          className={segClass("w-[3em]")}
-        />
+      <input
+        ref={(el) => registerRef("d", el)}
+        value={segs.d}
+        onChange={(e) => onUpdate(side, "d", e.target.value)}
+        onKeyDown={(e) => onKeyDown(e, side, "d")}
+        onBlur={onBlur}
+        onFocus={(e) => e.target.select()}
+        inputMode="numeric"
+        maxLength={2}
+        placeholder={t("shared.dayAbbr")}
+        aria-label={`${label} ${t("shared.day")}`}
+        className={segClass("w-[1.6em]")}
+      />
+      <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
+      <input
+        ref={(el) => registerRef("m", el)}
+        value={segs.m}
+        onChange={(e) => onUpdate(side, "m", e.target.value)}
+        onKeyDown={(e) => onKeyDown(e, side, "m")}
+        onBlur={onBlur}
+        onFocus={(e) => e.target.select()}
+        inputMode="numeric"
+        maxLength={2}
+        placeholder={t("shared.monthAbbr")}
+        aria-label={`${label} ${t("shared.month")}`}
+        className={segClass("w-[1.6em]")}
+      />
+      <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
+      <input
+        ref={(el) => registerRef("y", el)}
+        value={segs.y}
+        onChange={(e) => onUpdate(side, "y", e.target.value)}
+        onKeyDown={(e) => onKeyDown(e, side, "y")}
+        onBlur={onBlur}
+        onFocus={(e) => e.target.select()}
+        inputMode="numeric"
+        maxLength={4}
+        placeholder={t("shared.yearAbbr")}
+        aria-label={`${label} ${t("shared.year")}`}
+        className={segClass("w-[3em]")}
+      />
     </div>
   );
 }
@@ -456,32 +485,37 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
 // modifiers live in a separate `modifiersClassNames` prop.
 
 const DAY_PICKER_CLASSES = {
-  months:              "flex flex-col gap-6 sm:flex-row",
-  month:               "flex flex-col gap-3",
-  month_caption:       "flex items-center justify-center relative h-8",
-  caption_label:       "text-sm font-bold text-foreground capitalize",
-  nav:                 "flex items-center justify-between w-full absolute top-0 left-0 right-0 px-1",
-  button_previous:     "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-  button_next:         "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-  chevron:             "size-4 fill-current",
-  month_grid:          "w-full border-collapse",
-  weekdays:            "flex",
-  weekday:             "w-9 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pb-1.5",
-  weeks:               "flex flex-col gap-1",
-  week:                "flex w-full",
-  day:                 "size-9 p-0 text-center text-sm relative",
-  day_button:          "inline-flex size-9 cursor-pointer items-center justify-center rounded-md font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+  months: "flex flex-col gap-6 sm:flex-row",
+  month: "flex flex-col gap-3",
+  month_caption: "flex items-center justify-center relative h-8",
+  caption_label: "text-sm font-bold text-foreground capitalize",
+  nav: "flex items-center justify-between w-full absolute top-0 left-0 right-0 px-1",
+  button_previous:
+    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
+  button_next:
+    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
+  chevron: "size-4 fill-current",
+  month_grid: "w-full border-collapse",
+  weekdays: "flex",
+  weekday: "w-9 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pb-1.5",
+  weeks: "flex flex-col gap-1",
+  week: "flex w-full",
+  day: "size-9 p-0 text-center text-sm relative",
+  day_button:
+    "inline-flex size-9 cursor-pointer items-center justify-center rounded-md font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
 } as const;
 
 const DAY_PICKER_MODIFIERS = {
-  today:        "font-bold ring-1 ring-primary/40 ring-inset rounded-md",
-  outside:      "text-muted-foreground/40",
-  disabled:     "cursor-not-allowed opacity-30",
-  selected:     "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:hover:bg-primary/90 [&_button]:hover:text-primary-foreground",
-  range_start:  "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-r-none",
-  range_end:    "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-l-none",
-  range_middle: "[&_button]:bg-primary/15 [&_button]:text-foreground [&_button]:hover:bg-primary/20 [&_button]:hover:text-foreground [&_button]:rounded-none",
-  hidden:       "invisible",
+  today: "font-bold ring-1 ring-primary/40 ring-inset rounded-md",
+  outside: "text-muted-foreground/40",
+  disabled: "cursor-not-allowed opacity-30",
+  selected:
+    "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:hover:bg-primary/90 [&_button]:hover:text-primary-foreground",
+  range_start: "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-r-none",
+  range_end: "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-l-none",
+  range_middle:
+    "[&_button]:bg-primary/15 [&_button]:text-foreground [&_button]:hover:bg-primary/20 [&_button]:hover:text-foreground [&_button]:rounded-none",
+  hidden: "invisible",
 } as const;
 
 // ─── Shared popover styles ───────────────────────────────────────────────────
@@ -503,7 +537,7 @@ export const POPOVER_PANEL =
  *  near the viewport bottom (sticky pagination footer); default "bottom". */
 export const POPOVER_POSITION = {
   bottom: "top-full mt-1",
-  top:    "bottom-full mb-1",
+  top: "bottom-full mb-1",
 } as const;
 
 /** Horizontal anchor. "start" pins the panel's LEFT edge to the trigger's left
@@ -512,12 +546,11 @@ export const POPOVER_POSITION = {
  *  viewport's right edge so the panel doesn't clip off-screen. */
 export const POPOVER_ALIGN = {
   start: "left-0",
-  end:   "right-0",
+  end: "right-0",
 } as const;
 
 export const POPOVER_OPTION =
   "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-surface-subtle";
-
 
 // ─── SearchAutocomplete ──────────────────────────────────────────────────────
 
@@ -562,16 +595,13 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const groups = suggestions
-    ? (Object.entries(suggestions) as [keyof G, string[]][])
-    : [];
+  const groups = suggestions ? (Object.entries(suggestions) as [keyof G, string[]][]) : [];
   const hasAny = groups.some(([, items]) => items.length > 0);
 
   return (
@@ -590,23 +620,14 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
       />
       {open && draft.length >= 2 && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
-          {isLoading && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              {t("common.searching")}
-            </div>
-          )}
+          {isLoading && <div className="px-3 py-2 text-xs text-muted-foreground">{t("common.searching")}</div>}
           {!isLoading && !hasAny && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              {t("common.noResult")}
-            </div>
+            <div className="px-3 py-2 text-xs text-muted-foreground">{t("common.noResult")}</div>
           )}
           {!isLoading &&
             groups.map(([g, items]) =>
               items.length === 0 ? null : (
-                <div
-                  key={String(g)}
-                  className="border-b border-border last:border-0"
-                >
+                <div key={String(g)} className="border-b border-border last:border-0">
                   <div className="bg-surface-subtle px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {String(g)}
                   </div>
@@ -643,39 +664,25 @@ interface MultiSelectPopoverProps {
   onChange: (next: string[]) => void;
 }
 
-export function MultiSelectPopover({
-  label,
-  options,
-  selected,
-  onChange,
-}: MultiSelectPopoverProps) {
+export function MultiSelectPopover({ label, options, selected, onChange }: MultiSelectPopoverProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
   const toggle = (opt: string) =>
-    onChange(
-      selected.includes(opt)
-        ? selected.filter((s) => s !== opt)
-        : [...selected, opt],
-    );
+    onChange(selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt]);
 
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={POPOVER_TRIGGER}
-      >
+      <button type="button" onClick={() => setOpen(!open)} className={POPOVER_TRIGGER}>
         {label}
         {selected.length > 0 && (
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
@@ -687,9 +694,7 @@ export function MultiSelectPopover({
       {open && (
         <div className={cn(POPOVER_PANEL, POPOVER_POSITION.bottom, POPOVER_ALIGN.start)}>
           {options.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              {t("shared.noOption")}
-            </div>
+            <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>
           )}
           {options.map((opt) => {
             const checked = selected.includes(opt);
@@ -722,13 +727,7 @@ export function MultiSelectPopover({
 
 // ─── FilterPill ──────────────────────────────────────────────────────────────
 
-export function FilterPill({
-  children,
-  onRemove,
-}: {
-  children: ReactNode;
-  onRemove: () => void;
-}) {
+export function FilterPill({ children, onRemove }: { children: ReactNode; onRemove: () => void }) {
   const t = useT();
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs">
@@ -839,21 +838,9 @@ export function FilterBar<V extends string = string>({
           />
         )}
 
-        {dateRange && (
-          <DateRangePopover
-            from={dateRange.from}
-            to={dateRange.to}
-            onChange={dateRange.onChange}
-          />
-        )}
+        {dateRange && <DateRangePopover from={dateRange.from} to={dateRange.to} onChange={dateRange.onChange} />}
 
-        {segment && (
-          <CategorySegment<V>
-            value={segment.value}
-            options={segment.options}
-            onChange={segment.onChange}
-          />
-        )}
+        {segment && <CategorySegment<V> value={segment.value} options={segment.options} onChange={segment.onChange} />}
 
         {multiSelects?.map((ms) => (
           <MultiSelectPopover
@@ -892,13 +879,7 @@ export function FilterBar<V extends string = string>({
                 );
               }
               return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={a.onClick}
-                  disabled={a.disabled}
-                  className={cls}
-                >
+                <button key={i} type="button" onClick={a.onClick} disabled={a.disabled} className={cls}>
                   {a.icon}
                   {a.label}
                 </button>

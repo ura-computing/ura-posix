@@ -11,7 +11,6 @@ import {
 
 import { formatRelative } from "../_format";
 
-
 /** TAB 1 — DEMANDE.
  *
  *  Three mutually exclusive states:
@@ -25,18 +24,17 @@ import { formatRelative } from "../_format";
 
 export interface DemandeTabProps {
   /** The single active (non-closed) request, or null. */
-  activeRequest:      WebsiteRequest | null;
+  activeRequest: WebsiteRequest | null;
   /** Past Clôturée requests for the "Vos sites précédents" rail. */
-  pastRequests:       PastRequest[];
-  isLoading?:         boolean;
+  pastRequests: PastRequest[];
+  isLoading?: boolean;
   /** Inline error when trying to create while one is already active. */
   createBlockedError?: string | null;
-  onCreate:           () => void;
-  onEdit:             (requestId: string) => void;
-  onCancel:           (requestId: string) => void;
-  onReuse:            (pastRequestId: string) => void;
+  onCreate: () => void;
+  onEdit: (requestId: string) => void;
+  onCancel: (requestId: string) => void;
+  onReuse: (pastRequestId: string) => void;
 }
-
 
 export function DemandeTab({
   activeRequest,
@@ -64,7 +62,6 @@ export function DemandeTab({
   );
 }
 
-
 function Hero({ onCreate, error }: { onCreate: () => void; error?: string | null }) {
   return (
     <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-card p-10 text-center">
@@ -91,7 +88,6 @@ function Hero({ onCreate, error }: { onCreate: () => void; error?: string | null
     </div>
   );
 }
-
 
 function PastRequestsRail({ items, onReuse }: { items: PastRequest[]; onReuse: (id: string) => void }) {
   return (
@@ -131,18 +127,17 @@ function PastRequestsRail({ items, onReuse }: { items: PastRequest[]; onReuse: (
   );
 }
 
-
 function ActiveRequestCard({
   request,
   onEdit,
   onCancel,
 }: {
   request: WebsiteRequest;
-  onEdit:   (id: string) => void;
+  onEdit: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
   const reachedIndex = REQUEST_STATE_ORDER.indexOf(request.state);
-  const canEdit   = request.state === "soumise";
+  const canEdit = request.state === "soumise";
   const delivered = request.state === "livree" || request.state === "cloturee";
 
   return (
@@ -176,9 +171,9 @@ function ActiveRequestCard({
       {/* Timeline */}
       <ol className="flex flex-col gap-0 sm:flex-row sm:items-start">
         {REQUEST_STATE_ORDER.map((state, i) => {
-          const done    = i < reachedIndex;
+          const done = i < reachedIndex;
           const current = i === reachedIndex;
-          const step    = request.timeline.find((s) => s.state === state);
+          const step = request.timeline.find((s) => s.state === state);
           return (
             <li key={state} className="flex flex-1 gap-3 sm:flex-col sm:items-center sm:text-center">
               <div className="flex flex-col items-center sm:w-full sm:flex-row">

@@ -1,5 +1,6 @@
 """Catalogue (admin only): medicaments CRUD + filtered list, category suffixes.
 The catalogue CSV import is POST /uploads/catalog (routers/imports.py)."""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -45,30 +46,30 @@ MedIdPath = Annotated[int, Path(ge=1, description="Medicament id")]
 
 
 _SORTABLE = {
-    "product":     Medicament.product,
-    "category":    Medicament.category,
-    "ppv":         Medicament.ppv,
-    "pph":         Medicament.pph,
+    "product": Medicament.product,
+    "category": Medicament.category,
+    "ppv": Medicament.ppv,
+    "pph": Medicament.pph,
     "laboratoire": Medicament.laboratoire,
-    "tva":         Medicament.tva,
+    "tva": Medicament.tva,
 }
 
 
 def _row(m: Medicament) -> dict:
     return {
-        "id":           m.id,
-        "pid":          m.pid,
-        "product":      m.product,
-        "tva":          m.tva,
-        "pph":          m.pph,
-        "ppv":          m.ppv,
-        "category":     m.category,
-        "barcode1":     m.barcode1,
-        "barcode2":     m.barcode2,
-        "laboratoire":  m.laboratoire,
+        "id": m.id,
+        "pid": m.pid,
+        "product": m.product,
+        "tva": m.tva,
+        "pph": m.pph,
+        "ppv": m.ppv,
+        "category": m.category,
+        "barcode1": m.barcode1,
+        "barcode2": m.barcode2,
+        "laboratoire": m.laboratoire,
         "product_type": m.product_type,
-        "created_at":   m.created_at.isoformat() if m.created_at else "",
-        "updated_at":   m.updated_at.isoformat() if m.updated_at else None,
+        "created_at": m.created_at.isoformat() if m.created_at else "",
+        "updated_at": m.updated_at.isoformat() if m.updated_at else None,
     }
 
 
@@ -95,14 +96,14 @@ def list_catalog_categories(db: DbDep) -> list[str]:
 
 @router.get("/admin/catalog", response_model=CatalogListResponse)
 def list_catalog(
-    db:   DbDep,
-    search:     Annotated[str | None, Query()]   = None,
-    category:   Annotated[list[str], Query()]    = [],
-    type:       Annotated[str | None, Query()]   = None,    # pharmacie | parapharmacie
-    sort_by:    Annotated[str, Query()]          = "product",
-    sort_order: Annotated[str, Query()]          = "asc",
-    page:       Annotated[int, Query(ge=1)]      = 1,
-    limit:      Annotated[int, Query(ge=1, le=500)] = 25,
+    db: DbDep,
+    search: Annotated[str | None, Query()] = None,
+    category: Annotated[list[str], Query()] = [],
+    type: Annotated[str | None, Query()] = None,  # pharmacie | parapharmacie
+    sort_by: Annotated[str, Query()] = "product",
+    sort_order: Annotated[str, Query()] = "asc",
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=500)] = 25,
 ) -> dict:
     """Paginated + filtered + sortable catalog list."""
     q = db.query(Medicament)
@@ -123,16 +124,17 @@ def list_catalog(
     q = q.order_by(desc(col) if sort_order == "desc" else asc(col))
 
     total = q.count()
-    rows  = q.offset((page - 1) * limit).limit(limit).all()
+    rows = q.offset((page - 1) * limit).limit(limit).all()
     return {
-        "data":       [_row(m) for m in rows],
+        "data": [_row(m) for m in rows],
         "pagination": paginate(total, page, limit),
     }
 
 
 @router.post("/admin/catalog", response_model=MedicamentRow, status_code=201)
 def create_medicament(
-    body: MedicamentCreate, db: DbDep,
+    body: MedicamentCreate,
+    db: DbDep,
 ) -> dict:
     """Create a new Medicament. PID is derived from `barcode1` (if present) else
     a normalized product name. Returns 409 if PID already exists."""
@@ -142,23 +144,33 @@ def create_medicament(
         raise ApiError(400, ErrorCode.PRODUCT_NAME_REQUIRED, "Nom de produit requis")
     if db.query(Medicament).filter(Medicament.pid == pid).first():
         raise ApiError(
-            409, ErrorCode.MEDICAMENT_EXISTS,
+            409,
+            ErrorCode.MEDICAMENT_EXISTS,
             f"Un médicament avec ce code/nom existe déjà (pid={pid})",
             pid=pid,
         )
     m = Medicament(
-        pid=pid, product=body.product.strip(),
-        tva=body.tva, pph=body.pph, ppv=body.ppv,
-        category=body.category, barcode1=body.barcode1, barcode2=body.barcode2,
-        laboratoire=body.laboratoire, product_type=body.product_type,
+        pid=pid,
+        product=body.product.strip(),
+        tva=body.tva,
+        pph=body.pph,
+        ppv=body.ppv,
+        category=body.category,
+        barcode1=body.barcode1,
+        barcode2=body.barcode2,
+        laboratoire=body.laboratoire,
+        product_type=body.product_type,
     )
-    db.add(m); db.commit(); db.refresh(m)
+    db.add(m)
+    db.commit()
+    db.refresh(m)
     return _row(m)
 
 
 @router.put("/admin/catalog/{med_id}", response_model=MedicamentRow)
 def update_medicament(
-    med_id: MedIdPath, body: MedicamentUpdate,
+    med_id: MedIdPath,
+    body: MedicamentUpdate,
     db: DbDep,
 ) -> dict:
     """PATCH-like update: only the keys present in `body` overwrite."""
@@ -168,7 +180,8 @@ def update_medicament(
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(m, k, v)
-    db.commit(); db.refresh(m)
+    db.commit()
+    db.refresh(m)
     return _row(m)
 
 
@@ -183,10 +196,12 @@ def delete_medicament(med_id: MedIdPath, db: DbDep) -> None:
     for model in (Vente, Achat, PharmacyStock, PharmacyMedicamentStatus):
         if db.query(model.id).filter(model.medicament_id == med_id).first() is not None:
             raise ApiError(
-                409, ErrorCode.MEDICAMENT_IN_USE,
+                409,
+                ErrorCode.MEDICAMENT_IN_USE,
                 "Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible.",
             )
-    db.delete(m); db.commit()
+    db.delete(m)
+    db.commit()
 
 
 # ═══ Category suffixes ═══════════════════════════════════════════════════════
@@ -201,6 +216,7 @@ def delete_medicament(med_id: MedIdPath, db: DbDep) -> None:
 # admins manage via CLI or direct HTTP.
 #
 # Allowed `color` values mirror the frontend's SuffixBadge palette.
+
 
 @router.get("/category-suffixes", response_model=list[CategorySuffixOut])
 def list_category_suffixes(db: DbDep) -> list[CategorySuffix]:
@@ -217,7 +233,8 @@ def _suffix_taken(db, category: str, except_id: int | None = None) -> bool:
 def create_category_suffix(body: CategorySuffixIn, db: DbDep) -> CategorySuffix:
     if _suffix_taken(db, body.category):
         raise ApiError(
-            409, ErrorCode.SUFFIX_EXISTS,
+            409,
+            ErrorCode.SUFFIX_EXISTS,
             f"La catégorie « {body.category} » a déjà un suffixe.",
             category=body.category,
         )
@@ -231,21 +248,22 @@ def create_category_suffix(body: CategorySuffixIn, db: DbDep) -> CategorySuffix:
 @router.put("/category-suffixes/{suffix_id}", response_model=CategorySuffixOut)
 def update_category_suffix(
     suffix_id: Annotated[int, Path(ge=1)],
-    body:      CategorySuffixIn,
-    db:        DbDep,
+    body: CategorySuffixIn,
+    db: DbDep,
 ) -> CategorySuffix:
     row = db.get(CategorySuffix, suffix_id)
     if row is None:
         raise ApiError(404, ErrorCode.SUFFIX_NOT_FOUND, "Suffixe introuvable.")
     if _suffix_taken(db, body.category, except_id=row.id):
         raise ApiError(
-            409, ErrorCode.SUFFIX_EXISTS,
+            409,
+            ErrorCode.SUFFIX_EXISTS,
             f"La catégorie « {body.category} » a déjà un suffixe.",
             category=body.category,
         )
     row.category = body.category
-    row.suffix   = body.suffix
-    row.color    = body.color
+    row.suffix = body.suffix
+    row.color = body.color
     db.commit()
     db.refresh(row)
     return row
@@ -254,7 +272,7 @@ def update_category_suffix(
 @router.delete("/category-suffixes/{suffix_id}", status_code=204)
 def delete_category_suffix(
     suffix_id: Annotated[int, Path(ge=1)],
-    db:        DbDep,
+    db: DbDep,
 ) -> None:
     row = db.get(CategorySuffix, suffix_id)
     if row is None:

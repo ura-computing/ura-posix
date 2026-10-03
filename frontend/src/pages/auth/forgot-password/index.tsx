@@ -41,7 +41,11 @@ export default function ForgotPasswordPage() {
     resolver: zodResolver(forgotSchema),
     defaultValues: { email: "" },
   });
-  const { register, handleSubmit: rhfHandleSubmit, formState: { errors } } = form;
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+  } = form;
   const handleForgotSubmit = rhfHandleSubmit((data) => handleForgot(data));
 
   if (isSuccess) {
@@ -52,12 +56,8 @@ export default function ForgotPasswordPage() {
             <Check className="size-[30px]" strokeWidth={2.4} aria-hidden />
           </span>
           <div className="flex flex-col gap-2">
-            <h2 className="text-xl font-semibold tracking-tight text-foreground">
-              {t("auth.checkInbox")}
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {t("auth.checkInboxDesc")}
-            </p>
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">{t("auth.checkInbox")}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">{t("auth.checkInboxDesc")}</p>
           </div>
           <BackToLogin />
         </div>
@@ -69,12 +69,8 @@ export default function ForgotPasswordPage() {
     <AuthLayout>
       <div className="flex w-full max-w-[360px] flex-col gap-6">
         <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {t("auth.forgotTitle")}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {t("auth.forgotDesc")}
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("auth.forgotTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("auth.forgotDesc")}</p>
         </header>
 
         <form className="flex flex-col gap-6" onSubmit={handleForgotSubmit} noValidate>

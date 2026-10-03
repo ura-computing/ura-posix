@@ -1,6 +1,6 @@
 interface Props {
   className?: string;
-  size?:      number;
+  size?: number;
   ariaHidden?: boolean;
 }
 

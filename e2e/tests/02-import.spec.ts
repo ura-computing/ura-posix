@@ -53,8 +53,7 @@ test.describe("imports", () => {
             got.chunks += 1;
             got.batchId = body.batch_id;
             got.inserted += body.inserted;
-            got.skipped +=
-              type === "stock" ? body.skipped_unknown.length : body.skipped;
+            got.skipped += type === "stock" ? body.skipped_unknown.length : body.skipped;
             got.newMeds += body.new_medicaments.count;
           })(),
         );
@@ -88,21 +87,15 @@ test.describe("imports", () => {
       await Promise.all(pending);
       expect(got.errors, "chunk errors").toEqual([]);
       expect(title, "result card").toMatch(/lignes importées$/);
-      expect(title.replace(/\D/g, ""), "rows shown on the result card").toBe(
-        String(want.inserted),
-      );
+      expect(title.replace(/\D/g, ""), "rows shown on the result card").toBe(String(want.inserted));
       expect(got.inserted, "inserted rows").toBe(want.inserted);
-      expect(got.skipped, "skipped rows").toBe(
-        type === "stock" ? want.skipped_unknown : want.skipped,
-      );
+      expect(got.skipped, "skipped rows").toBe(type === "stock" ? want.skipped_unknown : want.skipped);
       expect(got.newMeds, "new products").toBe(want.new_medicaments);
       saveState({ [`batch_${kind}`]: got.batchId }); // rows' import_batch_id in later checks
-      test
-        .info()
-        .annotations.push({
-          type: "import",
-          description: `${kind}: ${got.inserted} rows · ${got.chunks} chunks · ${(ms / 1000).toFixed(1)} s`,
-        });
+      test.info().annotations.push({
+        type: "import",
+        description: `${kind}: ${got.inserted} rows · ${got.chunks} chunks · ${(ms / 1000).toFixed(1)} s`,
+      });
     });
   }
 });

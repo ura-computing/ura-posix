@@ -31,12 +31,7 @@ import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
 import { TabBar } from "@/_components/TabBar";
 import { useMe } from "@/hooks/useMe";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import {
-  ROLES,
-  ROUTES,
-  type MarginAlertsResponse,
-  type TvaSummary,
-} from "@/types";
+import { ROLES, ROUTES, type MarginAlertsResponse, type TvaSummary } from "@/types";
 import type {
   CategoryType,
   Feature,
@@ -81,9 +76,7 @@ import { AnimatePresence, motion } from "framer-motion";
  *  month. Pure CSS bars — no chart lib dep. Reused styling vocabulary
  *  ("var(--info)" / "var(--muted-foreground)") so it tracks the theme. */
 
-function AdminMonthlyTrendChart({
-  data, subtitle,
-}: { data: MonthlyTrendPoint[]; subtitle: string }) {
+function AdminMonthlyTrendChart({ data, subtitle }: { data: MonthlyTrendPoint[]; subtitle: string }) {
   const t = useT();
   const max = Math.max(1, ...data.flatMap((d) => [d.ventes, d.achats]));
 
@@ -105,15 +98,17 @@ function AdminMonthlyTrendChart({
           <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
             {t("rapportAdmin.aucuneDonneeMensuelle")}
           </div>
-        ) : data.map((d, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-            <div className="flex h-full w-full items-end justify-center gap-[3px]">
-              <Bar heightPct={(d.ventes  / max) * 100} color="var(--info)" />
-              <Bar heightPct={(d.achats  / max) * 100} color="var(--muted-foreground)" muted />
+        ) : (
+          data.map((d, i) => (
+            <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+              <div className="flex h-full w-full items-end justify-center gap-[3px]">
+                <Bar heightPct={(d.ventes / max) * 100} color="var(--info)" />
+                <Bar heightPct={(d.achats / max) * 100} color="var(--muted-foreground)" muted />
+              </div>
+              <span className="font-mono text-[10px] text-muted-foreground">{d.label}</span>
             </div>
-            <span className="font-mono text-[10px] text-muted-foreground">{d.label}</span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -142,7 +137,7 @@ function AdminLegend({ color, label }: { color: string; label: string }) {
  *  selected per tab. Built on the shared DataTable. */
 
 const buildTabs = (t: TFn): { id: MargeMode; label: string }[] => [
-  { id: "produit",   label: t("rapportAdmin.tabParProduit") },
+  { id: "produit", label: t("rapportAdmin.tabParProduit") },
   { id: "categorie", label: t("rapportAdmin.tabParCategorie") },
   { id: "grossiste", label: t("rapportAdmin.tabParGrossiste") },
 ];
@@ -169,40 +164,101 @@ function pct(v: unknown): string {
 function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
   if (mode === "produit") {
     return [
-      { key: "product",   label: t("col.produit"),                 sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["product"] ?? "—")}</span> },
-      { key: "category",  label: t("col.categorie"),               sortable: false, render: (r) => <span className="text-muted-foreground">{String(r["category"] ?? "—")}</span> },
-      { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-      { key: "ventes",    label: t("rapportAdmin.ventesMad"),      sortable: false, align: "right", render: (r) => mad(r["ca"]) },
-      { key: "ppv",       label: t("col.ppv"),                     sortable: false, align: "right", render: (r) => mad(r["ppv"]) },
-      { key: "marge_pct", label: t("col.margePct"),                sortable: false, align: "right", render: (r) => pct(r["marge_pct"]) },
-      { key: "marge_dh",  label: t("col.margeDh"),                 sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
-      { key: "tva",       label: t("col.tva"),                     sortable: false, render: (r) => <span className="text-muted-foreground">{String(r["tva"] ?? "—")}</span> },
+      {
+        key: "product",
+        label: t("col.produit"),
+        sortable: false,
+        render: (r) => <span className="font-semibold text-foreground">{String(r["product"] ?? "—")}</span>,
+      },
+      {
+        key: "category",
+        label: t("col.categorie"),
+        sortable: false,
+        render: (r) => <span className="text-muted-foreground">{String(r["category"] ?? "—")}</span>,
+      },
+      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
+      {
+        key: "ventes",
+        label: t("rapportAdmin.ventesMad"),
+        sortable: false,
+        align: "right",
+        render: (r) => mad(r["ca"]),
+      },
+      { key: "ppv", label: t("col.ppv"), sortable: false, align: "right", render: (r) => mad(r["ppv"]) },
+      {
+        key: "marge_pct",
+        label: t("col.margePct"),
+        sortable: false,
+        align: "right",
+        render: (r) => pct(r["marge_pct"]),
+      },
+      { key: "marge_dh", label: t("col.margeDh"), sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
+      {
+        key: "tva",
+        label: t("col.tva"),
+        sortable: false,
+        render: (r) => <span className="text-muted-foreground">{String(r["tva"] ?? "—")}</span>,
+      },
     ];
   }
   if (mode === "categorie") {
     return [
-      { key: "category",  label: t("col.categorie"),               sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["category"] ?? "—")}</span> },
-      { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-      { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ca"]) },
-      { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct_avg"]) },
-      { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh_avg"]) },
+      {
+        key: "category",
+        label: t("col.categorie"),
+        sortable: false,
+        render: (r) => <span className="font-semibold text-foreground">{String(r["category"] ?? "—")}</span>,
+      },
+      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
+      { key: "ventes", label: t("rapportAdmin.caMad"), sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+      {
+        key: "marge_pct",
+        label: t("rapportAdmin.margePctMoy"),
+        sortable: false,
+        align: "right",
+        render: (r) => pct(r["marge_pct_avg"]),
+      },
+      {
+        key: "marge_dh",
+        label: t("rapportAdmin.margeDhMoy"),
+        sortable: false,
+        align: "right",
+        render: (r) => mad(r["marge_dh_avg"]),
+      },
     ];
   }
   // grossiste
   return [
-    { key: "grossiste", label: t("col.grossiste"),               sortable: false, render: (r) => <span className="font-semibold text-foreground">{String(r["grossiste"] ?? "—")}</span> },
-    { key: "qty",       label: t("col.qte"),                     sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-    { key: "ventes",    label: t("rapportAdmin.caMad"),          sortable: false, align: "right", render: (r) => mad(r["ca"]) },
-    { key: "marge_pct", label: t("rapportAdmin.margePctMoy"),    sortable: false, align: "right", render: (r) => pct(r["marge_pct_avg"]) },
-    { key: "marge_dh",  label: t("rapportAdmin.margeDhMoy"),     sortable: false, align: "right", render: (r) => mad(r["marge_dh_avg"]) },
+    {
+      key: "grossiste",
+      label: t("col.grossiste"),
+      sortable: false,
+      render: (r) => <span className="font-semibold text-foreground">{String(r["grossiste"] ?? "—")}</span>,
+    },
+    { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
+    { key: "ventes", label: t("rapportAdmin.caMad"), sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+    {
+      key: "marge_pct",
+      label: t("rapportAdmin.margePctMoy"),
+      sortable: false,
+      align: "right",
+      render: (r) => pct(r["marge_pct_avg"]),
+    },
+    {
+      key: "marge_dh",
+      label: t("rapportAdmin.margeDhMoy"),
+      sortable: false,
+      align: "right",
+      render: (r) => mad(r["marge_dh_avg"]),
+    },
   ];
 }
 
 interface MarginAnalysisTableProps {
-  mode:         MargeMode;
+  mode: MargeMode;
   onModeChange: (mode: MargeMode) => void;
-  rows:         Row[];
-  isLoading?:   boolean;
+  rows: Row[];
+  isLoading?: boolean;
 }
 
 function MarginAnalysisTable({ mode, onModeChange, rows, isLoading }: MarginAnalysisTableProps) {
@@ -252,25 +308,37 @@ const fmtDateRaw = (s: string | undefined): string => s ?? "—";
 const TOP_CAT_COLORS = ["#0E9E8C", "#1D6FB8", "#4F56C9", "#B7791F", "#D6447B"];
 
 interface AdminPharmacyBodyProps {
-  stats:          StatsResponse;
-  pharmacyLabel:  string;
-  categoryType:   "all" | "pharmacie" | "parapharmacie";
-  marginMode:     MargeMode;
-  onMarginMode:   (m: MargeMode) => void;
-  marginRows:     Record<string, unknown>[];
-  marginLoading:  boolean;
-  subtitleDates:  string;
-  alerts?:        MarginAlertsResponse;
-  stock?:         StockSummaryResponse;
+  stats: StatsResponse;
+  pharmacyLabel: string;
+  categoryType: "all" | "pharmacie" | "parapharmacie";
+  marginMode: MargeMode;
+  onMarginMode: (m: MargeMode) => void;
+  marginRows: Record<string, unknown>[];
+  marginLoading: boolean;
+  subtitleDates: string;
+  alerts?: MarginAlertsResponse;
+  stock?: StockSummaryResponse;
 }
 
 function AdminPharmacyBody({
-  stats, pharmacyLabel, categoryType, marginMode, onMarginMode, marginRows, marginLoading, subtitleDates, alerts, stock,
+  stats,
+  pharmacyLabel,
+  categoryType,
+  marginMode,
+  onMarginMode,
+  marginRows,
+  marginLoading,
+  subtitleDates,
+  alerts,
+  stock,
 }: AdminPharmacyBodyProps) {
   const t = useT();
-  const catLabel = categoryType === "pharmacie" ? t("category.pharmacie")
-    : categoryType === "parapharmacie" ? t("category.parapharmacie")
-    : t("category.mixte");
+  const catLabel =
+    categoryType === "pharmacie"
+      ? t("category.pharmacie")
+      : categoryType === "parapharmacie"
+        ? t("category.parapharmacie")
+        : t("category.mixte");
 
   // Revenue delta vs previous period (simple %; backend doesn't pre-compute it).
   const rev = stats.kpis.ventes_total;
@@ -348,7 +416,11 @@ function AdminPharmacyBody({
           />
           <KpiTile
             label={t("rapportAdmin.meilleureJourneeOpe")}
-            value={stats.advanced_kpis.best_day_count ? `${fmtCount(stats.advanced_kpis.best_day_count.count)} ${t("rapportAdmin.opeUnit")}` : "—"}
+            value={
+              stats.advanced_kpis.best_day_count
+                ? `${fmtCount(stats.advanced_kpis.best_day_count.count)} ${t("rapportAdmin.opeUnit")}`
+                : "—"
+            }
             sub={fmtDateRaw(stats.advanced_kpis.best_day_count?.date)}
             icon={<CalendarCheck className="size-4.5" />}
             iconTone="emerald"
@@ -362,7 +434,11 @@ function AdminPharmacyBody({
           />
           <KpiTile
             label={t("rapportAdmin.moinsBonneJourneeOpe")}
-            value={stats.advanced_kpis.worst_day_count ? `${fmtCount(stats.advanced_kpis.worst_day_count.count)} ${t("rapportAdmin.opeUnit")}` : "—"}
+            value={
+              stats.advanced_kpis.worst_day_count
+                ? `${fmtCount(stats.advanced_kpis.worst_day_count.count)} ${t("rapportAdmin.opeUnit")}`
+                : "—"
+            }
             sub={fmtDateRaw(stats.advanced_kpis.worst_day_count?.date)}
             icon={<CalendarX className="size-4.5" />}
             iconTone="rose"
@@ -400,9 +476,22 @@ function AdminPharmacyBody({
       <section className="flex flex-col gap-3.5">
         <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.marge")}</h2>
         <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <MargeCell label={t("col.margePct")}                value={fmtPct(stats.marge.marge_pct)}      sub={t("rapportAdmin.moyennePonderee")} />
-          <MargeCell label={t("rapportAdmin.margeBruteDh")}   value={fmtMad(stats.marge.marge_brute_dh)} sub={t("rapportAdmin.avantCharges")} />
-          <MargeCell label={t("rapportAdmin.margeNetteDh")}   value={fmtMad(stats.marge.marge_nette_dh)} sub={t("rapportAdmin.apresCharges")}  emphasis />
+          <MargeCell
+            label={t("col.margePct")}
+            value={fmtPct(stats.marge.marge_pct)}
+            sub={t("rapportAdmin.moyennePonderee")}
+          />
+          <MargeCell
+            label={t("rapportAdmin.margeBruteDh")}
+            value={fmtMad(stats.marge.marge_brute_dh)}
+            sub={t("rapportAdmin.avantCharges")}
+          />
+          <MargeCell
+            label={t("rapportAdmin.margeNetteDh")}
+            value={fmtMad(stats.marge.marge_nette_dh)}
+            sub={t("rapportAdmin.apresCharges")}
+            emphasis
+          />
         </div>
       </section>
 
@@ -415,12 +504,7 @@ function AdminPharmacyBody({
       )}
 
       {/* 2e — Analyse de marge */}
-      <MarginAnalysisTable
-        mode={marginMode}
-        onModeChange={onMarginMode}
-        rows={marginRows}
-        isLoading={marginLoading}
-      />
+      <MarginAnalysisTable mode={marginMode} onModeChange={onMarginMode} rows={marginRows} isLoading={marginLoading} />
 
       {/* Stock — same tiles as the owner's Rapport, without links */}
       {stock && (
@@ -453,7 +537,10 @@ function AdminPharmacyBody({
                     <span className="font-mono text-[13px] font-semibold tabular-nums">{fmtMad(c.total)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
-                    <span className="block h-full rounded-full" style={{ width: `${(c.total / max) * 100}%`, background: color }} />
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${(c.total / max) * 100}%`, background: color }}
+                    />
                   </div>
                 </div>
               );
@@ -469,7 +556,9 @@ function MargeCell({ label, value, sub, emphasis }: { label: string; value: stri
   return (
     <div className="flex flex-col gap-1.5 p-5">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className={`font-mono text-2xl font-bold tabular-nums tracking-tight ${emphasis ? "text-success" : "text-foreground"}`}>
+      <span
+        className={`font-mono text-2xl font-bold tabular-nums tracking-tight ${emphasis ? "text-success" : "text-foreground"}`}
+      >
         {value}
       </span>
       <span className="text-[11.5px] text-muted-foreground">{sub}</span>
@@ -512,13 +601,21 @@ function AdminSystemTiles({ stats }: { stats: AdminStatsResponse }) {
  * plus a dashed CTA card linking out.
  */
 
-function AnalyseMargePreview({ stats, filters, tint = "all" }: { stats: StatsResponse; filters: StatsFilters; tint?: CategoryType }) {
+function AnalyseMargePreview({
+  stats,
+  filters,
+  tint = "all",
+}: {
+  stats: StatsResponse;
+  filters: StatsFilters;
+  tint?: CategoryType;
+}) {
   const t = useT();
-  const ca       = stats.kpis.ventes_total;
+  const ca = stats.kpis.ventes_total;
   const margePct = stats.marge.marge_pct;
   // Single source of truth: the backend reconciles marge_brute_dh to the full CA
   // (marge_brute_dh / CA == marge_pct), so every margin display reads the same value.
-  const margeDh  = stats.marge.marge_brute_dh;
+  const margeDh = stats.marge.marge_brute_dh;
 
   return (
     <section className="flex flex-col gap-3">
@@ -527,9 +624,19 @@ function AnalyseMargePreview({ stats, filters, tint = "all" }: { stats: StatsRes
       </h2>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile label={t("kpi.ca")} value={formatMAD(ca)}                icon={<Coins      className="size-5" />} tint={tint} />
-        <KpiTile label={t("kpi.margeMoyPct")}  value={formatPct(margePct)}   icon={<Percent    className="size-5" />} tint={tint} />
-        <KpiTile label={t("kpi.margeMoyDh")} value={formatMAD(margeDh)}          icon={<TrendingUp className="size-5" />} tint={tint} />
+        <KpiTile label={t("kpi.ca")} value={formatMAD(ca)} icon={<Coins className="size-5" />} tint={tint} />
+        <KpiTile
+          label={t("kpi.margeMoyPct")}
+          value={formatPct(margePct)}
+          icon={<Percent className="size-5" />}
+          tint={tint}
+        />
+        <KpiTile
+          label={t("kpi.margeMoyDh")}
+          value={formatMAD(margeDh)}
+          icon={<TrendingUp className="size-5" />}
+          tint={tint}
+        />
         <OptimisationTile filters={filters} tint={tint} />
       </div>
 
@@ -561,21 +668,25 @@ function OptimisationTile({ filters, tint }: { filters: StatsFilters; tint: Cate
 function CtaCard({ tint }: { tint: CategoryType }) {
   const t = useT();
   // CtaCard keeps its dashed border but adopts the category's bg tint.
-  const dashedTint = tint === "pharmacie"
-    ? "border-pharmacie-border bg-pharmacie-bg/30"
-    : tint === "parapharmacie"
-    ? "border-parapharmacie-border bg-parapharmacie-bg/30"
-    : "border-border bg-surface-subtle/30";
+  const dashedTint =
+    tint === "pharmacie"
+      ? "border-pharmacie-border bg-pharmacie-bg/30"
+      : tint === "parapharmacie"
+        ? "border-parapharmacie-border bg-parapharmacie-bg/30"
+        : "border-border bg-surface-subtle/30";
   return (
-    <div className={cn("flex flex-col gap-3 rounded-2xl border-2 border-dashed p-5 sm:flex-row sm:items-center sm:gap-4", dashedTint)}>
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-2xl border-2 border-dashed p-5 sm:flex-row sm:items-center sm:gap-4",
+        dashedTint,
+      )}
+    >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <UploadCloud className="size-5" />
       </div>
       <div className="flex-1">
         <h3 className="text-base font-semibold text-foreground">{t("preview.personalTitle")}</h3>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {t("preview.personalDesc")}
-        </p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{t("preview.personalDesc")}</p>
       </div>
       <Link
         to={ROUTES.ANALYSES}
@@ -598,15 +709,21 @@ function CtaCard({ tint }: { tint: CategoryType }) {
  */
 
 const PALETTE = [
-  "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",
-  "var(--chart-5)", "var(--chart-6)", "var(--chart-7)", "var(--chart-8)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
 ];
 
-const SIZE   = 220;             // SVG viewport (square)
+const SIZE = 220; // SVG viewport (square)
 const CENTER = SIZE / 2;
-const OUTER  = 96;              // outer radius
-const INNER  = 70;              // inner radius (donut hole)
-const GAP    = 0.012;           // gap between segments in radians (≈ 0.7°)
+const OUTER = 96; // outer radius
+const INNER = 70; // inner radius (donut hole)
+const GAP = 0.012; // gap between segments in radians (≈ 0.7°)
 
 function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategoryRow[]; tint?: CategoryType }) {
   const t = useT();
@@ -618,7 +735,7 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
     );
   }
 
-  const total   = categories.reduce((s, c) => s + c.total, 0);
+  const total = categories.reduce((s, c) => s + c.total, 0);
   const maxTotal = Math.max(...categories.map((c) => c.total), 1);
 
   // Build donut arcs around the circle (start at 12 o'clock). Slices smaller than
@@ -628,9 +745,9 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
   const arcs = categories.reduce<{ start: number; out: { i: number; draw: boolean; path: string }[] }>(
     (acc, c, i) => {
       const share = total ? c.total / total : 0;
-      const full  = share * Math.PI * 2;
+      const full = share * Math.PI * 2;
       const sweep = Math.max(full - GAP, 0);
-      const a0    = acc.start;
+      const a0 = acc.start;
       acc.out.push({ i, draw: sweep > 0.003, path: arcPath(a0, a0 + sweep) });
       return {
         start: a0 + full,
@@ -645,11 +762,28 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
       <div className="flex flex-col items-center gap-6 lg:flex-row lg:items-center">
         {/* Donut */}
         <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="shrink-0" aria-hidden>
-          {arcs.map(({ i, draw, path }) => (draw ? <path key={i} d={path} fill={PALETTE[i % PALETTE.length]} /> : null))}
-          <text x={CENTER} y={CENTER - 4} textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--foreground)" fontFamily="JetBrains Mono, monospace">
+          {arcs.map(({ i, draw, path }) =>
+            draw ? <path key={i} d={path} fill={PALETTE[i % PALETTE.length]} /> : null,
+          )}
+          <text
+            x={CENTER}
+            y={CENTER - 4}
+            textAnchor="middle"
+            fontSize="15"
+            fontWeight="600"
+            fill="var(--foreground)"
+            fontFamily="JetBrains Mono, monospace"
+          >
             {formatNumStr(total, 2)}
           </text>
-          <text x={CENTER} y={CENTER + 15} textAnchor="middle" fontSize="11" fill="var(--muted-foreground)" fontFamily="Inter, sans-serif">
+          <text
+            x={CENTER}
+            y={CENTER + 15}
+            textAnchor="middle"
+            fontSize="11"
+            fill="var(--muted-foreground)"
+            fontFamily="Inter, sans-serif"
+          >
             {t("dashboard.caTotal")}
           </text>
         </svg>
@@ -671,7 +805,7 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
                 {categories.map((c, i) => {
                   const color = PALETTE[i % PALETTE.length];
                   const share = total ? c.total / total : 0;
-                  const barW  = Math.max((c.total / maxTotal) * 100, 2);
+                  const barW = Math.max((c.total / maxTotal) * 100, 2);
                   return (
                     <tr key={c.category} className="border-b border-border/50 last:border-0">
                       <td className="py-2.5 pr-3">
@@ -684,7 +818,11 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
                         {formatNumStr(c.total, 2)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-mono tabular-nums text-foreground">
-                        {c.marge_pct != null ? formatPct(c.marge_pct) : <span className="text-muted-foreground">—</span>}
+                        {c.marge_pct != null ? (
+                          formatPct(c.marge_pct)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold tabular-nums text-foreground">
                         {formatPct(share * 100)}
@@ -752,14 +890,22 @@ function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?:
       <KpiTile
         label={t("kpi.meilleureJournee")}
         value={formatMAD(kpis.best_day_dh?.total ?? 0)}
-        sub={<>{fmtDate(kpis.best_day_dh?.date)} · {formatQty(kpis.best_day_count?.count ?? 0)} opé</>}
+        sub={
+          <>
+            {fmtDate(kpis.best_day_dh?.date)} · {formatQty(kpis.best_day_count?.count ?? 0)} opé
+          </>
+        }
         icon={<CalendarCheck className="size-5" />}
         tint={tint}
       />
       <KpiTile
         label={t("kpi.moinsBonneJournee")}
         value={formatMAD(kpis.worst_day_dh?.total ?? 0)}
-        sub={<>{fmtDate(kpis.worst_day_dh?.date)} · {formatQty(kpis.worst_day_count?.count ?? 0)} opé</>}
+        sub={
+          <>
+            {fmtDate(kpis.worst_day_dh?.date)} · {formatQty(kpis.worst_day_count?.count ?? 0)} opé
+          </>
+        }
         icon={<CalendarX className="size-5" />}
         tint={tint}
       />
@@ -781,17 +927,17 @@ function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?:
 
 function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?: CategoryType }) {
   const t = useT();
-  const ca       = stats.kpis.ventes_total;
-  const achats   = stats.kpis.achats_total;
+  const ca = stats.kpis.ventes_total;
+  const achats = stats.kpis.achats_total;
   const margePct = stats.marge.marge_pct;
-  const txns     = stats.kpis.ventes_count;
+  const txns = stats.kpis.ventes_count;
 
-  const dCA      = pctChange(ca,       stats.previous_kpis.ventes_total);
-  const dAchats  = pctChange(achats,   stats.previous_kpis.achats_total);
-  const dMarge   = pctChange(margePct, stats.previous_kpis.marge_pct);
+  const dCA = pctChange(ca, stats.previous_kpis.ventes_total);
+  const dAchats = pctChange(achats, stats.previous_kpis.achats_total);
+  const dMarge = pctChange(margePct, stats.previous_kpis.marge_pct);
 
-  const phShare  = ca ? Math.round((stats.type_breakdown.pharmacie.ventes_total     / ca) * 100) : 0;
-  const paShare  = ca ? Math.round((stats.type_breakdown.parapharmacie.ventes_total / ca) * 100) : 0;
+  const phShare = ca ? Math.round((stats.type_breakdown.pharmacie.ventes_total / ca) * 100) : 0;
+  const paShare = ca ? Math.round((stats.type_breakdown.parapharmacie.ventes_total / ca) * 100) : 0;
   const sparkline = stats.monthly_trend.map((p) => p.ventes);
 
   return (
@@ -822,7 +968,11 @@ function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?:
         href={ROUTES.ACHATS}
         label={t("kpi.totalAchats")}
         value={formatMAD(achats)}
-        sub={<>{formatQty(stats.kpis.achats_count)} {t("common.wLignes")}</>}
+        sub={
+          <>
+            {formatQty(stats.kpis.achats_count)} {t("common.wLignes")}
+          </>
+        }
         delta={dAchats != null ? { value: dAchats, invertColor: true } : null}
         icon={<ShoppingCart className="size-5" />}
         tint={tint}
@@ -830,7 +980,11 @@ function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?:
       <KpiTile
         label={t("kpi.margeBruteMoy")}
         value={formatPct(margePct)}
-        sub={<>{t("kpi.anneePrec")} {formatPct(stats.previous_kpis.marge_pct)}</>}
+        sub={
+          <>
+            {t("kpi.anneePrec")} {formatPct(stats.previous_kpis.marge_pct)}
+          </>
+        }
         delta={dMarge != null ? { value: dMarge } : null}
         icon={<TrendingUp className="size-5" />}
         tint={tint}
@@ -838,7 +992,11 @@ function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?:
       <KpiTile
         label={t("kpi.transactions")}
         value={formatQty(txns)}
-        sub={<>{t("kpi.ticketMoyenSub")} {formatMAD(stats.advanced_kpis.ticket_moyen)}</>}
+        sub={
+          <>
+            {t("kpi.ticketMoyenSub")} {formatMAD(stats.advanced_kpis.ticket_moyen)}
+          </>
+        }
         icon={<BarChart3 className="size-5" />}
         tint={tint}
       />
@@ -847,31 +1005,37 @@ function IndicateursCles({ stats, tint = "all" }: { stats: StatsResponse; tint?:
 }
 
 interface BracketDef {
-  key:       keyof MarginAlertsResponse;
-  titleKey:  string;
-  Icon:      typeof AlertTriangle;
-  tone:      IconTone;
-  showLoss?: boolean;   // negative bracket shows total loss instead of CA concerné
+  key: keyof MarginAlertsResponse;
+  titleKey: string;
+  Icon: typeof AlertTriangle;
+  tone: IconTone;
+  showLoss?: boolean; // negative bracket shows total loss instead of CA concerné
 }
 
 const BRACKETS: BracketDef[] = [
-  { key: "negative",  titleKey: "rapportAdmin.margeNegative", Icon: TrendingDown,  tone: "error",   showLoss: true },
-  { key: "low",       titleKey: "rapportAdmin.marge0a10",     Icon: AlertTriangle, tone: "warning" },
-  { key: "high",      titleKey: "rapportAdmin.marge60a90",    Icon: TrendingUp,    tone: "info" },
-  { key: "very_high", titleKey: "rapportAdmin.margeSup90",    Icon: ShieldCheck,   tone: "success" },
+  { key: "negative", titleKey: "rapportAdmin.margeNegative", Icon: TrendingDown, tone: "error", showLoss: true },
+  { key: "low", titleKey: "rapportAdmin.marge0a10", Icon: AlertTriangle, tone: "warning" },
+  { key: "high", titleKey: "rapportAdmin.marge60a90", Icon: TrendingUp, tone: "info" },
+  { key: "very_high", titleKey: "rapportAdmin.margeSup90", Icon: ShieldCheck, tone: "success" },
 ];
 
 /** `linked` = false in the admin drill-down: the owner pages (/alertes, /stock) show the admin no pharmacy data. */
-function MarginAlertCards({ data, tint = "all", linked = true }: { data: MarginAlertsResponse; tint?: CategoryType; linked?: boolean }) {
+function MarginAlertCards({
+  data,
+  tint = "all",
+  linked = true,
+}: {
+  data: MarginAlertsResponse;
+  tint?: CategoryType;
+  linked?: boolean;
+}) {
   const t = useT();
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {BRACKETS.map((b) => {
         const bucket = data[b.key];
         const subLabel = b.showLoss ? t("rapportAdmin.perteTotale") : t("rapportAdmin.caConcerne");
-        const subValue = b.showLoss
-          ? formatMAD(Math.abs(bucket.total_margin_dh))
-          : formatMAD(bucket.total_ca);
+        const subValue = b.showLoss ? formatMAD(Math.abs(bucket.total_margin_dh)) : formatMAD(bucket.total_ca);
         return (
           <KpiTile
             key={b.key}
@@ -881,7 +1045,14 @@ function MarginAlertCards({ data, tint = "all", linked = true }: { data: MarginA
             sub={subLabel}
             icon={<b.Icon className="size-5" />}
             iconTone={b.tone}
-            badge={{ label: <>{formatQty(bucket.count)} {t("rapportAdmin.produitsUnit")}</>, tone: b.tone }}
+            badge={{
+              label: (
+                <>
+                  {formatQty(bucket.count)} {t("rapportAdmin.produitsUnit")}
+                </>
+              ),
+              tone: b.tone,
+            }}
             tint={tint}
           />
         );
@@ -909,16 +1080,70 @@ function RapportSkeleton() {
   );
 }
 
-interface GradeDef { letter: string; labelKey: string; bg: string; ring: string; text: string; }
+interface GradeDef {
+  letter: string;
+  labelKey: string;
+  bg: string;
+  ring: string;
+  text: string;
+}
 
 function grade(marge_pct: number): GradeDef {
-  if (marge_pct > 30) return { letter: "A+", labelKey: "kpi.gradeExcellente", bg: "bg-success",     ring: "border-success", text: "text-success-foreground" };
-  if (marge_pct > 25) return { letter: "A",  labelKey: "kpi.gradeTresBonne",  bg: "bg-success/80",  ring: "border-success", text: "text-success-foreground" };
-  if (marge_pct > 20) return { letter: "B+", labelKey: "kpi.gradeBonne",      bg: "bg-info",        ring: "border-info",    text: "text-info-foreground" };
-  if (marge_pct > 15) return { letter: "B",  labelKey: "kpi.gradeCorrecte",   bg: "bg-info/80",     ring: "border-info",    text: "text-info-foreground" };
-  if (marge_pct > 10) return { letter: "C",  labelKey: "kpi.gradeFaible",     bg: "bg-warning",     ring: "border-warning", text: "text-warning-foreground" };
-  if (marge_pct >  5) return { letter: "D",  labelKey: "kpi.gradeCritique",   bg: "bg-warning/80",  ring: "border-warning", text: "text-warning-foreground" };
-  return                     { letter: "F",  labelKey: "kpi.gradeInsuffisante", bg: "bg-error",     ring: "border-error",   text: "text-error-foreground" };
+  if (marge_pct > 30)
+    return {
+      letter: "A+",
+      labelKey: "kpi.gradeExcellente",
+      bg: "bg-success",
+      ring: "border-success",
+      text: "text-success-foreground",
+    };
+  if (marge_pct > 25)
+    return {
+      letter: "A",
+      labelKey: "kpi.gradeTresBonne",
+      bg: "bg-success/80",
+      ring: "border-success",
+      text: "text-success-foreground",
+    };
+  if (marge_pct > 20)
+    return {
+      letter: "B+",
+      labelKey: "kpi.gradeBonne",
+      bg: "bg-info",
+      ring: "border-info",
+      text: "text-info-foreground",
+    };
+  if (marge_pct > 15)
+    return {
+      letter: "B",
+      labelKey: "kpi.gradeCorrecte",
+      bg: "bg-info/80",
+      ring: "border-info",
+      text: "text-info-foreground",
+    };
+  if (marge_pct > 10)
+    return {
+      letter: "C",
+      labelKey: "kpi.gradeFaible",
+      bg: "bg-warning",
+      ring: "border-warning",
+      text: "text-warning-foreground",
+    };
+  if (marge_pct > 5)
+    return {
+      letter: "D",
+      labelKey: "kpi.gradeCritique",
+      bg: "bg-warning/80",
+      ring: "border-warning",
+      text: "text-warning-foreground",
+    };
+  return {
+    letter: "F",
+    labelKey: "kpi.gradeInsuffisante",
+    bg: "bg-error",
+    ring: "border-error",
+    text: "text-error-foreground",
+  };
 }
 
 function SanteFinanciereCard({ marge, tint = "all" }: { marge: MargeSummary; tint?: CategoryType }) {
@@ -926,10 +1151,14 @@ function SanteFinanciereCard({ marge, tint = "all" }: { marge: MargeSummary; tin
   const g = grade(marge.marge_pct);
   return (
     <KpiTile label={t("kpi.santeFinanciere")} className="items-center text-center" tint={tint}>
-      <div className={cn(
-        "mx-auto flex size-28 items-center justify-center rounded-full border-4 font-mono text-6xl font-bold tracking-tight",
-        g.bg, g.ring, g.text,
-      )}>
+      <div
+        className={cn(
+          "mx-auto flex size-28 items-center justify-center rounded-full border-4 font-mono text-6xl font-bold tracking-tight",
+          g.bg,
+          g.ring,
+          g.text,
+        )}
+      >
         {g.letter}
       </div>
       <div className="text-center">
@@ -958,18 +1187,23 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function StockSummaryTiles({ stock, tint = "all", linked = true }: { stock: StockSummaryResponse; tint?: CategoryType; linked?: boolean }) {
+function StockSummaryTiles({
+  stock,
+  tint = "all",
+  linked = true,
+}: {
+  stock: StockSummaryResponse;
+  tint?: CategoryType;
+  linked?: boolean;
+}) {
   const t = useT();
   const { cardClass } = useCategoryTint(tint);
   // Health-tone mapping reuses our semantic tones — same vocabulary as everywhere else.
-  const healthTone: IconTone =
-    stock.health_pct >= 80 ? "success" :
-    stock.health_pct >= 60 ? "warning" : "error";
+  const healthTone: IconTone = stock.health_pct >= 80 ? "success" : stock.health_pct >= 60 ? "warning" : "error";
 
   // Health value reuses the tone color so the big number itself carries the signal.
   const healthValueClass =
-    stock.health_pct >= 80 ? "text-success" :
-    stock.health_pct >= 60 ? "text-warning" : "text-error";
+    stock.health_pct >= 80 ? "text-success" : stock.health_pct >= 60 ? "text-warning" : "text-error";
 
   return (
     <div className="flex flex-col gap-3">
@@ -993,7 +1227,11 @@ function StockSummaryTiles({ stock, tint = "all", linked = true }: { stock: Stoc
         <KpiTile
           href={linked ? ROUTES.STOCK : undefined}
           label={t("kpi.sousSurStock")}
-          value={<>{formatQty(stock.sous_stock_count)} / {formatQty(stock.sur_stock_count)}</>}
+          value={
+            <>
+              {formatQty(stock.sous_stock_count)} / {formatQty(stock.sur_stock_count)}
+            </>
+          }
           sub={t("kpi.produitsAjuster")}
           icon={<AlertTriangle className="size-5" />}
           tint={tint}
@@ -1010,29 +1248,29 @@ function StockSummaryTiles({ stock, tint = "all", linked = true }: { stock: Stoc
       </div>
 
       {/* Info card + 2 CTAs (owner only: they open the owner's stock / import pages) */}
-      {linked && <div className={cn("flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center", cardClass)}>
-        <div className="flex-1">
-          <p className="text-base font-semibold text-foreground">{t("kpi.analyseStock")}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {t("kpi.analyseStockSub")}
-          </p>
+      {linked && (
+        <div className={cn("flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center", cardClass)}>
+          <div className="flex-1">
+            <p className="text-base font-semibold text-foreground">{t("kpi.analyseStock")}</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">{t("kpi.analyseStockSub")}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Link
+              to={ROUTES.STOCK}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              {t("kpi.voirStock")}
+            </Link>
+            <Link
+              to={`${ROUTES.UPLOAD_FILE}?type=stock`}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-base font-semibold text-foreground hover:bg-surface-subtle"
+            >
+              <UploadCloud className="size-4" />
+              {t("kpi.importerStock")}
+            </Link>
+          </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Link
-            to={ROUTES.STOCK}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
-            {t("kpi.voirStock")}
-          </Link>
-          <Link
-            to={`${ROUTES.UPLOAD_FILE}?type=stock`}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-base font-semibold text-foreground hover:bg-surface-subtle"
-          >
-            <UploadCloud className="size-4" />
-            {t("kpi.importerStock")}
-          </Link>
-        </div>
-      </div>}
+      )}
     </div>
   );
 }
@@ -1046,13 +1284,16 @@ const MIN_W = 320;
 // Title + count-unit word (singular, plural) per granularity. The backend picks
 // the granularity from the selected period length (see _trend_granularity).
 const TITLE: Record<TrendGranularity, string> = {
-  week:     "trend.week",
-  month:    "trend.month",
+  week: "trend.week",
+  month: "trend.month",
   semester: "trend.semester",
-  year:     "trend.year",
+  year: "trend.year",
 };
 const UNIT_KEY: Record<TrendGranularity, string> = {
-  week: "trend.uWeek", month: "trend.uMonth", semester: "trend.uSemester", year: "trend.uYear",
+  week: "trend.uWeek",
+  month: "trend.uMonth",
+  semester: "trend.uSemester",
+  year: "trend.uYear",
 };
 
 /** Round the data max up to a "nice" axis top and return evenly-spaced ticks
@@ -1062,9 +1303,7 @@ function niceScale(max: number, targetTicks = 4): { niceMax: number; ticks: numb
   const niceNum = (x: number, round: boolean) => {
     const exp = Math.floor(Math.log10(x));
     const f = x / 10 ** exp;
-    const nf = round
-      ? (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10)
-      : (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10);
+    const nf = round ? (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) : f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
     return nf * 10 ** exp;
   };
   const step = niceNum(max / targetTicks, true);
@@ -1083,7 +1322,8 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   const n = pts.length;
   if (n === 0) return "";
   if (n === 1) return `M${pts[0].x},${pts[0].y}`;
-  const dx: number[] = [], slope: number[] = [];
+  const dx: number[] = [],
+    slope: number[] = [];
   for (let i = 0; i < n - 1; i++) {
     dx[i] = pts[i + 1].x - pts[i].x;
     slope[i] = (pts[i + 1].y - pts[i].y) / (dx[i] || 1);
@@ -1093,10 +1333,19 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   t[n - 1] = slope[n - 2];
   for (let i = 1; i < n - 1; i++) t[i] = slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2;
   for (let i = 0; i < n - 1; i++) {
-    if (slope[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
-    const a = t[i] / slope[i], b = t[i + 1] / slope[i];
+    if (slope[i] === 0) {
+      t[i] = 0;
+      t[i + 1] = 0;
+      continue;
+    }
+    const a = t[i] / slope[i],
+      b = t[i + 1] / slope[i];
     const s = a * a + b * b;
-    if (s > 9) { const tau = 3 / Math.sqrt(s); t[i] = tau * a * slope[i]; t[i + 1] = tau * b * slope[i]; }
+    if (s > 9) {
+      const tau = 3 / Math.sqrt(s);
+      t[i] = tau * a * slope[i];
+      t[i + 1] = tau * b * slope[i];
+    }
   }
   let d = `M${pts[0].x},${pts[0].y}`;
   for (let i = 0; i < n - 1; i++) {
@@ -1145,10 +1394,7 @@ function TrendChart({
 
   const single = points.length === 1;
   const rawMax = Math.max(...points.map((p) => Math.max(p.ventes, p.achats)), 1);
-  const {
-    niceMax,
-    ticks,
-  } = niceScale(rawMax, 4);
+  const { niceMax, ticks } = niceScale(rawMax, 4);
   const yLabels = ticks.map((t) => formatNumStr(t));
 
   // Geometry in real pixels (1 svg unit = 1 px) → crisp, undistorted text.
@@ -1221,9 +1467,24 @@ function TrendChart({
             return (
               <g key={tk}>
                 {interior && (
-                  <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="var(--chart-grid)" strokeWidth="1" strokeDasharray="3 4" />
+                  <line
+                    x1={PAD_L}
+                    y1={y}
+                    x2={W - PAD_R}
+                    y2={y}
+                    stroke="var(--chart-grid)"
+                    strokeWidth="1"
+                    strokeDasharray="3 4"
+                  />
                 )}
-                <text x={PAD_L - 10} y={y + 3.5} fontSize="11" fontFamily="JetBrains Mono, monospace" fill="var(--chart-axis)" textAnchor="end">
+                <text
+                  x={PAD_L - 10}
+                  y={y + 3.5}
+                  fontSize="11"
+                  fontFamily="JetBrains Mono, monospace"
+                  fill="var(--chart-axis)"
+                  textAnchor="end"
+                >
                   {yLabels[i]}
                 </text>
               </g>
@@ -1233,14 +1494,52 @@ function TrendChart({
           <g key={drawKey}>
             {!single && (
               <>
-                <motion.path d={areaTail(aPts)} fill="url(#trend-achats)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
-                <motion.path d={areaTail(vPts)} fill="url(#trend-ventes)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} />
+                <motion.path
+                  d={areaTail(aPts)}
+                  fill="url(#trend-achats)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                />
+                <motion.path
+                  d={areaTail(vPts)}
+                  fill="url(#trend-ventes)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5 }}
+                />
                 {/* soft glow under the ventes line */}
-                <path d={vLine} fill="none" stroke="var(--chart-1)" strokeWidth="4" strokeOpacity="0.35" filter="url(#trend-glow)" />
-                <motion.path d={aLine} fill="none" stroke="var(--chart-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4"
-                  initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
-                <motion.path d={vLine} fill="none" stroke="var(--chart-1)" strokeWidth="2.75" strokeLinecap="round" strokeLinejoin="round"
-                  initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.7, ease: "easeInOut" }} />
+                <path
+                  d={vLine}
+                  fill="none"
+                  stroke="var(--chart-1)"
+                  strokeWidth="4"
+                  strokeOpacity="0.35"
+                  filter="url(#trend-glow)"
+                />
+                <motion.path
+                  d={aLine}
+                  fill="none"
+                  stroke="var(--chart-3)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="5 4"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                />
+                <motion.path
+                  d={vLine}
+                  fill="none"
+                  stroke="var(--chart-1)"
+                  strokeWidth="2.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                />
               </>
             )}
           </g>
@@ -1256,9 +1555,32 @@ function TrendChart({
           {/* hover: crosshair + focus dots */}
           {hi != null && (
             <g pointerEvents="none">
-              <line x1={hx} y1={PAD_T} x2={hx} y2={baseY} stroke="var(--chart-axis)" strokeWidth="1" strokeOpacity="0.45" strokeDasharray="4 4" />
-              <circle cx={hx} cy={yAt(points[hi].achats)} r="5.5" fill="var(--chart-3)" stroke="var(--card)" strokeWidth="2.5" />
-              <circle cx={hx} cy={yAt(points[hi].ventes)} r="5.5" fill="var(--chart-1)" stroke="var(--card)" strokeWidth="2.5" />
+              <line
+                x1={hx}
+                y1={PAD_T}
+                x2={hx}
+                y2={baseY}
+                stroke="var(--chart-axis)"
+                strokeWidth="1"
+                strokeOpacity="0.45"
+                strokeDasharray="4 4"
+              />
+              <circle
+                cx={hx}
+                cy={yAt(points[hi].achats)}
+                r="5.5"
+                fill="var(--chart-3)"
+                stroke="var(--card)"
+                strokeWidth="2.5"
+              />
+              <circle
+                cx={hx}
+                cy={yAt(points[hi].ventes)}
+                r="5.5"
+                fill="var(--chart-1)"
+                stroke="var(--card)"
+                strokeWidth="2.5"
+              />
             </g>
           )}
 
@@ -1268,8 +1590,16 @@ function TrendChart({
             if (!show) return null;
             const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
             return (
-              <text key={i} x={xAt(i)} y={H - 8} fontSize="11" fontFamily="JetBrains Mono, monospace"
-                fill={i === hi ? "var(--foreground)" : "var(--chart-axis)"} fontWeight={i === hi ? 600 : 400} textAnchor={anchor}>
+              <text
+                key={i}
+                x={xAt(i)}
+                y={H - 8}
+                fontSize="11"
+                fontFamily="JetBrains Mono, monospace"
+                fill={i === hi ? "var(--foreground)" : "var(--chart-axis)"}
+                fontWeight={i === hi ? 600 : 400}
+                textAnchor={anchor}
+              >
                 {p.label}
               </text>
             );
@@ -1298,8 +1628,12 @@ function TrendChart({
       </div>
 
       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{t("dashboard.max")} <span className="font-mono tabular-nums">{formatMAD(rawMax)}</span></span>
-        <span>{points.length} {unitLabel}</span>
+        <span>
+          {t("dashboard.max")} <span className="font-mono tabular-nums">{formatMAD(rawMax)}</span>
+        </span>
+        <span>
+          {points.length} {unitLabel}
+        </span>
       </div>
     </KpiTile>
   );
@@ -1365,29 +1699,39 @@ function TvaTiles({ tva, tint = "all" }: { tva: TvaSummary; tint?: CategoryType 
   );
 }
 
-const CATEGORY_KEY = { all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie" } as const;
-
+const CATEGORY_KEY = {
+  all: "category.mixte",
+  pharmacie: "category.pharmacie",
+  parapharmacie: "category.parapharmacie",
+} as const;
 
 /** Build the activeFilters[] array from StatsFilters — shared by both owner + admin views. */
-function buildActiveFilters(
-  filters: StatsFilters,
-  setFilters: (f: StatsFilters) => void,
-  t: TFn,
-): ActiveFilter[] {
+function buildActiveFilters(filters: StatsFilters, setFilters: (f: StatsFilters) => void, t: TFn): ActiveFilter[] {
   return [
-    (filters.date_from || filters.date_to) ? {
-      key:    "dates",
-      label:  <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
-      onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
-    } : null,
-    filters.category_type !== "all" ? {
-      key:    "category",
-      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
-      onClear: () => setFilters({ ...filters, category_type: "all" }),
-    } : null,
+    filters.date_from || filters.date_to
+      ? {
+          key: "dates",
+          label: (
+            <>
+              {t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
+            </>
+          ),
+          onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
+        }
+      : null,
+    filters.category_type !== "all"
+      ? {
+          key: "category",
+          label: (
+            <>
+              {t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}
+            </>
+          ),
+          onClear: () => setFilters({ ...filters, category_type: "all" }),
+        }
+      : null,
   ].filter(Boolean) as ActiveFilter[];
 }
-
 
 // Local-only filter slice — date fields come from the cross-route
 // GlobalDateRangeProvider so picking dates on /rapport carries over to
@@ -1395,19 +1739,17 @@ function buildActiveFilters(
 // per-view by merging this local slice with the global range.
 type LocalStatsFilters = Omit<StatsFilters, "date_from" | "date_to">;
 const INITIAL_LOCAL: LocalStatsFilters = {
-  category_type:        "all",
+  category_type: "all",
   // USER DECISION 2026-08-01: special/excluded products + excluded fournisseurs/BLs
   // are INCLUDED in the Dashboard (Rapport). Only /comptabilite applies exclusions.
   include_non_declared: true,
 };
-
 
 export default function RapportPage() {
   const { me } = useMe();
   if (!me) return null;
   return me.role === ROLES.ADMIN ? <AdminView /> : <OwnerView />;
 }
-
 
 // ────────────────────────────────────────────────────────────────────────────
 // OWNER
@@ -1416,38 +1758,20 @@ export default function RapportPage() {
 function OwnerView() {
   const t = useT();
   const categoryTypeOptions = useCategoryTypeOptions();
-  const {
-    from: dateFrom,
-    to: dateTo,
-    setRange,
-  } = useGlobalDateRange();
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
   const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
   // Backwards-compat wrapper so the existing buildActiveFilters/FilterBar
   // call sites can keep doing `setFilters({ ...filters, date_from, date_to })`.
   const setFilters = (next: StatsFilters) => {
-    const {
-      date_from,
-      date_to,
-      ...rest
-    } = next;
+    const { date_from, date_to, ...rest } = next;
     setLocal(rest);
     setRange(date_from, date_to);
   };
 
-  const {
-    stats,
-    isLoading: l1,
-    isError: e1,
-  } = useStats(filters);
-  const {
-    alerts,
-    isLoading: l2,
-  }              = useMarginAlerts(filters);
-  const {
-    stock,
-    isLoading: l3,
-  }              = useStockSummary();
+  const { stats, isLoading: l1, isError: e1 } = useStats(filters);
+  const { alerts, isLoading: l2 } = useMarginAlerts(filters);
+  const { stock, isLoading: l3 } = useStockSummary();
 
   const loading = l1 || l2 || l3;
 
@@ -1460,17 +1784,20 @@ function OwnerView() {
 
       <FilterBar<StatsFilters["category_type"]>
         dateRange={{
-          from:     filters.date_from,
-          to:       filters.date_to,
+          from: filters.date_from,
+          to: filters.date_to,
           onChange: (from, to) => setFilters({ ...filters, date_from: from, date_to: to }),
         }}
         segment={{
-          value:    filters.category_type,
+          value: filters.category_type,
           onChange: (v) => setFilters({ ...filters, category_type: v }),
-          options:  categoryTypeOptions,
+          options: categoryTypeOptions,
         }}
         activeFilters={buildActiveFilters(filters, setFilters, t)}
-        onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); }}
+        onResetAll={() => {
+          setLocal(INITIAL_LOCAL);
+          setRange(null, null);
+        }}
       />
 
       {loading && <RapportSkeleton />}
@@ -1481,11 +1808,18 @@ function OwnerView() {
         </div>
       )}
 
-      {stats && !loading && <RapportSections stats={stats} filters={filters} alerts={alerts} stock={stock} category={filters.category_type} />}
+      {stats && !loading && (
+        <RapportSections
+          stats={stats}
+          filters={filters}
+          alerts={alerts}
+          stock={stock}
+          category={filters.category_type}
+        />
+      )}
     </div>
   );
 }
-
 
 // ────────────────────────────────────────────────────────────────────────────
 // ADMIN  (Vue système + per-pharmacy drill-down)
@@ -1495,49 +1829,34 @@ function AdminView() {
   const t = useT();
   const categoryTypeOptions = useCategoryTypeOptions();
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
-  const {
-    from: dateFrom,
-    to: dateTo,
-    setRange,
-  } = useGlobalDateRange();
+  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
   const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
   const setFilters = (next: StatsFilters) => {
-    const {
-      date_from,
-      date_to,
-      ...rest
-    } = next;
+    const { date_from, date_to, ...rest } = next;
     setLocal(rest);
     setRange(date_from, date_to);
   };
   const [marginMode, setMarginMode] = useState<MargeMode>("produit");
 
-  const {
-    systemStats,
-    isLoading: ls,
-  }         = useAdminStats();
-  const { pharmacies }                         = useAdminPharmacies();
-  const {
-    stats,
-    isLoading: l1,
-    isError: e1,
-  } = useAdminPharmacyStats(pharmacyId, filters);
-  const { alerts }                             = useAdminPharmacyMarginAlerts(pharmacyId, {
-    date_from: dateFrom, date_to: dateTo, category_type: filters.category_type,
+  const { systemStats, isLoading: ls } = useAdminStats();
+  const { pharmacies } = useAdminPharmacies();
+  const { stats, isLoading: l1, isError: e1 } = useAdminPharmacyStats(pharmacyId, filters);
+  const { alerts } = useAdminPharmacyMarginAlerts(pharmacyId, {
+    date_from: dateFrom,
+    date_to: dateTo,
+    category_type: filters.category_type,
   });
-  const { stock }                              = useAdminPharmacyStockSummary(pharmacyId);
-  const {
-    analyse,
-    isLoading: analyseLoading,
-  } = useAdminPharmacyAnalyseMarge(pharmacyId, marginMode, {
-    date_from: dateFrom, date_to: dateTo, category_type: filters.category_type,
+  const { stock } = useAdminPharmacyStockSummary(pharmacyId);
+  const { analyse, isLoading: analyseLoading } = useAdminPharmacyAnalyseMarge(pharmacyId, marginMode, {
+    date_from: dateFrom,
+    date_to: dateTo,
+    category_type: filters.category_type,
   });
 
   const loading = pharmacyId !== null && l1;
-  const subtitleDates = dateFrom || dateTo
-    ? `${t("dashboard.periode")} ${dateFrom ?? "…"} → ${dateTo ?? "…"}`
-    : t("trend.last12");
+  const subtitleDates =
+    dateFrom || dateTo ? `${t("dashboard.periode")} ${dateFrom ?? "…"} → ${dateTo ?? "…"}` : t("trend.last12");
 
   return (
     <div className="flex flex-col gap-6">
@@ -1548,10 +1867,14 @@ function AdminView() {
 
       {/* Vue système — always shown */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.vueSysteme")}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("rapportAdmin.vueSysteme")}
+        </h2>
         {ls || !systemStats ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />)}
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
+            ))}
           </div>
         ) : (
           <AdminSystemTiles stats={systemStats} />
@@ -1560,7 +1883,9 @@ function AdminView() {
 
       {/* Per-pharmacy drill-down */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.parPharmacie")}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("rapportAdmin.parPharmacie")}
+        </h2>
         {/* Admin pharmacy picker — uses the shared SingleSelectPopover so the
             trigger + panel match every other dropdown in the app (Catégorie,
             Type, Statut, page-size, etc.). */}
@@ -1581,32 +1906,45 @@ function AdminView() {
 
         <FilterBar<StatsFilters["category_type"]>
           dateRange={{
-            from:     filters.date_from,
-            to:       filters.date_to,
+            from: filters.date_from,
+            to: filters.date_to,
             onChange: (from, to) => setFilters({ ...filters, date_from: from, date_to: to }),
           }}
           segment={{
-            value:    filters.category_type,
+            value: filters.category_type,
             onChange: (v) => setFilters({ ...filters, category_type: v }),
-            options:  categoryTypeOptions,
+            options: categoryTypeOptions,
           }}
           activeFilters={[
-            ...(pharmacyId !== null ? [{
-              key:    "pharmacy",
-              label:  <>{t("rapportAdmin.pharmacieFilter")} {pharmacies.find((p) => p.id === pharmacyId)?.code ?? pharmacies.find((p) => p.id === pharmacyId)?.name ?? "—"}</>,
-              onClear: () => setPharmacyId(null),
-            }] : []),
+            ...(pharmacyId !== null
+              ? [
+                  {
+                    key: "pharmacy",
+                    label: (
+                      <>
+                        {t("rapportAdmin.pharmacieFilter")}{" "}
+                        {pharmacies.find((p) => p.id === pharmacyId)?.code ??
+                          pharmacies.find((p) => p.id === pharmacyId)?.name ??
+                          "—"}
+                      </>
+                    ),
+                    onClear: () => setPharmacyId(null),
+                  },
+                ]
+              : []),
             ...buildActiveFilters(filters, setFilters, t),
           ]}
-          onResetAll={() => { setLocal(INITIAL_LOCAL); setRange(null, null); setPharmacyId(null); }}
+          onResetAll={() => {
+            setLocal(INITIAL_LOCAL);
+            setRange(null, null);
+            setPharmacyId(null);
+          }}
         />
 
         {pharmacyId === null && (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
             <Building2 className="size-12 text-muted-foreground" aria-hidden />
-            <p className="max-w-md text-sm text-muted-foreground">
-              {t("rapportAdmin.selectPharmacyHint")}
-            </p>
+            <p className="max-w-md text-sm text-muted-foreground">{t("rapportAdmin.selectPharmacyHint")}</p>
           </div>
         )}
 
@@ -1618,39 +1956,41 @@ function AdminView() {
           </div>
         )}
 
-        {stats && pharmacyId !== null && !loading && (() => {
-          const sel = pharmacies.find((p) => p.id === pharmacyId);
-          const pharmacyLabel = sel ? [sel.code, sel.name].filter(Boolean).join(" · ") : "";
-          return (
-            <AdminPharmacyBody
-              stats={stats}
-              pharmacyLabel={pharmacyLabel}
-              categoryType={filters.category_type}
-              marginMode={marginMode}
-              onMarginMode={setMarginMode}
-              marginRows={(analyse?.rows ?? []) as Record<string, unknown>[]}
-              marginLoading={analyseLoading}
-              subtitleDates={subtitleDates}
-              alerts={alerts}
-              stock={stock}
-            />
-          );
-        })()}
+        {stats &&
+          pharmacyId !== null &&
+          !loading &&
+          (() => {
+            const sel = pharmacies.find((p) => p.id === pharmacyId);
+            const pharmacyLabel = sel ? [sel.code, sel.name].filter(Boolean).join(" · ") : "";
+            return (
+              <AdminPharmacyBody
+                stats={stats}
+                pharmacyLabel={pharmacyLabel}
+                categoryType={filters.category_type}
+                marginMode={marginMode}
+                onMarginMode={setMarginMode}
+                marginRows={(analyse?.rows ?? []) as Record<string, unknown>[]}
+                marginLoading={analyseLoading}
+                subtitleDates={subtitleDates}
+                alerts={alerts}
+                stock={stock}
+              />
+            );
+          })()}
       </section>
     </div>
   );
 }
-
 
 // ────────────────────────────────────────────────────────────────────────────
 // Shared sections (used by both owner + admin variants)
 // ────────────────────────────────────────────────────────────────────────────
 
 interface SectionsProps {
-  stats:    NonNullable<ReturnType<typeof useStats>["stats"]>;
-  filters:  StatsFilters;
-  alerts:   ReturnType<typeof useMarginAlerts>["alerts"];
-  stock:    ReturnType<typeof useStockSummary>["stock"];
+  stats: NonNullable<ReturnType<typeof useStats>["stats"]>;
+  filters: StatsFilters;
+  alerts: ReturnType<typeof useMarginAlerts>["alerts"];
+  stock: ReturnType<typeof useStockSummary>["stock"];
   category: CategoryType;
 }
 
@@ -1679,7 +2019,9 @@ function RapportSections({ stats, filters, alerts, stock, category }: SectionsPr
       {/* Section 5 — Alertes marges (feature: alertes) */}
       {has("alertes") && alerts && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.alertesMarges")}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("rapportAdmin.alertesMarges")}
+          </h2>
           <MarginAlertCards data={alerts} tint={category} />
         </section>
       )}
@@ -1687,7 +2029,9 @@ function RapportSections({ stats, filters, alerts, stock, category }: SectionsPr
       {/* Section 6 — Déclaration TVA (feature: accounting) */}
       {has("accounting") && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("rapportAdmin.declarationTva")}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("rapportAdmin.declarationTva")}
+          </h2>
           <TvaTiles tva={stats.tva} tint={category} />
         </section>
       )}

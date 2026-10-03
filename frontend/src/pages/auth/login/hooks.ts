@@ -10,13 +10,7 @@ export function useLogin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    isPending,
-    isError,
-    isSuccess,
-    error,
-  } = useMutation<MeResponse, ApiErr, LoginRequest>({
+  const { mutate, isPending, isError, isSuccess, error } = useMutation<MeResponse, ApiErr, LoginRequest>({
     mutationFn: (input) => api.post<MeResponse>(API.auth.login.url, input),
     onSuccess: (data) => {
       queryClient.setQueryData(API.auth.me.key, data);

@@ -13,10 +13,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import {
-  AlertDetailDialog,
-  PEREMPTION_COLUMNS,
-} from "@/pages/analytics/_components/AlertDetailDialog";
+import { AlertDetailDialog, PEREMPTION_COLUMNS } from "@/pages/analytics/_components/AlertDetailDialog";
 import { ROUTES } from "@/types";
 
 import { useStockPage } from "./hooks";
@@ -37,12 +34,12 @@ import type { StockSortKey } from "./hooks";
 
 interface AbcdAnalysisCardProps {
   /** Full distribution from the FULL fetch (only non-zero classes present). */
-  distribution:    Record<string, number>;
+  distribution: Record<string, number>;
   totalReferences: number;
   /** 0-10 health score (computed in useStockPage as ideal / non-inconnu × 10). */
-  health:          number;
-  activeClass:     AbcdClass | null;
-  onSelectClass:   (c: AbcdClass) => void;
+  health: number;
+  activeClass: AbcdClass | null;
+  onSelectClass: (c: AbcdClass) => void;
 }
 
 function AbcdAnalysisCard({
@@ -82,16 +79,12 @@ function AbcdAnalysisCard({
                   style={{
                     background: ABCD_COLORS[k],
                     fontSize: abcdFontSize(k),
-                    boxShadow: active
-                      ? "0 0 0 2px var(--color-card), 0 0 0 4px var(--color-primary)"
-                      : undefined,
+                    boxShadow: active ? "0 0 0 2px var(--color-card), 0 0 0 4px var(--color-primary)" : undefined,
                   }}
                 >
                   {k}
                 </span>
-                <span className="font-mono text-xl font-bold tabular-nums text-foreground">
-                  {formatQty(count)}
-                </span>
+                <span className="font-mono text-xl font-bold tabular-nums text-foreground">{formatQty(count)}</span>
                 <span className="-mt-0.5 whitespace-nowrap font-mono text-xs text-muted-foreground">
                   {formatPct(pct)}
                 </span>
@@ -107,14 +100,13 @@ function AbcdAnalysisCard({
           </span>
           <NeedleGauge value={health * 10} />
           <div className="-mt-2 flex items-baseline gap-1 whitespace-nowrap">
-            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">
-              {scoreLabel}
-            </span>
+            <span className="font-mono text-3xl font-bold tabular-nums text-foreground">{scoreLabel}</span>
             <span className="font-mono text-base font-semibold text-muted-foreground">/ 10</span>
           </div>
           {/* Explanation: pharmacists need to know what the needle measures */}
           <p className="mt-0.5 max-w-[220px] text-center text-xs leading-snug text-muted-foreground">
-            Part des produits en couverture idéale <span className="whitespace-nowrap">(46-60 j)</span> sur ceux qui ont des ventes.
+            Part des produits en couverture idéale <span className="whitespace-nowrap">(46-60 j)</span> sur ceux qui ont
+            des ventes.
           </p>
           <span className="mt-0.5 text-sm text-muted-foreground">
             <span className="font-mono tabular-nums text-foreground">{formatQty(totalReferences)}</span> références
@@ -178,9 +170,7 @@ function AlertCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         {metrics.map((m) => (
           <div key={m.label} className="flex flex-col gap-0.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {m.label}
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{m.label}</span>
             <span className="font-mono text-lg font-bold tabular-nums text-foreground">{m.value}</span>
           </div>
         ))}
@@ -189,13 +179,10 @@ function AlertCard({
   );
 }
 
-function AlertCardsGrid({
-  products }: AlertCardsGridProps) {
+function AlertCardsGrid({ products }: AlertCardsGridProps) {
   const t = useT();
   const negatif = products.filter((p) => p.status === "negatif");
-  const sousTop = products.filter(
-    (p) => (p.category === "A" || p.category === "A-") && p.status === "sous-stock",
-  );
+  const sousTop = products.filter((p) => (p.category === "A" || p.category === "A-") && p.status === "sous-stock");
   const surstock = products.filter((p) => p.status === "sur-stock");
 
   return (
@@ -210,12 +197,16 @@ function AlertCardsGrid({
 // src/pages/stock/_components/PeremptionsSection.tsx
 
 interface PeremptionsSectionProps {
-  data:   PeremptionsResponse;
+  data: PeremptionsResponse;
   onOpen: (d: DialogDescriptor) => void;
 }
 
 function PeremptionCard({
-  title, sub, tone, bracket, onClick,
+  title,
+  sub,
+  tone,
+  bracket,
+  onClick,
 }: {
   title: string;
   sub: string;
@@ -253,25 +244,52 @@ function PeremptionCard({
   );
 }
 
-function PeremptionsSection({
-  data, onOpen }: PeremptionsSectionProps) {
+function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
   const t = useT();
   // Same 4-bucket scheme as /alertes — clicking opens the shared
   // AlertDetailDialog with the per-bucket product list (sortable + Excel
   // export). The fourth bucket (`no_date`) is data-quality: products
   // whose Sobrus export had no expiry date.
   const cards: {
-    key:         keyof PeremptionsResponse;
-    tone:        IconTone;
-    title:       string;
-    sub:         string;
-    dlgTitle:    string;
+    key: keyof PeremptionsResponse;
+    tone: IconTone;
+    title: string;
+    sub: string;
+    dlgTitle: string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired",    tone: "error",   title: t("peremptions.expiresStock"),   sub: t("peremptions.actionUrgente"), dlgTitle: t("peremptions.dlgExpires"),              dlgSubtitle: t("peremptions.dlgExpiresSub") },
-    { key: "very_close", tone: "warning", title: t("peremptions.tresProche"), sub: t("peremptions.tresUrgent"),    dlgTitle: t("peremptions.dlgTresProche"), dlgSubtitle: t("peremptions.dlgTresProcheSub") },
-    { key: "close",      tone: "warning", title: t("peremptions.proche"),      sub: t("peremptions.aSurveiller"),   dlgTitle: t("peremptions.dlgProche"),      dlgSubtitle: t("peremptions.dlgProcheSub") },
-    { key: "no_date",    tone: "muted",   title: t("peremptions.sansDate"),          sub: t("peremptions.aRenseigner"),   dlgTitle: t("peremptions.dlgSansDate"), dlgSubtitle: t("peremptions.dlgSansDateSub") },
+    {
+      key: "expired",
+      tone: "error",
+      title: t("peremptions.expiresStock"),
+      sub: t("peremptions.actionUrgente"),
+      dlgTitle: t("peremptions.dlgExpires"),
+      dlgSubtitle: t("peremptions.dlgExpiresSub"),
+    },
+    {
+      key: "very_close",
+      tone: "warning",
+      title: t("peremptions.tresProche"),
+      sub: t("peremptions.tresUrgent"),
+      dlgTitle: t("peremptions.dlgTresProche"),
+      dlgSubtitle: t("peremptions.dlgTresProcheSub"),
+    },
+    {
+      key: "close",
+      tone: "warning",
+      title: t("peremptions.proche"),
+      sub: t("peremptions.aSurveiller"),
+      dlgTitle: t("peremptions.dlgProche"),
+      dlgSubtitle: t("peremptions.dlgProcheSub"),
+    },
+    {
+      key: "no_date",
+      tone: "muted",
+      title: t("peremptions.sansDate"),
+      sub: t("peremptions.aRenseigner"),
+      dlgTitle: t("peremptions.dlgSansDate"),
+      dlgSubtitle: t("peremptions.dlgSansDateSub"),
+    },
   ];
 
   return (
@@ -289,13 +307,15 @@ function PeremptionsSection({
               sub={c.sub}
               tone={c.tone}
               bracket={bracket}
-              onClick={() => onOpen({
-                title:          c.dlgTitle,
-                subtitle:       c.dlgSubtitle,
-                products:       bracket.products,
-                columns:        PEREMPTION_COLUMNS,
-                defaultSortKey: "expiry_date",
-              })}
+              onClick={() =>
+                onOpen({
+                  title: c.dlgTitle,
+                  subtitle: c.dlgSubtitle,
+                  products: bracket.products,
+                  columns: PEREMPTION_COLUMNS,
+                  defaultSortKey: "expiry_date",
+                })
+              }
             />
           );
         })}
@@ -305,19 +325,19 @@ function PeremptionsSection({
 }
 
 interface StockTableProps {
-  rows:        StockRow[];
-  isLoading:   boolean;
+  rows: StockRow[];
+  isLoading: boolean;
   classFilter: AbcdClass | null;
-  status:      string;
+  status: string;
   onStatusChange: (v: string) => void;
-  sortBy:      StockSortKey;
-  sortOrder:   "asc" | "desc";
-  onSort:      (key: StockSortKey) => void;
-  page:        number;
-  pageSize:    number;
-  onPage:      (p: number) => void;
-  onPageSize:  (n: number) => void;
-  onClose:     () => void;
+  sortBy: StockSortKey;
+  sortOrder: "asc" | "desc";
+  onSort: (key: StockSortKey) => void;
+  page: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+  onPageSize: (n: number) => void;
+  onClose: () => void;
 }
 
 /** Low-opacity rgba from an ABCD hex (used for the class pill bg). */
@@ -344,10 +364,7 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
   const t = useT();
   const meta = STATUS_META[status];
   return (
-    <span className={cn(
-      "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium",
-      meta.pill,
-    )}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium", meta.pill)}>
       <span className={cn("size-1.5 rounded-full", meta.dot)} aria-hidden />
       {t(`stockStatus.${status}`)}
     </span>
@@ -355,30 +372,74 @@ function StatusPill({ status }: { status: StockRow["status"] }) {
 }
 
 const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
-  { key: "product", label: t("col.produit"), width: 280,
-    render: (r) => <span className="block max-w-[260px] truncate text-base" title={r.product}>{r.product}</span> },
-  { key: "category", label: t("stock.classe"), width: 80,
-    render: (r) => <ClassPill klass={r.category} /> },
-  { key: "units_sold_12m", label: t("stock.ventes12m"), width: 110, align: "right",
-    render: (r) => formatQty(r.units_sold_12m) },
-  { key: "stock_min", label: t("stock.stockMin"), width: 100, align: "right",
-    render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_min)}</span> },
-  { key: "stock_max", label: t("stock.stockMax"), width: 100, align: "right",
-    render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_max)}</span> },
-  { key: "current_stock", label: t("stock.stockActuel"), width: 120, align: "right",
-    render: (r) => r.current_stock == null
-      ? <span className="text-muted-foreground">—</span>
-      : <span className={cn(
-          "inline-block rounded px-1.5 py-0.5 font-semibold",
-          r.status === "negatif" && "bg-error/10 text-error",
-        )}>{formatQty(r.current_stock)}</span> },
-  { key: "status", label: t("col.statut"), width: 140,
-    render: (r) => <StatusPill status={r.status} /> },
+  {
+    key: "product",
+    label: t("col.produit"),
+    width: 280,
+    render: (r) => (
+      <span className="block max-w-[260px] truncate text-base" title={r.product}>
+        {r.product}
+      </span>
+    ),
+  },
+  { key: "category", label: t("stock.classe"), width: 80, render: (r) => <ClassPill klass={r.category} /> },
+  {
+    key: "units_sold_12m",
+    label: t("stock.ventes12m"),
+    width: 110,
+    align: "right",
+    render: (r) => formatQty(r.units_sold_12m),
+  },
+  {
+    key: "stock_min",
+    label: t("stock.stockMin"),
+    width: 100,
+    align: "right",
+    render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_min)}</span>,
+  },
+  {
+    key: "stock_max",
+    label: t("stock.stockMax"),
+    width: 100,
+    align: "right",
+    render: (r) => <span className="text-muted-foreground">{formatQty(r.stock_max)}</span>,
+  },
+  {
+    key: "current_stock",
+    label: t("stock.stockActuel"),
+    width: 120,
+    align: "right",
+    render: (r) =>
+      r.current_stock == null ? (
+        <span className="text-muted-foreground">—</span>
+      ) : (
+        <span
+          className={cn(
+            "inline-block rounded px-1.5 py-0.5 font-semibold",
+            r.status === "negatif" && "bg-error/10 text-error",
+          )}
+        >
+          {formatQty(r.current_stock)}
+        </span>
+      ),
+  },
+  { key: "status", label: t("col.statut"), width: 140, render: (r) => <StatusPill status={r.status} /> },
 ];
 
 function StockTable({
-  rows, isLoading, classFilter, status, onStatusChange, sortBy, sortOrder, onSort,
-  page, pageSize, onPage, onPageSize, onClose,
+  rows,
+  isLoading,
+  classFilter,
+  status,
+  onStatusChange,
+  sortBy,
+  sortOrder,
+  onSort,
+  page,
+  pageSize,
+  onPage,
+  onPageSize,
+  onClose,
 }: StockTableProps) {
   const t = useT();
   // Active-filter banner above the table (Stock-specific UX).
@@ -402,7 +463,9 @@ function StockTable({
           label={t("col.statut")}
           options={STATUS_OPTIONS.map((o) => ({
             value: o.value,
-            label: o.days ? `${t(`stockStatus.${o.value}`)} (${o.days} ${t("stockStatus.days")})` : t(`stockStatus.${o.value || "all"}`),
+            label: o.days
+              ? `${t(`stockStatus.${o.value}`)} (${o.days} ${t("stockStatus.days")})`
+              : t(`stockStatus.${o.value || "all"}`),
           }))}
           value={status}
           onChange={onStatusChange}
@@ -431,8 +494,11 @@ function StockTable({
       sortOrder={sortOrder}
       onSort={onSort}
       pagination={{
-        page, pageSize, total: rows.length,
-        onPage, onPageSize,
+        page,
+        pageSize,
+        total: rows.length,
+        onPage,
+        onPageSize,
       }}
       topBanner={topBanner}
       emptyTitle={t("stock.emptyProduct")}
@@ -484,16 +550,31 @@ export default function StockPage() {
   const activeFilters: ActiveFilter[] = [
     // Only a pill for an EXPLICIT range — not the local 12-month default (whose
     // "clear" would just revert to the same default and feel broken).
-    !isDateDefault && (dateFrom || dateTo) ? {
-      key:    "dates",
-      label:  <>{t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}</>,
-      onClear: () => { setDateFrom(""); setDateTo(""); },
-    } : null,
-    classFilter !== null ? {
-      key:    "class",
-      label:  <>{t("stock.classe")} : {classFilter}</>,
-      onClear: closeTable,
-    } : null,
+    !isDateDefault && (dateFrom || dateTo)
+      ? {
+          key: "dates",
+          label: (
+            <>
+              {t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}
+            </>
+          ),
+          onClear: () => {
+            setDateFrom("");
+            setDateTo("");
+          },
+        }
+      : null,
+    classFilter !== null
+      ? {
+          key: "class",
+          label: (
+            <>
+              {t("stock.classe")} : {classFilter}
+            </>
+          ),
+          onClear: closeTable,
+        }
+      : null,
   ].filter(Boolean) as ActiveFilter[];
 
   return (
@@ -504,9 +585,12 @@ export default function StockPage() {
 
       <FilterBar
         dateRange={{
-          from:     dateFrom || null,
-          to:       dateTo || null,
-          onChange: (from, to) => { setDateFrom(from ?? ""); setDateTo(to ?? ""); },
+          from: dateFrom || null,
+          to: dateTo || null,
+          onChange: (from, to) => {
+            setDateFrom(from ?? "");
+            setDateTo(to ?? "");
+          },
         }}
         rightActions={[
           {
@@ -516,7 +600,12 @@ export default function StockPage() {
             onClick: handleExport,
             disabled: isExportLoading,
           },
-          { label: t("stock.importStock"),  icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=stock` },
+          {
+            label: t("stock.importStock"),
+            icon: <Upload className="size-4" />,
+            variant: "primary",
+            href: `${ROUTES.UPLOAD_FILE}?type=stock`,
+          },
         ]}
         activeFilters={activeFilters}
         onResetAll={clearAll}
@@ -550,9 +639,7 @@ export default function StockPage() {
           </span>
           <div className="flex max-w-md flex-col gap-1.5">
             <h2 className="text-[17px] font-semibold text-foreground">{t("stock.empty")}</h2>
-            <p className="text-sm text-muted-foreground">
-              {t("stock.emptyDesc")}
-            </p>
+            <p className="text-sm text-muted-foreground">{t("stock.emptyDesc")}</p>
           </div>
           <Link
             to={`${ROUTES.UPLOAD_FILE}?type=stock`}
@@ -597,9 +684,7 @@ export default function StockPage() {
 
           <AlertCardsGrid products={fullProducts} />
 
-          {peremptions && (
-            <PeremptionsSection data={peremptions} onOpen={openDialog} />
-          )}
+          {peremptions && <PeremptionsSection data={peremptions} onOpen={openDialog} />}
         </>
       )}
 

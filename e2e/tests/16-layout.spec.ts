@@ -30,8 +30,7 @@ const PAGES: [string, string, string][] = [
   ["/auth/me", "Mon compte", "Mi cuenta"],
 ];
 
-const title = (page: Page, name: string) =>
-  page.getByRole("heading", { level: 1, name, exact: true });
+const title = (page: Page, name: string) => page.getByRole("heading", { level: 1, name, exact: true });
 
 async function openAccount(page: Page): Promise<void> {
   await page.goto("/auth/me");
@@ -54,41 +53,27 @@ test("FR ⇄ ES : chaque page traduite, choix gardé", async ({ page }) => {
 
   await test.step("page sans accès : 404 dans le cadre", async () => {
     await page.goto("/admin/pharmacies");
-    await expect(
-      page.getByText("Página no encontrada", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      sidebar.getByRole("link", { name: "Compras", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Página no encontrada", { exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Compras", exact: true })).toBeVisible();
   });
 
   await test.step("retour en français", async () => {
     await page.getByRole("button", { name: "Francés", exact: true }).click();
-    await expect(
-      page.getByText("Page introuvable", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      sidebar.getByRole("link", { name: "Achats", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Page introuvable", { exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Achats", exact: true })).toBeVisible();
     await page.reload();
-    await expect(
-      page.getByText("Page introuvable", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Page introuvable", { exact: true })).toBeVisible();
   });
 });
 
-test("thème : Sombre (gardé), Clair, Système (suit l'ordinateur)", async ({
-  page,
-}) => {
+test("thème : Sombre (gardé), Clair, Système (suit l'ordinateur)", async ({ page }) => {
   const html = page.locator("html");
   await openAccount(page);
   await page.getByRole("button", { name: "Sombre", exact: true }).click();
   await expect(html).toHaveClass(/\bdark\b/);
   await page.reload();
   await expect(html).toHaveClass(/\bdark\b/);
-  await expect(
-    page.getByRole("button", { name: "Sombre", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Sombre", exact: true })).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: "Clair", exact: true }).click();
   await expect(html).not.toHaveClass(/\bdark\b/);
@@ -106,9 +91,7 @@ test("menu : Réduire (gardé, icônes cliquables), Étendre", async ({ page }) 
   await openAccount(page);
   await expect(label).toBeVisible();
 
-  await page
-    .getByRole("button", { name: "Réduire le menu", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Réduire le menu", exact: true }).click();
   await expect(label).toBeHidden(); // icons only
   await page.reload();
   await expect(title(page, "Mon compte")).toBeVisible();
@@ -116,15 +99,11 @@ test("menu : Réduire (gardé, icônes cliquables), Étendre", async ({ page }) 
   await sidebar.locator('a[href="/achats"]').click();
   await expect(title(page, "Achats")).toBeVisible();
 
-  await page
-    .getByRole("button", { name: "Étendre le menu", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Étendre le menu", exact: true }).click();
   await expect(label).toBeVisible();
 });
 
-test("session terminée ailleurs (401) : « Session expirée » → Plus tard / Actualiser → connexion", async ({
-  page,
-}) => {
+test("session terminée ailleurs (401) : « Session expirée » → Plus tard / Actualiser → connexion", async ({ page }) => {
   const sidebar = page.locator("aside");
   await openAccount(page);
   // This browser loses its session: every next call answers 401.
@@ -132,18 +111,13 @@ test("session terminée ailleurs (401) : « Session expirée » → Plus tard / 
 
   await test.step("« Plus tard » : le message se ferme, la page reste", async () => {
     const refused = page.waitForResponse(
-      (res) =>
-        new URL(res.url()).pathname.startsWith("/v1/") && res.status() === 401,
+      (res) => new URL(res.url()).pathname.startsWith("/v1/") && res.status() === 401,
     );
-    await sidebar
-      .getByRole("link", { name: "Comptabilité", exact: true })
-      .click();
+    await sidebar.getByRole("link", { name: "Comptabilité", exact: true }).click();
     await refused;
     const dialog = page.getByRole("dialog", { name: "Session expirée" });
     await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "Plus tard", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Plus tard", exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(sidebar).toBeVisible();
   });
@@ -153,24 +127,18 @@ test("session terminée ailleurs (401) : « Session expirée » → Plus tard / 
     await sidebar.getByRole("link", { name: "Compras", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Sesión expirada" });
     await expect(dialog).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "Actualizar", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Actualizar", exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);
     await expect(title(page, "Iniciar sesión")).toBeVisible();
   });
 
   await test.step("connexion refusée : message en espagnol", async () => {
     await page.locator('input[type="email"]').fill("personne@pharmagest.ma");
-    await page
-      .locator('input[autocomplete="current-password"]')
-      .fill("Mauvais#2026");
+    await page.locator('input[autocomplete="current-password"]').fill("Mauvais#2026");
     const refused = pageSend(page, "POST", "/auth/login", 401);
     await page.locator('button[type="submit"]').click();
     expect((await refused).code, "code d'erreur").toBe("badCredentials");
-    await expect(
-      page.getByText("Correo o contraseña incorrectos", { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText("Correo o contraseña incorrectos", { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
   });
 });

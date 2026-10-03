@@ -24,15 +24,15 @@ import { ROLES } from "@/types";
 import type { DocType, Feature, UploadStockResult } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 
-import { useUpload }    from "./hooks";
+import { useUpload } from "./hooks";
 import { cn } from "@/utils/cn";
 import { formatNumStr, formatQty } from "@/utils/format";
 import type { UploadPhase, UploadProgress } from "@/hooks/UploadContext";
 import type { ReactNode } from "react";
 
 interface DropZoneProps {
-  docType:  DocType;
-  example:  string;
+  docType: DocType;
+  example: string;
   onAccept: (file: File) => void;
   errorMsg: string | null;
   onClearError: () => void;
@@ -55,7 +55,7 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) onAccept(f);
-    e.target.value = "";   // allow re-picking the same file after a rejection
+    e.target.value = ""; // allow re-picking the same file after a rejection
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -71,8 +71,13 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
         role="button"
         tabIndex={0}
         onClick={pick}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pick(); }}
-        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") pick();
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
         onDragLeave={() => setOver(false)}
         onDrop={onDrop}
         className={cn(
@@ -81,7 +86,7 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
         )}
         style={{
           borderColor: over ? ring : "var(--border)",
-          background:  over ? `var(--color-doc-${docType}-bg)` : undefined,
+          background: over ? `var(--color-doc-${docType}-bg)` : undefined,
         }}
       >
         <div
@@ -93,23 +98,15 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
         <div className="flex flex-col gap-1">
           <p className="text-base font-semibold text-foreground">{t("uploadFile.dropHere")}</p>
           <p className="text-sm text-muted-foreground">
-            {t("uploadFile.or")} <span className="font-semibold underline" style={{ color: ring }}>{t("uploadFile.browse")}</span>
+            {t("uploadFile.or")}{" "}
+            <span className="font-semibold underline" style={{ color: ring }}>
+              {t("uploadFile.browse")}
+            </span>
           </p>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {t("uploadFile.csvHint")}
-        </p>
-        <p className="font-mono text-[11px] text-muted-foreground">
-          {example}
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".csv"
-          onChange={onChange}
-          className="sr-only"
-          tabIndex={-1}
-        />
+        <p className="mt-2 text-xs text-muted-foreground">{t("uploadFile.csvHint")}</p>
+        <p className="font-mono text-[11px] text-muted-foreground">{example}</p>
+        <input ref={inputRef} type="file" accept=".csv" onChange={onChange} className="sr-only" tabIndex={-1} />
       </div>
 
       {errorMsg && (
@@ -130,16 +127,16 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
 }
 
 interface ImportStateProps {
-  docType:    DocType;
+  docType: DocType;
   /** "idle" = no job → return null. Otherwise render the matching card. */
-  phase:      UploadPhase | "idle";
-  progress:   UploadProgress;
-  error:      string | null;
+  phase: UploadPhase | "idle";
+  progress: UploadProgress;
+  error: string | null;
   /** May be null when phase="idle" (no job) — guarded by the early return. */
-  filename:   string | null;
+  filename: string | null;
   stockResult: UploadStockResult | null;
-  onCancel:   () => void;
-  onReset:    () => void;
+  onCancel: () => void;
+  onReset: () => void;
 }
 
 /**
@@ -147,15 +144,22 @@ interface ImportStateProps {
  * Each card is tinted with the active doc-type's color. Returns null on 'idle'.
  */
 
-function ImportState({
-  docType, phase, progress, error, filename, stockResult, onCancel, onReset,
-}: ImportStateProps) {
+function ImportState({ docType, phase, progress, error, filename, stockResult, onCancel, onReset }: ImportStateProps) {
   if (phase === "idle") return null;
 
-  if (phase === "queued")      return <Queued     docType={docType} filename={filename ?? ""} onCancel={onCancel} />;
-  if (phase === "uploading")   return <Uploading  docType={docType} progress={progress} onCancel={onCancel} />;
-  if (phase === "success")     return <Success    docType={docType} progress={progress} filename={filename ?? ""} stockResult={stockResult} onReset={onReset} />;
-  if (phase === "cancelled")   return <Cancelled  progress={progress} onReset={onReset} />;
+  if (phase === "queued") return <Queued docType={docType} filename={filename ?? ""} onCancel={onCancel} />;
+  if (phase === "uploading") return <Uploading docType={docType} progress={progress} onCancel={onCancel} />;
+  if (phase === "success")
+    return (
+      <Success
+        docType={docType}
+        progress={progress}
+        filename={filename ?? ""}
+        stockResult={stockResult}
+        onReset={onReset}
+      />
+    );
+  if (phase === "cancelled") return <Cancelled progress={progress} onReset={onReset} />;
   return <Errored error={error} onDismiss={onReset} />;
 }
 
@@ -180,22 +184,26 @@ function Queued({ docType, filename, onCancel }: { docType: DocType; filename: s
           {t("uploadFile.removeFromQueue")}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {t("uploadFile.queuedHint")}
-      </p>
-      {filename && (
-        <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
-      )}
+      <p className="text-xs text-muted-foreground">{t("uploadFile.queuedHint")}</p>
+      {filename && <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>}
     </div>
   );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Uploading({ docType, progress, onCancel }: { docType: DocType; progress: UploadProgress; onCancel: () => void }) {
+function Uploading({
+  docType,
+  progress,
+  onCancel,
+}: {
+  docType: DocType;
+  progress: UploadProgress;
+  onCancel: () => void;
+}) {
   const t = useT();
   const ring = `var(--color-doc-${docType})`;
-  const pct  = progress.total ? Math.round((progress.current / progress.total) * 100) : 0;
+  const pct = progress.total ? Math.round((progress.current / progress.total) * 100) : 0;
   return (
     <div
       className="flex flex-col gap-3 rounded-2xl border p-5"
@@ -217,7 +225,10 @@ function Uploading({ docType, progress, onCancel }: { docType: DocType; progress
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{pct} % {t("uploadFile.completed")} — {formatQty(progress.inserted)} {t("uploadFile.inserted")}, {formatQty(progress.skipped)} {t("uploadFile.ignored")}</span>
+        <span>
+          {pct} % {t("uploadFile.completed")} — {formatQty(progress.inserted)} {t("uploadFile.inserted")},{" "}
+          {formatQty(progress.skipped)} {t("uploadFile.ignored")}
+        </span>
         <button
           type="button"
           onClick={onCancel}
@@ -232,8 +243,18 @@ function Uploading({ docType, progress, onCancel }: { docType: DocType; progress
 }
 
 function Success({
-  docType, progress, filename, stockResult, onReset,
-}: { docType: DocType; progress: UploadProgress; filename: string; stockResult: UploadStockResult | null; onReset: () => void }) {
+  docType,
+  progress,
+  filename,
+  stockResult,
+  onReset,
+}: {
+  docType: DocType;
+  progress: UploadProgress;
+  filename: string;
+  stockResult: UploadStockResult | null;
+  onReset: () => void;
+}) {
   const t = useT();
   const ring = `var(--color-doc-${docType})`;
   const newMeds = progress.new_medicaments;
@@ -243,13 +264,17 @@ function Success({
   // formatNumStr (plain string) NOT formatQty (returns JSX) — these build string
   // list items, and interpolating JSX into a template literal yields "[object Object]".
   const skipReasons: string[] = stockResult
-    ? (stockResult.skipped_unknown.length > 0
-        ? [t("uploadFile.skipUnknownPid", { n: formatNumStr(stockResult.skipped_unknown.length) })]
-        : [])
+    ? stockResult.skipped_unknown.length > 0
+      ? [t("uploadFile.skipUnknownPid", { n: formatNumStr(stockResult.skipped_unknown.length) })]
+      : []
     : [
-        ...(progress.skipped_duplicate     ? [t("uploadFile.skipDuplicate", { n: formatNumStr(progress.skipped_duplicate) })]            : []),
-        ...(progress.skipped_no_pid        ? [t("uploadFile.skipNoPid", { n: formatNumStr(progress.skipped_no_pid) })]                  : []),
-        ...(progress.skipped_no_medicament ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })] : []),
+        ...(progress.skipped_duplicate
+          ? [t("uploadFile.skipDuplicate", { n: formatNumStr(progress.skipped_duplicate) })]
+          : []),
+        ...(progress.skipped_no_pid ? [t("uploadFile.skipNoPid", { n: formatNumStr(progress.skipped_no_pid) })] : []),
+        ...(progress.skipped_no_medicament
+          ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })]
+          : []),
       ];
   // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
   if (skipReasons.length === 0 && progress.skipped > 0) {
@@ -261,7 +286,10 @@ function Success({
       className="flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
       style={{ borderColor: `var(--color-doc-${docType}-border)`, background: `var(--color-doc-${docType}-bg)` }}
     >
-      <div className="flex size-14 items-center justify-center rounded-full" style={{ background: `${ring}20`, color: ring }}>
+      <div
+        className="flex size-14 items-center justify-center rounded-full"
+        style={{ background: `${ring}20`, color: ring }}
+      >
         <CheckCircle2 className="size-7" aria-hidden />
       </div>
       <h3 className="text-xl font-semibold text-foreground">
@@ -269,27 +297,27 @@ function Success({
       </h3>
       {skipReasons.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground">
-          {skipReasons.map((r) => <li key={r}>{r}</li>)}
+          {skipReasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
         </ul>
       )}
       {newMeds && newMeds.count > 0 && (
         <div className="mt-1 flex w-full max-w-md flex-col gap-1.5 rounded-md border border-info-border bg-info-subtle px-4 py-3 text-left">
           <div className="flex items-center gap-2 text-sm font-semibold text-info">
             <Info className="size-4" aria-hidden />
-            {formatQty(newMeds.count)} {newMeds.count > 1 ? t("uploadFile.newProductPlural") : t("uploadFile.newProductSingular")}
+            {formatQty(newMeds.count)}{" "}
+            {newMeds.count > 1 ? t("uploadFile.newProductPlural") : t("uploadFile.newProductSingular")}
           </div>
           <p className="text-xs text-info-subtle-foreground">
             {newMeds.sample.slice(0, 3).join(" · ")}
-            {newMeds.count > 3 && ` · +${newMeds.count - 3} ${newMeds.count - 3 > 1 ? t("uploadFile.others") : t("uploadFile.other")}`}
+            {newMeds.count > 3 &&
+              ` · +${newMeds.count - 3} ${newMeds.count - 3 > 1 ? t("uploadFile.others") : t("uploadFile.other")}`}
           </p>
-          <p className="text-xs text-info-subtle-foreground">
-            {t("uploadFile.newProductsNote")}
-          </p>
+          <p className="text-xs text-info-subtle-foreground">{t("uploadFile.newProductsNote")}</p>
         </div>
       )}
-      <p className="font-mono text-[11px] text-muted-foreground">
-        {filename}
-      </p>
+      <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
       <button
         type="button"
         onClick={onReset}
@@ -312,9 +340,13 @@ function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: (
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-warning">{t("uploadFile.cancelledTitle")}</h3>
           <p className="mt-0.5 text-xs text-warning-subtle-foreground">
-            {had
-              ? <>{formatQty(progress.inserted)} {t("uploadFile.cancelledHad")}</>
-              : t("uploadFile.cancelledNone")}
+            {had ? (
+              <>
+                {formatQty(progress.inserted)} {t("uploadFile.cancelledHad")}
+              </>
+            ) : (
+              t("uploadFile.cancelledNone")
+            )}
           </p>
         </div>
       </div>
@@ -337,9 +369,7 @@ function Errored({ error, onDismiss }: { error: string | null; onDismiss: () => 
       <AlertCircle className="size-5 text-error" aria-hidden />
       <div className="flex-1">
         <h3 className="text-sm font-semibold text-error">{t("uploadFile.errorTitle")}</h3>
-        <p className="mt-0.5 text-xs text-error-subtle-foreground">
-          {error ?? t("uploadFile.unknownError")}
-        </p>
+        <p className="mt-0.5 text-xs text-error-subtle-foreground">{error ?? t("uploadFile.unknownError")}</p>
       </div>
       <button
         type="button"
@@ -354,11 +384,11 @@ function Errored({ error, onDismiss }: { error: string | null; onDismiss: () => 
 }
 
 interface PreviewTableProps {
-  headers:    string[];
-  rows:       Record<string, string>[];      // up to 8
-  totalRows:  number;
-  filename:   string;
-  fileDates:  { from: string; to: string } | null;
+  headers: string[];
+  rows: Record<string, string>[]; // up to 8
+  totalRows: number;
+  filename: string;
+  fileDates: { from: string; to: string } | null;
 }
 
 /**
@@ -392,7 +422,10 @@ function PreviewTable({ headers, rows, totalRows, filename, fileDates }: Preview
           <thead className="bg-surface-subtle text-muted-foreground">
             <tr>
               {headers.map((h) => (
-                <th key={h} className="border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide">
+                <th
+                  key={h}
+                  className="border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide"
+                >
                   {h}
                 </th>
               ))}
@@ -402,7 +435,10 @@ function PreviewTable({ headers, rows, totalRows, filename, fileDates }: Preview
             {rows.map((row, i) => (
               <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-surface-subtle/40"}>
                 {headers.map((h) => (
-                  <td key={h} className="max-w-[160px] truncate whitespace-nowrap border-b border-border px-3 py-1.5 text-foreground">
+                  <td
+                    key={h}
+                    className="max-w-[160px] truncate whitespace-nowrap border-b border-border px-3 py-1.5 text-foreground"
+                  >
                     {row[h] || <span className="text-muted-foreground">—</span>}
                   </td>
                 ))}
@@ -423,16 +459,32 @@ function PreviewTable({ headers, rows, totalRows, filename, fileDates }: Preview
 
 function CalendarIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   );
 }
 
 const FR = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 function fmtFR(iso: string): string {
-  try { return FR.format(new Date(iso)); } catch { return iso; }
+  try {
+    return FR.format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }
 
 /**
@@ -451,15 +503,15 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
   return (
     <ol className="flex w-full items-center justify-between gap-3">
       {STEPS.map((s, i) => {
-        const done    = current > s.n;
-        const active  = current === s.n;
+        const done = current > s.n;
+        const active = current === s.n;
         return (
           <li key={s.n} className="flex flex-1 items-center gap-3">
             <div className="flex items-center gap-3">
               <span
                 className={cn(
                   "flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold tabular-nums",
-                  done   && "border-primary bg-primary text-primary-foreground",
+                  done && "border-primary bg-primary text-primary-foreground",
                   active && "border-primary bg-primary/10 text-primary",
                   !done && !active && "border-border bg-card text-muted-foreground",
                 )}
@@ -470,7 +522,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
               <span
                 className={cn(
                   "hidden text-sm font-medium sm:inline",
-                  (done || active) ? "text-foreground" : "text-muted-foreground",
+                  done || active ? "text-foreground" : "text-muted-foreground",
                 )}
               >
                 {t(s.label)}
@@ -478,10 +530,7 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
             </div>
             {i < STEPS.length - 1 && (
               <span
-                className={cn(
-                  "ml-2 h-[2px] flex-1 rounded-full transition-colors",
-                  done ? "bg-primary" : "bg-border",
-                )}
+                className={cn("ml-2 h-[2px] flex-1 rounded-full transition-colors", done ? "bg-primary" : "bg-border")}
                 aria-hidden
               />
             )}
@@ -493,14 +542,14 @@ function Stepper({ current }: { current: 1 | 2 | 3 }) {
 }
 
 interface TypeCardProps {
-  type:        DocType;
-  title:       string;
+  type: DocType;
+  title: string;
   description: string;
-  icon:        ReactNode;
-  columns:     string[];      // first 5 column-name chips
-  totalCols:   number;        // for "+N autres"
-  selected:    boolean;
-  onSelect:    () => void;
+  icon: ReactNode;
+  columns: string[]; // first 5 column-name chips
+  totalCols: number; // for "+N autres"
+  selected: boolean;
+  onSelect: () => void;
 }
 
 /**
@@ -508,9 +557,7 @@ interface TypeCardProps {
  * when selected; bordered card otherwise. Hover lifts a couple of pixels.
  */
 
-function TypeCard({
-  type, title, description, icon, columns, totalCols, selected, onSelect,
-}: TypeCardProps) {
+function TypeCard({ type, title, description, icon, columns, totalCols, selected, onSelect }: TypeCardProps) {
   const ringColor = `var(--color-doc-${type})`;
   return (
     <button
@@ -519,9 +566,7 @@ function TypeCard({
       aria-pressed={selected}
       className={cn(
         "group flex cursor-pointer flex-col gap-3 rounded-2xl border-2 p-5 text-left transition-all",
-        selected
-          ? "shadow-md"
-          : "border-border bg-card hover:-translate-y-0.5 hover:shadow-md",
+        selected ? "shadow-md" : "border-border bg-card hover:-translate-y-0.5 hover:shadow-md",
       )}
       style={selected ? { borderColor: ringColor, background: `var(--color-doc-${type}-bg)` } : undefined}
     >
@@ -547,7 +592,10 @@ function TypeCard({
       </div>
       <div className="flex flex-wrap gap-1.5 pt-1">
         {columns.slice(0, 5).map((c) => (
-          <span key={c} className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <span
+            key={c}
+            className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+          >
             {c}
           </span>
         ))}
@@ -563,7 +611,17 @@ function TypeCard({
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
@@ -576,27 +634,58 @@ function CheckIcon() {
  * doc-type preselected. Used by the Stock CTA on /rapport (?type=stock).
  */
 
-const buildTypeMeta = (t: TFn) => ({
-  achat: {
-    title:       t("uploadFile.achatTitle"),
-    description: t("uploadFile.achatDesc"),
-    icon:        ShoppingCart,
-    columns:     ["PID", t("col.produit"), t("col.reference"), t("col.fournisseur"), t("uploadFile.quantite"), t("uploadFile.prixUnitaire"), t("col.total"), t("col.dateBL"), t("col.peremption")],
-  },
-  vente: {
-    title:       t("uploadFile.venteTitle"),
-    description: t("uploadFile.venteDesc"),
-    icon:        ShoppingBasket,
-    columns:     ["PID", t("col.produit"), t("col.date"), t("col.transaction"), t("col.client"), t("uploadFile.quantite"), t("col.remise"), t("uploadFile.prixUnitaire")],
-  },
-  stock: {
-    title:       t("uploadFile.stockTitle"),
-    description: t("uploadFile.stockDesc"),
-    icon:        Boxes,
-    columns:     ["PID", t("col.produit"), t("col.stock"), t("stock.stockMin"), t("stock.stockMax"), t("col.peremption"), t("uploadFile.zone"), t("col.categorie"), "PPV", "PPH", "TVA"],
-  },
-}) satisfies Record<DocType, { title: string; description: string; icon: typeof Boxes; columns: string[] }>;
-
+const buildTypeMeta = (t: TFn) =>
+  ({
+    achat: {
+      title: t("uploadFile.achatTitle"),
+      description: t("uploadFile.achatDesc"),
+      icon: ShoppingCart,
+      columns: [
+        "PID",
+        t("col.produit"),
+        t("col.reference"),
+        t("col.fournisseur"),
+        t("uploadFile.quantite"),
+        t("uploadFile.prixUnitaire"),
+        t("col.total"),
+        t("col.dateBL"),
+        t("col.peremption"),
+      ],
+    },
+    vente: {
+      title: t("uploadFile.venteTitle"),
+      description: t("uploadFile.venteDesc"),
+      icon: ShoppingBasket,
+      columns: [
+        "PID",
+        t("col.produit"),
+        t("col.date"),
+        t("col.transaction"),
+        t("col.client"),
+        t("uploadFile.quantite"),
+        t("col.remise"),
+        t("uploadFile.prixUnitaire"),
+      ],
+    },
+    stock: {
+      title: t("uploadFile.stockTitle"),
+      description: t("uploadFile.stockDesc"),
+      icon: Boxes,
+      columns: [
+        "PID",
+        t("col.produit"),
+        t("col.stock"),
+        t("stock.stockMin"),
+        t("stock.stockMax"),
+        t("col.peremption"),
+        t("uploadFile.zone"),
+        t("col.categorie"),
+        "PPV",
+        "PPH",
+        "TVA",
+      ],
+    },
+  }) satisfies Record<DocType, { title: string; description: string; icon: typeof Boxes; columns: string[] }>;
 
 /** Which per-type feature gates each DocType. The upload endpoint requires
  *  BOTH `import` AND the doc-type feature, so the picker must hide types
@@ -606,7 +695,6 @@ const TYPE_FEATURE: Record<DocType, Feature> = {
   vente: "ventes",
   stock: "stock",
 };
-
 
 export default function UploadFilePage() {
   const t = useT();
@@ -643,29 +731,35 @@ export default function UploadFilePage() {
   // stays a shareable deep-link to the active step. `replace: true` avoids
   // polluting the browser back-stack with every card toggle.
   const handlePickType = (dt: DocType) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("type", dt);
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("type", dt);
+        return next;
+      },
+      { replace: true },
+    );
     pickType(dt);
   };
 
   // Back-to-step-1 also clears ?type= so the URL doesn't lie about the
   // active step. Pairs with handlePickType to keep URL ↔ wizard in sync.
   const handleBackToType = () => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("type");
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("type");
+        return next;
+      },
+      { replace: true },
+    );
     backToType();
   };
 
   const { me } = useMe();
   const allowedTypes = useMemo<DocType[]>(() => {
     const all: DocType[] = ["achat", "vente", "stock"];
-    if (me?.role === ROLES.ADMIN) return all;          // admin bypass
+    if (me?.role === ROLES.ADMIN) return all; // admin bypass
     return all.filter((dt) => me?.permissions.includes(TYPE_FEATURE[dt]));
   }, [me]);
 
@@ -684,12 +778,8 @@ export default function UploadFilePage() {
           <FileSpreadsheet className="size-5" aria-hidden />
         </div>
         <div className="flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {t("uploadFile.pageTitle")}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {t("uploadFile.pageDesc")}
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("uploadFile.pageTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("uploadFile.pageDesc")}</p>
         </div>
       </header>
 
@@ -819,12 +909,10 @@ export default function UploadFilePage() {
   );
 }
 
-
 function parseTypeParam(s: string | null): DocType | null {
   if (s === "achat" || s === "vente" || s === "stock") return s;
   return null;
 }
-
 
 /** Shown on step 3 once the detailed success card has auto-dismissed (4 s) but
  *  the wizard is still parked on step 3 with no file — previously a blank page.
@@ -839,14 +927,15 @@ function ImportDoneFallback({ docType, onNewImport }: { docType: DocType; onNewI
     >
       <div
         className="flex size-12 items-center justify-center rounded-full"
-        style={{ background: `color-mix(in srgb, var(--color-doc-${docType}) 15%, transparent)`, color: `var(--color-doc-${docType})` }}
+        style={{
+          background: `color-mix(in srgb, var(--color-doc-${docType}) 15%, transparent)`,
+          color: `var(--color-doc-${docType})`,
+        }}
       >
         <CheckCircle2 className="size-6" aria-hidden />
       </div>
       <h3 className="text-base font-semibold text-foreground">{t("uploadFile.done")}</h3>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        {t("uploadFile.doneDesc")}
-      </p>
+      <p className="max-w-sm text-sm text-muted-foreground">{t("uploadFile.doneDesc")}</p>
       <button
         type="button"
         onClick={onNewImport}

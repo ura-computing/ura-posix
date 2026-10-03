@@ -12,14 +12,7 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 
-import type {
-  AchatsFilters,
-  CatalogFilters,
-  MargeMode,
-  StockFilters,
-  VentesFilters,
-  VentesFiltersKey,
-} from "@/types";
+import type { AchatsFilters, CatalogFilters, MargeMode, StockFilters, VentesFilters, VentesFiltersKey } from "@/types";
 
 type Key = readonly unknown[];
 
@@ -29,8 +22,7 @@ interface Read {
   all?: Key;
 }
 
-const p = (df: string | null, dt: string | null) =>
-  [df ?? "", dt ?? ""] as const;
+const p = (df: string | null, dt: string | null) => [df ?? "", dt ?? ""] as const;
 
 // ── Reads the writes of several groups refresh ─────────────────────────────
 
@@ -101,15 +93,8 @@ const achatsReads = (): Read[] => [
   API.achats.supplierSummary,
   API.achats.suggestions,
 ];
-const blExclusionReads = (): Read[] => [
-  API.blExclusions.list,
-  API.blExclusions.search,
-  API.blExclusions.detail,
-];
-const supplierExclusionReads = (): Read[] => [
-  API.supplierExclusions.list,
-  API.supplierExclusions.search,
-];
+const blExclusionReads = (): Read[] => [API.blExclusions.list, API.blExclusions.search, API.blExclusions.detail];
+const supplierExclusionReads = (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search];
 
 export const API = {
   auth: {
@@ -155,8 +140,7 @@ export const API = {
     },
     marginAlerts: {
       url: "/stats/margin-alerts",
-      key: (df: string | null, dt: string | null, ct: string) =>
-        ["stats", "margin-alerts", ...p(df, dt), ct] as const,
+      key: (df: string | null, dt: string | null, ct: string) => ["stats", "margin-alerts", ...p(df, dt), ct] as const,
       all: ["stats", "margin-alerts"],
     },
     ventesSansAchat: {
@@ -172,8 +156,7 @@ export const API = {
     // Stock page, same url twice: "full" (class circles) + "filtered" (table).
     stockAbcdFull: {
       url: "/stats/stock-abcd",
-      key: (df: string | null, dt: string | null) =>
-        ["stats", "stock-abcd-full", ...p(df, dt)] as const,
+      key: (df: string | null, dt: string | null) => ["stats", "stock-abcd-full", ...p(df, dt)] as const,
       all: ["stats", "stock-abcd-full"],
     },
     stockAbcdFiltered: {
@@ -184,21 +167,8 @@ export const API = {
     peremptions: { url: "/stats/peremptions", key: ["stats", "peremptions"] },
     analyseMarge: {
       url: "/stats/analyse-marge",
-      key: (
-        mode: MargeMode,
-        df: string | null,
-        dt: string | null,
-        ct: string,
-        product?: string | null,
-      ) =>
-        [
-          "stats",
-          "analyse-marge",
-          mode,
-          ...p(df, dt),
-          ct,
-          product ?? "",
-        ] as const,
+      key: (mode: MargeMode, df: string | null, dt: string | null, ct: string, product?: string | null) =>
+        ["stats", "analyse-marge", mode, ...p(df, dt), ct, product ?? ""] as const,
       all: ["stats", "analyse-marge"],
     },
     /** POST (the product list is the body), not cached. */
@@ -227,12 +197,8 @@ export const API = {
     },
     discountSummary: {
       url: "/ventes/discount-summary",
-      key: (
-        f: Omit<
-          VentesFilters,
-          "page" | "limit" | "sort_by" | "sort_order" | "surveillance"
-        >,
-      ) => ["ventes", "discount-summary", f] as const,
+      key: (f: Omit<VentesFilters, "page" | "limit" | "sort_by" | "sort_order" | "surveillance">) =>
+        ["ventes", "discount-summary", f] as const,
       all: ["ventes", "discount-summary"],
     },
   },
@@ -246,9 +212,8 @@ export const API = {
     tvaRates: { url: "/achats/tva-rates", key: ["achats", "tva-rates"] },
     supplierSummary: {
       url: "/achats/supplier-summary",
-      key: (
-        f: Omit<AchatsFilters, "page" | "limit" | "sort_by" | "sort_order">,
-      ) => ["achats", "supplier-summary", f] as const,
+      key: (f: Omit<AchatsFilters, "page" | "limit" | "sort_by" | "sort_order">) =>
+        ["achats", "supplier-summary", f] as const,
       all: ["achats", "supplier-summary"],
     },
     suggestions: {
@@ -296,19 +261,11 @@ export const API = {
     // An excluded product is no longer suggested.
     exclude: {
       url: "/special-products/",
-      refreshes: (): Read[] => [
-        API.specialProducts.list,
-        API.specialProducts.suggestions,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.specialProducts.list, API.specialProducts.suggestions, ...afterExclusion()],
     },
     reintegrate: {
       url: "/special-products/reintegrate",
-      refreshes: (): Read[] => [
-        API.specialProducts.list,
-        API.specialProducts.suggestions,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.specialProducts.list, API.specialProducts.suggestions, ...afterExclusion()],
     },
   },
   blExclusions: {
@@ -325,19 +282,11 @@ export const API = {
     },
     exclude: {
       url: "/bl-exclusions/",
-      refreshes: (): Read[] => [
-        API.blExclusions.list,
-        API.blExclusions.search,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.blExclusions.list, API.blExclusions.search, ...afterExclusion()],
     },
     reintegrate: {
       url: "/bl-exclusions/reintegrate",
-      refreshes: (): Read[] => [
-        API.blExclusions.list,
-        API.blExclusions.search,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.blExclusions.list, API.blExclusions.search, ...afterExclusion()],
     },
   },
   supplierExclusions: {
@@ -352,19 +301,11 @@ export const API = {
     },
     exclude: {
       url: "/supplier-exclusions/",
-      refreshes: (): Read[] => [
-        API.supplierExclusions.list,
-        API.supplierExclusions.search,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search, ...afterExclusion()],
     },
     reintegrate: {
       url: "/supplier-exclusions/reintegrate",
-      refreshes: (): Read[] => [
-        API.supplierExclusions.list,
-        API.supplierExclusions.search,
-        ...afterExclusion(),
-      ],
+      refreshes: (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search, ...afterExclusion()],
     },
   },
   categorySuffixes: {
@@ -437,13 +378,8 @@ export const API = {
     },
     pharmacyStats: {
       url: (id: number) => `/admin/pharmacy/${id}/stats`,
-      key: (
-        id: number,
-        df: string | null,
-        dt: string | null,
-        ct: string,
-        nd: boolean,
-      ) => ["admin", "pharmacy-stats", id, ...p(df, dt), ct, nd] as const,
+      key: (id: number, df: string | null, dt: string | null, ct: string, nd: boolean) =>
+        ["admin", "pharmacy-stats", id, ...p(df, dt), ct, nd] as const,
       all: ["admin", "pharmacy-stats"],
     },
     pharmacyMarginAlerts: {
@@ -459,13 +395,8 @@ export const API = {
     },
     pharmacyAnalyse: {
       url: (id: number) => `/admin/pharmacy/${id}/stats/analyse-marge`,
-      key: (
-        id: number,
-        mode: string,
-        df: string | null,
-        dt: string | null,
-        ct: string,
-      ) => ["admin", "pharmacy-analyse", id, mode, ...p(df, dt), ct] as const,
+      key: (id: number, mode: string, df: string | null, dt: string | null, ct: string) =>
+        ["admin", "pharmacy-analyse", id, mode, ...p(df, dt), ct] as const,
       all: ["admin", "pharmacy-analyse"],
     },
     users: { url: "/admin/users", key: ["admin", "users"] },
@@ -505,31 +436,19 @@ export const API = {
       },
       create: {
         url: "/admin/catalog",
-        refreshes: (): Read[] => [
-          API.admin.catalog.list,
-          API.admin.catalog.categories,
-        ],
+        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
       },
       update: {
         url: (id: number) => `/admin/catalog/${id}`,
-        refreshes: (): Read[] => [
-          API.admin.catalog.list,
-          API.admin.catalog.categories,
-        ],
+        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
       },
       remove: {
         url: (id: number) => `/admin/catalog/${id}`,
-        refreshes: (): Read[] => [
-          API.admin.catalog.list,
-          API.admin.catalog.categories,
-        ],
+        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
       },
       importCsv: {
         url: "/uploads/catalog",
-        refreshes: (): Read[] => [
-          API.admin.catalog.list,
-          API.admin.catalog.categories,
-        ],
+        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
       },
     },
   },
@@ -573,15 +492,9 @@ export const API = {
 } as const;
 
 /** After a write: refresh every read it lists (`write.refreshes`), in one pass. */
-export function refresh(
-  qc: QueryClient,
-  write: { refreshes: () => readonly Read[] },
-): Promise<void> {
+export function refresh(qc: QueryClient, write: { refreshes: () => readonly Read[] }): Promise<void> {
   const prefixes = write.refreshes().map((r) => r.all ?? (r.key as Key));
   return qc.invalidateQueries({
-    predicate: (q) =>
-      prefixes.some((prefix) =>
-        prefix.every((part, i) => q.queryKey[i] === part),
-      ),
+    predicate: (q) => prefixes.some((prefix) => prefix.every((part, i) => q.queryKey[i] === part)),
   });
 }

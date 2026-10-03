@@ -10,10 +10,7 @@ export function useLogout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const {
-    mutate,
-    isPending,
-  } = useMutation<void, ApiErr>({
+  const { mutate, isPending } = useMutation<void, ApiErr>({
     mutationFn: () => api.post<void>(API.auth.logout.url),
     onSuccess: () => {
       queryClient.clear();

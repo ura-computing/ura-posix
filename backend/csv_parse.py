@@ -10,6 +10,7 @@ Key invariants preserved from apcm-pharma:
   overwrites an existing category (admins curate those).
 - CSV delimiter is `;` (Sobrus default).
 """
+
 from __future__ import annotations
 
 import csv
@@ -30,6 +31,7 @@ from models import Medicament
 
 # ─── String helpers ───────────────────────────────────────────────────────────
 
+
 def strip_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
 
@@ -44,7 +46,7 @@ def strip_percentage(s: str | None) -> str:
     return _PCT_RE.sub("", s).strip()
 
 
-@lru_cache(maxsize=4096)   # pure; called once per exported row (45k), few distinct categories
+@lru_cache(maxsize=4096)  # pure; called once per exported row (45k), few distinct categories
 def suffix_key(category: str | None) -> str:
     """Category-suffix match key, ignoring accents, case, extra spaces and the
     « (x%) » part: « Médicament (33.930%) » and « medicament » → "medicament"."""
@@ -57,7 +59,12 @@ def suffix_key(category: str | None) -> str:
 # uses in its SQL fallback. Catalogue is the source of truth — see F19 plan.
 
 _PHARMA_KEYWORDS = (
-    "edicament", "édicament", "oméopath", "omeopath", "iététique", "ietetique",
+    "edicament",
+    "édicament",
+    "oméopath",
+    "omeopath",
+    "iététique",
+    "ietetique",
 )
 
 
@@ -76,10 +83,30 @@ def classify_product_type(category: str | None) -> str:
 
 
 _MOJIBAKE_FIXES = {
-    "√©": "é", "√®": "è", "√à": "è", "√™": "ê", "√Æ": "î", "√è": "ï",
-    "√Ø": "ï", "√†": "à", "√§": "ä", "√≥": "ó", "√µ": "õ", "√º": "ü",
-    "√â": "É", "√ä": "Ë", "√Ä": "À", "√î": "Ô", "√ô": "Ù", "√ª": "û",
-    "√Ç": "Â", "¬∞": "º", "¬µ": "µ", "¬¥": "´", "¬Æ": "®", "¬©": "©",
+    "√©": "é",
+    "√®": "è",
+    "√à": "è",
+    "√™": "ê",
+    "√Æ": "î",
+    "√è": "ï",
+    "√Ø": "ï",
+    "√†": "à",
+    "√§": "ä",
+    "√≥": "ó",
+    "√µ": "õ",
+    "√º": "ü",
+    "√â": "É",
+    "√ä": "Ë",
+    "√Ä": "À",
+    "√î": "Ô",
+    "√ô": "Ù",
+    "√ª": "û",
+    "√Ç": "Â",
+    "¬∞": "º",
+    "¬µ": "µ",
+    "¬¥": "´",
+    "¬Æ": "®",
+    "¬©": "©",
     "¬†": " ",
 }
 
@@ -101,6 +128,7 @@ def fix_mojibake(s: str | None) -> str | None:
 
 
 # ─── Scalar parsers (tolerant of Sobrus formatting quirks) ───────────────────
+
 
 def _decode(content: bytes) -> str:
     """Try BOM-aware UTF-8, then plain UTF-8, then Latin-1 fallback."""
@@ -144,12 +172,13 @@ def parse_iso_date(val: str | None) -> date | None:
 
 # ─── CSV parsing ──────────────────────────────────────────────────────────────
 
+
 def clean_header(h: str) -> str:
     return fix_mojibake(h.strip().strip('"').strip("'")) or ""
 
 
 def clean_value(v: str) -> str:
-    return (fix_mojibake(v.strip().strip('"').strip("'")) or "")
+    return fix_mojibake(v.strip().strip('"').strip("'")) or ""
 
 
 def _detect_delimiter(first_line: str) -> str:
@@ -163,8 +192,10 @@ def _detect_delimiter(first_line: str) -> str:
         if ch == '"':
             in_q = not in_q
         elif not in_q:
-            if   ch == ';': sc += 1
-            elif ch == ',': cc += 1
+            if ch == ";":
+                sc += 1
+            elif ch == ",":
+                cc += 1
     return "," if cc > sc else ";"
 
 
@@ -199,9 +230,9 @@ def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[dict]]:
     dict matching MedicamentCreate fields with a derived synthetic `pid`."""
     rows = parse_csv(content, delimiter=",")
     seen_pids: set[str] = set()
-    errors:    list[dict] = []
-    out:       list[dict] = []
-    for i, raw in enumerate(rows, start=2):    # row 1 = header
+    errors: list[dict] = []
+    out: list[dict] = []
+    for i, raw in enumerate(rows, start=2):  # row 1 = header
         name = (raw.get("Nom") or "").strip()
         if not name:
             errors.append(error_body(ErrorCode.ROW_MISSING_NAME, f"Ligne {i}: nom manquant", line=i))
@@ -210,24 +241,26 @@ def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[dict]]:
         bc2 = (raw.get("Code barre 2") or "").strip() or None
         pid = _derive_pid(bc1, name, seen_pids)
         seen_pids.add(pid)
-        out.append({
-            "pid":          pid,
-            "product":      name,
-            "category":     (raw.get("Categorie") or "").strip() or None,
-            "tva":          (raw.get("TVA") or "").strip() or None,
-            "ppv":          parse_float(raw.get("PPV")),
-            "pph":          parse_float(raw.get("PPH")),
-            "barcode1":     bc1,
-            "barcode2":     bc2,
-            "laboratoire":  (raw.get("Laboratoire") or "").strip() or None,
-        })
+        out.append(
+            {
+                "pid": pid,
+                "product": name,
+                "category": (raw.get("Categorie") or "").strip() or None,
+                "tva": (raw.get("TVA") or "").strip() or None,
+                "ppv": parse_float(raw.get("PPV")),
+                "pph": parse_float(raw.get("PPH")),
+                "barcode1": bc1,
+                "barcode2": bc2,
+                "laboratoire": (raw.get("Laboratoire") or "").strip() or None,
+            }
+        )
     return out, errors
 
 
 def _derive_pid(barcode1: str | None, product: str, seen_pids: set[str]) -> str:
     """Synthetic PID for the catalog import. Match ladder:
-       1. barcode1 if non-empty, ≥8 chars, AND not already seen this batch
-       2. normalized product name (accent-stripped + lowercased + single-spaced)"""
+    1. barcode1 if non-empty, ≥8 chars, AND not already seen this batch
+    2. normalized product name (accent-stripped + lowercased + single-spaced)"""
     bc = (barcode1 or "").strip()
     if bc and len(bc) >= 8 and bc not in seen_pids:
         return bc
@@ -235,6 +268,7 @@ def _derive_pid(barcode1: str | None, product: str, seen_pids: set[str]) -> str:
 
 
 # ─── Normalized-name dedup (shared by the achat/vente + catalog imports) ───────
+
 
 def normalized_name(product: str | None) -> str:
     """Accent-stripped, lowercased, single-spaced product name — THE dedup key
@@ -275,11 +309,7 @@ def existing_by_name(db: Session, products: Iterable[str | None]) -> dict[str, M
     if not keys:
         return {}
     out: dict[str, Medicament] = {}
-    for m in (
-        db.query(Medicament)
-        .filter(_normalized_name_expr(Medicament.product).in_(list(keys)))
-        .all()
-    ):
+    for m in db.query(Medicament).filter(_normalized_name_expr(Medicament.product).in_(list(keys))).all():
         k = normalized_name(m.product)
         cur = out.get(k)
         if cur is None or _prefer_lab_row(m, cur):
@@ -288,6 +318,7 @@ def existing_by_name(db: Session, products: Iterable[str | None]) -> dict[str, M
 
 
 # ─── Sobrus column lookup (tolerant of column reordering) ─────────────────────
+
 
 def col(row: dict[str, Any], *names: str) -> str | None:
     """Look up a value by trying multiple column-name variants. Returns the first

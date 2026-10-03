@@ -28,18 +28,12 @@ import type {
   ResetPasswordOut,
 } from "@/types";
 
-
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAdminUsers() {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey:  API.admin.users.key,
-    queryFn:   () => api.get<AdminUserRow[]>(API.admin.users.url),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.admin.users.key,
+    queryFn: () => api.get<AdminUserRow[]>(API.admin.users.url),
     staleTime: 30_000,
   });
   return {
@@ -51,14 +45,9 @@ export function useAdminUsers() {
 }
 
 export function useAdminPharmaciesList() {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey:  API.admin.pharmacies.key,
-    queryFn:   () => api.get<PharmacyListRow[]>(API.admin.pharmacies.url),
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.admin.pharmacies.key,
+    queryFn: () => api.get<PharmacyListRow[]>(API.admin.pharmacies.url),
     staleTime: 30_000,
   });
   return {
@@ -70,15 +59,10 @@ export function useAdminPharmaciesList() {
 }
 
 export function useAdminPharmacy(id: number | null) {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey:  API.admin.pharmacy.key(id ?? 0),
-    queryFn:   () => api.get<PharmacyDetail>(API.admin.pharmacy.url(id!)),
-    enabled:   id != null && id > 0,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.admin.pharmacy.key(id ?? 0),
+    queryFn: () => api.get<PharmacyDetail>(API.admin.pharmacy.url(id!)),
+    enabled: id != null && id > 0,
     staleTime: 30_000,
   });
   return {
@@ -89,17 +73,15 @@ export function useAdminPharmacy(id: number | null) {
   };
 }
 
-
 // ── Pharmacy mutations ──────────────────────────────────────────────────────
 
 export function useCreatePharmacy() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (body: PharmacyIn) => api.post<PharmacyDetail>(API.admin.createPharmacy.url, body),
-    onSuccess:  () => { void refresh(qc, API.admin.createPharmacy); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.createPharmacy);
+    },
   });
   return {
     createPharmacy: mutateAsync,
@@ -109,12 +91,11 @@ export function useCreatePharmacy() {
 
 export function useUpdatePharmacy(id: number) {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (body: PharmacyIn) => api.patch<PharmacyDetail>(API.admin.updatePharmacy.url(id), body),
-    onSuccess:  () => { void refresh(qc, API.admin.updatePharmacy); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.updatePharmacy);
+    },
   });
   return {
     updatePharmacy: mutateAsync,
@@ -124,12 +105,11 @@ export function useUpdatePharmacy(id: number) {
 
 export function useArchivePharmacy(id: number) {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: () => api.delete(API.admin.archivePharmacy.url(id)),
-    onSuccess:  () => { void refresh(qc, API.admin.archivePharmacy); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.archivePharmacy);
+    },
   });
   return {
     archivePharmacy: mutateAsync,
@@ -139,13 +119,12 @@ export function useArchivePharmacy(id: number) {
 
 export function useSetPharmacyFeatures(id: number) {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (features: Record<string, boolean>) =>
       api.put<PharmacyDetail>(API.admin.setPharmacyFeatures.url(id), { features }),
-    onSuccess:  () => { void refresh(qc, API.admin.setPharmacyFeatures); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.setPharmacyFeatures);
+    },
   });
   return {
     setPharmacyFeatures: mutateAsync,
@@ -153,18 +132,16 @@ export function useSetPharmacyFeatures(id: number) {
   };
 }
 
-
 // ── User mutations ──────────────────────────────────────────────────────────
 
 /** The pharmacy comes from the body (the dialog's picker), not from the page. */
 export function useCreateUser() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (body: CreateUserIn) => api.post<CreateUserOut>(API.admin.createUser.url(body.pharmacy_id), body),
-    onSuccess:  () => { void refresh(qc, API.admin.createUser); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.createUser);
+    },
   });
   return {
     createUser: mutateAsync,
@@ -174,13 +151,12 @@ export function useCreateUser() {
 
 export function useSetUserPermissions() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
       api.put<MemberOut>(API.admin.setUserPermissions.url(userId), { permissions }),
-    onSuccess:  () => { void refresh(qc, API.admin.setUserPermissions); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.setUserPermissions);
+    },
   });
   return {
     setUserPermissions: mutateAsync,
@@ -189,10 +165,7 @@ export function useSetUserPermissions() {
 }
 
 export function useResetUserPassword() {
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, password }: { userId: number; password: string }) =>
       api.post<ResetPasswordOut>(API.admin.resetUserPassword.url(userId), { password }),
   });
@@ -204,13 +177,12 @@ export function useResetUserPassword() {
 
 export function useSetUserStatus() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, status }: { userId: number; status: MemberStatus }) =>
       api.patch<MemberOut>(API.admin.setUserStatus.url(userId), { status }),
-    onSuccess:  () => { void refresh(qc, API.admin.setUserStatus); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.setUserStatus);
+    },
   });
   return {
     setUserStatus: mutateAsync,
@@ -220,12 +192,11 @@ export function useSetUserStatus() {
 
 export function useDeleteUser() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (userId: number) => api.delete(API.admin.removeUser.url(userId)),
-    onSuccess:  () => { void refresh(qc, API.admin.removeUser); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.removeUser);
+    },
   });
   return {
     deleteUser: mutateAsync,
@@ -236,13 +207,12 @@ export function useDeleteUser() {
 /** « Assigner une pharmacie » — the account moves; both pharmacies' pages change. */
 export function useAssignPharmacy() {
   const qc = useQueryClient();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number }) =>
       api.patch<AdminUserRow>(API.admin.assignPharmacy.url(userId), { pharmacy_id: pharmacyId }),
-    onSuccess:  () => { void refresh(qc, API.admin.assignPharmacy); },
+    onSuccess: () => {
+      void refresh(qc, API.admin.assignPharmacy);
+    },
   });
   return {
     assignPharmacy: mutateAsync,

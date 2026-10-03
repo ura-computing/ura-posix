@@ -1,0 +1,9 @@
+# Generated / installed — never formatted (paths relative to the repo root).
+**/node_modules/
+**/dist/
+e2e/report/
+e2e/test-results/
+e2e/.results/
+e2e/.state/
+**/package-lock.json
+e2e/perf-baseline.json

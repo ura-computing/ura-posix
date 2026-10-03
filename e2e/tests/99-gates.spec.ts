@@ -18,18 +18,23 @@ import { resolve } from "node:path";
 import { expect, test, type CallRecord } from "../lib/fixtures";
 import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR } from "../lib/paths";
 
-
 const ALLOWLIST = [/^\/v1\/store-website\//];
 const BASELINE_FILE = resolve(E2E_DIR, "perf-baseline.json");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
-
 function readCalls(): CallRecord[] {
   if (!existsSync(CALLS_FILE)) return [];
-  return readFileSync(CALLS_FILE, "utf-8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  return readFileSync(CALLS_FILE, "utf-8")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
 }
 
-interface Route { key: string; method: string; re: RegExp }
+interface Route {
+  key: string;
+  method: string;
+  re: RegExp;
+}
 
 async function openApiRoutes(request: import("@playwright/test").APIRequestContext): Promise<Route[]> {
   const spec = await (await request.get(`${API}/openapi.json`)).json();
@@ -53,7 +58,6 @@ const median = (xs: number[]): number => {
   return s[Math.floor((s.length - 1) / 2)];
 };
 
-
 /** Not a gate: .results/slowest.txt = time spent per route, biggest first, so a
  *  slow run can be explained without running it again. */
 test("report: time per route", async ({ request }) => {
@@ -61,16 +65,24 @@ test("report: time per route", async ({ request }) => {
   const acc: Record<string, number[]> = {};
   for (const c of readCalls()) {
     if (c.ms < 0) continue;
-    const key = c.source === "flow" ? `FLOW ${c.path}` : routeOf(c, routes)?.key ?? `${c.method} ${c.path}`;
+    const key = c.source === "flow" ? `FLOW ${c.path}` : (routeOf(c, routes)?.key ?? `${c.method} ${c.path}`);
     (acc[key] ??= []).push(c.ms);
   }
   const lines = Object.entries(acc)
-    .map(([key, xs]) => ({ key, n: xs.length, total: xs.reduce((a, b) => a + b, 0), med: median(xs), max: Math.max(...xs) }))
+    .map(([key, xs]) => ({
+      key,
+      n: xs.length,
+      total: xs.reduce((a, b) => a + b, 0),
+      med: median(xs),
+      max: Math.max(...xs),
+    }))
     .sort((a, b) => b.total - a.total)
-    .map((r) => `${String(r.total).padStart(9)} ms  ${String(r.n).padStart(4)} calls  median ${String(r.med).padStart(6)}  max ${String(r.max).padStart(6)}  ${r.key}`);
+    .map(
+      (r) =>
+        `${String(r.total).padStart(9)} ms  ${String(r.n).padStart(4)} calls  median ${String(r.med).padStart(6)}  max ${String(r.max).padStart(6)}  ${r.key}`,
+    );
   writeFileSync(resolve(RESULTS_DIR, "slowest.txt"), `rows: ${process.env.E2E_ROWS ?? 100_000}\n${lines.join("\n")}\n`);
 });
-
 
 test("gate: every API route is called by the suite", async ({ request }) => {
   test.skip(process.env.E2E_PARTIAL === "1", "partial run (failed tests only): not every route is called");
@@ -81,11 +93,15 @@ test("gate: every API route is called by the suite", async ({ request }) => {
       .map((c) => routeOf(c, routes)?.key)
       .filter(Boolean),
   );
-  const missing = routes.map((r) => r.key).filter((k) => !covered.has(k)).sort();
-  test.info().annotations.push({ type: "coverage", description: `${routes.length - missing.length}/${routes.length} routes` });
+  const missing = routes
+    .map((r) => r.key)
+    .filter((k) => !covered.has(k))
+    .sort();
+  test
+    .info()
+    .annotations.push({ type: "coverage", description: `${routes.length - missing.length}/${routes.length} routes` });
   expect(missing, `routes never called (${missing.length}):\n  ${missing.join("\n  ")}\n`).toEqual([]);
 });
-
 
 test("gate: no route got slower than the baseline", async ({ request }) => {
   test.skip(process.env.E2E_PARTIAL === "1", "partial run (failed tests only): timings not comparable");
@@ -97,7 +113,9 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
     if (key) (samples[key] ??= []).push(c.ms);
   }
   const current = Object.fromEntries(
-    Object.entries(samples).sort().map(([k, xs]) => [k, k.startsWith("FLOW") ? Math.max(...xs) : median(xs)]),
+    Object.entries(samples)
+      .sort()
+      .map(([k, xs]) => [k, k.startsWith("FLOW") ? Math.max(...xs) : median(xs)]),
   );
 
   // Timings depend on the data size: a baseline only applies to the ROWS it was recorded with.
@@ -105,11 +123,21 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
   const saved = existsSync(BASELINE_FILE) ? JSON.parse(readFileSync(BASELINE_FILE, "utf-8")) : null;
   if (process.env.E2E_UPDATE_BASELINE === "1" || !saved?.routes) {
     writeFileSync(BASELINE_FILE, JSON.stringify({ rows, routes: current }, null, 2) + "\n");
-    test.info().annotations.push({ type: "speed", description: `baseline written for ${rows} rows: ${Object.keys(current).length} entries` });
+    test
+      .info()
+      .annotations.push({
+        type: "speed",
+        description: `baseline written for ${rows} rows: ${Object.keys(current).length} entries`,
+      });
     return;
   }
   if (saved.rows !== rows) {
-    test.info().annotations.push({ type: "speed", description: `baseline is for ${saved.rows} rows, this run has ${rows}: not compared` });
+    test
+      .info()
+      .annotations.push({
+        type: "speed",
+        description: `baseline is for ${saved.rows} rows, this run has ${rows}: not compared`,
+      });
     return;
   }
 
@@ -118,23 +146,30 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
   const fresh: string[] = [];
   for (const [key, ms] of Object.entries(current)) {
     const base = baseline[key];
-    if (base === undefined) { fresh.push(key); continue; }
+    if (base === undefined) {
+      fresh.push(key);
+      continue;
+    }
     // A FLOW is ONE timing of a whole flow (browser + many calls): ±25 % between runs on a
     // shared machine, so +35 %. A route is a median of many calls: +20 %.
     const limit = key.startsWith("FLOW") ? Math.max(base * 1.35, base + 50) : Math.max(base * 1.2, base + 50);
     if (ms > limit) slower.push(`${key}: ${ms} ms (baseline ${base} ms, limit ${Math.round(limit)} ms)`);
   }
   if (fresh.length) {
-    test.info().annotations.push({ type: "speed", description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}` });
+    test
+      .info()
+      .annotations.push({
+        type: "speed",
+        description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}`,
+      });
   }
   expect(slower, `slower than baseline:\n  ${slower.join("\n  ")}\n`).toEqual([]);
 });
 
-
 test("gate: same error codes in backend and frontend", () => {
   const values = (file: string, re: RegExp) =>
     [...readFileSync(resolve(REPO_DIR, file), "utf-8").matchAll(re)].map((m) => m[1]).sort();
-  const backend  = values("backend/errors.py", /^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm);
+  const backend = values("backend/errors.py", /^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm);
   const frontend = values("frontend/src/api/errors.ts", /^ {2}[A-Z_]+:\s*"(\w+)",$/gm);
   expect(backend.length, "codes in backend/errors.py").toBeGreaterThan(0);
   expect(frontend, "frontend/src/api/errors.ts vs backend/errors.py").toEqual(backend);

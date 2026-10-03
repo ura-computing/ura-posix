@@ -30,21 +30,21 @@ import { SUFFIX_COLORS } from "@/types";
 
 /** Hex for the swatch fill — solids matching the SuffixBadge palette tone. */
 const SWATCH_SOLID: Record<SuffixColor, string> = {
-  teal:    "#0E9E8C",
-  blue:    "#1D6FB8",
-  purple:  "#7C3AED",
-  amber:   "#B7791F",
-  rose:    "#D6447B",
+  teal: "#0E9E8C",
+  blue: "#1D6FB8",
+  purple: "#7C3AED",
+  amber: "#B7791F",
+  rose: "#D6447B",
   emerald: "#1E9E63",
-  orange:  "#E07F1F",
-  pink:    "#E84A7B",
+  orange: "#E07F1F",
+  pink: "#E84A7B",
 };
 
 interface CategorySuffixDialogProps {
-  open:     boolean;
-  onClose:  () => void;
+  open: boolean;
+  onClose: () => void;
   /** Pass an item to edit; omit to create. */
-  item?:    CategorySuffixOut | null;
+  item?: CategorySuffixOut | null;
   isSaving?: boolean;
   onSubmit: (values: CategorySuffixIn) => Promise<unknown>;
 }
@@ -53,8 +53,8 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
   const t = useT();
   const [values, setValues] = useState<CategorySuffixIn>({
     category: item?.category ?? "",
-    suffix:   item?.suffix ?? "",
-    color:    item?.color ?? "teal",
+    suffix: item?.suffix ?? "",
+    color: item?.color ?? "teal",
   });
 
   // Reset fields when the dialog opens for a different item.
@@ -62,17 +62,18 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
     if (open) {
       setValues({
         category: item?.category ?? "",
-        suffix:   item?.suffix ?? "",
-        color:    item?.color ?? "teal",
+        suffix: item?.suffix ?? "",
+        color: item?.color ?? "teal",
       });
     }
   }, [open, item]);
 
-  const set = <K extends keyof CategorySuffixIn>(k: K, v: CategorySuffixIn[K]) =>
-    setValues((p) => ({ ...p, [k]: v }));
+  const set = <K extends keyof CategorySuffixIn>(k: K, v: CategorySuffixIn[K]) => setValues((p) => ({ ...p, [k]: v }));
 
   const previewSuffix = values.suffix || "-?";
-  const previewCategory = values.category ? normalizeCategory(values.category) : t("categories.previewCategoryFallback");
+  const previewCategory = values.category
+    ? normalizeCategory(values.category)
+    : t("categories.previewCategoryFallback");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +81,12 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
         <div className="border-b border-border px-5 py-4">
           <h3 className="text-[17px] font-semibold text-foreground">
@@ -90,7 +96,9 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
 
         {/* Live preview */}
         <div className="flex items-center gap-3 border-b border-border bg-surface-subtle px-5 py-3.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("categories.preview")}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("categories.preview")}
+          </span>
           <SuffixBadge text={previewSuffix} color={values.color ?? "teal"} />
           <span className="ml-auto font-mono text-xs text-muted-foreground">{previewCategory}</span>
         </div>
@@ -165,7 +173,17 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
 
 // ─── Tiny inline form primitives (same pattern as CreateUserDialog) ───────────
 
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium text-foreground">
@@ -179,8 +197,14 @@ function Field({ label, required, hint, children }: { label: string; required?: 
 }
 
 function Input({
-  value, onChange, className, ...rest
-}: { value: string; onChange: (v: string) => void; className?: string } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "className">) {
+  value,
+  onChange,
+  className,
+  ...rest
+}: { value: string; onChange: (v: string) => void; className?: string } & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange" | "className"
+>) {
   return (
     <input
       {...rest}
@@ -195,31 +219,16 @@ function normalizeCategory(input: string): string {
   return input.replace(/\s+/g, " ").trim();
 }
 
-
 export default function AdminCategoriesPage() {
   const t = useT();
-  const {
-    suffixes,
-    isLoading,
-    isError,
-    reload,
-  } = useCategorySuffixes();
-  const {
-    createSuffix,
-    isCreating,
-  } = useCreateCategorySuffix();
-  const {
-    updateSuffix,
-    isUpdating,
-  } = useUpdateCategorySuffix();
-  const {
-    deleteSuffix,
-    isDeleting,
-  } = useDeleteCategorySuffix();
+  const { suffixes, isLoading, isError, reload } = useCategorySuffixes();
+  const { createSuffix, isCreating } = useCreateCategorySuffix();
+  const { updateSuffix, isUpdating } = useUpdateCategorySuffix();
+  const { deleteSuffix, isDeleting } = useDeleteCategorySuffix();
 
-  const [editing,        setEditing]        = useState<CategorySuffixOut | null>(null);
-  const [createOpen,     setCreateOpen]     = useState(false);
-  const [removeTarget,   setRemoveTarget]   = useState<CategorySuffixOut | null>(null);
+  const [editing, setEditing] = useState<CategorySuffixOut | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<CategorySuffixOut | null>(null);
 
   const items = suffixes;
 

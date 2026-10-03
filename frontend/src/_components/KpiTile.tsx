@@ -22,97 +22,103 @@ import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
 import { formatPct } from "@/utils/format";
 
-
 export type IconTone = "primary" | "error" | "warning" | "success" | "info" | "slate" | "muted" | "emerald" | "rose";
-
 
 const ICON_TONE: Record<IconTone, string> = {
   primary: "bg-primary/10 text-primary",
-  error:   "bg-error/15 text-error",
+  error: "bg-error/15 text-error",
   warning: "bg-warning/15 text-warning",
   success: "bg-success/15 text-success",
-  info:    "bg-info/15 text-info",
-  slate:   "bg-muted text-muted-foreground",
-  muted:   "bg-muted text-muted-foreground",
+  info: "bg-info/15 text-info",
+  slate: "bg-muted text-muted-foreground",
+  muted: "bg-muted text-muted-foreground",
   emerald: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  rose:    "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  rose: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
 };
 
 const BADGE_TONE: Record<IconTone, string> = {
   primary: "bg-primary/10 text-primary",
-  error:   "bg-error-subtle text-error",
+  error: "bg-error-subtle text-error",
   warning: "bg-warning-subtle text-warning",
   success: "bg-success-subtle text-success",
-  info:    "bg-info-subtle text-info",
-  slate:   "bg-muted text-muted-foreground",
-  muted:   "bg-muted text-muted-foreground",
+  info: "bg-info-subtle text-info",
+  slate: "bg-muted text-muted-foreground",
+  muted: "bg-muted text-muted-foreground",
   emerald: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  rose:    "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
 };
 
 const SUB_TONE: Record<IconTone, string> = {
   primary: "text-primary",
-  error:   "text-error",
+  error: "text-error",
   warning: "text-warning",
   success: "text-success",
-  info:    "text-info",
-  slate:   "text-muted-foreground",
-  muted:   "text-muted-foreground",
+  info: "text-info",
+  slate: "text-muted-foreground",
+  muted: "text-muted-foreground",
   emerald: "text-emerald-700 dark:text-emerald-300",
-  rose:    "text-rose-700 dark:text-rose-300",
+  rose: "text-rose-700 dark:text-rose-300",
 };
-
 
 export type CategoryTint = "all" | "pharmacie" | "parapharmacie";
 
-
 export interface KpiTileProps {
-  label:      ReactNode;
-  value?:     ReactNode;                                             // optional: chart cards use children instead
-  sub?:       ReactNode;
+  label: ReactNode;
+  value?: ReactNode; // optional: chart cards use children instead
+  sub?: ReactNode;
   /** Tone applied to `sub` text (defaults to muted-foreground). */
-  subTone?:   IconTone;
-  delta?:     { value: number; invertColor?: boolean } | null;       // raw % (+ = up). invertColor = down-is-good (Achats)
-  icon?:      ReactNode;
-  iconTone?:  IconTone;                                              // default "primary"
+  subTone?: IconTone;
+  delta?: { value: number; invertColor?: boolean } | null; // raw % (+ = up). invertColor = down-is-good (Achats)
+  icon?: ReactNode;
+  iconTone?: IconTone; // default "primary"
   /** Top-right count pill — Stock peremptions / Alertes severity pattern. */
-  badge?:     { label: ReactNode; tone?: IconTone };
-  hero?:      boolean;                                               // brand-aurora gradient variant
-  sparkline?: number[];                                              // hero-only inline SVG
-  href?:      string;                                                // <Link> wrapper
-  onClick?:   () => void;                                            // <button> wrapper
-  disabled?:  boolean;                                               // opacity-60 + cursor-not-allowed
+  badge?: { label: ReactNode; tone?: IconTone };
+  hero?: boolean; // brand-aurora gradient variant
+  sparkline?: number[]; // hero-only inline SVG
+  href?: string; // <Link> wrapper
+  onClick?: () => void; // <button> wrapper
+  disabled?: boolean; // opacity-60 + cursor-not-allowed
   /** Footer link "voir les alertes →" pattern (Stock cards). */
   footerLink?: { label: ReactNode; href: string };
   /** Body slot: 2×2 grid, chart, gauge, mini-stats. */
-  children?:  ReactNode;
+  children?: ReactNode;
   className?: string;
   /** Category tint — swaps the default `border-border bg-card` surface for the
    *  pharmacie or parapharmacie palette. "all" (or omitted) = neutral. Hero
    *  variant ignores this (its aurora gradient is already brand-branded). */
-  tint?:      CategoryTint;
+  tint?: CategoryTint;
 }
 
-
 const TINT_SURFACE: Record<CategoryTint, string> = {
-  all:           "border border-border bg-card",
-  pharmacie:     "border border-pharmacie-border bg-pharmacie-bg/30",
+  all: "border border-border bg-card",
+  pharmacie: "border border-pharmacie-border bg-pharmacie-bg/30",
   parapharmacie: "border border-parapharmacie-border bg-parapharmacie-bg/30",
 };
 
-
 export function KpiTile({
-  label, value, sub, subTone, delta, icon, iconTone = "primary", badge,
-  hero, sparkline, href, onClick, disabled, footerLink, children, className,
+  label,
+  value,
+  sub,
+  subTone,
+  delta,
+  icon,
+  iconTone = "primary",
+  badge,
+  hero,
+  sparkline,
+  href,
+  onClick,
+  disabled,
+  footerLink,
+  children,
+  className,
   tint = "all",
 }: KpiTileProps) {
   const interactive = !disabled && (!!href || !!onClick);
 
   const baseClass = cn(
     "relative flex flex-col gap-2.5 rounded-2xl p-5 shadow-sm transition-shadow",
-    hero
-      ? "brand-aurora text-white overflow-hidden sm:col-span-2 sm:row-span-2"
-      : TINT_SURFACE[tint],
+    hero ? "brand-aurora text-white overflow-hidden sm:col-span-2 sm:row-span-2" : TINT_SURFACE[tint],
     interactive && "cursor-pointer hover:shadow-md",
     disabled && "cursor-not-allowed opacity-60",
     className,
@@ -121,26 +127,32 @@ export function KpiTile({
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <span className={cn(
-          "text-xs font-semibold uppercase tracking-wide",
-          hero ? "text-white/80" : "text-muted-foreground",
-        )}>
+        <span
+          className={cn(
+            "text-xs font-semibold uppercase tracking-wide",
+            hero ? "text-white/80" : "text-muted-foreground",
+          )}
+        >
           {label}
         </span>
         <div className="flex shrink-0 items-center gap-2">
           {badge && (
-            <span className={cn(
-              "rounded-full px-2.5 py-1 font-mono text-sm font-bold tabular-nums",
-              hero ? "bg-white/15 text-white" : BADGE_TONE[badge.tone ?? iconTone],
-            )}>
+            <span
+              className={cn(
+                "rounded-full px-2.5 py-1 font-mono text-sm font-bold tabular-nums",
+                hero ? "bg-white/15 text-white" : BADGE_TONE[badge.tone ?? iconTone],
+              )}
+            >
               {badge.label}
             </span>
           )}
           {icon && (
-            <div className={cn(
-              "flex size-9 items-center justify-center rounded-xl",
-              hero ? "bg-white/15 text-white" : ICON_TONE[iconTone],
-            )}>
+            <div
+              className={cn(
+                "flex size-9 items-center justify-center rounded-xl",
+                hero ? "bg-white/15 text-white" : ICON_TONE[iconTone],
+              )}
+            >
               {icon}
             </div>
           )}
@@ -150,19 +162,23 @@ export function KpiTile({
       {/* No whitespace-nowrap on the value — formatMAD guarantees the digits are
           one unbreakable unit and the only wrap point is before "MAD". */}
       {value != null && (
-        <span className={cn(
-          "font-mono font-bold tabular-nums tracking-tight",
-          hero ? "text-[52px] leading-[52px]" : "text-[32px] leading-[32px]",
-        )}>
+        <span
+          className={cn(
+            "font-mono font-bold tabular-nums tracking-tight",
+            hero ? "text-[52px] leading-[52px]" : "text-[32px] leading-[32px]",
+          )}
+        >
           {value}
         </span>
       )}
 
       {(sub || delta) && (
-        <div className={cn(
-          "flex flex-wrap items-center gap-2 text-sm",
-          hero ? "text-white/70" : subTone ? SUB_TONE[subTone] : "text-muted-foreground",
-        )}>
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2 text-sm",
+            hero ? "text-white/70" : subTone ? SUB_TONE[subTone] : "text-muted-foreground",
+          )}
+        >
           {delta && <DeltaBadge value={delta.value} invertColor={delta.invertColor} hero={hero} />}
           {sub && <span className="flex items-center gap-2">{sub}</span>}
         </div>
@@ -185,7 +201,11 @@ export function KpiTile({
   );
 
   if (href) {
-    return <Link to={href} className={baseClass}>{body}</Link>;
+    return (
+      <Link to={href} className={baseClass}>
+        {body}
+      </Link>
+    );
   }
   if (onClick) {
     return (
@@ -202,7 +222,6 @@ export function KpiTile({
   return <div className={baseClass}>{body}</div>;
 }
 
-
 function DeltaBadge({ value, invertColor, hero }: { value: number; invertColor?: boolean; hero?: boolean }) {
   const positive = invertColor ? value < 0 : value > 0;
   const sign = value > 0 ? "+" : value < 0 ? "" : "";
@@ -217,16 +236,17 @@ function DeltaBadge({ value, invertColor, hero }: { value: number; invertColor?:
             : "bg-error-subtle text-error-subtle-foreground",
       )}
     >
-      {sign}{formatPct(value)}
+      {sign}
+      {formatPct(value)}
     </span>
   );
 }
 
-
 /** Tiny inline SVG sparkline at the bottom of the hero tile. White stroke + thin
  *  area fill — visible over the aurora without competing with the big number. */
 function Sparkline({ data }: { data: number[] }) {
-  const W = 320, H = 56;
+  const W = 320,
+    H = 56;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -250,7 +270,15 @@ function Sparkline({ data }: { data: number[] }) {
         </linearGradient>
       </defs>
       <path d={area} fill="url(#kpi-spark)" />
-      <path d={line} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+      <path
+        d={line}
+        fill="none"
+        stroke="#fff"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.85"
+      />
     </svg>
   );
 }

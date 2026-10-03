@@ -8,14 +8,7 @@
 import type { Page } from "@playwright/test";
 
 import { apiGet, apiPost } from "../lib/api";
-import {
-  ALL_FEATURES,
-  LOGGED_OUT,
-  loadState,
-  login,
-  saveState,
-  sessionFile,
-} from "../lib/auth";
+import { ALL_FEATURES, LOGGED_OUT, loadState, login, saveState, sessionFile } from "../lib/auth";
 import { type Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expect, test } from "../lib/fixtures";
@@ -48,43 +41,24 @@ async function open(page: Page): Promise<Row> {
   return list;
 }
 
-const row = (page: Page, email = EMP.email) =>
-  page.getByRole("row", { name: new RegExp(email) });
+const row = (page: Page, email = EMP.email) => page.getByRole("row", { name: new RegExp(email) });
 
 /** Row kebab → one menu entry. */
-async function rowAction(
-  page: Page,
-  email: string,
-  action: string,
-): Promise<void> {
-  await row(page, email)
-    .getByRole("button", { name: "Plus d'actions" })
-    .click();
-  await page
-    .getByRole("menu")
-    .getByRole("button", { name: action, exact: true })
-    .click();
+async function rowAction(page: Page, email: string, action: string): Promise<void> {
+  await row(page, email).getByRole("button", { name: "Plus d'actions" }).click();
+  await page.getByRole("menu").getByRole("button", { name: action, exact: true }).click();
 }
 
 test.describe("propriétaire", () => {
   test.use({ storageState: sessionFile("owner") });
 
-  test("inviter un employé : mot de passe tapé, toutes les permissions", async ({
-    page,
-  }) => {
+  test("inviter un employé : mot de passe tapé, toutes les permissions", async ({ page }) => {
     const all = [...ALL_FEATURES].sort();
-    expectSame(
-      await open(page),
-      { employees: [], pharmacy_features: all, my_permissions: all },
-      "équipe au départ",
-    );
+    expectSame(await open(page), { employees: [], pharmacy_features: all, my_permissions: all }, "équipe au départ");
 
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("button", { name: /^Propriétaire/ }),
-      "rôle imposé : employé",
-    ).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Propriétaire/ }), "rôle imposé : employé").toHaveCount(0);
     await dialog.getByLabel("Nom complet").fill(EMP.name);
     await dialog.getByLabel("Email").fill(EMP.email);
     await dialog.getByLabel("Mot de passe", { exact: true }).fill(EMP.password);
@@ -101,15 +75,9 @@ test.describe("propriétaire", () => {
       granted_permissions: all,
     };
     expectSame(member, want, "POST /owner/employees");
-    expectSame(
-      (await list).employees,
-      [{ id: member.id, ...want }],
-      "équipe après invitation",
-    );
+    expectSame((await list).employees, [{ id: member.id, ...want }], "équipe après invitation");
     await expect(dialog.getByText(EMP.password)).toBeVisible();
-    await expect(
-      dialog.getByRole("link", { name: "Ouvrir dans Gmail" }),
-    ).toHaveAttribute(
+    await expect(dialog.getByRole("link", { name: "Ouvrir dans Gmail" })).toHaveAttribute(
       "href",
       new RegExp(`to=${encodeURIComponent(EMP.email)}`),
     );
@@ -117,9 +85,7 @@ test.describe("propriétaire", () => {
     saveState({ employeeId: member.id });
   });
 
-  test("inviter avec un email déjà utilisé → refusé, message, équipe inchangée", async ({
-    page,
-  }) => {
+  test("inviter avec un email déjà utilisé → refusé, message, équipe inchangée", async ({ page }) => {
     await open(page);
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");
@@ -127,17 +93,13 @@ test.describe("propriétaire", () => {
     await dialog.getByLabel("Email").fill(EMP.email);
     await dialog.getByLabel("Mot de passe", { exact: true }).fill(EMP.password);
     const refused = page.waitForResponse(
-      (res) =>
-        new URL(res.url()).pathname === "/v1/owner/employees" &&
-        res.request().method() === "POST",
+      (res) => new URL(res.url()).pathname === "/v1/owner/employees" && res.request().method() === "POST",
     );
     await dialog.getByRole("button", { name: "Créer le compte" }).click();
     const res = await refused;
     expect(res.ok(), "refusé").toBe(false);
     expect((await res.json()).code, "code d'erreur").toBe("emailTaken");
-    await expect(
-      page.getByText("Un utilisateur avec cet email existe déjà.").first(),
-    ).toBeVisible();
+    await expect(page.getByText("Un utilisateur avec cet email existe déjà.").first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(row(page), "une seule ligne pour cet email").toHaveCount(1);
@@ -145,55 +107,28 @@ test.describe("propriétaire", () => {
 
   test("retirer 2 permissions (Stock, Analyse)", async ({ page }) => {
     await open(page);
-    await row(page)
-      .getByRole("button", { name: "Gérer les permissions" })
-      .click();
+    await row(page).getByRole("button", { name: "Gérer les permissions" }).click();
     const dialog = page.getByRole("dialog");
     // One switch per feature, in ALL_FEATURES order (components/shared/members/constants.ts).
-    for (const f of REMOVED)
-      await dialog.getByRole("switch").nth(ALL_FEATURES.indexOf(f)).click();
-    const saved = pageSend(
-      page,
-      "PUT",
-      `/owner/employees/${employeeId()}/permissions`,
-    );
+    for (const f of REMOVED) await dialog.getByRole("switch").nth(ALL_FEATURES.indexOf(f)).click();
+    const saved = pageSend(page, "PUT", `/owner/employees/${employeeId()}/permissions`);
     const list = pageCall(page, "/owner/employees");
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
-    expectSame(
-      await saved,
-      { id: employeeId(), granted_permissions: GRANTED },
-      "PUT permissions",
-    );
-    expectSame(
-      (await list).employees[0].granted_permissions,
-      GRANTED,
-      "permissions dans la liste",
-    );
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    expectSame(await saved, { id: employeeId(), granted_permissions: GRANTED }, "PUT permissions");
+    expectSame((await list).employees[0].granted_permissions, GRANTED, "permissions dans la liste");
   });
 
   test("réinitialiser le mot de passe", async ({ page }) => {
     await open(page);
     await rowAction(page, EMP.email, "Réinitialiser le mot de passe");
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByLabel("Nouveau mot de passe", { exact: true })
-      .fill(NEW_PASSWORD);
-    const reset = pageSend(
-      page,
-      "POST",
-      `/owner/employees/${employeeId()}/reset-password`,
-    );
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByLabel("Nouveau mot de passe", { exact: true }).fill(NEW_PASSWORD);
+    const reset = pageSend(page, "POST", `/owner/employees/${employeeId()}/reset-password`);
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     expect(await reset, "POST reset-password").toEqual({
       user_id: employeeId(),
     });
-    await expect(
-      dialog.getByText("Mot de passe réinitialisé", { exact: true }),
-    ).toBeVisible();
+    await expect(dialog.getByText("Mot de passe réinitialisé", { exact: true })).toBeVisible();
     await expect(dialog.getByText(NEW_PASSWORD)).toBeVisible();
     await dialog.getByRole("button", { name: "Fermer" }).last().click();
   });
@@ -205,21 +140,11 @@ test.describe("propriétaire", () => {
       ["Réactiver", "active", "Actif"],
     ]) {
       await test.step(action, async () => {
-        const patched = pageSend(
-          page,
-          "PATCH",
-          `/owner/employees/${employeeId()}/status`,
-        );
+        const patched = pageSend(page, "PATCH", `/owner/employees/${employeeId()}/status`);
         const list = pageCall(page, "/owner/employees");
         await rowAction(page, EMP.email, action);
-        expectSame(
-          await patched,
-          { id: employeeId(), status },
-          `PATCH status ${status}`,
-        );
-        expect((await list).employees[0].status, "statut dans la liste").toBe(
-          status,
-        );
+        expectSame(await patched, { id: employeeId(), status }, `PATCH status ${status}`);
+        expect((await list).employees[0].status, "statut dans la liste").toBe(status);
         await expect(row(page)).toContainText(label);
       });
     }
@@ -241,16 +166,9 @@ test.describe("propriétaire", () => {
     const confirm = page.getByRole("dialog", {
       name: /^Supprimer définitivement Stagiaire E2E/,
     });
-    const deleted = pageSend(
-      page,
-      "DELETE",
-      `/owner/employees/${member.id}`,
-      204,
-    );
+    const deleted = pageSend(page, "DELETE", `/owner/employees/${member.id}`, 204);
     const list = pageCall(page, "/owner/employees");
-    await confirm
-      .getByRole("button", { name: "Confirmer", exact: true })
-      .click();
+    await confirm.getByRole("button", { name: "Confirmer", exact: true }).click();
     expect(await deleted, "DELETE employee → 204, corps vide").toBeNull();
     expect(
       (await list).employees.map((e: Row) => e.email),
@@ -262,46 +180,25 @@ test.describe("propriétaire", () => {
 test.describe("employé", () => {
   test.use({ storageState: LOGGED_OUT });
 
-  test("connexion : droits restreints, 404 dans l'interface, déconnexion", async ({
-    page,
-  }) => {
+  test("connexion : droits restreints, 404 dans l'interface, déconnexion", async ({ page }) => {
     await login(page, { ...EMP, password: NEW_PASSWORD }, "employee");
     const me = await apiGet(page, "/auth/me");
-    expectSame(
-      me.user,
-      { email: EMP.email, name: EMP.name, role: "employee", status: "active" },
-      "/auth/me",
-    );
-    expect([...me.permissions].sort(), "permissions effectives").toEqual(
-      GRANTED,
-    );
+    expectSame(me.user, { email: EMP.email, name: EMP.name, role: "employee", status: "active" }, "/auth/me");
+    expect([...me.permissions].sort(), "permissions effectives").toEqual(GRANTED);
     const refused = await apiPost(page, "/owner/employees", {}, {}, 403);
-    expect(
-      refused.code,
-      "un employé ne gère pas l'équipe (POST /owner/employees)",
-    ).toBe("ownerOnly");
-    await expect(
-      page.getByRole("link", { name: "Stock", exact: true }),
-      "menu sans Stock",
-    ).toHaveCount(0);
+    expect(refused.code, "un employé ne gère pas l'équipe (POST /owner/employees)").toBe("ownerOnly");
+    await expect(page.getByRole("link", { name: "Stock", exact: true }), "menu sans Stock").toHaveCount(0);
 
     await page.goto("/stock");
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Page introuvable" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
     await page.goto("/owner/employees"); // owner-only page: same 404 inside the layout
-    await expect(
-      page.getByRole("heading", { level: 1, name: "Page introuvable" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
     await expect(page, "pas de redirection").toHaveURL(/\/owner\/employees$/);
     const logout = page.getByRole("button", {
       name: "Déconnexion",
       exact: true,
     });
-    await expect(
-      logout,
-      "le menu reste là (on peut se déconnecter)",
-    ).toBeVisible();
+    await expect(logout, "le menu reste là (on peut se déconnecter)").toBeVisible();
 
     const out = pageSend(page, "POST", "/auth/logout", 204);
     await logout.click();

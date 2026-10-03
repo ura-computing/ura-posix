@@ -19,42 +19,21 @@ import {
 } from "../lib/checks";
 import { testWindow } from "../lib/expected";
 import { expect, recordCall, test } from "../lib/fixtures";
-import {
-  columnTexts,
-  frNumber,
-  pageCall,
-  period,
-  pickCategoryType,
-  setPeriod,
-} from "../lib/ui";
+import { columnTexts, frNumber, pageCall, period, pickCategoryType, setPeriod } from "../lib/ui";
 
 const close = (got: number | null, want: number | null) =>
   want == null ? got == null : got != null && Math.abs(got - want) <= 0.011;
 
 /** The n-th tile with this label (« Chiffre d'affaires » is shown twice). */
 const tile = (page: Page, label: string, n = 0): Locator =>
-  page
-    .getByText(label, { exact: true })
-    .nth(n)
-    .locator("xpath=ancestor::*[contains(@class, 'rounded-2xl')][1]");
+  page.getByText(label, { exact: true }).nth(n).locator("xpath=ancestor::*[contains(@class, 'rounded-2xl')][1]");
 
 /** poll: after a segment switch the old numbers stay a moment after the API answer. */
-async function expectNumber(
-  read: () => Promise<string>,
-  want: number | null,
-  what: string,
-): Promise<void> {
-  await expect
-    .poll(async () => close(frNumber(await read()), want), `${what} = ${want}`)
-    .toBe(true);
+async function expectNumber(read: () => Promise<string>, want: number | null, what: string): Promise<void> {
+  await expect.poll(async () => close(frNumber(await read()), want), `${what} = ${want}`).toBe(true);
 }
 
-async function checkScreen(
-  page: Page,
-  s: Row,
-  alerts: Row,
-  stock: Row,
-): Promise<void> {
+async function checkScreen(page: Page, s: Row, alerts: Row, stock: Row): Promise<void> {
   const k = s.kpis,
     adv = s.advanced_kpis,
     tva = s.tva,
@@ -83,38 +62,22 @@ async function checkScreen(
     ["Santé du stock", 0, stock.health_pct],
   ];
   for (const [label, n, want] of tiles) {
-    const value = tile(page, label, n)
-      .locator("span.font-mono.font-bold:not(.rounded-full)")
-      .first();
-    await expectNumber(
-      () => value.innerText(),
-      want,
-      `tuile « ${label} »${n ? ` (${n + 1}e)` : ""}`,
-    );
+    const value = tile(page, label, n).locator("span.font-mono.font-bold:not(.rounded-full)").first();
+    await expectNumber(() => value.innerText(), want, `tuile « ${label} »${n ? ` (${n + 1}e)` : ""}`);
   }
 
   // CA split (whole %, rounded) and purchase lines, under their tiles.
   const ca = k.ventes_total;
   const share = (v: number) => (ca ? Math.round((v / ca) * 100) : 0);
   const caText = tile(page, "Chiffre d'affaires");
+  await expect(caText).toContainText(new RegExp(`Pharmacie\\s*${share(s.type_breakdown.pharmacie.ventes_total)}\\s*%`));
   await expect(caText).toContainText(
-    new RegExp(
-      `Pharmacie\\s*${share(s.type_breakdown.pharmacie.ventes_total)}\\s*%`,
-    ),
-  );
-  await expect(caText).toContainText(
-    new RegExp(
-      `Parapharmacie\\s*${share(s.type_breakdown.parapharmacie.ventes_total)}\\s*%`,
-    ),
+    new RegExp(`Parapharmacie\\s*${share(s.type_breakdown.parapharmacie.ventes_total)}\\s*%`),
   );
   await expect
     .poll(
       async () =>
-        frNumber(
-          (await tile(page, "Total achats").innerText()).match(
-            /([\d\s\u202f\u00a0]+)\s*lignes/,
-          )?.[1] ?? null,
-        ),
+        frNumber((await tile(page, "Total achats").innerText()).match(/([\d\s\u202f\u00a0]+)\s*lignes/)?.[1] ?? null),
       "achats : lignes",
     )
     .toBe(k.achats_count);
@@ -124,45 +87,29 @@ async function checkScreen(
     ["Marge brute", m.marge_brute_dh],
     ["Marge nette", m.marge_nette_dh],
   ] as const) {
-    const value = page
-      .getByText(label, { exact: true })
-      .locator("xpath=following-sibling::span[1]");
-    await expectNumber(
-      () => value.innerText(),
-      want,
-      `santé financière « ${label} »`,
-    );
+    const value = page.getByText(label, { exact: true }).locator("xpath=following-sibling::span[1]");
+    await expectNumber(() => value.innerText(), want, `santé financière « ${label} »`);
   }
 
   // Top categories table: same order as the API, CA and marge % per row.
-  const table = page
-    .locator("table")
-    .filter({
-      has: page.getByRole("columnheader", { name: "Part", exact: true }),
-    });
+  const table = page.locator("table").filter({
+    has: page.getByRole("columnheader", { name: "Part", exact: true }),
+  });
   const cats = s.top_categories as Row[];
-  await expect
-    .poll(() => columnTexts(page, "Catégorie", table), "catégories")
-    .toEqual(cats.map((c) => c.category));
+  await expect.poll(() => columnTexts(page, "Catégorie", table), "catégories").toEqual(cats.map((c) => c.category));
   const caCol = (await columnTexts(page, "CA (MAD)", table)).map(frNumber);
   const margeCol = (await columnTexts(page, "Marge %", table)).map(frNumber);
   cats.forEach((c, i) => {
-    expect(
-      close(caCol[i], c.total),
-      `catégorie « ${c.category} » CA ${caCol[i]} ≠ ${c.total}`,
-    ).toBe(true);
-    expect(
-      close(margeCol[i], c.marge_pct),
-      `catégorie « ${c.category} » marge ${margeCol[i]} ≠ ${c.marge_pct}`,
-    ).toBe(true);
+    expect(close(caCol[i], c.total), `catégorie « ${c.category} » CA ${caCol[i]} ≠ ${c.total}`).toBe(true);
+    expect(close(margeCol[i], c.marge_pct), `catégorie « ${c.category} » marge ${margeCol[i]} ≠ ${c.marge_pct}`).toBe(
+      true,
+    );
   });
 }
 
 test.use({ storageState: sessionFile("owner") });
 
-test("rapport: every indicator × Mixte / Pharmacie / Parapharmacie", async ({
-  page,
-}) => {
+test("rapport: every indicator × Mixte / Pharmacie / Parapharmacie", async ({ page }) => {
   const w = testWindow();
   // First load (no period yet = whole history), timed for the speed gate: goto → every call
   // answered → the sections (incl. the Optimisation tile) are on screen.
@@ -185,9 +132,7 @@ test("rapport: every indicator × Mixte / Pharmacie / Parapharmacie", async ({
   const stock = await stockCall;
   checkStockSummary(stock);
   await first;
-  await expect(
-    page.getByText("Optimisation", { exact: true }).first(),
-  ).toBeVisible();
+  await expect(page.getByText("Optimisation", { exact: true }).first()).toBeVisible();
   recordCall({
     method: "FLOW",
     path: "rapport/first-load",
@@ -219,11 +164,8 @@ test("rapport: every indicator × Mixte / Pharmacie / Parapharmacie", async ({
       const tile = page
         .getByText("Écart meilleur ↔ pire produit", { exact: true })
         .locator("xpath=ancestor::*[contains(@class, 'rounded-2xl')][1]");
-      const digits = async () =>
-        ((await tile.textContent()) ?? "").replace(/\D/g, "");
-      await expect
-        .poll(digits, `Optimisation affichée (${gain})`)
-        .toBe(String(Math.round(Math.abs(gain) * 100)));
+      const digits = async () => ((await tile.textContent()) ?? "").replace(/\D/g, "");
+      await expect.poll(digits, `Optimisation affichée (${gain})`).toBe(String(Math.round(Math.abs(gain) * 100)));
       await checkScreen(page, s, al, stock);
     });
   }

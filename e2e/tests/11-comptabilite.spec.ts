@@ -7,12 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import { sessionFile } from "../lib/auth";
-import {
-  CATEGORY_TYPES,
-  checkLedgerPage,
-  checkStats,
-  type Row,
-} from "../lib/checks";
+import { CATEGORY_TYPES, checkLedgerPage, checkStats, type Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
@@ -31,9 +26,7 @@ test.use({ storageState: sessionFile("owner") });
 
 async function open(page: Page): Promise<void> {
   await page.goto("/comptabilite");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Comptabilité", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Comptabilité", exact: true })).toBeVisible();
 }
 
 /** The 8 KPI rows on screen = the /stats answer (label span, value = next span). */
@@ -49,15 +42,9 @@ async function checkKpiCards(page: Page, s: Row): Promise<void> {
     ["TVA à déclarer", s.tva.tva_a_declarer],
   ];
   for (const [label, want] of rows) {
-    const value = page
-      .getByText(label, { exact: true })
-      .first()
-      .locator("xpath=following-sibling::span[1]");
+    const value = page.getByText(label, { exact: true }).first().locator("xpath=following-sibling::span[1]");
     await expect
-      .poll(
-        async () => Math.abs((frNumber(await value.innerText()) ?? NaN) - want),
-        `« ${label} » = ${want}`,
-      )
+      .poll(async () => Math.abs((frNumber(await value.innerText()) ?? NaN) - want), `« ${label} » = ${want}`)
       .toBeLessThanOrEqual(0.011);
   }
 }
@@ -91,8 +78,7 @@ const MONTHS_SHORT = [
   "Déc.",
 ];
 /** « Octobre 2026 » for "2026-10" (the month picker's button). */
-const monthLabel = (ym: string) =>
-  `${MONTHS[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`;
+const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`;
 /** Another month of the same year (the picker shows one year at a time). */
 const otherMonth = (ym: string) =>
   `${ym.slice(0, 4)}-${String(ym.endsWith("-01") ? 2 : Number(ym.slice(5)) - 1).padStart(2, "0")}`;
@@ -116,33 +102,19 @@ interface Amounts {
 
 /** Click a method card, type the 3 values, save. Resolves with the POST answer
  *  and the month's list the page reloads after it. */
-async function savePayment(
-  page: Page,
-  card: RegExp,
-  v: Amounts,
-): Promise<{ saved: Row; list: Row[] }> {
+async function savePayment(page: Page, card: RegExp, v: Amounts): Promise<{ saved: Row; list: Row[] }> {
   await page.getByRole("button", { name: card }).click();
   const dialog = page.getByRole("dialog");
-  await dialog
-    .getByLabel("Pharmacie (MAD)", { exact: true })
-    .fill(String(v.pharmacie_amount));
-  await dialog
-    .getByLabel("Parapharmacie (MAD)", { exact: true })
-    .fill(String(v.parapharmacie_amount));
-  await dialog
-    .getByLabel("Nombre de transactions", { exact: true })
-    .fill(String(v.count));
+  await dialog.getByLabel("Pharmacie (MAD)", { exact: true }).fill(String(v.pharmacie_amount));
+  await dialog.getByLabel("Parapharmacie (MAD)", { exact: true }).fill(String(v.parapharmacie_amount));
+  await dialog.getByLabel("Nombre de transactions", { exact: true }).fill(String(v.count));
   const saved = pageSend(page, "POST", "/accounting/payments");
   const list = pageCall(page, "/accounting/payments", { month: thisMonth() });
-  await dialog
-    .getByRole("button", { name: "Enregistrer", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
   return { saved: await saved, list: await list };
 }
 
-test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ventes", async ({
-  page,
-}) => {
+test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ventes", async ({ page }) => {
   const w = testWindow();
   await open(page);
   const ledger = pageCall(page, "/ventes", {
@@ -169,14 +141,9 @@ test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ven
   }
 
   await test.step("Excel (Parapharmacie)", async () => {
-    const x = await downloadXlsx(page, () =>
-      page.getByRole("button", { name: "Exporter Excel" }).click(),
-    );
-    expect(x.filename, "nom du fichier").toBe(
-      `APCM - COMPTABILITE ${w.date_from} - ${w.date_to}.xlsx`,
-    );
-    const cell = (label: string) =>
-      (x.rows as unknown[][]).find((r) => r[0] === label)?.[1];
+    const x = await downloadXlsx(page, () => page.getByRole("button", { name: "Exporter Excel" }).click());
+    expect(x.filename, "nom du fichier").toBe(`APCM - COMPTABILITE ${w.date_from} - ${w.date_to}.xlsx`);
+    const cell = (label: string) => (x.rows as unknown[][]).find((r) => r[0] === label)?.[1];
     expect(cell("Type"), "type en français").toBe("Parapharmacie");
     expect(cell("Avec produits spéciaux")).toBe("Non");
     const want: [string, number][] = [
@@ -191,8 +158,7 @@ test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ven
       ["Pharmacie", last.type_breakdown.pharmacie.ventes_total],
       ["Parapharmacie", last.type_breakdown.parapharmacie.ventes_total],
     ];
-    for (const [label, value] of want)
-      expect(cell(label), `Excel « ${label} »`).toBe(value);
+    for (const [label, value] of want) expect(cell(label), `Excel « ${label} »`).toBe(value);
   });
   checkLedgerPage("ventes", await ledger, expected().ventes_list, 1, 25);
 
@@ -212,23 +178,14 @@ test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ven
       sort_order: "desc",
       include_non_declared: "false",
     });
-    await page
-      .getByRole("columnheader", { name: "Date", exact: true })
-      .getByRole("button")
-      .click();
+    await page.getByRole("columnheader", { name: "Date", exact: true }).getByRole("button").click();
     const s = await sorted;
     const dates = (s.data as Row[]).map((r) => r.date);
     expect(dates, "dates décroissantes").toEqual([...dates].sort().reverse());
-    await expect(page.locator("table tbody tr").first()).toContainText(
-      s.data[0].product,
-    );
+    await expect(page.locator("table tbody tr").first()).toContainText(s.data[0].product);
     // The « Produit » cell = name + PID on a 2nd line: compare the name.
-    const names = (await columnTexts(page, "Produit")).map(
-      (c) => c.split("\n")[0],
-    );
-    expect(names, "lignes affichées = ordre de l'API").toEqual(
-      (s.data as Row[]).map((r) => r.product),
-    );
+    const names = (await columnTexts(page, "Produit")).map((c) => c.split("\n")[0]);
+    expect(names, "lignes affichées = ordre de l'API").toEqual((s.data as Row[]).map((r) => r.product));
   });
 
   const withSpecial = pageCall(page, "/stats", {
@@ -244,9 +201,7 @@ test("comptabilité : KPI × Mixte / Pharmacie / Parapharmacie + journal des ven
   checkStats(await withSpecial, "parapharmacie");
 });
 
-test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprimer", async ({
-  page,
-}) => {
+test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprimer", async ({ page }) => {
   const month = thisMonth();
   const list0 = pageCall(page, "/accounting/payments", { month });
   await open(page);
@@ -261,9 +216,7 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
   const tpe = { month, method: "tpe", ...tpe1 };
   expectSame(created.saved, tpe, "POST tpe (création)");
   expectSame(created.list, [tpe], "paiements après création");
-  await expect(page.getByRole("button", { name: /^TPE/ })).toContainText(
-    "87 transactions",
-  );
+  await expect(page.getByRole("button", { name: /^TPE/ })).toContainText("87 transactions");
 
   const tpe2 = {
     pharmacie_amount: 13000,
@@ -276,11 +229,7 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
     { id: created.saved.id, month, method: "tpe", ...tpe2 },
     "POST tpe (modification = même ligne)",
   );
-  expectSame(
-    edited.list,
-    [{ ...tpe, ...tpe2 }],
-    "paiements après modification",
-  );
+  expectSame(edited.list, [{ ...tpe, ...tpe2 }], "paiements après modification");
 
   const esp1 = {
     pharmacie_amount: 8000,
@@ -290,29 +239,15 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
   const second = await savePayment(page, /^Espèces/, esp1);
   const esp = { month, method: "especes", ...esp1 };
   expectSame(second.saved, esp, "POST especes");
-  expectSame(
-    second.list,
-    [esp, { ...tpe, ...tpe2 }],
-    "paiements triés par mode",
-  );
+  expectSame(second.list, [esp, { ...tpe, ...tpe2 }], "paiements triés par mode");
 
   await page.getByRole("button", { name: /^TPE/ }).click();
-  const deleted = pageSend(
-    page,
-    "DELETE",
-    `/accounting/payments/${created.saved.id}`,
-    204,
-  );
+  const deleted = pageSend(page, "DELETE", `/accounting/payments/${created.saved.id}`, 204);
   const list = pageCall(page, "/accounting/payments", { month });
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Supprimer", exact: true })
-    .click();
+  await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
   expect(await deleted, "DELETE tpe → 204, corps vide").toBeNull();
   expectSame(await list, [esp], "paiements après suppression");
-  await expect(page.getByRole("button", { name: /^TPE/ })).toContainText(
-    "Ajouter",
-  );
+  await expect(page.getByRole("button", { name: /^TPE/ })).toContainText("Ajouter");
 
   await test.step("autre mois : champ Mois du dialogue + sélecteur du mois de la page", async () => {
     const other = otherMonth(month);
@@ -329,16 +264,10 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
     await monthButton.click();
     await dialog.getByRole("button", { name: short, exact: true }).click();
     await dialog.getByLabel("Pharmacie (MAD)", { exact: true }).fill("500");
-    await dialog
-      .getByLabel("Parapharmacie (MAD)", { exact: true })
-      .fill("250.5");
-    await dialog
-      .getByLabel("Nombre de transactions", { exact: true })
-      .fill("3");
+    await dialog.getByLabel("Parapharmacie (MAD)", { exact: true }).fill("250.5");
+    await dialog.getByLabel("Nombre de transactions", { exact: true }).fill("3");
     const saved = pageSend(page, "POST", "/accounting/payments");
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     const chq = {
       month: other,
       method: "cheques",
@@ -348,26 +277,17 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
     };
     const c = await saved;
     expectSame(c, chq, "POST chèques (autre mois)");
-    await expect(page.getByRole("button", { name: /^Chèques/ })).toContainText(
-      "Ajouter",
-    );
+    await expect(page.getByRole("button", { name: /^Chèques/ })).toContainText("Ajouter");
 
     // Page picker → that month: only the cheque; delete it to leave the data as found.
     const otherList = pageCall(page, "/accounting/payments", { month: other });
-    await page
-      .getByRole("button", { name: monthLabel(month), exact: true })
-      .click();
+    await page.getByRole("button", { name: monthLabel(month), exact: true }).click();
     await page.getByRole("button", { name: short, exact: true }).click();
     expectSame(await otherList, [chq], `paiements de ${other}`);
-    await expect(page.getByRole("button", { name: /^Chèques/ })).toContainText(
-      "3 transactions",
-    );
+    await expect(page.getByRole("button", { name: /^Chèques/ })).toContainText("3 transactions");
     await page.getByRole("button", { name: /^Chèques/ }).click();
     const gone = pageSend(page, "DELETE", `/accounting/payments/${c.id}`, 204);
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Supprimer", exact: true })
-      .click();
+    await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
     expect(await gone, "DELETE chèques").toBeNull();
   });
 });

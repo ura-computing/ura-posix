@@ -21,6 +21,7 @@ WHERE clause excludes already-populated rows.
 Downgrade is a no-op — once a NULL has been replaced with an owner id, we have
 no record of which rows were originally NULL.
 """
+
 from __future__ import annotations
 
 from alembic import op
@@ -38,7 +39,8 @@ def upgrade() -> None:
     # `import_batches` JOIN — pulling them in a separate subquery avoids
     # multiplying the count by the batch-row fan-out (which would otherwise
     # make `COUNT(u.id) = 1` impossible for any pharmacy with > 1 NULL batch).
-    op.get_bind().execute(text("""
+    op.get_bind().execute(
+        text("""
         UPDATE import_batches
         SET    created_by_user_id = sub.owner_id
         FROM (
@@ -50,7 +52,8 @@ def upgrade() -> None:
         ) sub
         WHERE  import_batches.pharmacy_id = sub.pharmacy_id
           AND  import_batches.created_by_user_id IS NULL
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:

@@ -4,13 +4,13 @@ import { motion } from "framer-motion";
 import { cn } from "@/utils/cn";
 
 export interface TabItem<K extends string = string> {
-  id:    K;
+  id: K;
   label: string;
   icon?: ReactNode;
 }
 
 interface TabBarProps<K extends string> {
-  tabs:     TabItem<K>[];
+  tabs: TabItem<K>[];
   activeId: K;
   onChange: (id: K) => void;
 }

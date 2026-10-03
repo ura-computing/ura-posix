@@ -23,58 +23,47 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-
 const DEFAULT_FILTERS: AnalyseFilters = {
-  date_from:     null,
-  date_to:       null,
+  date_from: null,
+  date_to: null,
   category_type: "all",
 };
 
 // Which row field carries the "label" of each mode — used for autocomplete.
 const MODE_LABEL_FIELD: Record<MargeMode, keyof AnalyseMargeRow> = {
-  produit:     "product",
-  categorie:   "category",
+  produit: "product",
+  categorie: "category",
   laboratoire: "laboratoire",
-  grossiste:   "grossiste",
-  operateur:   "client",
-  mois:        "mois",
-  annee:       "annee",
-  liste:       "product",
+  grossiste: "grossiste",
+  operateur: "client",
+  mois: "mois",
+  annee: "annee",
+  liste: "product",
 };
 
-
 export function useAnalysePage() {
-  const [filters,  setFilters]  = useState<AnalyseFilters>(DEFAULT_FILTERS);
-  const [mode,     setMode]     = useState<MargeMode>("produit");
-  const [search,   setSearch]   = useState("");
-  const [page,     setPage]     = useState(1);
+  const [filters, setFilters] = useState<AnalyseFilters>(DEFAULT_FILTERS);
+  const [mode, setMode] = useState<MargeMode>("produit");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   // Uploaded Liste items, kept so date/category filter changes can re-run Liste.
   const [listeItems, setListeItems] = useState<ListeItem[] | null>(null);
   // PG-014: client-side sort — rows are fully in memory, so sorting covers the
   // ENTIRE filtered set (not just the visible page), as the QA rule requires.
-  const [sortBy,    setSortBy]    = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Auto-fetch query for 7 group-by modes; Liste uses the mutation below.
   // In année mode the search box filters ventes by PRODUCT server-side (so each
   // month reflects that product's quantities); other modes filter rows client-side.
   const margeFilters = mode === "annee" ? { ...filters, product: search.trim() || null } : filters;
-  const {
-    analyse,
-    isLoading: margeLoading,
-    error: margeError,
-  } = useAnalyseMarge(margeFilters, mode);
-  const {
-    runListe,
-    liste,
-    isListeLoading,
-    listeError,
-  } = useAnalyseListe();
+  const { analyse, isLoading: margeLoading, error: margeError } = useAnalyseMarge(margeFilters, mode);
+  const { runListe, liste, isListeLoading, listeError } = useAnalyseListe();
 
   // When mode === liste, the active result lives on the mutation; otherwise on the query.
   const activeData = mode === "liste" ? liste : analyse;
-  const isLoading  = mode === "liste" ? isListeLoading : margeLoading;
+  const isLoading = mode === "liste" ? isListeLoading : margeLoading;
 
   // Client-side search filter — accent/case-insensitive, `*` wildcard aware
   // (prefix `rino*`, suffix `*enil`, infix `ri*il`), each token may match any field.
@@ -111,7 +100,7 @@ export function useAnalysePage() {
     if (q.length < 2 || !activeData?.rows?.length) return null;
     const field = MODE_LABEL_FIELD[mode];
     const seen = new Set<string>();
-    const out:  string[] = [];
+    const out: string[] = [];
     for (const r of activeData.rows) {
       const label = String(r[field] ?? "").trim();
       if (!label || seen.has(label) || !matchesText(label, search)) continue;
@@ -122,7 +111,9 @@ export function useAnalysePage() {
   }, [activeData, mode, search]);
 
   // Reset to page 1 whenever the active dataset or filters change.
-  useEffect(() => { setPage(1); }, [mode, filters, search]);
+  useEffect(() => {
+    setPage(1);
+  }, [mode, filters, search]);
 
   // Liste is a mutation (no auto-refetch like the query modes). Re-run it when the
   // date / category (Mixte / Pharmacie / Parapharmacie) filters change so the rows
@@ -148,7 +139,7 @@ export function useAnalysePage() {
       const aEmpty = va == null || va === "";
       const bEmpty = vb == null || vb === "";
       if (aEmpty && bEmpty) return 0;
-      if (aEmpty) return 1;   // empties last, regardless of direction
+      if (aEmpty) return 1; // empties last, regardless of direction
       if (bEmpty) return -1;
       if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
       return String(va).localeCompare(String(vb), "fr") * dir;
@@ -165,7 +156,7 @@ export function useAnalysePage() {
     page,
     pageSize,
     total: sortedRows.length,
-    onPage:     setPage,
+    onPage: setPage,
     onPageSize: setPageSize,
   };
 
@@ -193,7 +184,7 @@ export function useAnalysePage() {
       cols.map((c) => {
         const v = c.raw(row);
         return v == null ? "" : v;
-      })
+      }),
     );
     downloadXlsx(
       [header, ...dataRows],
@@ -224,15 +215,20 @@ export function useAnalysePage() {
   }
 
   return {
-    filters, setFilters,
-    mode,    setMode: changeMode,
-    search,  setSearch,
+    filters,
+    setFilters,
+    mode,
+    setMode: changeMode,
+    search,
+    setSearch,
     suggestions,
-    sortBy, sortOrder, toggleSort,
+    sortBy,
+    sortOrder,
+    toggleSort,
     isLoading,
-    error:    margeError ?? listeError,
+    error: margeError ?? listeError,
     kpis,
-    rows:     pageRows,
+    rows: pageRows,
     pagination,
     totalRows: activeData?.rows.length ?? 0,
     handleExport,
@@ -250,19 +246,26 @@ export function useAnalysePage() {
  */
 
 export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: API.stats.analyseMarge.key(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
-    queryFn:  () => api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, { params: {
-      mode, date_from: filters.date_from, date_to: filters.date_to,
-      category_type: filters.category_type, product: filters.product,
-    } }),
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: API.stats.analyseMarge.key(
+      mode,
+      filters.date_from,
+      filters.date_to,
+      filters.category_type,
+      filters.product,
+    ),
+    queryFn: () =>
+      api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, {
+        params: {
+          mode,
+          date_from: filters.date_from,
+          date_to: filters.date_to,
+          category_type: filters.category_type,
+          product: filters.product,
+        },
+      }),
     staleTime: 60_000,
-    enabled:   mode !== "liste",   // Liste uses the mutation hook below
+    enabled: mode !== "liste", // Liste uses the mutation hook below
   });
   return {
     analyse: data,
@@ -272,13 +275,7 @@ export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
 }
 
 export function useAnalyseListe() {
-  const {
-    mutate,
-    data,
-    isPending,
-    isError,
-    error,
-  } = useMutation({
+  const { mutate, data, isPending, isError, error } = useMutation({
     mutationFn: (body: ListeRequest) => api.post<AnalyseMargeResponse>(API.stats.analyseListe.url, body),
   });
   return {
@@ -313,29 +310,33 @@ const n = (v: number | null | undefined) => Number(v ?? 0);
 /** Python `a or b` semantics: falls back when a is null/undefined OR 0. */
 const orFb = (a: number | null | undefined, b: number | null | undefined) => n(a) || n(b);
 
-const maxBy = <T,>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) > f(a) ? b : a));
-const minBy = <T,>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) < f(a) ? b : a));
+const maxBy = <T>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) > f(a) ? b : a));
+const minBy = <T>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) < f(a) ? b : a));
 
 export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
-  const totalCa     = rows.reduce((s, r) => s + n(r.ca), 0);
+  const totalCa = rows.reduce((s, r) => s + n(r.ca), 0);
   const totalUnites = rows.reduce((s, r) => s + n(r.qty), 0);
-  const unitsAvail  = rows.reduce((s, r) => s + n(r.stock_dispo), 0);
+  const unitsAvail = rows.reduce((s, r) => s + n(r.stock_dispo), 0);
   const puPurchased = rows.reduce((s, r) => s + n(r.total_achat_cost), 0);
-  const ppvAvail    = rows.reduce((s, r) => s + n(r.ppv_potentiel), 0);
+  const ppvAvail = rows.reduce((s, r) => s + n(r.ppv_potentiel), 0);
 
   const kpis: AnalyseMargeKpis = {
-    total_ventes_dh:       round2(totalCa),
-    total_ventes_unites:   round2(totalUnites),
+    total_ventes_dh: round2(totalCa),
+    total_ventes_unites: round2(totalUnites),
     // Backend: `round(x, 2) if x else None` — zero sums render as "—".
-    total_units_available: unitsAvail  ? round2(unitsAvail)  : null,
-    total_pu_purchased:    puPurchased ? round2(puPurchased) : null,
-    ppv_total_available:   ppvAvail    ? round2(ppvAvail)    : null,
-    marge_pct_avg: null, marge_pct_min: null, marge_pct_max: null,
-    marge_dh_avg:  null, marge_dh_min:  null, marge_dh_max:  null,
+    total_units_available: unitsAvail ? round2(unitsAvail) : null,
+    total_pu_purchased: puPurchased ? round2(puPurchased) : null,
+    ppv_total_available: ppvAvail ? round2(ppvAvail) : null,
+    marge_pct_avg: null,
+    marge_pct_min: null,
+    marge_pct_max: null,
+    marge_dh_avg: null,
+    marge_dh_min: null,
+    marge_dh_max: null,
     difference_gain_dh: null,
   };
 
-  const margeRows    = rows.filter((r) => r.marge_pct != null);
+  const margeRows = rows.filter((r) => r.marge_pct != null);
   const margeAvgRows = rows.filter((r) => r.marge_pct_avg != null);
 
   if (margeRows.length) {
@@ -344,42 +345,41 @@ export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
     const totalQty = margeRows.reduce((s, r) => s + n(r.qty), 0);
     if (totalQty) {
       const sumQtyPpv = margeRows.reduce((s, r) => s + n(r.qty) * n(r.ppv), 0);
-      const sumQtyPu  = margeRows.reduce((s, r) => s + n(r.qty) * n(r.pu),  0);
+      const sumQtyPu = margeRows.reduce((s, r) => s + n(r.qty) * n(r.pu), 0);
       kpis.marge_pct_avg = sumQtyPpv ? round3((1 - sumQtyPu / sumQtyPpv) * 100) : null;
-      kpis.marge_dh_avg  = round2(
-        margeRows.reduce((s, r) => s + n(r.qty) * n(r.marge_dh), 0) / totalQty);
+      kpis.marge_dh_avg = round2(margeRows.reduce((s, r) => s + n(r.qty) * n(r.marge_dh), 0) / totalQty);
     }
-    const bestPctVal  = (r: AnalyseMargeRow) => orFb(r.marge_pct_best,  r.marge_pct);
+    const bestPctVal = (r: AnalyseMargeRow) => orFb(r.marge_pct_best, r.marge_pct);
     const worstPctVal = (r: AnalyseMargeRow) => orFb(r.marge_pct_worst, r.marge_pct);
-    const bestDhVal   = (r: AnalyseMargeRow) => orFb(r.marge_dh_best,   r.marge_dh);
-    const worstDhVal  = (r: AnalyseMargeRow) => orFb(r.marge_dh_worst,  r.marge_dh);
+    const bestDhVal = (r: AnalyseMargeRow) => orFb(r.marge_dh_best, r.marge_dh);
+    const worstDhVal = (r: AnalyseMargeRow) => orFb(r.marge_dh_worst, r.marge_dh);
     const bp = maxBy(margeRows, bestPctVal);
     const wp = minBy(margeRows, worstPctVal);
     const bd = maxBy(margeRows, bestDhVal);
     const wd = minBy(margeRows, worstDhVal);
-    const pt = (r: AnalyseMargeRow, value: number): MargeKpiPoint =>
-      ({ label: r.product ?? "", value, qty: n(r.qty) });
+    const pt = (r: AnalyseMargeRow, value: number): MargeKpiPoint => ({ label: r.product ?? "", value, qty: n(r.qty) });
     kpis.marge_pct_max = pt(bp, bestPctVal(bp));
     kpis.marge_pct_min = pt(wp, worstPctVal(wp));
-    kpis.marge_dh_max  = pt(bd, bestDhVal(bd));
-    kpis.marge_dh_min  = pt(wd, worstDhVal(wd));
+    kpis.marge_dh_max = pt(bd, bestDhVal(bd));
+    kpis.marge_dh_min = pt(wd, worstDhVal(wd));
     // NB: backend multiplies by the PLAIN marge_dh here, not the best/worst variant.
     kpis.difference_gain_dh = round2(n(bd.qty) * n(bd.marge_dh) - n(wd.qty) * n(wd.marge_dh));
   } else if (margeAvgRows.length) {
     // Branch B — categorie/grossiste/laboratoire rows (pre-averaged per group).
-    const sample   = margeAvgRows[0] as Record<string, unknown>;
-    const labelKey = sample.category !== undefined ? "category"
-      : sample.grossiste !== undefined ? "grossiste"
-      : sample.laboratoire !== undefined ? "laboratoire"
-      : "category";
-    const labelOf = (r: AnalyseMargeRow) =>
-      String((r as unknown as Record<string, unknown>)[labelKey] ?? "");
+    const sample = margeAvgRows[0] as Record<string, unknown>;
+    const labelKey =
+      sample.category !== undefined
+        ? "category"
+        : sample.grossiste !== undefined
+          ? "grossiste"
+          : sample.laboratoire !== undefined
+            ? "laboratoire"
+            : "category";
+    const labelOf = (r: AnalyseMargeRow) => String((r as unknown as Record<string, unknown>)[labelKey] ?? "");
     const totalQty = margeAvgRows.reduce((s, r) => s + n(r.qty), 0);
     if (totalQty) {
-      kpis.marge_pct_avg = round3(
-        margeAvgRows.reduce((s, r) => s + n(r.qty) * n(r.marge_pct_avg), 0) / totalQty);
-      kpis.marge_dh_avg  = round2(
-        margeAvgRows.reduce((s, r) => s + n(r.qty) * n(r.marge_dh_avg), 0) / totalQty);
+      kpis.marge_pct_avg = round3(margeAvgRows.reduce((s, r) => s + n(r.qty) * n(r.marge_pct_avg), 0) / totalQty);
+      kpis.marge_dh_avg = round2(margeAvgRows.reduce((s, r) => s + n(r.qty) * n(r.marge_dh_avg), 0) / totalQty);
     }
     const bp = maxBy(margeAvgRows, (r) => n(r.marge_pct_avg));
     const wp = minBy(margeAvgRows, (r) => n(r.marge_pct_avg));
@@ -387,10 +387,9 @@ export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
     const wd = minBy(margeAvgRows, (r) => n(r.marge_dh_avg));
     kpis.marge_pct_max = { label: labelOf(bp), value: n(bp.marge_pct_avg), qty: n(bp.qty) };
     kpis.marge_pct_min = { label: labelOf(wp), value: n(wp.marge_pct_avg), qty: n(wp.qty) };
-    kpis.marge_dh_max  = { label: labelOf(bd), value: n(bd.marge_dh_avg),  qty: n(bd.qty) };
-    kpis.marge_dh_min  = { label: labelOf(wd), value: n(wd.marge_dh_avg),  qty: n(wd.qty) };
-    kpis.difference_gain_dh = round2(
-      n(bd.qty) * n(bd.marge_dh_avg) - n(wd.qty) * n(wd.marge_dh_avg));
+    kpis.marge_dh_max = { label: labelOf(bd), value: n(bd.marge_dh_avg), qty: n(bd.qty) };
+    kpis.marge_dh_min = { label: labelOf(wd), value: n(wd.marge_dh_avg), qty: n(wd.qty) };
+    kpis.difference_gain_dh = round2(n(bd.qty) * n(bd.marge_dh_avg) - n(wd.qty) * n(wd.marge_dh_avg));
   }
 
   return kpis;

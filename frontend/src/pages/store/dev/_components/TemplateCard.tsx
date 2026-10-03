@@ -9,45 +9,73 @@ import { Check } from "lucide-react";
 import { TEMPLATE_LABEL, type StoreTemplate } from "@/types/storeWebsite";
 import { cn } from "@/utils/cn";
 
-
 interface Preview {
-  palette:     [string, string, string];
+  palette: [string, string, string];
   displayFont: string;
-  sample:      string;
+  sample: string;
   /** CSS animation name — matches a @keyframes block below. */
-  motion:      "bloom" | "ink" | "shine" | "wave" | "gold";
-  duration:    string;
+  motion: "bloom" | "ink" | "shine" | "wave" | "gold";
+  duration: string;
 }
 
 const TEMPLATE_PREVIEW: Record<StoreTemplate, Preview> = {
-  lumiere:   { palette: ["#F4C9D9", "#9BE0C4", "#E9C887"], displayFont: "'Fraunces', 'Playfair Display', serif",         sample: "L",  motion: "bloom", duration: "9s" },
-  classique: { palette: ["#F4EEDF", "#C9BFA3", "#6B584A"], displayFont: "'Cormorant', 'Playfair Display', serif",        sample: "A",  motion: "ink",   duration: "12s" },
-  moderne:   { palette: ["#F5F5F5", "#0F172A", "#F97316"], displayFont: "'Space Grotesk', 'Inter', sans-serif",           sample: "M",  motion: "shine", duration: "7s" },
-  apotheose: { palette: ["#0A0A0A", "#C7A662", "#F5E6C9"], displayFont: "'Playfair Display', 'Cormorant', serif",         sample: "Ap", motion: "gold",  duration: "10s" },
-  elegance:  { palette: ["#1E293B", "#7C3AED", "#F59E0B"], displayFont: "'Playfair Display', 'Cormorant', serif",         sample: "É",  motion: "wave",  duration: "11s" },
+  lumiere: {
+    palette: ["#F4C9D9", "#9BE0C4", "#E9C887"],
+    displayFont: "'Fraunces', 'Playfair Display', serif",
+    sample: "L",
+    motion: "bloom",
+    duration: "9s",
+  },
+  classique: {
+    palette: ["#F4EEDF", "#C9BFA3", "#6B584A"],
+    displayFont: "'Cormorant', 'Playfair Display', serif",
+    sample: "A",
+    motion: "ink",
+    duration: "12s",
+  },
+  moderne: {
+    palette: ["#F5F5F5", "#0F172A", "#F97316"],
+    displayFont: "'Space Grotesk', 'Inter', sans-serif",
+    sample: "M",
+    motion: "shine",
+    duration: "7s",
+  },
+  apotheose: {
+    palette: ["#0A0A0A", "#C7A662", "#F5E6C9"],
+    displayFont: "'Playfair Display', 'Cormorant', serif",
+    sample: "Ap",
+    motion: "gold",
+    duration: "10s",
+  },
+  elegance: {
+    palette: ["#1E293B", "#7C3AED", "#F59E0B"],
+    displayFont: "'Playfair Display', 'Cormorant', serif",
+    sample: "É",
+    motion: "wave",
+    duration: "11s",
+  },
 };
 
-const [P1, P2, P3] = [0, 1, 2] as const;   // helper indices for palette entries
-
+const [P1, P2, P3] = [0, 1, 2] as const; // helper indices for palette entries
 
 export interface TemplateCardProps {
   template: StoreTemplate;
-  active:   boolean;
-  onClick:  () => void;
+  active: boolean;
+  onClick: () => void;
 }
-
 
 export function TemplateCard({ template, active, onClick }: TemplateCardProps) {
   const p = TEMPLATE_PREVIEW[template];
 
   const gradient = `linear-gradient(135deg, ${p.palette[P1]} 0%, ${p.palette[P2]} 50%, ${p.palette[P3]} 100%)`;
-  const sampleColor = template === "apotheose"
-    ? "#F5E6C9"                      // gold on dark
-    : template === "elegance"
-      ? "#F59E0B"                    // amber on slate
-      : template === "moderne"
-        ? "#0F172A"                  // dark on light
-        : "#3D2A1C";                 // dark ink on soft
+  const sampleColor =
+    template === "apotheose"
+      ? "#F5E6C9" // gold on dark
+      : template === "elegance"
+        ? "#F59E0B" // amber on slate
+        : template === "moderne"
+          ? "#0F172A" // dark on light
+          : "#3D2A1C"; // dark ink on soft
 
   return (
     <motion.button
@@ -68,8 +96,8 @@ export function TemplateCard({ template, active, onClick }: TemplateCardProps) {
         aria-hidden
         className={`pgcard-motion pgcard-${p.motion}`}
         style={{
-          background:       gradient,
-          backgroundSize:   "200% 200%",
+          background: gradient,
+          backgroundSize: "200% 200%",
           animationDuration: p.duration,
         }}
       />
@@ -88,10 +116,7 @@ export function TemplateCard({ template, active, onClick }: TemplateCardProps) {
             </span>
           )}
         </div>
-        <span
-          style={{ fontFamily: p.displayFont, color: sampleColor }}
-          className="text-sm font-medium"
-        >
+        <span style={{ fontFamily: p.displayFont, color: sampleColor }} className="text-sm font-medium">
           {TEMPLATE_LABEL[template]}
         </span>
       </div>
@@ -101,7 +126,6 @@ export function TemplateCard({ template, active, onClick }: TemplateCardProps) {
     </motion.button>
   );
 }
-
 
 const KEYFRAMES = `
   .pgcard-motion {

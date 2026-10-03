@@ -5,25 +5,14 @@ import type { TabItem } from "@/_components/TabBar";
 import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 
-import {
-  AsYouType,
-  getCountryCallingCode,
-  type CountryCode,
-  isValidPhoneNumber,
-} from "libphonenumber-js";
+import { AsYouType, getCountryCallingCode, type CountryCode, isValidPhoneNumber } from "libphonenumber-js";
 import { cn } from "@/utils/cn";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AsyncButton } from "@/_components/AsyncButton";
 import { PasswordField } from "@/_components/PasswordField";
-import {
-  useChangePassword,
-  useUpdateProfile,
-  useKillSession,
-  useRevokeOtherSessions,
-  useSessions,
-} from "./hooks";
+import { useChangePassword, useUpdateProfile, useKillSession, useRevokeOtherSessions, useSessions } from "./hooks";
 import { Lock, Loader2, Monitor } from "lucide-react";
 import { TextField } from "@/_components/TextField";
 import type { Me, Session } from "@/types";
@@ -38,12 +27,12 @@ const COUNTRIES: { code: CountryCode; label: string }[] = [
 ];
 
 interface PhoneFieldProps {
-  label:    string;
-  value:    string;                  // stored as E.164, e.g. "+212600000000"
+  label: string;
+  value: string; // stored as E.164, e.g. "+212600000000"
   onChange: (value: string) => void;
   country?: CountryCode;
-  error?:   string;
-  hint?:    string;
+  error?: string;
+  hint?: string;
 }
 
 const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
@@ -61,7 +50,9 @@ const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
 
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={id} className="text-sm font-medium text-foreground">{label}</label>
+        <label htmlFor={id} className="text-sm font-medium text-foreground">
+          {label}
+        </label>
         <div
           className={cn(
             "flex items-stretch overflow-hidden rounded-md border bg-surface-subtle",
@@ -80,7 +71,9 @@ const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
             className="cursor-pointer border-r border-border bg-transparent py-2 pl-3 pr-2 font-mono text-sm text-foreground outline-none"
           >
             {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>+{getCountryCallingCode(c.code)}</option>
+              <option key={c.code} value={c.code}>
+                +{getCountryCallingCode(c.code)}
+              </option>
             ))}
           </select>
           <input
@@ -104,16 +97,17 @@ const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
 );
 PhoneField.displayName = "PhoneField";
 
-const makePasswordSchema = (t: (k: string) => string) => z
-  .object({
-    current_password: z.string().min(1, t("me.currentRequired")),
-    new_password:     z.string().min(8, t("me.min8chars")),
-    confirm_password: z.string().min(1, t("me.confirmRequired")),
-  })
-  .refine((d) => d.new_password === d.confirm_password, {
-    message: t("me.passwordMismatch"),
-    path:    ["confirm_password"],
-  });
+const makePasswordSchema = (t: (k: string) => string) =>
+  z
+    .object({
+      current_password: z.string().min(1, t("me.currentRequired")),
+      new_password: z.string().min(8, t("me.min8chars")),
+      confirm_password: z.string().min(1, t("me.confirmRequired")),
+    })
+    .refine((d) => d.new_password === d.confirm_password, {
+      message: t("me.passwordMismatch"),
+      path: ["confirm_password"],
+    });
 
 type PasswordValues = z.infer<ReturnType<typeof makePasswordSchema>>;
 
@@ -123,7 +117,12 @@ function PasswordTab() {
     resolver: zodResolver(makePasswordSchema(t)),
     defaultValues: { current_password: "", new_password: "", confirm_password: "" },
   });
-  const { register, handleSubmit: rhfHandleSubmit, reset, formState: { errors } } = form;
+  const {
+    register,
+    handleSubmit: rhfHandleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
 
   const { handleChange, isPending } = useChangePassword(() => reset());
 
@@ -133,9 +132,7 @@ function PasswordTab() {
 
   return (
     <form className="flex max-w-[480px] flex-col gap-5" onSubmit={handlePasswordSubmit} noValidate>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {t("me.changePassword")}
-      </h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("me.changePassword")}</h2>
 
       <PasswordField
         label={t("me.currentPassword")}
@@ -168,10 +165,11 @@ function PasswordTab() {
   );
 }
 
-const makeProfileSchema = (t: (k: string) => string) => z.object({
-  name:  z.string().min(1, t("me.nameRequired")),
-  phone: z.string().refine((v) => isValidPhoneNumber(v), t("me.phoneInvalid")),
-});
+const makeProfileSchema = (t: (k: string) => string) =>
+  z.object({
+    name: z.string().min(1, t("me.nameRequired")),
+    phone: z.string().refine((v) => isValidPhoneNumber(v), t("me.phoneInvalid")),
+  });
 type ProfileValues = z.infer<ReturnType<typeof makeProfileSchema>>;
 
 function ProfileTab({ me }: { me: Me }) {
@@ -182,7 +180,12 @@ function ProfileTab({ me }: { me: Me }) {
     resolver: zodResolver(makeProfileSchema(t)),
     defaultValues: { name: me.name, phone: me.phone ?? "" },
   });
-  const { register, control, handleSubmit: rhfHandleSubmit, formState: { errors } } = form;
+  const {
+    register,
+    control,
+    handleSubmit: rhfHandleSubmit,
+    formState: { errors },
+  } = form;
   const handleProfileSubmit = rhfHandleSubmit((data) => handleUpdate(data));
 
   return (
@@ -198,11 +201,7 @@ function ProfileTab({ me }: { me: Me }) {
         hint={t("me.emailHint")}
       />
 
-      <TextField
-        label={t("me.fullName")}
-        error={errors.name?.message}
-        {...register("name")}
-      />
+      <TextField label={t("me.fullName")} error={errors.name?.message} {...register("name")} />
 
       <Controller
         control={control}
@@ -229,18 +228,18 @@ function ProfileTab({ me }: { me: Me }) {
 // Inline relative time. Avoids pulling date-fns in just for one label.
 function frRelative(iso: string, t: TFn): string {
   const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diffSec < 60)     return t("me.now");
-  if (diffSec < 3600)   return t("me.minsAgo", { n: Math.floor(diffSec / 60) });
-  if (diffSec < 86400)  return t("me.hoursAgo", { n: Math.floor(diffSec / 3600) });
+  if (diffSec < 60) return t("me.now");
+  if (diffSec < 3600) return t("me.minsAgo", { n: Math.floor(diffSec / 60) });
+  if (diffSec < 86400) return t("me.hoursAgo", { n: Math.floor(diffSec / 3600) });
   return t("me.daysAgo", { n: Math.floor(diffSec / 86400) });
 }
 
 function SessionsTab({ me }: { me: Me }) {
   const t = useT();
-  const { sessions, isLoading, isError }                = useSessions(me.id);
-  const { handleKill,         pendingId }               = useKillSession();
-  const { handleRevokeOthers, isPending: isRevoking }   = useRevokeOtherSessions();
-  const { handleLogout,       isPending: isLoggingOut } = useLogout();
+  const { sessions, isLoading, isError } = useSessions(me.id);
+  const { handleKill, pendingId } = useKillSession();
+  const { handleRevokeOthers, isPending: isRevoking } = useRevokeOtherSessions();
+  const { handleLogout, isPending: isLoggingOut } = useLogout();
   const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
 
   const otherCount = sessions.filter((s) => !s.is_current).length;
@@ -248,12 +247,8 @@ function SessionsTab({ me }: { me: Me }) {
   return (
     <div className="flex max-w-[640px] flex-col gap-5">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("me.mySessions")}
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t("me.sessionsDesc")}
-        </p>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("me.mySessions")}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t("me.sessionsDesc")}</p>
       </div>
 
       {isLoading && (
@@ -308,7 +303,10 @@ function SessionsTab({ me }: { me: Me }) {
         loadingLabel={t("me.revokeLoading")}
         variant="destructive"
         isLoading={isRevoking}
-        onConfirm={() => { handleRevokeOthers(); setConfirmRevokeOpen(false); }}
+        onConfirm={() => {
+          handleRevokeOthers();
+          setConfirmRevokeOpen(false);
+        }}
       />
     </div>
   );
@@ -323,7 +321,7 @@ function SessionRow({
   s: Session;
   isWorking: boolean;
   onLogoutCurrent: () => void;
-  onKillOther:     (id: string) => void;
+  onKillOther: (id: string) => void;
 }) {
   const t = useT();
   const lastActive = frRelative(s.last_active_at, t);
@@ -358,7 +356,7 @@ function SessionRow({
 }
 
 const buildTabs = (t: TFn): TabItem[] => [
-  { id: "profil",   label: t("me.tabProfil") },
+  { id: "profil", label: t("me.tabProfil") },
   { id: "password", label: t("me.tabPassword") },
   { id: "sessions", label: t("me.tabSessions") },
 ];
@@ -374,7 +372,7 @@ export default function MePage() {
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("me.title")}</h1>
       <TabBar tabs={buildTabs(t)} activeId={active} onChange={setActive} />
       <div>
-        {active === "profil"   && <ProfileTab me={me} />}
+        {active === "profil" && <ProfileTab me={me} />}
         {active === "password" && <PasswordTab />}
         {active === "sessions" && <SessionsTab me={me} />}
       </div>

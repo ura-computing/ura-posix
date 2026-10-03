@@ -1,5 +1,6 @@
 """Imports: catalogue CSV (admin), achat / vente / stock JSON chunks from the
 browser wizard, batch status, import history + delete."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -55,7 +56,7 @@ router = APIRouter(tags=["imports"])
 #
 # Catalogue file-size limit: MAX_FILE_BYTES (100 MB).
 
-MAX_FILE_BYTES = 100 * 1024 * 1024   # 100 MB
+MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
 EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
 EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
@@ -63,11 +64,13 @@ EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
 # ─── Shared helpers ──────────────────────────────────────────────────────────
 
+
 def _check_size(content: bytes) -> None:
     if len(content) > MAX_FILE_BYTES:
         raise ApiError(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, ErrorCode.FILE_TOO_LARGE,
-            f"Fichier trop volumineux (max {MAX_FILE_BYTES // (1024*1024)} Mo).",
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            ErrorCode.FILE_TOO_LARGE,
+            f"Fichier trop volumineux (max {MAX_FILE_BYTES // (1024 * 1024)} Mo).",
             max_mb=MAX_FILE_BYTES // (1024 * 1024),
         )
 
@@ -75,13 +78,15 @@ def _check_size(content: bytes) -> None:
 def _check_csv(file: UploadFile) -> None:
     if not (file.filename or "").lower().endswith(".csv"):
         raise ApiError(
-            status.HTTP_400_BAD_REQUEST, ErrorCode.CSV_ONLY,
+            status.HTTP_400_BAD_REQUEST,
+            ErrorCode.CSV_ONLY,
             "Seuls les fichiers CSV sont acceptés.",
         )
 
 
-def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filename: str | None,
-                        batch_id: int | None, user_id: int) -> ImportBatch:
+def _get_or_create_batch(
+    db: Session, *, pharmacy_id: int, file_type: str, filename: str | None, batch_id: int | None, user_id: int
+) -> ImportBatch:
     """Returns the existing batch if `batch_id` is given AND it belongs to this pharmacy.
     Otherwise creates a fresh `in_progress` batch and returns it. New batches start at
     rows_inserted=0 / rows_skipped=0; chunked uploads accumulate on later calls.
@@ -94,8 +99,12 @@ def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filen
             return batch
         # silently fall through to create — caller passed a stale/foreign id
     batch = ImportBatch(
-        pharmacy_id=pharmacy_id, file_type=file_type, filename=filename,
-        rows_inserted=0, rows_skipped=0, status="in_progress",
+        pharmacy_id=pharmacy_id,
+        file_type=file_type,
+        filename=filename,
+        rows_inserted=0,
+        rows_skipped=0,
+        status="in_progress",
         created_by_user_id=user_id,
     )
     db.add(batch)
@@ -105,43 +114,47 @@ def _get_or_create_batch(db: Session, *, pharmacy_id: int, file_type: str, filen
 
 # ─── Sobrus CSV column name constants (catch typos at import time) ───────────
 
-COL_PID         = "PID"
-COL_PRODUCT     = "Produit"
-COL_CATEGORY    = "Catégorie"
-COL_TVA         = "TVA"
-COL_PPH         = "PPH"
-COL_PPV         = "PPV"
-COL_ZONE        = "Zone"
-COL_QUANTITY    = "Quantité"
-COL_TOTAL       = "Total"
-COL_UNIT_PRICE  = "Prix unitaire"
+COL_PID = "PID"
+COL_PRODUCT = "Produit"
+COL_CATEGORY = "Catégorie"
+COL_TVA = "TVA"
+COL_PPH = "PPH"
+COL_PPV = "PPV"
+COL_ZONE = "Zone"
+COL_QUANTITY = "Quantité"
+COL_TOTAL = "Total"
+COL_UNIT_PRICE = "Prix unitaire"
 # Achat-only
-COL_DELIVERY_REF  = "Référence de livraison"
+COL_DELIVERY_REF = "Référence de livraison"
 COL_DELIVERY_DATE = "Date Bon de Livraison"
-COL_CREATED      = "Créée le"
-COL_SUPPLIER     = "Fournisseur"
-COL_EXPIRY       = "Date de péremption"
-COL_STOCK_MIN    = "Stock min"
-COL_STOCK_MAX    = "Stock max"
+COL_CREATED = "Créée le"
+COL_SUPPLIER = "Fournisseur"
+COL_EXPIRY = "Date de péremption"
+COL_STOCK_MIN = "Stock min"
+COL_STOCK_MAX = "Stock max"
 # Vente-only
-COL_TXN_REF      = "Numéro de transaction"
-COL_DATE         = "Date"
-COL_CLIENT       = "Client"
-COL_DISCOUNT     = "Remise"
+COL_TXN_REF = "Numéro de transaction"
+COL_DATE = "Date"
+COL_CLIENT = "Client"
+COL_DISCOUNT = "Remise"
 
 
 # ─── Per-type config + one generic insert pipeline (replaces _insert_achats + _insert_ventes) ─
+
 
 @dataclass(frozen=True)
 class TransactionConfig:
     """Captures the 5 things that differ between an Achat ingest and a Vente ingest.
     Everything else (medicament resolve, dedup, batch accounting, commit) is in
     `_insert_transactions` and runs against either config unchanged."""
-    file_type:      str                                                        # "achat" | "vente"
-    model:          type                                                       # Achat | Vente (SQLAlchemy class)
-    dedup_column:   str                                                        # CSV column to dedup on
-    dedup_attr:     str                                                        # corresponding model attribute name
-    build_row_dict: Callable[[dict[str, Any], int, int, int], dict[str, Any]]  # (row, pharmacy_id, med_id, batch_id) → dict for bulk_insert
+
+    file_type: str  # "achat" | "vente"
+    model: type  # Achat | Vente (SQLAlchemy class)
+    dedup_column: str  # CSV column to dedup on
+    dedup_attr: str  # corresponding model attribute name
+    build_row_dict: Callable[
+        [dict[str, Any], int, int, int], dict[str, Any]
+    ]  # (row, pharmacy_id, med_id, batch_id) → dict for bulk_insert
 
 
 ACHAT_CFG = TransactionConfig(
@@ -150,19 +163,19 @@ ACHAT_CFG = TransactionConfig(
     dedup_column=COL_DELIVERY_REF,
     dedup_attr="delivery_ref",
     build_row_dict=lambda row, pharm_id, med_id, batch_id: {
-        "pharmacy_id":       pharm_id,
-        "medicament_id":     med_id,
-        "import_batch_id":   batch_id,
+        "pharmacy_id": pharm_id,
+        "medicament_id": med_id,
+        "import_batch_id": batch_id,
         "created_at_source": col(row, COL_CREATED),
-        "delivery_date":     col(row, COL_DELIVERY_DATE),
-        "delivery_ref":      col(row, COL_DELIVERY_REF),
-        "supplier":          col(row, COL_SUPPLIER),
-        "quantity":          parse_float(col(row, COL_QUANTITY)),
-        "unit_price":        parse_float(col(row, COL_UNIT_PRICE)),
-        "expiry_date":       col(row, COL_EXPIRY),
-        "stock_min":         parse_float(col(row, COL_STOCK_MIN)),
-        "stock_max":         parse_float(col(row, COL_STOCK_MAX)),
-        "total":             parse_float(col(row, COL_TOTAL)),
+        "delivery_date": col(row, COL_DELIVERY_DATE),
+        "delivery_ref": col(row, COL_DELIVERY_REF),
+        "supplier": col(row, COL_SUPPLIER),
+        "quantity": parse_float(col(row, COL_QUANTITY)),
+        "unit_price": parse_float(col(row, COL_UNIT_PRICE)),
+        "expiry_date": col(row, COL_EXPIRY),
+        "stock_min": parse_float(col(row, COL_STOCK_MIN)),
+        "stock_max": parse_float(col(row, COL_STOCK_MAX)),
+        "total": parse_float(col(row, COL_TOTAL)),
     },
 )
 
@@ -172,16 +185,16 @@ VENTE_CFG = TransactionConfig(
     dedup_column=COL_TXN_REF,
     dedup_attr="transaction_ref",
     build_row_dict=lambda row, pharm_id, med_id, batch_id: {
-        "pharmacy_id":     pharm_id,
-        "medicament_id":   med_id,
+        "pharmacy_id": pharm_id,
+        "medicament_id": med_id,
         "import_batch_id": batch_id,
-        "date":            col(row, COL_DATE),
+        "date": col(row, COL_DATE),
         "transaction_ref": col(row, COL_TXN_REF),
-        "client":          col(row, COL_CLIENT),
-        "quantity":        parse_float(col(row, COL_QUANTITY)),
-        "discount":        parse_float(col(row, COL_DISCOUNT)),
-        "unit_price":      parse_float(col(row, COL_UNIT_PRICE)),
-        "total":           parse_float(col(row, COL_TOTAL)),
+        "client": col(row, COL_CLIENT),
+        "quantity": parse_float(col(row, COL_QUANTITY)),
+        "discount": parse_float(col(row, COL_DISCOUNT)),
+        "unit_price": parse_float(col(row, COL_UNIT_PRICE)),
+        "total": parse_float(col(row, COL_TOTAL)),
     },
 )
 
@@ -206,22 +219,23 @@ def _batch_resolve_medicaments(
         return {}, []
 
     pids = list(first_row_by_pid.keys())
-    existing: dict[str, Medicament] = {
-        m.pid: m
-        for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
-    }
+    existing: dict[str, Medicament] = {m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()}
 
     def _update_fields(med: Medicament, r: dict[str, Any]) -> None:
         # Fill missing TVA / zone, refresh prices. Category intentionally NOT
         # overwritten — admin-curated.
-        tva  = col(r, COL_TVA)
-        pph  = parse_float(col(r, COL_PPH))
-        ppv  = parse_float(col(r, COL_PPV))
+        tva = col(r, COL_TVA)
+        pph = parse_float(col(r, COL_PPH))
+        ppv = parse_float(col(r, COL_PPV))
         zone = col(r, COL_ZONE)
-        if tva and not med.tva:   med.tva = tva
-        if pph is not None:       med.pph = pph
-        if ppv is not None:       med.ppv = ppv
-        if zone and not med.zone: med.zone = zone
+        if tva and not med.tva:
+            med.tva = tva
+        if pph is not None:
+            med.pph = pph
+        if ppv is not None:
+            med.ppv = ppv
+        if zone and not med.zone:
+            med.zone = zone
 
     # Name-dedup: a row whose PID is new but whose product NAME already exists
     # (under a different PID — e.g. a catalog row that carries the laboratoire)
@@ -232,7 +246,7 @@ def _batch_resolve_medicaments(
 
     med_for_pid: dict[str, Medicament] = {}
     new_meds: list[Medicament] = []
-    new_by_name: dict[str, Medicament] = {}   # dedup two new rows of the same name in one batch
+    new_by_name: dict[str, Medicament] = {}  # dedup two new rows of the same name in one batch
     for pid, r in first_row_by_pid.items():
         med = existing.get(pid)
         if med is None:
@@ -260,14 +274,15 @@ def _batch_resolve_medicaments(
 
     if new_meds:
         db.add_all(new_meds)
-        db.flush()   # populates .id on every new row in one round-trip
+        db.flush()  # populates .id on every new row in one round-trip
 
     resolved: dict[str, int] = {pid: med.id for pid, med in med_for_pid.items()}
     return resolved, new_meds
 
 
-def _preload_existing_keys(db: Session, cfg: TransactionConfig, pharmacy_id: int,
-                          refs: set[str], batch_id: int) -> set[tuple[str, int]]:
+def _preload_existing_keys(
+    db: Session, cfg: TransactionConfig, pharmacy_id: int, refs: set[str], batch_id: int
+) -> set[tuple[str, int]]:
     """(BL or ticket, med_id) pairs stored by the pharmacy's OTHER imports: the same
     file imported again adds nothing. Lines of this import are never skipped: the
     same BL + product twice in one file = 2 real purchases (G1)."""
@@ -277,8 +292,8 @@ def _preload_existing_keys(db: Session, cfg: TransactionConfig, pharmacy_id: int
     other_import = or_(cfg.model.import_batch_id.is_(None), cfg.model.import_batch_id != batch_id)
     rows = (
         db.query(dedup_col, cfg.model.medicament_id)
-          .filter(cfg.model.pharmacy_id == pharmacy_id, other_import, dedup_col.in_(refs))
-          .all()
+        .filter(cfg.model.pharmacy_id == pharmacy_id, other_import, dedup_col.in_(refs))
+        .all()
     )
     return {(ref, med_id) for ref, med_id in rows if ref and med_id}
 
@@ -299,8 +314,12 @@ def _insert_transactions(
     in one executemany. What was N+1 SELECT/flush per chunk is now 2 queries total
     (medicament resolve + dedup preload) plus 1 bulk INSERT."""
     batch = _get_or_create_batch(
-        db, pharmacy_id=pharmacy_id, file_type=cfg.file_type,
-        filename=filename, batch_id=batch_id, user_id=user_id,
+        db,
+        pharmacy_id=pharmacy_id,
+        file_type=cfg.file_type,
+        filename=filename,
+        batch_id=batch_id,
+        user_id=user_id,
     )
     med_id_by_pid, new_medicaments = _batch_resolve_medicaments(db, rows)
     refs = {r.get(cfg.dedup_column) for r in rows if r.get(cfg.dedup_column)}
@@ -309,7 +328,7 @@ def _insert_transactions(
     to_insert: list[dict[str, Any]] = []
     skipped_no_pid = 0
     skipped_no_med = 0
-    skipped_dup    = 0
+    skipped_dup = 0
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
@@ -333,25 +352,32 @@ def _insert_transactions(
     inserted = len(to_insert)
     skipped = skipped_no_pid + skipped_no_med + skipped_dup
     batch.rows_inserted += inserted
-    batch.rows_skipped  += skipped
+    batch.rows_skipped += skipped
     batch.status = "success"
     db.commit()
     return {
-        "inserted":              inserted,
-        "skipped":               skipped,
-        "skipped_no_pid":        skipped_no_pid,
+        "inserted": inserted,
+        "skipped": skipped,
+        "skipped_no_pid": skipped_no_pid,
         "skipped_no_medicament": skipped_no_med,
-        "skipped_duplicate":     skipped_dup,
-        "batch_id":              batch.id,
+        "skipped_duplicate": skipped_dup,
+        "batch_id": batch.id,
         "new_medicaments": {
-            "count":  len(new_medicaments),
+            "count": len(new_medicaments),
             "sample": [m.product or m.pid for m in new_medicaments[:10]],
         },
     }
 
 
-def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
-                  filename: str | None, batch_id: int | None, user_id: int) -> dict:
+def _insert_stock(
+    db: Session,
+    rows: list[dict[str, Any]],
+    *,
+    pharmacy_id: int,
+    filename: str | None,
+    batch_id: int | None,
+    user_id: int,
+) -> dict:
     """Chunked stock import. Postgres ON CONFLICT upsert by (pharmacy_id, medicament_id)
     so re-uploading tomorrow's stock cleanly replaces today's snapshot. The UPSERT is
     chunk-safe — re-applying the same row is idempotent. Within ONE chunk we still
@@ -361,8 +387,9 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
     batch_id threading: first chunk passes None → creates an ImportBatch and returns
     its id. Subsequent chunks pass that id → _get_or_create_batch reuses the row and
     we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
-    batch = _get_or_create_batch(db, pharmacy_id=pharmacy_id, file_type="stock",
-                                 filename=filename, batch_id=batch_id, user_id=user_id)
+    batch = _get_or_create_batch(
+        db, pharmacy_id=pharmacy_id, file_type="stock", filename=filename, batch_id=batch_id, user_id=user_id
+    )
     med_id_by_pid, new_medicaments = _batch_resolve_medicaments(db, rows)
 
     seen_meds: set[int] = set()
@@ -380,15 +407,17 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
         if med_id in seen_meds:
             continue
         seen_meds.add(med_id)
-        inserted_rows.append({
-            "pharmacy_id":   pharmacy_id,
-            "medicament_id": med_id,
-            "current_stock": parse_int(col(row, "Stock")) or 0,
-            "stock_min":     parse_int(col(row, COL_STOCK_MIN)),
-            "stock_max":     parse_int(col(row, COL_STOCK_MAX)),
-            "expiry_date":   parse_iso_date(col(row, COL_EXPIRY)),
-            "zone":          col(row, COL_ZONE),
-        })
+        inserted_rows.append(
+            {
+                "pharmacy_id": pharmacy_id,
+                "medicament_id": med_id,
+                "current_stock": parse_int(col(row, "Stock")) or 0,
+                "stock_min": parse_int(col(row, COL_STOCK_MIN)),
+                "stock_max": parse_int(col(row, COL_STOCK_MAX)),
+                "expiry_date": parse_iso_date(col(row, COL_EXPIRY)),
+                "zone": col(row, COL_ZONE),
+            }
+        )
 
     if inserted_rows:
         stmt = pg_insert(PharmacyStock).values(inserted_rows)
@@ -396,25 +425,25 @@ def _insert_stock(db: Session, rows: list[dict[str, Any]], *, pharmacy_id: int,
             index_elements=["pharmacy_id", "medicament_id"],
             set_={
                 "current_stock": stmt.excluded.current_stock,
-                "stock_min":     stmt.excluded.stock_min,
-                "stock_max":     stmt.excluded.stock_max,
-                "expiry_date":   stmt.excluded.expiry_date,
-                "zone":          stmt.excluded.zone,
+                "stock_min": stmt.excluded.stock_min,
+                "stock_max": stmt.excluded.stock_max,
+                "expiry_date": stmt.excluded.expiry_date,
+                "zone": stmt.excluded.zone,
             },
         )
         db.execute(stmt)
 
     batch.rows_inserted += len(inserted_rows)
-    batch.rows_skipped  += len(skipped_unknown)
+    batch.rows_skipped += len(skipped_unknown)
     batch.status = "success"
     db.commit()
     return {
-        "inserted":        len(inserted_rows),
+        "inserted": len(inserted_rows),
         "skipped_unknown": skipped_unknown,
-        "total_rows":      len(rows),
-        "batch_id":        batch.id,
+        "total_rows": len(rows),
+        "batch_id": batch.id,
         "new_medicaments": {
-            "count":  len(new_medicaments),
+            "count": len(new_medicaments),
             "sample": [m.product or m.pid for m in new_medicaments[:10]],
         },
     }
@@ -446,7 +475,7 @@ def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> t
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
 async def upload_catalog(
     user: AdminDep,
-    db:   DbDep,
+    db: DbDep,
     file: Annotated[UploadFile, File(description="Sobrus catalogue CSV (comma-delimited)")],
 ) -> dict:
     """Admin-only catalog import. Upsert by synthetic PID:
@@ -463,15 +492,11 @@ async def upload_catalog(
         raise ApiError(400, ErrorCode.EMPTY_FILE, EMPTY_FILE_DETAIL)
 
     pids = [r["pid"] for r in parsed]
-    by_pid = {
-        m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()
-    }
+    by_pid = {m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()}
     # Name-dedup: a catalog row whose PID is new but whose product name already
     # exists (under a different PID — e.g. a row the sales import created) MERGES
     # onto that row (adding the laboratoire) instead of forking a duplicate.
-    by_name = existing_by_name(
-        db, (r.get("product") for r in parsed if r["pid"] not in by_pid)
-    )
+    by_name = existing_by_name(db, (r.get("product") for r in parsed if r["pid"] not in by_pid))
     inserted = updated = 0
     for row in parsed:
         match = by_pid.get(row["pid"]) or by_name.get(normalized_name(row.get("product")))
@@ -482,47 +507,66 @@ async def upload_catalog(
             inserted += 1
             nkey = normalized_name(row.get("product"))
             if nkey:
-                by_name[nkey] = med   # later same-name rows in this CSV merge onto it
+                by_name[nkey] = med  # later same-name rows in this CSV merge onto it
     db.commit()
     return {
         "total_rows": len(parsed),
-        "inserted":   inserted,
-        "updated":    updated,
-        "skipped":    len(errors),
-        "errors":     errors[:10],
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": len(errors),
+        "errors": errors[:10],
     }
 
 
 # ─── JSON endpoints (Chrome extension) ───────────────────────────────────────
 
+
 @router.post("/uploads/achat-json")
-def upload_achat_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "achats")], user: CurrentUserDep, db: DbDep) -> dict:
+def upload_achat_json(
+    body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "achats")], user: CurrentUserDep, db: DbDep
+) -> dict:
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
-    return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
-                                filename=body.filename, batch_id=body.batch_id,
-                                user_id=user.id, cfg=ACHAT_CFG)
+    return _insert_transactions(
+        db,
+        body.rows,
+        pharmacy_id=pharmacy_id,
+        filename=body.filename,
+        batch_id=body.batch_id,
+        user_id=user.id,
+        cfg=ACHAT_CFG,
+    )
 
 
 @router.post("/uploads/vente-json")
-def upload_vente_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "ventes")], user: CurrentUserDep, db: DbDep) -> dict:
+def upload_vente_json(
+    body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "ventes")], user: CurrentUserDep, db: DbDep
+) -> dict:
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
-    return _insert_transactions(db, body.rows, pharmacy_id=pharmacy_id,
-                                filename=body.filename, batch_id=body.batch_id,
-                                user_id=user.id, cfg=VENTE_CFG)
+    return _insert_transactions(
+        db,
+        body.rows,
+        pharmacy_id=pharmacy_id,
+        filename=body.filename,
+        batch_id=body.batch_id,
+        user_id=user.id,
+        cfg=VENTE_CFG,
+    )
 
 
 @router.post("/uploads/stock-json")
-def upload_stock_json(body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "stock")], user: CurrentUserDep, db: DbDep) -> dict:
+def upload_stock_json(
+    body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "stock")], user: CurrentUserDep, db: DbDep
+) -> dict:
     """Chunked stock import — same JSON shape as achat/vente. First chunk passes
     batch_id=None (creates the ImportBatch); subsequent chunks reuse it via the
     returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
-    return _insert_stock(db, body.rows, pharmacy_id=pharmacy_id,
-                         filename=body.filename, batch_id=body.batch_id,
-                         user_id=user.id)
+    return _insert_stock(
+        db, body.rows, pharmacy_id=pharmacy_id, filename=body.filename, batch_id=body.batch_id, user_id=user.id
+    )
 
 
 # ─── PATCH batch status (cancel) ─────────────────────────────────────────────
@@ -560,7 +604,8 @@ def patch_batch_status(
     """
     if body.status not in ALLOWED_STATUSES:
         raise ApiError(
-            400, ErrorCode.INVALID_BATCH_STATUS,
+            400,
+            ErrorCode.INVALID_BATCH_STATUS,
             f"Statut invalide. Attendu : {sorted(ALLOWED_STATUSES)}",
             allowed=", ".join(sorted(ALLOWED_STATUSES)),
         )
@@ -589,10 +634,10 @@ def patch_batch_status(
     if body.status in ("success", "cancelled"):
         _analyze(db, batch.file_type)
     return {
-        "id":             batch.id,
-        "status":         batch.status,
-        "error_message":  batch.error_message,
-        "deleted_rows":   deleted_rows,
+        "id": batch.id,
+        "status": batch.status,
+        "error_message": batch.error_message,
+        "deleted_rows": deleted_rows,
     }
 
 
@@ -613,6 +658,7 @@ def patch_batch_status(
 #   - owner    → batches they created OR created by an employee in their pharmacy
 #   - employee → only batches they created
 
+
 def _visible_batches_query(db: Session, user: User) -> OrmQuery:
     """Returns the base query over ImportBatch filtered by the caller's
     per-role visibility rules. Reused by list (page through it) and delete
@@ -628,9 +674,7 @@ def _visible_batches_query(db: Session, user: User) -> OrmQuery:
         return base.filter(ImportBatch.created_by_user_id == user.id)
     if user.role == "owner":
         employee_ids_sq = (
-            db.query(User.id)
-            .filter(User.pharmacy_id == user.pharmacy_id, User.role == "employee")
-            .subquery()
+            db.query(User.id).filter(User.pharmacy_id == user.pharmacy_id, User.role == "employee").subquery()
         )
         # Legacy batches (created before migration 0014) have NULL creator. They
         # belong to the pharmacy, so the owner — manager of pharmacy-scoped state
@@ -652,28 +696,28 @@ def _visible_batches_query(db: Session, user: User) -> OrmQuery:
 
 def _serialize(batch: ImportBatch, creator: User | None, deletor: User | None) -> dict:
     return {
-        "id":                   batch.id,
-        "file_type":            batch.file_type,
-        "filename":             batch.filename,
-        "rows_inserted":        batch.rows_inserted,
-        "rows_skipped":         batch.rows_skipped,
-        "status":               batch.status,
-        "error_message":        batch.error_message,
-        "imported_at":          batch.imported_at,
-        "created_by_full_name": creator.name  if creator else None,
-        "created_by_email":     creator.email if creator else None,
-        "deleted_at":           batch.deleted_at,
-        "deleted_by_full_name": deletor.name  if deletor else None,
-        "deleted_by_email":     deletor.email if deletor else None,
+        "id": batch.id,
+        "file_type": batch.file_type,
+        "filename": batch.filename,
+        "rows_inserted": batch.rows_inserted,
+        "rows_skipped": batch.rows_skipped,
+        "status": batch.status,
+        "error_message": batch.error_message,
+        "imported_at": batch.imported_at,
+        "created_by_full_name": creator.name if creator else None,
+        "created_by_email": creator.email if creator else None,
+        "deleted_at": batch.deleted_at,
+        "deleted_by_full_name": deletor.name if deletor else None,
+        "deleted_by_email": deletor.email if deletor else None,
     }
 
 
 @router.get("/data/imports", response_model=ImportsListResponse)
 def list_imports(
     user: CurrentUserDep,
-    db:   DbDep,
-    page:  Annotated[int, Query(ge=1)]            = 1,
-    limit: Annotated[int, Query(ge=1, le=200)]    = 50,
+    db: DbDep,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict:
     # Non-admin must have the `import` feature; admin bypasses.
     if user.role != "admin":
@@ -686,15 +730,15 @@ def list_imports(
 
     rows = (
         scope.outerjoin(creator, creator.id == ImportBatch.created_by_user_id)
-             .outerjoin(deletor, deletor.id == ImportBatch.deleted_by_user_id)
-             .with_entities(ImportBatch, creator, deletor)
-             .order_by(desc(ImportBatch.imported_at))
-             .offset((page - 1) * limit)
-             .limit(limit)
-             .all()
+        .outerjoin(deletor, deletor.id == ImportBatch.deleted_by_user_id)
+        .with_entities(ImportBatch, creator, deletor)
+        .order_by(desc(ImportBatch.imported_at))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
     )
     return {
-        "data":       [_serialize(b, c, d) for b, c, d in rows],
+        "data": [_serialize(b, c, d) for b, c, d in rows],
         "pagination": paginate(total, page, limit),
     }
 
@@ -702,8 +746,8 @@ def list_imports(
 @router.delete("/data/imports/{batch_id}")
 def delete_import(
     batch_id: Annotated[int, Path(ge=1)],
-    user:     CurrentUserDep,
-    db:       DbDep,
+    user: CurrentUserDep,
+    db: DbDep,
 ) -> dict:
     """Soft-delete: removes the Achat/Vente rows belonging to this batch (stock
     skipped — UPSERT can't be undone), then marks the batch row with

@@ -15,6 +15,7 @@ uses absolute DH/PPV ratio. We pick the consistent reading: discount = %.
 
 Owner sees only their pharmacy's rows. Admin is forbidden.
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -49,10 +50,10 @@ from search import product_search_clauses, supplier_search_clauses, tokenize_sea
 
 # Multi-value query parameter type aliases (defined here for use across endpoints)
 CategoryMultiQ = Annotated[list[str] | None, Query(alias="category", description="Repeat: ?category=A&category=B")]
-TvaMultiQ      = Annotated[list[str] | None, Query(alias="tva",      description="Repeat: ?tva=20%25&tva=10%25")]
-SurveillanceQ  = Annotated[str | None,       Query(description="all_flagged | marge_negative | marge_low | remises_high")]
-IncludeNDQ     = Annotated[bool,             Query(description="Include non-declared products. Default: true")]
-MinSearchQ     = Annotated[str,              Query(min_length=2, description="Min 2 chars for autocomplete")]
+TvaMultiQ = Annotated[list[str] | None, Query(alias="tva", description="Repeat: ?tva=20%25&tva=10%25")]
+SurveillanceQ = Annotated[str | None, Query(description="all_flagged | marge_negative | marge_low | remises_high")]
+IncludeNDQ = Annotated[bool, Query(description="Include non-declared products. Default: true")]
+MinSearchQ = Annotated[str, Query(min_length=2, description="Min 2 chars for autocomplete")]
 
 
 router = APIRouter(tags=["transactions"])
@@ -60,15 +61,17 @@ router = APIRouter(tags=["transactions"])
 
 # ─── Common query params (Annotated) ─────────────────────────────────────────
 
-PageQ        = Annotated[int,        Query(ge=1)]
-LimitQ       = Annotated[int,        Query(ge=1, le=200)]
-DateFromQ    = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
-DateToQ      = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
-SearchQ      = Annotated[str | None, Query(description="Substring search on product / supplier / client / refs")]
-BatchIdQ     = Annotated[int | None, Query(ge=1, description="Filter to a specific ImportBatch.id")]
-SortByQ      = Annotated[str | None, Query(description="Sort column whitelist per endpoint")]
-SortOrderQ   = Annotated[str,        Query(description="asc | desc")]
-ExportQ      = Annotated[bool,       Query(description="If true, return ALL filter-matching rows (skip pagination). Capped at MAX_EXPORT_ROWS.")]
+PageQ = Annotated[int, Query(ge=1)]
+LimitQ = Annotated[int, Query(ge=1, le=200)]
+DateFromQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
+DateToQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
+SearchQ = Annotated[str | None, Query(description="Substring search on product / supplier / client / refs")]
+BatchIdQ = Annotated[int | None, Query(ge=1, description="Filter to a specific ImportBatch.id")]
+SortByQ = Annotated[str | None, Query(description="Sort column whitelist per endpoint")]
+SortOrderQ = Annotated[str, Query(description="asc | desc")]
+ExportQ = Annotated[
+    bool, Query(description="If true, return ALL filter-matching rows (skip pagination). Capped at MAX_EXPORT_ROWS.")
+]
 
 
 # Server-side cap on export size. Exporting more is almost always a sign the
@@ -80,15 +83,17 @@ def _check_export_cap(export: bool, total: int) -> None:
     """Enforce MAX_EXPORT_ROWS when export=true. Shared by list_achats + list_ventes."""
     if export and total > MAX_EXPORT_ROWS:
         raise ApiError(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, ErrorCode.EXPORT_TOO_LARGE,
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            ErrorCode.EXPORT_TOO_LARGE,
             f"Trop de lignes ({total:,}) — affinez les filtres (max {MAX_EXPORT_ROWS:,}).",
-            total=total, max=MAX_EXPORT_ROWS,
+            total=total,
+            max=MAX_EXPORT_ROWS,
         )
 
 
 # Sort whitelists — narrow + explicit so no SQL injection vector via sort_by.
-ACHAT_SORT  = {"id", "delivery_date", "delivery_ref", "supplier", "quantity", "unit_price", "total", "expiry_date"}
-VENTE_SORT  = {"id", "date", "transaction_ref", "client", "quantity", "discount", "unit_price", "total"}
+ACHAT_SORT = {"id", "delivery_date", "delivery_ref", "supplier", "quantity", "unit_price", "total", "expiry_date"}
+VENTE_SORT = {"id", "date", "transaction_ref", "client", "quantity", "discount", "unit_price", "total"}
 
 
 def _build_search_filter(search: str | None, *extra_text_cols):
@@ -103,12 +108,10 @@ def _build_search_filter(search: str | None, *extra_text_cols):
 
 # ─── Ventes shared helpers ───────────────────────────────────────────────────
 
+
 def _suffix_map(db: Session) -> dict[str, tuple[str, str | None]]:
     """In-memory map of (normalized category) → (suffix, color). One DB hit per request."""
-    return {
-        suffix_key(s.category): (s.suffix, s.color)
-        for s in db.query(CategorySuffix).all()
-    }
+    return {suffix_key(s.category): (s.suffix, s.color) for s in db.query(CategorySuffix).all()}
 
 
 def _meds_by_id(db: Session, ids: set[int]) -> dict[int, Medicament]:
@@ -116,15 +119,20 @@ def _meds_by_id(db: Session, ids: set[int]) -> dict[int, Medicament]:
     return {m.id: m for m in db.query(Medicament).filter(Medicament.id.in_(ids))} if ids else {}
 
 
-def _avg_pu_subq(db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None,
-                 *, include_non_declared: bool = True):
+def _avg_pu_subq(
+    db: Session, pharmacy_id: int, date_from: str | None, date_to: str | None, *, include_non_declared: bool = True
+):
     """Weighted avg purchase price per medicament over the window. Used by both
     list_ventes (avg_pu_map for marge cells) and surveillance_counts (so badge counts
     match visible rows). include_non_declared=False (comptabilité) drops the
     excluded products."""
     f = Filters(pharmacy_id, date_from, date_to, include_non_declared)
     return avg_pu_subquery(
-        db, Achat.quantity > 0, Achat.unit_price.isnot(None), *f.achats(db), id_label="med_id",
+        db,
+        Achat.quantity > 0,
+        Achat.unit_price.isnot(None),
+        *f.achats(db),
+        id_label="med_id",
     )
 
 
@@ -149,10 +157,10 @@ def _apply_vente_filters(
     pharmacy_id: int,
     *,
     date_from: str | None = None,
-    date_to:   str | None = None,
-    search:    str | None = None,
-    category:  list[str] | None = None,
-    tva:       list[str] | None = None,
+    date_to: str | None = None,
+    search: str | None = None,
+    category: list[str] | None = None,
+    tva: list[str] | None = None,
     include_non_declared: bool = True,
 ):
     """Reusable WHERE-chain shared by list + surveillance-counts."""
@@ -185,16 +193,25 @@ def _apply_surveillance(q, surveillance: str | None, avg_pu_sub, has_med_join: b
     if surveillance == "remises_high":
         return q.filter(Vente.discount > 20)
     if surveillance == "all_flagged":
-        return q.filter(or_(
-            avg_pu_sub.c.avg_pu > Medicament.ppv,
-            Vente.discount > 20,
-            ((1.0 - avg_pu_sub.c.avg_pu / Medicament.ppv) * 100.0) < 10.0,
-        ))
+        return q.filter(
+            or_(
+                avg_pu_sub.c.avg_pu > Medicament.ppv,
+                Vente.discount > 20,
+                ((1.0 - avg_pu_sub.c.avg_pu / Medicament.ppv) * 100.0) < 10.0,
+            )
+        )
     return q
 
 
-def _apply_sort(query, model, sort_by: str | None, sort_order: str, whitelist: set[str], default_col: str,
-                extra_cols: dict | None = None):
+def _apply_sort(
+    query,
+    model,
+    sort_by: str | None,
+    sort_order: str,
+    whitelist: set[str],
+    default_col: str,
+    extra_cols: dict | None = None,
+):
     """Order by a whitelisted model column, or by an explicit joined/computed
     expression from `extra_cols` (PG-014: lets Achats/Ventes sort on Medicament
     columns and marge expressions). extra_cols keys are hardcoded by callers —
@@ -202,7 +219,7 @@ def _apply_sort(query, model, sort_by: str | None, sort_order: str, whitelist: s
     ("—" rows) → always pushed last."""
     extra_cols = extra_cols or {}
     if sort_by in extra_cols:
-        column  = extra_cols[sort_by]
+        column = extra_cols[sort_by]
         ordered = column.desc() if sort_order == "desc" else column.asc()
         return query.order_by(ordered.nullslast())
     col_name = sort_by if sort_by in whitelist else default_col
@@ -212,15 +229,16 @@ def _apply_sort(query, model, sort_by: str | None, sort_order: str, whitelist: s
 
 # ─── GET /achats ─────────────────────────────────────────────────────────────
 
+
 def _apply_achat_filters(
     q,
     pharmacy_id: int,
     *,
     date_from: str | None = None,
-    date_to:   str | None = None,
-    search:    str | None = None,
-    category:  list[str] | None = None,
-    tva:       list[str] | None = None,
+    date_to: str | None = None,
+    search: str | None = None,
+    category: list[str] | None = None,
+    tva: list[str] | None = None,
 ):
     """Shared WHERE-chain for list + supplier-summary. Joins Medicament when
     any of search/category/tva is set (PG-006 tokenized search needs it)."""
@@ -244,21 +262,26 @@ def _apply_achat_filters(
 def list_achats(
     pharmacy_id: Annotated[int, member("achats")],
     db: DbDep,
-    page:       PageQ          = 1,
-    limit:      LimitQ         = 20,
-    date_from:  DateFromQ      = None,
-    date_to:    DateToQ        = None,
-    search:     SearchQ        = None,
-    category:   CategoryMultiQ = None,
-    tva:        TvaMultiQ      = None,
+    page: PageQ = 1,
+    limit: LimitQ = 20,
+    date_from: DateFromQ = None,
+    date_to: DateToQ = None,
+    search: SearchQ = None,
+    category: CategoryMultiQ = None,
+    tva: TvaMultiQ = None,
     include_non_declared: IncludeNDQ = True,
-    sort_by:    SortByQ        = None,
-    sort_order: SortOrderQ     = "desc",
-    export:     ExportQ        = False,
+    sort_by: SortByQ = None,
+    sort_order: SortOrderQ = "desc",
+    export: ExportQ = False,
 ) -> dict:
     q = _apply_achat_filters(
-        db.query(Achat), pharmacy_id,
-        date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
+        db.query(Achat),
+        pharmacy_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        category=category,
+        tva=tva,
     )
     # Excluded products (special + all products on an excluded BL + all products from
     # an excluded supplier) are hidden from the Achats ledger ONLY in the comptabilite
@@ -283,9 +306,15 @@ def list_achats(
 
     # PG-014: Produit/Catégorie/PPH sort via the (always-joined) Medicament —
     # PPH is a catalogue column, not an Achat one.
-    sorted_q = _apply_sort(q, Achat, sort_by, sort_order, ACHAT_SORT, "id",
-                           extra_cols={"product": Medicament.product, "category": Medicament.category,
-                                       "pph": Medicament.pph})
+    sorted_q = _apply_sort(
+        q,
+        Achat,
+        sort_by,
+        sort_order,
+        ACHAT_SORT,
+        "id",
+        extra_cols={"product": Medicament.product, "category": Medicament.category, "pph": Medicament.pph},
+    )
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
 
     # One query for the medicaments, kept in a dict: the session's identity map
@@ -331,13 +360,15 @@ def _achat_to_row(a: Achat, med: Medicament | None, suffixes: dict[str, tuple[st
 
 # ─── GET /achats/categories ──────────────────────────────────────────────────
 
+
 @router.get("/achats/categories")
 def list_achat_categories(pharmacy_id: Annotated[int, member("achats")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.category)
         .join(Achat, Achat.medicament_id == Medicament.id)
         .filter(Achat.pharmacy_id == pharmacy_id, Medicament.category.isnot(None))
-        .distinct().all()
+        .distinct()
+        .all()
     )
     seen = {strip_percentage(r.category) for r in rows if r.category}
     return sorted(seen, key=lambda s: s.lower())
@@ -345,18 +376,22 @@ def list_achat_categories(pharmacy_id: Annotated[int, member("achats")], db: DbD
 
 # ─── GET /achats/tva-rates ───────────────────────────────────────────────────
 
+
 @router.get("/achats/tva-rates")
 def list_achat_tva_rates(pharmacy_id: Annotated[int, member("achats")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.tva)
         .join(Achat, Achat.medicament_id == Medicament.id)
         .filter(Achat.pharmacy_id == pharmacy_id, Medicament.tva.isnot(None))
-        .distinct().order_by(Medicament.tva).all()
+        .distinct()
+        .order_by(Medicament.tva)
+        .all()
     )
     return [r.tva for r in rows if r.tva]
 
 
 # ─── GET /achats/suggestions ─────────────────────────────────────────────────
+
 
 def _apply_clauses(q, clauses):
     """Reduce a list of SQLAlchemy clauses into a filtered query (AND-join)."""
@@ -386,35 +421,41 @@ def list_achat_suggestions(q: MinSearchQ, pharmacy_id: Annotated[int, member("ac
         .join(Achat, Achat.medicament_id == Medicament.id)
         .filter(Achat.pharmacy_id == pharmacy_id)
     )
-    prod_q   = _apply_clauses(prod_q, product_search_clauses(tokens))
+    prod_q = _apply_clauses(prod_q, product_search_clauses(tokens))
     products = [r.product for r in prod_q.distinct().all() if r.product]
 
     return {
-        "products":  products,
-        "suppliers": _suggest_supplier_col(db, pharmacy_id, Achat.supplier,     tokens),
-        "refs":      _suggest_supplier_col(db, pharmacy_id, Achat.delivery_ref, tokens),
+        "products": products,
+        "suppliers": _suggest_supplier_col(db, pharmacy_id, Achat.supplier, tokens),
+        "refs": _suggest_supplier_col(db, pharmacy_id, Achat.delivery_ref, tokens),
     }
 
 
 # ─── GET /achats/supplier-summary ────────────────────────────────────────────
 
+
 @router.get("/achats/supplier-summary", response_model=AchatsSupplierSummary)
 def achat_supplier_summary(
     pharmacy_id: Annotated[int, member("achats")],
-    db:   DbDep,
-    date_from: DateFromQ      = None,
-    date_to:   DateToQ        = None,
-    search:    SearchQ        = None,
-    category:  CategoryMultiQ = None,
-    tva:       TvaMultiQ      = None,
+    db: DbDep,
+    date_from: DateFromQ = None,
+    date_to: DateToQ = None,
+    search: SearchQ = None,
+    category: CategoryMultiQ = None,
+    tva: TvaMultiQ = None,
     include_non_declared: IncludeNDQ = True,
 ) -> dict:
     """Split supplier-side totals into grossiste vs direct_labo for the gauge.
     Classification: UPPER(supplier) LIKE 'GROSSISTE%' → grossiste, else direct_labo.
     Exclusions apply only in the comptabilite view (include_non_declared=false)."""
     base = _apply_achat_filters(
-        db.query(Achat), pharmacy_id,
-        date_from=date_from, date_to=date_to, search=search, category=category, tva=tva,
+        db.query(Achat),
+        pharmacy_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        category=category,
+        tva=tva,
     ).filter(Achat.supplier.isnot(None), Achat.supplier != "")
     if not include_non_declared:
         base = base.filter(achat_filter(db, pharmacy_id))
@@ -422,42 +463,56 @@ def achat_supplier_summary(
     is_grossiste = func.upper(Achat.supplier).like("GROSSISTE%")
 
     def _agg(filter_clause) -> dict:
-        row = base.with_entities(
-            func.coalesce(func.sum(Achat.total),                       0.0).label("total"),
-            func.coalesce(func.sum(Achat.quantity),                    0.0).label("units"),
-            func.count(func.distinct(Achat.delivery_ref)).label("bls"),
-        ).filter(filter_clause).one()
-        return {"total_mad": float(row.total or 0.0), "unit_count": float(row.units or 0.0), "bl_count": int(row.bls or 0)}
+        row = (
+            base.with_entities(
+                func.coalesce(func.sum(Achat.total), 0.0).label("total"),
+                func.coalesce(func.sum(Achat.quantity), 0.0).label("units"),
+                func.count(func.distinct(Achat.delivery_ref)).label("bls"),
+            )
+            .filter(filter_clause)
+            .one()
+        )
+        return {
+            "total_mad": float(row.total or 0.0),
+            "unit_count": float(row.units or 0.0),
+            "bl_count": int(row.bls or 0),
+        }
 
     return {
-        "grossiste":   _agg(is_grossiste),
+        "grossiste": _agg(is_grossiste),
         "direct_labo": _agg(~is_grossiste),
     }
 
 
 # ─── GET /ventes ─────────────────────────────────────────────────────────────
 
+
 @router.get("/ventes", response_model=VentesListResponse)
 def list_ventes(
     pharmacy_id: Annotated[int, member("ventes")],
-    db:   DbDep,
-    page:                 PageQ          = 1,
-    limit:                LimitQ         = 20,
-    date_from:            DateFromQ      = None,
-    date_to:              DateToQ        = None,
-    search:               SearchQ        = None,
-    category:             CategoryMultiQ = None,
-    tva:                  TvaMultiQ      = None,
-    surveillance:         SurveillanceQ  = None,
-    include_non_declared: IncludeNDQ     = True,
-    sort_by:              SortByQ        = None,
-    sort_order:           SortOrderQ     = "desc",
-    export:               ExportQ        = False,
+    db: DbDep,
+    page: PageQ = 1,
+    limit: LimitQ = 20,
+    date_from: DateFromQ = None,
+    date_to: DateToQ = None,
+    search: SearchQ = None,
+    category: CategoryMultiQ = None,
+    tva: TvaMultiQ = None,
+    surveillance: SurveillanceQ = None,
+    include_non_declared: IncludeNDQ = True,
+    sort_by: SortByQ = None,
+    sort_order: SortOrderQ = "desc",
+    export: ExportQ = False,
 ) -> dict:
     q = _apply_vente_filters(
-        db.query(Vente), pharmacy_id,
-        date_from=date_from, date_to=date_to, search=search,
-        category=category, tva=tva, include_non_declared=include_non_declared,
+        db.query(Vente),
+        pharmacy_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        category=category,
+        tva=tva,
+        include_non_declared=include_non_declared,
     )
     # Ensure Medicament is joined for the TVA aggregate (might not be joined yet
     # if no search/category/tva filter was applied). Idempotent for SQLAlchemy.
@@ -467,8 +522,7 @@ def list_ventes(
     marge_sort = sort_by in ("marge_pct", "marge_dh")
     avg_pu_sub = None
     if surveillance or marge_sort:
-        avg_pu_sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to,
-                                  include_non_declared=include_non_declared)
+        avg_pu_sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to, include_non_declared=include_non_declared)
         q = q.outerjoin(avg_pu_sub, Vente.medicament_id == avg_pu_sub.c.med_id)
     if surveillance:
         q = _apply_surveillance(q, surveillance, avg_pu_sub, has_med_join=has_med_join)
@@ -491,12 +545,12 @@ def list_ventes(
     # PG-014: joined/computed sort columns — Produit/Catégorie/PPV live on
     # Medicament (always joined by now); marge mirrors the surveillance formula.
     vente_extra_sort = {
-        "product":  Medicament.product,
+        "product": Medicament.product,
         "category": Medicament.category,
-        "ppv":      Medicament.ppv,
+        "ppv": Medicament.ppv,
     }
     if marge_sort and avg_pu_sub is not None:
-        vente_extra_sort["marge_dh"]  = Medicament.ppv - avg_pu_sub.c.avg_pu
+        vente_extra_sort["marge_dh"] = Medicament.ppv - avg_pu_sub.c.avg_pu
         vente_extra_sort["marge_pct"] = (1.0 - avg_pu_sub.c.avg_pu / func.nullif(Medicament.ppv, 0)) * 100.0
     sorted_q = _apply_sort(q, Vente, sort_by, sort_order, VENTE_SORT, "id", extra_cols=vente_extra_sort)
     rows = sorted_q.all() if export else sorted_q.offset((page - 1) * limit).limit(limit).all()
@@ -507,8 +561,7 @@ def list_ventes(
     meds = _meds_by_id(db, med_ids)
     avg_pu_map: dict[int, float] = {}
     if med_ids:
-        sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to,
-                           include_non_declared=include_non_declared)
+        sub = _avg_pu_subq(db, pharmacy_id, date_from, date_to, include_non_declared=include_non_declared)
         for row in db.query(sub.c.med_id, sub.c.avg_pu).filter(sub.c.med_id.in_(med_ids)).all():
             if row.avg_pu is not None:
                 avg_pu_map[row.med_id] = float(row.avg_pu)
@@ -527,7 +580,8 @@ def list_ventes(
 
 
 def _vente_to_row(
-    v: Vente, med: Medicament | None,
+    v: Vente,
+    med: Medicament | None,
     suffixes: dict[str, tuple[str, str | None]],
     avg_pu_map: dict[int, float],
 ) -> VenteRow:
@@ -567,13 +621,15 @@ def _vente_to_row(
 
 # ─── GET /ventes/categories ──────────────────────────────────────────────────
 
+
 @router.get("/ventes/categories")
 def list_vente_categories(pharmacy_id: Annotated[int, member("ventes")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.category)
         .join(Vente, Vente.medicament_id == Medicament.id)
         .filter(Vente.pharmacy_id == pharmacy_id, Medicament.category.isnot(None))
-        .distinct().all()
+        .distinct()
+        .all()
     )
     seen = {strip_percentage(r.category) for r in rows if r.category}
     return sorted(seen, key=lambda s: s.lower())
@@ -581,18 +637,22 @@ def list_vente_categories(pharmacy_id: Annotated[int, member("ventes")], db: DbD
 
 # ─── GET /ventes/tva-rates ───────────────────────────────────────────────────
 
+
 @router.get("/ventes/tva-rates")
 def list_vente_tva_rates(pharmacy_id: Annotated[int, member("ventes")], db: DbDep) -> list[str]:
     rows = (
         db.query(Medicament.tva)
         .join(Vente, Vente.medicament_id == Medicament.id)
         .filter(Vente.pharmacy_id == pharmacy_id, Medicament.tva.isnot(None))
-        .distinct().order_by(Medicament.tva).all()
+        .distinct()
+        .order_by(Medicament.tva)
+        .all()
     )
     return [r.tva for r in rows if r.tva]
 
 
 # ─── GET /ventes/suggestions ─────────────────────────────────────────────────
+
 
 def _suggest_vente_col(db, pharmacy_id: int, col, tokens: list[str]) -> list[str]:
     """Distinct values of `col` matching every token (`search.py` grammar)."""
@@ -614,27 +674,28 @@ def list_vente_suggestions(q: MinSearchQ, pharmacy_id: Annotated[int, member("ve
         .join(Vente, Vente.medicament_id == Medicament.id)
         .filter(Vente.pharmacy_id == pharmacy_id)
     )
-    prod_q   = _apply_clauses(prod_q, product_search_clauses(tokens))
+    prod_q = _apply_clauses(prod_q, product_search_clauses(tokens))
     products = [r.product for r in prod_q.distinct().all() if r.product]
 
     return {
         "products": products,
-        "clients":  _suggest_vente_col(db, pharmacy_id, Vente.client,          tokens),
-        "refs":     _suggest_vente_col(db, pharmacy_id, Vente.transaction_ref, tokens),
+        "clients": _suggest_vente_col(db, pharmacy_id, Vente.client, tokens),
+        "refs": _suggest_vente_col(db, pharmacy_id, Vente.transaction_ref, tokens),
     }
 
 
 # ─── GET /ventes/surveillance-counts ─────────────────────────────────────────
 
+
 @router.get("/ventes/surveillance-counts", response_model=VentesSurveillanceCounts)
 def vente_surveillance_counts(
     pharmacy_id: Annotated[int, member("ventes")],
-    db:   DbDep,
-    date_from: DateFromQ      = None,
-    date_to:   DateToQ        = None,
-    search:    SearchQ        = None,
-    category:  CategoryMultiQ = None,
-    tva:       TvaMultiQ      = None,
+    db: DbDep,
+    date_from: DateFromQ = None,
+    date_to: DateToQ = None,
+    search: SearchQ = None,
+    category: CategoryMultiQ = None,
+    tva: TvaMultiQ = None,
 ) -> dict:
     """4 counts driving the surveillance tabs. BL exclusion is applied to the
     avg_pu subquery (apcm-pharma had this inconsistent — counts could disagree
@@ -642,9 +703,14 @@ def vente_surveillance_counts(
     avg_pu = _avg_pu_subq(db, pharmacy_id, date_from, date_to)
 
     base = _apply_vente_filters(
-        db.query(Vente.id), pharmacy_id,
-        date_from=date_from, date_to=date_to, search=search,
-        category=category, tva=tva, include_non_declared=True,
+        db.query(Vente.id),
+        pharmacy_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        category=category,
+        tva=tva,
+        include_non_declared=True,
     )
     # Ensure Medicament + avg_pu joined for the predicates below
     base = base.outerjoin(avg_pu, Vente.medicament_id == avg_pu.c.med_id)
@@ -668,47 +734,57 @@ def vente_surveillance_counts(
     n_rem = _count(flag_rem)
     n_all = _count(or_(flag_neg, flag_low, flag_rem))
     return {
-        "all_flagged":    n_all,
+        "all_flagged": n_all,
         "marge_negative": n_neg,
-        "marge_low":      n_low,
-        "remises_high":   n_rem,
+        "marge_low": n_low,
+        "remises_high": n_rem,
     }
 
 
 # ─── GET /ventes/discount-summary ────────────────────────────────────────────
 
+
 @router.get("/ventes/discount-summary", response_model=VentesDiscountSummary)
 def vente_discount_summary(
     pharmacy_id: Annotated[int, member("ventes")],
-    db:   DbDep,
-    date_from: DateFromQ      = None,
-    date_to:   DateToQ        = None,
-    search:    SearchQ        = None,
-    category:  CategoryMultiQ = None,
-    tva:       TvaMultiQ      = None,
+    db: DbDep,
+    date_from: DateFromQ = None,
+    date_to: DateToQ = None,
+    search: SearchQ = None,
+    category: CategoryMultiQ = None,
+    tva: TvaMultiQ = None,
 ) -> dict:
     """Split the filtered ventes set into discounted vs full-price aggregates.
     Drives the /ventes remise-discipline gauge: high discounted share = the
     team is giving away margin too often. Mirrors achat_supplier_summary
     structure (MAD + count + units per side, NO surveillance filter)."""
     base = _apply_vente_filters(
-        db.query(Vente), pharmacy_id,
-        date_from=date_from, date_to=date_to, search=search,
-        category=category, tva=tva, include_non_declared=True,
+        db.query(Vente),
+        pharmacy_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        category=category,
+        tva=tva,
+        include_non_declared=True,
     )
 
     is_discounted = (Vente.discount.isnot(None)) & (Vente.discount > 0)
 
     def _agg(filter_clause) -> dict:
-        row = base.with_entities(
-            func.coalesce(func.sum(Vente.total),    0.0).label("total"),
-            func.coalesce(func.sum(Vente.quantity), 0.0).label("units"),
-            func.count(Vente.id).label("lines"),
-        ).filter(filter_clause).one()
+        row = (
+            base.with_entities(
+                func.coalesce(func.sum(Vente.total), 0.0).label("total"),
+                func.coalesce(func.sum(Vente.quantity), 0.0).label("units"),
+                func.count(Vente.id).label("lines"),
+            )
+            .filter(filter_clause)
+            .one()
+        )
         return {
-            "total_mad":  float(row.total or 0.0),
+            "total_mad": float(row.total or 0.0),
             "unit_count": float(row.units or 0.0),
-            "count":      int(row.lines or 0),
+            "count": int(row.lines or 0),
         }
 
     return {

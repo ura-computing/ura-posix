@@ -65,12 +65,42 @@ function GlobalSummaryStrip(p: GlobalSummaryStripProps) {
   const t = useT();
   return (
     <div className="flex flex-wrap gap-3">
-      <Chip icon={<AlertTriangle className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.alertesTotales")} value={p.totalAlerts} />
-      <Chip icon={<TrendingDown className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.margesNegatives")} value={p.marginNegative} />
-      <Chip icon={<TrendingDown className="size-4" />} color="bg-amber-500/10 text-amber-500" label={t("alertes.margesFaibles")} value={p.marginLow} />
-      <Chip icon={<CalendarX className="size-4" />} color="bg-red-500/10 text-red-500" label={t("alertes.peremptionsCritiques")} value={p.peremptionCritical} />
-      <Chip icon={<PackageMinus className="size-4" />} color="bg-amber-500/10 text-amber-500" label={t("alertes.stockReappro")} value={p.toRestock} />
-      <Chip icon={<PackagePlus className="size-4" />} color="bg-blue-500/10 text-blue-500" label={t("alertes.stockExcessif")} value={p.excessStock} />
+      <Chip
+        icon={<AlertTriangle className="size-4" />}
+        color="bg-red-500/10 text-red-500"
+        label={t("alertes.alertesTotales")}
+        value={p.totalAlerts}
+      />
+      <Chip
+        icon={<TrendingDown className="size-4" />}
+        color="bg-red-500/10 text-red-500"
+        label={t("alertes.margesNegatives")}
+        value={p.marginNegative}
+      />
+      <Chip
+        icon={<TrendingDown className="size-4" />}
+        color="bg-amber-500/10 text-amber-500"
+        label={t("alertes.margesFaibles")}
+        value={p.marginLow}
+      />
+      <Chip
+        icon={<CalendarX className="size-4" />}
+        color="bg-red-500/10 text-red-500"
+        label={t("alertes.peremptionsCritiques")}
+        value={p.peremptionCritical}
+      />
+      <Chip
+        icon={<PackageMinus className="size-4" />}
+        color="bg-amber-500/10 text-amber-500"
+        label={t("alertes.stockReappro")}
+        value={p.toRestock}
+      />
+      <Chip
+        icon={<PackagePlus className="size-4" />}
+        color="bg-blue-500/10 text-blue-500"
+        label={t("alertes.stockExcessif")}
+        value={p.excessStock}
+      />
     </div>
   );
 }
@@ -87,13 +117,18 @@ function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) {
   // NB: backend also returns `high` + `very_high` — intentionally NOT shown here
   // (they live on the Rapport margin tiles).
   const cards: {
-    tone:        IconTone;
-    title:       string;
-    bracket?:    MarginAlertsResponse["negative"];
+    tone: IconTone;
+    title: string;
+    bracket?: MarginAlertsResponse["negative"];
     dlgSubtitle: string;
   }[] = [
-    { tone: "error",   title: t("ventes.margeNegative"),     bracket: data?.negative, dlgSubtitle: t("alertes.margeNegativeSub") },
-    { tone: "warning", title: t("alertes.margeFaible"), bracket: data?.low,      dlgSubtitle: t("alertes.margeFaibleSub") },
+    {
+      tone: "error",
+      title: t("ventes.margeNegative"),
+      bracket: data?.negative,
+      dlgSubtitle: t("alertes.margeNegativeSub"),
+    },
+    { tone: "warning", title: t("alertes.margeFaible"), bracket: data?.low, dlgSubtitle: t("alertes.margeFaibleSub") },
   ];
 
   return (
@@ -117,16 +152,23 @@ function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) {
               sub={t("alertes.caConcerne")}
               icon={<TrendingDown className="size-5" />}
               iconTone={c.tone}
-              badge={{ label: <>{formatQty(count)} {t("stock.produitsWord")}</>, tone: c.tone }}
+              badge={{
+                label: (
+                  <>
+                    {formatQty(count)} {t("stock.produitsWord")}
+                  </>
+                ),
+                tone: c.tone,
+              }}
               disabled={count === 0}
               onClick={
                 c.bracket
                   ? () =>
                       onOpen({
-                        title:          c.title,
-                        subtitle:       c.dlgSubtitle,
-                        products:       c.bracket!.products,
-                        columns:        MARGIN_COLUMNS,
+                        title: c.title,
+                        subtitle: c.dlgSubtitle,
+                        products: c.bracket!.products,
+                        columns: MARGIN_COLUMNS,
                         defaultSortKey: "marge_pct",
                       })
                   : undefined
@@ -155,25 +197,52 @@ function MiniStat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function PeremptionsSection({
-  data, onOpen }: PeremptionsSectionProps) {
+function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
   const t = useT();
   // 4 mutually-exclusive cards — labels + buckets port the old apcm-pharma
   // app verbatim (client-requested parity). The first three are date-bucketed
   // by urgency; the fourth (`no_date`) is a data-quality bucket — products
   // whose Sobrus export had no expiry date.
   const cards: {
-    key:         keyof PeremptionsResponse;
-    tone:        IconTone;
-    title:       string;
-    sub:         string;
-    dlgTitle:    string;
+    key: keyof PeremptionsResponse;
+    tone: IconTone;
+    title: string;
+    sub: string;
+    dlgTitle: string;
     dlgSubtitle: string;
   }[] = [
-    { key: "expired",    tone: "error",   title: t("peremptions.expires"),             sub: t("peremptions.actionUrgente"), dlgTitle: t("peremptions.dlgExpires"),               dlgSubtitle: t("peremptions.dlgExpiresSub") },
-    { key: "very_close", tone: "warning", title: t("peremptions.tresProche"), sub: t("peremptions.tresUrgent"),    dlgTitle: t("peremptions.dlgTresProche"),  dlgSubtitle: t("peremptions.dlgTresProcheSub") },
-    { key: "close",      tone: "warning", title: t("peremptions.proche"),      sub: t("peremptions.aSurveiller"),   dlgTitle: t("peremptions.dlgProche"),       dlgSubtitle: t("peremptions.dlgProcheSub") },
-    { key: "no_date",    tone: "muted",   title: t("peremptions.sansDate"),           sub: t("peremptions.aRenseigner"),   dlgTitle: t("peremptions.dlgSansDate"), dlgSubtitle: t("peremptions.dlgSansDateSub") },
+    {
+      key: "expired",
+      tone: "error",
+      title: t("peremptions.expires"),
+      sub: t("peremptions.actionUrgente"),
+      dlgTitle: t("peremptions.dlgExpires"),
+      dlgSubtitle: t("peremptions.dlgExpiresSub"),
+    },
+    {
+      key: "very_close",
+      tone: "warning",
+      title: t("peremptions.tresProche"),
+      sub: t("peremptions.tresUrgent"),
+      dlgTitle: t("peremptions.dlgTresProche"),
+      dlgSubtitle: t("peremptions.dlgTresProcheSub"),
+    },
+    {
+      key: "close",
+      tone: "warning",
+      title: t("peremptions.proche"),
+      sub: t("peremptions.aSurveiller"),
+      dlgTitle: t("peremptions.dlgProche"),
+      dlgSubtitle: t("peremptions.dlgProcheSub"),
+    },
+    {
+      key: "no_date",
+      tone: "muted",
+      title: t("peremptions.sansDate"),
+      sub: t("peremptions.aRenseigner"),
+      dlgTitle: t("peremptions.dlgSansDate"),
+      dlgSubtitle: t("peremptions.dlgSansDateSub"),
+    },
   ];
 
   return (
@@ -204,17 +273,17 @@ function PeremptionsSection({
                 b
                   ? () =>
                       onOpen({
-                        title:          c.dlgTitle,
-                        subtitle:       c.dlgSubtitle,
-                        products:       b.products,
-                        columns:        PEREMPTION_COLUMNS,
+                        title: c.dlgTitle,
+                        subtitle: c.dlgSubtitle,
+                        products: b.products,
+                        columns: PEREMPTION_COLUMNS,
                         defaultSortKey: "expiry_date",
                       })
                   : undefined
               }
             >
               <div className="flex items-center gap-5 pt-0.5">
-                <MiniStat label={t("col.unites")}       value={formatQty(b?.total_units ?? 0)} />
+                <MiniStat label={t("col.unites")} value={formatQty(b?.total_units ?? 0)} />
                 <MiniStat label={t("peremptions.valeurAchat")} value={formatMAD(b?.purchase_value ?? 0)} />
               </div>
             </KpiTile>
@@ -228,31 +297,61 @@ function PeremptionsSection({
 // src/pages/alertes/_components/StockAlertsSection.tsx
 
 interface StockAlertsSectionProps {
-  negatif:   StockRow[];
+  negatif: StockRow[];
   sousStock: StockRow[];
-  surStock:  StockRow[];
-  negUnits:  number;
-  sousPpv:   number;
-  surPpv:    number;
-  onOpen:    (d: DialogDescriptor) => void;
+  surStock: StockRow[];
+  negUnits: number;
+  sousPpv: number;
+  surPpv: number;
+  onOpen: (d: DialogDescriptor) => void;
 }
 
 function StockAlertsSection({
-  negatif, sousStock, surStock, negUnits, sousPpv, surPpv, onOpen,
+  negatif,
+  sousStock,
+  surStock,
+  negUnits,
+  sousPpv,
+  surPpv,
+  onOpen,
 }: StockAlertsSectionProps) {
   const t = useT();
   const cards: {
-    tone:        IconTone;
-    title:       string;
-    rows:        StockRow[];
+    tone: IconTone;
+    title: string;
+    rows: StockRow[];
     metricLabel: string;
-    metric:      ReactNode;
-    Icon:        typeof PackageX;
+    metric: ReactNode;
+    Icon: typeof PackageX;
     dlgSubtitle: string;
   }[] = [
-    { tone: "error",   title: t("alertes.stockNegatif"), rows: negatif,   metricLabel: t("alertes.unitesNegatif"), metric: formatQty(negUnits), Icon: AlertTriangle, dlgSubtitle: t("alertes.stockNegatifSub") },
-    { tone: "warning", title: t("alertes.sousStock"),    rows: sousStock, metricLabel: t("kpi.ppvPotentiel"),     metric: formatMAD(sousPpv),  Icon: TrendingDown,  dlgSubtitle: t("alertes.sousStockSub") },
-    { tone: "info",    title: t("alertes.surStock"),     rows: surStock,  metricLabel: t("alertes.ppvImmobilise"),    metric: formatMAD(surPpv),   Icon: PackageOpen,   dlgSubtitle: t("alertes.surStockSub") },
+    {
+      tone: "error",
+      title: t("alertes.stockNegatif"),
+      rows: negatif,
+      metricLabel: t("alertes.unitesNegatif"),
+      metric: formatQty(negUnits),
+      Icon: AlertTriangle,
+      dlgSubtitle: t("alertes.stockNegatifSub"),
+    },
+    {
+      tone: "warning",
+      title: t("alertes.sousStock"),
+      rows: sousStock,
+      metricLabel: t("kpi.ppvPotentiel"),
+      metric: formatMAD(sousPpv),
+      Icon: TrendingDown,
+      dlgSubtitle: t("alertes.sousStockSub"),
+    },
+    {
+      tone: "info",
+      title: t("alertes.surStock"),
+      rows: surStock,
+      metricLabel: t("alertes.ppvImmobilise"),
+      metric: formatMAD(surPpv),
+      Icon: PackageOpen,
+      dlgSubtitle: t("alertes.surStockSub"),
+    },
   ];
 
   return (
@@ -274,14 +373,21 @@ function StockAlertsSection({
               label={c.title}
               icon={<c.Icon className="size-5" />}
               iconTone={c.tone}
-              badge={{ label: <>{formatQty(count)} {t("common.wProduits")}</>, tone: c.tone }}
+              badge={{
+                label: (
+                  <>
+                    {formatQty(count)} {t("common.wProduits")}
+                  </>
+                ),
+                tone: c.tone,
+              }}
               disabled={count === 0}
               onClick={() =>
                 onOpen({
-                  title:          c.title,
-                  subtitle:       c.dlgSubtitle,
-                  products:       c.rows,
-                  columns:        STOCK_COLUMNS,
+                  title: c.title,
+                  subtitle: c.dlgSubtitle,
+                  products: c.rows,
+                  columns: STOCK_COLUMNS,
                   defaultSortKey: "current_stock",
                 })
               }
@@ -314,9 +420,7 @@ function VentesSansAchatSection({ data, onOpen }: VentesSansAchatSectionProps) {
         <FileWarning className="size-5 text-warning" />
         <div>
           <h2 className="text-base font-semibold text-foreground">{t("alertes.dataTitle")}</h2>
-          <p className="text-[13px] text-muted-foreground">
-            {t("alertes.dataDesc")}
-          </p>
+          <p className="text-[13px] text-muted-foreground">{t("alertes.dataDesc")}</p>
         </div>
       </header>
 
@@ -324,19 +428,31 @@ function VentesSansAchatSection({ data, onOpen }: VentesSansAchatSectionProps) {
         <KpiTile
           label={t("alertes.vsaTitle")}
           value={formatMAD(data?.total_ca ?? 0)}
-          sub={<>{formatQty(count)} {t("common.wProduits")} · {formatQty(data?.total_units_sold ?? 0)} {t("common.wUnites")}</>}
+          sub={
+            <>
+              {formatQty(count)} {t("common.wProduits")} · {formatQty(data?.total_units_sold ?? 0)}{" "}
+              {t("common.wUnites")}
+            </>
+          }
           icon={<FileWarning className="size-5" />}
           iconTone="warning"
-          badge={{ label: <>{formatQty(count)} {t("common.wProduits")}</>, tone: "warning" }}
+          badge={{
+            label: (
+              <>
+                {formatQty(count)} {t("common.wProduits")}
+              </>
+            ),
+            tone: "warning",
+          }}
           disabled={count === 0}
           onClick={
             data && count > 0
               ? () =>
                   onOpen({
-                    title:          t("alertes.vsaTitle"),
-                    subtitle:       t("alertes.vsaSub"),
-                    products:       data.products,
-                    columns:        VENTES_SANS_ACHAT_COLUMNS,
+                    title: t("alertes.vsaTitle"),
+                    subtitle: t("alertes.vsaSub"),
+                    products: data.products,
+                    columns: VENTES_SANS_ACHAT_COLUMNS,
                     defaultSortKey: "ca",
                   })
               : undefined
@@ -348,9 +464,10 @@ function VentesSansAchatSection({ data, onOpen }: VentesSansAchatSectionProps) {
 }
 
 const CATEGORY_KEY: Record<CategoryType, string> = {
-  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
+  all: "category.mixte",
+  pharmacie: "category.pharmacie",
+  parapharmacie: "category.parapharmacie",
 };
-
 
 export default function AlertesPage() {
   const t = useT();
@@ -384,37 +501,47 @@ export default function AlertesPage() {
   const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
-    (dateFrom || dateTo) ? {
-      key:    "dates",
-      label:  <>{t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}</>,
-      onClear: () => setPeriod(null, null),
-    } : null,
-    category !== "all" ? {
-      key:    "cat",
-      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[category])}</>,
-      onClear: () => setCategory("all"),
-    } : null,
+    dateFrom || dateTo
+      ? {
+          key: "dates",
+          label: (
+            <>
+              {t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}
+            </>
+          ),
+          onClear: () => setPeriod(null, null),
+        }
+      : null,
+    category !== "all"
+      ? {
+          key: "cat",
+          label: (
+            <>
+              {t("dashboard.categorieFilter")} {t(CATEGORY_KEY[category])}
+            </>
+          ),
+          onClear: () => setCategory("all"),
+        }
+      : null,
   ].filter(Boolean) as ActiveFilter[];
 
   return (
     <div className="flex flex-col gap-5">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.alertes")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("alertes.subtitle")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("alertes.subtitle")}</p>
       </header>
 
       <FilterBar<CategoryType>
         dateRange={{
-          from:     dateFrom || null,
-          to:       dateTo || null,
+          from: dateFrom || null,
+          to: dateTo || null,
           onChange: (from, to) => setPeriod(from, to),
         }}
         segment={{
-          value:    category,
+          value: category,
           onChange: setCategory,
-          options:  categoryTypeOptions,
+          options: categoryTypeOptions,
         }}
         activeFilters={activeFilters}
         onResetAll={resetAll}
@@ -497,9 +624,21 @@ function AlertesSkeleton() {
           <div key={i} className="h-[54px] w-44 animate-pulse rounded-md border border-border bg-card" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Array.from({ length: 2 }).map((_, i) => <Card key={i} />)}</div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Card key={i} />)}</div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <Card key={i} />)}</div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i} />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} />
+        ))}
+      </div>
     </>
   );
 }

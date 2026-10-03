@@ -26,40 +26,43 @@ import type { MemberOut } from "@/types";
 
 import { FEATURES, ROLE_LABEL, type FeatureKey } from "./memberConstants";
 
-
 /** One layer that gates the user's effective access for each feature.
  *  The label appears on per-row pills; the values dict says which features
  *  this layer allows. A feature is "locked" when ANY ceiling layer has it
  *  set to false. */
 export interface CeilingLayer {
-  label:  string;                              // "Pharmacie" | "Vous" | …
+  label: string; // "Pharmacie" | "Vous" | …
   values: Record<FeatureKey, boolean>;
 }
 
-
 export interface UserPermissionsDialogProps {
-  open:             boolean;
-  onClose:          () => void;
-  user:             MemberOut | null;
+  open: boolean;
+  onClose: () => void;
+  user: MemberOut | null;
   /** Sentence inserted into the info banner — should mention the ceiling
    *  layers (e.g. "Une permission n'est effective que si la pharmacie ET
    *  vous-même l'avez activée."). Keeps copy ownership with the caller. */
-  contextStrip:     React.ReactNode;
+  contextStrip: React.ReactNode;
   /** Ordered list of ceiling layers — at least one. Each contributes a pill
    *  on every feature row. */
-  ceilings:         CeilingLayer[];
+  ceilings: CeilingLayer[];
   /** UserPermission values (server-side current state) — used for dirty-bag. */
   serverPermissions: Record<FeatureKey, boolean>;
-  isSaving?:        boolean;
-  onSave:           (next: Record<FeatureKey, boolean>) => void;
+  isSaving?: boolean;
+  onSave: (next: Record<FeatureKey, boolean>) => void;
 }
-
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 
-
 export function UserPermissionsDialog({
-  open, onClose, user, contextStrip, ceilings, serverPermissions, isSaving, onSave,
+  open,
+  onClose,
+  user,
+  contextStrip,
+  ceilings,
+  serverPermissions,
+  isSaving,
+  onSave,
 }: UserPermissionsDialogProps) {
   const t = useT();
   // Local pending edits — initialized from server, reset on open / user change.
@@ -70,14 +73,16 @@ export function UserPermissionsDialog({
 
   if (!user) return null;
 
-  const initials = (user.full_name ?? user.email).split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase()).join("");
+  const initials = (user.full_name ?? user.email)
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
 
-  const set = (key: FeatureKey, next: boolean) =>
-    setPending((prev) => ({ ...prev, [key]: next }));
+  const set = (key: FeatureKey, next: boolean) => setPending((prev) => ({ ...prev, [key]: next }));
 
   /** A feature is locked when ANY ceiling layer disallows it. */
-  const isLocked = (key: FeatureKey) =>
-    ceilings.some((layer) => !layer.values[key]);
+  const isLocked = (key: FeatureKey) => ceilings.some((layer) => !layer.values[key]);
 
   const enableAllPossible = () => {
     const next: Record<FeatureKey, boolean> = { ...pending };
@@ -97,7 +102,12 @@ export function UserPermissionsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="flex max-h-[calc(100vh-140px)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
@@ -113,7 +123,12 @@ export function UserPermissionsDialog({
               <span className="text-[12.5px] text-muted-foreground">{user.email}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="cursor-pointer text-muted-foreground hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -130,11 +145,9 @@ export function UserPermissionsDialog({
             {FEATURES.map((f) => {
               const locked = isLocked(f.key);
               const userOn = !locked && pending[f.key];
-              const Icon   = f.icon;
+              const Icon = f.icon;
 
-              const toggle = (
-                <Switch checked={!!userOn} disabled={locked} onChange={(next) => set(f.key, next)} />
-              );
+              const toggle = <Switch checked={!!userOn} disabled={locked} onChange={(next) => set(f.key, next)} />;
 
               return (
                 <div
@@ -161,7 +174,10 @@ export function UserPermissionsDialog({
                       return (
                         <span
                           key={layer.label}
-                          className={cn(PILL_BASE, allowed ? "bg-info-subtle text-info" : "bg-muted text-muted-foreground")}
+                          className={cn(
+                            PILL_BASE,
+                            allowed ? "bg-info-subtle text-info" : "bg-muted text-muted-foreground",
+                          )}
                         >
                           {layer.label} : {allowed ? t("adminPharm.enabledF") : t("adminPharm.disabledF")}
                         </span>
@@ -172,7 +188,9 @@ export function UserPermissionsDialog({
                         <Tooltip label={lockReason(f.key)} placement="top">
                           <span>{toggle}</span>
                         </Tooltip>
-                      ) : toggle}
+                      ) : (
+                        toggle
+                      )}
                     </div>
                   </div>
                 </div>

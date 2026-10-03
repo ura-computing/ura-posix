@@ -15,6 +15,7 @@ locked toggles; the intersection at read time (permissions.py) is the truth.
 Member lifecycle + shared helpers live in members.py (also used by
 admin_pharmacies.py); this router only does the owner auth + scope checks.
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -52,6 +53,7 @@ router = APIRouter(tags=["owner-employees"])
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+
 def _pharm_features(db, pharmacy_id: int) -> list[str]:
     rows = (
         db.query(PharmacyFeature.feature)
@@ -82,6 +84,7 @@ def _get_employee_or_404(db, pharmacy_id: int, employee_id: int) -> User:
 
 # ── List ─────────────────────────────────────────────────────────────────────
 
+
 @router.get("/owner/employees", response_model=OwnerEmployeesResponse)
 def list_employees(pharmacy_id: OwnerDep, user: CurrentUserDep, db: DbDep) -> OwnerEmployeesResponse:
     """One-shot fetch for the page: employees + pharmacy features + caller's
@@ -89,10 +92,7 @@ def list_employees(pharmacy_id: OwnerDep, user: CurrentUserDep, db: DbDep) -> Ow
     in EmployeePermissionsDialog without a second round-trip."""
 
     employees = (
-        db.query(User)
-        .filter(User.pharmacy_id == pharmacy_id, User.role == "employee")
-        .order_by(User.id.asc())
-        .all()
+        db.query(User).filter(User.pharmacy_id == pharmacy_id, User.role == "employee").order_by(User.id.asc()).all()
     )
     granted = granted_permissions_map(db, [e.id for e in employees])
 
@@ -107,6 +107,7 @@ def list_employees(pharmacy_id: OwnerDep, user: CurrentUserDep, db: DbDep) -> Ow
 
 # ── Create / update / lifecycle ──────────────────────────────────────────────
 
+
 @router.post("/owner/employees", response_model=CreateUserOut)
 def create_employee(body: CreateUserIn, pharmacy_id: OwnerDep, db: DbDep) -> CreateUserOut:
     """Create an employee account for the caller's pharmacy. Role is HARDCODED
@@ -118,13 +119,17 @@ def create_employee(body: CreateUserIn, pharmacy_id: OwnerDep, db: DbDep) -> Cre
     password (body.password)."""
     if db.query(User).filter(User.email == body.email).first():
         raise ApiError(
-            http_status.HTTP_409_CONFLICT, ErrorCode.EMAIL_TAKEN,
+            http_status.HTTP_409_CONFLICT,
+            ErrorCode.EMAIL_TAKEN,
             "Un utilisateur avec cet email existe déjà.",
         )
 
     new_emp = create_member(
-        db, email=body.email, name=body.full_name, password=body.password,
-        role="employee",                            # hardcoded — owner can't create co-owners
+        db,
+        email=body.email,
+        name=body.full_name,
+        password=body.password,
+        role="employee",  # hardcoded — owner can't create co-owners
         pharmacy_id=pharmacy_id,
     )
     return CreateUserOut(member=member_out(db, new_emp))
@@ -134,7 +139,7 @@ def create_employee(body: CreateUserIn, pharmacy_id: OwnerDep, db: DbDep) -> Cre
 def set_employee_permissions(
     body: PermissionsBulkSet,
     pharmacy_id: OwnerDep,
-    db:   DbDep,
+    db: DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Bulk-set the target employee's 9 UserPermission rows. The frontend
@@ -150,7 +155,7 @@ def set_employee_permissions(
 def set_employee_status(
     body: StatusPatchIn,
     pharmacy_id: OwnerDep,
-    db:   DbDep,
+    db: DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Toggle active ↔ inactive. Bumps token_version on inactive so any live
@@ -164,7 +169,7 @@ def set_employee_status(
 def reset_employee_password(
     body: ResetPasswordIn,
     pharmacy_id: OwnerDep,
-    db:   DbDep,
+    db: DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
     """Set the password the owner typed + bump token_version so live sessions die."""
@@ -176,7 +181,7 @@ def reset_employee_password(
 @router.delete("/owner/employees/{employee_id}", status_code=204)
 def delete_employee(
     pharmacy_id: OwnerDep,
-    db:   DbDep,
+    db: DbDep,
     employee_id: Annotated[int, Path(ge=1)],
 ) -> None:
     """Hard-delete an employee. Cascades drop their UserPermission rows

@@ -7,29 +7,13 @@
  *  Body: per-mode table (Liste mode: slim import status line, then the table).
  */
 import { useRef, useState } from "react";
-import {
-  Download,
-  Upload,
-  BarChart3,
-  Boxes,
-  Coins,
-  Percent,
-  ShoppingCart,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { Download, Upload, BarChart3, Boxes, Coins, Percent, ShoppingCart, Sparkles, TrendingUp } from "lucide-react";
 
 import { useCategoryTypeOptions } from "@/_components/CategorySegment";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { FilterBar, type ActiveFilter, type RightAction } from "@/_components/filterBar";
 import { MARGE_MODES } from "@/types";
-import type {
-  AnalyseFilters,
-  MargeMode,
-  AnalyseMargeKpis,
-  AnalyseMargeRow,
-  ListeItem,
-} from "@/types";
+import type { AnalyseFilters, MargeMode, AnalyseMargeKpis, AnalyseMargeRow, ListeItem } from "@/types";
 
 import { useAnalysePage } from "./hooks";
 import { KpiTile } from "@/_components/KpiTile";
@@ -61,11 +45,11 @@ function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?:
       </div>
     );
   }
-  const ca       = kpis?.total_ventes_dh ?? 0;
-  const unites   = kpis?.total_ventes_unites ?? 0;
+  const ca = kpis?.total_ventes_dh ?? 0;
+  const unites = kpis?.total_ventes_unites ?? 0;
   const margePct = kpis?.marge_pct_avg;
-  const margeDh  = kpis?.marge_dh_avg;
-  const gain     = kpis?.difference_gain_dh ?? 0;
+  const margeDh = kpis?.marge_dh_avg;
+  const gain = kpis?.difference_gain_dh ?? 0;
 
   // Gauge 0-100 — clamp `difference_gain_dh` against an arbitrary scale (10k MAD).
   // The gauge is a relative signal: bigger gain → higher needle.
@@ -76,7 +60,11 @@ function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?:
       <KpiTile
         label={t("kpi.ca")}
         value={formatMAD(ca)}
-        sub={<>{formatQty(unites)} {t("kpi.unites")}</>}
+        sub={
+          <>
+            {formatQty(unites)} {t("kpi.unites")}
+          </>
+        }
         icon={<Coins className="size-5" />}
         iconTone="primary"
       />
@@ -85,7 +73,10 @@ function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?:
         value={margePct != null ? formatPct(margePct) : "—"}
         sub={
           kpis?.marge_pct_max && kpis?.marge_pct_min ? (
-            <>{t("kpi.max")} {formatPct(kpis.marge_pct_max.value)} · {t("kpi.min")} {formatPct(kpis.marge_pct_min.value)}</>
+            <>
+              {t("kpi.max")} {formatPct(kpis.marge_pct_max.value)} · {t("kpi.min")}{" "}
+              {formatPct(kpis.marge_pct_min.value)}
+            </>
           ) : undefined
         }
         icon={<Percent className="size-5" />}
@@ -96,7 +87,9 @@ function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?:
         value={margeDh != null ? formatMAD(margeDh) : "—"}
         sub={
           kpis?.marge_dh_max && kpis?.marge_dh_min ? (
-            <>{t("kpi.max")} {formatMAD(kpis.marge_dh_max.value)} · {t("kpi.min")} {formatMAD(kpis.marge_dh_min.value)}</>
+            <>
+              {t("kpi.max")} {formatMAD(kpis.marge_dh_max.value)} · {t("kpi.min")} {formatMAD(kpis.marge_dh_min.value)}
+            </>
           ) : undefined
         }
         icon={<TrendingUp className="size-5" />}
@@ -153,17 +146,28 @@ function AnalyseKpis({ kpis, isLoading }: { kpis?: AnalyseMargeKpis; isLoading?:
  *  defs come from MARGE_COLS[mode]. Pagination state lives in useAnalysePage. */
 
 interface AnalyseTableProps {
-  mode:        MargeMode;
-  rows:        AnalyseMargeRow[];
-  loading:     boolean;
-  pagination:  DataTablePagination;
-  sortBy:      string | null;
-  sortOrder:   "asc" | "desc";
-  onSort:      (key: string) => void;
+  mode: MargeMode;
+  rows: AnalyseMargeRow[];
+  loading: boolean;
+  pagination: DataTablePagination;
+  sortBy: string | null;
+  sortOrder: "asc" | "desc";
+  onSort: (key: string) => void;
 }
 
 const MONTH_IDX: Record<string, number> = {
-  m01: 0, m02: 1, m03: 2, m04: 3, m05: 4, m06: 5, m07: 6, m08: 7, m09: 8, m10: 9, m11: 10, m12: 11,
+  m01: 0,
+  m02: 1,
+  m03: 2,
+  m04: 3,
+  m05: 4,
+  m06: 5,
+  m07: 6,
+  m08: 7,
+  m09: 8,
+  m10: 9,
+  m11: 10,
+  m12: 11,
 };
 
 function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrder, onSort }: AnalyseTableProps) {
@@ -174,18 +178,24 @@ function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrder, onSo
   // The Année-pivot month columns take their localized short name; the Liste
   // "Statut" cell translates found / not_found.
   const columns: ColumnDef<AnalyseMargeRow>[] = MARGE_COLS[mode].map((c) => ({
-    key:      c.key,
-    label:    c.key in MONTH_IDX ? monthsShort[MONTH_IDX[c.key]] : t(c.label),
-    align:    c.align,
+    key: c.key,
+    label: c.key in MONTH_IDX ? monthsShort[MONTH_IDX[c.key]] : t(c.label),
+    align: c.align,
     sortable: !!c.raw,
-    width:    c.width ? parseInt(c.width, 10) : undefined,
-    render:   c.key === "match_status"
-      ? (r: AnalyseMargeRow) => (
-          r.match_status === "found"
-            ? <span className="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success">{t("analyse.trouve")}</span>
-            : <span className="rounded-full bg-error-subtle px-2 py-0.5 text-xs font-semibold text-error">{t("analyse.introuvable")}</span>
-        )
-      : c.render,
+    width: c.width ? parseInt(c.width, 10) : undefined,
+    render:
+      c.key === "match_status"
+        ? (r: AnalyseMargeRow) =>
+            r.match_status === "found" ? (
+              <span className="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success">
+                {t("analyse.trouve")}
+              </span>
+            ) : (
+              <span className="rounded-full bg-error-subtle px-2 py-0.5 text-xs font-semibold text-error">
+                {t("analyse.introuvable")}
+              </span>
+            )
+        : c.render,
   }));
 
   return (
@@ -210,7 +220,10 @@ function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrder, onSo
 
 function detectColumn(headers: string[], aliases: string[]): number {
   const norm = (s: string) =>
-    s.replace(/﻿|ï»¿/g, "").toLowerCase().replace(/[\s_-]/g, "");
+    s
+      .replace(/﻿|ï»¿/g, "")
+      .toLowerCase()
+      .replace(/[\s_-]/g, "");
   const normalizedHeaders = headers.map(norm);
   for (const a of aliases) {
     const idx = normalizedHeaders.indexOf(norm(a));
@@ -230,8 +243,8 @@ function parseCsv(text: string): ListeItem[] {
   if (lines.length === 0) return [];
 
   const headers = lines[0].split(delim).map((s) => s.trim().replace(/^"|"$/g, ""));
-  const nameIdx     = detectColumn(headers, ["produit", "product", "designation", "désignation"]);
-  const pidIdx      = detectColumn(headers, ["pid", "id", "code"]);
+  const nameIdx = detectColumn(headers, ["produit", "product", "designation", "désignation"]);
+  const pidIdx = detectColumn(headers, ["pid", "id", "code"]);
   const barcode1Idx = detectColumn(headers, ["codebarre1", "barcode1", "ean", "codebarre"]);
   const barcode2Idx = detectColumn(headers, ["codebarre2", "barcode2"]);
 
@@ -241,11 +254,11 @@ function parseCsv(text: string): ListeItem[] {
   const items: ListeItem[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = lines[i].split(delim).map((s) => s.trim().replace(/^"|"$/g, ""));
-    const name  = cells[effectiveNameIdx] || "";
+    const name = cells[effectiveNameIdx] || "";
     if (!name) continue;
     items.push({
       name,
-      pid:      pidIdx      >= 0 ? cells[pidIdx]      || undefined : undefined,
+      pid: pidIdx >= 0 ? cells[pidIdx] || undefined : undefined,
       barcode1: barcode1Idx >= 0 ? cells[barcode1Idx] || undefined : undefined,
       barcode2: barcode2Idx >= 0 ? cells[barcode2Idx] || undefined : undefined,
     });
@@ -254,29 +267,33 @@ function parseCsv(text: string): ListeItem[] {
 }
 
 const CATEGORY_KEY: Record<string, string> = {
-  all: "category.mixte", pharmacie: "category.pharmacie", parapharmacie: "category.parapharmacie",
+  all: "category.mixte",
+  pharmacie: "category.pharmacie",
+  parapharmacie: "category.parapharmacie",
 };
 
-
-function buildActiveFilters(
-  filters: AnalyseFilters,
-  setFilters: (f: AnalyseFilters) => void,
-  t: TFn,
-): ActiveFilter[] {
+function buildActiveFilters(filters: AnalyseFilters, setFilters: (f: AnalyseFilters) => void, t: TFn): ActiveFilter[] {
   return [
     (filters.date_from || filters.date_to) && {
       key: "dates",
-      label: <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
+      label: (
+        <>
+          {t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
+        </>
+      ),
       onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
     },
     filters.category_type !== "all" && {
       key: "category",
-      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
+      label: (
+        <>
+          {t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}
+        </>
+      ),
       onClear: () => setFilters({ ...filters, category_type: "all" }),
     },
   ].filter(Boolean) as ActiveFilter[];
 }
-
 
 export default function AnalysePage() {
   const t = useT();
@@ -307,7 +324,7 @@ export default function AnalysePage() {
   // Liste import moved into the FilterBar (right of "Exporter Excel"). The hidden
   // file input + a slim status line replace the old upload card.
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [listeFile,  setListeFile]  = useState<string | null>(null);
+  const [listeFile, setListeFile] = useState<string | null>(null);
   const [listeCount, setListeCount] = useState<number>(0);
   const [listeError, setListeError] = useState<string | null>(null);
 
@@ -336,48 +353,50 @@ export default function AnalysePage() {
 
   const rightActions: RightAction[] = [
     {
-      label:    t("common.export"),
-      icon:     <Download className="size-4" />,
-      variant:  "outline",
-      onClick:  handleExport,
+      label: t("common.export"),
+      icon: <Download className="size-4" />,
+      variant: "outline",
+      onClick: handleExport,
       disabled: rows.length === 0,
     },
     // Import lives here only in Liste mode — to the right of Exporter Excel.
-    ...(mode === "liste" ? [{
-      label:    isLoading ? t("analyse.analyseLoading") : t("analyse.importListe"),
-      icon:     <Upload className="size-4" />,
-      variant:  "primary" as const,
-      onClick:  () => fileInputRef.current?.click(),
-      disabled: isLoading,
-    }] : []),
+    ...(mode === "liste"
+      ? [
+          {
+            label: isLoading ? t("analyse.analyseLoading") : t("analyse.importListe"),
+            icon: <Upload className="size-4" />,
+            variant: "primary" as const,
+            onClick: () => fileInputRef.current?.click(),
+            disabled: isLoading,
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("analyse.title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("analyse.subtitle")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("analyse.subtitle")}</p>
       </header>
 
       <FilterBar<string>
         dateRange={{
-          from:     filters.date_from,
-          to:       filters.date_to,
+          from: filters.date_from,
+          to: filters.date_to,
           onChange: (from, to) => setFilters({ ...filters, date_from: from, date_to: to }),
         }}
         segment={{
-          value:    filters.category_type,
+          value: filters.category_type,
           onChange: (v) => setFilters({ ...filters, category_type: v }),
-          options:  categoryTypeOptions,
+          options: categoryTypeOptions,
         }}
         search={{
-          value:       search,
-          onChange:    setSearch,
+          value: search,
+          onChange: setSearch,
           placeholder: t("analyse.searchPh"),
           suggestions: suggestions,
-          onPick:      (label) => setSearch(label),
+          onPick: (label) => setSearch(label),
         }}
         rightActions={rightActions}
         activeFilters={buildActiveFilters(filters, setFilters, t)}
@@ -405,7 +424,12 @@ export default function AnalysePage() {
             ) : listeFile ? (
               <>
                 <span className="font-medium text-foreground">{listeFile}</span>
-                {listeCount > 0 && <> · {listeCount} {t("stock.produitsWord")}</>}
+                {listeCount > 0 && (
+                  <>
+                    {" "}
+                    · {listeCount} {t("stock.produitsWord")}
+                  </>
+                )}
               </>
             ) : (
               t("analyse.listeHint")
@@ -434,10 +458,7 @@ export default function AnalysePage() {
       {error && (
         <div className="rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-sm text-error">
           {/* Surface the API detail when available — a bare "réessayez" hid real causes (e.g. 422). */}
-          {t("analyse.loadError")}{" "}
-          {error instanceof Error && error.message
-            ? error.message
-            : t("analyse.retryLater")}
+          {t("analyse.loadError")} {error instanceof Error && error.message ? error.message : t("analyse.retryLater")}
         </div>
       )}
     </div>

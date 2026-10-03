@@ -3,7 +3,10 @@
  *  Use for every client-side search/filter so a query without accents still matches
  *  accented records (mirrors the backend's SQL `unaccent`). */
 export function normalizeText(s: unknown): string {
-  return String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 }
 
 /** Build a `(fullText) => boolean` predicate for one normalized token, honoring the
@@ -15,13 +18,13 @@ export function normalizeText(s: unknown): string {
  */
 function makeTokenTest(token: string): (full: string) => boolean {
   const parts = token.split("*").filter(Boolean);
-  if (parts.length === 0) return () => true;                       // lone "*"
+  if (parts.length === 0) return () => true; // lone "*"
   if (parts.length === 1) {
     const seg = parts[0];
     if (token.endsWith("*") && !token.startsWith("*")) {
-      return (full) => full.startsWith(seg);                       // starts with
+      return (full) => full.startsWith(seg); // starts with
     }
-    return (full) => full.includes(seg);                           // contains
+    return (full) => full.includes(seg); // contains
   }
   // 2+ parts: one whole word (backend SQL: \ma[^[:space:]]*b\M)
   const inner = parts.map(escapeRegex).join("[^\\s]*");

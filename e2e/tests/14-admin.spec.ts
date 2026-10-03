@@ -21,16 +21,7 @@ import { expectSame, expectSameSet } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
 import { REPO_DIR } from "../lib/paths";
-import {
-  columnTexts,
-  frNumber,
-  kpiValue,
-  pageCall,
-  pageSend,
-  period,
-  pickCategoryType,
-  setPeriod,
-} from "../lib/ui";
+import { columnTexts, frNumber, kpiValue, pageCall, pageSend, period, pickCategoryType, setPeriod } from "../lib/ui";
 
 test.use({ storageState: sessionFile("admin") });
 
@@ -48,19 +39,12 @@ async function openAdminRapport(page: Page): Promise<void> {
       exact: true,
     }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Pharmacie", exact: true })
-    .first()
-    .click();
+  await page.getByRole("button", { name: "Pharmacie", exact: true }).first().click();
   await page.getByRole("button", { name: /· Pharmacie E2E$/ }).click();
 }
 
 /** Drill-down « Alertes marges » + « Stock » tiles show the API answers. */
-async function checkAlertStockTiles(
-  page: Page,
-  alerts: Row,
-  stock: Row,
-): Promise<void> {
+async function checkAlertStockTiles(page: Page, alerts: Row, stock: Row): Promise<void> {
   const tiles: [string, number][] = [
     ["Marge négative", Math.abs(alerts.negative.total_margin_dh)],
     ["Marge 0 % à 10 %", alerts.low.total_ca],
@@ -74,21 +58,14 @@ async function checkAlertStockTiles(
   for (const [label, want] of tiles) {
     await expect
       .poll(
-        async () =>
-          Math.abs(
-            (frNumber(await kpiValue(page, label).innerText()) ?? NaN) - want,
-          ),
+        async () => Math.abs((frNumber(await kpiValue(page, label).innerText()) ?? NaN) - want),
         `tuile « ${label} » = ${want}`,
       )
       .toBeLessThanOrEqual(0.011);
   }
   await expect
     .poll(
-      async () =>
-        (await kpiValue(page, "Sous-stock / Sur-stock").innerText()).replace(
-          /[\s\u00a0\u202f]/g,
-          "",
-        ),
+      async () => (await kpiValue(page, "Sous-stock / Sur-stock").innerText()).replace(/[\s\u00a0\u202f]/g, ""),
       "tuile « Sous-stock / Sur-stock »",
     )
     .toBe(`${stock.sous_stock_count}/${stock.sur_stock_count}`);
@@ -105,36 +82,22 @@ async function activeUsersTile(page: Page): Promise<number> {
     ["Utilisateurs actifs", s.total_active_users],
     ["Médicaments au catalogue", s.total_catalog_items],
   ]) {
-    await expect
-      .poll(
-        async () => frNumber(await kpiValue(page, label).innerText()),
-        `tuile « ${label} »`,
-      )
-      .toBe(want);
+    await expect.poll(async () => frNumber(await kpiValue(page, label).innerText()), `tuile « ${label} »`).toBe(want);
   }
   await page.goto(back);
   return s.total_active_users;
 }
 
 /** Row kebab → one menu entry. */
-async function rowAction(
-  page: Page,
-  email: string,
-  action: string,
-): Promise<void> {
+async function rowAction(page: Page, email: string, action: string): Promise<void> {
   await page
     .getByRole("row", { name: new RegExp(email) })
     .getByRole("button", { name: "Plus d'actions" })
     .click();
-  await page
-    .getByRole("menu")
-    .getByRole("button", { name: action, exact: true })
-    .click();
+  await page.getByRole("menu").getByRole("button", { name: action, exact: true }).click();
 }
 
-test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Parapharmacie", async ({
-  page,
-}) => {
+test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Parapharmacie", async ({ page }) => {
   const w = testWindow();
   const id = pharmacyId();
   const system = pageCall(page, "/admin/stats");
@@ -160,16 +123,8 @@ test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Paraph
         ...q,
         include_non_declared: "true",
       });
-      const analyse = pageCall(
-        page,
-        `/admin/pharmacy/${id}/stats/analyse-marge`,
-        { ...q, mode: "produit" },
-      );
-      const alerts = pageCall(
-        page,
-        `/admin/pharmacy/${id}/stats/margin-alerts`,
-        q,
-      );
+      const analyse = pageCall(page, `/admin/pharmacy/${id}/stats/analyse-marge`, { ...q, mode: "produit" });
+      const alerts = pageCall(page, `/admin/pharmacy/${id}/stats/margin-alerts`, q);
       if (i === 0) await setPeriod(page, w.date_from, w.date_to);
       else await pickCategoryType(page, label);
       checkStats(await stats, ct);
@@ -186,11 +141,11 @@ test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Paraph
     ["grossiste", "Par grossiste"],
   ] as const) {
     await test.step(tab, async () => {
-      const analyse = pageCall(
-        page,
-        `/admin/pharmacy/${id}/stats/analyse-marge`,
-        { ...period(w), category_type: "parapharmacie", mode },
-      );
+      const analyse = pageCall(page, `/admin/pharmacy/${id}/stats/analyse-marge`, {
+        ...period(w),
+        category_type: "parapharmacie",
+        mode,
+      });
       await page.getByRole("tab", { name: tab, exact: true }).click();
       checkAnalyse(await analyse, "parapharmacie", mode);
     });
@@ -238,9 +193,7 @@ const MARGE_TABS = [
   ],
 ] as const;
 
-test("rapport admin : le tableau « Analyse de marge » affiche les valeurs de l'API (3 onglets)", async ({
-  page,
-}) => {
+test("rapport admin : le tableau « Analyse de marge » affiche les valeurs de l'API (3 onglets)", async ({ page }) => {
   const w = testWindow();
   const answer = (mode: string) =>
     pageCall(page, `/admin/pharmacy/${pharmacyId()}/stats/analyse-marge`, {
@@ -270,27 +223,17 @@ test("rapport admin : le tableau « Analyse de marge » affiche les valeurs de l
         .last()
         .locator("table");
       // columnTexts reads at once: wait until this tab's rows are drawn (not the previous tab's).
-      await expect(
-        table.getByRole("columnheader", { name: nameCol, exact: true }),
-      ).toBeVisible();
-      await expect(table.locator("tbody tr").first()).toContainText(
-        String(rows[0]?.[nameKey] ?? "—"),
-      );
+      await expect(table.getByRole("columnheader", { name: nameCol, exact: true })).toBeVisible();
+      await expect(table.locator("tbody tr").first()).toContainText(String(rows[0]?.[nameKey] ?? "—"));
       const names = await columnTexts(page, nameCol, table);
       expect(names.length, `${mode}: lignes affichées`).toBeGreaterThan(0);
       const shown = rows.slice(0, names.length);
-      expect(names, `${mode}: ${nameCol}`).toEqual(
-        shown.map((r) => String(r[nameKey] ?? "—")),
-      );
+      expect(names, `${mode}: ${nameCol}`).toEqual(shown.map((r) => String(r[nameKey] ?? "—")));
       for (const [header, key] of cols) {
         const got = (await columnTexts(page, header, table)).map(frNumber);
         const bad = shown.flatMap((r, i) => {
-          const want =
-            r[key] == null ? null : Math.round(Number(r[key]) * 100) / 100;
-          return got[i] === want ||
-            (got[i] != null &&
-              want != null &&
-              Math.abs(got[i]! - want) <= 0.011)
+          const want = r[key] == null ? null : Math.round(Number(r[key]) * 100) / 100;
+          return got[i] === want || (got[i] != null && want != null && Math.abs(got[i]! - want) <= 0.011)
             ? []
             : [`${names[i]}: ${got[i]} ≠ ${want}`];
         });
@@ -344,9 +287,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     await dialog.getByLabel("Adresse").fill(P.address);
     await dialog.getByLabel("Téléphone").fill(P.phone);
     const patched = pageSend(page, "PATCH", `/admin/pharmacies/${c.id}`);
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     expectSame(
       await patched,
       {
@@ -364,20 +305,11 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
   const features = ALL_FEATURES.filter((f) => f !== "stock" && f !== "analyse");
   await test.step("fonctionnalités : Stock + Analyse coupées", async () => {
     // The page's only switches: one per feature, in ALL_FEATURES order.
-    for (const f of ["stock", "analyse"])
-      await page.getByRole("switch").nth(ALL_FEATURES.indexOf(f)).click();
-    await expect(
-      page.getByText("2 modifications non enregistrées"),
-    ).toBeVisible();
+    for (const f of ["stock", "analyse"]) await page.getByRole("switch").nth(ALL_FEATURES.indexOf(f)).click();
+    await expect(page.getByText("2 modifications non enregistrées")).toBeVisible();
     const saved = pageSend(page, "PUT", `/admin/pharmacies/${c.id}/features`);
-    await page
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
-    expectSame(
-      (await saved).enabled_features,
-      sorted(features),
-      "PUT features",
-    );
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    expectSame((await saved).enabled_features, sorted(features), "PUT features");
   });
 
   let memberId = 0;
@@ -404,9 +336,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
       "POST users",
     );
     await dialog.getByRole("button", { name: "Fermer" }).last().click();
-    expect(await activeUsersTile(page), "utilisateurs actifs +1").toBe(
-      base + 1,
-    );
+    expect(await activeUsersTile(page), "utilisateurs actifs +1").toBe(base + 1);
   });
 
   await test.step("permissions : Achats retiré (Stock / Analyse verrouillés par la pharmacie)", async () => {
@@ -415,17 +345,10 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
       .getByRole("button", { name: "Gérer les permissions" })
       .click();
     dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("switch").nth(ALL_FEATURES.indexOf("stock")),
-    ).toBeDisabled();
-    await dialog
-      .getByRole("switch")
-      .nth(ALL_FEATURES.indexOf("achats"))
-      .click();
+    await expect(dialog.getByRole("switch").nth(ALL_FEATURES.indexOf("stock"))).toBeDisabled();
+    await dialog.getByRole("switch").nth(ALL_FEATURES.indexOf("achats")).click();
     const saved = pageSend(page, "PUT", `/admin/users/${memberId}/permissions`);
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     expectSame(
       await saved,
       {
@@ -441,17 +364,9 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     ["Réactiver", "active", base + 1],
   ] as const) {
     await test.step(action, async () => {
-      const patched = pageSend(
-        page,
-        "PATCH",
-        `/admin/users/${memberId}/status`,
-      );
+      const patched = pageSend(page, "PATCH", `/admin/users/${memberId}/status`);
       await rowAction(page, M.email, action);
-      expectSame(
-        await patched,
-        { id: memberId, status },
-        `PATCH status ${status}`,
-      );
+      expectSame(await patched, { id: memberId, status }, `PATCH status ${status}`);
       expect(await activeUsersTile(page), "utilisateurs actifs").toBe(users);
     });
   }
@@ -459,17 +374,9 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
   await test.step("réinitialiser le mot de passe", async () => {
     await rowAction(page, M.email, "Réinitialiser le mot de passe");
     dialog = page.getByRole("dialog");
-    await dialog
-      .getByLabel("Nouveau mot de passe", { exact: true })
-      .fill("GerantE2e#2");
-    const reset = pageSend(
-      page,
-      "POST",
-      `/admin/users/${memberId}/reset-password`,
-    );
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByLabel("Nouveau mot de passe", { exact: true }).fill("GerantE2e#2");
+    const reset = pageSend(page, "POST", `/admin/users/${memberId}/reset-password`);
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     expect(await reset).toEqual({ user_id: memberId });
     await expect(dialog.getByText("GerantE2e#2")).toBeVisible();
     await dialog.getByRole("button", { name: "Fermer" }).last().click();
@@ -483,9 +390,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
       .getByRole("button", { name: "Confirmer", exact: true })
       .click();
     expect(await deleted, "DELETE user → 204, corps vide").toBeNull();
-    await expect(
-      page.getByRole("row", { name: new RegExp(M.email) }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(M.email) })).toHaveCount(0);
   });
 
   await test.step("archiver la pharmacie", async () => {
@@ -504,16 +409,11 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
       (await list).map((p) => p.id),
       "absente de la liste",
     ).not.toContain(c.id);
-    await expect(
-      page.getByRole("row", { name: /Pharmacie Archive E2E/ }),
-      "absente du tableau",
-    ).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /Pharmacie Archive E2E/ }), "absente du tableau").toHaveCount(0);
   });
 });
 
-test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharmacie", async ({
-  page,
-}) => {
+test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharmacie", async ({ page }) => {
   // An owner left on an archived pharmacy: invisible on every pharmacy page.
   const O = {
     full_name: "Orphelin E2E",
@@ -524,18 +424,16 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
     name: "Pharmacie Fermée E2E",
     city: "Rabat",
   });
-  const { member } = await apiPost(
-    page,
-    `/admin/pharmacies/${archived.id}/users`,
-    { ...O, role: "owner", pharmacy_id: archived.id },
-  );
+  const { member } = await apiPost(page, `/admin/pharmacies/${archived.id}/users`, {
+    ...O,
+    role: "owner",
+    pharmacy_id: archived.id,
+  });
   await apiDelete(page, `/admin/pharmacies/${archived.id}`, 204);
 
   const list = pageCall<Row[]>(page, "/admin/users");
   await page.goto("/admin/pharmacies");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Pharmacies et utilisateurs" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Pharmacies et utilisateurs" })).toBeVisible();
   await page.getByRole("tab", { name: "Utilisateurs", exact: true }).click();
   await expect(page).toHaveURL(/\?tab=utilisateurs$/);
   const users = await list;
@@ -551,11 +449,7 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
     },
     "admin (seed)",
   );
-  expectSame(
-    byEmail("dev@gmail.com"),
-    { role: "developer", status: "active", pharmacy: null },
-    "développeur (seed)",
-  );
+  expectSame(byEmail("dev@gmail.com"), { role: "developer", status: "active", pharmacy: null }, "développeur (seed)");
   expectSame(
     byEmail("owner@gmail.com"),
     {
@@ -589,55 +483,30 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
     },
     "orphelin",
   );
-  expect(
-    byEmail(O.email)?.pharmacy?.archived_at,
-    "pharmacie archivée",
-  ).not.toBeNull();
-  expect(new Set(users.map((u) => u.email)).size, "un compte = une ligne").toBe(
-    users.length,
-  );
+  expect(byEmail(O.email)?.pharmacy?.archived_at, "pharmacie archivée").not.toBeNull();
+  expect(new Set(users.map((u) => u.email)).size, "un compte = une ligne").toBe(users.length);
 
   await test.step("filtre « Sans pharmacie »", async () => {
-    await page
-      .getByRole("button", { name: "Sans pharmacie", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Sans pharmacie", exact: true }).click();
     for (const email of ["admin@gmail.com", "dev@gmail.com", O.email]) {
-      await expect(
-        page.getByRole("row", { name: new RegExp(email) }),
-        email,
-      ).toBeVisible();
+      await expect(page.getByRole("row", { name: new RegExp(email) }), email).toBeVisible();
     }
-    await expect(
-      page.getByRole("row", { name: /owner@gmail\.com/ }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("row", { name: /owner@gmail\.com/ })).toHaveCount(0);
   });
 
   await test.step("filtre « Avec pharmacie » + recherche", async () => {
-    await page
-      .getByRole("button", { name: "Avec pharmacie", exact: true })
-      .click();
-    await expect(
-      page.getByRole("row", { name: /owner@gmail\.com/ }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "Avec pharmacie", exact: true }).click();
+    await expect(page.getByRole("row", { name: /owner@gmail\.com/ })).toBeVisible();
     for (const email of ["admin@gmail.com", O.email]) {
-      await expect(
-        page.getByRole("row", { name: new RegExp(email) }),
-        email,
-      ).toHaveCount(0);
+      await expect(page.getByRole("row", { name: new RegExp(email) }), email).toHaveCount(0);
     }
     await page.getByRole("button", { name: "Tous", exact: true }).click();
-    const box = page.getByPlaceholder(
-      "Rechercher par nom, email, téléphone, pharmacie…",
-    );
+    const box = page.getByPlaceholder("Rechercher par nom, email, téléphone, pharmacie…");
     await box.fill(O.full_name);
-    await expect(page.locator("table tbody tr"), "une seule ligne").toHaveCount(
-      1,
-    );
+    await expect(page.locator("table tbody tr"), "une seule ligne").toHaveCount(1);
     await expect(page.locator("table tbody tr")).toContainText(O.email);
     await box.fill("");
-    await page
-      .getByRole("button", { name: "Sans pharmacie", exact: true })
-      .click();
+    await page.getByRole("button", { name: "Sans pharmacie", exact: true }).click();
   });
 
   await test.step("assigner une pharmacie (Pharmacie Demo)", async () => {
@@ -646,15 +515,9 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
       .getByRole("button", { name: "Assigner une pharmacie" })
       .click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .getByRole("button", { name: "Pharmacie", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Pharmacie", exact: true }).click();
     await dialog.getByRole("button", { name: /· Pharmacie Demo$/ }).click();
-    const assigned = pageSend(
-      page,
-      "PATCH",
-      `/admin/users/${member.id}/pharmacy`,
-    );
+    const assigned = pageSend(page, "PATCH", `/admin/users/${member.id}/pharmacy`);
     await dialog.getByRole("button", { name: "Assigner", exact: true }).click();
     expectSame(
       await assigned,
@@ -666,9 +529,7 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
       "PATCH /admin/users/{id}/pharmacy",
     );
     await page.getByRole("button", { name: "Tous", exact: true }).click();
-    await expect(
-      page.getByRole("row", { name: new RegExp(O.email) }),
-    ).toContainText("Pharmacie Demo");
+    await expect(page.getByRole("row", { name: new RegExp(O.email) })).toContainText("Pharmacie Demo");
   });
 
   await test.step("supprimer le compte", async () => {
@@ -679,9 +540,7 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
       .getByRole("button", { name: "Confirmer", exact: true })
       .click();
     expect(await deleted, "DELETE user → 204, corps vide").toBeNull();
-    await expect(
-      page.getByRole("row", { name: new RegExp(O.email) }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("row", { name: new RegExp(O.email) })).toHaveCount(0);
   });
 });
 
@@ -708,13 +567,8 @@ test.describe("catégories", () => {
       await apiDelete(page, `/category-suffixes/${r.id}`, 204);
   });
 
-  test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé", async ({
-    page,
-    browser,
-  }) => {
-    const owner = await (
-      await browser.newContext({ storageState: sessionFile("owner") })
-    ).newPage();
+  test("catégories : suffixe créé, modifié, visible dans les ventes, supprimé", async ({ page, browser }) => {
+    const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
 
     const list0 = pageCall(page, "/category-suffixes");
     await page.goto("/admin/categories");
@@ -726,15 +580,9 @@ test.describe("catégories", () => {
     await dialog.getByLabel("Suffixe").fill("-P");
     await dialog.getByRole("button", { name: "blue", exact: true }).click();
     const created = pageSend(page, "POST", "/category-suffixes", 201);
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     const c = await created;
-    expectSame(
-      c,
-      { category: "Parapharmacie", suffix: "-P", color: "blue" },
-      "POST /category-suffixes",
-    );
+    expectSame(c, { category: "Parapharmacie", suffix: "-P", color: "blue" }, "POST /category-suffixes");
 
     await page
       .getByRole("row", { name: /Parapharmacie/ })
@@ -744,9 +592,7 @@ test.describe("catégories", () => {
     await dialog.getByLabel("Suffixe").fill("-PA");
     await dialog.getByRole("button", { name: "rose", exact: true }).click();
     const updated = pageSend(page, "PUT", `/category-suffixes/${c.id}`);
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     expectSame(
       await updated,
       { id: c.id, category: "Parapharmacie", suffix: "-PA", color: "rose" },
@@ -759,10 +605,7 @@ test.describe("catégories", () => {
       withSuffix.map((r) => [`${r.transaction_ref}-PA`, "rose"]),
       "référence + suffixe dans /ventes",
     );
-    await expect(
-      owner.getByText("-PA", { exact: true }).first(),
-      "badge « -PA » à l'écran",
-    ).toBeVisible();
+    await expect(owner.getByText("-PA", { exact: true }).first(), "badge « -PA » à l'écran").toBeVisible();
 
     const deleted = pageSend(page, "DELETE", `/category-suffixes/${c.id}`, 204);
     const list1 = pageCall(page, "/category-suffixes");
@@ -776,24 +619,14 @@ test.describe("catégories", () => {
       .click();
     await deleted;
     expect(await list1, "plus de suffixe").toEqual([]);
-    await expect(
-      page.getByText("Aucun mapping configuré"),
-      "liste vide à l'écran",
-    ).toBeVisible();
+    await expect(page.getByText("Aucun mapping configuré"), "liste vide à l'écran").toBeVisible();
 
     const without = await ownerVentes(owner, "Parapharmacie");
     expect(
-      without.every(
-        (r) =>
-          r.transaction_ref_final === r.transaction_ref &&
-          r.transaction_ref_color === null,
-      ),
+      without.every((r) => r.transaction_ref_final === r.transaction_ref && r.transaction_ref_color === null),
       "références sans suffixe",
     ).toBe(true);
-    await expect(
-      owner.getByText("-PA", { exact: true }),
-      "plus de badge",
-    ).toHaveCount(0);
+    await expect(owner.getByText("-PA", { exact: true }), "plus de badge").toHaveCount(0);
     await owner.context().close();
   });
 
@@ -801,9 +634,7 @@ test.describe("catégories", () => {
     page,
     browser,
   }) => {
-    const owner = await (
-      await browser.newContext({ storageState: sessionFile("owner") })
-    ).newPage();
+    const owner = await (await browser.newContext({ storageState: sessionFile("owner") })).newPage();
     await page.goto("/admin/categories");
     await page.getByRole("button", { name: "Nouveau mapping" }).click();
     const dialog = page.getByRole("dialog");
@@ -811,26 +642,17 @@ test.describe("catégories", () => {
     await dialog.getByLabel("Suffixe").fill("-M");
     await dialog.getByRole("button", { name: "Aucune", exact: true }).click();
     const created = pageSend(page, "POST", "/category-suffixes", 201);
-    await dialog
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await dialog.getByRole("button", { name: "Enregistrer", exact: true }).click();
     const c = await created;
     try {
       // cleanup even if a check fails
-      expectSame(
-        c,
-        { category: "Médicament", suffix: "-M", color: null },
-        "saved as typed, accent kept, no colour",
-      );
+      expectSame(c, { category: "Médicament", suffix: "-M", color: null }, "saved as typed, accent kept, no colour");
       const rows = await ownerVentes(owner, "Médicament");
       expect(
         rows.map((r) => r.transaction_ref_final),
         "suffixe sur « Médicament (x%) »",
       ).toEqual(rows.map((r) => `${r.transaction_ref}-M`));
-      await expect(
-        owner.getByText("-M", { exact: true }).first(),
-        "badge gris « -M » à l'écran",
-      ).toBeVisible();
+      await expect(owner.getByText("-M", { exact: true }).first(), "badge gris « -M » à l'écran").toBeVisible();
     } finally {
       await apiDelete(page, `/category-suffixes/${c.id}`, 204);
       await owner.context().close();
@@ -842,11 +664,8 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
   page,
 }) => {
   const e = expected().catalog;
-  const box = page.getByPlaceholder(
-    "Nom, catégorie, code-barres, laboratoire…",
-  );
-  const row = (name: string) =>
-    page.getByRole("row", { name: new RegExp(name) });
+  const box = page.getByPlaceholder("Nom, catégorie, code-barres, laboratoire…");
+  const row = (name: string) => page.getByRole("row", { name: new RegExp(name) });
 
   const categories = pageCall(page, "/admin/catalog/categories");
   const first = pageCall(page, "/admin/catalog", {
@@ -856,9 +675,7 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     limit: "25",
   });
   await page.goto("/admin/catalogue");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Catalogue médicaments" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Catalogue médicaments" })).toBeVisible();
   expect(await categories, "catégories").toEqual(e.categories);
   const l0 = await first;
   expectSame(
@@ -881,9 +698,7 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     const shows = async (res: Promise<Row>, want: Row, what: string) => {
       const r = await res;
       expectSame(r.pagination, want, `${what}: pagination`);
-      await expect(page.locator("table tbody tr").first()).toContainText(
-        r.data[0].product,
-      );
+      await expect(page.locator("table tbody tr").first()).toContainText(r.data[0].product);
       expect(
         (await columnTexts(page, "Produit")).map((t) => t.split("\n")[0]),
         `${what}: lignes à l'écran`,
@@ -898,18 +713,9 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
         limit: "25",
       });
     let next = sorted(1);
-    await page
-      .getByRole("columnheader", { name: "Produit", exact: true })
-      .getByRole("button")
-      .click();
-    const d1 = await shows(
-      next,
-      { page: 1, limit: 25, total: e.total },
-      "tri décroissant",
-    );
-    expect(d1.data[0].product, "plus le même premier produit").not.toBe(
-      e.first_page[0],
-    );
+    await page.getByRole("columnheader", { name: "Produit", exact: true }).getByRole("button").click();
+    const d1 = await shows(next, { page: 1, limit: 25, total: e.total }, "tri décroissant");
+    expect(d1.data[0].product, "plus le même premier produit").not.toBe(e.first_page[0]);
     next = sorted(2);
     await page.getByRole("button", { name: "Page suivante" }).click();
     await shows(next, { page: 2, limit: 25, total: e.total }, "page 2");
@@ -970,9 +776,7 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     await page.goto("/admin/catalogue");
     await page.getByRole("button", { name: "Ajouter", exact: true }).click();
     const form = page.getByRole("dialog");
-    await form
-      .getByLabel("Nom du produit *", { exact: true })
-      .fill(NEW.product);
+    await form.getByLabel("Nom du produit *", { exact: true }).fill(NEW.product);
     await form.getByLabel("Catégorie", { exact: true }).fill(NEW.category);
     await form.getByLabel("Laboratoire", { exact: true }).fill(NEW.laboratoire);
     await form.getByLabel("TVA", { exact: true }).fill(NEW.tva);
@@ -983,11 +787,7 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     await form.getByRole("button", { name: "Ajouter", exact: true }).click();
     const m = await created;
     medId = m.id;
-    expectSame(
-      m,
-      { pid: NEW.barcode1, ...NEW, barcode2: null, product_type: null },
-      "POST /admin/catalog",
-    );
+    expectSame(m, { pid: NEW.barcode1, ...NEW, barcode2: null, product_type: null }, "POST /admin/catalog");
   });
 
   await test.step("modifier : Médicament + TVA 20 % → alerte, confirmer", async () => {
@@ -995,16 +795,10 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     await box.fill(NEW.product);
     await found;
     await row(NEW.product).getByRole("button", { name: "Modifier" }).click();
-    const form = page
-      .getByRole("dialog")
-      .filter({ hasText: "Modifier le médicament" });
-    await form
-      .getByLabel("Catégorie", { exact: true })
-      .fill("Médicament (30.000%)");
+    const form = page.getByRole("dialog").filter({ hasText: "Modifier le médicament" });
+    await form.getByLabel("Catégorie", { exact: true }).fill("Médicament (30.000%)");
     await form.getByRole("button", { name: "Pharmacie", exact: true }).click();
-    await form
-      .getByRole("button", { name: "Enregistrer", exact: true })
-      .click();
+    await form.getByRole("button", { name: "Enregistrer", exact: true }).click();
     const updated = pageSend(page, "PUT", `/admin/catalog/${medId}`);
     await page
       .getByRole("dialog", { name: /exonérés/ })
@@ -1042,19 +836,14 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     await box.fill(x.query);
     const med = (await found).data[0];
     const refused = pageSend(page, "DELETE", `/admin/catalog/${med.id}`, 409);
-    await page
-      .getByRole("row", { name: x.product })
-      .getByRole("button", { name: "Supprimer" })
-      .click();
+    await page.getByRole("row", { name: x.product }).getByRole("button", { name: "Supprimer" }).click();
     await page
       .getByRole("dialog", { name: "Supprimer ce médicament ?" })
       .getByRole("button", { name: "Supprimer", exact: true })
       .click();
     expect((await refused).code, "code d'erreur").toBe("medicamentInUse");
     await expect(
-      page.getByText(
-        "Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible.",
-      ),
+      page.getByText("Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible."),
     ).toBeVisible();
     await expect(page.getByRole("row", { name: x.product })).toHaveCount(1);
   });
@@ -1065,29 +854,17 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
     try {
       const found = pageCall(page, "/admin/catalog", { search: x.query });
       await page.goto("/admin/catalogue");
-      await page
-        .getByPlaceholder("Nombre, categoría, código de barras, laboratorio…")
-        .fill(x.query);
+      await page.getByPlaceholder("Nombre, categoría, código de barras, laboratorio…").fill(x.query);
       await found;
-      const refused = pageSend(
-        page,
-        "DELETE",
-        /^\/v1\/admin\/catalog\/\d+$/,
-        409,
-      );
-      await page
-        .getByRole("row", { name: x.product })
-        .getByRole("button", { name: "Eliminar" })
-        .click();
+      const refused = pageSend(page, "DELETE", /^\/v1\/admin\/catalog\/\d+$/, 409);
+      await page.getByRole("row", { name: x.product }).getByRole("button", { name: "Eliminar" }).click();
       await page
         .getByRole("dialog", { name: "¿Eliminar este medicamento?" })
         .getByRole("button", { name: "Eliminar", exact: true })
         .click();
       expect((await refused).code, "code d'erreur").toBe("medicamentInUse");
       await expect(
-        page.getByText(
-          "Este medicamento se usa en ventas, compras o stock: no se puede eliminar.",
-        ),
+        page.getByText("Este medicamento se usa en ventas, compras o stock: no se puede eliminar."),
       ).toBeVisible();
     } finally {
       await page.getByRole("button", { name: "Francés", exact: true }).click();
@@ -1097,9 +874,7 @@ test("catalogue : liste, recherche, filtres, ajout, modification (alerte TVA), s
   await test.step("import CSV du catalogue (5 nouveaux produits)", async () => {
     await page.getByRole("button", { name: "Importer CSV" }).click();
     const dialog = page.getByRole("dialog");
-    await dialog
-      .locator('input[type="file"]')
-      .setInputFiles(resolve(REPO_DIR, expected().files.catalog.path));
+    await dialog.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, expected().files.catalog.path));
     const imported = pageSend(page, "POST", "/uploads/catalog");
     await dialog.getByRole("button", { name: "Importer", exact: true }).click();
     expectSame(await imported, e.import, "POST /uploads/catalog");

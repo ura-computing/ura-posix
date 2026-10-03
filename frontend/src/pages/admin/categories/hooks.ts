@@ -7,14 +7,8 @@ import { useT } from "@/i18n/I18nProvider";
 
 import type { CategorySuffixIn, CategorySuffixOut } from "@/types";
 
-
 export function useCategorySuffixes() {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.categorySuffixes.list.key,
     queryFn: () => api.get<CategorySuffixOut[]>(API.categorySuffixes.list.url),
   });
@@ -29,10 +23,7 @@ export function useCategorySuffixes() {
 export function useCreateCategorySuffix() {
   const qc = useQueryClient();
   const t = useT();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (body: CategorySuffixIn) => api.post<CategorySuffixOut>(API.categorySuffixes.create.url, body),
     onSuccess: () => {
       void refresh(qc, API.categorySuffixes.create);
@@ -48,10 +39,7 @@ export function useCreateCategorySuffix() {
 export function useUpdateCategorySuffix() {
   const qc = useQueryClient();
   const t = useT();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ id, body }: { id: number; body: CategorySuffixIn }) =>
       api.put<CategorySuffixOut>(API.categorySuffixes.update.url(id), body),
     onSuccess: () => {
@@ -68,10 +56,7 @@ export function useUpdateCategorySuffix() {
 export function useDeleteCategorySuffix() {
   const qc = useQueryClient();
   const t = useT();
-  const {
-    mutateAsync,
-    isPending,
-  } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (id: number) => api.delete(API.categorySuffixes.remove.url(id)),
     onSuccess: () => {
       void refresh(qc, API.categorySuffixes.remove);

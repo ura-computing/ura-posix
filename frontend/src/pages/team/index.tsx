@@ -35,9 +35,7 @@ import {
   useSetEmployeeStatus,
 } from "./hooks";
 
-
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
-
 
 export default function OwnerEmployeesPage() {
   const t = useT();
@@ -48,15 +46,9 @@ export default function OwnerEmployeesPage() {
   const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
   const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
 
-  const {
-    team,
-    isLoading,
-  } = useOwnerEmployees();
+  const { team, isLoading } = useOwnerEmployees();
   const { createEmployee } = useCreateEmployee();
-  const {
-    setEmployeePermissions,
-    isSavingPermissions,
-  } = useSetEmployeePermissions();
+  const { setEmployeePermissions, isSavingPermissions } = useSetEmployeePermissions();
   const { setEmployeeStatus } = useSetEmployeeStatus();
   const { resetEmployeePassword } = useResetEmployeePassword();
   const { deleteEmployee } = useDeleteEmployee();
@@ -69,11 +61,7 @@ export default function OwnerEmployeesPage() {
     );
   }
 
-  const {
-    employees,
-    pharmacy_features,
-    my_permissions,
-  } = team;
+  const { employees, pharmacy_features, my_permissions } = team;
   const pharmFeats = toFeatureRecord(pharmacy_features);
   const myPerms = toFeatureRecord(my_permissions);
 
@@ -106,18 +94,14 @@ export default function OwnerEmployeesPage() {
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4 pb-30">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("employees.title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("employees.subtitle")}
-        </p>
+        <p className="text-sm text-muted-foreground">{t("employees.subtitle")}</p>
       </header>
 
       {/* Section A — pharmacy features summary (read-only) */}
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold text-foreground">{t("employees.featuresTitle")}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {t("employees.featuresDesc")}
-          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{t("employees.featuresDesc")}</p>
         </div>
         <div className="grid grid-cols-1 gap-2.5 p-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => {
@@ -129,8 +113,10 @@ export default function OwnerEmployeesPage() {
             // Three visual states: active (you can grant), locked-by-you (pharmacy ok, you don't have it),
             // locked-by-pharmacy (admin hasn't enabled it for this pharmacy).
             const stateTone = !phEnabled ? "muted" : !ownerEnabled ? "warning" : "ok";
-            const stateLabel = !phEnabled ? t("employees.disabledForPharmacy")
-              : !ownerEnabled ? t("employees.notGrantedToYou")
+            const stateLabel = !phEnabled
+              ? t("employees.disabledForPharmacy")
+              : !ownerEnabled
+                ? t("employees.notGrantedToYou")
                 : t("employees.available");
 
             return (
@@ -143,8 +129,10 @@ export default function OwnerEmployeesPage() {
                   data-tone={stateTone}
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    fullyOk ? "bg-primary/15 text-primary"
-                      : phEnabled ? "bg-warning-subtle text-warning"
+                    fullyOk
+                      ? "bg-primary/15 text-primary"
+                      : phEnabled
+                        ? "bg-warning-subtle text-warning"
                         : "bg-muted text-muted-foreground",
                   )}
                 >
@@ -178,9 +166,7 @@ export default function OwnerEmployeesPage() {
             <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <Users className="size-5" />
             </span>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              {t("employees.empty")}
-            </p>
+            <p className="max-w-sm text-sm text-muted-foreground">{t("employees.empty")}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -199,7 +185,11 @@ export default function OwnerEmployeesPage() {
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-2.5">
                       <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-foreground">
-                        {(m.full_name ?? m.email).split(/\s+/).slice(0, 2).map((s: string) => s[0]?.toUpperCase()).join("")}
+                        {(m.full_name ?? m.email)
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((s: string) => s[0]?.toUpperCase())
+                          .join("")}
                       </span>
                       <div className="flex flex-col">
                         <span className="text-[13px] font-semibold text-foreground">{m.full_name ?? "—"}</span>
@@ -211,7 +201,12 @@ export default function OwnerEmployeesPage() {
                     <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{t(ROLE_LABEL[m.role])}</span>
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={cn(PILL_BASE, m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground")}>
+                    <span
+                      className={cn(
+                        PILL_BASE,
+                        m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
+                      )}
+                    >
                       {t(STATUS_LABEL[m.status])}
                     </span>
                   </td>
@@ -273,12 +268,12 @@ export default function OwnerEmployeesPage() {
         open={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
         variant="destructive"
-        title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
+        title={t("members.removeTitle", {
+          who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember"),
+        })}
         description={t("members.removeDesc", { pharmacy: pharmacyName })}
         onConfirm={handleConfirmRemove}
       />
     </div>
   );
 }
-
-

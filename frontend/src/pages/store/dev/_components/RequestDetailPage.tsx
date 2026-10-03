@@ -2,13 +2,9 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ExternalLink, Phone, Store } from "lucide-react";
 
 import { Button } from "@/_components/button";
-import {
-  REQUEST_STATE_LABEL, URGENCY_LABEL,
-  type RequestBrief, type RequestState,
-} from "@/types/storeWebsite";
+import { REQUEST_STATE_LABEL, URGENCY_LABEL, type RequestBrief, type RequestState } from "@/types/storeWebsite";
 
 import { formatMAD } from "../../store-website/_format";
-
 
 /** /requests/:id — developer's read-only brief + state-aware action stack.
  *
@@ -21,17 +17,16 @@ import { formatMAD } from "../../store-website/_format";
  *  hover on the "Libérer" button. */
 
 export interface RequestDetailPageProps {
-  brief:             RequestBrief;
-  isLoading?:        boolean;
-  onClaim:           (id: string) => void;
-  onRelease:         (id: string) => void;
-  onMarkInProgress:  (id: string) => void;
-  onMarkDelivered:   (id: string) => void;
-  onClose:           (id: string) => void;
-  onOpenEditor:      (id: string) => void;
+  brief: RequestBrief;
+  isLoading?: boolean;
+  onClaim: (id: string) => void;
+  onRelease: (id: string) => void;
+  onMarkInProgress: (id: string) => void;
+  onMarkDelivered: (id: string) => void;
+  onClose: (id: string) => void;
+  onOpenEditor: (id: string) => void;
   renderBreadcrumb?: (pharmacyName: string) => ReactNode;
 }
-
 
 export function RequestDetailPage(props: RequestDetailPageProps) {
   const { brief, isLoading } = props;
@@ -54,7 +49,6 @@ export function RequestDetailPage(props: RequestDetailPageProps) {
   );
 }
 
-
 // ── Brief column ───────────────────────────────────────────────────────────
 
 function BriefColumn({ brief }: { brief: RequestBrief }) {
@@ -63,9 +57,11 @@ function BriefColumn({ brief }: { brief: RequestBrief }) {
       <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5">
         <div className="flex items-start gap-4">
           <div className="flex size-20 flex-none items-center justify-center overflow-hidden rounded-xl border border-border bg-surface-subtle">
-            {brief.logoUrl
-              ? <img src={brief.logoUrl} alt="" className="size-full object-contain" />
-              : <Store className="size-8 text-muted-foreground" />}
+            {brief.logoUrl ? (
+              <img src={brief.logoUrl} alt="" className="size-full object-contain" />
+            ) : (
+              <Store className="size-8 text-muted-foreground" />
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">{brief.storeName}</h1>
@@ -85,17 +81,15 @@ function BriefColumn({ brief }: { brief: RequestBrief }) {
         </div>
 
         <dl className="grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm">
-          <Info label="Pharmacie"        value={brief.pharmacyName} />
-          <Info label="Urgence"          value={URGENCY_LABEL[brief.urgency]} />
+          <Info label="Pharmacie" value={brief.pharmacyName} />
+          <Info label="Urgence" value={URGENCY_LABEL[brief.urgency]} />
           <Info label="Domaine souhaité" value={brief.customDomain ?? "—"} mono />
-          <Info label="État"             value={REQUEST_STATE_LABEL[brief.state]} />
+          <Info label="État" value={REQUEST_STATE_LABEL[brief.state]} />
         </dl>
 
         {brief.vision && (
           <div className="flex flex-col gap-1.5 border-t border-border pt-4">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Vision libre
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vision libre</span>
             <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">{brief.vision}</p>
           </div>
         )}
@@ -106,9 +100,7 @@ function BriefColumn({ brief }: { brief: RequestBrief }) {
           {brief.categories.map((c) => (
             <div key={c.id} className="flex items-center justify-between py-2 text-sm">
               <span className="font-medium text-foreground">{c.name}</span>
-              <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                {c.productCount} produits
-              </span>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">{c.productCount} produits</span>
             </div>
           ))}
         </div>
@@ -130,7 +122,6 @@ function BriefColumn({ brief }: { brief: RequestBrief }) {
     </div>
   );
 }
-
 
 // ── Action column ──────────────────────────────────────────────────────────
 
@@ -186,7 +177,6 @@ function ActionColumn(props: RequestDetailPageProps) {
   );
 }
 
-
 function PhoneCallCard({ ownerName, ownerPhone }: { ownerName: string; ownerPhone: string }) {
   return (
     <a
@@ -205,20 +195,22 @@ function PhoneCallCard({ ownerName, ownerPhone }: { ownerName: string; ownerPhon
   );
 }
 
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className={mono ? "font-mono text-[13px] tabular-nums text-foreground" : "text-[13px] font-medium text-foreground"}>
+      <dd
+        className={
+          mono ? "font-mono text-[13px] tabular-nums text-foreground" : "text-[13px] font-medium text-foreground"
+        }
+      >
         {value}
       </dd>
     </div>
   );
 }
-
 
 function Collapsible({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -230,16 +222,12 @@ function Collapsible({ title, defaultOpen, children }: { title: string; defaultO
         className="flex w-full items-center justify-between gap-2 px-5 py-3.5 text-base font-semibold text-foreground transition-colors hover:bg-surface-subtle/40"
       >
         {title}
-        <ChevronDown
-          data-open={open}
-          className="size-4 text-muted-foreground transition data-[open=true]:rotate-180"
-        />
+        <ChevronDown data-open={open} className="size-4 text-muted-foreground transition data-[open=true]:rotate-180" />
       </button>
       {open && <div className="border-t border-border px-5 py-3">{children}</div>}
     </div>
   );
 }
-
 
 function DetailSkeleton() {
   return (

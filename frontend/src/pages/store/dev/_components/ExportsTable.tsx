@@ -4,7 +4,6 @@ import { TEMPLATE_LABEL, type ExportRow } from "@/types/storeWebsite";
 
 import { formatRelative } from "../../store-website/_format";
 
-
 /** /exports — developer's history of past project exports. UI shape mirrors
  *  /imports (rounded-2xl card + bg-surface-subtle thead + border-border row
  *  + dashed empty state). Page wrapper is the standard `flex flex-col gap-6`
@@ -14,13 +13,11 @@ function formatSize(bytes: number): string {
   return (bytes / 1_048_576).toFixed(1).replace(".", ",") + " Mo";
 }
 
-
 export interface ExportsTableProps {
-  rows:         ExportRow[];
-  isLoading?:   boolean;
+  rows: ExportRow[];
+  isLoading?: boolean;
   onRedownload: (id: string) => void;
 }
-
 
 export function ExportsTable({ rows, isLoading, onRedownload }: ExportsTableProps) {
   return (
@@ -89,30 +86,23 @@ export function ExportsTable({ rows, isLoading, onRedownload }: ExportsTableProp
   );
 }
 
-
 function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border p-10 text-center">
       <span className="flex size-12 items-center justify-center rounded-xl bg-surface-subtle text-muted-foreground">
         <Inbox className="size-5" />
       </span>
-      <p className="text-sm text-muted-foreground">
-        Aucun export pour l'instant. Générez un projet depuis l'éditeur.
-      </p>
+      <p className="text-sm text-muted-foreground">Aucun export pour l'instant. Générez un projet depuis l'éditeur.</p>
     </div>
   );
 }
-
 
 function ExportsSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="h-11 border-b border-border bg-surface-subtle" />
       {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-0"
-        >
+        <div key={i} className="flex items-center gap-3 border-b border-border px-4 py-3.5 last:border-0">
           <div className="size-2.5 shrink-0 animate-pulse rounded-full bg-muted" />
           <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
         </div>
