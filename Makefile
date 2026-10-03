@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format e2e-tests e2e-ui
+.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format tests tests-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -36,8 +36,8 @@ help:
 	@echo "    make format    — format the whole repo (Prettier: frontend + e2e, ruff: backend)"
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
-	@echo "    make e2e-tests     — every test, headless"
-	@echo "    make e2e-ui        — one test file (or all) in a real browser, slowed down"
+	@echo "    make tests     — every test, headless"
+	@echo "    make tests-ui  — one test file (or all) in a real browser, slowed down"
 
 # ── Setup (fresh clone) ─────────────────────────────────────────────────────
 
@@ -154,11 +154,11 @@ format:
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
 # Two commands. The script asks for its inputs (Enter = default); with no
 # terminal (git pre-push) it uses the defaults. First run installs Playwright.
-#   make e2e-tests   headless, every test
-#   make e2e-ui      real browser, slowed down; asks which test file
+#   make tests      headless, every test
+#   make tests-ui   real browser, slowed down; asks which test file
 
-e2e-tests:
+tests:
 	@bash e2e/scripts/run.sh tests
 
-e2e-ui:
+tests-ui:
 	@bash e2e/scripts/run.sh ui

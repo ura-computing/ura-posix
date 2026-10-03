@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Single entry point of the E2E suite (make e2e-tests / make e2e-ui).
+# Single entry point of the E2E suite (make tests / make tests-ui).
 # Asks for its inputs — Enter keeps the default. No terminal (git pre-push)
 # → defaults, no questions. First run installs Playwright by itself.
 set -euo pipefail

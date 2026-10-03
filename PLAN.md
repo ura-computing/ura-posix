@@ -1,7 +1,7 @@
 # PharmaGest — the plan (everything left, in order)
 
 Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this file when
-`make e2e-tests` is green. Rules: `CLAUDE.md`. App + setup: `README.md`.
+`make tests` is green. Rules: `CLAUDE.md`. App + setup: `README.md`.
 
 **Order:** §5 frontend → §2 speed → §3 production tools → §6 backend folders.
 
@@ -11,7 +11,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | Rule | Why / example |
 |---|---|
-| One step → `make e2e-tests` green → step removed from this file | the oracle (`resources/tests/oracle.py`) pins every number |
+| One step → `make tests` green → step removed from this file | the oracle (`resources/tests/oracle.py`) pins every number |
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
 | Hidden store website (`routers/store_website.py`, `pages/store/*`): moved as-is, never rewritten | hidden, must not break |
@@ -22,7 +22,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
-| FE5: reads used by 2+ pages get one hook in `hooks/sharedQueries.ts` (`useStats` Rapport + Comptabilité, `useMarginAlerts` Rapport + Alertes, `useAnalyseMarge` Analyses + Rapport « Optimisation », `useVentesList` Ventes + Comptabilité, `useAdminPharmaciesList` admin Pharmacies + Rapport picker; dead type `AdminPharmacyRow` removed). Achats / ventes / catalogue filter + sort + page state = `hooks/useListFilters.ts` | `03`, `04`, `06`, `07`, `08`, `11`, `14` |
+| FE9: one `Page` (`_components/Page.tsx`) on every page in the layout: same h1 + subtitle + actions on the right, same gap. Data pages full width (was 920 / 1100 / 1320 on catégories / équipe + pharmacy detail / pharmacies); `narrow` (`max-w-3xl`) for Mon compte + Importer un fichier. Extra padding over the layout's `p-7` gone (catégories, import). Pharmacy detail: title / address / buttons in the page header (no more header card); import: no icon box | every spec (titles unchanged) |
 
 ---
 
@@ -60,8 +60,6 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 | # | Step | Today | After |
 |---|---|---|---|
-| FE6 | **Same search everywhere** | produits-spéciaux tables filter with a local `norm()` (no `*` grammar) | `matchesFields` |
-| FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
 
 **Bugs fixed in these steps**
 

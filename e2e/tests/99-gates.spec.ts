@@ -7,7 +7,7 @@
  *  2. SPEED — median duration per route (and total per FLOW, e.g. import/ventes, +35 %)
  *     ≤ max(baseline × 1.2 (FLOW: × 1.35), baseline + 50 ms). Baseline = e2e/perf-baseline.json
  *     (committed, recorded for one ROWS size — other sizes are not compared).
- *     First run, or `make e2e-tests` answered "y" to "Record a new speed
+ *     First run, or `make tests` answered "y" to "Record a new speed
  *     baseline?", (re)writes it.
  *  3. ERROR CODES — backend `errors.py` ErrorCode values = frontend `api/errors.ts`
  *     (fr.ts / es.ts already fail the build when a frontend code has no text).
@@ -157,7 +157,7 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
   if (fresh.length) {
     test.info().annotations.push({
       type: "speed",
-      description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}`,
+      description: `not in baseline yet (make tests, answer y): ${fresh.join(", ")}`,
     });
   }
   expect(slower, `slower than baseline:\n  ${slower.join("\n  ")}\n`).toEqual([]);

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx prettier:*)",
+      "Bash(make format)"
+    ],
+    "ask": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(make tests:*)",
+      "Bash(make tests-ui:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Edit(**/.env)",
+      "Read(**/node_modules/**)",
+      "Edit(**/node_modules/**)",
+      "Read(**/.venv/**)",
+      "Edit(**/.venv/**)",
+      "Read(**/dist/**)",
+      "Edit(**/dist/**)",
+      "Read(**/__pycache__/**)",
+      "Edit(**/__pycache__/**)",
+      "Read(.git/**)",
+      "Edit(.git/**)"
+    ]
+  }
+}

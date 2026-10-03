@@ -6,14 +6,14 @@
  *  builds on the previous step.
  *
  *  Ports 8001 / 5174 keep the dev servers (8000 / 5173) untouched.
- *    make e2e-tests  headless, every test (pre-push)
- *    make e2e-ui     a real browser plays one test file (or all), slowed down
+ *    make tests      headless, every test (pre-push)
+ *    make tests-ui  a real browser plays one test file (or all), slowed down
  */
 import { defineConfig } from "@playwright/test";
 
 import { API, WEB } from "./lib/paths";
 
-/** Set by `make e2e-ui`: maximized window, page fills it. Headless keeps a fixed size. */
+/** Set by `make tests-ui`: maximized window, page fills it. Headless keeps a fixed size. */
 const HEADED = process.env.E2E_HEADED === "1";
 
 export default defineConfig({
@@ -30,7 +30,7 @@ export default defineConfig({
     actionTimeout: 15_000, // a missing button fails in 15 s, not after the 20-min test timeout
     navigationTimeout: 30_000,
     launchOptions: {
-      slowMo: Number(process.env.E2E_SLOWMO ?? 0), // make e2e-ui: slow enough to follow
+      slowMo: Number(process.env.E2E_SLOWMO ?? 0), // make tests-ui: slow enough to follow
       args: HEADED ? ["--start-maximized"] : [],
     },
     locale: "fr-FR",
@@ -40,7 +40,7 @@ export default defineConfig({
     screenshot: "on",
   },
   // `setup` (admin creates the pharmacy + owner, owner imports the files) always
-  // runs first — also when you run a single page spec (make e2e-ui ARGS=…).
+  // runs first — also when you run a single page spec (make tests-ui ARGS=…).
   projects: [
     { name: "setup", testMatch: /0[12]-.*\.spec\.ts/ },
     { name: "pages", testMatch: /(0[3-9]|[1-9]\d)-.*\.spec\.ts/, dependencies: ["setup"] },
