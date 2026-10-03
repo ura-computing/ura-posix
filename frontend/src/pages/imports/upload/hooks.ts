@@ -53,6 +53,9 @@ const REQUIRED_COLUMNS: Record<DocType, string[]> = {
   stock: ["PID", "Produit", "Stock"],
 };
 const asciiKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Every control character except tab, line feed, carriage return.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHAR = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
 
 export function useUpload(initialDocType: DocType | null = null) {
   const { jobs, cancelUpload, dismissJob, enqueueUpload } = useUploadCtx();
@@ -117,6 +120,13 @@ export function useUpload(initialDocType: DocType | null = null) {
     }
     setFilenameError(null);
     const text = await readFileText(f);
+    // Control characters (NUL…) never appear in a good Sobrus export: the file is damaged.
+    // Stop here, before anything is imported, and say which line.
+    const bad = text.search(CONTROL_CHAR);
+    if (bad >= 0) {
+      setFilenameError(translate("uploadFile.corrupted", { line: text.slice(0, bad).split("\n").length }));
+      return;
+    }
     const parsed = parseSobrusCsv(text);
     if (parsed.rows.length === 0) {
       setFilenameError(translate("uploadFile.emptyFile"));

@@ -10,6 +10,7 @@ ErrorCode values = `frontend/src/api/errors.ts` (gate: e2e/tests/99-gates.spec.t
 
 from __future__ import annotations
 
+import logging
 from enum import StrEnum
 from typing import Any
 
@@ -22,6 +23,7 @@ from fastapi.responses import JSONResponse
 class ErrorCode(StrEnum):
     # Request / generic
     INVALID_INPUT = "invalidInput"
+    SERVER_ERROR = "serverError"
     TOO_MANY_ATTEMPTS = "tooManyAttempts"
     # Auth + access
     SESSION_EXPIRED = "sessionExpired"
@@ -61,6 +63,7 @@ class ErrorCode(StrEnum):
     FILE_TOO_LARGE = "fileTooLarge"
     CSV_ONLY = "csvOnly"
     EMPTY_FILE = "emptyFile"
+    FILE_CORRUPTED = "fileCorrupted"
     EMPTY_BODY = "emptyBody"
     ROW_MISSING_NAME = "rowMissingName"
     INVALID_BATCH_STATUS = "invalidBatchStatus"
@@ -106,6 +109,9 @@ class ApiError(HTTPException):
         self.params = params
 
 
+log = logging.getLogger("uvicorn.error")
+
+
 def error_body(code: ErrorCode, detail: Any, **params: Any) -> dict:
     return {"detail": detail, "code": code, "params": params}
 
@@ -114,6 +120,41 @@ def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(
         error_body(exc.code, exc.detail, **exc.params), status_code=exc.status_code, headers=exc.headers
     )
+
+
+class CatchServerErrors:
+    """Any exception nothing else handled → JSON 500 `{detail, code: serverError}`.
+
+    Added INSIDE the CORS middleware (main.py), so the answer carries the CORS headers:
+    without them the browser drops a crash answer and the user read « Serveur
+    injoignable » (network message) for what is a server problem. The trace still
+    goes to the server log."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def send_tracking(message: Any) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_tracking)
+        except Exception:
+            log.exception("Unhandled error on %s %s", scope.get("method"), scope.get("path"))
+            if started:  # part of the answer already left: nothing clean to send
+                raise
+            body = error_body(
+                ErrorCode.SERVER_ERROR, "Le logiciel a rencontré un problème. Réessayez dans quelques minutes."
+            )
+            await JSONResponse(body, status_code=500)(scope, receive, send)
 
 
 def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

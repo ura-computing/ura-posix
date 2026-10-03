@@ -194,6 +194,8 @@ class ImportBatch(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="success")
     error_message: Mapped[str | None] = mapped_column(String, nullable=True)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Newest chunk received (migration 0020): no chunk for 1 min while `in_progress` = interrupted.
+    last_chunk_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Audit columns added in migration 0014. Soft-delete: a non-NULL `deleted_at`
     # marks the batch as removed but keeps the row visible on /imports as history.
     created_by_user_id: Mapped[int | None] = mapped_column(

@@ -8,7 +8,7 @@ from app.identity.auth import router as auth
 from app.core import health
 from app.identity.members import admin_router as admin_pharmacies, owner_router as owner_employees
 from app.core.config import settings
-from app.core.errors import ApiError, api_error_handler, validation_error_handler
+from app.core.errors import ApiError, CatchServerErrors, api_error_handler, validation_error_handler
 from app.core.rate_limit import limiter, rate_limit_handler
 from app.accounting.exclusions import router as exclusions
 from app.accounting.payments import router as accounting
@@ -20,6 +20,10 @@ from app.store_website import router as store_website
 
 
 app = FastAPI(title="PharmaGest", version="0.1.0")
+
+# Crash → JSON 500 `serverError` (« Le logiciel a rencontré un problème »). Added before
+# CORS = inside it, so the answer keeps the CORS headers and the browser can read it.
+app.add_middleware(CatchServerErrors)
 
 # CORS — exact-match the configured frontend origin. allow_credentials must be
 # True because the frontend sends httpOnly cookies (access_token, session_token).

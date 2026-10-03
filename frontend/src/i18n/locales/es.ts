@@ -617,6 +617,8 @@ export const es: Dict = {
     statusSuccess: "Correcto",
     statusCancelled: "Cancelado",
     statusError: "Error",
+    statusInterrupted: "Interrumpido",
+    interruptedHint: "Vuelve a importar el mismo archivo para completarlo.",
     now: "ahora mismo",
     minsAgo: "hace {{n}} min",
     hoursAgo: "hace {{n}} h",
@@ -1074,6 +1076,7 @@ export const es: Dict = {
   uploadFile: {
     missingColumns: "Este archivo no corresponde a este tipo de importación. Columnas faltantes: {{columns}}",
     emptyFile: "El archivo está vacío: ninguna línea para importar.",
+    corrupted: "Este archivo está dañado (línea {{line}}). Descárgalo de nuevo desde Sobrus e inténtalo otra vez.",
     step1: "Tipo de documento",
     step2: "Archivo CSV",
     step3: "Vista previa e importación",
@@ -1149,7 +1152,8 @@ export const es: Dict = {
     toggleActiveSoon: "Activar/desactivar una cuenta — próximamente",
   },
   toast: {
-    networkError: "Servidor inaccesible. Comprueba tu conexión e inténtalo de nuevo.",
+    networkError: "El programa no responde en este momento. Inténtalo de nuevo en unos minutos.",
+    offline: "Sin conexión a Internet. Comprueba tu Wi-Fi o tu cable e inténtalo de nuevo.",
     genericError: "Se ha producido un error. Inténtalo más tarde.",
     pwdChanged: "Contraseña modificada correctamente. Tus otros dispositivos han sido desconectados.",
     pwdCurrentWrong: "Contraseña actual incorrecta.",
@@ -1166,6 +1170,7 @@ export const es: Dict = {
   /** Server errors by `code` (backend errors.py = api/errors.ts). */
   errors: {
     invalidInput: "Datos no válidos. Revisa los campos e inténtalo de nuevo.",
+    serverError: "El programa ha tenido un problema. Inténtalo de nuevo en unos minutos.",
     tooManyAttempts: "Demasiados intentos. Inténtalo de nuevo en unos minutos.",
     sessionExpired: "Sesión caducada, vuelve a iniciar sesión",
     badCredentials: "Correo o contraseña incorrectos",
@@ -1201,6 +1206,7 @@ export const es: Dict = {
     fileTooLarge: "Archivo demasiado grande (máx. {{max_mb}} MB).",
     csvOnly: "Solo se aceptan archivos CSV.",
     emptyFile: "No se encontraron datos en el archivo.",
+    fileCorrupted: "Este archivo está dañado. Descárgalo de nuevo desde Sobrus e inténtalo otra vez.",
     emptyBody: "Ninguna fila en la solicitud.",
     rowMissingName: "Fila {{line}}: falta el nombre",
     invalidBatchStatus: "Estado no válido. Esperado: {{allowed}}",

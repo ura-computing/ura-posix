@@ -4,7 +4,9 @@
 
 export type DocType = "achat" | "vente" | "stock";
 
-export type ImportBatchStatus = "in_progress" | "success" | "cancelled" | "error";
+/** `interrupted` is never stored: the backend shows it for an `in_progress` batch with no chunk
+ *  for 1 min (browser closed or refreshed before the last chunk). */
+export type ImportBatchStatus = "in_progress" | "success" | "cancelled" | "error" | "interrupted";
 
 /** Response from /v1/uploads/{achat|vente}{,-json} */
 export interface UploadTxResult {

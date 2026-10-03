@@ -66,7 +66,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
     });
   } catch {
     // Server down / no network: fetch throws a TypeError with an English message.
-    throw new ApiErr(0, translate("toast.networkError"));
+    throw new ApiErr(0, translate(navigator.onLine ? "toast.networkError" : "toast.offline"));
   }
 
   if (res.status === 204) return undefined as T;
@@ -81,11 +81,18 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
 
   if (!res.ok) {
     // `{detail, code, params}` (backend errors.py) → `errors.<code>` in the UI language.
-    // Unknown code → the French `detail`, else a generic message.
+    // No code: a 5xx (proxy page, platform down) = « Le logiciel a rencontré un problème »,
+    // else the French `detail`, else a generic message.
     const key = `errors.${data?.code}`;
     const text = translate(key, data?.params);
     const detail =
-      text !== key ? text : typeof data?.detail === "string" ? data.detail : translate("toast.genericError");
+      text !== key
+        ? text
+        : res.status >= 500
+          ? translate("errors.serverError")
+          : typeof data?.detail === "string"
+            ? data.detail
+            : translate("toast.genericError");
     if (res.status === 401) onUnauthorized?.();
     throw new ApiErr(res.status, detail);
   }

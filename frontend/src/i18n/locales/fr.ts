@@ -624,6 +624,8 @@ export const fr = {
     statusSuccess: "Réussi",
     statusCancelled: "Annulé",
     statusError: "Erreur",
+    statusInterrupted: "Interrompu",
+    interruptedHint: "Importez le même fichier à nouveau pour le compléter.",
     now: "à l'instant",
     minsAgo: "il y a {{n}} min",
     hoursAgo: "il y a {{n}} h",
@@ -1085,6 +1087,7 @@ export const fr = {
   uploadFile: {
     missingColumns: "Ce fichier ne correspond pas à ce type d'import. Colonnes manquantes : {{columns}}",
     emptyFile: "Le fichier est vide : aucune ligne à importer.",
+    corrupted: "Ce fichier est abîmé (ligne {{line}}). Téléchargez-le à nouveau depuis Sobrus, puis réessayez.",
     step1: "Type de document",
     step2: "Fichier CSV",
     step3: "Aperçu et import",
@@ -1160,7 +1163,8 @@ export const fr = {
     toggleActiveSoon: "Activer/désactiver un compte — endpoint à venir",
   },
   toast: {
-    networkError: "Serveur injoignable. Vérifiez votre connexion puis réessayez.",
+    networkError: "Le logiciel ne répond pas pour le moment. Réessayez dans quelques minutes.",
+    offline: "Pas de connexion Internet. Vérifiez votre Wi-Fi ou votre câble, puis réessayez.",
     genericError: "Une erreur est survenue. Réessayez plus tard.",
     pwdChanged: "Mot de passe modifié avec succès. Vos autres appareils ont été déconnectés.",
     pwdCurrentWrong: "Mot de passe actuel incorrect.",
@@ -1177,6 +1181,7 @@ export const fr = {
   /** Server errors by `code` (backend errors.py = api/errors.ts). A missing code = build error. */
   errors: {
     invalidInput: "Données invalides. Vérifiez les champs puis réessayez.",
+    serverError: "Le logiciel a rencontré un problème. Réessayez dans quelques minutes.",
     tooManyAttempts: "Trop de tentatives. Réessayez dans quelques minutes.",
     sessionExpired: "Session expirée, veuillez vous reconnecter",
     badCredentials: "Email ou mot de passe incorrect",
@@ -1212,6 +1217,7 @@ export const fr = {
     fileTooLarge: "Fichier trop volumineux (max {{max_mb}} Mo).",
     csvOnly: "Seuls les fichiers CSV sont acceptés.",
     emptyFile: "Aucune donnée trouvée dans le fichier.",
+    fileCorrupted: "Ce fichier est abîmé. Téléchargez-le à nouveau depuis Sobrus, puis réessayez.",
     emptyBody: "Aucune ligne dans la requête.",
     rowMissingName: "Ligne {{line}} : nom manquant",
     invalidBatchStatus: "Statut invalide. Attendu : {{allowed}}",

@@ -4,7 +4,7 @@ browser wizard, batch status, import history + delete."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, Callable
 
 from fastapi import APIRouter, File, Path, Query, status, UploadFile
@@ -353,7 +353,9 @@ def _insert_transactions(
     skipped = skipped_no_pid + skipped_no_med + skipped_dup
     batch.rows_inserted += inserted
     batch.rows_skipped += skipped
-    batch.status = "success"
+    # Stays `in_progress`: only the browser's final PATCH « success » (after the last
+    # chunk) closes the batch, so a half import never looks finished.
+    batch.last_chunk_at = datetime.now(timezone.utc)
     db.commit()
     return {
         "inserted": inserted,
@@ -435,7 +437,8 @@ def _insert_stock(
 
     batch.rows_inserted += len(inserted_rows)
     batch.rows_skipped += len(skipped_unknown)
-    batch.status = "success"
+    # Stays `in_progress` until the final PATCH « success » (see _insert_transactions).
+    batch.last_chunk_at = datetime.now(timezone.utc)
     db.commit()
     return {
         "inserted": len(inserted_rows),
@@ -472,6 +475,17 @@ def _apply_catalog_row(db: Session, existing: Medicament | None, row: dict) -> t
     return med, False
 
 
+FILE_CORRUPTED_DETAIL = "Ce fichier est abîmé. Téléchargez-le à nouveau depuis Sobrus, puis réessayez."
+
+
+def _reject_corrupted(rows: list[dict[str, str]]) -> None:
+    """A NUL byte = damaged file (Postgres refuses it in any text): stop before writing
+    anything, with a message the user can act on (the browser checks first, see
+    frontend pages/imports/upload/hooks.ts)."""
+    if any("\x00" in v for r in rows for v in r.values()):
+        raise ApiError(400, ErrorCode.FILE_CORRUPTED, FILE_CORRUPTED_DETAIL)
+
+
 @router.post("/uploads/catalog", response_model=CatalogImportResponse)
 async def upload_catalog(
     user: AdminDep,
@@ -487,6 +501,8 @@ async def upload_catalog(
     _check_csv(file)
     content = await file.read()
     _check_size(content)
+    if b"\x00" in content:
+        raise ApiError(400, ErrorCode.FILE_CORRUPTED, FILE_CORRUPTED_DETAIL)
     parsed, errors = parse_catalog_csv(content)
     if not parsed and not errors:
         raise ApiError(400, ErrorCode.EMPTY_FILE, EMPTY_FILE_DETAIL)
@@ -527,6 +543,7 @@ def upload_achat_json(
 ) -> dict:
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
+    _reject_corrupted(body.rows)
     return _insert_transactions(
         db,
         body.rows,
@@ -544,6 +561,7 @@ def upload_vente_json(
 ) -> dict:
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
+    _reject_corrupted(body.rows)
     return _insert_transactions(
         db,
         body.rows,
@@ -564,6 +582,7 @@ def upload_stock_json(
     returned batch_id. Postgres ON CONFLICT keeps the per-chunk UPSERTs idempotent."""
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
+    _reject_corrupted(body.rows)
     return _insert_stock(
         db, body.rows, pharmacy_id=pharmacy_id, filename=body.filename, batch_id=body.batch_id, user_id=user.id
     )
@@ -694,6 +713,19 @@ def _visible_batches_query(db: Session, user: User) -> OrmQuery:
     )
 
 
+# The browser sends the next chunk as soon as the previous one is stored (a few seconds
+# at most): no chunk for this long while `in_progress` = closed / refreshed / offline.
+INTERRUPTED_AFTER = timedelta(minutes=1)
+
+
+def _shown_status(batch: ImportBatch) -> str:
+    """`interrupted` (never stored): `in_progress` with no chunk for INTERRUPTED_AFTER."""
+    last = batch.last_chunk_at or batch.imported_at
+    if batch.status == "in_progress" and last < datetime.now(timezone.utc) - INTERRUPTED_AFTER:
+        return "interrupted"
+    return batch.status
+
+
 def _serialize(batch: ImportBatch, creator: User | None, deletor: User | None) -> dict:
     return {
         "id": batch.id,
@@ -701,7 +733,7 @@ def _serialize(batch: ImportBatch, creator: User | None, deletor: User | None) -
         "filename": batch.filename,
         "rows_inserted": batch.rows_inserted,
         "rows_skipped": batch.rows_skipped,
-        "status": batch.status,
+        "status": _shown_status(batch),
         "error_message": batch.error_message,
         "imported_at": batch.imported_at,
         "created_by_full_name": creator.name if creator else None,

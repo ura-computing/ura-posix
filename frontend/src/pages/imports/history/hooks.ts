@@ -13,6 +13,10 @@ export function useImports() {
       api.get<DataImportsResponse>(API.imports.list.url, {
         params: { page: 1, limit: 100 },
       }),
+    // An import « En cours » turns « Réussi » or « Interrompu » (no chunk for 1 min): look again
+    // every 10 s while one is listed, so the label changes without a reload.
+    refetchInterval: (query) =>
+      query.state.data?.data.some((r) => r.status === "in_progress" && !r.deleted_at) ? 10_000 : false,
   });
   return {
     imports: data?.data ?? [],

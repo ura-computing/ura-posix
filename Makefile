@@ -13,7 +13,7 @@ help:
 	@echo ""
 	@echo "  Local dev (dockerized DB + host backend/frontend):"
 	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
-	@echo "    make backend   — only the backend (auto-starts the DB; uvicorn :8000, hot reload)"
+	@echo "    make backend   — only the backend (starts the DB, applies new migrations; uvicorn :8000, hot reload)"
 	@echo "    make frontend  — only the frontend (Vite dev :5173)"
 	@echo "    make db        — start the Postgres 17 container + create the dev DB if missing"
 	@echo "    make migrate   — apply Alembic migrations against the dev DB"
@@ -85,7 +85,7 @@ db:
 	    docker compose exec -T db psql -U apcm -d postgres -c "CREATE DATABASE $(DEV_DB);"; \
 	  }
 
-backend: db
+backend: db migrate
 	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
 
 frontend:

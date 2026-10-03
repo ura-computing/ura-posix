@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Trash2, TriangleAlert } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { TabBar } from "@/_components/TabBar";
@@ -22,8 +22,14 @@ const TYPE_LABEL: Record<DocType, string> = {
 const STATUS_TINT: Record<ImportBatchStatus, { bg: string; fg: string; label: string }> = {
   in_progress: { bg: "bg-info-subtle", fg: "text-info", label: "imports.statusInProgress" },
   success: { bg: "bg-success-subtle", fg: "text-success", label: "imports.statusSuccess" },
-  cancelled: { bg: "bg-warning-subtle", fg: "text-warning", label: "imports.statusCancelled" },
+  // Indigo (cancelled) / violet (deleted) = nothing to do; orange = act (import the file again).
+  cancelled: {
+    bg: "bg-[color-mix(in_srgb,var(--chart-7)_14%,transparent)]",
+    fg: "text-[var(--chart-7)]",
+    label: "imports.statusCancelled",
+  },
   error: { bg: "bg-error-subtle", fg: "text-error", label: "imports.statusError" },
+  interrupted: { bg: "bg-warning-subtle", fg: "text-warning", label: "imports.statusInterrupted" },
 };
 
 function relativeDate(iso: string, t: TFn): string {
@@ -143,8 +149,8 @@ function ImportsTab() {
                   </td>
                   <td className="px-4 py-3">
                     {isDeleted ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">
-                        <TriangleAlert className="size-3" />
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--chart-4)_14%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--chart-4)]">
+                        <Trash2 className="size-3" />
                         {t("imports.deletedBy", {
                           who: row.deleted_by_full_name ?? row.deleted_by_email ?? "—",
                           when: relativeDate(row.deleted_at!, t),
@@ -156,6 +162,9 @@ function ImportsTab() {
                       >
                         {t(status.label)}
                       </span>
+                    )}
+                    {!isDeleted && row.status === "interrupted" && (
+                      <p className="mt-1 text-xs text-muted-foreground">{t("imports.interruptedHint")}</p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

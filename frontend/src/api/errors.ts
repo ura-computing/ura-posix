@@ -3,6 +3,7 @@
  *  fr.ts / es.ts. A const object, not a TS `enum` (`erasableSyntaxOnly`). */
 export const ErrorCode = {
   INVALID_INPUT: "invalidInput",
+  SERVER_ERROR: "serverError",
   TOO_MANY_ATTEMPTS: "tooManyAttempts",
   SESSION_EXPIRED: "sessionExpired",
   BAD_CREDENTIALS: "badCredentials",
@@ -38,6 +39,7 @@ export const ErrorCode = {
   FILE_TOO_LARGE: "fileTooLarge",
   CSV_ONLY: "csvOnly",
   EMPTY_FILE: "emptyFile",
+  FILE_CORRUPTED: "fileCorrupted",
   EMPTY_BODY: "emptyBody",
   ROW_MISSING_NAME: "rowMissingName",
   INVALID_BATCH_STATUS: "invalidBatchStatus",
