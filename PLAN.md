@@ -14,7 +14,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 | One step → `make tests` green → step removed from this file | the oracle (`resources/tests/oracle.py`) pins every number |
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
-| Hidden store website (`routers/store_website.py`, `pages/store/*`): moved as-is, never rewritten | hidden, must not break |
+| Hidden store website (`backend/app/store_website/`, `frontend/src/pages/store/*`): moved as-is, never rewritten | hidden, must not break |
 
 ---
 
@@ -22,7 +22,9 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
-| Backend layout: all code in `backend/app/` (`core/`, `identity/auth` + `identity/members`, `catalog/`, `ingestion/`, `ledger/`, `analytics/`, `accounting/payments` + `accounting/exclusions`, `store_website/`), scripts in `backend/scripts/` (`bootstrap.py`, `seed.py` + `seed.json`, legacy migration). `main.py` stays at the backend root (`uvicorn main:app` unchanged for deployments); scripts: `python scripts/…` (Makefile, `entrypoint.sh`, E2E start script). OpenAPI identical. **Fix**: `entrypoint.sh` still imported `database` / `models` since the `core/` step (Docker + production boot would crash) | every spec; Docker: `make demo` |
+| E2E on the production images: `e2e/docker-compose.e2e.yml` (backend Dockerfile → `entrypoint.sh` → migrations + seed + `uvicorn main:app` 2 workers; frontend Dockerfile → `serve`; Postgres 17 in memory) started / removed by `e2e/scripts/start-stack.sh` (replaces `start-backend.sh` + `vite preview`). `docker-compose.yml`: `backend` service restored (`make demo` had no backend since `72d98fc`). Speed baseline to re-record once (answer `y`) | every spec, `make demo` |
+| Clear errors: (1) any server crash → JSON 500 `serverError` with CORS headers (`CatchServerErrors`, `app/core/errors.py`) → « Le logiciel a rencontré un problème. Réessayez dans quelques minutes. » (was « Serveur injoignable »); 5xx without code (proxy) → same; (2) no network → « Pas de connexion Internet… », server down → « Le logiciel ne répond pas… »; (3) damaged file (control character) refused in the browser with its line « Ce fichier est abîmé (ligne N). Téléchargez-le à nouveau depuis Sobrus… », backend safety net `fileCorrupted` (chunks + catalogue) | `15-imports` (bad files test + API check), `99-gates` (codes) |
+| B6: a chunk no longer marks its batch « success »: only the final PATCH after the last chunk does. Batch `in_progress` with no chunk for 1 min (new column `last_chunk_at`, migration 0020) → API shows `interrupted`, list shows « Interrompu » + « Importez le même fichier à nouveau pour le compléter. » (FR + ES); the list re-reads every 10 s while one is « En cours ». New test: tab closed after chunk 1 → « En cours », 2 000 lines, deleted from the list | `15-imports` (new test before the last one), `02-import` |
 
 ---
 
@@ -50,8 +52,8 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 | # | Bug | Example |
 |---|---|---|
-| G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
-| G3 | Supplier axes join sales once per supplier (`analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
+| G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`app/analytics/analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
+| G3 | Supplier axes join sales once per supplier (`app/analytics/analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
 
 **Blockers for the microservice split**
 
@@ -59,13 +61,12 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 |---|---|---|
 | B1 | One shared DB | import and stats both read `medicaments` + exclusions → start with workers on the same DB and models (§3); don't split the DB |
 | B2 | Auth needs the DB | every request loads user + session + 3 permission layers → a new service needs `JWT_SECRET` + DB, or a gateway |
-| B3 | In-memory rate limit (`rate_limit.py`) | 2 workers → login limit 10/min instead of 5 → `Limiter(storage_uri=<Valkey URL>)` |
-| B4 | Blocking catalogue upload: `async def upload_catalog` runs sync SQLAlchemy (`routers/imports.py`) | pharmacy A uploads a 50 MB CSV → pharmacy B's Rapport waits → plain `def`, or the RQ worker |
+| B3 | In-memory rate limit (`app/core/rate_limit.py`) | 2 workers → login limit 10/min instead of 5 → `Limiter(storage_uri=<Valkey URL>)` |
+| B4 | Blocking catalogue upload: `async def upload_catalog` runs sync SQLAlchemy (`app/ingestion/router.py`) | pharmacy A uploads a 50 MB CSV → pharmacy B's Rapport waits → plain `def`, or the RQ worker |
 | B5 | Race on a new product insert | 2 chunks insert PID 12345 at once → UniqueViolation → 500 → `ON CONFLICT (pid) DO NOTHING` + re-select (S7) |
-| B6 | Batch set to `success` after **every** chunk (`routers/imports.py`) | browser closed after chunk 1/40 → batch « success » with 500 of 20 000 rows → chunks keep `in_progress`, the final `success` PATCH (S3) closes the batch |
 | B7 | CA = `qty × Medicament.ppv`, and `ppv` is global and mutable | January sold 100 × 15.00 = 1 500; June import sets PPV 16.50 → January becomes 1 650 for every pharmacy → every cache is cleared on catalogue edits |
-| B8 | `Vente.date`, `Achat.delivery_date` are text (`models.py`) | `cast(date as Date)` can't use the index; « 15/01/2024 » → 500 → real `DATE` columns |
-| B9 | `date.today()` uses the server timezone (`*_queries.py`) | server UTC, pharmacy at 00:30 Casablanca → « today » is yesterday → `TZ=Africa/Casablanca` in every service |
+| B8 | `Vente.date`, `Achat.delivery_date` are text (`app/core/models.py`) | `cast(date as Date)` can't use the index; « 15/01/2024 » → 500 → real `DATE` columns |
+| B9 | `date.today()` uses the server timezone (`app/analytics/*_queries.py`) | server UTC, pharmacy at 00:30 Casablanca → « today » is yesterday → `TZ=Africa/Casablanca` in every service |
 
 ---
 

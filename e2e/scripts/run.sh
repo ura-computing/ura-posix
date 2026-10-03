@@ -2,10 +2,21 @@
 # Single entry point of the E2E suite (make tests / make tests-ui).
 # Asks for its inputs — Enter keeps the default. No terminal (git pre-push)
 # → defaults, no questions. First run installs Playwright by itself.
+# Test files can also be given after the mode: `run.sh tests 06 15` (make tests 06 15).
 set -euo pipefail
 
 MODE="${1:-tests}"                      # tests | ui
+shift || true
+SPECS=("$@")                            # test files: number (06) or part of the name (ventes)
 cd "$(dirname "$0")/.."                 # e2e/
+
+spec_file() {                           # "06" / "ventes" → tests/06-ventes.spec.ts
+  local match
+  if [[ "$1" =~ ^[0-9]+$ ]]; then match="$(ls tests/"$(printf '%02d' "$((10#$1))")"-*.spec.ts 2>/dev/null | head -1 || true)"
+  else match="$(ls tests/*"$1"*.spec.ts 2>/dev/null | head -1 || true)"; fi
+  [ -z "$match" ] && { echo "✗ no test file matches \"$1\"" >&2; ls tests >&2; exit 1; }
+  echo "$match"
+}
 
 ask() {                                 # ask "question" default → answer
   local answer=""
@@ -29,16 +40,19 @@ while :; do
 done
 args=()
 
+if [ ${#SPECS[@]} -gt 0 ]; then         # files given on the command line
+  for spec in "${SPECS[@]}"; do args+=("$(spec_file "$spec")"); done
+  export E2E_PARTIAL=1                  # coverage + speed gates need the full suite: skipped
+fi
+
 if [ "$MODE" = ui ]; then
-  spec="$(ask "Test file (e.g. 06 or ventes; all = every test)" all)"
-  if [ "$spec" != all ]; then
-    match="$(ls tests/*"$spec"*.spec.ts 2>/dev/null | head -1 || true)"
-    [ -z "$match" ] && { echo "✗ no test file matches \"$spec\""; ls tests; exit 1; }
-    args+=("$match")
+  if [ ${#SPECS[@]} -eq 0 ]; then
+    spec="$(ask "Test file (e.g. 06 or ventes; all = every test)" all)"
+    [ "$spec" != all ] && args+=("$(spec_file "$spec")")
   fi
   export E2E_HEADED=1 E2E_SLOWMO=250
   args+=(--headed)
-else
+elif [ ${#SPECS[@]} -eq 0 ]; then
   if [ "$(ask "Only the tests that failed last time? (y/n)" n)" = y ]; then
     args+=(--last-failed)               # + the setup tests (01, 02) they depend on
     export E2E_PARTIAL=1                # coverage + speed gates need the full suite: skipped

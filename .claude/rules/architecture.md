@@ -29,7 +29,7 @@ All code in `backend/app/`, one folder per business area (like `frontend/src/pag
 | Heavy SQL / aggregates in `*_queries.py`; router = read params → call → return the schema | `app/analytics/stats_queries.py` |
 | Imports always absolute from `app` | `from app.core.models import User` |
 | Errors: `raise ApiError(status, ErrorCode.X, "French detail")` (`app/core/errors.py`) | frontend shows `errors.<code>`; codes equal on both sides (gate) |
-| Run: `uv run uvicorn main:app`; scripts: `uv run python scripts/seed.py` | Makefile, `entrypoint.sh`, `e2e/scripts/start-backend.sh` |
+| Run: `uv run uvicorn main:app`; scripts: `uv run python scripts/seed.py` | Makefile (`make dev`), `entrypoint.sh` (Docker: demo, E2E, production) |
 | Schema changes: Alembic (`alembic/versions/`), applied by `scripts/bootstrap.py` | `make migrate` |
 
 - Stack: FastAPI + SQLAlchemy 2 + Postgres (unaccent) + Alembic.

@@ -5,7 +5,7 @@
  *     least once with a 2xx/3xx answer. Only /v1/store-website/* is allowlisted
  *     (feature hidden, see memory "store website skipped").
  *  2. SPEED — median duration per route (and total per FLOW, e.g. import/ventes, +35 %)
- *     ≤ max(baseline × 1.2 (FLOW: × 1.35), baseline + 50 ms). Baseline = e2e/perf-baseline.json
+ *     ≤ max(baseline × 1.2, baseline + 50 ms); FLOW ≤ max(baseline × 1.35, baseline + 150 ms). Baseline = e2e/perf-baseline.json
  *     (committed, recorded for one ROWS size — other sizes are not compared).
  *     First run, or `make tests` answered "y" to "Record a new speed
  *     baseline?", (re)writes it.
@@ -151,7 +151,8 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
     }
     // A FLOW is ONE timing of a whole flow (browser + many calls): ±25 % between runs on a
     // shared machine, so +35 %. A route is a median of many calls: +20 %.
-    const limit = key.startsWith("FLOW") ? Math.max(base * 1.35, base + 50) : Math.max(base * 1.2, base + 50);
+    // A FLOW is timed once per run: short ones (one stock chunk ≈ 170 ms) jitter ±50 ms → +150 ms floor.
+    const limit = key.startsWith("FLOW") ? Math.max(base * 1.35, base + 150) : Math.max(base * 1.2, base + 50);
     if (ms > limit) slower.push(`${key}: ${ms} ms (baseline ${base} ms, limit ${Math.round(limit)} ms)`);
   }
   if (fresh.length) {

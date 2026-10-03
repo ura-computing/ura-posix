@@ -25,13 +25,15 @@ Topic rules in `.claude/rules/` (each loads with the files it covers):
 | Type-check frontend | `cd frontend && npx tsc -p tsconfig.app.json --noEmit` |
 | Lint frontend | `cd frontend && npx eslint src` |
 | E2E, every test, headless | `make tests` |
+| E2E, some test files only | `make tests 99`, `make tests 06 15`, `make tests-ui ventes` |
 | E2E, one file in a real browser | `make tests-ui` |
 
 - One command per reply. E2E: the user runs `make tests` / `make tests-ui`, nothing else.
-- Scripts ask their inputs on stdin with a default (`Enter` = default). No CLI args. New E2E option = prompt in `e2e/scripts/run.sh`, not a make target.
+- Scripts ask their inputs on stdin with a default (`Enter` = default). Only CLI arguments: E2E test files (`make tests 06`). New E2E option = prompt in `e2e/scripts/run.sh`, not a make target.
 
 # Tests
 - Playwright E2E only (`e2e/`): huge generated Sobrus CSVs + oracle `resources/tests/oracle.py` → `expected.json`.
+- E2E runs the production images (backend + frontend Dockerfiles, `entrypoint.sh`) on Postgres 17: `e2e/docker-compose.e2e.yml`, own project `apcm-e2e`, fresh database each run.
 - Gates `e2e/tests/99-gates.spec.ts`: every API route called, no route slower than the baseline, same error codes front ⇄ back, 0 `react-hooks` lint errors.
 - Through the UI: click / type like a user, the oracle checks every field. API only for setup, cleanup, an exact extra check. Missing UI → raise it.
 - Failing E2E: read `e2e/test-results/*/error-context.md` directly.

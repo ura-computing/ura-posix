@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format tests tests-ui
+.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -36,7 +36,7 @@ help:
 	@echo "    make format    — format the whole repo (Prettier: frontend + e2e, ruff: backend)"
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
-	@echo "    make tests     — every test, headless"
+	@echo "    make tests     — every test, headless (make tests 99 / 06 15: only those test files)"
 	@echo "    make tests-ui  — one test file (or all) in a real browser, slowed down"
 
 # ── Setup (fresh clone) ─────────────────────────────────────────────────────
@@ -154,11 +154,20 @@ format:
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
 # Two commands. The script asks for its inputs (Enter = default); with no
 # terminal (git pre-push) it uses the defaults. First run installs Playwright.
-#   make tests      headless, every test
-#   make tests-ui   real browser, slowed down; asks which test file
+#   make tests      headless, every test        make tests 99 / make tests 06 15: only those files
+#   make tests-ui   real browser, slowed down; asks which test file (or: make tests-ui 06)
 
-tests:
-	@bash e2e/scripts/run.sh tests
+# `make tests 99`, `make tests 06 15`, `make tests-ui ventes`: only those test files (number
+# or part of the name; the setup tests 01-02 always run first). `make test` = `make tests`.
+ifneq ($(filter test tests tests-ui,$(firstword $(MAKECMDGOALS))),)
+SPECS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+ifneq ($(SPECS),)
+$(eval $(SPECS):;@:)
+endif
+endif
+
+test tests:
+	@bash e2e/scripts/run.sh tests $(SPECS)
 
 tests-ui:
-	@bash e2e/scripts/run.sh ui
+	@bash e2e/scripts/run.sh ui $(SPECS)

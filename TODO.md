@@ -26,6 +26,5 @@
     + lot of other stuff change with it
 
 + make sure all file uses translation
-+ see if you can put query keys with urls togeher in one object
 + add ui tutorial for new user to show the m how to use the app
-+ fix gauge ui
++ make sure tests-ui tests everything that have to do with ui

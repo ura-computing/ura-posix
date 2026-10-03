@@ -1,0 +1,62 @@
+# E2E stack = the production images on Postgres 17, like DigitalOcean:
+#   backend  → backend/Dockerfile → entrypoint.sh (migrations, seed, uvicorn main:app, 2 workers)
+#   frontend → frontend/Dockerfile → production build served by `serve`
+# Isolated from dev: own project (apcm-e2e), own ports, database in memory (fresh every run).
+# Started and removed by e2e/scripts/start-stack.sh (Playwright webServer).
+name: apcm-e2e
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: apcm_e2e
+      POSTGRES_USER: apcm
+      POSTGRES_PASSWORD: apcm
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apcm -d apcm_e2e"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build: ../backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://apcm:apcm@db:5432/apcm_e2e
+      JWT_SECRET: e2e-jwt-secret-only-for-the-test-stack-0123456789
+      FRONTEND_URL: http://localhost:5174
+      COOKIE_SECURE: "false"
+      MAIL_USERNAME: "" # no SMTP: magic links are printed to the log (e2e/lib/mail.ts)
+      SEED_CATALOG: "0" # catalogue = generated products only (every value known to the oracle)
+      RATE_LIMIT: "0" # the suite logs in more than 5 times a minute
+      PORT: "8001"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/health || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 90
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_BACKEND_URL: http://localhost:8001 # read at build time, like production
+    ports:
+      - "127.0.0.1:5174:4173"
+    # Starts once the API answers: Playwright waits for this app, so « app up » = whole stack up.
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4173/ || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

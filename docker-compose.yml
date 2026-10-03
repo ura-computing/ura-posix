@@ -28,6 +28,28 @@ services:
       retries:  10
     restart: unless-stopped
 
+  backend:
+    build: ./backend
+    environment:
+      # Driver explicitly named — config.py uses psycopg2.
+      DATABASE_URL:          postgresql+psycopg2://${POSTGRES_USER:-apcm}:${POSTGRES_PASSWORD:-apcm}@db:5432/${POSTGRES_DB:-apcm_demo}
+      JWT_SECRET:            ${JWT_SECRET:-demo-jwt-secret-not-for-prod-32chars-min!!}
+      JWT_ACCESS_EXPIRY_MIN: ${JWT_ACCESS_EXPIRY_MIN:-10080}
+      COOKIE_SECURE:         ${COOKIE_SECURE:-false}
+      FRONTEND_URL:          ${FRONTEND_URL:-http://localhost:4173}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:         ["CMD-SHELL", "curl -fsS http://localhost:8000/v1/health || exit 1"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
+      start_period: 30s
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

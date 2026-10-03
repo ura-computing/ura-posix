@@ -1,6 +1,9 @@
 /** Field-by-field comparison of an app payload with the oracle. Collects EVERY
  *  mismatch (not just the first) so one run shows all that is wrong. */
+import { appendFileSync, mkdirSync } from "node:fs";
+
 import { expect } from "./fixtures";
+import { COMPARED_FILE, RESULTS_DIR } from "./paths";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Row = Record<string, any>;
@@ -37,8 +40,16 @@ export function diff(actual: unknown, expected: unknown, path = "", out: string[
   return out;
 }
 
+/** Number of single values (numbers, texts, null…) in an oracle payload = values compared. */
+function countValues(expected: unknown): number {
+  if (expected === null || typeof expected !== "object") return 1;
+  return Object.values(expected as Row).reduce((n: number, v) => n + countValues(v), 0);
+}
+
 /** One assertion listing up to 40 differences. */
 export function expectSame(actual: unknown, expected: unknown, what: string): void {
+  mkdirSync(RESULTS_DIR, { recursive: true });
+  appendFileSync(COMPARED_FILE, `${countValues(expected)}\n`); // run summary (lib/summary-reporter.ts)
   const d = diff(actual, expected);
   expect(d.slice(0, 40), `${what}: ${d.length} difference(s)`).toEqual([]);
 }
