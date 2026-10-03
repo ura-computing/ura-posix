@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend cli migrate seed db build build-backend build-frontend demo down clean logs test test-backend install-hooks e2e-tests e2e-ui
+.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs e2e-tests e2e-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -18,7 +18,6 @@ help:
 	@echo "    make db        — start the Postgres 17 container + create the dev DB if missing"
 	@echo "    make migrate   — apply Alembic migrations against the dev DB"
 	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
-	@echo "    make cli       — interactive Python CLI"
 	@echo ""
 	@echo "  Build:"
 	@echo "    make build          — build-backend + build-frontend"
@@ -36,12 +35,6 @@ help:
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
 	@echo "    make e2e-tests     — every test, headless"
 	@echo "    make e2e-ui        — one test file (or all) in a real browser, slowed down"
-	@echo ""
-	@echo "  Tests + git hooks:"
-	@echo "    make test          — backend pytest suite"
-	@echo "    make test-backend  — backend pytest only"
-	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
-	@echo "                         (run once per clone; bypass with git push --no-verify)"
 
 # ── Setup (fresh clone) ─────────────────────────────────────────────────────
 
@@ -95,9 +88,6 @@ backend: db
 frontend:
 	cd $(FRONTEND_DIR) && npm run dev
 
-cli:
-	cd $(BACKEND_DIR) && uv run python -m cli
-
 migrate: db
 	cd $(BACKEND_DIR) && uv run python bootstrap.py
 
@@ -149,16 +139,6 @@ logs:
 clean:
 	docker compose down -v
 	@echo "✓ Volume removed. Next 'make demo' starts from an empty DB."
-
-# ── Tests + git hooks ──────────────────────────────────────────────────────
-
-test: test-backend
-
-test-backend:
-	cd $(BACKEND_DIR) && uv run pytest
-
-install-hooks:
-	@bash scripts/install-hooks.sh
 
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
 # Two commands. The script asks for its inputs (Enter = default); with no

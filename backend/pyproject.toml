@@ -22,17 +22,5 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff>=0.4",
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
 ]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-asyncio_mode = "auto"
-# All tests must execute against a separate database so they don't trample
-# the dev DB. conftest.py reads APCM_TEST_DATABASE_URL or falls back to a
-# `_test` suffix on the dev URL.
-filterwarnings = [
-    "ignore::DeprecationWarning:starlette.testclient",
-]

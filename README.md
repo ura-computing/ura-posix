@@ -95,12 +95,9 @@ apcm-pharma/
 ├── PLAN.md                 everything left to do, open bugs, open questions
 ├── TODO.md                 owner's personal notes — ignore
 ├── Makefile                every command (make help)
-├── docker-compose.yml      db (Postgres 17) + backend + frontend (demo); db16 = one-time 16→17 copy
+├── docker-compose.yml      db (Postgres 17) + backend + frontend (demo)
 ├── env/demo/docker.env     demo env, copied to .env by make db / make demo
 ├── scripts/
-│   ├── install-hooks.sh    installs .git/hooks/pre-push
-│   ├── pre-push.sh         pre-push hook (still runs the old pytest suite — `PLAN.md` §5)
-│   └── pg16-to-17.sh       one-time copy of an old Postgres 16 volume into 17
 ├── resources/
 │   ├── catalog.csv         real Sobrus catalogue sample (~16k products) used by seed
 │   └── tests/              E2E data generator + oracle (§7)
@@ -130,7 +127,6 @@ apcm-pharma/
 │   ├── schemas/            Pydantic request/response models, one file per domain
 │   ├── alembic/versions/   migrations 0001 → 0019 (head)
 │   ├── migrations/legacy_to_refactoring.py   one-off upgrade of the old production DB
-│   ├── conftest.py + tests/  OLD pytest suite (being removed)
 │   └── .env.example        every backend env var, documented
 └── frontend/               React app (§5)
     ├── vite.config.ts      React Compiler, Tailwind, `@` alias, /v1 dev proxy
@@ -176,7 +172,7 @@ Needs: Docker (for Postgres), `uv` (Python 3.12), Node 20+.
 Other targets: `make backend`, `make frontend`, `make build` (= `build-backend`: backend
 Docker image, + `build-frontend`: `tsc -b && vite build`), `make demo` (full Docker stack: frontend
 **:4173**, backend :8000), `make down`, `make logs`, `make clean` (**destroys all DB volumes**),
-`make e2e-tests`, `make e2e-ui`, `make install-hooks`.
+`make e2e-tests`, `make e2e-ui`.
 
 ### Seed accounts (`backend/seed.json`)
 | Email | Password | Role |
@@ -203,8 +199,7 @@ Docker image, + `build-frontend`: `tsc -b && vite build`), `make demo` (full Doc
 `/v1`; the Vite dev server proxies `/v1` to it.
 
 ### Postgres versions
-Local Postgres is 17 (same as production). An old Postgres 16 volume (`postgres_data`) can be copied
-once with `bash scripts/pg16-to-17.sh` (uses the `db16` compose service, profile `pg16`).
+Local Postgres is 17 (same as production).
 
 ---
 
@@ -456,8 +451,8 @@ collapsed spaces) merges onto that row. Duplicate `(ref, product)` lines are ski
 
 ## 7. Tests — the Playwright E2E suite
 
-**The only test suite going forward.** The old vitest suite is gone; the old pytest suite
-(`backend/tests/`) is being removed. The idea: generate huge Sobrus-format files with **known answers**, import them through the
+**The only test suite going forward.** The old vitest and pytest suites are gone.
+The idea: generate huge Sobrus-format files with **known answers**, import them through the
 real UI, and compare **every field of every API response** with those answers.
 
 ### 7.1 Run

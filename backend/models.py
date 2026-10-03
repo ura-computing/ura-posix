@@ -1,6 +1,6 @@
 from datetime import datetime, date
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
@@ -21,6 +21,8 @@ ALLOWED_FEATURES = (
     "stock", "analyse", "accounting", "alertes",
     "special_products",
 )
+# Same rule as migrations 0009 / 0016, so a fresh DB (create_all) rejects unknown features too.
+_FEATURES_SQL = "(" + ", ".join(f"'{f}'" for f in ALLOWED_FEATURES) + ")"
 
 
 class Pharmacy(Base):
@@ -78,7 +80,10 @@ class Session(Base):
 
 class PharmacyFeature(Base):
     __tablename__ = "pharmacy_features"
-    __table_args__ = (UniqueConstraint("pharmacy_id", "feature", name="uq_pharmacy_features_pharmacy_feature"),)
+    __table_args__ = (
+        UniqueConstraint("pharmacy_id", "feature", name="uq_pharmacy_features_pharmacy_feature"),
+        CheckConstraint(f"feature IN {_FEATURES_SQL}", name="ck_pharmacy_features_feature"),
+    )
 
     id:          Mapped[int]  = mapped_column(Integer, primary_key=True)
     pharmacy_id: Mapped[int]  = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
@@ -90,7 +95,10 @@ class PharmacyFeature(Base):
 
 class UserPermission(Base):
     __tablename__ = "user_permissions"
-    __table_args__ = (UniqueConstraint("user_id", "permission", name="uq_user_permissions_user_permission"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "permission", name="uq_user_permissions_user_permission"),
+        CheckConstraint(f"permission IN {_FEATURES_SQL}", name="ck_user_permissions_permission"),
+    )
 
     id:         Mapped[int]  = mapped_column(Integer, primary_key=True)
     user_id:    Mapped[int]  = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="CASCADE"), nullable=False)
