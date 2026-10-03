@@ -416,6 +416,7 @@ export const fr = {
 
 
   comptabilite: {
+    soldeTva: "Solde TVA {{year}}",
     avecSpeciaux: "Avec produits spéciaux",
     kpiCA:        "Chiffre d'Affaires",
     ventesTotal:  "Ventes total",
@@ -1072,6 +1073,8 @@ export const fr = {
     footer: "© PharmaGest · Gestion d'officine",
   },
   uploadFile: {
+    missingColumns: "Ce fichier ne correspond pas à ce type d'import. Colonnes manquantes : {{columns}}",
+    emptyFile: "Le fichier est vide : aucune ligne à importer.",
     step1: "Type de document",
     step2: "Fichier CSV",
     step3: "Aperçu et import",

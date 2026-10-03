@@ -151,7 +151,11 @@ function navTitle(pathname: string): string {
 
 /** FR / ES segmented switch — mirrors ThemeToggle, sits next to it in the Header. */
 function LanguageToggle() {
-  const { lang, setLang, t } = useI18n();
+  const {
+    lang,
+    setLang,
+    t,
+  } = useI18n();
   return (
     <div className="flex items-center gap-0.5 rounded-[9px] border border-border bg-surface-subtle p-0.5" aria-label={t("lang.label")}>
       {LANGS.map((l) => {
@@ -277,14 +281,16 @@ function Header({ onOpenMobile }: HeaderProps) {
 /** Admin-only count of unclassified medicaments. Drives the "Catalogue"
  *  sidebar badge. Refetches every 60s; cheap query. */
 function useUnclassifiedCount(role: Role): number {
-  const q = useQuery({
+  const {
+    data,
+  } = useQuery({
     queryKey:        QUERIES.admin.catalog.unclassifiedCount,
     queryFn:         () => api.get<{ count: number }>(URLS.admin.catalog.unclassifiedCount),
     enabled:         role === ROLES.ADMIN,
     staleTime:       60_000,
     refetchInterval: 60_000,
   });
-  return q.data?.count ?? 0;
+  return data?.count ?? 0;
 }
 
 interface SidebarProps {
@@ -480,7 +486,11 @@ const TYPE_LABEL: Record<DocType, string> = {
 const MAX_VISIBLE = 5;
 
 function UploadProgressWidget() {
-  const { jobs, cancelUpload, dismissJob } = useUploadCtx();
+  const {
+    jobs,
+    cancelUpload,
+    dismissJob,
+  } = useUploadCtx();
   const nav = useNavigate();
 
   if (jobs.length === 0) return null;
@@ -639,7 +649,11 @@ function JobCard({
 const COLLAPSE_KEY = "pg-sidebar-collapsed";
 
 export function AppLayout() {
-  const { me, isLoading, isError } = useMe();
+  const {
+    me,
+    isLoading,
+    isError,
+  } = useMe();
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(COLLAPSE_KEY) === "1",
   );

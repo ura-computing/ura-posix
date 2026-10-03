@@ -9,17 +9,22 @@ import { QUERIES } from "@/api/queries";
 import type { UpdateProfileRequest, ChangePasswordRequest, Me, MeResponse, Session } from "@/types";
 
 export function useSessions(userId: string) {
-  const query = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: QUERIES.sessions.list(userId),
     queryFn:  () => api.get<Session[]>(URLS.sessions.list),
     staleTime: 30_000,
   });
 
   return {
-    sessions:  query.data ?? [],
-    isLoading: query.isLoading,
-    isError:   query.isError,
-    error:     query.error,
+    sessions:  data ?? [],
+    isLoading,
+    isError,
+    error,
   };
 }
 
@@ -27,7 +32,11 @@ export function useKillSession(userId: string) {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
+  const {
+    mutate,
+    variables,
+    isPending,
+  } = useMutation({
     mutationFn: (sessionId: string) => api.delete(URLS.sessions.one(sessionId)),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(userId) });
@@ -45,11 +54,11 @@ export function useKillSession(userId: string) {
     },
   });
 
-  const handleKill = (sessionId: string) => mutation.mutate(sessionId);
+  const handleKill = (sessionId: string) => mutate(sessionId);
 
   return {
     handleKill,
-    pendingId: mutation.isPending ? mutation.variables ?? null : null,
+    pendingId: isPending ? variables ?? null : null,
   };
 }
 
@@ -57,7 +66,10 @@ export function useRevokeOtherSessions(userId: string) {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
+  const {
+    mutate,
+    isPending,
+  } = useMutation({
     mutationFn: () => api.post<void>(URLS.sessions.revokeOthers),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERIES.sessions.list(userId) });
@@ -68,11 +80,11 @@ export function useRevokeOtherSessions(userId: string) {
     },
   });
 
-  const handleRevokeOthers = () => mutation.mutate();
+  const handleRevokeOthers = () => mutate();
 
   return {
     handleRevokeOthers,
-    isPending: mutation.isPending,
+    isPending,
   };
 }
 
@@ -80,7 +92,12 @@ export function useUpdateProfile() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
+  const {
+    mutate,
+    isPending,
+    isError,
+    error,
+  } = useMutation({
     mutationFn: (input: UpdateProfileRequest) => api.patch<MeResponse>(URLS.auth.me, input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: QUERIES.auth.me });
@@ -91,13 +108,13 @@ export function useUpdateProfile() {
     },
   });
 
-  const handleUpdate = (input: UpdateProfileRequest) => mutation.mutate(input);
+  const handleUpdate = (input: UpdateProfileRequest) => mutate(input);
 
   return {
     handleUpdate,
-    isPending: mutation.isPending,
-    isError:   mutation.isError,
-    error:     mutation.error,
+    isPending,
+    isError,
+    error,
   };
 }
 
@@ -105,7 +122,12 @@ export function useChangePassword(onDone?: () => void) {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation({
+  const {
+    mutate,
+    isPending,
+    isError,
+    error,
+  } = useMutation({
     mutationFn: (input: ChangePasswordRequest) => api.post<void>(URLS.auth.changePassword, input),
     onSuccess: async () => {
       // Backend wiped every session row of this user + re-issued cookies for the
@@ -125,12 +147,12 @@ export function useChangePassword(onDone?: () => void) {
     },
   });
 
-  const handleChange = (input: ChangePasswordRequest) => mutation.mutate(input);
+  const handleChange = (input: ChangePasswordRequest) => mutate(input);
 
   return {
     handleChange,
-    isPending: mutation.isPending,
-    isError:   mutation.isError,
-    error:     mutation.error,
+    isPending,
+    isError,
+    error,
   };
 }

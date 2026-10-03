@@ -13,72 +13,116 @@ import type {
 // ── Owner ────────────────────────────────────────────────────────────────────
 
 export function useStats(filters: StatsFilters) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
     queryFn:  () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
     staleTime: 60_000,
   });
-  return { stats: q.data, isLoading: q.isLoading, isError: q.isError, error: q.error };
+  return {
+    stats: data,
+    isLoading,
+    isError,
+    error,
+  };
 }
 
 /** « Optimisation » tile: the /analyses gain (best ↔ worst product, mode produit)
  *  for the Rapport period + category. Same key + URL as /analyses → shared cache. */
 export function useOptimisationGain(filters: StatsFilters) {
-  const q = useQuery({
+  const { data } = useQuery({
     queryKey: QUERIES.stats.analyseMarge("produit", filters.date_from, filters.date_to, filters.category_type, null),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
       mode: "produit", date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
     } }),
     staleTime: 60_000,
   });
-  return q.data?.kpis.difference_gain_dh ?? null;
+  return data?.kpis.difference_gain_dh ?? null;
 }
 
 
 export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.stats.marginAlerts(filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<MarginAlertsResponse>(URLS.stats.marginAlerts, { params: filters }),
     staleTime: 60_000,
   });
-  return { alerts: q.data, isLoading: q.isLoading, isError: q.isError };
+  return {
+    alerts: data,
+    isLoading,
+    isError,
+  };
 }
 
 
 export function useStockSummary() {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.stats.stockSummary,
     queryFn:  () => api.get<StockSummaryResponse>(URLS.stats.stockSummary),
     staleTime: 5 * 60_000,    // stock changes less often than ventes
   });
-  return { stock: q.data, isLoading: q.isLoading, isError: q.isError };
+  return {
+    stock: data,
+    isLoading,
+    isError,
+  };
 }
 
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 export function useAdminStats() {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.admin.stats,
     queryFn:  () => api.get<AdminStatsResponse>(URLS.admin.stats),
     staleTime: 60_000,
   });
-  return { systemStats: q.data, isLoading: q.isLoading, isError: q.isError };
+  return {
+    systemStats: data,
+    isLoading,
+    isError,
+  };
 }
 
 
 export function useAdminPharmacies() {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.admin.pharmacies,
     queryFn:  () => api.get<AdminPharmacyRow[]>(URLS.admin.pharmacies),
     staleTime: 5 * 60_000,    // pharmacy list rarely changes
   });
-  return { pharmacies: q.data ?? [], isLoading: q.isLoading };
+  return {
+    pharmacies: data ?? [],
+    isLoading,
+  };
 }
 
 
 export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsFilters) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.admin.pharmacyStats(
       pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared,
     ),
@@ -86,29 +130,45 @@ export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsF
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
   });
-  return { stats: q.data, isLoading: q.isLoading, isError: q.isError };
+  return {
+    stats: data,
+    isLoading,
+    isError,
+  };
 }
 
 
 export function useAdminPharmacyMarginAlerts(pharmacyId: number | null, filters: Omit<StatsFilters, "include_non_declared">) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.admin.pharmacyMarge(pharmacyId ?? 0, filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<MarginAlertsResponse>(URLS.admin.pharmacy.marginAlerts(pharmacyId as number), { params: filters }),
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
   });
-  return { alerts: q.data, isLoading: q.isLoading };
+  return {
+    alerts: data,
+    isLoading,
+  };
 }
 
 
 export function useAdminPharmacyStockSummary(pharmacyId: number | null) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.admin.pharmacyStock(pharmacyId ?? 0),
     queryFn:  () => api.get<StockSummaryResponse>(URLS.admin.pharmacy.stockSummary(pharmacyId as number)),
     enabled:  pharmacyId !== null,
     staleTime: 5 * 60_000,
   });
-  return { stock: q.data, isLoading: q.isLoading };
+  return {
+    stock: data,
+    isLoading,
+  };
 }
 
 /** Admin-only analyse-marge query — used by the /admin/stats page's Analyse de
@@ -120,7 +180,11 @@ export function useAdminPharmacyAnalyseMarge(
   mode:       MargeMode,
   filters:    AnalyseFilters,
 ) {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.admin.pharmacyAnalyse(pharmacyId ?? 0, mode, filters.date_from, filters.date_to, filters.category_type),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.admin.pharmacy.analyseMarge(pharmacyId as number), { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to, category_type: filters.category_type,
@@ -128,7 +192,11 @@ export function useAdminPharmacyAnalyseMarge(
     enabled:  pharmacyId !== null,
     staleTime: 60_000,
   });
-  return { data: q.data, isLoading: q.isLoading, isError: q.isError };
+  return {
+    analyse: data,
+    isLoading,
+    isError,
+  };
 }
 
 // src/pages/rapport/_hooks/useCategoryTint.ts

@@ -51,8 +51,14 @@ export default function ImportsPage() {
 
 function ImportsTab() {
   const t = useT();
-  const { imports, isLoading } = useImports();
-  const { deleteImport, isPending } = useDeleteImport();
+  const {
+    imports,
+    isLoading,
+  } = useImports();
+  const {
+    deleteImport,
+    isDeleting,
+  } = useDeleteImport();
   const [pendingRow, setPendingRow] = useState<DataImport | null>(null);
 
   const sorted = useMemo(
@@ -178,7 +184,7 @@ function ImportsTab() {
         variant="destructive"
         confirmLabel={pendingRow?.file_type === "stock" ? t("imports.markDeleted") : t("imports.deleteBtn")}
         loadingLabel={t("imports.deleting")}
-        isLoading={isPending}
+        isLoading={isDeleting}
       />
     </>
   );

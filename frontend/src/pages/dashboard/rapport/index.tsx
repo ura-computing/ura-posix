@@ -60,6 +60,8 @@ import {
   useStats,
   useStockSummary,
   useAdminPharmacyAnalyseMarge,
+  useAdminPharmacyMarginAlerts,
+  useAdminPharmacyStockSummary,
   useCategoryTint,
   useOptimisationGain,
 } from "./hooks";
@@ -258,10 +260,12 @@ interface AdminPharmacyBodyProps {
   marginRows:     Record<string, unknown>[];
   marginLoading:  boolean;
   subtitleDates:  string;
+  alerts?:        MarginAlertsResponse;
+  stock?:         StockSummaryResponse;
 }
 
 function AdminPharmacyBody({
-  stats, pharmacyLabel, categoryType, marginMode, onMarginMode, marginRows, marginLoading, subtitleDates,
+  stats, pharmacyLabel, categoryType, marginMode, onMarginMode, marginRows, marginLoading, subtitleDates, alerts, stock,
 }: AdminPharmacyBodyProps) {
   const t = useT();
   const catLabel = categoryType === "pharmacie" ? t("category.pharmacie")
@@ -402,6 +406,14 @@ function AdminPharmacyBody({
         </div>
       </section>
 
+      {/* Alertes marges — same cards as the owner's Rapport, without links */}
+      {alerts && (
+        <section className="flex flex-col gap-3.5">
+          <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.alertesMarges")}</h2>
+          <MarginAlertCards data={alerts} tint={categoryType} linked={false} />
+        </section>
+      )}
+
       {/* 2e — Analyse de marge */}
       <MarginAnalysisTable
         mode={marginMode}
@@ -409,6 +421,14 @@ function AdminPharmacyBody({
         rows={marginRows}
         isLoading={marginLoading}
       />
+
+      {/* Stock — same tiles as the owner's Rapport, without links */}
+      {stock && (
+        <section className="flex flex-col gap-3.5">
+          <h2 className="text-base font-bold tracking-tight text-foreground">{t("col.stock")}</h2>
+          <StockSummaryTiles stock={stock} tint={categoryType} linked={false} />
+        </section>
+      )}
 
       {/* 2f — Évolution mensuelle */}
       <AdminMonthlyTrendChart data={stats.monthly_trend} subtitle={subtitleDates} />
@@ -612,7 +632,10 @@ function CategoriesDonut({ categories, tint = "all" }: { categories: TopCategory
       const sweep = Math.max(full - GAP, 0);
       const a0    = acc.start;
       acc.out.push({ i, draw: sweep > 0.003, path: arcPath(a0, a0 + sweep) });
-      return { start: a0 + full, out: acc.out };
+      return {
+        start: a0 + full,
+        out: acc.out,
+      };
     },
     { start: -Math.PI / 2, out: [] },
   ).out;
@@ -838,7 +861,8 @@ const BRACKETS: BracketDef[] = [
   { key: "very_high", titleKey: "rapportAdmin.margeSup90",    Icon: ShieldCheck,   tone: "success" },
 ];
 
-function MarginAlertCards({ data, tint = "all" }: { data: MarginAlertsResponse; tint?: CategoryType }) {
+/** `linked` = false in the admin drill-down: the owner pages (/alertes, /stock) show the admin no pharmacy data. */
+function MarginAlertCards({ data, tint = "all", linked = true }: { data: MarginAlertsResponse; tint?: CategoryType; linked?: boolean }) {
   const t = useT();
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -851,7 +875,7 @@ function MarginAlertCards({ data, tint = "all" }: { data: MarginAlertsResponse; 
         return (
           <KpiTile
             key={b.key}
-            href={ROUTES.ALERTES}
+            href={linked ? ROUTES.ALERTES : undefined}
             label={t(b.titleKey)}
             value={subValue}
             sub={subLabel}
@@ -934,7 +958,7 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryResponse; tint?: CategoryType }) {
+function StockSummaryTiles({ stock, tint = "all", linked = true }: { stock: StockSummaryResponse; tint?: CategoryType; linked?: boolean }) {
   const t = useT();
   const { cardClass } = useCategoryTint(tint);
   // Health-tone mapping reuses our semantic tones — same vocabulary as everywhere else.
@@ -951,7 +975,7 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile
-          href={ROUTES.STOCK}
+          href={linked ? ROUTES.STOCK : undefined}
           label={t("kpi.totalRefs")}
           value={formatQty(stock.total_references)}
           sub={t("kpi.produitsSuivis")}
@@ -959,7 +983,7 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
           tint={tint}
         />
         <KpiTile
-          href={ROUTES.STOCK}
+          href={linked ? ROUTES.STOCK : undefined}
           label={t("kpi.ppvPotentiel")}
           value={formatMAD(stock.ppv_potentiel)}
           sub={t("kpi.madEnStock")}
@@ -967,7 +991,7 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
           tint={tint}
         />
         <KpiTile
-          href={ROUTES.STOCK}
+          href={linked ? ROUTES.STOCK : undefined}
           label={t("kpi.sousSurStock")}
           value={<>{formatQty(stock.sous_stock_count)} / {formatQty(stock.sur_stock_count)}</>}
           sub={t("kpi.produitsAjuster")}
@@ -975,7 +999,7 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
           tint={tint}
         />
         <KpiTile
-          href={ROUTES.STOCK}
+          href={linked ? ROUTES.STOCK : undefined}
           label={t("kpi.santeStock")}
           value={<span className={cn(healthValueClass)}>{formatPct(stock.health_pct)}</span>}
           sub={t("kpi.fourchetteIdeale")}
@@ -985,8 +1009,8 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
         />
       </div>
 
-      {/* Info card + 2 CTAs */}
-      <div className={cn("flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center", cardClass)}>
+      {/* Info card + 2 CTAs (owner only: they open the owner's stock / import pages) */}
+      {linked && <div className={cn("flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center", cardClass)}>
         <div className="flex-1">
           <p className="text-base font-semibold text-foreground">{t("kpi.analyseStock")}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">
@@ -1008,7 +1032,7 @@ function StockSummaryTiles({ stock, tint = "all" }: { stock: StockSummaryRespons
             {t("kpi.importerStock")}
           </Link>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -1047,7 +1071,10 @@ function niceScale(max: number, targetTicks = 4): { niceMax: number; ticks: numb
   const niceMax = Math.ceil(max / step) * step;
   const ticks: number[] = [];
   for (let v = 0; v <= niceMax + step / 2; v += step) ticks.push(Math.round(v));
-  return { niceMax, ticks };
+  return {
+    niceMax,
+    ticks,
+  };
 }
 
 /** Smooth monotone-cubic path (d3.curveMonotoneX style) through the points —
@@ -1118,7 +1145,10 @@ function TrendChart({
 
   const single = points.length === 1;
   const rawMax = Math.max(...points.map((p) => Math.max(p.ventes, p.achats)), 1);
-  const { niceMax, ticks } = niceScale(rawMax, 4);
+  const {
+    niceMax,
+    ticks,
+  } = niceScale(rawMax, 4);
   const yLabels = ticks.map((t) => formatNumStr(t));
 
   // Geometry in real pixels (1 svg unit = 1 px) → crisp, undistorted text.
@@ -1386,20 +1416,38 @@ export default function RapportPage() {
 function OwnerView() {
   const t = useT();
   const categoryTypeOptions = useCategoryTypeOptions();
-  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const {
+    from: dateFrom,
+    to: dateTo,
+    setRange,
+  } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
   const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
   // Backwards-compat wrapper so the existing buildActiveFilters/FilterBar
   // call sites can keep doing `setFilters({ ...filters, date_from, date_to })`.
   const setFilters = (next: StatsFilters) => {
-    const { date_from, date_to, ...rest } = next;
+    const {
+      date_from,
+      date_to,
+      ...rest
+    } = next;
     setLocal(rest);
     setRange(date_from, date_to);
   };
 
-  const { stats,  isLoading: l1, isError: e1 } = useStats(filters);
-  const { alerts, isLoading: l2 }              = useMarginAlerts(filters);
-  const { stock,  isLoading: l3 }              = useStockSummary();
+  const {
+    stats,
+    isLoading: l1,
+    isError: e1,
+  } = useStats(filters);
+  const {
+    alerts,
+    isLoading: l2,
+  }              = useMarginAlerts(filters);
+  const {
+    stock,
+    isLoading: l3,
+  }              = useStockSummary();
 
   const loading = l1 || l2 || l3;
 
@@ -1447,20 +1495,42 @@ function AdminView() {
   const t = useT();
   const categoryTypeOptions = useCategoryTypeOptions();
   const [pharmacyId, setPharmacyId] = useState<number | null>(null);
-  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const {
+    from: dateFrom,
+    to: dateTo,
+    setRange,
+  } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalStatsFilters>(INITIAL_LOCAL);
   const filters: StatsFilters = { ...local, date_from: dateFrom, date_to: dateTo };
   const setFilters = (next: StatsFilters) => {
-    const { date_from, date_to, ...rest } = next;
+    const {
+      date_from,
+      date_to,
+      ...rest
+    } = next;
     setLocal(rest);
     setRange(date_from, date_to);
   };
   const [marginMode, setMarginMode] = useState<MargeMode>("produit");
 
-  const { systemStats, isLoading: ls }         = useAdminStats();
+  const {
+    systemStats,
+    isLoading: ls,
+  }         = useAdminStats();
   const { pharmacies }                         = useAdminPharmacies();
-  const { stats,  isLoading: l1, isError: e1 } = useAdminPharmacyStats(pharmacyId, filters);
-  const analyse                                = useAdminPharmacyAnalyseMarge(pharmacyId, marginMode, {
+  const {
+    stats,
+    isLoading: l1,
+    isError: e1,
+  } = useAdminPharmacyStats(pharmacyId, filters);
+  const { alerts }                             = useAdminPharmacyMarginAlerts(pharmacyId, {
+    date_from: dateFrom, date_to: dateTo, category_type: filters.category_type,
+  });
+  const { stock }                              = useAdminPharmacyStockSummary(pharmacyId);
+  const {
+    analyse,
+    isLoading: analyseLoading,
+  } = useAdminPharmacyAnalyseMarge(pharmacyId, marginMode, {
     date_from: dateFrom, date_to: dateTo, category_type: filters.category_type,
   });
 
@@ -1558,9 +1628,11 @@ function AdminView() {
               categoryType={filters.category_type}
               marginMode={marginMode}
               onMarginMode={setMarginMode}
-              marginRows={(analyse.data?.rows ?? []) as Record<string, unknown>[]}
-              marginLoading={analyse.isLoading}
+              marginRows={(analyse?.rows ?? []) as Record<string, unknown>[]}
+              marginLoading={analyseLoading}
               subtitleDates={subtitleDates}
+              alerts={alerts}
+              stock={stock}
             />
           );
         })()}

@@ -335,7 +335,28 @@ function MedicamentFormDialog({
 
 export default function CataloguePage() {
   const t = useT();
-  const p = useCatalogPage();
+  const {
+    categories,
+    create,
+    filters,
+    importCsv,
+    isCreating,
+    isImporting,
+    isLoading,
+    isRemoving,
+    isUpdating,
+    lastImport,
+    list,
+    remove,
+    reset,
+    setCategories,
+    setPage,
+    setPageSize,
+    setSearch,
+    setSort,
+    setType,
+    update,
+  } = useCatalogPage();
 
   const [editing, setEditing] = useState<Medicament | null>(null);
   const [creating, setCreating] = useState(false);
@@ -343,20 +364,20 @@ export default function CataloguePage() {
   const [importing, setImporting] = useState(false);
 
   const activeFilters: ActiveFilter[] = [
-    p.filters.search ? {
+    filters.search ? {
       key: "search",
-      label: <>{t("catalogue.filterSearch", { value: p.filters.search })}</>,
-      onClear: () => p.setSearch(""),
+      label: <>{t("catalogue.filterSearch", { value: filters.search })}</>,
+      onClear: () => setSearch(""),
     } : null,
-    p.filters.category.length > 0 ? {
+    filters.category.length > 0 ? {
       key: "category",
-      label: <>{t("col.categorie")} : {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
-      onClear: () => p.setCategories([]),
+      label: <>{t("col.categorie")} : {filters.category[0]}{filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}</>,
+      onClear: () => setCategories([]),
     } : null,
-    p.filters.type ? {
+    filters.type ? {
       key: "type",
-      label: <>{t("col.type")} : {p.filters.type === "pharmacie" ? t("catalogue.pharmacie") : p.filters.type === "parapharmacie" ? t("catalogue.parapharmacie") : t("catalogue.nonClasses")}</>,
-      onClear: () => p.setType(null),
+      label: <>{t("col.type")} : {filters.type === "pharmacie" ? t("catalogue.pharmacie") : filters.type === "parapharmacie" ? t("catalogue.parapharmacie") : t("catalogue.nonClasses")}</>,
+      onClear: () => setType(null),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
 
@@ -428,13 +449,13 @@ export default function CataloguePage() {
 
       <FilterBar
         search={{
-          value: p.filters.search,
-          onChange: p.setSearch,
+          value: filters.search,
+          onChange: setSearch,
           placeholder: t("catalogue.searchPlaceholder"),
           suggestions: null,
         }}
         multiSelects={[
-          { label: t("col.categorie"), options: p.categories, selected: p.filters.category, onChange: p.setCategories },
+          { label: t("col.categorie"), options: categories, selected: filters.category, onChange: setCategories },
         ]}
         singleSelect={{
           label: t("col.type"),
@@ -444,30 +465,30 @@ export default function CataloguePage() {
             { value: "parapharmacie", label: t("catalogue.parapharmacie") },
             { value: "unclassified", label: t("catalogue.nonClasses") },
           ],
-          value: p.filters.type ?? "",
-          onChange: (v) => p.setType((v === "" ? null : v) as ProductType | "unclassified" | null),
+          value: filters.type ?? "",
+          onChange: (v) => setType((v === "" ? null : v) as ProductType | "unclassified" | null),
         }}
         rightActions={[
           { label: t("catalogue.importCsv"), icon: <UploadCloud className="size-4" />, variant: "outline", onClick: () => setImporting(true) },
           { label: t("common.add"), icon: <Plus className="size-4" />, variant: "primary", onClick: () => setCreating(true) },
         ]}
         activeFilters={activeFilters}
-        onResetAll={p.reset}
+        onResetAll={reset}
       />
 
       <DataTable<Medicament>
-        rows={p.list?.data ?? []}
+        rows={list?.data ?? []}
         columns={COLUMNS}
-        isLoading={p.isLoading}
-        sortBy={p.filters.sort_by}
-        sortOrder={p.filters.sort_order}
-        onSort={p.setSort}
+        isLoading={isLoading}
+        sortBy={filters.sort_by}
+        sortOrder={filters.sort_order}
+        onSort={setSort}
         pagination={{
-          page: p.filters.page,
-          pageSize: p.filters.limit,
-          total: p.list?.pagination.total ?? 0,
-          onPage: p.setPage,
-          onPageSize: p.setPageSize,
+          page: filters.page,
+          pageSize: filters.limit,
+          total: list?.pagination.total ?? 0,
+          onPage: setPage,
+          onPageSize: setPageSize,
           pageSizes: [25, 50, 100],
         }}
         emptyTitle={t("catalogue.emptyTitle")}
@@ -480,9 +501,9 @@ export default function CataloguePage() {
         open={creating}
         onClose={() => setCreating(false)}
         initial={null}
-        isLoading={p.creating}
+        isLoading={isCreating}
         onSubmit={(body: MedicamentInput) => {
-          p.create(body);
+          create(body);
           setCreating(false);
         }}
       />
@@ -492,9 +513,9 @@ export default function CataloguePage() {
         open={!!editing}
         onClose={() => setEditing(null)}
         initial={editing}
-        isLoading={p.updating}
+        isLoading={isUpdating}
         onSubmit={(body) => {
-          if (editing) p.update(editing.id, body);
+          if (editing) update({ id: editing.id, body });
           setEditing(null);
         }}
       />
@@ -503,22 +524,22 @@ export default function CataloguePage() {
       <ConfirmDialog
         open={!!removing}
         onClose={() => setRemoving(null)}
-        onConfirm={() => { if (removing) { p.remove(removing.id); setRemoving(null); } }}
+        onConfirm={() => { if (removing) { remove(removing.id); setRemoving(null); } }}
         title={t("catalogue.deleteTitle")}
         description={removing ? t("catalogue.deleteDescription", { product: removing.product }) : undefined}
         variant="destructive"
         confirmLabel={t("common.delete")}
         loadingLabel={t("catalogue.deleting")}
-        isLoading={p.removing}
+        isLoading={isRemoving}
       />
 
       {/* Import CSV */}
       <ImportCsvDialog
         open={importing}
         onClose={() => setImporting(false)}
-        onSubmit={(f) => p.importCsv(f)}
-        isLoading={p.importing}
-        lastResult={p.lastImport}
+        onSubmit={(f) => importCsv(f)}
+        isLoading={isImporting}
+        lastResult={lastImport}
       />
     </div>
   );

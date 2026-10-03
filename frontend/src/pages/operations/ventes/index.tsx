@@ -184,7 +184,10 @@ interface VentesTableProps {
 /** PPV - avg_pu => marge en DH. Color-coded per the audit:
  *    < 0 = red, < 10 % = orange, ≥ 10 % = emerald. Same thresholds as apcm-pharma. */
 function MargeCell({ row, mode }: { row: VenteRow; mode: "pct" | "dh" }) {
-  const { ppv, avg_pu } = row;
+  const {
+    ppv,
+    avg_pu,
+  } = row;
   if (ppv == null || avg_pu == null || ppv === 0) return <span className="text-muted-foreground">—</span>;
   const pct = (1 - avg_pu / ppv) * 100;
   const dh  = ppv - avg_pu;
@@ -261,35 +264,57 @@ function VentesTable({ rows, isLoading, sortBy, sortOrder, onSort, pagination }:
 
 export default function VentesPage() {
   const t = useT();
-  const p = useVentesPage();
+  const {
+    categories,
+    counts,
+    discountLoading,
+    discountSummary,
+    filters,
+    handleExport,
+    isLoading,
+    list,
+    reset,
+    setCategories,
+    setDateRange,
+    setPage,
+    setPageSize,
+    setSearch,
+    setSort,
+    setSuggestQ,
+    setSurveillance,
+    setTva,
+    suggestions,
+    suggestionsLoading,
+    tvaRates,
+  } = useVentesPage();
 
   // Wire search → suggestions debounce trigger. Keeps SearchAutocomplete decoupled from the API layer.
-  useEffect(() => { p.setSuggestQ(p.filters.search); }, [p.filters.search, p]);
+  useEffect(() => { setSuggestQ(filters.search); }, [filters.search, setSuggestQ]);
 
-  const summary   = p.list?.summary;
-  const totalRows = p.list?.pagination.total ?? 0;
+  const summary   = list?.summary;
+  const totalRows = list?.pagination.total ?? 0;
 
   // Active filter pills (surveillance has its own dedicated tab row, so it stays out of this array).
   const activeFilters: ActiveFilter[] = [
-    p.filters.search ? {
+    filters.search ? {
       key: "search",
-      label: <>{t("common.recherche")} {p.filters.search}</>,
-      onClear: () => p.setSearch(""),
+      label: <>{t("common.recherche")} {filters.search}</>,
+      onClear: () => setSearch(""),
     } : null,
-    (p.filters.date_from || p.filters.date_to) ? {
+    (filters.date_from || filters.date_to) ? {
       key: "dates",
-      label: <>{p.filters.date_from ?? "…"} → {p.filters.date_to ?? "…"}</>,
-      onClear: () => p.setDateRange(null, null),
+      label: <>{filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
+      onClear: () => setDateRange(null, null),
     } : null,
-    p.filters.category.length > 0 ? {
+    filters.category.length > 0 ? {
       key: "category",
-      label: <>{t("dashboard.categorieFilter")} {p.filters.category[0]}{p.filters.category.length > 1 ? `, +${p.filters.category.length - 1}` : ""}</>,
-      onClear: () => p.setCategories([]),
+      label: <>{t("dashboard.categorieFilter")} {filters.category[0]}{filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}</>,
+      onClear: () => setCategories([]),
     } : null,
-    p.filters.tva.length > 0 ? {
+    filters.tva.length > 0 ? {
       key: "tva",
-      label: <>{t("common.tvaFilter")} {p.filters.tva.length}</>,
-      onClear: () => p.setTva([]),
+      label: <>{t("common.tvaFilter")} {filters.tva.length}</>,
+      onClear: () => setTva([]),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
 
@@ -302,53 +327,53 @@ export default function VentesPage() {
 
       <FilterBar
         search={{
-          value:       p.filters.search,
-          onChange:    p.setSearch,
+          value:       filters.search,
+          onChange:    setSearch,
           placeholder: t("ventes.searchPh"),
-          suggestions: p.suggestions ? { [t("col.produit")]: p.suggestions.products, [t("col.client")]: p.suggestions.clients, [t("col.transaction")]: p.suggestions.refs } : null,
-          onPick:      (label) => { p.setSearch(label); p.setSuggestQ(""); },
-          isLoading:   p.suggestionsLoading,
+          suggestions: suggestions ? { [t("col.produit")]: suggestions.products, [t("col.client")]: suggestions.clients, [t("col.transaction")]: suggestions.refs } : null,
+          onPick:      (label) => { setSearch(label); setSuggestQ(""); },
+          isLoading:   suggestionsLoading,
         }}
         dateRange={{
-          from:     p.filters.date_from,
-          to:       p.filters.date_to,
-          onChange: p.setDateRange,
+          from:     filters.date_from,
+          to:       filters.date_to,
+          onChange: setDateRange,
         }}
         multiSelects={[
-          { label: t("col.categorie"), options: p.categories, selected: p.filters.category, onChange: p.setCategories },
-          { label: t("col.tva"),       options: p.tvaRates,   selected: p.filters.tva,      onChange: p.setTva },
+          { label: t("col.categorie"), options: categories, selected: filters.category, onChange: setCategories },
+          { label: t("col.tva"),       options: tvaRates,   selected: filters.tva,      onChange: setTva },
         ]}
         rightActions={[
-          { label: t("common.export"), icon: <Download className="size-4" />, variant: "outline", onClick: p.handleExport },
+          { label: t("common.export"), icon: <Download className="size-4" />, variant: "outline", onClick: handleExport },
           { label: t("common.import"),       icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=vente` },
         ]}
         activeFilters={activeFilters}
-        onResetAll={p.reset}
+        onResetAll={reset}
       />
 
-      <DiscountGauge data={p.discountSummary} isLoading={p.discountLoading} />
+      <DiscountGauge data={discountSummary} isLoading={discountLoading} />
 
       {/* Surveillance tabs */}
-      <SurveillanceTabs active={p.filters.surveillance} counts={p.counts} onSelect={p.setSurveillance} />
+      <SurveillanceTabs active={filters.surveillance} counts={counts} onSelect={setSurveillance} />
 
       {/* Table — pagination now lives inside the shared DataTable footer */}
       <VentesTable
-        rows={p.list?.data ?? []}
-        isLoading={p.isLoading}
-        sortBy={p.filters.sort_by}
-        sortOrder={p.filters.sort_order}
-        onSort={p.setSort}
+        rows={list?.data ?? []}
+        isLoading={isLoading}
+        sortBy={filters.sort_by}
+        sortOrder={filters.sort_order}
+        onSort={setSort}
         pagination={{
-          page:       p.filters.page,
-          pageSize:   p.filters.limit,
+          page:       filters.page,
+          pageSize:   filters.limit,
           total:      totalRows,
-          onPage:     p.setPage,
-          onPageSize: p.setPageSize,
+          onPage:     setPage,
+          onPageSize: setPageSize,
         }}
       />
 
       {/* SummaryFooter — TVA encaissée from backend aggregate (full filtered set, pagination-ignored) */}
-      {(p.list?.data ?? []).length > 0 && summary && (
+      {(list?.data ?? []).length > 0 && summary && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-4 py-2 text-xs">
           <span className="text-muted-foreground">
             {t("ventes.tvaEncFooter")} <span className="text-foreground/60">{t("common.filtresActifs")}</span> :

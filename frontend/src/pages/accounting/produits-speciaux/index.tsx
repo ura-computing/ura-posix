@@ -70,7 +70,11 @@ function ExcludeBlDialog({
     if (!open) { setSelected(null); setNotes(""); onSearchChange(""); }
   }, [open, onSearchChange]);
 
-  const detail = useQuery({
+  const {
+    data: detail,
+    isLoading: detailLoading,
+    isError: detailError,
+  } = useQuery({
     queryKey: QUERIES.blExclusions.detail(selected?.delivery_ref ?? ""),
     queryFn:  () => api.get<BlDetail>(URLS.blExclusions.detail, { params: { delivery_ref: selected!.delivery_ref } }),
     enabled:  open && !!selected,
@@ -180,11 +184,11 @@ function ExcludeBlDialog({
               </div>
 
               <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-card">
-                {detail.isLoading ? (
+                {detailLoading ? (
                   <div className="flex items-center justify-center py-6">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
-                ) : detail.isError ? (
+                ) : detailError ? (
                   <p className="p-4 text-center text-xs text-error">{t("ps.loadDetailErr")}</p>
                 ) : (
                   <table className="w-full text-left text-xs">
@@ -197,7 +201,7 @@ function ExcludeBlDialog({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {(detail.data?.lines ?? []).map((ln, i) => (
+                      {(detail?.lines ?? []).map((ln, i) => (
                         <tr key={i}>
                           <td className="max-w-[220px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>{ln.product ?? "—"}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">{ln.quantity != null ? formatQty(ln.quantity) : "—"}</td>
@@ -819,9 +823,49 @@ type Tab = "produits" | "bl" | "fournisseurs";
 
 export default function ProduitsSpeciauxPage() {
   const t = useT();
-  const p   = useProduitsSpeciaux();
-  const bl  = useBlExclusions();
-  const sup = useSupplierExclusions();
+  const {
+    isExcludingProducts,
+    filteredProducts,
+    excludeProducts,
+    reintegrateProducts,
+    productsLoading,
+    isReintegratingProducts,
+    productSearch,
+    setProductSearch,
+    setSuggestQ,
+    specialProducts,
+    suggestions,
+    suggestionsLoading,
+    suggestQ,
+  } = useProduitsSpeciaux();
+  const {
+    isExcludingBl,
+    filteredBls,
+    excludeBl,
+    reintegrateBls,
+    blsLoading,
+    isReintegratingBls,
+    blResults,
+    blResultsLoading,
+    blSearch,
+    blSearchQ,
+    setBlSearch,
+    setBlSearchQ,
+  } = useBlExclusions();
+  const {
+    isExcludingSupplier,
+    filteredSuppliers,
+    excludeSupplier,
+    reintegrateSuppliers,
+    suppliersLoading,
+    isReintegratingSuppliers,
+    supplierResults,
+    supplierResultsLoading,
+    supplierSearch,
+    supplierSearchQ,
+    setSupplierSearch,
+    setSupplierSearchQ,
+  } = useSupplierExclusions();
   const [tab, setTab] = useState<Tab>("produits");
   const [excluding, setExcluding]         = useState(false);
   const [reintegrating, setReintegrating] = useState(false);
@@ -846,8 +890,8 @@ export default function ProduitsSpeciauxPage() {
         <AsyncButton
           variant="ghost"
           type="button"
-          isLoading={sup.reintegrating}
-          onClick={() => sup.handleReintegrate([s.supplier])}
+          isLoading={isReintegratingSuppliers}
+          onClick={() => reintegrateSuppliers([s.supplier])}
         >
           <Undo2 className="size-3.5" /> {t("ps.reintegrer")}
         </AsyncButton>
@@ -876,22 +920,22 @@ export default function ProduitsSpeciauxPage() {
         <AsyncButton
           variant="ghost"
           type="button"
-          isLoading={bl.reintegrating}
-          onClick={() => bl.handleReintegrate([b.delivery_ref])}
+          isLoading={isReintegratingBls}
+          onClick={() => reintegrateBls([b.delivery_ref])}
         >
           <Undo2 className="size-3.5" /> {t("ps.reintegrer")}
         </AsyncButton>
       ) },
   ];
 
-  const productFilters: ActiveFilter[] = p.search
-    ? [{ key: "search", label: <>{t("common.recherche")} {p.search}</>, onClear: () => p.setSearch("") }]
+  const productFilters: ActiveFilter[] = productSearch
+    ? [{ key: "search", label: <>{t("common.recherche")} {productSearch}</>, onClear: () => setProductSearch("") }]
     : [];
-  const blFilters: ActiveFilter[] = bl.search
-    ? [{ key: "search", label: <>{t("common.recherche")} {bl.search}</>, onClear: () => bl.setSearch("") }]
+  const blFilters: ActiveFilter[] = blSearch
+    ? [{ key: "search", label: <>{t("common.recherche")} {blSearch}</>, onClear: () => setBlSearch("") }]
     : [];
-  const supFilters: ActiveFilter[] = sup.search
-    ? [{ key: "search", label: <>{t("common.recherche")} {sup.search}</>, onClear: () => sup.setSearch("") }]
+  const supFilters: ActiveFilter[] = supplierSearch
+    ? [{ key: "search", label: <>{t("common.recherche")} {supplierSearch}</>, onClear: () => setSupplierSearch("") }]
     : [];
 
   return (
@@ -919,27 +963,27 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       p.search,
-              onChange:    p.setSearch,
+              value:       productSearch,
+              onChange:    setProductSearch,
               placeholder: t("ps.searchProdPh"),
               suggestions: null,
             }}
             rightActions={[
               { label: t("ps.reintegrerProduits"), icon: <Undo2 className="size-4" />, variant: "outline",
-                onClick: () => setReintegrating(true), disabled: p.specialProducts.length === 0 },
+                onClick: () => setReintegrating(true), disabled: specialProducts.length === 0 },
               { label: t("ps.exclureProduits"), icon: <Plus className="size-4" />, variant: "primary",
                 onClick: () => setExcluding(true) },
             ]}
             activeFilters={productFilters}
-            onResetAll={() => p.setSearch("")}
+            onResetAll={() => setProductSearch("")}
           />
 
           <DataTable<SpecialProduct>
-            rows={p.filteredProducts}
+            rows={filteredProducts}
             columns={buildProductColumns(t)}
-            isLoading={p.isLoading}
+            isLoading={productsLoading}
             emptyTitle={t("ps.emptyProduits")}
-            emptyHint={p.search ? t("ps.emptySearchHint") : t("ps.emptyProduitsHint")}
+            emptyHint={productSearch ? t("ps.emptySearchHint") : t("ps.emptyProduitsHint")}
             rowKey={(sp) => sp.medicament_id}
           />
         </>
@@ -950,8 +994,8 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       bl.search,
-              onChange:    bl.setSearch,
+              value:       blSearch,
+              onChange:    setBlSearch,
               placeholder: t("ps.searchBlPh"),
               suggestions: null,
             }}
@@ -960,15 +1004,15 @@ export default function ProduitsSpeciauxPage() {
                 onClick: () => setExcludingBl(true) },
             ]}
             activeFilters={blFilters}
-            onResetAll={() => bl.setSearch("")}
+            onResetAll={() => setBlSearch("")}
           />
 
           <DataTable<BlExclusion>
-            rows={bl.filtered}
+            rows={filteredBls}
             columns={blColumns}
-            isLoading={bl.isLoading}
+            isLoading={blsLoading}
             emptyTitle={t("ps.emptyBl")}
-            emptyHint={bl.search ? t("ps.emptySearchHint") : t("ps.emptyBlHint")}
+            emptyHint={blSearch ? t("ps.emptySearchHint") : t("ps.emptyBlHint")}
             rowKey={(b) => b.delivery_ref}
           />
         </>
@@ -979,8 +1023,8 @@ export default function ProduitsSpeciauxPage() {
         <>
           <FilterBar
             search={{
-              value:       sup.search,
-              onChange:    sup.setSearch,
+              value:       supplierSearch,
+              onChange:    setSupplierSearch,
               placeholder: t("ps.searchSupPh"),
               suggestions: null,
             }}
@@ -989,15 +1033,15 @@ export default function ProduitsSpeciauxPage() {
                 onClick: () => setExcludingSup(true) },
             ]}
             activeFilters={supFilters}
-            onResetAll={() => sup.setSearch("")}
+            onResetAll={() => setSupplierSearch("")}
           />
 
           <DataTable<SupplierExclusion>
-            rows={sup.filtered}
+            rows={filteredSuppliers}
             columns={supplierColumns}
-            isLoading={sup.isLoading}
+            isLoading={suppliersLoading}
             emptyTitle={t("ps.emptySup")}
-            emptyHint={sup.search ? t("ps.emptySearchHint") : t("ps.emptySupHint")}
+            emptyHint={supplierSearch ? t("ps.emptySearchHint") : t("ps.emptySupHint")}
             rowKey={(s) => s.supplier}
           />
         </>
@@ -1007,42 +1051,42 @@ export default function ProduitsSpeciauxPage() {
       <ExcludeProductDialog
         open={excluding}
         onClose={() => setExcluding(false)}
-        onSubmit={(ids) => { p.handleExclude(ids); setExcluding(false); }}
-        isLoading={p.excluding}
-        suggestions={p.suggestions}
-        suggestionsLoading={p.suggestionsLoading}
-        query={p.suggestQ}
-        onQueryChange={p.setSuggestQ}
+        onSubmit={(ids) => { excludeProducts(ids); setExcluding(false); }}
+        isLoading={isExcludingProducts}
+        suggestions={suggestions}
+        suggestionsLoading={suggestionsLoading}
+        query={suggestQ}
+        onQueryChange={setSuggestQ}
       />
 
       <ReintegrateProductsDialog
         open={reintegrating}
         onClose={() => setReintegrating(false)}
-        onSubmit={(ids) => { p.handleReintegrate(ids); setReintegrating(false); }}
-        isLoading={p.reintegrating}
-        specialProducts={p.specialProducts}
+        onSubmit={(ids) => { reintegrateProducts(ids); setReintegrating(false); }}
+        isLoading={isReintegratingProducts}
+        specialProducts={specialProducts}
       />
 
       <ExcludeBlDialog
         open={excludingBl}
         onClose={() => setExcludingBl(false)}
-        onSubmit={(ref, notes) => { bl.handleExclude(ref, notes); setExcludingBl(false); }}
-        isLoading={bl.excluding}
-        results={bl.results}
-        resultsLoading={bl.resultsLoading}
-        searchQ={bl.searchQ}
-        onSearchChange={bl.setSearchQ}
+        onSubmit={(ref, notes) => { excludeBl(ref, notes); setExcludingBl(false); }}
+        isLoading={isExcludingBl}
+        results={blResults}
+        resultsLoading={blResultsLoading}
+        searchQ={blSearchQ}
+        onSearchChange={setBlSearchQ}
       />
 
       <ExcludeSupplierDialog
         open={excludingSup}
         onClose={() => setExcludingSup(false)}
-        onSubmit={(supplier, notes) => { sup.handleExclude(supplier, notes); setExcludingSup(false); }}
-        isLoading={sup.excluding}
-        results={sup.results}
-        resultsLoading={sup.resultsLoading}
-        searchQ={sup.searchQ}
-        onSearchChange={sup.setSearchQ}
+        onSubmit={(supplier, notes) => { excludeSupplier(supplier, notes); setExcludingSup(false); }}
+        isLoading={isExcludingSupplier}
+        results={supplierResults}
+        resultsLoading={supplierResultsLoading}
+        searchQ={supplierSearchQ}
+        onSearchChange={setSupplierSearchQ}
       />
     </div>
   );

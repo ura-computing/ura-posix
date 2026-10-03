@@ -29,7 +29,11 @@ const DEFAULT_LOCAL: LocalAchatsFilters = {
 
 export function useAchatsPage() {
   const t = useT();
-  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const {
+    from: dateFrom,
+    to: dateTo,
+    setRange,
+  } = useGlobalDateRange();
   const [localFilters, setLocal] = useState<LocalAchatsFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
 
@@ -40,7 +44,11 @@ export function useAchatsPage() {
     [localFilters, dateFrom, dateTo],
   );
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.achats.list(filters),
     queryFn: () => api.get<AchatsListResponse>(URLS.achats.list, { params: filters }),
   });
@@ -50,22 +58,28 @@ export function useAchatsPage() {
     () => ({ date_from: filters.date_from, date_to: filters.date_to, search: filters.search, category: filters.category, tva: filters.tva }),
     [filters.date_from, filters.date_to, filters.search, filters.category, filters.tva],
   );
-  const supplierSummary = useQuery({
+  const {
+    data: supplierSummary,
+    isLoading: supplierLoading,
+  } = useQuery({
     queryKey: QUERIES.achats.supplierSummary(summaryKey),
     queryFn: () => api.get<AchatsSupplierSummary>(URLS.achats.supplierSummary, { params: summaryKey }),
   });
 
-  const categories = useQuery({
+  const { data: categories } = useQuery({
     queryKey: QUERIES.achats.categories,
     queryFn: () => api.get<string[]>(URLS.achats.categories),
     staleTime: 5 * 60_000,
   });
-  const tvaRates = useQuery({
+  const { data: tvaRates } = useQuery({
     queryKey: QUERIES.achats.tvaRates,
     queryFn: () => api.get<string[]>(URLS.achats.tvaRates),
     staleTime: 5 * 60_000,
   });
-  const suggestions = useQuery({
+  const {
+    data: suggestions,
+    isFetching: suggestionsLoading,
+  } = useQuery({
     queryKey: QUERIES.achats.suggestions(suggestQ),
     queryFn: () => api.get<AchatsSuggestions>(URLS.achats.suggestions, { params: { q: suggestQ } }),
     enabled: suggestQ.length >= 2,
@@ -140,14 +154,11 @@ export function useAchatsPage() {
     setSearch, setDateRange, setCategories, setTva, setSort, setPage, setPageSize, reset,
     suggestQ, setSuggestQ,
     handleExport,
-    list: list.data,
-    isLoading: list.isLoading,
-    isError: list.isError,
-    supplierSummary: supplierSummary.data,
-    supplierLoading: supplierSummary.isLoading,
-    categories: categories.data ?? [],
-    tvaRates: tvaRates.data ?? [],
-    suggestions: suggestions.data ?? null,
-    suggestionsLoading: suggestions.isFetching,
+    list, isLoading, isError,
+    supplierSummary, supplierLoading,
+    categories: categories ?? [],
+    tvaRates: tvaRates ?? [],
+    suggestions: suggestions ?? null,
+    suggestionsLoading,
   };
 }

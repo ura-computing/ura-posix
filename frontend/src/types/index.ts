@@ -10,11 +10,10 @@ export const ROLES = {
 } as const;
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
+/** User account status, same values as the backend (`members.py`). */
 export const STATUSES = {
-  ACTIVE: "active",
-  REVOKED: "revoked",
-  PENDING: "pending",
-  REJECTED: "rejected",
+  ACTIVE:   "active",
+  INACTIVE: "inactive",
 } as const;
 export type Status = (typeof STATUSES)[keyof typeof STATUSES];
 
@@ -39,7 +38,6 @@ export const ROUTES = {
   STOCK:             "/stock",
   UPLOAD_FILE:       "/upload-file",
   ANALYSES:          "/analyses",
-  RAPPORTS:          "/rapports",
   ALERTES:           "/alertes",
   COMPTABILITE:      "/comptabilite",
   PRODUITS_SPECIAUX: "/produits-speciaux",

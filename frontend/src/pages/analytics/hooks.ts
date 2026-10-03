@@ -36,7 +36,11 @@ export interface DialogDescriptor {
 export function useAlertesPage() {
   // Date range lives in the cross-route global context — picking dates on
   // /alertes carries them over to /achats, /ventes, /rapport, etc.
-  const { from: globalFrom, to: globalTo, setRange } = useGlobalDateRange();
+  const {
+    from: globalFrom,
+    to: globalTo,
+    setRange,
+  } = useGlobalDateRange();
   const dateFrom = globalFrom ?? "";
   const dateTo   = globalTo   ?? "";
   const setDateFrom = (v: string) => setRange(v || null, globalTo);
@@ -50,24 +54,45 @@ export function useAlertesPage() {
   const [category, setCategory] = useState<CategoryType>("all");
   const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
-  const marginQuery = useMarginAlerts({
+  const {
+    marginAlerts: margin,
+    isLoading: marginLoading,
+    isError: marginError,
+    reload: reloadMargin,
+  } = useMarginAlerts({
     date_from:     dateFrom || null,
     date_to:       dateTo   || null,
     category_type: category || "all",
   });
-  const vsaQuery = useVentesSansAchat({
+  const {
+    ventesSansAchat: vsa,
+    isLoading: vsaLoading,
+    isError: vsaError,
+    reload: reloadVsa,
+  } = useVentesSansAchat({
     date_from:     dateFrom || null,
     date_to:       dateTo   || null,
     category_type: category || "all",
   });
-  const peremptionsQuery = usePeremptions(); // ignores date + category (backend)
-  const stockQuery = useStockAbcd({
+  // ignores date + category (backend)
+  const {
+    peremptions: perem,
+    isLoading: peremLoading,
+    isError: peremError,
+    reload: reloadPerem,
+  } = usePeremptions();
+  const {
+    abcd,
+    isLoading: stockLoading,
+    isError: stockError,
+    reload: reloadStock,
+  } = useStockAbcd({
     date_from: dateFrom || null,
     date_to:   dateTo   || null,
   }); // ignores category
 
   // ---- stock alerts derived CLIENT-SIDE from stockAbcd.products ----
-  const products = stockQuery.data?.products ?? [];
+  const products = abcd?.products ?? [];
   const negatif = useMemo(() => products.filter((p) => p.status === "negatif"), [products]);
   const sousStock = useMemo(() => products.filter((p) => p.status === "sous-stock"), [products]);
   const surStock = useMemo(() => products.filter((p) => p.status === "sur-stock"), [products]);
@@ -86,9 +111,6 @@ export function useAlertesPage() {
     [surStock],
   );
 
-  const margin = marginQuery.data;
-  const perem = peremptionsQuery.data;
-  const vsa = vsaQuery.data;
 
   const counts = {
     marginNeg:      margin?.negative.count ?? 0,
@@ -106,16 +128,16 @@ export function useAlertesPage() {
   // Expired + very-close = the "act today" subset.
   const peremptionCritical = counts.expired + counts.veryClose;
 
-  const isLoading = marginQuery.isLoading || peremptionsQuery.isLoading || stockQuery.isLoading || vsaQuery.isLoading;
-  const isError = marginQuery.isError || peremptionsQuery.isError || stockQuery.isError || vsaQuery.isError;
+  const isLoading = marginLoading || peremLoading || stockLoading || vsaLoading;
+  const isError = marginError || peremError || stockError || vsaError;
   const isEmpty = !isLoading && !isError && totalAlerts === 0;
 
   const refetchAll = useCallback(() => {
-    marginQuery.refetch();
-    vsaQuery.refetch();
-    peremptionsQuery.refetch();
-    stockQuery.refetch();
-  }, [marginQuery, vsaQuery, peremptionsQuery, stockQuery]);
+    reloadMargin();
+    reloadVsa();
+    reloadPerem();
+    reloadStock();
+  }, [reloadMargin, reloadVsa, reloadPerem, reloadStock]);
 
   const resetAll = useCallback(() => {
     setRange(null, null);
@@ -127,7 +149,7 @@ export function useAlertesPage() {
     dateFrom, dateTo, category,
     setDateFrom, setDateTo, setPeriod, setCategory, resetAll,
     // queries + data
-    marginQuery, vsaQuery, peremptionsQuery, stockQuery, margin, perem, vsa,
+    margin, perem, vsa,
     // derived stock
     negatif, sousStock, surStock, negUnits, sousPpv, surPpv,
     // counts
@@ -173,26 +195,53 @@ export function useStockAbcd(
     ? QUERIES.stats.stockAbcdFiltered(filters as StockFilters)
     : QUERIES.stats.stockAbcdFull(filters.date_from ?? null, filters.date_to ?? null);
 
-  return useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey,
     queryFn: () => api.get<StockAbcdResponse>(URLS.stats.stockAbcd, { params: filters }),
     enabled: options.enabled ?? true,
   });
+  return {
+    abcd: data,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+  };
 }
 
 export function usePeremptions() {
-  return useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: QUERIES.stats.peremptions,
     queryFn:  () => api.get<PeremptionsResponse>(URLS.stats.peremptions),
     staleTime: 60_000,
   });
+  return {
+    peremptions: data,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+  };
 }
 
 /** Fetch the 5-bracket margin-alerts payload. /alertes renders only `negative`
  *  + `low`; Rapport reads the same response. Cache key includes filters so
  *  switching dates / category type refetches cleanly. */
 export function useMarginAlerts(filters: MarginAlertsFilters) {
-  return useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: QUERIES.stats.marginAlerts(
       filters.date_from ?? null,
       filters.date_to   ?? null,
@@ -201,12 +250,23 @@ export function useMarginAlerts(filters: MarginAlertsFilters) {
     queryFn:  () => api.get<MarginAlertsResponse>(URLS.stats.marginAlerts, { params: filters }),
     staleTime: 60_000,
   });
+  return {
+    marginAlerts: data,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+  };
 }
 
 /** Products with ventes in the window but no matching achat — the root cause of
  *  "—" cells for Marge %/DH on /ventes. Same filter shape as MarginAlerts. */
 export function useVentesSansAchat(filters: MarginAlertsFilters) {
-  return useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: QUERIES.stats.ventesSansAchat(
       filters.date_from ?? null,
       filters.date_to   ?? null,
@@ -215,4 +275,10 @@ export function useVentesSansAchat(filters: MarginAlertsFilters) {
     queryFn:  () => api.get<VentesSansAchatResponse>(URLS.stats.ventesSansAchat, { params: filters }),
     staleTime: 60_000,
   });
+  return {
+    ventesSansAchat: data,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+  };
 }

@@ -20,7 +20,13 @@ function toFlat(r: MeResponse): Me {
 }
 
 export function useMe() {
-  const query = useQuery<MeResponse, Error, Me>({
+  const {
+    data,
+    isLoading,
+    isSuccess,
+    isError,
+    error,
+  } = useQuery<MeResponse, Error, Me>({
     queryKey:  QUERIES.auth.me,
     queryFn:   () => api.get<MeResponse>(URLS.auth.me),
     select:    toFlat,
@@ -29,10 +35,10 @@ export function useMe() {
   });
 
   return {
-    me:        query.data ?? null,
-    isLoading: query.isLoading,
-    isError:   query.isError,
-    isSuccess: query.isSuccess,
-    error:     query.error,
+    me:        data ?? null,
+    isLoading,
+    isError,
+    isSuccess,
+    error,
   };
 }

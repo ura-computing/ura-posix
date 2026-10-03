@@ -43,19 +43,25 @@ export default function OwnerEmployeesPage() {
   const t = useT();
   const { me } = useMe();
 
-  const [createOpen,     setCreateOpen]     = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
-  const [removeTarget,   setRemoveTarget]   = useState<MemberOut | null>(null);
-  const [resetTarget,    setResetTarget]    = useState<MemberOut | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
+  const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
 
-  const q = useOwnerEmployees();
-  const createMut   = useCreateEmployee();
-  const permsMut    = useSetEmployeePermissions();
-  const statusMut   = useSetEmployeeStatus();
-  const resetPwdMut = useResetEmployeePassword();
-  const removeMut   = useDeleteEmployee();
+  const {
+    team,
+    isLoading,
+  } = useOwnerEmployees();
+  const { createEmployee } = useCreateEmployee();
+  const {
+    setEmployeePermissions,
+    isSavingPermissions,
+  } = useSetEmployeePermissions();
+  const { setEmployeeStatus } = useSetEmployeeStatus();
+  const { resetEmployeePassword } = useResetEmployeePassword();
+  const { deleteEmployee } = useDeleteEmployee();
 
-  if (q.isLoading || !q.data) {
+  if (isLoading || !team) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 py-10 text-center text-sm text-muted-foreground">
         {t("common.loading")}
@@ -63,31 +69,34 @@ export default function OwnerEmployeesPage() {
     );
   }
 
-  const { employees, pharmacy_features, my_permissions } = q.data;
+  const {
+    employees,
+    pharmacy_features,
+    my_permissions,
+  } = team;
   const pharmFeats = toFeatureRecord(pharmacy_features);
-  const myPerms    = toFeatureRecord(my_permissions);
+  const myPerms = toFeatureRecord(my_permissions);
 
-  const handleCreate = async (v: CreateUserIn): Promise<CreateUserOut> =>
-    createMut.mutateAsync(v);
+  const handleCreate = async (v: CreateUserIn): Promise<CreateUserOut> => createEmployee(v);
 
   const handleSavePerms = async (next: Record<FeatureKey, boolean>) => {
     if (!permDialogUser) return;
-    await permsMut.mutateAsync({ employeeId: permDialogUser.id, permissions: next });
+    await setEmployeePermissions({ employeeId: permDialogUser.id, permissions: next });
     setPermDialogUser(null);
   };
 
   const handleResetPassword = async (password: string) => {
-    if (resetTarget) await resetPwdMut.mutateAsync({ employeeId: resetTarget.id, password });
+    if (resetTarget) await resetEmployeePassword({ employeeId: resetTarget.id, password });
   };
 
   const handleToggleStatus = async (employee: MemberOut) => {
     const nextStatus = employee.status === "active" ? "inactive" : "active";
-    await statusMut.mutateAsync({ employeeId: employee.id, status: nextStatus });
+    await setEmployeeStatus({ employeeId: employee.id, status: nextStatus });
   };
 
   const handleConfirmRemove = async () => {
     if (!removeTarget) return;
-    await removeMut.mutateAsync(removeTarget.id);
+    await deleteEmployee(removeTarget.id);
     setRemoveTarget(null);
   };
 
@@ -112,17 +121,17 @@ export default function OwnerEmployeesPage() {
         </div>
         <div className="grid grid-cols-1 gap-2.5 p-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => {
-            const phEnabled    = pharmFeats[f.key];
+            const phEnabled = pharmFeats[f.key];
             const ownerEnabled = myPerms[f.key];
-            const fullyOk      = phEnabled && ownerEnabled;
-            const Icon         = f.icon;
+            const fullyOk = phEnabled && ownerEnabled;
+            const Icon = f.icon;
 
             // Three visual states: active (you can grant), locked-by-you (pharmacy ok, you don't have it),
             // locked-by-pharmacy (admin hasn't enabled it for this pharmacy).
-            const stateTone  = !phEnabled ? "muted" : !ownerEnabled ? "warning" : "ok";
+            const stateTone = !phEnabled ? "muted" : !ownerEnabled ? "warning" : "ok";
             const stateLabel = !phEnabled ? t("employees.disabledForPharmacy")
-                              : !ownerEnabled ? t("employees.notGrantedToYou")
-                              : t("employees.available");
+              : !ownerEnabled ? t("employees.notGrantedToYou")
+                : t("employees.available");
 
             return (
               <div
@@ -134,9 +143,9 @@ export default function OwnerEmployeesPage() {
                   data-tone={stateTone}
                   className={cn(
                     "flex size-9 shrink-0 items-center justify-center rounded-lg",
-                    fullyOk         ? "bg-primary/15 text-primary"
-                    : phEnabled     ? "bg-warning-subtle text-warning"
-                    :                 "bg-muted text-muted-foreground",
+                    fullyOk ? "bg-primary/15 text-primary"
+                      : phEnabled ? "bg-warning-subtle text-warning"
+                        : "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="size-4" />
@@ -253,10 +262,10 @@ export default function OwnerEmployeesPage() {
         contextStrip={t("employees.permContext")}
         ceilings={[
           { label: t("employees.ceilingPharmacy"), values: pharmFeats },
-          { label: t("employees.ceilingYou"),      values: myPerms    },
+          { label: t("employees.ceilingYou"), values: myPerms },
         ]}
         serverPermissions={toFeatureRecord(permDialogUser?.granted_permissions)}
-        isSaving={permsMut.isPending}
+        isSaving={isSavingPermissions}
         onSave={handleSavePerms}
       />
 

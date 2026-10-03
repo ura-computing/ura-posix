@@ -1,10 +1,10 @@
 # PharmaGest — the plan (everything left, in order)
 
-Updated 2026-10-02. One list, top to bottom. Open items only: a step leaves this file when
+Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this file when
 `make e2e-tests` is green. Rules: `CLAUDE.md`. App + setup: `README.md`.
 
-**Budget order (2026-10-02):** §2 speed → §3 production tools → §5 frontend → §6 backend folders
-if budget is left; §4 (E2E every page) next budget.
+**Order:** §1 run → §5 frontend → §2 speed → §3 production tools → §6 backend folders.
+(§4 « E2E every page » done: rows in §1 until green.)
 
 ---
 
@@ -23,6 +23,10 @@ if budget is left; §4 (E2E every page) next budget.
 
 | What | Where |
 |---|---|
+| /équipe: same email invited twice → refused (`emailTaken`), team unchanged | `12-equipe` |
+| /mon-compte: profile form errors; password form errors + wrong current one (400, no « Session expirée »); « Se déconnecter » on this session; reset link opened twice → « Lien expiré »; old password → error toast (was API only) | `13-compte` |
+| Admin: users / catalogue tiles of « Vue système » after each user change (was API only); users tab « Avec pharmacie » + search; catalogue sort Produit ↓ + next page; ES switch through the header button | `14-admin` |
+| Layout (new): FR ⇄ ES on every owner page + 404, kept after reload; theme Sombre / Clair / Système; sidebar Réduire / Étendre (kept); 401 → « Session expirée » → Plus tard / Actualiser → login, refused login in ES | `16-layout` |
 
 ---
 
@@ -56,53 +60,17 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 ---
 
-## 4. E2E: every page, every control, through the UI
-
-**E2E1 — still checked through the API only → needs a UI step**
-
-| Check | Today | UI step |
-|---|---|---|
-| Product suggestions after exclusion | `10-exclusions:74` | type the product in « Exclure des produits » → no suggestion |
-| BL search by reference after exclusion | `10-exclusions:110` | type the ref in « Exclure un BL » → « déjà exclu » |
-| Supplier search « grossiste », then after exclusion | `10-exclusions:139-140` | type in « Exclure un fournisseur » → list, then « déjà exclu » |
-| Comptabilité with special products, Mixte | `10-exclusions:172` | tick the box + Mixte on the page |
-| Numbers back after réintégrer / after undoing imports | `10-exclusions:212`, `15-imports:107-108` | open Comptabilité / Rapport / Achats |
-| Reset link used twice / old password | `13-compte:136-137` | open the link again → invalid-link page; old password → error toast |
-| Admin system tiles after user changes | `14-admin:89` | Rapport admin « Vue système » tile |
-| Admin drill-down margin alerts + stock summary | `14-admin:73-74` | add the 2 sections to the drill-down (G8, decided) and check them on screen |
-
-Kept: `01:10` /health (Docker only), `01:26,44`, `12:132`, `13:55,102` (extra check after a UI step);
-`10:38-43`, `14:308` (cleanup); `12:113`, `13:36`, `14:197-200` (setup).
-
-**E2E2 — page by page** (one page per run; for each: list every button, input, tab, filter, chip,
-sort, pagination, dialog, export file and value shown; test each against the oracle).
-
-| Order | Page | Known gaps |
-|---|---|---|
-| 1 | /stock | class circles A–D → table, status filter, sort, pagination, péremption card → dialog, Excel |
-| 2 | /alertes | alert card → detail dialog (sort, Excel — FE7 header bug) |
-| 3 | /comptabilité | Excel, payment dialog fields |
-| 4 | /rapport | every tile + chart value on screen, CTA, admin view |
-| 5 | /ventes, /achats | values shown per column, gauges, chips, reset |
-| 6 | /produits-spéciaux | 3 tabs, table filters, dialogs (with E2E1 rows) |
-| 7 | /imports + /upload-file | wrong file name / type, empty file, closing the error (FE5 bug), history actions |
-| 8 | /équipe, /mon-compte | every dialog / tab / button |
-| 9 | admin pages | pharmacies, users tab, catalogue (filters, sort, pagination), catégories |
-| 10 | login / password pages, layout | FR ⇄ ES on every page, theme, sidebar collapse, 401 → « Session expirée » dialog |
-
----
-
 ## 5. Frontend consistency
 
 | # | Step | Today | After |
 |---|---|---|---|
+| FE12 | **One `API` object: urls + query keys + what each write refreshes** (decision 2026-10-03; after the E2E pages) | `URLS` + `QUERIES` in 2 files; each hook lists its own `invalidateQueries` → easy to forget one (product suggestions bug) | `API.specialProducts.list = { url, key }`, `API.specialProducts.exclude = { url, refreshes: [...] }`; entries named by action (same url, GET vs POST = 2 entries); `changedByImport` moves in; a test checks every key has an url |
 | FE3b | **One members table** | admin detail + team = 2 tables | `MembersTable` used by both (product rule: same behavior) |
 | FE3c | **Shared form / gauge / exclude pieces** | inline Field/Input ×4 (`_components/CreateUserDialog.tsx:400`, `admin/categories/index.tsx:169`, `admin/pharmacies/_components/PharmacyFormDialog.tsx:127`, `accounting/comptabilite/index.tsx:355`); gauge tiles ×2 (achats, ventes); BL / supplier exclude dialogs ×2 | `FormField`, `GaugeTiles`, `TwoStepExcludeDialog` |
 | FE4 | **One formatter set** | own `num/mad/fmtMad/fmtPct` (`dashboard/rapport/index.tsx:150,154,252,257`); 15 `toLocaleString` / `toFixed` outside `utils/format.tsx` | only `utils/format.tsx` |
 | FE5 | **One hook pattern** | 2 `useMarginAlerts` (`analytics/hooks.ts:193`, `dashboard/rapport/hooks.ts:24`); achats / ventes / catalogue copy the filter state | one hook per query; one `useListFilters`. Date range shared on rapport / achats / ventes / alertes / comptabilité; /stock and /analyses keep their own |
 | FE6 | **Same search everywhere** | produits-spéciaux tables filter with a local `norm()` (no `*` grammar) | `matchesFields` |
 | FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
-| FE10 | **Dead code** | `ROUTES.RAPPORTS`, `STATUSES` (revoked/pending/rejected) | removed (the admin margin-alerts / stock-summary hooks stay: G8 uses them) |
 
 **Bugs fixed in these steps**
 
@@ -113,10 +81,6 @@ sort, pagination, dialog, export file and value shown; test each against the ora
 
 | Today | After |
 |---|---|
-| `make cli` → `python -m cli`: no `backend/cli` | target removed |
-| `make test` + `scripts/pre-push.sh` run the old pytest suite (broken: it imports merged files) | old pytest suite, `make test`, `make install-hooks`, `scripts/pre-push.sh` removed |
-| Fresh DB (`create_all` + stamp) has no CHECK on feature / permission; migrated DB has it (0009, 0016) | same CHECK in `models.py` |
-| `docker-compose.yml` `db16` service (one-time Postgres 16 → 17 copy) | removed once no old volume is left |
 
 ---
 
@@ -149,8 +113,6 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 |---|---|---|
 | G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
 | G3 | Supplier axes join sales once per supplier (`analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
-| G4 | Liste mode loads the **whole** catalogue and loops on substrings (`compute_analyse_liste`) | a 200-item list × a 30k-product catalogue ≈ 6M comparisons per request |
-| G8 | 2 routes no page calls (`routers/stats.py`) — decision 2026-10-02: **show them in the admin drill-down** (alerts + stock sections, E2E through the UI) | `/admin/pharmacy/{id}/stats/margin-alerts` and `/stock-summary` (Q2) |
 
 **Blockers for the microservice split**
 
@@ -169,6 +131,8 @@ file(s); subfolders fine when cleaner (`stats/queries/`). Moves + import paths o
 ---
 
 ## 8. Later
+
+**Last step of all (decision 2026-10-03):** re-check every commit on `dev` and reorganize them (one clear commit per topic, messages that match the content: amended commits mixed topics, e.g. `63e6292` holds G8 + /stock). `dev` is pushed → needs a force push, only on your OK. Then README update (one final docs pass).
 
 | What | Notes |
 |---|---|

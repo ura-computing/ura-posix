@@ -11,7 +11,13 @@ export function useLogin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<MeResponse, ApiErr, LoginRequest>({
+  const {
+    mutate,
+    isPending,
+    isError,
+    isSuccess,
+    error,
+  } = useMutation<MeResponse, ApiErr, LoginRequest>({
     mutationFn: (input) => api.post<MeResponse>(URLS.auth.login, input),
     onSuccess: (data) => {
       queryClient.setQueryData(QUERIES.auth.me, data);
@@ -22,13 +28,13 @@ export function useLogin() {
     },
   });
 
-  const handleLogin = (input: LoginRequest) => mutation.mutate(input);
+  const handleLogin = (input: LoginRequest) => mutate(input);
 
   return {
     handleLogin,
-    isPending: mutation.isPending,
-    isError:   mutation.isError,
-    isSuccess: mutation.isSuccess,
-    error:     mutation.error,
+    isPending,
+    isError,
+    isSuccess,
+    error,
   };
 }

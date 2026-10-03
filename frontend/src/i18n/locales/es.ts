@@ -409,6 +409,7 @@ export const es: Dict = {
 
 
   comptabilite: {
+    soldeTva: "Saldo IVA {{year}}",
     avecSpeciaux: "Con productos especiales",
     kpiCA:        "Facturación",
     ventesTotal:  "Ventas total",
@@ -1065,6 +1066,8 @@ export const es: Dict = {
     footer: "© PharmaGest · Gestión de farmacia",
   },
   uploadFile: {
+    missingColumns: "Este archivo no corresponde a este tipo de importación. Columnas faltantes: {{columns}}",
+    emptyFile: "El archivo está vacío: ninguna línea para importar.",
     step1: "Tipo de documento",
     step2: "Archivo CSV",
     step3: "Vista previa e importación",

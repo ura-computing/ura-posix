@@ -12,7 +12,12 @@ export function useSetPassword(token: string) {
   const t = useT();
   const navigate = useNavigate();
 
-  const mutation = useMutation({
+  const {
+    mutate,
+    isPending,
+    isError,
+    error,
+  } = useMutation({
     mutationFn: (input: { password: string }) => api.post<void>(URLS.auth.setPassword, { token, password: input.password }),
     onSuccess: () => {
       toast.success(t("toast.pwdSaved"));
@@ -23,18 +28,22 @@ export function useSetPassword(token: string) {
     },
   });
 
-  const handleSetPassword = (input: { password: string }) => mutation.mutate(input);
+  const handleSetPassword = (input: { password: string }) => mutate(input);
 
   return {
     handleSetPassword,
-    isPending: mutation.isPending,
-    isError:   mutation.isError,
-    error:     mutation.error,
+    isPending,
+    isError,
+    error,
   };
 }
 
 export function useValidateToken(token: string) {
-  const query = useQuery({
+  const {
+    data,
+    isLoading,
+    isSuccess,
+  } = useQuery({
     queryKey: QUERIES.auth.validateToken(token),
     queryFn:  () => api.get<ValidateTokenResponse>(URLS.auth.validateToken, { params: { token } }),
     enabled:  token.length > 0,
@@ -47,9 +56,9 @@ export function useValidateToken(token: string) {
   });
 
   return {
-    isValidating: token.length > 0 && query.isLoading,
-    isValid:      query.isSuccess,
-    isSetup:      query.data?.is_setup  ?? false,
-    fullName:     query.data?.full_name ?? "",
+    isValidating: token.length > 0 && isLoading,
+    isValid:      isSuccess,
+    isSetup:      data?.is_setup  ?? false,
+    fullName:     data?.full_name ?? "",
   };
 }

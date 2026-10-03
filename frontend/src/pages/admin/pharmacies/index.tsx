@@ -55,22 +55,24 @@ function PharmaciesTab() {
   const [createOpen,     setCreateOpen]     = useState(false);
   const [createUserOpen, setCreateUserOpen] = useState(false);
 
-  const list = useAdminPharmaciesList();
-  const rows: PharmacyListRow[] = useMemo(() => list.data ?? [], [list.data]);
-  const isLoading = list.isLoading;
-  const isError   = list.isError;
-  const refetch   = list.refetch;
+  const {
+    pharmacies,
+    isLoading,
+    isError,
+    reload,
+  } = useAdminPharmaciesList();
+  const rows: PharmacyListRow[] = useMemo(() => pharmacies ?? [], [pharmacies]);
 
-  const createMut = useCreatePharmacy();
-  const createUserMut = useCreateUser();
+  const { createPharmacy } = useCreatePharmacy();
+  const { createUser } = useCreateUser();
 
   const handleCreate = async (v: import("@/types").PharmacyIn) => {
-    const detail = await createMut.mutateAsync(v);
+    const detail = await createPharmacy(v);
     setCreateOpen(false);
     nav(`/admin/pharmacies/${detail.id}`);
   };
 
-  const handleCreateUser = (v: CreateUserIn): Promise<CreateUserOut> => createUserMut.mutateAsync(v);
+  const handleCreateUser = (v: CreateUserIn): Promise<CreateUserOut> => createUser(v);
 
   // Filter rows client-side. Cheap (admin has a small N of pharmacies).
   const filtered = useMemo(() => {
@@ -141,7 +143,7 @@ function PharmaciesTab() {
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("adminPharm.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={() => void refetch()}>
+          <AsyncButton variant="secondary" onClick={reload}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
           </AsyncButton>
@@ -221,8 +223,13 @@ const toMember = (u: AdminUserRow): MemberOut => ({
 
 function UsersTab() {
   const t = useT();
-  const users = useAdminUsers();
-  const pharmacies = useAdminPharmaciesList();   // active ones only → assign targets
+  const {
+    users,
+    isLoading: usersLoading,
+    isError: usersError,
+    reload: reloadUsers,
+  } = useAdminUsers();
+  const { pharmacies } = useAdminPharmaciesList();   // active ones only → assign targets
 
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<Scope>("all");
@@ -231,11 +238,11 @@ function UsersTab() {
   const [assignTarget, setAssignTarget] = useState<AdminUserRow | null>(null);
 
   // Pharmacy id 0: these hooks also refresh the whole pharmacies cache + this list.
-  const statusMut = useSetUserStatus(0);
-  const resetMut  = useResetUserPassword();
-  const removeMut = useDeleteUser(0);
+  const { setUserStatus } = useSetUserStatus(0);
+  const { resetUserPassword } = useResetUserPassword();
+  const { deleteUser } = useDeleteUser(0);
 
-  const rows = useMemo(() => users.data ?? [], [users.data]);
+  const rows = useMemo(() => users ?? [], [users]);
   const orphans  = rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length;
   const inactive = rows.filter((u) => u.status !== "active").length;
 
@@ -319,7 +326,7 @@ function UsersTab() {
           <MemberKebab
             member={toMember(u)}
             onResetPassword={() => setResetTarget(toMember(u))}
-            onToggleStatus={() => void statusMut.mutateAsync({ userId: u.id, status: u.status === "active" ? "inactive" : "active" })}
+            onToggleStatus={() => void setUserStatus({ userId: u.id, status: u.status === "active" ? "inactive" : "active" })}
             onRemove={() => setRemoveTarget(u)}
           />
         </div>
@@ -342,16 +349,16 @@ function UsersTab() {
         }}
       />
 
-      {!users.isLoading && !users.isError && (
+      {!usersLoading && !usersError && (
         <p className="text-sm text-muted-foreground">
           {t("adminUsers.summary", { total: rows.length, orphans, inactive })}
         </p>
       )}
 
-      {users.isError ? (
+      {usersError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("adminUsers.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={() => void users.refetch()}>
+          <AsyncButton variant="secondary" onClick={reloadUsers}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
           </AsyncButton>
@@ -360,7 +367,7 @@ function UsersTab() {
         <DataTable
           rows={filtered}
           columns={columns}
-          isLoading={users.isLoading}
+          isLoading={usersLoading}
           rowKey={(u) => u.id}
           emptyTitle={t("adminUsers.empty")}
         />
@@ -371,7 +378,7 @@ function UsersTab() {
         onClose={() => setResetTarget(null)}
         onSubmit={async (password) => {
           // Guarded, not `resetTarget!.id`: the React Compiler reads `.id` at render to track deps.
-          if (resetTarget) await resetMut.mutateAsync({ userId: resetTarget.id, password });
+          if (resetTarget) await resetUserPassword({ userId: resetTarget.id, password });
         }}
       />
 
@@ -382,14 +389,14 @@ function UsersTab() {
         title={t("members.removeTitle", { who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember") })}
         description={t("members.removeDesc", { pharmacy: removeTarget?.pharmacy?.name ?? "—" })}
         onConfirm={async () => {
-          if (removeTarget) await removeMut.mutateAsync(removeTarget.id);
+          if (removeTarget) await deleteUser(removeTarget.id);
           setRemoveTarget(null);
         }}
       />
 
       <AssignPharmacyDialog
         user={assignTarget}
-        pharmacies={(pharmacies.data ?? []).map((p) => ({ value: String(p.id), label: [p.code, p.name].filter(Boolean).join(" · ") }))}
+        pharmacies={(pharmacies ?? []).map((p) => ({ value: String(p.id), label: [p.code, p.name].filter(Boolean).join(" · ") }))}
         onClose={() => setAssignTarget(null)}
       />
     </>
@@ -405,7 +412,10 @@ function AssignPharmacyDialog({
   onClose:    () => void;
 }) {
   const t = useT();
-  const assign = useAssignPharmacy();
+  const {
+    assignPharmacy,
+    isAssigning,
+  } = useAssignPharmacy();
   const [pharmacyId, setPharmacyId] = useState("");
 
   // Reset on (re)open — derive-from-prop pattern (no effect).
@@ -417,7 +427,7 @@ function AssignPharmacyDialog({
 
   const submit = async () => {
     if (!user || !pharmacyId) return;
-    await assign.mutateAsync({ userId: user.id, pharmacyId: Number(pharmacyId) });
+    await assignPharmacy({ userId: user.id, pharmacyId: Number(pharmacyId) });
     toast.success(t("adminUsers.assigned"));
     onClose();
   };
@@ -439,10 +449,10 @@ function AssignPharmacyDialog({
             onChange={setPharmacyId}
           />
           <div className="flex justify-end gap-2 border-t border-border pt-3">
-            <AsyncButton variant="secondary" onClick={onClose} disabled={assign.isPending}>
+            <AsyncButton variant="secondary" onClick={onClose} disabled={isAssigning}>
               {t("common.cancel")}
             </AsyncButton>
-            <AsyncButton variant="primary" onClick={() => void submit()} isLoading={assign.isPending} disabled={!pharmacyId}>
+            <AsyncButton variant="primary" onClick={() => void submit()} isLoading={isAssigning} disabled={!pharmacyId}>
               {t("adminUsers.assignBtn")}
             </AsyncButton>
           </div>

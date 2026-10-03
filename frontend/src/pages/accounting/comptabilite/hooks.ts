@@ -18,6 +18,7 @@ import type {
   StatsResponse,
   VentesListResponse,
 } from "@/types";
+import { translateFr } from "@/i18n/I18nProvider";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
 
@@ -27,7 +28,7 @@ import { downloadXlsx, exportFilename } from "@/utils/table";
 type LocalFilters = Omit<StatsFilters, "date_from" | "date_to">;
 
 const DEFAULT_LOCAL: LocalFilters = {
-  category_type:        "all",
+  category_type: "all",
   include_non_declared: false,
 };
 
@@ -44,7 +45,11 @@ export function useComptabilitePage() {
   // Date range comes from the cross-route context (preserved when user
   // navigates to /achats, /ventes, etc.). All other filter fields stay
   // page-local.
-  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const {
+    from: dateFrom,
+    to: dateTo,
+    setRange,
+  } = useGlobalDateRange();
   const [local, setLocal] = useState<LocalFilters>(DEFAULT_LOCAL);
 
   const filters: StatsFilters = useMemo(
@@ -56,53 +61,63 @@ export function useComptabilitePage() {
   // `setFilters({ ...filters, date_from, date_to, category_type, ... })`.
   // We split the write so the dates flow to the global context.
   const setFilters = (next: StatsFilters) => {
-    const { date_from, date_to, ...rest } = next;
+    const {
+      date_from,
+      date_to,
+      ...rest
+    } = next;
     setLocal(rest);
     setRange(date_from, date_to);
   };
 
-  const [activeMonth,  setActiveMonth]  = useState<string>(currentYearMonth());
-  const [openMethod,   setOpenMethod]   = useState<PaymentMethod | null>(null);   // dialog state
+  const [activeMonth, setActiveMonth] = useState<string>(currentYearMonth());
+  const [openMethod, setOpenMethod] = useState<PaymentMethod | null>(null);   // dialog state
 
   // Ledger pagination + sort — mirror the shape /ventes uses so the shared
   // DataTable footer + ColumnDef sortable behavior plug in unchanged.
-  const [ventesPage,     setVentesPage]     = useState(1);
+  const [ventesPage, setVentesPage] = useState(1);
   const [ventesPageSize, setVentesPageSize] = useState(25);
-  const [ventesSortBy,   setVentesSortBy]   = useState<string | null>(null);
+  const [ventesSortBy, setVentesSortBy] = useState<string | null>(null);
   const [ventesSortOrder, setVentesSortOrder] = useState<"asc" | "desc">("desc");
 
   // KPIs (existing /stats endpoint)
-  const statsQ = useQuery({
+  const {
+    data: stats,
+    isLoading: statsLoading,
+  } = useQuery({
     queryKey: QUERIES.stats.main(filters.date_from, filters.date_to, filters.category_type, filters.include_non_declared),
-    queryFn:  () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
+    queryFn: () => api.get<StatsResponse>(URLS.stats.main, { params: filters }),
     staleTime: 60_000,
   });
-  const stats        = statsQ.data;
-  const statsLoading = statsQ.isLoading;
 
   // Payment entries for the active month (drives the 4 cards)
-  const paymentsQ = usePayments(activeMonth);
-  const payments  = paymentsQ.data ?? [];
+  const {
+    payments,
+    isLoading: paymentsLoading,
+  } = usePayments(activeMonth);
 
   // Ventes ledger — independent query so changing the page's filters refetches
   // just the ledger (TanStack cache keyed via QUERIES.ventes.list).
   const ventesFilters: VentesFilters = useMemo(() => ({
-    page:                 ventesPage,
-    limit:                ventesPageSize,
-    date_from:            filters.date_from,
-    date_to:              filters.date_to,
-    search:               "",
-    category:             [],
-    tva:                  [],
-    surveillance:         null,
+    page: ventesPage,
+    limit: ventesPageSize,
+    date_from: filters.date_from,
+    date_to: filters.date_to,
+    search: "",
+    category: [],
+    tva: [],
+    surveillance: null,
     include_non_declared: filters.include_non_declared,
-    sort_by:              ventesSortBy,
-    sort_order:           ventesSortOrder,
+    sort_by: ventesSortBy,
+    sort_order: ventesSortOrder,
   }), [filters, ventesPage, ventesPageSize, ventesSortBy, ventesSortOrder]);
 
-  const ventesQ = useQuery({
+  const {
+    data: ventesData,
+    isLoading: ventesLoading,
+  } = useQuery({
     queryKey: QUERIES.ventes.list(ventesFilters),
-    queryFn:  () => api.get<VentesListResponse>(URLS.ventes.list, { params: ventesFilters }),
+    queryFn: () => api.get<VentesListResponse>(URLS.ventes.list, { params: ventesFilters }),
   });
 
   /** Toggle order on same key; reset to "desc" on different key.
@@ -124,26 +139,26 @@ export function useComptabilitePage() {
       ["Comptabilité — résumé KPI"],
       [],
       ["Période", `${filters.date_from ?? "—"} → ${filters.date_to ?? "—"}`],
-      ["Type",    filters.category_type],
+      ["Type", translateFr(`category.${filters.category_type === "all" ? "mixte" : filters.category_type}`)],   // « Mixte », not « all »
       ["Avec produits spéciaux", filters.include_non_declared ? "Oui" : "Non"],
       [],
       ["Indicateur", "Valeur (MAD)"],
-      ["Chiffre d'Affaires",   fmt(stats.kpis.ventes_total)],
-      ["Achats",                fmt(stats.kpis.achats_total)],
+      ["Chiffre d'Affaires", fmt(stats.kpis.ventes_total)],
+      ["Achats", fmt(stats.kpis.achats_total)],
       [],
       ["Marge", ""],
-      ["Marge %",              fmt(stats.marge.marge_pct)],
-      ["Marge brute (DH)",     fmt(stats.marge.marge_brute_dh)],
-      ["Marge nette (DH)",     fmt(stats.marge.marge_nette_dh)],
+      ["Marge %", fmt(stats.marge.marge_pct)],
+      ["Marge brute (DH)", fmt(stats.marge.marge_brute_dh)],
+      ["Marge nette (DH)", fmt(stats.marge.marge_nette_dh)],
       [],
       ["TVA", ""],
-      ["TVA encaissée",        fmt(stats.tva.tva_encaissee)],
-      ["TVA payée",            fmt(stats.tva.tva_payee)],
-      ["TVA à déclarer",       fmt(stats.tva.tva_a_declarer)],
+      ["TVA encaissée", fmt(stats.tva.tva_encaissee)],
+      ["TVA payée", fmt(stats.tva.tva_payee)],
+      ["TVA à déclarer", fmt(stats.tva.tva_a_declarer)],
       [],
       ["Type breakdown", "Ventes (MAD)"],
-      ["Pharmacie",            fmt(stats.type_breakdown.pharmacie.ventes_total)],
-      ["Parapharmacie",        fmt(stats.type_breakdown.parapharmacie.ventes_total)],
+      ["Pharmacie", fmt(stats.type_breakdown.pharmacie.ventes_total)],
+      ["Parapharmacie", fmt(stats.type_breakdown.parapharmacie.ventes_total)],
     ];
     void downloadXlsx(rows, exportFilename("COMPTABILITE", "xlsx", filters.date_from, filters.date_to));
   }, [stats, filters]);
@@ -154,16 +169,16 @@ export function useComptabilitePage() {
     openMethod, setOpenMethod,
 
     stats, statsLoading,
-    payments, paymentsLoading: paymentsQ.isLoading,
+    payments, paymentsLoading,
 
     // Ventes ledger — full pagination/sort surface so the DataTable footer +
     // sortable headers behave the same as /achats and /ventes.
-    ventes:          ventesQ.data?.data ?? [],
-    ventesTotal:     ventesQ.data?.pagination.total ?? 0,
-    ventesLoading:   ventesQ.isLoading,
-    ventesPage,      setVentesPage,
-    ventesPageSize,  setVentesPageSize,
-    ventesSortBy,    ventesSortOrder, setVentesSort,
+    ventes: ventesData?.data ?? [],
+    ventesTotal: ventesData?.pagination.total ?? 0,
+    ventesLoading,
+    ventesPage, setVentesPage,
+    ventesPageSize, setVentesPageSize,
+    ventesSortBy, ventesSortOrder, setVentesSort,
 
     handleExport,
   };
@@ -175,25 +190,46 @@ export function useComptabilitePage() {
 
 /** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
 export function usePayments(month?: string) {
-  return useQuery({
+  const {
+    data,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.payments.list(month),
-    queryFn:  () => api.get<PaymentEntry[]>(URLS.payments.list, { params: { month } }),
+    queryFn: () => api.get<PaymentEntry[]>(URLS.payments.list, { params: { month } }),
     staleTime: 30_000,
   });
+  return {
+    payments: data ?? [],
+    isLoading,
+  };
 }
 
 export function useSavePayment() {
   const qc = useQueryClient();
-  return useMutation<PaymentEntry, Error, PaymentEntryIn>({
+  const {
+    mutateAsync,
+    isPending,
+  } = useMutation<PaymentEntry, Error, PaymentEntryIn>({
     mutationFn: (body) => api.post<PaymentEntry>(URLS.payments.list, body),
-    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
   });
+  return {
+    savePayment: mutateAsync,
+    isSaving: isPending,
+  };
 }
 
 export function useDeletePayment() {
   const qc = useQueryClient();
-  return useMutation<void, Error, number>({
+  const {
+    mutateAsync,
+    isPending,
+  } = useMutation<void, Error, number>({
     mutationFn: (id) => api.delete(URLS.payments.one(id)),
-    onSuccess:  () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: QUERIES.payments.all }); },
   });
+  return {
+    deletePayment: mutateAsync,
+    isDeleting: isPending,
+  };
 }

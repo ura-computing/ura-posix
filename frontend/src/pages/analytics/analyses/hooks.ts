@@ -61,12 +61,21 @@ export function useAnalysePage() {
   // In année mode the search box filters ventes by PRODUCT server-side (so each
   // month reflects that product's quantities); other modes filter rows client-side.
   const margeFilters = mode === "annee" ? { ...filters, product: search.trim() || null } : filters;
-  const margeQ = useAnalyseMarge(margeFilters, mode);
-  const listeM = useAnalyseListe();
+  const {
+    analyse,
+    isLoading: margeLoading,
+    error: margeError,
+  } = useAnalyseMarge(margeFilters, mode);
+  const {
+    runListe,
+    liste,
+    isListeLoading,
+    listeError,
+  } = useAnalyseListe();
 
   // When mode === liste, the active result lives on the mutation; otherwise on the query.
-  const activeData = mode === "liste" ? listeM.data : margeQ.data;
-  const isLoading  = mode === "liste" ? listeM.isPending : margeQ.isLoading;
+  const activeData = mode === "liste" ? liste : analyse;
+  const isLoading  = mode === "liste" ? isListeLoading : margeLoading;
 
   // Client-side search filter — accent/case-insensitive, `*` wildcard aware
   // (prefix `rino*`, suffix `*enil`, infix `ri*il`), each token may match any field.
@@ -121,7 +130,7 @@ export function useAnalysePage() {
   // AND the KPI cards follow the selected window. (Text search stays client-side.)
   useEffect(() => {
     if (mode === "liste" && listeItems) {
-      listeM.mutate({ items: listeItems, ...filters });
+      runListe({ items: listeItems, ...filters });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, filters.date_from, filters.date_to, filters.category_type]);
@@ -196,7 +205,7 @@ export function useAnalysePage() {
 
   function submitListe(items: ListeItem[]) {
     setListeItems(items);
-    listeM.mutate({ items, ...filters });
+    runListe({ items, ...filters });
   }
 
   function clearAll() {
@@ -222,14 +231,14 @@ export function useAnalysePage() {
     suggestions,
     sortBy, sortOrder, toggleSort,
     isLoading,
-    error:    margeQ.isError ? margeQ.error : (listeM.isError ? listeM.error : null),
+    error:    margeError ?? listeError,
     kpis,
     rows:     pageRows,
     pagination,
     totalRows: activeData?.rows.length ?? 0,
     handleExport,
     submitListe,
-    listeSubmitted: !!listeM.data,
+    listeSubmitted: !!liste,
     clearAll,
   };
 }
@@ -242,7 +251,12 @@ export function useAnalysePage() {
  */
 
 export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
-  return useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: QUERIES.stats.analyseMarge(mode, filters.date_from, filters.date_to, filters.category_type, filters.product),
     queryFn:  () => api.get<AnalyseMargeResponse>(URLS.stats.analyseMarge, { params: {
       mode, date_from: filters.date_from, date_to: filters.date_to,
@@ -251,12 +265,29 @@ export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
     staleTime: 60_000,
     enabled:   mode !== "liste",   // Liste uses the mutation hook below
   });
+  return {
+    analyse: data,
+    isLoading,
+    error: isError ? error : null,
+  };
 }
 
 export function useAnalyseListe() {
-  return useMutation({
+  const {
+    mutate,
+    data,
+    isPending,
+    isError,
+    error,
+  } = useMutation({
     mutationFn: (body: ListeRequest) => api.post<AnalyseMargeResponse>(URLS.stats.analyseListe, body),
   });
+  return {
+    runListe: mutate,
+    liste: data,
+    isListeLoading: isPending,
+    listeError: isError ? error : null,
+  };
 }
 
 /** Client-side mirror of the backend `_compute_kpis` (backend/analyse_queries.py:532).

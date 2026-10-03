@@ -390,7 +390,7 @@ function StockTable({
           className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold"
           style={{ background: hexA(ABCD_COLORS[classFilter], 0.16), color: ABCD_COLORS[classFilter] }}
         >
-          Classe {classFilter}
+          {t("stock.classe")} {classFilter}
         </span>
       )}
       <span className="font-mono text-xs tabular-nums text-muted-foreground">
@@ -413,7 +413,7 @@ function StockTable({
           onClick={onClose}
           className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-error/40 hover:bg-error-subtle hover:text-error"
         >
-          <X className="size-3" /> Fermer
+          <X className="size-3" /> {t("common.close")}
         </button>
       </div>
     </div>
@@ -444,21 +444,55 @@ function StockTable({
 
 export default function StockPage() {
   const t = useT();
-  const s = useStockPage();
-  const full = s.fullQuery;
+  const {
+    abcd,
+    classFilter,
+    clearAll,
+    closeDialog,
+    closeTable,
+    dateFrom,
+    dateTo,
+    dialog,
+    fullProducts,
+    handleExport,
+    hasTableFilter,
+    healthScore,
+    isDateDefault,
+    isEmpty,
+    isError,
+    isExportLoading,
+    isLoading,
+    isTableLoading,
+    openDialog,
+    page,
+    pageSize,
+    peremptions,
+    reload,
+    selectClass,
+    setDateFrom,
+    setDateTo,
+    setPage,
+    setPageSize,
+    setStatus,
+    sortBy,
+    sortOrder,
+    status,
+    tableRows,
+    toggleSort,
+  } = useStockPage();
 
   const activeFilters: ActiveFilter[] = [
     // Only a pill for an EXPLICIT range — not the local 12-month default (whose
     // "clear" would just revert to the same default and feel broken).
-    !s.isDateDefault && (s.dateFrom || s.dateTo) ? {
+    !isDateDefault && (dateFrom || dateTo) ? {
       key:    "dates",
-      label:  <>{t("dashboard.periode")} {s.dateFrom || "…"} → {s.dateTo || "…"}</>,
-      onClear: () => { s.setDateFrom(""); s.setDateTo(""); },
+      label:  <>{t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}</>,
+      onClear: () => { setDateFrom(""); setDateTo(""); },
     } : null,
-    s.classFilter !== null ? {
+    classFilter !== null ? {
       key:    "class",
-      label:  <>{t("stock.classe")} : {s.classFilter}</>,
-      onClear: s.closeTable,
+      label:  <>{t("stock.classe")} : {classFilter}</>,
+      onClear: closeTable,
     } : null,
   ].filter(Boolean) as ActiveFilter[];
 
@@ -470,26 +504,26 @@ export default function StockPage() {
 
       <FilterBar
         dateRange={{
-          from:     s.dateFrom || null,
-          to:       s.dateTo || null,
-          onChange: (from, to) => { s.setDateFrom(from ?? ""); s.setDateTo(to ?? ""); },
+          from:     dateFrom || null,
+          to:       dateTo || null,
+          onChange: (from, to) => { setDateFrom(from ?? ""); setDateTo(to ?? ""); },
         }}
         rightActions={[
           {
             label: t("common.export"),
             icon: <Download className="size-4" />,
             variant: "outline",
-            onClick: s.handleExport,
-            disabled: s.isExportLoading,
+            onClick: handleExport,
+            disabled: isExportLoading,
           },
           { label: t("stock.importStock"),  icon: <Upload   className="size-4" />, variant: "primary", href: `${ROUTES.UPLOAD_FILE}?type=stock` },
         ]}
         activeFilters={activeFilters}
-        onResetAll={s.clearAll}
+        onResetAll={clearAll}
       />
 
       {/* ERROR */}
-      {full.isError && (
+      {isError && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
           <span className="flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="size-4" />
@@ -497,7 +531,7 @@ export default function StockPage() {
           </span>
           <button
             type="button"
-            onClick={() => full.refetch()}
+            onClick={reload}
             className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
           >
             {t("common.retry")}
@@ -506,10 +540,10 @@ export default function StockPage() {
       )}
 
       {/* LOADING */}
-      {full.isLoading && <StockSkeleton />}
+      {isLoading && <StockSkeleton />}
 
       {/* EMPTY — no stock data imported yet */}
-      {!full.isLoading && !full.isError && s.isEmpty && (
+      {!isLoading && !isError && isEmpty && (
         <div className="flex flex-col items-center justify-center gap-3.5 rounded-xl border border-border bg-card px-6 py-[72px] text-center">
           <span className="flex size-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Package className="size-7" />
@@ -530,56 +564,56 @@ export default function StockPage() {
       )}
 
       {/* DATA */}
-      {!full.isLoading && !full.isError && !s.isEmpty && full.data && (
+      {!isLoading && !isError && !isEmpty && abcd && (
         <>
           <AbcdAnalysisCard
-            distribution={full.data.distribution}
-            totalReferences={full.data.total_references}
-            health={s.healthScore}
-            activeClass={s.classFilter}
-            onSelectClass={s.selectClass}
+            distribution={abcd.distribution}
+            totalReferences={abcd.total_references}
+            health={healthScore}
+            activeClass={classFilter}
+            onSelectClass={selectClass}
           />
 
-          {s.hasTableFilter && (
+          {hasTableFilter && (
             <StockTable
-              rows={s.filteredQuery.data?.products ?? []}
-              isLoading={s.filteredQuery.isLoading}
-              classFilter={s.classFilter}
-              status={s.status}
-              onStatusChange={s.setStatus}
-              sortBy={s.sortBy}
-              sortOrder={s.sortOrder}
-              onSort={s.toggleSort}
-              page={s.page}
-              pageSize={s.pageSize}
-              onPage={s.setPage}
+              rows={tableRows}
+              isLoading={isTableLoading}
+              classFilter={classFilter}
+              status={status}
+              onStatusChange={setStatus}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={toggleSort}
+              page={page}
+              pageSize={pageSize}
+              onPage={setPage}
               onPageSize={(n) => {
-                s.setPageSize(n);
-                s.setPage(1);
+                setPageSize(n);
+                setPage(1);
               }}
-              onClose={s.closeTable}
+              onClose={closeTable}
             />
           )}
 
-          <AlertCardsGrid products={s.fullProducts} />
+          <AlertCardsGrid products={fullProducts} />
 
-          {s.peremptionsQuery.data && (
-            <PeremptionsSection data={s.peremptionsQuery.data} onOpen={s.openDialog} />
+          {peremptions && (
+            <PeremptionsSection data={peremptions} onOpen={openDialog} />
           )}
         </>
       )}
 
       {/* shared detail dialog (portal) — same pattern as /alertes */}
       <AlertDetailDialog
-        open={!!s.dialog}
-        onClose={s.closeDialog}
-        title={s.dialog?.title ?? ""}
-        subtitle={s.dialog?.subtitle}
-        products={s.dialog?.products ?? []}
-        columns={s.dialog?.columns ?? []}
-        defaultSortKey={s.dialog?.defaultSortKey ?? ""}
-        dateFrom={s.dateFrom}
-        dateTo={s.dateTo}
+        open={!!dialog}
+        onClose={closeDialog}
+        title={dialog?.title ?? ""}
+        subtitle={dialog?.subtitle}
+        products={dialog?.products ?? []}
+        columns={dialog?.columns ?? []}
+        defaultSortKey={dialog?.defaultSortKey ?? ""}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
       />
     </div>
   );

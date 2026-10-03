@@ -34,14 +34,22 @@ const DEFAULT_LOCAL: LocalVentesFilters = {
 /** Pull surveillance + sort + pagination out so the cache key is stable across page/sort changes
  *  for the same filter set (counts share this trimmed key too). */
 function trimForKey(f: VentesFilters): VentesFiltersKey {
-  const { sort_by: _sb, sort_order: _so, ...rest } = f;
+  const {
+    sort_by: _sb,
+    sort_order: _so,
+    ...rest
+  } = f;
   return rest;
 }
 
 
 export function useVentesPage() {
   const t = useT();
-  const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
+  const {
+    from: dateFrom,
+    to: dateTo,
+    setRange,
+  } = useGlobalDateRange();
   const [localFilters, setLocal] = useState<LocalVentesFilters>(DEFAULT_LOCAL);
   const [suggestQ, setSuggestQ] = useState<string>("");
 
@@ -57,36 +65,53 @@ export function useVentesPage() {
   // Surveillance counts + discount gauge read only these axes (pagination +
   // sort + active surveillance tab ignored).
   const summaryFilters = useMemo(() => {
-    const { page: _p, limit: _l, sort_by: _sb, sort_order: _so, surveillance: _s, ...rest } = filters;
+    const {
+      page: _p,
+      limit: _l,
+      sort_by: _sb,
+      sort_order: _so,
+      surveillance: _s,
+      ...rest
+    } = filters;
     return rest;
   }, [filters]);
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.ventes.list(filters),
     queryFn:  () => api.get<VentesListResponse>(URLS.ventes.list, { params: filters }),
   });
-  const counts = useQuery({
+  const { data: counts } = useQuery({
     queryKey: QUERIES.ventes.surveillance(key),
     queryFn:  () => api.get<VentesSurveillanceCounts>(URLS.ventes.surveillanceCounts, { params: summaryFilters }),
   });
-  const categories = useQuery({
+  const { data: categories } = useQuery({
     queryKey: QUERIES.ventes.categories,
     queryFn:  () => api.get<string[]>(URLS.ventes.categories),
     staleTime: 5 * 60_000,
   });
-  const tvaRates = useQuery({
+  const { data: tvaRates } = useQuery({
     queryKey: QUERIES.ventes.tvaRates,
     queryFn:  () => api.get<string[]>(URLS.ventes.tvaRates),
     staleTime: 5 * 60_000,
   });
-  const suggestions = useQuery({
+  const {
+    data: suggestions,
+    isFetching: suggestionsLoading,
+  } = useQuery({
     queryKey: QUERIES.ventes.suggestions(suggestQ),
     queryFn:  () => api.get<VentesSuggestions>(URLS.ventes.suggestions, { params: { q: suggestQ } }),
     enabled:  suggestQ.length >= 2,
     staleTime: 60_000,
   });
 
-  const discountSummaryQ = useQuery({
+  const {
+    data: discountSummary,
+    isLoading: discountLoading,
+  } = useQuery({
     queryKey: QUERIES.ventes.discountSummary(summaryFilters),
     queryFn:  () => api.get<VentesDiscountSummary>(URLS.ventes.discountSummary, { params: summaryFilters }),
     staleTime: 60_000,
@@ -167,15 +192,12 @@ export function useVentesPage() {
     setSort, setPage, setPageSize, reset,
     suggestQ, setSuggestQ,
     handleExport,
-    list:        list.data,
-    isLoading:   list.isLoading,
-    isError:     list.isError,
-    counts:      counts.data,
-    discountSummary: discountSummaryQ.data,
-    discountLoading: discountSummaryQ.isLoading,
-    categories:  categories.data ?? [],
-    tvaRates:    tvaRates.data ?? [],
-    suggestions: suggestions.data ?? null,
-    suggestionsLoading: suggestions.isFetching,
+    list, isLoading, isError,
+    counts,
+    discountSummary, discountLoading,
+    categories:  categories ?? [],
+    tvaRates:    tvaRates ?? [],
+    suggestions: suggestions ?? null,
+    suggestionsLoading,
   };
 }

@@ -23,12 +23,18 @@ export function useProduitsSpeciaux() {
   const [search,   setSearch]   = useState("");
   const [suggestQ, setSuggestQ] = useState("");
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.specialProducts.list,
     queryFn:  () => api.get<SpecialProduct[]>(URLS.specialProducts.list),
   });
 
-  const suggestions = useQuery({
+  const {
+    data: suggestions,
+    isFetching: suggestionsLoading,
+  } = useQuery({
     queryKey:  QUERIES.specialProducts.suggestions(suggestQ),
     queryFn:   () => api.get<MedicamentSuggestion[]>(URLS.specialProducts.suggestions, { params: { q: suggestQ } }),
     enabled:   suggestQ.trim().length >= 2,
@@ -39,6 +45,7 @@ export function useProduitsSpeciaux() {
   // achats / ventes / stats / margin alerts / stock / analyse aggregates.
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: QUERIES.specialProducts.list });
+    queryClient.invalidateQueries({ queryKey: QUERIES.specialProducts.suggestionsAll });   // an excluded product is no longer suggested
     queryClient.invalidateQueries({ queryKey: QUERIES.stats.mainAll });
     queryClient.invalidateQueries({ queryKey: QUERIES.stats.marginAlertsAll });
     queryClient.invalidateQueries({ queryKey: QUERIES.stats.analyseMargeAll });
@@ -49,7 +56,10 @@ export function useProduitsSpeciaux() {
     queryClient.invalidateQueries({ queryKey: QUERIES.achats.listAll });
   };
 
-  const exclude = useMutation({
+  const {
+    mutate: exclude,
+    isPending: excluding,
+  } = useMutation({
     mutationFn: (ids: number[]) =>
       api.post<SpecialProductBulkResult>(URLS.specialProducts.list, { medicament_ids: ids }),
     onSuccess:  (r) => {
@@ -63,7 +73,10 @@ export function useProduitsSpeciaux() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const reintegrate = useMutation({
+  const {
+    mutate: reintegrate,
+    isPending: reintegrating,
+  } = useMutation({
     mutationFn: (ids: number[]) =>
       api.post<SpecialProductReintegrateResult>(URLS.specialProducts.reintegrate, { medicament_ids: ids }),
     onSuccess:  (r) => {
@@ -77,7 +90,7 @@ export function useProduitsSpeciaux() {
   // Local filter on the displayed table (case + accent insensitive).
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const filteredProducts = useMemo(() => {
-    const all = list.data ?? [];
+    const all = list ?? [];
     if (!search.trim()) return all;
     const q = norm(search.trim());
     return all.filter((p) =>
@@ -85,23 +98,22 @@ export function useProduitsSpeciaux() {
       norm(p.pid).includes(q) ||
       norm(p.category ?? "").includes(q),
     );
-  }, [list.data, search]);
+  }, [list, search]);
 
   return {
-    specialProducts: list.data ?? [],
+    specialProducts: list ?? [],
     filteredProducts,
-    isLoading: list.isLoading,
-
-    search, setSearch,
-
-    suggestions: suggestions.data ?? [],
-    suggestionsLoading: suggestions.isFetching,
-    suggestQ, setSuggestQ,
-
-    handleExclude:     (ids: number[]) => exclude.mutate(ids),
-    handleReintegrate: (ids: number[]) => reintegrate.mutate(ids),
-    excluding:    exclude.isPending,
-    reintegrating: reintegrate.isPending,
+    productsLoading: isLoading,
+    productSearch: search,
+    setProductSearch: setSearch,
+    suggestions: suggestions ?? [],
+    suggestionsLoading,
+    suggestQ,
+    setSuggestQ,
+    excludeProducts: exclude,
+    reintegrateProducts: reintegrate,
+    isExcludingProducts: excluding,
+    isReintegratingProducts: reintegrating,
   };
 }
 
@@ -116,12 +128,18 @@ export function useBlExclusions() {
   const [search,   setSearch]   = useState("");   // filters the excluded-BL table
   const [searchQ,  setSearchQ]  = useState("");    // exclude-dialog search box
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.blExclusions.list,
     queryFn:  () => api.get<BlExclusion[]>(URLS.blExclusions.list),
   });
 
-  const results = useQuery({
+  const {
+    data: results,
+    isFetching: resultsLoading,
+  } = useQuery({
     queryKey:  QUERIES.blExclusions.search(searchQ),
     queryFn:   () => api.get<BlSummary[]>(URLS.blExclusions.search, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
@@ -143,7 +161,10 @@ export function useBlExclusions() {
     queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
   };
 
-  const exclude = useMutation({
+  const {
+    mutate: exclude,
+    isPending: excluding,
+  } = useMutation({
     mutationFn: (v: { ref: string; notes?: string }) =>
       api.post<BlExclusionResult>(URLS.blExclusions.list, { delivery_ref: v.ref, notes: v.notes || null }),
     onSuccess:  (r) => {
@@ -154,7 +175,10 @@ export function useBlExclusions() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const reintegrate = useMutation({
+  const {
+    mutate: reintegrate,
+    isPending: reintegrating,
+  } = useMutation({
     mutationFn: (refs: string[]) =>
       api.post<BlReintegrateResult>(URLS.blExclusions.reintegrate, { delivery_refs: refs }),
     onSuccess:  (r) => {
@@ -167,7 +191,7 @@ export function useBlExclusions() {
 
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const filtered = useMemo(() => {
-    const all = list.data ?? [];
+    const all = list ?? [];
     if (!search.trim()) return all;
     const q = norm(search.trim());
     return all.filter((b) =>
@@ -175,23 +199,22 @@ export function useBlExclusions() {
       norm(b.supplier ?? "").includes(q) ||
       norm(b.notes ?? "").includes(q),
     );
-  }, [list.data, search]);
+  }, [list, search]);
 
   return {
-    exclusions: list.data ?? [],
-    filtered,
-    isLoading: list.isLoading,
-
-    search, setSearch,
-
-    searchQ, setSearchQ,
-    results:        results.data ?? [],
-    resultsLoading: results.isFetching,
-
-    handleExclude:     (ref: string, notes?: string) => exclude.mutate({ ref, notes }),
-    handleReintegrate: (refs: string[]) => reintegrate.mutate(refs),
-    excluding:     exclude.isPending,
-    reintegrating: reintegrate.isPending,
+    blExclusions: list ?? [],
+    filteredBls: filtered,
+    blsLoading: isLoading,
+    blSearch: search,
+    setBlSearch: setSearch,
+    blSearchQ: searchQ,
+    setBlSearchQ: setSearchQ,
+    blResults: results ?? [],
+    blResultsLoading: resultsLoading,
+    excludeBl: (ref: string, notes?: string) => exclude({ ref, notes }),
+    reintegrateBls: reintegrate,
+    isExcludingBl: excluding,
+    isReintegratingBls: reintegrating,
   };
 }
 
@@ -206,12 +229,18 @@ export function useSupplierExclusions() {
   const [search,  setSearch]  = useState("");   // filters the excluded-supplier table
   const [searchQ, setSearchQ] = useState("");   // exclude-dialog search box
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+  } = useQuery({
     queryKey: QUERIES.supplierExclusions.list,
     queryFn:  () => api.get<SupplierExclusion[]>(URLS.supplierExclusions.list),
   });
 
-  const results = useQuery({
+  const {
+    data: results,
+    isFetching: resultsLoading,
+  } = useQuery({
     queryKey:  QUERIES.supplierExclusions.search(searchQ),
     queryFn:   () => api.get<SupplierSummary[]>(URLS.supplierExclusions.search, { params: { q: searchQ } }),
     enabled:   searchQ.trim().length >= 2,
@@ -233,7 +262,10 @@ export function useSupplierExclusions() {
     queryClient.invalidateQueries({ queryKey: QUERIES.ventes.listAll });
   };
 
-  const exclude = useMutation({
+  const {
+    mutate: exclude,
+    isPending: excluding,
+  } = useMutation({
     mutationFn: (v: { supplier: string; notes?: string }) =>
       api.post<SupplierExclusionResult>(URLS.supplierExclusions.list, { supplier: v.supplier, notes: v.notes || null }),
     onSuccess:  (r) => {
@@ -248,7 +280,10 @@ export function useSupplierExclusions() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const reintegrate = useMutation({
+  const {
+    mutate: reintegrate,
+    isPending: reintegrating,
+  } = useMutation({
     mutationFn: (suppliers: string[]) =>
       api.post<SupplierReintegrateResult>(URLS.supplierExclusions.reintegrate, { suppliers }),
     onSuccess:  (r) => {
@@ -260,25 +295,24 @@ export function useSupplierExclusions() {
   });
 
   const filtered = useMemo(() => {
-    const all = list.data ?? [];
+    const all = list ?? [];
     if (!search.trim()) return all;
     return all.filter((s) => matchesFields([s.supplier, s.notes ?? ""], search));
-  }, [list.data, search]);
+  }, [list, search]);
 
   return {
-    exclusions: list.data ?? [],
-    filtered,
-    isLoading: list.isLoading,
-
-    search, setSearch,
-
-    searchQ, setSearchQ,
-    results:        results.data ?? [],
-    resultsLoading: results.isFetching,
-
-    handleExclude:     (supplier: string, notes?: string) => exclude.mutate({ supplier, notes }),
-    handleReintegrate: (suppliers: string[]) => reintegrate.mutate(suppliers),
-    excluding:     exclude.isPending,
-    reintegrating: reintegrate.isPending,
+    supplierExclusions: list ?? [],
+    filteredSuppliers: filtered,
+    suppliersLoading: isLoading,
+    supplierSearch: search,
+    setSupplierSearch: setSearch,
+    supplierSearchQ: searchQ,
+    setSupplierSearchQ: setSearchQ,
+    supplierResults: results ?? [],
+    supplierResultsLoading: resultsLoading,
+    excludeSupplier: (supplier: string, notes?: string) => exclude({ supplier, notes }),
+    reintegrateSuppliers: reintegrate,
+    isExcludingSupplier: excluding,
+    isReintegratingSuppliers: reintegrating,
   };
 }

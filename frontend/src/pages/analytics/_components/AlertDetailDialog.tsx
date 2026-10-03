@@ -190,16 +190,20 @@ export function AlertDetailDialog({
                         return (
                           <th
                             key={c.key}
-                            onClick={() => toggleSort(c.key)}
                             className={cn(
-                              "sticky top-0 z-[1] cursor-pointer select-none whitespace-nowrap border-b border-border bg-surface-subtle p-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground",
+                              "sticky top-0 z-[1] select-none whitespace-nowrap border-b border-border bg-surface-subtle p-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground",
                               c.align === "right" ? "text-right" : "text-left",
                             )}
                           >
-                            <span className={cn("inline-flex items-center gap-1.5", c.align === "right" && "flex-row-reverse")}>
+                            {/* A button (not onClick on <th>): sortable with the keyboard, like DataTable. */}
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(c.key)}
+                              className={cn("inline-flex cursor-pointer items-center gap-1.5 uppercase", c.align === "right" && "flex-row-reverse")}
+                            >
                               {t(c.label)}
                               <Icon className={cn("size-3", active ? "text-primary" : "opacity-50")} />
-                            </span>
+                            </button>
                           </th>
                         );
                       })}

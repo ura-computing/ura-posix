@@ -614,8 +614,30 @@ export default function UploadFilePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFromUrl = parseTypeParam(searchParams.get("type"));
 
-  const u = useUpload(typeFromUrl);
-  const { pickType } = u;
+  const {
+    acceptFile,
+    pickType,
+    backToType,
+    cancel,
+    changeFile,
+    clearFilenameError,
+    docType,
+    error,
+    examples,
+    file,
+    fileDates,
+    filename,
+    filenameError,
+    headers,
+    phase,
+    previewRows,
+    progress,
+    reset,
+    startImport,
+    step,
+    stockResult,
+    totalRows,
+  } = useUpload(typeFromUrl);
 
   // Card-click handler: pick the type AND mirror it into ?type=... so the URL
   // stays a shareable deep-link to the active step. `replace: true` avoids
@@ -637,7 +659,7 @@ export default function UploadFilePage() {
       next.delete("type");
       return next;
     }, { replace: true });
-    u.backToType();
+    backToType();
   };
 
   const { me } = useMe();
@@ -671,10 +693,10 @@ export default function UploadFilePage() {
         </div>
       </header>
 
-      <Stepper current={u.step} />
+      <Stepper current={step} />
 
       {/* ─── STEP 1 — Type ─── */}
-      {u.step === 1 && (
+      {step === 1 && (
         <section className="flex flex-col gap-4">
           {allowedTypes.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -694,7 +716,7 @@ export default function UploadFilePage() {
                     icon={<Icon className="size-5" />}
                     columns={meta.columns}
                     totalCols={meta.columns.length}
-                    selected={u.docType === dt}
+                    selected={docType === dt}
                     onSelect={() => handlePickType(dt)}
                   />
                 );
@@ -704,8 +726,8 @@ export default function UploadFilePage() {
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => u.docType && handlePickType(u.docType)}
-              disabled={!u.docType}
+              onClick={() => docType && handlePickType(docType)}
+              disabled={!docType}
               className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t("uploadFile.continue")}
@@ -716,7 +738,7 @@ export default function UploadFilePage() {
       )}
 
       {/* ─── STEP 2 — File ─── */}
-      {u.step === 2 && u.docType && (
+      {step === 2 && docType && (
         <section className="flex flex-col gap-4">
           <button
             type="button"
@@ -727,11 +749,11 @@ export default function UploadFilePage() {
             {t("uploadFile.changeType")}
           </button>
           <DropZone
-            docType={u.docType}
-            example={u.examples[u.docType]}
-            onAccept={(f) => u.acceptFile(f, u.docType!)}
-            errorMsg={u.filenameError}
-            onClearError={u.clearFilenameError}
+            docType={docType}
+            example={examples[docType]}
+            onAccept={(f) => acceptFile(f, docType!)}
+            errorMsg={filenameError}
+            onClearError={clearFilenameError}
           />
         </section>
       )}
@@ -744,32 +766,32 @@ export default function UploadFilePage() {
               left us parked on step 3 → show a persistent "Import terminé"
               confirmation instead of a blank page.
       */}
-      {u.step === 3 && u.docType && (
+      {step === 3 && docType && (
         <section className="flex flex-col gap-4">
-          {(u.file || u.phase !== "idle") && (
+          {(file || phase !== "idle") && (
             <button
               type="button"
-              onClick={u.file ? u.changeFile : u.reset}
+              onClick={file ? changeFile : reset}
               className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" />
-              {u.file ? t("uploadFile.chooseAnother") : t("uploadFile.newImport")}
+              {file ? t("uploadFile.chooseAnother") : t("uploadFile.newImport")}
             </button>
           )}
 
-          {u.file && u.phase === "idle" ? (
+          {file && phase === "idle" ? (
             <>
               <PreviewTable
-                headers={u.headers}
-                rows={u.previewRows}
-                totalRows={u.totalRows}
-                filename={u.file.name}
-                fileDates={u.fileDates}
+                headers={headers}
+                rows={previewRows}
+                totalRows={totalRows}
+                filename={file.name}
+                fileDates={fileDates}
               />
               <div className="flex justify-end">
                 <button
                   type="button"
-                  onClick={u.startImport}
+                  onClick={startImport}
                   className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
                   <UploadCloud className="size-4" />
@@ -777,19 +799,19 @@ export default function UploadFilePage() {
                 </button>
               </div>
             </>
-          ) : u.phase !== "idle" ? (
+          ) : phase !== "idle" ? (
             <ImportState
-              docType={u.docType}
-              phase={u.phase}
-              progress={u.progress}
-              error={u.error}
-              filename={u.filename ?? u.file?.name ?? null}
-              stockResult={u.stockResult}
-              onCancel={u.cancel}
-              onReset={u.reset}
+              docType={docType}
+              phase={phase}
+              progress={progress}
+              error={error}
+              filename={filename ?? file?.name ?? null}
+              stockResult={stockResult}
+              onCancel={cancel}
+              onReset={reset}
             />
           ) : (
-            <ImportDoneFallback docType={u.docType} onNewImport={u.reset} />
+            <ImportDoneFallback docType={docType} onNewImport={reset} />
           )}
         </section>
       )}

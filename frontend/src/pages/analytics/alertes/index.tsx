@@ -354,19 +354,45 @@ const CATEGORY_KEY: Record<CategoryType, string> = {
 
 export default function AlertesPage() {
   const t = useT();
-  const a = useAlertesPage();
+  const {
+    category,
+    closeDialog,
+    counts,
+    dateFrom,
+    dateTo,
+    dialog,
+    isEmpty,
+    isError,
+    isLoading,
+    margin,
+    negUnits,
+    negatif,
+    openDialog,
+    perem,
+    peremptionCritical,
+    refetchAll,
+    resetAll,
+    setCategory,
+    setPeriod,
+    sousPpv,
+    sousStock,
+    surPpv,
+    surStock,
+    totalAlerts,
+    vsa,
+  } = useAlertesPage();
   const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
-    (a.dateFrom || a.dateTo) ? {
+    (dateFrom || dateTo) ? {
       key:    "dates",
-      label:  <>{t("dashboard.periode")} {a.dateFrom || "…"} → {a.dateTo || "…"}</>,
-      onClear: () => a.setPeriod(null, null),
+      label:  <>{t("dashboard.periode")} {dateFrom || "…"} → {dateTo || "…"}</>,
+      onClear: () => setPeriod(null, null),
     } : null,
-    a.category !== "all" ? {
+    category !== "all" ? {
       key:    "cat",
-      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[a.category])}</>,
-      onClear: () => a.setCategory("all"),
+      label:  <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[category])}</>,
+      onClear: () => setCategory("all"),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
 
@@ -381,20 +407,20 @@ export default function AlertesPage() {
 
       <FilterBar<CategoryType>
         dateRange={{
-          from:     a.dateFrom || null,
-          to:       a.dateTo || null,
-          onChange: (from, to) => a.setPeriod(from, to),
+          from:     dateFrom || null,
+          to:       dateTo || null,
+          onChange: (from, to) => setPeriod(from, to),
         }}
         segment={{
-          value:    a.category,
-          onChange: a.setCategory,
+          value:    category,
+          onChange: setCategory,
           options:  categoryTypeOptions,
         }}
         activeFilters={activeFilters}
-        onResetAll={a.resetAll}
+        onResetAll={resetAll}
       />
 
-      {a.isError ? (
+      {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
           <span className="flex items-center gap-2 text-sm font-medium">
             <AlertCircle className="size-4" />
@@ -402,15 +428,15 @@ export default function AlertesPage() {
           </span>
           <button
             type="button"
-            onClick={a.refetchAll}
+            onClick={refetchAll}
             className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
           >
             {t("common.retry")}
           </button>
         </div>
-      ) : a.isLoading ? (
+      ) : isLoading ? (
         <AlertesSkeleton />
-      ) : a.isEmpty ? (
+      ) : isEmpty ? (
         <div className="flex flex-col items-center justify-center gap-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 px-6 py-[72px] text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
           <span className="flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
             <CheckCircle2 className="size-7" />
@@ -423,39 +449,39 @@ export default function AlertesPage() {
       ) : (
         <>
           <GlobalSummaryStrip
-            totalAlerts={a.totalAlerts}
-            marginNegative={a.counts.marginNeg}
-            marginLow={a.counts.marginLow}
-            peremptionCritical={a.peremptionCritical}
-            toRestock={a.counts.sousStock}
-            excessStock={a.counts.surStock}
+            totalAlerts={totalAlerts}
+            marginNegative={counts.marginNeg}
+            marginLow={counts.marginLow}
+            peremptionCritical={peremptionCritical}
+            toRestock={counts.sousStock}
+            excessStock={counts.surStock}
           />
-          <VentesSansAchatSection data={a.vsa} onOpen={a.openDialog} />
-          <MarginAlertsSection data={a.margin} onOpen={a.openDialog} />
-          <PeremptionsSection data={a.perem} onOpen={a.openDialog} />
+          <VentesSansAchatSection data={vsa} onOpen={openDialog} />
+          <MarginAlertsSection data={margin} onOpen={openDialog} />
+          <PeremptionsSection data={perem} onOpen={openDialog} />
           <StockAlertsSection
-            negatif={a.negatif}
-            sousStock={a.sousStock}
-            surStock={a.surStock}
-            negUnits={a.negUnits}
-            sousPpv={a.sousPpv}
-            surPpv={a.surPpv}
-            onOpen={a.openDialog}
+            negatif={negatif}
+            sousStock={sousStock}
+            surStock={surStock}
+            negUnits={negUnits}
+            sousPpv={sousPpv}
+            surPpv={surPpv}
+            onOpen={openDialog}
           />
         </>
       )}
 
       {/* shared detail dialog (portal) */}
       <AlertDetailDialog
-        open={!!a.dialog}
-        onClose={a.closeDialog}
-        title={a.dialog?.title ?? ""}
-        subtitle={a.dialog?.subtitle}
-        products={a.dialog?.products ?? []}
-        columns={a.dialog?.columns ?? []}
-        defaultSortKey={a.dialog?.defaultSortKey ?? ""}
-        dateFrom={a.dateFrom}
-        dateTo={a.dateTo}
+        open={!!dialog}
+        onClose={closeDialog}
+        title={dialog?.title ?? ""}
+        subtitle={dialog?.subtitle}
+        products={dialog?.products ?? []}
+        columns={dialog?.columns ?? []}
+        defaultSortKey={dialog?.defaultSortKey ?? ""}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
       />
     </div>
   );

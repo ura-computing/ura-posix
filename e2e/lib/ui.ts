@@ -81,8 +81,8 @@ export function frNumber(text: string | null): number | null {
 /** The big value of a KPI tile, found by its label. */
 export function kpiValue(page: Page, label: string): Locator {
   return page.getByText(label, { exact: true })
-    .locator("xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]")
-    .locator("span.font-mono.font-bold");
+    .locator("xpath=ancestor::*[contains(@class, 'rounded-2xl')][1]")   // div, or <a> / <button> when clickable
+    .locator("span.font-mono.font-bold:not(.rounded-full)");   // not the count badge
 }
 
 /** Text of every cell of one DataTable column (by its header label) on the current page.

@@ -103,7 +103,7 @@ function AppToaster() {
           content:     "flex min-w-0 flex-col gap-0.5",
           title:       "text-sm font-medium leading-snug text-foreground",
           description: "text-sm text-muted-foreground",
-          closeButton: "absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+          closeButton: "absolute right-2 top-1/2 flex size-7 cursor-pointer -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
         },
       }}
     />

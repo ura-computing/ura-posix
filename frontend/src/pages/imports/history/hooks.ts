@@ -9,15 +9,19 @@ import { type DataImportsResponse, type DocType } from "@/types";
 
 
 export function useImports() {
-  const q = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: QUERIES.imports.list,
     queryFn:  () => api.get<DataImportsResponse>(URLS.imports.list, { params: { page: 1, limit: 100 } }),
   });
   return {
-    imports:    q.data?.data ?? [],
-    pagination: q.data?.pagination,
-    isLoading:  q.isLoading,
-    error:      q.error,
+    imports:    data?.data ?? [],
+    pagination: data?.pagination,
+    isLoading,
+    error,
   };
 }
 
@@ -25,7 +29,10 @@ export function useImports() {
 export function useDeleteImport() {
   const qc = useQueryClient();
   const t = useT();
-  const m = useMutation({
+  const {
+    mutate,
+    isPending,
+  } = useMutation({
     mutationFn: (batchId: number) =>
       api.delete<{ id: number; deleted_rows: number; file_type: DocType }>(URLS.imports.one(batchId)),
     onSuccess:  (res) => {
@@ -37,5 +44,8 @@ export function useDeleteImport() {
       );
     },
   });
-  return { deleteImport: m.mutate, isPending: m.isPending };
+  return {
+    deleteImport: mutate,
+    isDeleting: isPending,
+  };
 }

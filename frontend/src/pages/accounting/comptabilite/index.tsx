@@ -201,7 +201,7 @@ function KpiCards({ stats }: { stats: StatsResponse }) {
       <Card icon={<BarChart3 className="size-5" />} title={t("comptabilite.bilanTva")} tone="info">
         <Row label={t("comptabilite.resultat")} value={formatMAD(stats.marge.marge_brute_dh)} hero />
         <Row label={t("comptabilite.tvaADeclarer")}      value={formatMAD(stats.tva.tva_a_declarer)} />
-        <Row label={`Solde TVA ${new Date().getFullYear()}`} value={formatMAD(stats.tva.tva_a_declarer)} subtle />
+        <Row label={t("comptabilite.soldeTva", { year: new Date().getFullYear() })} value={formatMAD(stats.tva.tva_a_declarer)} subtle />
       </Card>
     </div>
   );
@@ -263,8 +263,14 @@ interface PaymentEditDialogProps {
 
 function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditDialogProps) {
   const t = useT();
-  const save = useSavePayment();
-  const del  = useDeletePayment();
+  const {
+    savePayment,
+    isSaving,
+  }   = useSavePayment();
+  const {
+    deletePayment,
+    isDeleting,
+  } = useDeletePayment();
 
   // Form state — initialized from `entry` when the dialog opens. Reset on
   // method/month/open change so reopening on a different card shows the
@@ -285,7 +291,7 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
   if (!method) return null;
 
   const handleSave = async () => {
-    await save.mutateAsync({
+    await savePayment({
       month:                monthV,
       method,
       pharmacie_amount:     Number(pharm) || 0,
@@ -297,7 +303,7 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
 
   const handleDelete = async () => {
     if (!entry) return;
-    await del.mutateAsync(entry.id);
+    await deletePayment(entry.id);
     onClose();
   };
 
@@ -337,14 +343,14 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
             <AsyncButton
               variant="ghost"
               onClick={handleDelete}
-              isLoading={del.isPending}
+              isLoading={isDeleting}
               className="!text-destructive hover:!bg-destructive/5"
             >
               <Trash2 className="size-4" />
               Supprimer
             </AsyncButton>
           ) : <span />}
-          <AsyncButton variant="primary" onClick={handleSave} isLoading={save.isPending}>
+          <AsyncButton variant="primary" onClick={handleSave} isLoading={isSaving}>
             Enregistrer
           </AsyncButton>
         </div>
@@ -558,30 +564,51 @@ const CATEGORY_KEY: Record<StatsFilters["category_type"], string> = {
 
 export default function ComptabilitePage() {
   const t = useT();
-  const p = useComptabilitePage();
+  const {
+    activeMonth,
+    filters,
+    handleExport,
+    openMethod,
+    payments,
+    setActiveMonth,
+    setFilters,
+    setOpenMethod,
+    setVentesPage,
+    setVentesPageSize,
+    setVentesSort,
+    stats,
+    statsLoading,
+    ventes,
+    ventesLoading,
+    ventesPage,
+    ventesPageSize,
+    ventesSortBy,
+    ventesSortOrder,
+    ventesTotal,
+  } = useComptabilitePage();
   const categoryTypeOptions = useCategoryTypeOptions();
 
   const activeFilters: ActiveFilter[] = [
-    (p.filters.date_from || p.filters.date_to) ? {
+    (filters.date_from || filters.date_to) ? {
       key:   "dates",
-      label: <>{t("dashboard.periode")} {p.filters.date_from ?? "…"} → {p.filters.date_to ?? "…"}</>,
-      onClear: () => p.setFilters({ ...p.filters, date_from: null, date_to: null }),
+      label: <>{t("dashboard.periode")} {filters.date_from ?? "…"} → {filters.date_to ?? "…"}</>,
+      onClear: () => setFilters({ ...filters, date_from: null, date_to: null }),
     } : null,
-    p.filters.category_type !== "all" ? {
+    filters.category_type !== "all" ? {
       key:   "cat",
-      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[p.filters.category_type])}</>,
-      onClear: () => p.setFilters({ ...p.filters, category_type: "all" }),
+      label: <>{t("dashboard.categorieFilter")} {t(CATEGORY_KEY[filters.category_type])}</>,
+      onClear: () => setFilters({ ...filters, category_type: "all" }),
     } : null,
-    p.filters.include_non_declared ? {
+    filters.include_non_declared ? {
       key:   "nd",
       label: <>{t("comptabilite.avecSpeciaux")}</>,
-      onClear: () => p.setFilters({ ...p.filters, include_non_declared: false }),
+      onClear: () => setFilters({ ...filters, include_non_declared: false }),
     } : null,
   ].filter(Boolean) as ActiveFilter[];
 
   // Active entry for the open method (drives the dialog's initial values).
-  const activeEntry = p.openMethod
-    ? (p.payments.find((e) => e.method === p.openMethod) ?? null)
+  const activeEntry = openMethod
+    ? (payments.find((e) => e.method === openMethod) ?? null)
     : null;
 
   return (
@@ -595,13 +622,13 @@ export default function ComptabilitePage() {
 
       <FilterBar<StatsFilters["category_type"]>
         dateRange={{
-          from:     p.filters.date_from,
-          to:       p.filters.date_to,
-          onChange: (from, to) => p.setFilters({ ...p.filters, date_from: from, date_to: to }),
+          from:     filters.date_from,
+          to:       filters.date_to,
+          onChange: (from, to) => setFilters({ ...filters, date_from: from, date_to: to }),
         }}
         segment={{
-          value:    p.filters.category_type,
-          onChange: (v) => p.setFilters({ ...p.filters, category_type: v }),
+          value:    filters.category_type,
+          onChange: (v) => setFilters({ ...filters, category_type: v }),
           options:  categoryTypeOptions,
         }}
         rightActions={[
@@ -609,12 +636,12 @@ export default function ComptabilitePage() {
             label:    t("common.export"),
             icon:     <Download className="size-4" />,
             variant:  "outline",
-            onClick:  p.handleExport,
-            disabled: !p.stats,
+            onClick:  handleExport,
+            disabled: !stats,
           },
         ]}
         activeFilters={activeFilters}
-        onResetAll={() => p.setFilters({
+        onResetAll={() => setFilters({
           date_from: null, date_to: null, category_type: "all", include_non_declared: false,
         })}
       />
@@ -623,19 +650,19 @@ export default function ComptabilitePage() {
       <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
         <input
           type="checkbox"
-          checked={p.filters.include_non_declared}
-          onChange={(e) => p.setFilters({ ...p.filters, include_non_declared: e.target.checked })}
+          checked={filters.include_non_declared}
+          onChange={(e) => setFilters({ ...filters, include_non_declared: e.target.checked })}
           className="cursor-pointer accent-primary"
         />
         {t("comptabilite.includeSpecial")}
       </label>
 
       {/* KPI cards (3) */}
-      {p.statsLoading || !p.stats
+      {statsLoading || !stats
         ? <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             {[0,1,2].map((i) => <div key={i} className="h-44 animate-pulse rounded-xl border border-border bg-card" />)}
           </div>
-        : <KpiCards stats={p.stats} />}
+        : <KpiCards stats={stats} />}
 
       {/* Payment method cards (4) for the active month */}
       <section className="flex flex-col gap-3">
@@ -645,12 +672,12 @@ export default function ComptabilitePage() {
           </h2>
           <MonthPopover
             label=""
-            value={p.activeMonth}
-            onChange={p.setActiveMonth}
+            value={activeMonth}
+            onChange={setActiveMonth}
             align="end"
           />
         </div>
-        <PaymentMethodGrid payments={p.payments} onOpenMethod={p.setOpenMethod} />
+        <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
       </section>
 
       {/* Ventes ledger */}
@@ -659,26 +686,26 @@ export default function ComptabilitePage() {
           {t("comptabilite.salesJournal")}
         </h2>
         <VentesLedger
-          rows={p.ventes}
-          isLoading={p.ventesLoading}
-          sortBy={p.ventesSortBy}
-          sortOrder={p.ventesSortOrder}
-          onSort={p.setVentesSort}
+          rows={ventes}
+          isLoading={ventesLoading}
+          sortBy={ventesSortBy}
+          sortOrder={ventesSortOrder}
+          onSort={setVentesSort}
           pagination={{
-            page:       p.ventesPage,
-            pageSize:   p.ventesPageSize,
-            total:      p.ventesTotal,
-            onPage:     p.setVentesPage,
-            onPageSize: p.setVentesPageSize,
+            page:       ventesPage,
+            pageSize:   ventesPageSize,
+            total:      ventesTotal,
+            onPage:     setVentesPage,
+            onPageSize: setVentesPageSize,
           }}
         />
       </section>
 
       <PaymentEditDialog
-        open={p.openMethod !== null}
-        onClose={() => p.setOpenMethod(null)}
-        method={p.openMethod}
-        month={p.activeMonth}
+        open={openMethod !== null}
+        onClose={() => setOpenMethod(null)}
+        method={openMethod}
+        month={activeMonth}
         entry={activeEntry}
       />
     </div>

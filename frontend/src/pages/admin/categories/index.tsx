@@ -198,16 +198,30 @@ function normalizeCategory(input: string): string {
 
 export default function AdminCategoriesPage() {
   const t = useT();
-  const list = useCategorySuffixes();
-  const createMut = useCreateCategorySuffix();
-  const updateMut = useUpdateCategorySuffix();
-  const deleteMut = useDeleteCategorySuffix();
+  const {
+    suffixes,
+    isLoading,
+    isError,
+    reload,
+  } = useCategorySuffixes();
+  const {
+    createSuffix,
+    isCreating,
+  } = useCreateCategorySuffix();
+  const {
+    updateSuffix,
+    isUpdating,
+  } = useUpdateCategorySuffix();
+  const {
+    deleteSuffix,
+    isDeleting,
+  } = useDeleteCategorySuffix();
 
   const [editing,        setEditing]        = useState<CategorySuffixOut | null>(null);
   const [createOpen,     setCreateOpen]     = useState(false);
   const [removeTarget,   setRemoveTarget]   = useState<CategorySuffixOut | null>(null);
 
-  const items = list.data ?? [];
+  const items = suffixes;
 
   const columns: ColumnDef<CategorySuffixOut>[] = [
     {
@@ -269,15 +283,15 @@ export default function AdminCategoriesPage() {
         </AsyncButton>
       </header>
 
-      {list.isError ? (
+      {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("categories.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={() => list.refetch()}>
+          <AsyncButton variant="secondary" onClick={reload}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
           </AsyncButton>
         </div>
-      ) : list.isLoading ? (
+      ) : isLoading ? (
         <div className="flex items-center justify-center rounded-2xl border border-border bg-card py-16">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -295,9 +309,9 @@ export default function AdminCategoriesPage() {
       <CategorySuffixDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        isSaving={createMut.isPending}
+        isSaving={isCreating}
         onSubmit={async (values) => {
-          await createMut.mutateAsync(values);
+          await createSuffix(values);
           setCreateOpen(false);
         }}
       />
@@ -307,10 +321,10 @@ export default function AdminCategoriesPage() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         item={editing}
-        isSaving={updateMut.isPending}
+        isSaving={isUpdating}
         onSubmit={async (values) => {
           if (!editing) return;
-          await updateMut.mutateAsync({ id: editing.id, body: values });
+          await updateSuffix({ id: editing.id, body: values });
           setEditing(null);
         }}
       />
@@ -321,7 +335,7 @@ export default function AdminCategoriesPage() {
         onClose={() => setRemoveTarget(null)}
         onConfirm={async () => {
           if (!removeTarget) return;
-          await deleteMut.mutateAsync(removeTarget.id);
+          await deleteSuffix(removeTarget.id);
           setRemoveTarget(null);
         }}
         title={removeTarget ? t("categories.deleteTitle", { category: removeTarget.category }) : ""}
@@ -329,7 +343,7 @@ export default function AdminCategoriesPage() {
         variant="destructive"
         confirmLabel={t("common.delete")}
         loadingLabel={t("categories.deleting")}
-        isLoading={deleteMut.isPending}
+        isLoading={isDeleting}
       />
     </div>
   );

@@ -6,7 +6,7 @@ import { loadState } from "./auth";
 import { expectSame, expectSameSet, expectTiedPick, TOL, type Row } from "./diff";
 import { expected } from "./expected";
 import { expect } from "./fixtures";
-import { frNumber, kpiValue } from "./ui";
+import { columnTexts, frNumber, kpiValue } from "./ui";
 
 export type { Row } from "./diff";
 export type CategoryType = "all" | "pharmacie" | "parapharmacie";
@@ -239,5 +239,58 @@ export async function checkKpiTiles(page: Page, k: Row, gains?: number[]): Promi
     const nums = (sub.match(/-?\u2212?\d{1,3}(?:[\s\u202f\u00a0]\d{3})*(?:,\d+)?/g) ?? []).map((t) => frNumber(t));
     expect(near(nums[0] ?? null, k[max].value) && near(nums[1] ?? null, k[min].value),
       `« ${label} » : ${sub} ≠ Max ${k[max].value} · Min ${k[min].value}`).toBe(true);
+  }
+}
+
+
+type Cell = [header: string, value: (r: Row) => string | number | null, kind: "text" | "num" | "starts"];
+const marge = (r: Row, mode: "pct" | "dh"): number | null =>
+  r.ppv == null || r.avg_pu == null || r.ppv === 0 ? null : mode === "pct" ? (1 - r.avg_pu / r.ppv) * 100 : r.ppv - r.avg_pu;
+const LEDGER_CELLS: Record<Ledger, Cell[]> = {
+  ventes: [
+    ["Date", (r) => r.date ?? "—", "text"], ["N° Transaction", (r) => r.transaction_ref ?? "—", "starts"],
+    ["Client", (r) => r.client || "Anonyme", "text"], ["Produit", (r) => r.product ?? "—", "text"],
+    ["Catégorie", (r) => r.category ?? "—", "text"], ["TVA", (r) => r.tva ?? "—", "text"],
+    ["Qté", (r) => r.quantity, "num"], ["Remise", (r) => (r.discount && r.discount > 0 ? r.discount : 0), "num"],
+    ["PPV", (r) => r.ppv, "num"], ["Sous-total", (r) => r.subtotal, "num"], ["Total", (r) => r.total, "num"],
+    ["Marge %", (r) => marge(r, "pct"), "num"], ["Marge DH", (r) => marge(r, "dh"), "num"],
+  ],
+  achats: [
+    ["Date BL", (r) => r.delivery_date ?? "—", "text"], ["Référence", (r) => r.delivery_ref ?? "—", "starts"],
+    ["Fournisseur", (r) => r.supplier ?? "—", "text"], ["Produit", (r) => r.product ?? "—", "text"],
+    ["Catégorie", (r) => r.category ?? "—", "text"], ["TVA", (r) => r.tva ?? "—", "text"],
+    ["Qté", (r) => r.quantity, "num"], ["PPH", (r) => r.pph, "num"], ["PU (achat)", (r) => r.unit_price, "num"],
+    ["Péremption", (r) => r.expiry_date ?? "—", "text"], ["Total", (r) => r.total, "num"],
+  ],
+};
+
+/** The ledger table on screen = these API rows (current page, same order): every column,
+ *  text (1st line: the PID sits under the product) or number (2 decimals shown). */
+export async function checkLedgerScreen(page: Page, kind: Ledger, rows: Row[]): Promise<void> {
+  // Wait for THESE rows (not the previous filter's): 1st row's product + date.
+  const first = page.locator("table tbody tr").first();
+  await expect(first).toContainText(rows[0]?.product ?? "");
+  await expect(first).toContainText((kind === "ventes" ? rows[0]?.date : rows[0]?.delivery_date) ?? "");
+  const bad: string[] = [];
+  for (const [header, value, how] of LEDGER_CELLS[kind]) {
+    const cells = await columnTexts(page, header);
+    if (cells.length !== rows.length) bad.push(`${header}: ${cells.length} lignes ≠ ${rows.length}`);
+    rows.forEach((r, i) => {
+      const want = value(r);
+      const shown = (cells[i] ?? "").split("\n")[0].trim();
+      const ok = how === "num" ? (want == null ? shown === "—" : Math.abs((frNumber(shown) ?? NaN) - (want as number)) <= 0.011)
+        : how === "starts" ? shown.startsWith(String(want)) : shown === String(want);
+      if (!ok) bad.push(`${header}[${i}]: « ${shown} » ≠ ${want}`);
+    });
+  }
+  expect(bad.slice(0, 20), `${kind}: tableau à l'écran`).toEqual([]);
+}
+
+/** A gauge side / summary tile: label, value = next sibling (p or span). */
+export async function checkTileValues(page: Page, tiles: [string, number][], what: string): Promise<void> {
+  for (const [label, want] of tiles) {
+    const value = page.getByText(label, { exact: true }).first().locator("xpath=following-sibling::*[1]");
+    await expect.poll(async () => Math.abs((frNumber(await value.innerText()) ?? NaN) - want), `${what} « ${label} » = ${want}`)
+      .toBeLessThanOrEqual(0.011);
   }
 }

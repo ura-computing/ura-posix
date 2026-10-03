@@ -19,6 +19,7 @@ Senior engr PharmaGest. Caveman "full" style. Zero fluff.
 - Unsure → `unknown` + verifying file.
 - Minimal edits. No unrequested refactors.
 - One router + one schema per domain.
+- Hooks return named actions + state (`{ deletePayment, isDeleting }`), never the raw `useMutation` / `useQuery`; callers never see `mutate` / `mutateAsync`. Caller must wait → action returns a Promise. Destructure everywhere, no `obj.prop` when not needed: `const { mutateAsync, isPending } = useMutation(...)` → `return { createSuffix: mutateAsync, isCreating: isPending }`; callers `const { stats, savePayment } = useComptabilitePage()`, never `p.stats`. 2+ entries in a `return { … }` or `const { … } =` → one per line.
 - Ignore `TODO.md`.
 - Report honestly: failing tests → say so + output.
 
@@ -43,6 +44,7 @@ Senior engr PharmaGest. Caveman "full" style. Zero fluff.
 # Must-knows (each broke something)
 - Index SQL functions schema-qualified (`public.unaccent(...)`): PG 17 runs index expressions with `search_path = pg_catalog, pg_temp`.
 - React Compiler on: no `state!.prop` in callbacks → `if (state) await save(state.id, x)`.
+- React Compiler caches a call whose inputs never change: read React state (`jobs`), not a stable getter over a ref (`getJobByDocType`) → stale UI.
 - Date filters: set both dates in one call (`setRange(from, to)`).
 - Several buttons in one `<label>` → use `role="group"` + `aria-label`.
 - Fixed menus flip up near window bottom (`KebabMenu.tsx`).

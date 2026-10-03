@@ -180,20 +180,26 @@ export default function AdminPharmacyDetail() {
   // Pending feature toggles — separate from the server values; resets after save.
   const [pendingFeatures, setPendingFeatures] = useState<Record<FeatureKey, boolean> | null>(null);
 
-  const detailQ = useAdminPharmacy(id);
-  const detail  = detailQ.data ?? null;
+  const {
+    pharmacy,
+    isLoading,
+  } = useAdminPharmacy(id);
+  const detail = pharmacy ?? null;
 
-  const updateMut   = useUpdatePharmacy(id);
-  const archiveMut  = useArchivePharmacy(id);
-  const featuresMut = useSetPharmacyFeatures(id);
-  const permsMut    = useSetUserPermissions(id);
-  const createMut   = useCreateUser();
-  const resetPwdMut = useResetUserPassword();
-  const statusMut   = useSetUserStatus(id);
-  const removeMut   = useDeleteUser(id);
-
-  const isSavingFeatures = featuresMut.isPending;
-  const isSavingPerms    = permsMut.isPending;
+  const { updatePharmacy } = useUpdatePharmacy(id);
+  const { archivePharmacy } = useArchivePharmacy(id);
+  const {
+    setPharmacyFeatures,
+    isSavingFeatures,
+  } = useSetPharmacyFeatures(id);
+  const {
+    setUserPermissions,
+    isSavingPermissions: isSavingPerms,
+  } = useSetUserPermissions(id);
+  const { createUser } = useCreateUser();
+  const { resetUserPassword } = useResetUserPassword();
+  const { setUserStatus } = useSetUserStatus(id);
+  const { deleteUser } = useDeleteUser(id);
 
   const serverFeatures: Record<FeatureKey, boolean> = useMemo(
     () => toFeatureRecord(detail?.enabled_features),
@@ -203,37 +209,35 @@ export default function AdminPharmacyDetail() {
   const featureValues = pendingFeatures ?? serverFeatures;
 
   const handleEdit = async (v: PharmacyIn) => {
-    await updateMut.mutateAsync(v);
+    await updatePharmacy(v);
     setEditOpen(false);
   };
-  const handleCreateUser = async (v: CreateUserIn): Promise<CreateUserOut> =>
-    createMut.mutateAsync(v);
+  const handleCreateUser = async (v: CreateUserIn): Promise<CreateUserOut> => createUser(v);
   const handleSaveFeatures = async () => {
     if (!pendingFeatures) return;
-    await featuresMut.mutateAsync(pendingFeatures);
+    await setPharmacyFeatures(pendingFeatures);
     setPendingFeatures(null);
   };
   const handleSavePerms = async (user: MemberOut, next: Record<FeatureKey, boolean>) => {
-    await permsMut.mutateAsync({ userId: user.id, permissions: next });
+    await setUserPermissions({ userId: user.id, permissions: next });
     setPermDialogUser(null);
   };
   const handleDelete = async () => {
-    await archiveMut.mutateAsync();
+    await archivePharmacy();
     nav(ROUTES.ADMIN_PHARMACIES);
   };
   const handleResetPassword = async (password: string) => {
-    if (resetTarget) await resetPwdMut.mutateAsync({ userId: resetTarget.id, password });
+    if (resetTarget) await resetUserPassword({ userId: resetTarget.id, password });
   };
   const handleToggleStatus = async (member: MemberOut) => {
     const status = member.status === "active" ? "inactive" : "active";
-    await statusMut.mutateAsync({ userId: member.id, status });
+    await setUserStatus({ userId: member.id, status });
   };
   const handleConfirmRemove = async () => {
     if (!removeTarget) return;
-    await removeMut.mutateAsync(removeTarget.id);
+    await deleteUser(removeTarget.id);
     setRemoveTarget(null);
   };
-  const isLoading = detailQ.isLoading;
 
   if (isLoading || !detail) {
     return (

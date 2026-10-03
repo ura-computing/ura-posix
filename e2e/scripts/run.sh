@@ -39,7 +39,12 @@ if [ "$MODE" = ui ]; then
   export E2E_HEADED=1 E2E_SLOWMO=250
   args+=(--headed)
 else
-  [ "$(ask "Record a new speed baseline? (y/n)" n)" = y ] && export E2E_UPDATE_BASELINE=1
+  if [ "$(ask "Only the tests that failed last time? (y/n)" n)" = y ]; then
+    args+=(--last-failed)               # + the setup tests (01, 02) they depend on
+    export E2E_PARTIAL=1                # coverage + speed gates need the full suite: skipped
+  else
+    [ "$(ask "Record a new speed baseline? (y/n)" n)" = y ] && export E2E_UPDATE_BASELINE=1
+  fi
 fi
 
 exec npx playwright test ${args[@]+"${args[@]}"}

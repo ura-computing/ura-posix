@@ -21,7 +21,7 @@ import { translate } from "@/i18n/I18nProvider";
  *   3. Preview first 8 rows + date range → click "Importer" (enqueues a job)
  *
  * REHYDRATION is now SCOPED PER DOC-TYPE — fixes the previous "blank page"
- * bug. `getJobByDocType(localDocType)` returns the most-recent job for THIS
+ * bug. `job` = the most-recent job in `jobs` for THIS
  * doc-type (queued / running / finished). If present, we render its state
  * card; otherwise the wizard renders normally. Navigating to a different
  * doc-type while another is running shows that doc-type's wizard (or its
@@ -44,8 +44,22 @@ const EXAMPLE_FILENAME: Record<DocType, string> = {
 };
 
 
+/** Columns a Sobrus file of this type must have. Compared on ASCII letters only, so
+ *  « Référence » and a broken « RÃ©fÃ©rence » both match. */
+const REQUIRED_COLUMNS: Record<DocType, string[]> = {
+  achat: ["PID", "Produit", "Référence de livraison", "Quantité"],
+  vente: ["PID", "Produit", "Numéro de transaction", "Quantité"],
+  stock: ["PID", "Produit", "Stock"],
+};
+const asciiKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 export function useUpload(initialDocType: DocType | null = null) {
-  const upload = useUploadCtx();
+  const {
+    jobs,
+    cancelUpload,
+    dismissJob,
+    enqueueUpload,
+  } = useUploadCtx();
 
   // Local-only wizard scaffolding. Lost on unmount — that's OK because the
   // state card pulls everything from the rehydrated job below.
@@ -69,7 +83,9 @@ export function useUpload(initialDocType: DocType | null = null) {
   // The wizard for `type=achat` cares only about achat jobs; it must NOT
   // show a running stock job's state card (which would render blank because
   // the local file/headers belong to a different intent).
-  const job = localDocType ? upload.getJobByDocType(localDocType) : null;
+  // From `jobs` (state), not getJobByDocType (reads a ref): the React Compiler caches a
+  // call whose inputs never change, so the wizard would never see the job progress.
+  const job = localDocType ? [...jobs].reverse().find((j) => j.docType === localDocType) ?? null : null;
 
   // Render priority: local file-preview > active/recent job for this docType > wizard
   // - localStep=3 + file: user is on the confirmation step with a freshly-picked file
@@ -106,6 +122,16 @@ export function useUpload(initialDocType: DocType | null = null) {
     setFilenameError(null);
     const text   = await readFileText(f);
     const parsed = parseSobrusCsv(text);
+    if (parsed.rows.length === 0) {
+      setFilenameError(translate("uploadFile.emptyFile"));
+      return;
+    }
+    const have = new Set(parsed.headers.map(asciiKey));
+    const missing = REQUIRED_COLUMNS[t].filter((c) => !have.has(asciiKey(c)));
+    if (missing.length > 0) {            // e.g. a Ventes file renamed « Achats »
+      setFilenameError(translate("uploadFile.missingColumns", { columns: missing.join(", ") }));
+      return;
+    }
     setFile(f);
     setHeaders(parsed.headers);
     setAllRows(parsed.rows);
@@ -125,19 +151,19 @@ export function useUpload(initialDocType: DocType | null = null) {
    *  uploadId so callers can reference it (not used today). */
   const startImport = useCallback(() => {
     if (!localDocType || !file || allRows.length === 0) return;
-    const id = upload.enqueueUpload(localDocType, allRows, file.name);
+    const id = enqueueUpload(localDocType, allRows, file.name);
     // Release local preview state — `job` (rehydration) will now render the
     // queued/running card for this doc-type.
     setFile(null);
     setHeaders([]);
     setAllRows([]);
     return id;
-  }, [localDocType, file, allRows, upload]);
+  }, [localDocType, file, allRows, enqueueUpload]);
 
   /** Cancel the currently-rehydrated job (queued or running). */
   const cancel = useCallback(() => {
-    if (job) upload.cancelUpload(job.id);
-  }, [job, upload]);
+    if (job) cancelUpload(job.id);
+  }, [job, cancelUpload]);
 
   /** "Nouvel import" — return to step 1, like any normal navigation.
    *  • If the job is still in flight: leave it running in the global
@@ -151,11 +177,11 @@ export function useUpload(initialDocType: DocType | null = null) {
       if (job.phase === "queued" || job.phase === "uploading") {
         setDismissedRunningCard(true);
       } else {
-        upload.dismissJob(job.id);
+        dismissJob(job.id);
       }
     }
     backToType();
-  }, [job, upload, backToType]);
+  }, [job, dismissJob, backToType]);
 
   return {
     // shell state (rehydration scoped per-doc-type via `job`)

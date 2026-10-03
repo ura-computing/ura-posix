@@ -8,6 +8,7 @@ import { monthsAgo, todayIso } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/pages/analytics/hooks";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
+import { translateFr } from "@/i18n/I18nProvider";
 
 export type StockSortKey =
   | "product"
@@ -54,13 +55,21 @@ export function useStockPage() {
     classFilter !== null || status !== "";
 
   // ---- 1) FULL fetch: drives circles + gauge + alert cards (NO class/status) ----
-  const fullQuery = useStockAbcd({
+  const {
+    abcd,
+    isLoading,
+    isError,
+    reload,
+  } = useStockAbcd({
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   });
 
   // ---- 2) FILTERED fetch: drives ONLY the conditional table ----
-  const filteredQuery = useStockAbcd(
+  const {
+    abcd: filtered,
+    isLoading: isTableLoading,
+  } = useStockAbcd(
     {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
@@ -72,9 +81,9 @@ export function useStockPage() {
     { enabled: hasTableFilter },
   );
 
-  const peremptionsQuery = usePeremptions();
+  const { peremptions } = usePeremptions();
 
-  const fullProducts: StockRow[] = fullQuery.data?.products ?? [];
+  const fullProducts: StockRow[] = abcd?.products ?? [];
 
   // ---- health gauge score: ideal / non-inconnu * 10 ----
   const healthScore = useMemo(() => {
@@ -98,6 +107,12 @@ export function useStockPage() {
   const selectClass = useCallback((c: AbcdClass) => {
     setPage(1);
     setClassFilter((prev) => (prev === c ? null : c)); // click same circle clears
+  }, []);
+
+  /** New status = new list: back to page 1 (was left on page 2 → first rows hidden). */
+  const changeStatus = useCallback((v: string) => {
+    setStatus(v);
+    setPage(1);
   }, []);
 
   const clearAll = useCallback(() => {
@@ -132,7 +147,7 @@ export function useStockPage() {
       "Statut",
     ];
     const rowsToExport = hasTableFilter
-      ? (filteredQuery.data?.products ?? [])
+      ? (filtered?.products ?? [])
       : fullProducts;
     const body = rowsToExport.map((r) => [
       r.product,
@@ -143,25 +158,26 @@ export function useStockPage() {
       r.stock_max,
       r.ppv ?? 0,
       r.avg_pu ?? 0,
-      r.status,
+      translateFr(`stockStatus.${r.status}`),   // « À surveiller », not the code « a-surveiller »
     ]);
     downloadXlsx(
       [header, ...body],
       exportFilename("STOCK", "xlsx", dateFrom, dateTo),
     );
-  }, [fullProducts, filteredQuery.data, hasTableFilter, dateFrom, dateTo]);
+  }, [fullProducts, filtered, hasTableFilter, dateFrom, dateTo]);
 
   return {
     // queries
-    fullQuery,
-    filteredQuery,
-    peremptionsQuery,
+    abcd, isLoading, isError, reload,         // full fetch: circles + gauge + alert cards (no class / status)
+    tableRows: filtered?.products ?? [],
+    isTableLoading,
+    peremptions,
     // derived
     fullProducts,
     healthScore,
     hasTableFilter,
-    isExportLoading: hasTableFilter && filteredQuery.isLoading,
-    isEmpty: (fullQuery.data?.total_references ?? 0) === 0,
+    isExportLoading: hasTableFilter && isTableLoading,
+    isEmpty: (abcd?.total_references ?? 0) === 0,
     // filter state + setters
     dateFrom,
     dateTo,
@@ -170,7 +186,7 @@ export function useStockPage() {
     status,
     setDateFrom,
     setDateTo,
-    setStatus,
+    setStatus: changeStatus,
     selectClass,
     // table state
     sortBy,

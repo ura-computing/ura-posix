@@ -29,12 +29,16 @@ export function useCatalogPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
 
-  const list = useQuery({
+  const {
+    data: list,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERIES.admin.catalog.list(filters),
     queryFn:  () => api.get<CatalogListResponse>(URLS.admin.catalog.list, { params: filters }),
   });
 
-  const categories = useQuery({
+  const { data: categories } = useQuery({
     queryKey:  QUERIES.admin.catalog.categories,
     queryFn:   () => api.get<string[]>(URLS.admin.catalog.categories),
     staleTime: 5 * 60_000,
@@ -63,26 +67,39 @@ export function useCatalogPage() {
     queryClient.invalidateQueries({ queryKey: QUERIES.admin.catalog.categories });
   };
 
-  const create = useMutation({
+  const {
+    mutate: create,
+    isPending: isCreating,
+  } = useMutation({
     mutationFn: (body: MedicamentInput) => api.post<Medicament>(URLS.admin.catalog.list, body),
     onSuccess:  () => { toast.success(t("catalogue.toastCreated")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
-  const update = useMutation({
+  const {
+    mutate: update,
+    isPending: isUpdating,
+  } = useMutation({
     mutationFn: ({ id, body }: { id: number; body: Partial<MedicamentInput> }) =>
       api.put<Medicament>(URLS.admin.catalog.one(id), body),
     onSuccess:  () => { toast.success(t("catalogue.toastUpdated")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
-  const remove = useMutation({
+  const {
+    mutate: remove,
+    isPending: isRemoving,
+  } = useMutation({
     mutationFn: (id: number) => api.delete(URLS.admin.catalog.one(id)),
     onSuccess:  () => { toast.success(t("catalogue.toastDeleted")); invalidate(); },
     onError:    (e: Error) => toast.error(e.message),
   });
 
-  const importCsv = useMutation({
+  const {
+    mutate: importCsv,
+    isPending: isImporting,
+    data: lastImport,
+  } = useMutation({
     mutationFn: (file: File) => api.upload<CatalogImportResponse>(URLS.uploads.catalog, file),
     onSuccess:  (r) => {
       toast.success(t("catalogue.toastImport", { inserted: r.inserted, updated: r.updated, skipped: r.skipped }));
@@ -95,19 +112,11 @@ export function useCatalogPage() {
     filters,
     setSearch, setCategories, setType,
     setSort, setPage, setPageSize, reset,
-    list:        list.data,
-    isLoading:   list.isLoading,
-    isError:     list.isError,
-    categories:  categories.data ?? [],
-    create:      (body: MedicamentInput)                          => create.mutate(body),
-    update:      (id: number, body: Partial<MedicamentInput>)     => update.mutate({ id, body }),
-    remove:      (id: number)                                     => remove.mutate(id),
-    importCsv:   (file: File)                                     => importCsv.mutate(file),
-    creating:    create.isPending,
-    updating:    update.isPending,
-    removing:    remove.isPending,
-    importing:   importCsv.isPending,
-    lastImport:  importCsv.data,
+    list, isLoading, isError,
+    categories:  categories ?? [],
+    create, update, remove, importCsv,      // update({ id, body })
+    isCreating, isUpdating, isRemoving, isImporting,
+    lastImport,
   };
 }
 
