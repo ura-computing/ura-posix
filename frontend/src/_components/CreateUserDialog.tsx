@@ -18,6 +18,7 @@ import { CheckCircle2, Copy, KeyRound, Loader2, Mail, UserPlus, X } from "lucide
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { AsyncButton } from "./AsyncButton";
+import { FormField, FormInput } from "./FormField";
 import { PasswordField } from "./PasswordField";
 import { SingleSelectPopover } from "./SingleSelectPopover";
 import { Dialog, DialogContent } from "./dialog";
@@ -114,24 +115,24 @@ export function CreateUserDialog({
         {/* ─── State A · Form ──────────────────────────────────────────── */}
         {!revealed && (
           <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-            <Field label={t("adminPharm.fullName")} required>
-              <Input
+            <FormField label={t("adminPharm.fullName")} required>
+              <FormInput
                 value={values.full_name ?? ""}
                 onChange={(v) => set("full_name", v)}
                 placeholder="Karim Bennani"
                 required
               />
-            </Field>
+            </FormField>
 
-            <Field label={t("adminPharm.email")} required>
-              <Input
+            <FormField label={t("adminPharm.email")} required>
+              <FormInput
                 type="email"
                 value={values.email}
                 onChange={(v) => set("email", v)}
                 placeholder="karim.bennani@pharmacentre.ma"
                 required
               />
-            </Field>
+            </FormField>
 
             <PasswordField
               label={t("adminPharm.password")}
@@ -146,7 +147,7 @@ export function CreateUserDialog({
             {/* Rôle radio — hidden when roleLocked is set (owner-side caller
                 forces "employee"; admin-side caller shows the choice). */}
             {!roleLocked && (
-              <Field label={t("adminPharm.role")} required group>
+              <FormField label={t("adminPharm.role")} required group>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {(["owner", "employee"] as const).map((role) => {
                     const selected = values.role === role;
@@ -172,10 +173,10 @@ export function CreateUserDialog({
                     );
                   })}
                 </div>
-              </Field>
+              </FormField>
             )}
 
-            <Field label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
+            <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
               <SingleSelectPopover
                 label=""
                 options={pharmacies.map((p) => ({
@@ -185,7 +186,7 @@ export function CreateUserDialog({
                 value={String(values.pharmacy_id)}
                 onChange={(v) => set("pharmacy_id", Number(v))}
               />
-            </Field>
+            </FormField>
 
             <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
               <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
@@ -370,7 +371,7 @@ function CredentialsReveal({
         </span>
       </div>
 
-      <Field label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")} group>
+      <FormField label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")} group>
         <div className="flex items-center gap-2">
           <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
             {tempPassword}
@@ -380,7 +381,7 @@ function CredentialsReveal({
             {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
           </AsyncButton>
         </div>
-      </Field>
+      </FormField>
 
       <div className="-mx-5 -mb-5 mt-1 flex items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
         {/* Gmail web compose, not mailto: — mailto goes to the OS default mail
@@ -423,53 +424,4 @@ function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, 
     body,
   });
   return `https://mail.google.com/mail/?${params.toString()}`;
-}
-
-// ─── Tiny inline form primitives (kept inline to avoid one-off shared/ files) ──
-
-/** `group`: children are buttons (role cards, picker, copy) — render a
- *  div role="group", not a <label>: a <label> names its first button after the
- *  whole block (the Propriétaire card was announced "Rôle* Employé…"). */
-function Field({
-  label,
-  required,
-  hint,
-  group,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  group?: boolean;
-  children: React.ReactNode;
-}) {
-  const Tag = group ? "div" : "label";
-  return (
-    <Tag className="flex flex-col gap-1.5" {...(group ? { role: "group", "aria-label": label } : {})}>
-      <span className="text-sm font-medium text-foreground">
-        {label}
-        {required && <span className="ml-1 text-error">*</span>}
-      </span>
-      {children}
-      {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
-    </Tag>
-  );
-}
-
-function Input({
-  value,
-  onChange,
-  ...rest
-}: { value: string; onChange: (v: string) => void } & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange"
->) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-    />
-  );
 }

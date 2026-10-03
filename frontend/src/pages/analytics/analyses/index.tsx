@@ -24,6 +24,7 @@ import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
 import { useMonthsShort } from "@/i18n/dates";
 import { MARGE_COLS } from "./constants";
+import { Page } from "@/_components/Page";
 
 /** 8 KPI tiles for /analyse (old-app parity):
  *  Row 1 — CA, Marge moyenne %, Marge moyenne DH, Optimisation.
@@ -374,12 +375,7 @@ export default function AnalysePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("analyse.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("analyse.subtitle")}</p>
-      </header>
-
+    <Page title={t("analyse.title")} subtitle={t("analyse.subtitle")}>
       <FilterBar<string>
         dateRange={{
           from: filters.date_from,
@@ -461,6 +457,6 @@ export default function AnalysePage() {
           {t("analyse.loadError")} {error instanceof Error && error.message ? error.message : t("analyse.retryLater")}
         </div>
       )}
-    </div>
+    </Page>
   );
 }

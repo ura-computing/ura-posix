@@ -19,6 +19,10 @@ const SIZE_H = 130;
 const CX = 100;
 const CY = 105;
 const R = 80;
+const STROKE = 14;
+const RED = "rgb(244 63 94)";
+const YELLOW = "rgb(245 158 11)";
+const GREEN = "rgb(16 185 129)";
 
 function arcPath(startDeg: number, endDeg: number): string {
   const s = ((startDeg - 90) * Math.PI) / 180;
@@ -42,9 +46,13 @@ export function NeedleGauge({ value }: { value: number }) {
 
   return (
     <svg width={SIZE_W} height={SIZE_H} viewBox={`0 0 ${SIZE_W} ${SIZE_H}`} aria-hidden>
-      <path d={arcPath(-90, -54)} stroke="rgb(244 63 94)" strokeWidth={14} fill="none" strokeLinecap="round" />
-      <path d={arcPath(-54, +54)} stroke="rgb(245 158 11)" strokeWidth={14} fill="none" />
-      <path d={arcPath(+54, +90)} stroke="rgb(16 185 129)" strokeWidth={14} fill="none" strokeLinecap="round" />
+      {/* Flat joints on both sides (yellow drawn first, a bit longer, under red + green: no
+          hairline gap), round only at the 2 outer ends (one dot each) → symmetric. */}
+      <path d={arcPath(-55, +55)} stroke={YELLOW} strokeWidth={STROKE} fill="none" />
+      <path d={arcPath(-90, -54)} stroke={RED} strokeWidth={STROKE} fill="none" />
+      <path d={arcPath(+54, +90)} stroke={GREEN} strokeWidth={STROKE} fill="none" />
+      <circle cx={CX - R} cy={CY} r={STROKE / 2} fill={RED} />
+      <circle cx={CX + R} cy={CY} r={STROKE / 2} fill={GREEN} />
       <line x1={CX} y1={CY} x2={nx} y2={ny} stroke="var(--color-foreground)" strokeWidth={2.5} strokeLinecap="round" />
       <circle cx={CX} cy={CY} r={5} fill="var(--color-foreground)" />
       <circle cx={CX} cy={CY} r={2} fill="var(--color-background)" />

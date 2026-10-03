@@ -28,3 +28,4 @@
 + make sure all file uses translation
 + see if you can put query keys with urls togeher in one object
 + add ui tutorial for new user to show the m how to use the app
++ fix gauge ui

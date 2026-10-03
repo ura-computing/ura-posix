@@ -2,19 +2,13 @@
 import { useCallback, useMemo, useState } from "react";
 // Already shipped at @/hooks/stats:
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import { useMarginAlerts, type MarginAlertsFilters } from "@/hooks/sharedQueries";
 import type { AlertColumn } from "./_components/AlertDetailDialog";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-import type {
-  MarginAlertsResponse,
-  PeremptionsResponse,
-  StatsFilters,
-  StockAbcdResponse,
-  StockFilters,
-  VentesSansAchatResponse,
-} from "@/types";
+import type { PeremptionsResponse, StockAbcdResponse, StockFilters, VentesSansAchatResponse } from "@/types";
 
 /** Same vocabulary as StatsFilters.category_type so the segmented selector
  *  matches /rapport visually + semantically. "all" = no filter. */
@@ -87,7 +81,7 @@ export function useAlertesPage() {
   }); // ignores category
 
   // ---- stock alerts derived CLIENT-SIDE from stockAbcd.products ----
-  const products = abcd?.products ?? [];
+  const products = useMemo(() => abcd?.products ?? [], [abcd]);
   const negatif = useMemo(() => products.filter((p) => p.status === "negatif"), [products]);
   const sousStock = useMemo(() => products.filter((p) => p.status === "sous-stock"), [products]);
   const surStock = useMemo(() => products.filter((p) => p.status === "sur-stock"), [products]);
@@ -191,7 +185,6 @@ export type UseAlertesPage = ReturnType<typeof useAlertesPage>;
  */
 
 /** Subset of StatsFilters used by margin-alerts (no include_non_declared). */
-export type MarginAlertsFilters = Omit<StatsFilters, "include_non_declared">;
 
 interface UseStockAbcdOptions {
   enabled?: boolean;
@@ -212,7 +205,10 @@ export function useStockAbcd(filters: Partial<StockFilters>, options: UseStockAb
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey,
-    queryFn: () => api.get<StockAbcdResponse>(API.stats.stockAbcdFull.url, { params: filters }),
+    queryFn: () =>
+      api.get<StockAbcdResponse>(API.stats.stockAbcdFull.url, {
+        params: filters,
+      }),
     enabled: options.enabled ?? true,
   });
   return {
@@ -237,27 +233,6 @@ export function usePeremptions() {
   };
 }
 
-/** Fetch the 5-bracket margin-alerts payload. /alertes renders only `negative`
- *  + `low`; Rapport reads the same response. Cache key includes filters so
- *  switching dates / category type refetches cleanly. */
-export function useMarginAlerts(filters: MarginAlertsFilters) {
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: API.stats.marginAlerts.key(
-      filters.date_from ?? null,
-      filters.date_to ?? null,
-      filters.category_type ?? "all",
-    ),
-    queryFn: () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
-    staleTime: 60_000,
-  });
-  return {
-    marginAlerts: data,
-    isLoading,
-    isError,
-    reload: () => void refetch(),
-  };
-}
-
 /** Products with ventes in the window but no matching achat — the root cause of
  *  "—" cells for Marge %/DH on /ventes. Same filter shape as MarginAlerts. */
 export function useVentesSansAchat(filters: MarginAlertsFilters) {
@@ -267,7 +242,10 @@ export function useVentesSansAchat(filters: MarginAlertsFilters) {
       filters.date_to ?? null,
       filters.category_type ?? "all",
     ),
-    queryFn: () => api.get<VentesSansAchatResponse>(API.stats.ventesSansAchat.url, { params: filters }),
+    queryFn: () =>
+      api.get<VentesSansAchatResponse>(API.stats.ventesSansAchat.url, {
+        params: filters,
+      }),
     staleTime: 60_000,
   });
   return {

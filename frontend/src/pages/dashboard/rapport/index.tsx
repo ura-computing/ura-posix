@@ -48,11 +48,8 @@ import type {
 } from "@/types";
 
 import {
-  useAdminPharmacies,
   useAdminPharmacyStats,
   useAdminStats,
-  useMarginAlerts,
-  useStats,
   useStockSummary,
   useAdminPharmacyAnalyseMarge,
   useAdminPharmacyMarginAlerts,
@@ -60,17 +57,19 @@ import {
   useCategoryTint,
   useOptimisationGain,
 } from "./hooks";
+import { useAdminPharmaciesList, useMarginAlerts, useStats } from "@/hooks/sharedQueries";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { DataTable } from "@/_components/DataTable";
 import type { ColumnDef } from "@/_components/DataTable";
 import { KpiTile, type IconTone } from "@/_components/KpiTile";
 import { NeedleGauge } from "@/_components/NeedleGauge";
-import { formatQty, formatMAD, formatPct, formatNumStr, pctChange } from "@/utils/format";
+import { formatDate, formatQty, formatMAD, formatPct, formatNumStr, pctChange } from "@/utils/format";
 import { Link } from "react-router-dom";
 import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Page } from "@/_components/Page";
 
 /** Section 2f — dual-bar trend chart. Ventes (info-blue) + Achats (muted) per
  *  month. Pure CSS bars — no chart lib dep. Reused styling vocabulary
@@ -148,18 +147,8 @@ const buildTabs = (t: TFn): { id: MargeMode; label: string }[] => [
 
 type Row = Record<string, unknown>;
 
-function num(v: unknown, decimals = 0): string {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-function mad(v: unknown): string {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " MAD";
-}
-function pct(v: unknown): string {
-  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-  return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
-}
+/** Wide-row cell → number, or null (shown « — »). */
+const cell = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
   if (mode === "produit") {
@@ -176,23 +165,29 @@ function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
         sortable: false,
         render: (r) => <span className="text-muted-foreground">{String(r["category"] ?? "—")}</span>,
       },
-      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
+      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => formatQty(cell(r["qty"])) },
       {
         key: "ventes",
         label: t("rapportAdmin.ventesMad"),
         sortable: false,
         align: "right",
-        render: (r) => mad(r["ca"]),
+        render: (r) => formatMAD(cell(r["ca"])),
       },
-      { key: "ppv", label: t("col.ppv"), sortable: false, align: "right", render: (r) => mad(r["ppv"]) },
+      { key: "ppv", label: t("col.ppv"), sortable: false, align: "right", render: (r) => formatMAD(cell(r["ppv"])) },
       {
         key: "marge_pct",
         label: t("col.margePct"),
         sortable: false,
         align: "right",
-        render: (r) => pct(r["marge_pct"]),
+        render: (r) => formatPct(cell(r["marge_pct"])),
       },
-      { key: "marge_dh", label: t("col.margeDh"), sortable: false, align: "right", render: (r) => mad(r["marge_dh"]) },
+      {
+        key: "marge_dh",
+        label: t("col.margeDh"),
+        sortable: false,
+        align: "right",
+        render: (r) => formatMAD(cell(r["marge_dh"])),
+      },
       {
         key: "tva",
         label: t("col.tva"),
@@ -209,21 +204,27 @@ function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
         sortable: false,
         render: (r) => <span className="font-semibold text-foreground">{String(r["category"] ?? "—")}</span>,
       },
-      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-      { key: "ventes", label: t("rapportAdmin.caMad"), sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+      { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => formatQty(cell(r["qty"])) },
+      {
+        key: "ventes",
+        label: t("rapportAdmin.caMad"),
+        sortable: false,
+        align: "right",
+        render: (r) => formatMAD(cell(r["ca"])),
+      },
       {
         key: "marge_pct",
         label: t("rapportAdmin.margePctMoy"),
         sortable: false,
         align: "right",
-        render: (r) => pct(r["marge_pct_avg"]),
+        render: (r) => formatPct(cell(r["marge_pct_avg"])),
       },
       {
         key: "marge_dh",
         label: t("rapportAdmin.margeDhMoy"),
         sortable: false,
         align: "right",
-        render: (r) => mad(r["marge_dh_avg"]),
+        render: (r) => formatMAD(cell(r["marge_dh_avg"])),
       },
     ];
   }
@@ -235,21 +236,27 @@ function columnsFor(mode: MargeMode, t: TFn): ColumnDef<Row>[] {
       sortable: false,
       render: (r) => <span className="font-semibold text-foreground">{String(r["grossiste"] ?? "—")}</span>,
     },
-    { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => num(r["qty"], 2) },
-    { key: "ventes", label: t("rapportAdmin.caMad"), sortable: false, align: "right", render: (r) => mad(r["ca"]) },
+    { key: "qty", label: t("col.qte"), sortable: false, align: "right", render: (r) => formatQty(cell(r["qty"])) },
+    {
+      key: "ventes",
+      label: t("rapportAdmin.caMad"),
+      sortable: false,
+      align: "right",
+      render: (r) => formatMAD(cell(r["ca"])),
+    },
     {
       key: "marge_pct",
       label: t("rapportAdmin.margePctMoy"),
       sortable: false,
       align: "right",
-      render: (r) => pct(r["marge_pct_avg"]),
+      render: (r) => formatPct(cell(r["marge_pct_avg"])),
     },
     {
       key: "marge_dh",
       label: t("rapportAdmin.margeDhMoy"),
       sortable: false,
       align: "right",
-      render: (r) => mad(r["marge_dh_avg"]),
+      render: (r) => formatMAD(cell(r["marge_dh_avg"])),
     },
   ];
 }
@@ -288,22 +295,6 @@ function MarginAnalysisTable({ mode, onModeChange, rows, isLoading }: MarginAnal
  *  · 2e Analyse de marge tabs+table · 2f Évolution mensuelle bars · 2g Top
  *  catégories. Moved from the old /admin/stats page when we merged the two
  *  surfaces into /rapport. */
-
-// ─── Formatting helpers ───────────────────────────────────────────────────
-
-const fmtCount = (n: number): string => n.toLocaleString("fr-FR");
-
-const fmtMad = (n: number | null | undefined): string => {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " MAD";
-};
-
-const fmtPct = (n: number | null | undefined): string => {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return (n > 0 ? "+" : "") + n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %";
-};
-
-const fmtDateRaw = (s: string | undefined): string => s ?? "—";
 
 const TOP_CAT_COLORS = ["#0E9E8C", "#1D6FB8", "#4F56C9", "#B7791F", "#D6447B"];
 
@@ -361,7 +352,7 @@ function AdminPharmacyBody({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiTile
             label={t("rapportAdmin.chiffreAffaires")}
-            value={fmtMad(rev)}
+            value={formatMAD(rev)}
             sub={prevRev > 0 ? t("rapportAdmin.vsPeriodePrecedente") : undefined}
             delta={prevRev > 0 ? { value: revDelta } : null}
             icon={<TrendingUp className="size-4.5" />}
@@ -369,20 +360,20 @@ function AdminPharmacyBody({
           />
           <KpiTile
             label={t("rapportAdmin.achatsTotaux")}
-            value={fmtMad(stats.kpis.achats_total)}
+            value={formatMAD(stats.kpis.achats_total)}
             icon={<ShoppingCart className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
             label={t("rapportAdmin.transactionsVentes")}
-            value={fmtCount(stats.kpis.ventes_count)}
+            value={formatQty(stats.kpis.ventes_count)}
             sub={t("rapportAdmin.operationsVente")}
             icon={<BarChart3 className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
             label={t("rapportAdmin.transactionsAchats")}
-            value={fmtCount(stats.kpis.achats_count)}
+            value={formatQty(stats.kpis.achats_count)}
             sub={t("rapportAdmin.lignesAchat")}
             icon={<Package className="size-4.5" />}
             iconTone="slate"
@@ -396,50 +387,58 @@ function AdminPharmacyBody({
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           <KpiTile
             label={t("rapportAdmin.ticketMoyen")}
-            value={fmtMad(stats.advanced_kpis.ticket_moyen)}
+            value={formatMAD(stats.advanced_kpis.ticket_moyen)}
             sub={t("rapportAdmin.parTransaction")}
             icon={<Receipt className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
             label={t("rapportAdmin.venteMoyenneJour")}
-            value={fmtMad(stats.advanced_kpis.vente_moyenne_par_jour)}
+            value={formatMAD(stats.advanced_kpis.vente_moyenne_par_jour)}
             icon={<BarChart3 className="size-4.5" />}
             iconTone="slate"
           />
           <KpiTile
             label={t("rapportAdmin.meilleureJourneeDh")}
-            value={fmtMad(stats.advanced_kpis.best_day_dh?.total)}
-            sub={fmtDateRaw(stats.advanced_kpis.best_day_dh?.date)}
+            value={formatMAD(stats.advanced_kpis.best_day_dh?.total)}
+            sub={stats.advanced_kpis.best_day_dh?.date ?? "—"}
             icon={<CalendarCheck className="size-4.5" />}
             iconTone="emerald"
           />
           <KpiTile
             label={t("rapportAdmin.meilleureJourneeOpe")}
             value={
-              stats.advanced_kpis.best_day_count
-                ? `${fmtCount(stats.advanced_kpis.best_day_count.count)} ${t("rapportAdmin.opeUnit")}`
-                : "—"
+              stats.advanced_kpis.best_day_count ? (
+                <>
+                  {formatQty(stats.advanced_kpis.best_day_count.count)} {t("rapportAdmin.opeUnit")}
+                </>
+              ) : (
+                "—"
+              )
             }
-            sub={fmtDateRaw(stats.advanced_kpis.best_day_count?.date)}
+            sub={stats.advanced_kpis.best_day_count?.date ?? "—"}
             icon={<CalendarCheck className="size-4.5" />}
             iconTone="emerald"
           />
           <KpiTile
             label={t("rapportAdmin.moinsBonneJourneeDh")}
-            value={fmtMad(stats.advanced_kpis.worst_day_dh?.total)}
-            sub={fmtDateRaw(stats.advanced_kpis.worst_day_dh?.date)}
+            value={formatMAD(stats.advanced_kpis.worst_day_dh?.total)}
+            sub={stats.advanced_kpis.worst_day_dh?.date ?? "—"}
             icon={<CalendarX className="size-4.5" />}
             iconTone="rose"
           />
           <KpiTile
             label={t("rapportAdmin.moinsBonneJourneeOpe")}
             value={
-              stats.advanced_kpis.worst_day_count
-                ? `${fmtCount(stats.advanced_kpis.worst_day_count.count)} ${t("rapportAdmin.opeUnit")}`
-                : "—"
+              stats.advanced_kpis.worst_day_count ? (
+                <>
+                  {formatQty(stats.advanced_kpis.worst_day_count.count)} {t("rapportAdmin.opeUnit")}
+                </>
+              ) : (
+                "—"
+              )
             }
-            sub={fmtDateRaw(stats.advanced_kpis.worst_day_count?.date)}
+            sub={stats.advanced_kpis.worst_day_count?.date ?? "—"}
             icon={<CalendarX className="size-4.5" />}
             iconTone="rose"
           />
@@ -452,19 +451,19 @@ function AdminPharmacyBody({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <KpiTile
             label={t("rapportAdmin.tvaEncaissee")}
-            value={fmtMad(stats.tva.tva_encaissee)}
+            value={formatMAD(stats.tva.tva_encaissee)}
             icon={<Coins className="size-4.5" />}
             iconTone="info"
           />
           <KpiTile
             label={t("rapportAdmin.tvaPayee")}
-            value={fmtMad(stats.tva.tva_payee)}
+            value={formatMAD(stats.tva.tva_payee)}
             icon={<Banknote className="size-4.5" />}
             iconTone="warning"
           />
           <KpiTile
             label={t("rapportAdmin.tvaADeclarer")}
-            value={fmtMad(stats.tva.tva_a_declarer)}
+            value={formatMAD(stats.tva.tva_a_declarer)}
             icon={<Wallet className="size-4.5" />}
             iconTone="primary"
             badge={{ label: t("rapportAdmin.estimation"), tone: "primary" }}
@@ -478,17 +477,17 @@ function AdminPharmacyBody({
         <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <MargeCell
             label={t("col.margePct")}
-            value={fmtPct(stats.marge.marge_pct)}
+            value={formatPct(stats.marge.marge_pct)}
             sub={t("rapportAdmin.moyennePonderee")}
           />
           <MargeCell
             label={t("rapportAdmin.margeBruteDh")}
-            value={fmtMad(stats.marge.marge_brute_dh)}
+            value={formatMAD(stats.marge.marge_brute_dh)}
             sub={t("rapportAdmin.avantCharges")}
           />
           <MargeCell
             label={t("rapportAdmin.margeNetteDh")}
-            value={fmtMad(stats.marge.marge_nette_dh)}
+            value={formatMAD(stats.marge.marge_nette_dh)}
             sub={t("rapportAdmin.apresCharges")}
             emphasis
           />
@@ -534,7 +533,7 @@ function AdminPharmacyBody({
                       <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
                       <span className="truncate">{c.category}</span>
                     </span>
-                    <span className="font-mono text-[13px] font-semibold tabular-nums">{fmtMad(c.total)}</span>
+                    <span className="font-mono text-[13px] font-semibold tabular-nums">{formatMAD(c.total)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-subtle">
                     <span
@@ -552,7 +551,17 @@ function AdminPharmacyBody({
   );
 }
 
-function MargeCell({ label, value, sub, emphasis }: { label: string; value: string; sub: string; emphasis?: boolean }) {
+function MargeCell({
+  label,
+  value,
+  sub,
+  emphasis,
+}: {
+  label: string;
+  value: ReactNode;
+  sub: string;
+  emphasis?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-1.5 p-5">
       <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -864,12 +873,6 @@ function arcPath(a0: number, a1: number): string {
   ].join(" ");
 }
 
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?: CategoryType }) {
   const t = useT();
   return (
@@ -892,7 +895,7 @@ function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?:
         value={formatMAD(kpis.best_day_dh?.total ?? 0)}
         sub={
           <>
-            {fmtDate(kpis.best_day_dh?.date)} · {formatQty(kpis.best_day_count?.count ?? 0)} opé
+            {formatDate(kpis.best_day_dh?.date)} · {formatQty(kpis.best_day_count?.count ?? 0)} opé
           </>
         }
         icon={<CalendarCheck className="size-5" />}
@@ -903,7 +906,7 @@ function IndicateursAvances({ kpis, tint = "all" }: { kpis: AdvancedKpis; tint?:
         value={formatMAD(kpis.worst_day_dh?.total ?? 0)}
         sub={
           <>
-            {fmtDate(kpis.worst_day_dh?.date)} · {formatQty(kpis.worst_day_count?.count ?? 0)} opé
+            {formatDate(kpis.worst_day_dh?.date)} · {formatQty(kpis.worst_day_count?.count ?? 0)} opé
           </>
         }
         icon={<CalendarX className="size-5" />}
@@ -1770,18 +1773,13 @@ function OwnerView() {
   };
 
   const { stats, isLoading: l1, isError: e1 } = useStats(filters);
-  const { alerts, isLoading: l2 } = useMarginAlerts(filters);
+  const { marginAlerts: alerts, isLoading: l2 } = useMarginAlerts(filters);
   const { stock, isLoading: l3 } = useStockSummary();
 
   const loading = l1 || l2 || l3;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("dashboard.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("dashboard.subtitle")}</p>
-      </header>
-
+    <Page title={t("dashboard.title")} subtitle={t("dashboard.subtitle")}>
       <FilterBar<StatsFilters["category_type"]>
         dateRange={{
           from: filters.date_from,
@@ -1817,7 +1815,7 @@ function OwnerView() {
           category={filters.category_type}
         />
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -1840,7 +1838,7 @@ function AdminView() {
   const [marginMode, setMarginMode] = useState<MargeMode>("produit");
 
   const { systemStats, isLoading: ls } = useAdminStats();
-  const { pharmacies } = useAdminPharmacies();
+  const { pharmacies = [] } = useAdminPharmaciesList();
   const { stats, isLoading: l1, isError: e1 } = useAdminPharmacyStats(pharmacyId, filters);
   const { alerts } = useAdminPharmacyMarginAlerts(pharmacyId, {
     date_from: dateFrom,
@@ -1859,12 +1857,7 @@ function AdminView() {
     dateFrom || dateTo ? `${t("dashboard.periode")} ${dateFrom ?? "…"} → ${dateTo ?? "…"}` : t("trend.last12");
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("dashboard.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("dashboard.subtitleAdmin")}</p>
-      </header>
-
+    <Page title={t("dashboard.title")} subtitle={t("dashboard.subtitleAdmin")}>
       {/* Vue système — always shown */}
       <section className="flex flex-col gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1978,7 +1971,7 @@ function AdminView() {
             );
           })()}
       </section>
-    </div>
+    </Page>
   );
 }
 
@@ -1989,7 +1982,7 @@ function AdminView() {
 interface SectionsProps {
   stats: NonNullable<ReturnType<typeof useStats>["stats"]>;
   filters: StatsFilters;
-  alerts: ReturnType<typeof useMarginAlerts>["alerts"];
+  alerts: MarginAlertsResponse | undefined;
   stock: ReturnType<typeof useStockSummary>["stock"];
   category: CategoryType;
 }

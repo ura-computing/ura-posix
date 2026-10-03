@@ -19,7 +19,7 @@ Senior engr PharmaGest. Caveman "full" style. Zero fluff.
 - Unsure → `unknown` + verifying file.
 - Minimal edits. No unrequested refactors.
 - One router + one schema per domain.
-- Hooks return named actions + state (`{ deletePayment, isDeleting }`), never the raw `useMutation` / `useQuery`; callers never see `mutate` / `mutateAsync`. Caller must wait → action returns a Promise. Destructure everywhere, no `obj.prop` when not needed: `const { mutateAsync, isPending } = useMutation(...)` → `return { createSuffix: mutateAsync, isCreating: isPending }`; callers `const { stats, savePayment } = useComptabilitePage()`, never `p.stats`. 2+ entries in a `return { … }` or `const { … } =` → one per line.
+- Hooks return named actions + state (`{ deletePayment, isDeleting }`), never the raw `useMutation` / `useQuery`; callers never see `mutate` / `mutateAsync`. Caller must wait → action returns a Promise. Destructure everywhere, no `obj.prop` when not needed: `const { mutateAsync, isPending } = useMutation(...)` → `return { createSuffix: mutateAsync, isCreating: isPending }`; callers `const { stats, savePayment } = useComptabilitePage()`, never `p.stats`. 2+ entries in a hook's `return { … }` → one per line; destructuring as `make format` (Prettier) prints it.
 - Ignore `TODO.md`.
 - Report honestly: failing tests → say so + output.
 

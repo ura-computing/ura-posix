@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
-import { Building2, FileText, Package, Plus, Undo2, ArrowLeft, Loader2, Search, X } from "lucide-react";
+import { Building2, FileText, Package, Plus, Undo2, Loader2, Search, X } from "lucide-react";
 
 import { AsyncButton } from "@/_components/AsyncButton";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import { formatMAD, formatQty } from "@/utils/format";
+import { formatDate, formatMAD, formatQty } from "@/utils/format";
+import { matchesFields } from "@/utils/text";
 import type {
-  BlDetail,
   BlExclusion,
   SpecialProduct,
   SupplierExclusion,
@@ -15,13 +15,12 @@ import type {
   SupplierSummary,
 } from "@/types";
 
-import { useBlExclusions, useProduitsSpeciaux, useSupplierExclusions } from "./hooks";
+import { TwoStepExcludeDialog } from "./_components/TwoStepExcludeDialog";
+import { useBlDetail, useBlExclusions, useProduitsSpeciaux, useSupplierExclusions } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { TabBar } from "@/_components/TabBar";
-import { api } from "@/api/client";
-import { API } from "@/api/api";
+import { Page } from "@/_components/Page";
 
 /** "Exclure un BL" dialog — PG-007. Two steps:
  *   1. Search a delivery note by reference OR by a product it contains → pick one.
@@ -40,231 +39,125 @@ interface ExcludeBlDialogProps {
   onSearchChange: (q: string) => void;
 }
 
-function frDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+function ExcludeBlDialog({ onSubmit, ...rest }: ExcludeBlDialogProps) {
+  const t = useT();
+  return (
+    <TwoStepExcludeDialog<BlSummary>
+      {...rest}
+      title={t("ps.blTitle")}
+      description={t("ps.blDesc")}
+      searchPlaceholder={t("ps.blSearchPh")}
+      min2Text={t("ps.blMin2")}
+      noResultText={t("ps.blNoResult")}
+      itemKey={(b) => b.delivery_ref}
+      renderResult={(b) => (
+        <>
+          <FileText className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-mono text-sm font-medium text-foreground">{b.delivery_ref}</span>
+              {b.already_excluded && <AlreadyExcluded />}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="truncate">{b.supplier ?? "—"}</span>
+              <span>·</span>
+              <span>{formatDate(b.delivery_date)}</span>
+              <span>·</span>
+              <span>
+                {formatQty(b.nb_products)} {t("ps.ref")}
+              </span>
+            </div>
+            {/* When found via a product search, show the matched product(s) so
+                the user recognises the BL by what they bought. */}
+            {b.matched_products.length > 0 && (
+              <div className="mt-0.5 truncate text-[11px] text-primary" title={b.matched_products.join(", ")}>
+                {t("ps.contient")} {b.matched_products.join(", ")}
+              </div>
+            )}
+          </div>
+          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
+            {formatMAD(b.total)}
+          </span>
+        </>
+      )}
+      renderPicked={(b) => (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-sm font-semibold text-foreground">{b.delivery_ref}</span>
+            <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatMAD(b.total)}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="truncate">{b.supplier ?? "—"}</span>
+            <span>·</span>
+            <span>{formatDate(b.delivery_date)}</span>
+            <span>·</span>
+            <span>
+              {formatQty(b.nb_lines)} {b.nb_lines > 1 ? t("ps.lignesWord") : t("ps.ligne")}
+            </span>
+          </div>
+        </>
+      )}
+      renderDetails={(b) => <BlLines deliveryRef={b.delivery_ref} />}
+      noteId="bl-note"
+      confirmLabel={t("ps.excludeThisBl")}
+      onSubmit={(b, notes) => onSubmit(b.delivery_ref, notes)}
+    />
+  );
 }
 
-function ExcludeBlDialog({
-  open,
-  onClose,
-  onSubmit,
-  isLoading,
-  results,
-  resultsLoading,
-  searchQ,
-  onSearchChange,
-}: ExcludeBlDialogProps) {
+/** Step 2 of « Exclure un BL »: the BL's product lines. */
+function BlLines({ deliveryRef }: { deliveryRef: string }) {
   const t = useT();
-  const [selected, setSelected] = useState<BlSummary | null>(null);
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    if (!open) {
-      setSelected(null);
-      setNotes("");
-      onSearchChange("");
-    }
-  }, [open, onSearchChange]);
-
-  const {
-    data: detail,
-    isLoading: detailLoading,
-    isError: detailError,
-  } = useQuery({
-    queryKey: API.blExclusions.detail.key(selected?.delivery_ref ?? ""),
-    queryFn: () => api.get<BlDetail>(API.blExclusions.detail.url, { params: { delivery_ref: selected!.delivery_ref } }),
-    enabled: open && !!selected,
-  });
-
+  const { blLines, isLoadingLines, linesError } = useBlDetail(deliveryRef);
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !isLoading && onClose()}>
-      <DialogContent className="max-w-xl">
-        <div className="flex flex-col gap-4 p-5">
-          <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.blTitle")}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.blDesc")}</p>
-          </header>
-
-          {/* ── Step 1: search + pick ─────────────────────────────────────── */}
-          {!selected ? (
-            <>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <input
-                  type="text"
-                  autoFocus
-                  value={searchQ}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder={t("ps.blSearchPh")}
-                  className="block w-full rounded-md border border-input bg-surface-subtle py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-                />
-              </div>
-
-              <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
-                {searchQ.trim().length < 2 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.blMin2")}</p>
-                ) : resultsLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : results.length === 0 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.blNoResult")}</p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {results.map((b) => (
-                      <li key={b.delivery_ref}>
-                        <button
-                          type="button"
-                          disabled={b.already_excluded}
-                          onClick={() => setSelected(b)}
-                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <FileText className="size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate font-mono text-sm font-medium text-foreground">
-                                {b.delivery_ref}
-                              </span>
-                              {b.already_excluded && (
-                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                  {t("ps.dejaExclu")}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span className="truncate">{b.supplier ?? "—"}</span>
-                              <span>·</span>
-                              <span>{frDate(b.delivery_date)}</span>
-                              <span>·</span>
-                              <span>
-                                {formatQty(b.nb_products)} {t("ps.ref")}
-                              </span>
-                            </div>
-                            {/* When found via a product search, show the matched product(s) so
-                                the user recognises the BL by what they bought. */}
-                            {b.matched_products.length > 0 && (
-                              <div
-                                className="mt-0.5 truncate text-[11px] text-primary"
-                                title={b.matched_products.join(", ")}
-                              >
-                                {t("ps.contient")} {b.matched_products.join(", ")}
-                              </div>
-                            )}
-                          </div>
-                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
-                            {formatMAD(b.total)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <footer className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-3">
-                <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
-                  {t("common.cancel")}
-                </AsyncButton>
-              </footer>
-            </>
-          ) : (
-            /* ── Step 2: review + note + confirm ──────────────────────────── */
-            <>
-              <div className="rounded-md border border-border bg-surface-subtle/50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-sm font-semibold text-foreground">{selected.delivery_ref}</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                    {formatMAD(selected.total)}
-                  </span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="truncate">{selected.supplier ?? "—"}</span>
-                  <span>·</span>
-                  <span>{frDate(selected.delivery_date)}</span>
-                  <span>·</span>
-                  <span>
-                    {formatQty(selected.nb_lines)} {selected.nb_lines > 1 ? t("ps.lignesWord") : t("ps.ligne")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-card">
-                {detailLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : detailError ? (
-                  <p className="p-4 text-center text-xs text-error">{t("ps.loadDetailErr")}</p>
-                ) : (
-                  <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 bg-surface-subtle text-[10px] uppercase tracking-wide text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-1.5 font-semibold">{t("col.produit")}</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.qte")}</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.puAchat")}</th>
-                        <th className="px-3 py-1.5 text-right font-semibold">{t("col.total")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {(detail?.lines ?? []).map((ln, i) => (
-                        <tr key={i}>
-                          <td className="max-w-[220px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>
-                            {ln.product ?? "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">
-                            {ln.quantity != null ? formatQty(ln.quantity) : "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-right tabular-nums">
-                            {ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-right font-medium tabular-nums">
-                            {ln.total != null ? formatMAD(ln.total) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label htmlFor="bl-note" className="text-xs font-medium text-muted-foreground">
-                  {t("ps.noteOptionnelle")}
-                </label>
-                <textarea
-                  id="bl-note"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder={t("ps.notePlaceholder")}
-                  className="block w-full resize-none rounded-md border border-input bg-surface-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-                />
-              </div>
-
-              <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
-                <AsyncButton variant="ghost" type="button" onClick={() => setSelected(null)} disabled={isLoading}>
-                  <ArrowLeft className="size-4" /> {t("common.back")}
-                </AsyncButton>
-                <AsyncButton
-                  type="button"
-                  variant="primary"
-                  isLoading={isLoading}
-                  loadingText={t("ps.excluding")}
-                  onClick={() => onSubmit(selected.delivery_ref, notes.trim() || undefined)}
-                >
-                  {t("ps.excludeThisBl")}
-                </AsyncButton>
-              </footer>
-            </>
-          )}
+    <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-card">
+      {isLoadingLines ? (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
         </div>
-      </DialogContent>
-    </Dialog>
+      ) : linesError ? (
+        <p className="p-4 text-center text-xs text-error">{t("ps.loadDetailErr")}</p>
+      ) : (
+        <table className="w-full text-left text-xs">
+          <thead className="sticky top-0 bg-surface-subtle text-[10px] uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-3 py-1.5 font-semibold">{t("col.produit")}</th>
+              <th className="px-3 py-1.5 text-right font-semibold">{t("col.qte")}</th>
+              <th className="px-3 py-1.5 text-right font-semibold">{t("col.puAchat")}</th>
+              <th className="px-3 py-1.5 text-right font-semibold">{t("col.total")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {blLines.map((ln, i) => (
+              <tr key={i}>
+                <td className="max-w-[220px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>
+                  {ln.product ?? "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">
+                  {ln.quantity != null ? formatQty(ln.quantity) : "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">
+                  {ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                  {ln.total != null ? formatMAD(ln.total) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/** « Déjà exclu » pill on a search result. */
+function AlreadyExcluded() {
+  const t = useT();
+  return (
+    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+      {t("ps.dejaExclu")}
+    </span>
   );
 }
 
@@ -283,7 +176,12 @@ interface ExcludeProductDialogProps {
   onQueryChange: (q: string) => void;
 }
 
-function ExcludeProductDialog({
+/** Mounted only while open: every open starts empty; closing clears the search. */
+function ExcludeProductDialog(props: ExcludeProductDialogProps) {
+  return props.open ? <ExcludeProductBody {...props} /> : null;
+}
+
+function ExcludeProductBody({
   open,
   onClose,
   onSubmit,
@@ -298,13 +196,7 @@ function ExcludeProductDialog({
   // query changes (owner can search "a", pick 2, clear, search "b", pick more).
   const [picked, setPicked] = useState<Map<number, MedicamentSuggestion>>(new Map());
 
-  // Reset on dialog close.
-  useEffect(() => {
-    if (!open) {
-      setPicked(new Map());
-      onQueryChange("");
-    }
-  }, [open, onQueryChange]);
+  useEffect(() => () => onQueryChange(""), [onQueryChange]);
 
   const togglePick = (s: MedicamentSuggestion) =>
     setPicked((p) => {
@@ -482,168 +374,58 @@ interface ExcludeSupplierDialogProps {
   onSearchChange: (q: string) => void;
 }
 
-function ExcludeSupplierDialog({
-  open,
-  onClose,
-  onSubmit,
-  isLoading,
-  results,
-  resultsLoading,
-  searchQ,
-  onSearchChange,
-}: ExcludeSupplierDialogProps) {
+function ExcludeSupplierDialog({ onSubmit, ...rest }: ExcludeSupplierDialogProps) {
   const t = useT();
-  const [selected, setSelected] = useState<SupplierSummary | null>(null);
-  const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    if (!open) {
-      setSelected(null);
-      setNotes("");
-      onSearchChange("");
-    }
-  }, [open, onSearchChange]);
-
+  const facts = (s: SupplierSummary) => (
+    <>
+      <span>
+        {formatQty(s.nb_lines)} {t("ps.lignesWord")}
+      </span>
+      <span>·</span>
+      <span>
+        {formatQty(s.nb_products)} {t("common.wProduits")}
+      </span>
+      <span>·</span>
+      <span>{formatDate(s.last_date)}</span>
+    </>
+  );
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && !isLoading && onClose()}>
-      <DialogContent className="max-w-xl">
-        <div className="flex flex-col gap-4 p-5">
-          <header>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">{t("ps.supTitle")}</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">{t("ps.supDesc")}</p>
-          </header>
-
-          {/* ── Step 1: search + pick ─────────────────────────────────────── */}
-          {!selected ? (
-            <>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden
-                />
-                <input
-                  type="text"
-                  autoFocus
-                  value={searchQ}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder={t("ps.supSearchPh")}
-                  className="block w-full rounded-md border border-input bg-surface-subtle py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-                />
-              </div>
-
-              <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-card">
-                {searchQ.trim().length < 2 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.supMin2")}</p>
-                ) : resultsLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                  </div>
-                ) : results.length === 0 ? (
-                  <p className="p-4 text-center text-xs text-muted-foreground">{t("ps.supNoResult")}</p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {results.map((s) => (
-                      <li key={s.supplier}>
-                        <button
-                          type="button"
-                          disabled={s.already_excluded}
-                          onClick={() => setSelected(s)}
-                          className="flex w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Building2 className="size-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium text-foreground">{s.supplier}</span>
-                              {s.already_excluded && (
-                                <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                  {t("ps.dejaExclu")}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <span>
-                                {formatQty(s.nb_lines)} {t("ps.lignesWord")}
-                              </span>
-                              <span>·</span>
-                              <span>
-                                {formatQty(s.nb_products)} {t("common.wProduits")}
-                              </span>
-                              <span>·</span>
-                              <span>{frDate(s.last_date)}</span>
-                            </div>
-                          </div>
-                          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
-                            {formatMAD(s.total)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <footer className="mt-1 flex items-center justify-end gap-2 border-t border-border pt-3">
-                <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
-                  {t("common.cancel")}
-                </AsyncButton>
-              </footer>
-            </>
-          ) : (
-            /* ── Step 2: review + note + confirm ──────────────────────────── */
-            <>
-              <div className="rounded-md border border-border bg-surface-subtle/50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-foreground">{selected.supplier}</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                    {formatMAD(selected.total)}
-                  </span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>
-                    {formatQty(selected.nb_lines)} {t("ps.lignesWord")}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {formatQty(selected.nb_products)} {t("common.wProduits")}
-                  </span>
-                  <span>·</span>
-                  <span>{frDate(selected.last_date)}</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label htmlFor="sup-note" className="text-xs font-medium text-muted-foreground">
-                  {t("ps.noteOptionnelle")}
-                </label>
-                <textarea
-                  id="sup-note"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder={t("ps.notePlaceholder")}
-                  className="block w-full resize-none rounded-md border border-input bg-surface-subtle px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-                />
-              </div>
-
-              <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
-                <AsyncButton variant="ghost" type="button" onClick={() => setSelected(null)} disabled={isLoading}>
-                  <ArrowLeft className="size-4" /> {t("common.back")}
-                </AsyncButton>
-                <AsyncButton
-                  type="button"
-                  variant="primary"
-                  isLoading={isLoading}
-                  loadingText={t("ps.excluding")}
-                  onClick={() => onSubmit(selected.supplier, notes.trim() || undefined)}
-                >
-                  {t("ps.excludeThisSup")}
-                </AsyncButton>
-              </footer>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <TwoStepExcludeDialog<SupplierSummary>
+      {...rest}
+      title={t("ps.supTitle")}
+      description={t("ps.supDesc")}
+      searchPlaceholder={t("ps.supSearchPh")}
+      min2Text={t("ps.supMin2")}
+      noResultText={t("ps.supNoResult")}
+      itemKey={(s) => s.supplier}
+      renderResult={(s) => (
+        <>
+          <Building2 className="size-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-medium text-foreground">{s.supplier}</span>
+              {s.already_excluded && <AlreadyExcluded />}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">{facts(s)}</div>
+          </div>
+          <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-foreground">
+            {formatMAD(s.total)}
+          </span>
+        </>
+      )}
+      renderPicked={(s) => (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-sm font-semibold text-foreground">{s.supplier}</span>
+            <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{formatMAD(s.total)}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">{facts(s)}</div>
+        </>
+      )}
+      noteId="sup-note"
+      confirmLabel={t("ps.excludeThisSup")}
+      onSubmit={(s, notes) => onSubmit(s.supplier, notes)}
+    />
   );
 }
 
@@ -659,12 +441,12 @@ interface ReintegrateProductsDialogProps {
   specialProducts: SpecialProduct[];
 }
 
-/** Case + accent insensitive normalization for the local filter. */
-function norm(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+/** Mounted only while open: every open starts with no pick and no search. */
+function ReintegrateProductsDialog(props: ReintegrateProductsDialogProps) {
+  return props.open ? <ReintegrateProductsBody {...props} /> : null;
 }
 
-function ReintegrateProductsDialog({
+function ReintegrateProductsBody({
   open,
   onClose,
   onSubmit,
@@ -672,34 +454,16 @@ function ReintegrateProductsDialog({
   specialProducts,
 }: ReintegrateProductsDialogProps) {
   const t = useT();
-  const [picked, setPicked] = useState<Map<number, SpecialProduct>>(new Map());
+  const [allPicked, setPicked] = useState<Map<number, SpecialProduct>>(new Map());
   const [query, setQuery] = useState("");
 
-  // Reset on dialog close.
-  useEffect(() => {
-    if (!open) {
-      setPicked(new Map());
-      setQuery("");
-    }
-  }, [open]);
-
-  // Drop picks that no longer exist in the spéciaux list (e.g. someone else
-  // reintegrated them in another tab between dialog open + submit).
-  useEffect(() => {
-    if (!open) return;
-    setPicked((p) => {
-      const validIds = new Set(specialProducts.map((s) => s.medicament_id));
-      let changed = false;
-      const n = new Map(p);
-      for (const id of n.keys()) {
-        if (!validIds.has(id)) {
-          n.delete(id);
-          changed = true;
-        }
-      }
-      return changed ? n : p;
-    });
-  }, [open, specialProducts]);
+  // Only the picks still in the spéciaux list (e.g. someone else reintegrated
+  // one in another tab between dialog open + submit).
+  const picked = useMemo(() => {
+    const validIds = new Set(specialProducts.map((s) => s.medicament_id));
+    const kept = new Map([...allPicked].filter(([id]) => validIds.has(id)));
+    return kept.size === allPicked.size ? allPicked : kept;
+  }, [allPicked, specialProducts]);
 
   const togglePick = (sp: SpecialProduct) =>
     setPicked((p) => {
@@ -718,11 +482,8 @@ function ReintegrateProductsDialog({
 
   // Filter the visible list — local, no API call. Hide already-picked rows.
   const visible = useMemo(() => {
-    const base = specialProducts.filter((sp) => !picked.has(sp.medicament_id));
-    if (!query.trim()) return base;
-    const q = norm(query.trim());
-    return base.filter(
-      (sp) => norm(sp.product).includes(q) || norm(sp.pid).includes(q) || norm(sp.category ?? "").includes(q),
+    return specialProducts.filter(
+      (sp) => !picked.has(sp.medicament_id) && matchesFields([sp.product, sp.pid, sp.category], query),
     );
   }, [specialProducts, picked, query]);
 
@@ -854,12 +615,6 @@ function ReintegrateProductsDialog({
   );
 }
 
-function formatRelative(iso: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 const buildProductColumns = (t: TFn): ColumnDef<SpecialProduct>[] => [
   {
     key: "product",
@@ -891,7 +646,7 @@ const buildProductColumns = (t: TFn): ColumnDef<SpecialProduct>[] => [
     label: t("ps.exclusLe"),
     width: 160,
     sortable: false,
-    render: (sp) => <span className="text-xs text-muted-foreground">{formatRelative(sp.created_at)}</span>,
+    render: (sp) => <span className="text-xs text-muted-foreground">{formatDate(sp.created_at)}</span>,
   },
 ];
 
@@ -991,7 +746,7 @@ export default function ProduitsSpeciauxPage() {
       label: t("ps.exclusLe"),
       width: 130,
       sortable: false,
-      render: (s) => <span className="text-xs text-muted-foreground">{formatRelative(s.created_at)}</span>,
+      render: (s) => <span className="text-xs text-muted-foreground">{formatDate(s.created_at)}</span>,
     },
     {
       key: "_action",
@@ -1036,7 +791,7 @@ export default function ProduitsSpeciauxPage() {
       label: t("col.dateBL"),
       width: 120,
       sortable: false,
-      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.delivery_date ?? "")}</span>,
+      render: (b) => <span className="text-xs text-muted-foreground">{formatDate(b.delivery_date ?? "")}</span>,
     },
     {
       key: "nb_lines",
@@ -1073,7 +828,7 @@ export default function ProduitsSpeciauxPage() {
       label: t("ps.exclusLe"),
       width: 130,
       sortable: false,
-      render: (b) => <span className="text-xs text-muted-foreground">{formatRelative(b.created_at)}</span>,
+      render: (b) => <span className="text-xs text-muted-foreground">{formatDate(b.created_at)}</span>,
     },
     {
       key: "_action",
@@ -1135,12 +890,7 @@ export default function ProduitsSpeciauxPage() {
     : [];
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.produitsSpeciaux")}</h1>
-        <p className="text-sm text-muted-foreground">{t("ps.subtitle")}</p>
-      </header>
-
+    <Page title={t("nav.produitsSpeciaux")} subtitle={t("ps.subtitle")}>
       {/* Tabs */}
       <TabBar<Tab>
         tabs={[
@@ -1311,6 +1061,6 @@ export default function ProduitsSpeciauxPage() {
         searchQ={supplierSearchQ}
         onSearchChange={setSupplierSearchQ}
       />
-    </div>
+    </Page>
   );
 }

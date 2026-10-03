@@ -35,6 +35,7 @@ import type {
   VentesSansAchatResponse,
 } from "@/types";
 import type { DialogDescriptor } from "../hooks";
+import { Page } from "@/_components/Page";
 
 // src/pages/alertes/_components/GlobalSummaryStrip.tsx
 
@@ -526,12 +527,7 @@ export default function AlertesPage() {
   ].filter(Boolean) as ActiveFilter[];
 
   return (
-    <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.alertes")}</h1>
-        <p className="text-sm text-muted-foreground">{t("alertes.subtitle")}</p>
-      </header>
-
+    <Page title={t("nav.alertes")} subtitle={t("alertes.subtitle")}>
       <FilterBar<CategoryType>
         dateRange={{
           from: dateFrom || null,
@@ -610,7 +606,7 @@ export default function AlertesPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
-    </div>
+    </Page>
   );
 }
 

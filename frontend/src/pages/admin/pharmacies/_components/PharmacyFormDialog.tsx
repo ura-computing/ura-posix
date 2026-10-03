@@ -1,10 +1,11 @@
 /** Create + edit pharmacy basic info (Screen 4). No special states — just a
  *  form. Field set: name (required), code, city, address, phone, email. */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, Info, Loader2, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { AsyncButton } from "@/_components/AsyncButton";
+import { FormField, FormInput } from "@/_components/FormField";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import type { PharmacyIn } from "@/types";
 
@@ -28,22 +29,15 @@ export interface PharmacyFormDialogProps {
   onSubmit: (values: PharmacyIn) => void;
 }
 
-export function PharmacyFormDialog({
-  open,
-  onClose,
-  initialValues,
-  pharmacyName,
-  isSaving,
-  onSubmit,
-}: PharmacyFormDialogProps) {
+/** Mounted only while open: the fields start from `initialValues` on every open. */
+export function PharmacyFormDialog(props: PharmacyFormDialogProps) {
+  return props.open ? <PharmacyFormBody {...props} /> : null;
+}
+
+function PharmacyFormBody({ open, onClose, initialValues, pharmacyName, isSaving, onSubmit }: PharmacyFormDialogProps) {
   const t = useT();
   const isCreate = !initialValues;
   const [values, setValues] = useState<PharmacyIn>(initialValues ?? EMPTY);
-
-  // Reset values when the dialog (re)opens or the target pharmacy changes.
-  useEffect(() => {
-    if (open) setValues(initialValues ?? EMPTY);
-  }, [open, initialValues]);
 
   const set = <K extends keyof PharmacyIn>(key: K, v: PharmacyIn[K]) => setValues((prev) => ({ ...prev, [key]: v }));
 
@@ -90,39 +84,39 @@ export function PharmacyFormDialog({
             onSubmit(values);
           }}
         >
-          <Field label={t("adminPharm.name")} required>
-            <Input value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
-          </Field>
+          <FormField label={t("adminPharm.name")} required>
+            <FormInput value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
+          </FormField>
 
-          <Field label={t("adminPharm.city")} required hint={isCreate ? t("adminPharm.cityHint") : undefined}>
-            <Input value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
-          </Field>
+          <FormField label={t("adminPharm.city")} required hint={isCreate ? t("adminPharm.cityHint") : undefined}>
+            <FormInput value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
+          </FormField>
 
-          <Field label={t("adminPharm.address")}>
+          <FormField label={t("adminPharm.address")}>
             <Textarea
               value={values.address ?? ""}
               onChange={(v) => set("address", v)}
               placeholder="24 Bd Mohammed V…"
             />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label={t("adminPharm.phone")}>
-              <Input
+            <FormField label={t("adminPharm.phone")}>
+              <FormInput
                 value={values.phone ?? ""}
                 onChange={(v) => set("phone", v)}
                 placeholder="+212 522 00 00 00"
                 className="font-mono"
               />
-            </Field>
-            <Field label={t("adminPharm.email")}>
-              <Input
+            </FormField>
+            <FormField label={t("adminPharm.email")}>
+              <FormInput
                 type="email"
                 value={values.email ?? ""}
                 onChange={(v) => set("email", v)}
                 placeholder="contact@pharmacie.ma"
               />
-            </Field>
+            </FormField>
           </div>
 
           {isCreate && (
@@ -146,52 +140,6 @@ export function PharmacyFormDialog({
     </Dialog>
   );
 }
-
-// ─── Tiny inline form primitives ──────────────────────────────────────────
-// Kept inline since they're only used by this dialog + CreateUserDialog. If a
-// third caller appears we can promote them to shared/.
-
-function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">
-        {label}
-        {required && <span className="ml-1 text-error">*</span>}
-      </span>
-      {children}
-      {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function Input({
-  value,
-  onChange,
-  ...rest
-}: { value: string; onChange: (v: string) => void } & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange"
->) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${rest.className ?? ""}`}
-    />
-  );
-}
-
 function Textarea({
   value,
   onChange,

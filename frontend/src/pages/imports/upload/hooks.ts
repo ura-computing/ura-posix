@@ -200,7 +200,12 @@ export function useUpload(initialDocType: DocType | null = null) {
     clearFilenameError: () => setFilenameError(null),
     // job state (null when no job for this doc-type) — the state card reads from here
     phase: (job?.phase ?? "idle") as UploadPhase | "idle",
-    progress: job?.progress ?? { current: 0, total: 0, inserted: 0, skipped: 0 },
+    progress: job?.progress ?? {
+      current: 0,
+      total: 0,
+      inserted: 0,
+      skipped: 0,
+    },
     batchId: job?.batchId ?? null,
     error: job?.error ?? null,
     stockResult: job?.stockResult ?? null,

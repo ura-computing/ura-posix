@@ -4,6 +4,7 @@
  *    - Money values → `formatMAD()` (always emits "X MAD" suffix)
  *    - Counts / quantities → `formatQty()` or `formatQtyDec()`
  *    - Percentages → `formatPct()`
+ *    - Date + time → `formatDateTime()`
  *    - NEVER call `.toLocaleString()` or `.toFixed()` directly in a component
  *    - NEVER use a template literal to interpolate these. Use JSX:
  *        WRONG : sub={`Ticket : ${formatMAD(x)}`}
@@ -74,14 +75,16 @@ export function formatMADStr(n: number | null | undefined): string {
   return MAD.format(n);
 }
 
-const NUM_FR = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
-const NUM_FR2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-/** Plain-string number with fr-FR grouping ("1 500 000" or "1 500 000,00") — full
+const NUM_FR = [0, 1, 2].map(
+  (d) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d }),
+);
+/** Plain-string number with fr-FR grouping ("1 500 000", "7,4" or "1 500 000,00") — full
  *  numbers, no k/M abbreviation, no currency suffix. `decimals` = 0 (default, e.g.
- *  chart axis ticks) or 2 (money columns whose header already says "MAD"). */
-export function formatNumStr(n: number | null | undefined, decimals: 0 | 2 = 0): string {
+ *  chart axis ticks), 1 (stock health score, file size) or 2 (money columns whose
+ *  header already says "MAD"). */
+export function formatNumStr(n: number | null | undefined, decimals: 0 | 1 | 2 = 0): string {
   if (n == null) return "—";
-  return (decimals === 2 ? NUM_FR2 : NUM_FR).format(n);
+  return NUM_FR[decimals].format(n);
 }
 
 export function formatQty(n: number | null | undefined): ReactNode {
@@ -113,6 +116,21 @@ export function formatPctStr(n: number | null | undefined, decimals = 2): string
       ? PCT2
       : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   return `${fmt.format(n)} %`;
+}
+
+const DATE_TIME = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
+const DATE = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+/** « 03 oct. 2026 » — an ISO date, French style in both languages. Not a date → shown as is. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : DATE.format(d);
+}
+
+/** « 03/10/2026 16:48 » — an ISO date-time, French style in both languages. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return DATE_TIME.format(new Date(iso));
 }
 
 /** Variation: ((current - previous) / previous) × 100. Returns null if previous is 0. */

@@ -68,7 +68,7 @@ export function useStockPage() {
 
   const { peremptions } = usePeremptions();
 
-  const fullProducts: StockRow[] = abcd?.products ?? [];
+  const fullProducts: StockRow[] = useMemo(() => abcd?.products ?? [], [abcd]);
 
   // ---- health gauge score: ideal / non-inconnu * 10 ----
   const healthScore = useMemo(() => {

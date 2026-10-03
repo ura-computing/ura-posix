@@ -4,11 +4,12 @@ import { Loader2, Trash2, TriangleAlert } from "lucide-react";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { TabBar } from "@/_components/TabBar";
 import type { TabItem } from "@/_components/TabBar";
-import { formatQty } from "@/utils/format";
+import { formatDateTime, formatQty } from "@/utils/format";
 import type { DataImport, DocType, ImportBatchStatus } from "@/types";
 
 import { useDeleteImport, useImports } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
+import { Page } from "@/_components/Page";
 
 const buildTabs = (t: TFn): TabItem[] => [{ id: "imports", label: t("imports.tab") }];
 
@@ -38,14 +39,10 @@ export default function ImportsPage() {
   const [active, setActive] = useState("imports");
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("imports.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("imports.subtitle")}</p>
-      </header>
+    <Page title={t("imports.title")} subtitle={t("imports.subtitle")}>
       <TabBar tabs={buildTabs(t)} activeId={active} onChange={setActive} />
       <div>{active === "imports" && <ImportsTab />}</div>
-    </div>
+    </Page>
   );
 }
 
@@ -103,7 +100,7 @@ function ImportsTab() {
                   className={`border-b border-border last:border-0 ${isDeleted ? "bg-surface-subtle/40" : "hover:bg-surface-subtle/50"}`}
                 >
                   <td className="px-4 py-3 font-mono text-xs tabular-nums text-muted-foreground">
-                    {new Date(row.imported_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                    {formatDateTime(row.imported_at)}
                   </td>
                   <td className="px-4 py-3">
                     <span

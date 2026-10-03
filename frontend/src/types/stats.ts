@@ -123,12 +123,6 @@ export interface AdminStatsResponse {
   pending_catalog_requests: number;
 }
 
-export interface AdminPharmacyRow {
-  id: number;
-  name: string;
-  code: string | null;
-}
-
 export interface StatsFilters {
   date_from: string | null;
   date_to: string | null;

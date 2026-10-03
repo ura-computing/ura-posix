@@ -34,9 +34,11 @@ import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { formatMAD, formatPct } from "@/utils/format";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { AsyncButton } from "@/_components/AsyncButton";
+import { FormField } from "@/_components/FormField";
 import { PAYMENT_METHODS } from "@/types";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
 import { TypeBadge } from "@/_components/TypeBadge";
+import { Page } from "@/_components/Page";
 
 /** Month-picker matching the app's design system (same trigger shell as
  *  SingleSelectPopover, same panel positioning). Returns a "YYYY-MM" string.
@@ -85,12 +87,6 @@ function MonthPopover({ value, onChange, label = "", placement = "bottom", align
   // the user can browse other years before committing.
   const [displayYear, setDisplayYear] = useState(valueY);
 
-  // Reset the panel's displayed year when the bound value changes or the
-  // panel reopens, so we always start from the selected year.
-  useEffect(() => {
-    if (open) setDisplayYear(valueY);
-  }, [open, valueY]);
-
   // Outside-click close
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -107,7 +103,14 @@ function MonthPopover({ value, onChange, label = "", placement = "bottom", align
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className={POPOVER_TRIGGER}>
+      <button
+        type="button"
+        onClick={() => {
+          if (!open) setDisplayYear(valueY); // the panel always opens on the selected year
+          setOpen(!open);
+        }}
+        className={POPOVER_TRIGGER}
+      >
         <span>
           {label}
           <span className={cn("font-semibold text-foreground", label && "ml-1")}>
@@ -286,26 +289,21 @@ interface PaymentEditDialogProps {
   entry: PaymentEntry | null; // existing row, if any
 }
 
-function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditDialogProps) {
+/** Mounted only while open, once per (method, month): the fields start from `entry`. */
+function PaymentEditDialog(props: PaymentEditDialogProps) {
+  return props.open ? <PaymentEditBody key={`${props.method}|${props.month}`} {...props} /> : null;
+}
+
+function PaymentEditBody({ open, onClose, method, month, entry }: PaymentEditDialogProps) {
   const t = useT();
   const { savePayment, isSaving } = useSavePayment();
   const { deletePayment, isDeleting } = useDeletePayment();
 
-  // Form state — initialized from `entry` when the dialog opens. Reset on
-  // method/month/open change so reopening on a different card shows the
-  // right starting values.
-  const [pharm, setPharm] = useState("0");
-  const [para, setPara] = useState("0");
-  const [cnt, setCnt] = useState("0");
+  // Form state — starts from `entry` (the body mounts on every open).
+  const [pharm, setPharm] = useState(String(entry?.pharmacie_amount ?? 0));
+  const [para, setPara] = useState(String(entry?.parapharmacie_amount ?? 0));
+  const [cnt, setCnt] = useState(String(entry?.count ?? 0));
   const [monthV, setMonthV] = useState(month);
-
-  useEffect(() => {
-    if (!open) return;
-    setPharm(String(entry?.pharmacie_amount ?? 0));
-    setPara(String(entry?.parapharmacie_amount ?? 0));
-    setCnt(String(entry?.count ?? 0));
-    setMonthV(month);
-  }, [open, entry, month]);
 
   if (!method) return null;
 
@@ -349,22 +347,22 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
         </div>
 
         <div className="flex flex-col gap-4 px-5 py-4">
-          <Field label={t("comptabilite.moisLabel")}>
+          <FormField label={t("comptabilite.moisLabel")}>
             <MonthPopover label="" value={monthV} onChange={setMonthV} />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={t("comptabilite.pharmacieMad")}>
+            <FormField label={t("comptabilite.pharmacieMad")}>
               <NumberInput value={pharm} onChange={setPharm} />
-            </Field>
-            <Field label={t("comptabilite.parapharmacieMad")}>
+            </FormField>
+            <FormField label={t("comptabilite.parapharmacieMad")}>
               <NumberInput value={para} onChange={setPara} />
-            </Field>
+            </FormField>
           </div>
 
-          <Field label={t("comptabilite.nbTransactions")}>
+          <FormField label={t("comptabilite.nbTransactions")}>
             <NumberInput value={cnt} onChange={setCnt} integer />
-          </Field>
+          </FormField>
         </div>
 
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
@@ -387,15 +385,6 @@ function PaymentEditDialog({ open, onClose, method, month, entry }: PaymentEditD
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      {children}
-    </label>
   );
 }
 
@@ -675,12 +664,7 @@ export default function ComptabilitePage() {
   const activeEntry = openMethod ? (payments.find((e) => e.method === openMethod) ?? null) : null;
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.comptabilite")}</h1>
-        <p className="text-sm text-muted-foreground">{t("comptabilite.pageSubtitle")}</p>
-      </header>
-
+    <Page title={t("nav.comptabilite")} subtitle={t("comptabilite.pageSubtitle")}>
       <FilterBar<StatsFilters["category_type"]>
         dateRange={{
           from: filters.date_from,
@@ -773,6 +757,6 @@ export default function ComptabilitePage() {
         month={activeMonth}
         entry={activeEntry}
       />
-    </div>
+    </Page>
   );
 }

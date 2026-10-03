@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { API } from "@/api/api";
+import { useAnalyseMarge } from "@/hooks/sharedQueries";
 
 import type {
-  AdminPharmacyRow,
   AdminStatsResponse,
   AnalyseFilters,
   AnalyseMargeResponse,
@@ -18,55 +18,19 @@ import type {
 
 // ── Owner ────────────────────────────────────────────────────────────────────
 
-export function useStats(filters: StatsFilters) {
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: API.stats.main.key(
-      filters.date_from,
-      filters.date_to,
-      filters.category_type,
-      filters.include_non_declared,
-    ),
-    queryFn: () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
-    staleTime: 60_000,
-  });
-  return {
-    stats: data,
-    isLoading,
-    isError,
-    error,
-  };
-}
-
 /** « Optimisation » tile: the /analyses gain (best ↔ worst product, mode produit)
- *  for the Rapport period + category. Same key + URL as /analyses → shared cache. */
+ *  for the Rapport period + category. Same hook as /analyses → shared cache. */
 export function useOptimisationGain(filters: StatsFilters) {
-  const { data } = useQuery({
-    queryKey: API.stats.analyseMarge.key("produit", filters.date_from, filters.date_to, filters.category_type, null),
-    queryFn: () =>
-      api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, {
-        params: {
-          mode: "produit",
-          date_from: filters.date_from,
-          date_to: filters.date_to,
-          category_type: filters.category_type,
-        },
-      }),
-    staleTime: 60_000,
-  });
-  return data?.kpis.difference_gain_dh ?? null;
-}
-
-export function useMarginAlerts(filters: Omit<StatsFilters, "include_non_declared">) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: API.stats.marginAlerts.key(filters.date_from, filters.date_to, filters.category_type),
-    queryFn: () => api.get<MarginAlertsResponse>(API.stats.marginAlerts.url, { params: filters }),
-    staleTime: 60_000,
-  });
-  return {
-    alerts: data,
-    isLoading,
-    isError,
-  };
+  const { analyse } = useAnalyseMarge(
+    {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      category_type: filters.category_type,
+      product: null,
+    },
+    "produit",
+  );
+  return analyse?.kpis.difference_gain_dh ?? null;
 }
 
 export function useStockSummary() {
@@ -94,18 +58,6 @@ export function useAdminStats() {
     systemStats: data,
     isLoading,
     isError,
-  };
-}
-
-export function useAdminPharmacies() {
-  const { data, isLoading } = useQuery({
-    queryKey: API.admin.pharmacies.key,
-    queryFn: () => api.get<AdminPharmacyRow[]>(API.admin.pharmacies.url),
-    staleTime: 5 * 60_000, // pharmacy list rarely changes
-  });
-  return {
-    pharmacies: data ?? [],
-    isLoading,
   };
 }
 

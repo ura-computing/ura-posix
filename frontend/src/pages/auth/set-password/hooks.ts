@@ -13,7 +13,10 @@ export function useSetPassword(token: string) {
 
   const { mutate, isPending, isError, error } = useMutation({
     mutationFn: (input: { password: string }) =>
-      api.post<void>(API.auth.setPassword.url, { token, password: input.password }),
+      api.post<void>(API.auth.setPassword.url, {
+        token,
+        password: input.password,
+      }),
     onSuccess: () => {
       toast.success(t("toast.pwdSaved"));
       navigate(ROUTES.LOGIN, { replace: true });
@@ -36,7 +39,10 @@ export function useSetPassword(token: string) {
 export function useValidateToken(token: string) {
   const { data, isLoading, isSuccess } = useQuery({
     queryKey: API.auth.validateToken.key(token),
-    queryFn: () => api.get<ValidateTokenResponse>(API.auth.validateToken.url, { params: { token } }),
+    queryFn: () =>
+      api.get<ValidateTokenResponse>(API.auth.validateToken.url, {
+        params: { token },
+      }),
     enabled: token.length > 0,
     retry: false,
     // Matches backend RESET_TOKEN_EXPIRY_MIN. A user who opens the link, walks

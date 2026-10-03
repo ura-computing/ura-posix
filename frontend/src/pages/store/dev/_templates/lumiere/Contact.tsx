@@ -172,7 +172,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-[var(--lum-ink-soft)]">{label}</span>
-      {children}
+      the store is a hidden feature tha twould be fully implemented later on add a comamnd in pakcage.json that format
+      the code so the cod ecan be fully consistent {children}
     </label>
   );
 }

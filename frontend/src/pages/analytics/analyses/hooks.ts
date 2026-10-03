@@ -1,7 +1,7 @@
 /** /analyse page state: filters + mode + search + client-side pagination + Excel
  *  export + Liste CSV upload trigger. Pagination is client-side (rows are already
  *  in memory from the API response). Resets to page 1 on mode/filter/search change. */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { DataTablePagination } from "@/_components/DataTable";
 import { MARGE_MODE_LABELS } from "@/types";
@@ -19,7 +19,8 @@ import { downloadXlsx, exportFilename } from "@/utils/table";
 import { normalizeText, matchesText, matchesFields } from "@/utils/text";
 
 import { EXPORT_COLS, MARGE_COLS } from "./constants";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
+import { useAnalyseMarge } from "@/hooks/sharedQueries";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
@@ -45,7 +46,12 @@ export function useAnalysePage() {
   const [filters, setFilters] = useState<AnalyseFilters>(DEFAULT_FILTERS);
   const [mode, setMode] = useState<MargeMode>("produit");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  // The page is kept with the (mode, filters, search) it was picked for: any change
+  // of those shows page 1 again, without a reset effect.
+  const pageFor = JSON.stringify([mode, filters, search]);
+  const [picked, setPicked] = useState({ pageFor, page: 1 });
+  const page = picked.pageFor === pageFor ? picked.page : 1;
+  const setPage = useCallback((next: number) => setPicked({ pageFor, page: next }), [pageFor]);
   const [pageSize, setPageSize] = useState(25);
   // Uploaded Liste items, kept so date/category filter changes can re-run Liste.
   const [listeItems, setListeItems] = useState<ListeItem[] | null>(null);
@@ -109,11 +115,6 @@ export function useAnalysePage() {
     }
     return { [MARGE_MODE_LABELS[mode]]: out };
   }, [activeData, mode, search]);
-
-  // Reset to page 1 whenever the active dataset or filters change.
-  useEffect(() => {
-    setPage(1);
-  }, [mode, filters, search]);
 
   // Liste is a mutation (no auto-refetch like the query modes). Re-run it when the
   // date / category (Mixte / Pharmacie / Parapharmacie) filters change so the rows
@@ -241,38 +242,9 @@ export function useAnalysePage() {
 /** TanStack Query wrappers for /v1/stats/analyse-marge + /v1/stats/analyse-liste.
  *
  *  Pattern matches the other stats hooks (useStats, useMarginAlerts, useStockAbcd).
- *  - useAnalyseMarge: GET per (mode, filters). Liste mode goes through useAnalyseListe instead.
+ *  - useAnalyseMarge (hooks/sharedQueries.ts, shared with Rapport): GET per (mode, filters).
  *  - useAnalyseListe: POST with CSV-parsed items. Mutation-shape since upload is user-triggered.
  */
-
-export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: API.stats.analyseMarge.key(
-      mode,
-      filters.date_from,
-      filters.date_to,
-      filters.category_type,
-      filters.product,
-    ),
-    queryFn: () =>
-      api.get<AnalyseMargeResponse>(API.stats.analyseMarge.url, {
-        params: {
-          mode,
-          date_from: filters.date_from,
-          date_to: filters.date_to,
-          category_type: filters.category_type,
-          product: filters.product,
-        },
-      }),
-    staleTime: 60_000,
-    enabled: mode !== "liste", // Liste uses the mutation hook below
-  });
-  return {
-    analyse: data,
-    isLoading,
-    error: isError ? error : null,
-  };
-}
 
 export function useAnalyseListe() {
   const { mutate, data, isPending, isError, error } = useMutation({
@@ -357,7 +329,11 @@ export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
     const wp = minBy(margeRows, worstPctVal);
     const bd = maxBy(margeRows, bestDhVal);
     const wd = minBy(margeRows, worstDhVal);
-    const pt = (r: AnalyseMargeRow, value: number): MargeKpiPoint => ({ label: r.product ?? "", value, qty: n(r.qty) });
+    const pt = (r: AnalyseMargeRow, value: number): MargeKpiPoint => ({
+      label: r.product ?? "",
+      value,
+      qty: n(r.qty),
+    });
     kpis.marge_pct_max = pt(bp, bestPctVal(bp));
     kpis.marge_pct_min = pt(wp, worstPctVal(wp));
     kpis.marge_dh_max = pt(bd, bestDhVal(bd));
@@ -385,10 +361,26 @@ export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
     const wp = minBy(margeAvgRows, (r) => n(r.marge_pct_avg));
     const bd = maxBy(margeAvgRows, (r) => n(r.marge_dh_avg));
     const wd = minBy(margeAvgRows, (r) => n(r.marge_dh_avg));
-    kpis.marge_pct_max = { label: labelOf(bp), value: n(bp.marge_pct_avg), qty: n(bp.qty) };
-    kpis.marge_pct_min = { label: labelOf(wp), value: n(wp.marge_pct_avg), qty: n(wp.qty) };
-    kpis.marge_dh_max = { label: labelOf(bd), value: n(bd.marge_dh_avg), qty: n(bd.qty) };
-    kpis.marge_dh_min = { label: labelOf(wd), value: n(wd.marge_dh_avg), qty: n(wd.qty) };
+    kpis.marge_pct_max = {
+      label: labelOf(bp),
+      value: n(bp.marge_pct_avg),
+      qty: n(bp.qty),
+    };
+    kpis.marge_pct_min = {
+      label: labelOf(wp),
+      value: n(wp.marge_pct_avg),
+      qty: n(wp.qty),
+    };
+    kpis.marge_dh_max = {
+      label: labelOf(bd),
+      value: n(bd.marge_dh_avg),
+      qty: n(bd.qty),
+    };
+    kpis.marge_dh_min = {
+      label: labelOf(wd),
+      value: n(wd.marge_dh_avg),
+      qty: n(wd.qty),
+    };
     kpis.difference_gain_dh = round2(n(bd.qty) * n(bd.marge_dh_avg) - n(wd.qty) * n(wd.marge_dh_avg));
   }
 

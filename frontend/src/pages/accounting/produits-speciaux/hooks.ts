@@ -8,6 +8,7 @@ import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 
 import type {
+  BlDetail,
   BlExclusion,
   BlExclusionResult,
   BlReintegrateResult,
@@ -37,18 +38,28 @@ export function useProduitsSpeciaux() {
 
   const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
     queryKey: API.specialProducts.suggestions.key(suggestQ),
-    queryFn: () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q: suggestQ } }),
+    queryFn: () =>
+      api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, {
+        params: { q: suggestQ },
+      }),
     enabled: suggestQ.trim().length >= 2,
     staleTime: 60_000,
   });
 
   const { mutate: exclude, isPending: excluding } = useMutation({
     mutationFn: (ids: number[]) =>
-      api.post<SpecialProductBulkResult>(API.specialProducts.exclude.url, { medicament_ids: ids }),
+      api.post<SpecialProductBulkResult>(API.specialProducts.exclude.url, {
+        medicament_ids: ids,
+      }),
     onSuccess: (r) => {
       const n = r.inserted + r.already_special;
       const s = r.already_special;
-      const tail = s > 0 ? t(s === 1 ? "ps.alreadySpecialOne" : "ps.alreadySpecialMany", { n: s }) : "";
+      const tail =
+        s > 0
+          ? t(s === 1 ? "ps.alreadySpecialOne" : "ps.alreadySpecialMany", {
+              n: s,
+            })
+          : "";
       toast.success(t(n === 1 ? "ps.prodExcludedOne" : "ps.prodExcludedMany", { n }) + tail);
       setSuggestQ("");
       void refresh(queryClient, API.specialProducts.exclude);
@@ -61,22 +72,22 @@ export function useProduitsSpeciaux() {
       api.post<SpecialProductReintegrateResult>(API.specialProducts.reintegrate.url, { medicament_ids: ids }),
     onSuccess: (r) => {
       const n = r.reintegrated;
-      toast.success(t(n === 1 ? "ps.prodReintegratedOne" : "ps.prodReintegratedMany", { n }));
+      toast.success(
+        t(n === 1 ? "ps.prodReintegratedOne" : "ps.prodReintegratedMany", {
+          n,
+        }),
+      );
       void refresh(queryClient, API.specialProducts.reintegrate);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Local filter on the displayed table (case + accent insensitive).
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const filteredProducts = useMemo(() => {
-    const all = list ?? [];
-    if (!search.trim()) return all;
-    const q = norm(search.trim());
-    return all.filter(
-      (p) => norm(p.product).includes(q) || norm(p.pid).includes(q) || norm(p.category ?? "").includes(q),
-    );
-  }, [list, search]);
+  // Local filter on the displayed table: same search as every other page (accents,
+  // several words, `*`).
+  const filteredProducts = useMemo(
+    () => (list ?? []).filter((p) => matchesFields([p.product, p.pid, p.category], search)),
+    [list, search],
+  );
 
   return {
     specialProducts: list ?? [],
@@ -113,14 +124,20 @@ export function useBlExclusions() {
 
   const { data: results, isFetching: resultsLoading } = useQuery({
     queryKey: API.blExclusions.search.key(searchQ),
-    queryFn: () => api.get<BlSummary[]>(API.blExclusions.search.url, { params: { q: searchQ } }),
+    queryFn: () =>
+      api.get<BlSummary[]>(API.blExclusions.search.url, {
+        params: { q: searchQ },
+      }),
     enabled: searchQ.trim().length >= 2,
     staleTime: 30_000,
   });
 
   const { mutate: exclude, isPending: excluding } = useMutation({
     mutationFn: (v: { ref: string; notes?: string }) =>
-      api.post<BlExclusionResult>(API.blExclusions.exclude.url, { delivery_ref: v.ref, notes: v.notes || null }),
+      api.post<BlExclusionResult>(API.blExclusions.exclude.url, {
+        delivery_ref: v.ref,
+        notes: v.notes || null,
+      }),
     onSuccess: (r) => {
       toast.success(
         r.already_excluded ? t("ps.blAlreadyExcluded") : t("ps.blExcluded", { ref: r.item?.delivery_ref ?? "" }),
@@ -133,7 +150,9 @@ export function useBlExclusions() {
 
   const { mutate: reintegrate, isPending: reintegrating } = useMutation({
     mutationFn: (refs: string[]) =>
-      api.post<BlReintegrateResult>(API.blExclusions.reintegrate.url, { delivery_refs: refs }),
+      api.post<BlReintegrateResult>(API.blExclusions.reintegrate.url, {
+        delivery_refs: refs,
+      }),
     onSuccess: (r) => {
       const n = r.reintegrated;
       toast.success(t(n === 1 ? "ps.blReintegratedOne" : "ps.blReintegratedMany", { n }));
@@ -142,15 +161,10 @@ export function useBlExclusions() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const filtered = useMemo(() => {
-    const all = list ?? [];
-    if (!search.trim()) return all;
-    const q = norm(search.trim());
-    return all.filter(
-      (b) => norm(b.delivery_ref).includes(q) || norm(b.supplier ?? "").includes(q) || norm(b.notes ?? "").includes(q),
-    );
-  }, [list, search]);
+  const filtered = useMemo(
+    () => (list ?? []).filter((b) => matchesFields([b.delivery_ref, b.supplier, b.notes], search)),
+    [list, search],
+  );
 
   return {
     blExclusions: list ?? [],
@@ -166,6 +180,19 @@ export function useBlExclusions() {
     reintegrateBls: reintegrate,
     isExcludingBl: excluding,
     isReintegratingBls: reintegrating,
+  };
+}
+
+/** Product lines of one BL (step 2 of « Exclure un BL »). */
+export function useBlDetail(deliveryRef: string) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: API.blExclusions.detail.key(deliveryRef),
+    queryFn: () => api.get<BlDetail>(API.blExclusions.detail.url, { params: { delivery_ref: deliveryRef } }),
+  });
+  return {
+    blLines: data?.lines ?? [],
+    isLoadingLines: isLoading,
+    linesError: isError,
   };
 }
 
@@ -187,7 +214,10 @@ export function useSupplierExclusions() {
 
   const { data: results, isFetching: resultsLoading } = useQuery({
     queryKey: API.supplierExclusions.search.key(searchQ),
-    queryFn: () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q: searchQ } }),
+    queryFn: () =>
+      api.get<SupplierSummary[]>(API.supplierExclusions.search.url, {
+        params: { q: searchQ },
+      }),
     enabled: searchQ.trim().length >= 2,
     staleTime: 30_000,
   });

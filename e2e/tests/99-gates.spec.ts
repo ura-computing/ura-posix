@@ -1,4 +1,4 @@
-/** Runs last (file order). Two gates over every call recorded during the run
+/** Runs last (file order). Gates 1-2 read every call recorded during the run
  *  (.results/calls.jsonl, written by lib/fixtures.ts + lib/api.ts):
  *
  *  1. COVERAGE — every backend route in /openapi.json must have been called at
@@ -11,7 +11,10 @@
  *     baseline?", (re)writes it.
  *  3. ERROR CODES — backend `errors.py` ErrorCode values = frontend `api/errors.ts`
  *     (fr.ts / es.ts already fail the build when a frontend code has no text).
+ *  4. REACT COMPILER — 0 `react-hooks` lint errors: the compiler skips (no auto
+ *     memo) every component with one. Hidden store pages (moved as-is) excluded.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -123,21 +126,17 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
   const saved = existsSync(BASELINE_FILE) ? JSON.parse(readFileSync(BASELINE_FILE, "utf-8")) : null;
   if (process.env.E2E_UPDATE_BASELINE === "1" || !saved?.routes) {
     writeFileSync(BASELINE_FILE, JSON.stringify({ rows, routes: current }, null, 2) + "\n");
-    test
-      .info()
-      .annotations.push({
-        type: "speed",
-        description: `baseline written for ${rows} rows: ${Object.keys(current).length} entries`,
-      });
+    test.info().annotations.push({
+      type: "speed",
+      description: `baseline written for ${rows} rows: ${Object.keys(current).length} entries`,
+    });
     return;
   }
   if (saved.rows !== rows) {
-    test
-      .info()
-      .annotations.push({
-        type: "speed",
-        description: `baseline is for ${saved.rows} rows, this run has ${rows}: not compared`,
-      });
+    test.info().annotations.push({
+      type: "speed",
+      description: `baseline is for ${saved.rows} rows, this run has ${rows}: not compared`,
+    });
     return;
   }
 
@@ -156,12 +155,10 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
     if (ms > limit) slower.push(`${key}: ${ms} ms (baseline ${base} ms, limit ${Math.round(limit)} ms)`);
   }
   if (fresh.length) {
-    test
-      .info()
-      .annotations.push({
-        type: "speed",
-        description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}`,
-      });
+    test.info().annotations.push({
+      type: "speed",
+      description: `not in baseline yet (make e2e-tests, answer y): ${fresh.join(", ")}`,
+    });
   }
   expect(slower, `slower than baseline:\n  ${slower.join("\n  ")}\n`).toEqual([]);
 });
@@ -173,4 +170,22 @@ test("gate: same error codes in backend and frontend", () => {
   const frontend = values("frontend/src/api/errors.ts", /^ {2}[A-Z_]+:\s*"(\w+)",$/gm);
   expect(backend.length, "codes in backend/errors.py").toBeGreaterThan(0);
   expect(frontend, "frontend/src/api/errors.ts vs backend/errors.py").toEqual(backend);
+});
+
+test("gate: the React Compiler compiles every component (0 react-hooks lint errors)", () => {
+  test.setTimeout(120_000);
+  const run = spawnSync("npx", ["eslint", "src", "-f", "json"], {
+    cwd: resolve(REPO_DIR, "frontend"),
+    encoding: "utf-8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const files: { filePath: string; messages: { ruleId: string | null; line: number }[] }[] = JSON.parse(run.stdout);
+  const found = files
+    .flatMap((f) =>
+      f.messages
+        .filter((m) => m.ruleId?.startsWith("react-hooks/"))
+        .map((m) => `${f.filePath.replace(/^.*\/frontend\//, "")}:${m.line} ${m.ruleId}`),
+    )
+    .filter((s) => !s.startsWith("src/pages/store/"));
+  expect(found, "react-hooks lint errors (npx eslint src in frontend/)").toEqual([]);
 });

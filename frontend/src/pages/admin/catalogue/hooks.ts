@@ -1,10 +1,10 @@
 /** /admin/catalogue page state: filters + pagination + sort + CRUD + CSV import. */
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
+import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
 
 import type {
@@ -29,7 +29,7 @@ const DEFAULT_FILTERS: CatalogFilters = {
 export function useCatalogPage() {
   const t = useT();
   const queryClient = useQueryClient();
-  const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
+  const { filters, patch, setSort, setPage, setPageSize, reset } = useListFilters(DEFAULT_FILTERS, "asc");
 
   const {
     data: list,
@@ -37,7 +37,10 @@ export function useCatalogPage() {
     isError,
   } = useQuery({
     queryKey: API.admin.catalog.list.key(filters),
-    queryFn: () => api.get<CatalogListResponse>(API.admin.catalog.list.url, { params: filters }),
+    queryFn: () =>
+      api.get<CatalogListResponse>(API.admin.catalog.list.url, {
+        params: filters,
+      }),
   });
 
   const { data: categories } = useQuery({
@@ -46,23 +49,10 @@ export function useCatalogPage() {
     staleTime: 5 * 60_000,
   });
 
-  // Filter helpers — every filter change resets pagination to page 1.
-  const patch = (next: Partial<CatalogFilters>) => setFilters((p) => ({ ...p, ...next, page: 1 }));
+  // Every filter change goes back to page 1 (`patch`).
   const setSearch = (search: string) => patch({ search });
   const setCategories = (category: string[]) => patch({ category });
   const setType = (type: ProductType | "unclassified" | null) => patch({ type });
-
-  // Sort: toggle order on same key, reset to "asc" on new key.
-  const setSort = (key: string) =>
-    setFilters((p) => ({
-      ...p,
-      sort_by: key,
-      sort_order: p.sort_by === key ? (p.sort_order === "asc" ? "desc" : "asc") : "asc",
-    }));
-  const setPage = (page: number) => setFilters((p) => ({ ...p, page }));
-  const setPageSize = (limit: number) => setFilters((p) => ({ ...p, limit, page: 1 }));
-
-  const reset = () => setFilters(DEFAULT_FILTERS);
 
   const { mutate: create, isPending: isCreating } = useMutation({
     mutationFn: (body: MedicamentInput) => api.post<Medicament>(API.admin.catalog.create.url, body),
@@ -99,7 +89,13 @@ export function useCatalogPage() {
   } = useMutation({
     mutationFn: (file: File) => api.upload<CatalogImportResponse>(API.admin.catalog.importCsv.url, file),
     onSuccess: (r) => {
-      toast.success(t("catalogue.toastImport", { inserted: r.inserted, updated: r.updated, skipped: r.skipped }));
+      toast.success(
+        t("catalogue.toastImport", {
+          inserted: r.inserted,
+          updated: r.updated,
+          skipped: r.skipped,
+        }),
+      );
       void refresh(queryClient, API.admin.catalog.importCsv);
     },
     onError: (e: Error) => toast.error(e.message),

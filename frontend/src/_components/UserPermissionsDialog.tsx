@@ -13,7 +13,7 @@
  *  Backend persists whatever the user picks; effective access is computed at
  *  read time by the 3-layer intersection in permissions.py.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Info, Check, Loader2, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
@@ -54,7 +54,14 @@ export interface UserPermissionsDialogProps {
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 
-export function UserPermissionsDialog({
+/** Mounted only while open (one mount per user): the toggles start from the
+ *  server values on every open, no reset effect needed. */
+export function UserPermissionsDialog(props: UserPermissionsDialogProps) {
+  if (!props.open || !props.user) return null;
+  return <PermissionsBody key={props.user.id} {...props} user={props.user} />;
+}
+
+function PermissionsBody({
   open,
   onClose,
   user,
@@ -63,15 +70,10 @@ export function UserPermissionsDialog({
   serverPermissions,
   isSaving,
   onSave,
-}: UserPermissionsDialogProps) {
+}: UserPermissionsDialogProps & { user: MemberOut }) {
   const t = useT();
-  // Local pending edits — initialized from server, reset on open / user change.
+  // Local pending edits, saved with « Enregistrer ».
   const [pending, setPending] = useState<Record<FeatureKey, boolean>>(serverPermissions);
-  useEffect(() => {
-    if (open) setPending(serverPermissions);
-  }, [open, serverPermissions, user?.id]);
-
-  if (!user) return null;
 
   const initials = (user.full_name ?? user.email)
     .split(/\s+/)

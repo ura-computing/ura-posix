@@ -100,6 +100,12 @@ function DateRangePopover({ from, to, onChange, showPresets = true, className }:
   const [toSegs, setToSegs] = useState<Segs>(() => isoToSegs(toIso));
   const [invalid, setInvalid] = useState({ from: false, to: false });
   const [open, setOpen] = useState(false);
+  // The values the segments were last filled from (see « new value from outside » below).
+  const [shownFromIso, setShownFromIso] = useState(fromIso);
+  const [shownToIso, setShownToIso] = useState(toIso);
+  // Popover anchor + panel, as state (not refs): Floating UI reads them during render.
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [panelEl, setPanelEl] = useState<HTMLElement | null>(null);
 
   const refs = useRef<Array<HTMLInputElement | null>>([null, null, null, null, null, null]);
 
@@ -107,11 +113,8 @@ function DateRangePopover({ from, to, onChange, showPresets = true, className }:
   // BELOW the fields by default, auto-flips above when no room, auto-shifts
   // left/right to fit within the viewport, clamps max-width on narrow screens.
   // `autoUpdate` re-positions on scroll, resize, transforms — for free.
-  const {
-    refs: floatRefs,
-    floatingStyles,
-    context,
-  } = useFloating({
+  const { floatingStyles, context } = useFloating({
+    elements: { reference: anchorEl, floating: panelEl },
     open,
     onOpenChange: setOpen,
     placement: "bottom-start",
@@ -135,15 +138,18 @@ function DateRangePopover({ from, to, onChange, showPresets = true, className }:
   const dismiss = useDismiss(context);
   const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
 
-  // Sync external prop changes into local segments.
-  useEffect(() => {
+  // New value from outside (preset, « Tout réinitialiser », another page): refill
+  // the segments during render, not in an effect (no extra render pass).
+  if (fromIso !== shownFromIso) {
+    setShownFromIso(fromIso);
     const next = isoToSegs(fromIso);
     setFromSegs((cur) => (segsEqual(cur, next) ? cur : next));
-  }, [fromIso]);
-  useEffect(() => {
+  }
+  if (toIso !== shownToIso) {
+    setShownToIso(toIso);
     const next = isoToSegs(toIso);
     setToSegs((cur) => (segsEqual(cur, next) ? cur : next));
-  }, [toIso]);
+  }
 
   const focusIdx = (idx: number, opts?: { selectAll?: boolean }) => {
     const el = refs.current[idx];
@@ -307,11 +313,7 @@ function DateRangePopover({ from, to, onChange, showPresets = true, className }:
   };
 
   return (
-    <div
-      ref={floatRefs.setReference}
-      {...getReferenceProps()}
-      className={cn("inline-flex items-center gap-2", className)}
-    >
+    <div ref={setAnchorEl} {...getReferenceProps()} className={cn("inline-flex items-center gap-2", className)}>
       <DateField
         side="from"
         label={t("shared.dateStart")}
@@ -355,7 +357,7 @@ function DateRangePopover({ from, to, onChange, showPresets = true, className }:
           + shift() + size() handle every viewport edge case automatically. */}
       {open && (
         <div
-          ref={floatRefs.setFloating}
+          ref={setPanelEl}
           {...getFloatingProps()}
           style={floatingStyles}
           className="z-50 flex flex-col overflow-auto rounded-xl border border-border bg-card shadow-2xl"
@@ -416,11 +418,13 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
   const t = useT();
   const segClass = (w: string) =>
     cn(
-      "bg-transparent text-center text-sm font-semibold tabular-nums outline-none placeholder:text-muted-foreground/60",
+      "bg-transparent text-center font-mono text-sm font-semibold tabular-nums outline-none placeholder:text-muted-foreground/60",
       "selection:bg-primary/20",
       w,
       invalid && "text-error",
     );
+  // Monospace: every character is 1ch wide, so each box = its characters + 0.5ch for the
+  // caret (2.5ch / 4.5ch): nothing scrolls out of a box, same gap around each « / ».
   // Label-less variant: the visible JJ/MM/AAAA placeholders + the left→right
   // reading order are enough to identify début vs fin. The `aria-label` on each
   // sub-input still includes the label for screen readers.
@@ -444,9 +448,9 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
         maxLength={2}
         placeholder={t("shared.dayAbbr")}
         aria-label={`${label} ${t("shared.day")}`}
-        className={segClass("w-[1.6em]")}
+        className={segClass("w-[2.5ch]")}
       />
-      <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
+      <span className={cn("mx-1 select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
       <input
         ref={(el) => registerRef("m", el)}
         value={segs.m}
@@ -458,9 +462,9 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
         maxLength={2}
         placeholder={t("shared.monthAbbr")}
         aria-label={`${label} ${t("shared.month")}`}
-        className={segClass("w-[1.6em]")}
+        className={segClass("w-[2.5ch]")}
       />
-      <span className={cn("select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
+      <span className={cn("mx-1 select-none text-sm text-muted-foreground", invalid && "text-error")}>/</span>
       <input
         ref={(el) => registerRef("y", el)}
         value={segs.y}
@@ -472,7 +476,7 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
         maxLength={4}
         placeholder={t("shared.yearAbbr")}
         aria-label={`${label} ${t("shared.year")}`}
-        className={segClass("w-[3em]")}
+        className={segClass("w-[4.5ch]")}
       />
     </div>
   );

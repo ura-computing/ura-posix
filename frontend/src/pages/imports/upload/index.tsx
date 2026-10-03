@@ -3,7 +3,6 @@ import {
   Boxes,
   CheckCircle2,
   ChevronRight,
-  FileSpreadsheet,
   ShoppingBasket,
   ShoppingCart,
   UploadCloud,
@@ -29,6 +28,7 @@ import { cn } from "@/utils/cn";
 import { formatNumStr, formatQty } from "@/utils/format";
 import type { UploadPhase, UploadProgress } from "@/hooks/UploadContext";
 import type { ReactNode } from "react";
+import { Page } from "@/_components/Page";
 
 interface DropZoneProps {
   docType: DocType;
@@ -772,17 +772,7 @@ export default function UploadFilePage() {
   }, [typeFromUrl, pickType]);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <header className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <FileSpreadsheet className="size-5" aria-hidden />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("uploadFile.pageTitle")}</h1>
-          <p className="text-sm text-muted-foreground">{t("uploadFile.pageDesc")}</p>
-        </div>
-      </header>
-
+    <Page title={t("uploadFile.pageTitle")} subtitle={t("uploadFile.pageDesc")} narrow>
       <Stepper current={step} />
 
       {/* ─── STEP 1 — Type ─── */}
@@ -905,7 +895,7 @@ export default function UploadFilePage() {
           )}
         </section>
       )}
-    </div>
+    </Page>
   );
 }
 

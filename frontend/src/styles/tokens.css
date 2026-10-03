@@ -65,6 +65,11 @@
   --surface-subtle: #f5f8f7; /* input bg, row hover            */
   --disabled-foreground: #98a5a2; /* disabled text / placeholders  */
 
+  /* Scrollbars: muted thumb from the text color, so light + dark follow (globals.css) */
+  --scrollbar-thumb: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+  color-scheme: light; /* native controls (date picker, select) in the app theme */
+
   /* ============ STATUS — LIGHT ============
      each: solid (badge fill / icon) · foreground (text on solid)
            subtle (tinted bg) · subtle-foreground (text on subtle) · border */
@@ -255,6 +260,7 @@
 
   --surface-subtle: #141c1b;
   --disabled-foreground: #5c6b68;
+  color-scheme: dark;
 
   /* status — dark */
   --success: #3fcf7a;

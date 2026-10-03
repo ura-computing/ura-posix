@@ -6,22 +6,18 @@
  *  Section B: employees table + actions (Inviter / Gérer les permissions /
  *    Réinitialiser / Désactiver / Supprimer).
  *
- *  Shares components/shared/members/ with the admin pharmacy page:
- *  CreateUserDialog (role locked to "employee" via the roleLocked prop),
- *  UserPermissionsDialog (N ceiling layers — we pass [Pharmacie, Vous]) and
- *  MemberKebab. */
+ *  Shares _components/ with the admin pharmacy page: MembersSection (the
+ *  table), CreateUserDialog (role locked to "employee" via the roleLocked prop),
+ *  UserPermissionsDialog (N ceiling layers — we pass [Pharmacie, Vous]). */
 import { useState } from "react";
-import { SlidersHorizontal, UserPlus, Users } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 
-import { AsyncButton } from "@/_components/AsyncButton";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
-import { FeaturePills } from "@/_components/FeaturePills";
-import { MemberKebab } from "@/_components/MemberKebab";
+import { MembersSection } from "@/_components/MembersSection";
 import { UserPermissionsDialog } from "@/_components/UserPermissionsDialog";
-import { FEATURES, ROLE_LABEL, STATUS_LABEL, toFeatureRecord, type FeatureKey } from "@/_components/memberConstants";
+import { FEATURES, toFeatureRecord, type FeatureKey } from "@/_components/memberConstants";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/utils/cn";
 import type { CreateUserIn, CreateUserOut, MemberOut } from "@/types";
@@ -34,8 +30,7 @@ import {
   useSetEmployeePermissions,
   useSetEmployeeStatus,
 } from "./hooks";
-
-const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
+import { Page } from "@/_components/Page";
 
 export default function OwnerEmployeesPage() {
   const t = useT();
@@ -91,12 +86,7 @@ export default function OwnerEmployeesPage() {
   const pharmacyName = me?.pharmacy?.name ?? t("employees.yourPharmacy");
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-4 pb-30">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("employees.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("employees.subtitle")}</p>
-      </header>
-
+    <Page title={t("employees.title")} subtitle={t("employees.subtitle")}>
       {/* Section A — pharmacy features summary (read-only) */}
       <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border px-5 py-4">
@@ -148,95 +138,19 @@ export default function OwnerEmployeesPage() {
         </div>
       </section>
 
-      {/* Section B — employees */}
-      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-base font-semibold text-foreground">{t("employees.employees")}</h2>
-            <p className="text-sm text-muted-foreground">{t("employees.employeesDesc")}</p>
-          </div>
-          <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
-            <UserPlus className="size-4" />
-            {t("employees.invite")}
-          </AsyncButton>
-        </div>
-
-        {employees.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-6 py-11 text-center">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-              <Users className="size-5" />
-            </span>
-            <p className="max-w-sm text-sm text-muted-foreground">{t("employees.empty")}</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface-subtle text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2.5">{t("employees.colName")}</th>
-                <th className="px-3 py-2.5">{t("employees.colRole")}</th>
-                <th className="px-3 py-2.5">{t("employees.colStatus")}</th>
-                <th className="px-3 py-2.5">{t("employees.colPerms")}</th>
-                <th className="px-3 py-2.5 text-right">{t("employees.colActions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((m) => (
-                <tr key={m.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-foreground">
-                        {(m.full_name ?? m.email)
-                          .split(/\s+/)
-                          .slice(0, 2)
-                          .map((s: string) => s[0]?.toUpperCase())
-                          .join("")}
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-semibold text-foreground">{m.full_name ?? "—"}</span>
-                        <span className="text-xs text-muted-foreground">{m.email}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{t(ROLE_LABEL[m.role])}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={cn(
-                        PILL_BASE,
-                        m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {t(STATUS_LABEL[m.status])}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <FeaturePills features={m.granted_permissions} maxShown={3} />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setPermDialogUser(m)}
-                        className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
-                      >
-                        <SlidersHorizontal className="size-3.5" />
-                        {t("employees.managePerms")}
-                      </button>
-                      <MemberKebab
-                        member={m}
-                        onResetPassword={() => setResetTarget(m)}
-                        onToggleStatus={() => handleToggleStatus(m)}
-                        onRemove={() => setRemoveTarget(m)}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+      {/* Section B — employees (same card as the admin pharmacy page) */}
+      <MembersSection
+        title={t("employees.employees")}
+        description={t("employees.employeesDesc")}
+        addLabel={t("employees.invite")}
+        onAdd={() => setCreateOpen(true)}
+        emptyText={t("employees.empty")}
+        members={employees}
+        onManagePermissions={setPermDialogUser}
+        onResetPassword={setResetTarget}
+        onToggleStatus={handleToggleStatus}
+        onRemove={setRemoveTarget}
+      />
 
       {/* Dialogs */}
       <CreateUserDialog
@@ -274,6 +188,6 @@ export default function OwnerEmployeesPage() {
         description={t("members.removeDesc", { pharmacy: pharmacyName })}
         onConfirm={handleConfirmRemove}
       />
-    </div>
+    </Page>
   );
 }

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import { useListFilters } from "@/hooks/useListFilters";
 
 import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
@@ -27,7 +28,14 @@ const DEFAULT_LOCAL: LocalAchatsFilters = {
 export function useAchatsPage() {
   const t = useT();
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
-  const [localFilters, setLocal] = useState<LocalAchatsFilters>(DEFAULT_LOCAL);
+  const {
+    filters: localFilters,
+    patch,
+    setSort,
+    setPage,
+    setPageSize,
+    reset: resetLocal,
+  } = useListFilters(DEFAULT_LOCAL, "desc");
   const [suggestQ, setSuggestQ] = useState<string>("");
 
   // Merge global dates + local fields into the AchatsFilters payload the
@@ -59,7 +67,10 @@ export function useAchatsPage() {
   );
   const { data: supplierSummary, isLoading: supplierLoading } = useQuery({
     queryKey: API.achats.supplierSummary.key(summaryKey),
-    queryFn: () => api.get<AchatsSupplierSummary>(API.achats.supplierSummary.url, { params: summaryKey }),
+    queryFn: () =>
+      api.get<AchatsSupplierSummary>(API.achats.supplierSummary.url, {
+        params: summaryKey,
+      }),
   });
 
   const { data: categories } = useQuery({
@@ -74,32 +85,22 @@ export function useAchatsPage() {
   });
   const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
     queryKey: API.achats.suggestions.key(suggestQ),
-    queryFn: () => api.get<AchatsSuggestions>(API.achats.suggestions.url, { params: { q: suggestQ } }),
+    queryFn: () =>
+      api.get<AchatsSuggestions>(API.achats.suggestions.url, {
+        params: { q: suggestQ },
+      }),
     enabled: suggestQ.length >= 2,
     staleTime: 60_000,
   });
 
-  // Local-filter patch resets pagination; sort + page do not. Date range
-  // is the only filter routed through the global context.
-  const patch = (next: Partial<LocalAchatsFilters>) => setLocal((p) => ({ ...p, ...next, page: 1 }));
-
+  // Every filter change goes back to page 1 (`patch`); the date range is shared between pages.
   const setSearch = (search: string) => patch({ search });
   const setDateRange = (date_from: string | null, date_to: string | null) => setRange(date_from, date_to);
   const setCategories = (category: string[]) => patch({ category });
   const setTva = (tva: string[]) => patch({ tva });
 
-  // Toggle order on same key; reset to "desc" on different key.
-  const setSort = (key: string) =>
-    setLocal((p) => ({
-      ...p,
-      sort_by: key,
-      sort_order: p.sort_by === key ? (p.sort_order === "desc" ? "asc" : "desc") : "desc",
-    }));
-  const setPage = (page: number) => setLocal((p) => ({ ...p, page }));
-  const setPageSize = (limit: number) => setLocal((p) => ({ ...p, limit, page: 1 }));
-
   const reset = () => {
-    setLocal(DEFAULT_LOCAL);
+    resetLocal();
     setRange(null, null);
   };
 

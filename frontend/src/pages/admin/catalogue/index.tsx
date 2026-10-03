@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Pencil, Trash2, Plus, UploadCloud, FileSpreadsheet, AlertTriangle } from "lucide-react";
 
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
@@ -6,7 +6,7 @@ import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatMAD, formatPct } from "@/utils/format";
+import { formatMAD, formatNumStr, formatPct } from "@/utils/format";
 import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types";
 
 import { useCatalogPage } from "./hooks";
@@ -14,6 +14,7 @@ import { AsyncButton } from "@/_components/AsyncButton";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { TextField } from "@/_components/TextField";
 import { TypeBadge } from "@/_components/TypeBadge";
+import { Page } from "@/_components/Page";
 
 /** CSV import dialog for the admin catalog. File picker → submit → result toast. */
 
@@ -72,7 +73,7 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
               <>
                 <FileSpreadsheet className="size-8 text-primary" aria-hidden />
                 <span className="text-sm font-semibold text-foreground">{file.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</span>
+                <span className="font-mono text-xs text-muted-foreground">{formatNumStr(file.size / 1024, 1)} KB</span>
               </>
             ) : (
               <>
@@ -198,17 +199,16 @@ function tvaPercent(tva: string | null | undefined): number {
   return m ? parseFloat(m[0]) : 0;
 }
 
-function MedicamentFormDialog({ open, onClose, initial, onSubmit, isLoading }: MedicamentFormDialogProps) {
+/** Mounted only while open, once per medicament: the form starts from `initial`. */
+function MedicamentFormDialog(props: MedicamentFormDialogProps) {
+  return props.open ? <MedicamentFormBody key={props.initial?.id ?? "new"} {...props} /> : null;
+}
+
+function MedicamentFormBody({ open, onClose, initial, onSubmit, isLoading }: MedicamentFormDialogProps) {
   const t = useT();
-  const [form, setForm] = useState<MedicamentInput>(blank());
+  const [form, setForm] = useState<MedicamentInput>(() => (initial ? fromMedicament(initial) : blank()));
   const [error, setError] = useState<string | null>(null);
   const [tvaConfirmOpen, setTvaConfirmOpen] = useState(false);
-
-  useEffect(() => {
-    setForm(initial ? fromMedicament(initial) : blank());
-    setError(null);
-    setTvaConfirmOpen(false);
-  }, [initial, open]);
 
   const setField = <K extends keyof MedicamentInput>(k: K, v: MedicamentInput[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -530,12 +530,7 @@ export default function CataloguePage() {
   ];
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("catalogue.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("catalogue.subtitle")}</p>
-      </header>
-
+    <Page title={t("catalogue.title")} subtitle={t("catalogue.subtitle")}>
       <FilterBar
         search={{
           value: filters.search,
@@ -645,6 +640,6 @@ export default function CataloguePage() {
         isLoading={isImporting}
         lastResult={lastImport}
       />
-    </div>
+    </Page>
   );
 }

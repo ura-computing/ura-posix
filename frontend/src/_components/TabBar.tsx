@@ -19,7 +19,11 @@ interface TabBarProps<K extends string> {
  *  sideways when the tabs don't fit (7 modes on /analyses). */
 export function TabBar<K extends string = string>({ tabs, activeId, onChange }: TabBarProps<K>) {
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
+    <div
+      role="tablist"
+      // Scrolls sideways only on a narrow screen (no visible bar); never vertically.
+      className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {tabs.map((tab) => {
         const active = tab.id === activeId;
         return (
@@ -39,7 +43,7 @@ export function TabBar<K extends string = string>({ tabs, activeId, onChange }: 
             {active && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary"
+                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }}
               />
             )}

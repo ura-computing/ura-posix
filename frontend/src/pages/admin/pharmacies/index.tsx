@@ -11,6 +11,8 @@ import { useT } from "@/i18n/I18nProvider";
 import { useMemo, useState } from "react";
 import { ArrowRight, Plus, RefreshCw, UserPlus, Building2 } from "lucide-react";
 import { AsyncButton } from "@/_components/AsyncButton";
+import { useAdminPharmaciesList } from "@/hooks/sharedQueries";
+import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar } from "@/_components/filterBar";
@@ -27,7 +29,6 @@ import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserD
 import { FeaturePills } from "@/_components/FeaturePills";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
 import {
-  useAdminPharmaciesList,
   useCreatePharmacy,
   useCreateUser,
   useAdminUsers,
@@ -42,6 +43,7 @@ import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
 import { MemberKebab } from "@/_components/MemberKebab";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { cn } from "@/utils/cn";
+import { Page } from "@/_components/Page";
 
 /** « Pharmacies » tab of /admin/pharmacies — the pharmacies list (was the
  *  whole page before the « Utilisateurs » tab). The TanStack hooks return
@@ -247,14 +249,19 @@ function UsersTab() {
   const [removeTarget, setRemoveTarget] = useState<AdminUserRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<AdminUserRow | null>(null);
 
-  // Pharmacy id 0: these hooks also refresh the whole pharmacies cache + this list.
+  // These hooks refresh the whole pharmacies cache + this list.
   const { setUserStatus } = useSetUserStatus();
   const { resetUserPassword } = useResetUserPassword();
   const { deleteUser } = useDeleteUser();
 
   const rows = useMemo(() => users ?? [], [users]);
-  const orphans = rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length;
-  const inactive = rows.filter((u) => u.status !== "active").length;
+  const { orphans, inactive } = useMemo(
+    () => ({
+      orphans: rows.filter((u) => isMember(u) && !hasActivePharmacy(u)).length,
+      inactive: rows.filter((u) => u.status !== "active").length,
+    }),
+    [rows],
+  );
 
   // « Sans pharmacie » = no ACTIVE pharmacy (none, or an archived one).
   const filtered = useMemo(
@@ -336,9 +343,7 @@ function UsersTab() {
       sortable: false,
       render: (u) => (
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          {u.last_login_at
-            ? new Date(u.last_login_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })
-            : t("adminUsers.never")}
+          {u.last_login_at ? formatDateTime(u.last_login_at) : t("adminUsers.never")}
         </span>
       ),
     },
@@ -529,12 +534,7 @@ export default function AdminPharmaciesIndex() {
   const tab = params.get("tab") === "utilisateurs" ? "users" : "pharmacies";
 
   return (
-    <div className="mx-auto flex max-w-[1320px] flex-col gap-4">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("adminUsers.pageTitle")}</h1>
-        <p className="text-sm text-muted-foreground">{t("adminUsers.pageSubtitle")}</p>
-      </header>
-
+    <Page title={t("adminUsers.pageTitle")} subtitle={t("adminUsers.pageSubtitle")}>
       <TabBar
         tabs={[
           { id: "pharmacies", label: t("adminUsers.tabPharmacies") },
@@ -545,6 +545,6 @@ export default function AdminPharmaciesIndex() {
       />
 
       {tab === "pharmacies" ? <PharmaciesTab /> : <UsersTab />}
-    </div>
+    </Page>
   );
 }

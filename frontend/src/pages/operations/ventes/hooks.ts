@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import { useVentesList } from "@/hooks/sharedQueries";
+import { useListFilters } from "@/hooks/useListFilters";
 
 import type {
   SurveillanceTab,
@@ -43,7 +45,14 @@ function trimForKey(f: VentesFilters): VentesFiltersKey {
 export function useVentesPage() {
   const t = useT();
   const { from: dateFrom, to: dateTo, setRange } = useGlobalDateRange();
-  const [localFilters, setLocal] = useState<LocalVentesFilters>(DEFAULT_LOCAL);
+  const {
+    filters: localFilters,
+    patch,
+    setSort,
+    setPage,
+    setPageSize,
+    reset: resetLocal,
+  } = useListFilters(DEFAULT_LOCAL, "desc");
   const [suggestQ, setSuggestQ] = useState<string>("");
 
   // Merge global dates + local fields into the VentesFilters payload the
@@ -62,17 +71,13 @@ export function useVentesPage() {
     return rest;
   }, [filters]);
 
-  const {
-    data: list,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: API.ventes.list.key(filters),
-    queryFn: () => api.get<VentesListResponse>(API.ventes.list.url, { params: filters }),
-  });
+  const { ventesList: list, isLoading, isError } = useVentesList(filters);
   const { data: counts } = useQuery({
     queryKey: API.ventes.surveillance.key(key),
-    queryFn: () => api.get<VentesSurveillanceCounts>(API.ventes.surveillance.url, { params: summaryFilters }),
+    queryFn: () =>
+      api.get<VentesSurveillanceCounts>(API.ventes.surveillance.url, {
+        params: summaryFilters,
+      }),
   });
   const { data: categories } = useQuery({
     queryKey: API.ventes.categories.key,
@@ -86,21 +91,24 @@ export function useVentesPage() {
   });
   const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
     queryKey: API.ventes.suggestions.key(suggestQ),
-    queryFn: () => api.get<VentesSuggestions>(API.ventes.suggestions.url, { params: { q: suggestQ } }),
+    queryFn: () =>
+      api.get<VentesSuggestions>(API.ventes.suggestions.url, {
+        params: { q: suggestQ },
+      }),
     enabled: suggestQ.length >= 2,
     staleTime: 60_000,
   });
 
   const { data: discountSummary, isLoading: discountLoading } = useQuery({
     queryKey: API.ventes.discountSummary.key(summaryFilters),
-    queryFn: () => api.get<VentesDiscountSummary>(API.ventes.discountSummary.url, { params: summaryFilters }),
+    queryFn: () =>
+      api.get<VentesDiscountSummary>(API.ventes.discountSummary.url, {
+        params: summaryFilters,
+      }),
     staleTime: 60_000,
   });
 
-  // Local-filter patch resets pagination; sort + page do not. Date range
-  // is the only filter routed through the global context.
-  const patch = (next: Partial<LocalVentesFilters>) => setLocal((prev) => ({ ...prev, ...next, page: 1 }));
-
+  // Every filter change goes back to page 1 (`patch`); the date range is shared between pages.
   const setSearch = (search: string) => patch({ search });
   const setDateRange = (date_from: string | null, date_to: string | null) => setRange(date_from, date_to);
   const setCategories = (category: string[]) => patch({ category });
@@ -108,19 +116,8 @@ export function useVentesPage() {
   const setSurveillance = (surveillance: SurveillanceTab | null) => patch({ surveillance });
   const setIncludeND = (include_non_declared: boolean) => patch({ include_non_declared });
 
-  // Sort + page DON'T reset to page 1 → kept out of `patch`.
-  // setSort toggles order on same key, resets to "desc" on different key.
-  const setSort = (key: string) =>
-    setLocal((prev) => ({
-      ...prev,
-      sort_by: key,
-      sort_order: prev.sort_by === key ? (prev.sort_order === "desc" ? "asc" : "desc") : "desc",
-    }));
-  const setPage = (page: number) => setLocal((prev) => ({ ...prev, page }));
-  const setPageSize = (limit: number) => setLocal((prev) => ({ ...prev, limit, page: 1 }));
-
   const reset = () => {
-    setLocal(DEFAULT_LOCAL);
+    resetLocal();
     setRange(null, null);
   };
 

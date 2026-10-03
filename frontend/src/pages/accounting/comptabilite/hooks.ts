@@ -7,16 +7,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
+import { useStats, useVentesList } from "@/hooks/sharedQueries";
 
-import type {
-  PaymentMethod,
-  StatsFilters,
-  VentesFilters,
-  PaymentEntry,
-  PaymentEntryIn,
-  StatsResponse,
-  VentesListResponse,
-} from "@/types";
+import type { PaymentMethod, StatsFilters, VentesFilters, PaymentEntry, PaymentEntryIn } from "@/types";
 import { translateFr } from "@/i18n/I18nProvider";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
@@ -69,17 +62,8 @@ export function useComptabilitePage() {
   const [ventesSortBy, setVentesSortBy] = useState<string | null>(null);
   const [ventesSortOrder, setVentesSortOrder] = useState<"asc" | "desc">("desc");
 
-  // KPIs (existing /stats endpoint)
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: API.stats.main.key(
-      filters.date_from,
-      filters.date_to,
-      filters.category_type,
-      filters.include_non_declared,
-    ),
-    queryFn: () => api.get<StatsResponse>(API.stats.main.url, { params: filters }),
-    staleTime: 60_000,
-  });
+  // KPIs (same /stats read as Rapport)
+  const { stats, isLoading: statsLoading } = useStats(filters);
 
   // Payment entries for the active month (drives the 4 cards)
   const { payments, isLoading: paymentsLoading } = usePayments(activeMonth);
@@ -103,10 +87,7 @@ export function useComptabilitePage() {
     [filters, ventesPage, ventesPageSize, ventesSortBy, ventesSortOrder],
   );
 
-  const { data: ventesData, isLoading: ventesLoading } = useQuery({
-    queryKey: API.ventes.list.key(ventesFilters),
-    queryFn: () => api.get<VentesListResponse>(API.ventes.list.url, { params: ventesFilters }),
-  });
+  const { ventesList: ventesData, isLoading: ventesLoading } = useVentesList(ventesFilters);
 
   /** Toggle order on same key; reset to "desc" on different key.
    *  Same UX as the /ventes page's setSort. */

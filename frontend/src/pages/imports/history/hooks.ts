@@ -9,7 +9,10 @@ import { type DataImportsResponse, type DocType } from "@/types";
 export function useImports() {
   const { data, isLoading, error } = useQuery({
     queryKey: API.imports.list.key,
-    queryFn: () => api.get<DataImportsResponse>(API.imports.list.url, { params: { page: 1, limit: 100 } }),
+    queryFn: () =>
+      api.get<DataImportsResponse>(API.imports.list.url, {
+        params: { page: 1, limit: 100 },
+      }),
   });
   return {
     imports: data?.data ?? [],

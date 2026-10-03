@@ -21,14 +21,15 @@ import { useT, type TFn } from "@/i18n/I18nProvider";
 import { KpiTile, type IconTone } from "@/_components/KpiTile";
 import { NeedleGauge } from "@/_components/NeedleGauge";
 import { cn } from "@/utils/cn";
-import { formatQty, formatPct, formatMAD } from "@/utils/format";
+import { formatQty, formatPct, formatMAD, formatNumStr } from "@/utils/format";
 import type { AbcdClass, StockRow, PeremptionBracket, PeremptionsResponse } from "@/types";
 import { ABCD_COLORS, ABCD_ORDER, abcdFontSize, STATUS_META, STATUS_OPTIONS } from "../constants";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { DialogDescriptor } from "@/pages/analytics/hooks";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
 import type { StockSortKey } from "./hooks";
+import { Page } from "@/_components/Page";
 
 // src/pages/stock/_components/AbcdAnalysisCard.tsx
 
@@ -50,7 +51,7 @@ function AbcdAnalysisCard({
   onSelectClass,
 }: AbcdAnalysisCardProps) {
   const t = useT();
-  const scoreLabel = health.toFixed(1).replace(".", ",");
+  const scoreLabel = formatNumStr(health, 1);
 
   return (
     <KpiTile label={t("stock.abcdTitle")}>
@@ -181,9 +182,15 @@ function AlertCard({
 
 function AlertCardsGrid({ products }: AlertCardsGridProps) {
   const t = useT();
-  const negatif = products.filter((p) => p.status === "negatif");
-  const sousTop = products.filter((p) => (p.category === "A" || p.category === "A-") && p.status === "sous-stock");
-  const surstock = products.filter((p) => p.status === "sur-stock");
+  // Every stock product (thousands): filtered once per new list, not per render.
+  const { negatif, sousTop, surstock } = useMemo(
+    () => ({
+      negatif: products.filter((p) => p.status === "negatif"),
+      sousTop: products.filter((p) => (p.category === "A" || p.category === "A-") && p.status === "sous-stock"),
+      surstock: products.filter((p) => p.status === "sur-stock"),
+    }),
+    [products],
+  );
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -382,7 +389,12 @@ const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
       </span>
     ),
   },
-  { key: "category", label: t("stock.classe"), width: 80, render: (r) => <ClassPill klass={r.category} /> },
+  {
+    key: "category",
+    label: t("stock.classe"),
+    width: 80,
+    render: (r) => <ClassPill klass={r.category} />,
+  },
   {
     key: "units_sold_12m",
     label: t("stock.ventes12m"),
@@ -423,7 +435,12 @@ const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
         </span>
       ),
   },
-  { key: "status", label: t("col.statut"), width: 140, render: (r) => <StatusPill status={r.status} /> },
+  {
+    key: "status",
+    label: t("col.statut"),
+    width: 140,
+    render: (r) => <StatusPill status={r.status} />,
+  },
 ];
 
 function StockTable({
@@ -578,11 +595,7 @@ export default function StockPage() {
   ].filter(Boolean) as ActiveFilter[];
 
   return (
-    <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("nav.stock")}</h1>
-      </header>
-
+    <Page title={t("nav.stock")}>
       <FilterBar
         dateRange={{
           from: dateFrom || null,
@@ -700,15 +713,16 @@ export default function StockPage() {
         dateFrom={dateFrom}
         dateTo={dateTo}
       />
-    </div>
+    </Page>
   );
 }
 
 /* ---- loading skeleton ---- */
+function Pulse({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-full bg-muted ${className ?? ""}`} />;
+}
+
 function StockSkeleton() {
-  const Pulse = ({ className }: { className?: string }) => (
-    <div className={`animate-pulse rounded-full bg-muted ${className ?? ""}`} />
-  );
   return (
     <>
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">

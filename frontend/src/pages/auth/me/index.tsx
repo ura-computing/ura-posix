@@ -18,6 +18,7 @@ import { TextField } from "@/_components/TextField";
 import type { Me, Session } from "@/types";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { useLogout } from "@/hooks/useLogout";
+import { Page } from "@/_components/Page";
 
 const COUNTRIES: { code: CountryCode; label: string }[] = [
   { code: "MA", label: "Maroc" },
@@ -368,14 +369,13 @@ export default function MePage() {
   if (!me) return null;
 
   return (
-    <div className="flex max-w-[680px] flex-col gap-6">
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("me.title")}</h1>
+    <Page title={t("me.title")} narrow>
       <TabBar tabs={buildTabs(t)} activeId={active} onChange={setActive} />
       <div>
         {active === "profil" && <ProfileTab me={me} />}
         {active === "password" && <PasswordTab />}
         {active === "sessions" && <SessionsTab me={me} />}
       </div>
-    </div>
+    </Page>
   );
 }

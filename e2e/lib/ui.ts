@@ -1,6 +1,6 @@
 /** Drive the real UI: type a period like a user, and read back the JSON the
  *  PAGE ITSELF loaded (so the check covers the frontend call + the backend). */
-import type { Locator, Page } from "@playwright/test";
+import type { Locator, Page, Response } from "@playwright/test";
 import * as XLSX from "xlsx";
 
 import { expect } from "./fixtures";
@@ -123,6 +123,24 @@ export async function columnTexts(
 export async function resultsCount(page: Page): Promise<number> {
   const text = await page.getByText(/^[\d\s\u00a0\u202f]+ résultats$/).innerText();
   return Number(text.replace(/\D/g, ""));
+}
+
+/** Click « Exporter Excel » on a ledger page (`api` = "/v1/ventes" or "/v1/achats"): the
+ *  export answer, the saved .xlsx path + name (null when refused, e.g. 413) and the time from
+ *  the click to the file on disk (speed gate FLOW). */
+export async function exportLedger(
+  page: Page,
+  api: string,
+): Promise<{ res: Response; path: string | null; filename: string | null; ms: number }> {
+  const exported = page.waitForResponse((r) => r.url().includes(`${api}?`) && r.url().includes("export=true"));
+  const download = page.waitForEvent("download").catch(() => null); // none when the export is refused
+  const t0 = Date.now();
+  await page.getByRole("button", { name: "Exporter Excel" }).click();
+  const res = await exported;
+  if (res.status() !== 200) return { res, path: null, filename: null, ms: Date.now() - t0 };
+  const file = await download;
+  const path = (await file?.path()) ?? null;
+  return { res, path, filename: file?.suggestedFilename() ?? null, ms: Date.now() - t0 };
 }
 
 /** Click something that downloads an .xlsx; returns its name + first sheet as rows. */

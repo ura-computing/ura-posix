@@ -3,10 +3,11 @@
  *  Header + DataTable + create/edit dialog + confirm-delete dialog. Uses the
  *  shared DataTable primitive so empty/loading/sort states stay consistent
  *  with the rest of the app. */
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
 
 import { AsyncButton } from "@/_components/AsyncButton";
+import { FormField, FormInput } from "@/_components/FormField";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { DataTable } from "@/_components/DataTable";
 import { SuffixBadge } from "@/_components/SuffixBadge";
@@ -22,6 +23,7 @@ import {
 } from "./hooks";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { SUFFIX_COLORS } from "@/types";
+import { Page } from "@/_components/Page";
 
 /** Create / edit dialog for a CategorySuffix. Mirrors the handoff design via
  *  our shared primitives (Dialog, AsyncButton, SuffixBadge). The category is
@@ -49,24 +51,18 @@ interface CategorySuffixDialogProps {
   onSubmit: (values: CategorySuffixIn) => Promise<unknown>;
 }
 
-function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: CategorySuffixDialogProps) {
+/** Mounted only while open, once per item: the fields start from `item`. */
+function CategorySuffixDialog(props: CategorySuffixDialogProps) {
+  return props.open ? <CategorySuffixBody key={props.item?.id ?? "new"} {...props} /> : null;
+}
+
+function CategorySuffixBody({ open, onClose, item, isSaving, onSubmit }: CategorySuffixDialogProps) {
   const t = useT();
   const [values, setValues] = useState<CategorySuffixIn>({
     category: item?.category ?? "",
     suffix: item?.suffix ?? "",
     color: item?.color ?? "teal",
   });
-
-  // Reset fields when the dialog opens for a different item.
-  useEffect(() => {
-    if (open) {
-      setValues({
-        category: item?.category ?? "",
-        suffix: item?.suffix ?? "",
-        color: item?.color ?? "teal",
-      });
-    }
-  }, [open, item]);
 
   const set = <K extends keyof CategorySuffixIn>(k: K, v: CategorySuffixIn[K]) => setValues((p) => ({ ...p, [k]: v }));
 
@@ -104,18 +100,18 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
         </div>
 
         <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-          <Field label={t("col.categorie")} required>
-            <Input
+          <FormField label={t("col.categorie")} required>
+            <FormInput
               value={values.category}
               onChange={(v) => set("category", v)}
               placeholder={t("categories.categoryPlaceholderEx")}
               required
               autoFocus
             />
-          </Field>
+          </FormField>
 
-          <Field label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
-            <Input
+          <FormField label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
+            <FormInput
               value={values.suffix}
               onChange={(v) => set("suffix", v)}
               placeholder="-1"
@@ -123,9 +119,9 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
               required
               className="max-w-[140px] font-mono"
             />
-          </Field>
+          </FormField>
 
-          <Field label={t("categories.color")}>
+          <FormField label={t("categories.color")}>
             <div className="flex flex-wrap items-center gap-2">
               {SUFFIX_COLORS.map((c) => {
                 const selected = values.color === c;
@@ -155,7 +151,7 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
                 <Minus className="size-3.5 text-muted-foreground" />
               </button>
             </div>
-          </Field>
+          </FormField>
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
             <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
@@ -170,51 +166,6 @@ function CategorySuffixDialog({ open, onClose, item, isSaving, onSubmit }: Categ
     </Dialog>
   );
 }
-
-// ─── Tiny inline form primitives (same pattern as CreateUserDialog) ───────────
-
-function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">
-        {label}
-        {required && <span className="ml-1 text-error">*</span>}
-      </span>
-      {children}
-      {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function Input({
-  value,
-  onChange,
-  className,
-  ...rest
-}: { value: string; onChange: (v: string) => void; className?: string } & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange" | "className"
->) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${className ?? ""}`}
-    />
-  );
-}
-
 function normalizeCategory(input: string): string {
   return input.replace(/\s+/g, " ").trim();
 }
@@ -280,18 +231,16 @@ export default function AdminCategoriesPage() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 sm:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("categories.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("categories.subtitle")}</p>
-        </div>
+    <Page
+      title={t("categories.title")}
+      subtitle={t("categories.subtitle")}
+      actions={
         <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
           {t("categories.newMapping")}
         </AsyncButton>
-      </header>
-
+      }
+    >
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("categories.loadError")}</span>
@@ -354,6 +303,6 @@ export default function AdminCategoriesPage() {
         loadingLabel={t("categories.deleting")}
         isLoading={isDeleting}
       />
-    </div>
+    </Page>
   );
 }

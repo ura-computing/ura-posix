@@ -1,5 +1,5 @@
 // src/pages/alertes/_components/AlertDetailDialog.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/_components/dialog";
@@ -241,7 +241,14 @@ export interface AlertDetailDialogProps {
   dateTo?: string;
 }
 
-export function AlertDetailDialog({
+/** Mounted only while open, once per alert (`title`): the sort starts from
+ *  `defaultSortKey` on every open, no reset effect needed. */
+export function AlertDetailDialog(props: AlertDetailDialogProps) {
+  if (!props.open) return null;
+  return <AlertDetailBody key={`${props.title}|${props.defaultSortKey}`} {...props} />;
+}
+
+function AlertDetailBody({
   open,
   onClose,
   title,
@@ -255,12 +262,6 @@ export function AlertDetailDialog({
   const t = useT();
   const [sortKey, setSortKey] = useState(defaultSortKey);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-
-  // reset sort whenever the dialog target changes
-  useEffect(() => {
-    setSortKey(defaultSortKey);
-    setSortOrder("asc");
-  }, [title, defaultSortKey]);
 
   const sorted = useMemo(() => {
     const col = columns.find((c) => c.key === sortKey);

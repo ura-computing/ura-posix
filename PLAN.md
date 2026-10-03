@@ -22,6 +22,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 
 | What | Where |
 |---|---|
+| FE5: reads used by 2+ pages get one hook in `hooks/sharedQueries.ts` (`useStats` Rapport + Comptabilité, `useMarginAlerts` Rapport + Alertes, `useAnalyseMarge` Analyses + Rapport « Optimisation », `useVentesList` Ventes + Comptabilité, `useAdminPharmaciesList` admin Pharmacies + Rapport picker; dead type `AdminPharmacyRow` removed). Achats / ventes / catalogue filter + sort + page state = `hooks/useListFilters.ts` | `03`, `04`, `06`, `07`, `08`, `11`, `14` |
 
 ---
 
@@ -59,11 +60,6 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 | # | Step | Today | After |
 |---|---|---|---|
-| FE13 | **`useMemo` / `useCallback` where they count** (your call 2026-10-03) | React Compiler memoizes every component it can compile, but it skips a component with a `react-hooks` lint error: 32 today (`set-state-in-effect` ×15: filterBar, comptabilité, produits-spéciaux, catalogue, catégories, dialogs, analyses hooks; `refs` ×8: filterBar; `exhaustive-deps` ×6: analytics + stock hooks; `static-components` ×3: stock page) → those re-filter / re-sort every render | each lint error fixed (compiler compiles the file again); `useMemo` on heavy derived data (table filter / sort, chart series, totals) and `useCallback` on handlers passed to children or used in effect deps, in every hook; `npx eslint src` = 0 `react-hooks` errors (gate) |
-| FE3b | **One members table** | admin detail + team = 2 tables | `MembersTable` used by both (product rule: same behavior) |
-| FE3c | **Shared form / gauge / exclude pieces** | inline Field/Input ×4 (`_components/CreateUserDialog.tsx:400`, `admin/categories/index.tsx:169`, `admin/pharmacies/_components/PharmacyFormDialog.tsx:127`, `accounting/comptabilite/index.tsx:355`); gauge tiles ×2 (achats, ventes); BL / supplier exclude dialogs ×2 | `FormField`, `GaugeTiles`, `TwoStepExcludeDialog` |
-| FE4 | **One formatter set** | own `num/mad/fmtMad/fmtPct` (`dashboard/rapport/index.tsx:150,154,252,257`); 15 `toLocaleString` / `toFixed` outside `utils/format.tsx` | only `utils/format.tsx` |
-| FE5 | **One hook pattern** | 2 `useMarginAlerts` (`analytics/hooks.ts:193`, `dashboard/rapport/hooks.ts:24`); achats / ventes / catalogue copy the filter state | one hook per query; one `useListFilters`. Date range shared on rapport / achats / ventes / alertes / comptabilité; /stock and /analyses keep their own |
 | FE6 | **Same search everywhere** | produits-spéciaux tables filter with a local `norm()` (no `*` grammar) | `matchesFields` |
 | FE9 | **One page shell** | widths 920 / 1100 / 1320 / `max-w-3xl` + extra padding over the layout's `p-7` | `PageHeader` + one container |
 

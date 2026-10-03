@@ -1,7 +1,7 @@
 /** TanStack Query wrappers for the admin permission-management pages.
  *
  *  Hooks:
- *    useAdminPharmaciesList()      — Screen 1 table data
+ *    (Screen 1 table data: useAdminPharmaciesList in hooks/sharedQueries.ts, shared with Rapport)
  *    useAdminPharmacy(id)          — Screen 2 detail (info + features + members)
  *    useCreatePharmacy() / useUpdatePharmacy() / useArchivePharmacy()
  *    useSetPharmacyFeatures(id)    — Section A bulk save
@@ -24,7 +24,6 @@ import type {
   MemberStatus,
   PharmacyDetail,
   PharmacyIn,
-  PharmacyListRow,
   ResetPasswordOut,
 } from "@/types";
 
@@ -38,20 +37,6 @@ export function useAdminUsers() {
   });
   return {
     users: data,
-    isLoading,
-    isError,
-    reload: () => void refetch(),
-  };
-}
-
-export function useAdminPharmaciesList() {
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: API.admin.pharmacies.key,
-    queryFn: () => api.get<PharmacyListRow[]>(API.admin.pharmacies.url),
-    staleTime: 30_000,
-  });
-  return {
-    pharmacies: data,
     isLoading,
     isError,
     reload: () => void refetch(),
@@ -121,7 +106,9 @@ export function useSetPharmacyFeatures(id: number) {
   const qc = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
     mutationFn: (features: Record<string, boolean>) =>
-      api.put<PharmacyDetail>(API.admin.setPharmacyFeatures.url(id), { features }),
+      api.put<PharmacyDetail>(API.admin.setPharmacyFeatures.url(id), {
+        features,
+      }),
     onSuccess: () => {
       void refresh(qc, API.admin.setPharmacyFeatures);
     },
@@ -153,7 +140,9 @@ export function useSetUserPermissions() {
   const qc = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, permissions }: { userId: number; permissions: Record<string, boolean> }) =>
-      api.put<MemberOut>(API.admin.setUserPermissions.url(userId), { permissions }),
+      api.put<MemberOut>(API.admin.setUserPermissions.url(userId), {
+        permissions,
+      }),
     onSuccess: () => {
       void refresh(qc, API.admin.setUserPermissions);
     },
@@ -167,7 +156,9 @@ export function useSetUserPermissions() {
 export function useResetUserPassword() {
   const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, password }: { userId: number; password: string }) =>
-      api.post<ResetPasswordOut>(API.admin.resetUserPassword.url(userId), { password }),
+      api.post<ResetPasswordOut>(API.admin.resetUserPassword.url(userId), {
+        password,
+      }),
   });
   return {
     resetUserPassword: mutateAsync,
@@ -209,7 +200,9 @@ export function useAssignPharmacy() {
   const qc = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ userId, pharmacyId }: { userId: number; pharmacyId: number }) =>
-      api.patch<AdminUserRow>(API.admin.assignPharmacy.url(userId), { pharmacy_id: pharmacyId }),
+      api.patch<AdminUserRow>(API.admin.assignPharmacy.url(userId), {
+        pharmacy_id: pharmacyId,
+      }),
     onSuccess: () => {
       void refresh(qc, API.admin.assignPharmacy);
     },
