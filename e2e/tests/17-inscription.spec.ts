@@ -24,7 +24,7 @@ const NEW_OWNER = {
   phone: "0611223344",
   password: "InscritE2e#1",
 };
-const NEW_PHARMACY = { name: "Pharmacie Inscription E2E", city: "Tanger", address: "5 avenue E2E" };
+const NEW_PHARMACY = { name: "Pharmacie Inscription E2E", city: "Tanger" };
 const EMPLOYEE = {
   name: "Employé Inscrit E2E",
   email: "employe.inscrit.e2e@pharmagest.ma",
@@ -43,23 +43,28 @@ type Person = { name: string; email: string; phone: string; password: string };
 type Kind =
   "Propriétaire d'une nouvelle pharmacie" | "Propriétaire d'une pharmacie déjà inscrite" | "Employé d'une pharmacie";
 
-/** /login → « Créer un compte » → the choice → the form → « Envoyer ma demande »: the same answer every time. */
+/** /login → « Créer un compte » → one screen per question, « Suivant » each time →
+ *  « Envoyer ma demande »: the same answer every time. */
 async function signUp(page: Page, kind: Kind, person: Person, pharmacy: { code: string } | typeof NEW_PHARMACY) {
+  const next = () => page.getByRole("button", { name: "Suivant" }).click();
   await page.goto("/login");
   await page.getByRole("link", { name: "Créer un compte" }).click();
   await page.getByRole("radio", { name: new RegExp(`^${kind}`) }).click();
-  await page.getByLabel("Nom complet").fill(person.name);
-  await page.getByLabel("Email").fill(person.email);
-  await page.getByLabel("Téléphone").fill(person.phone);
-  await page.getByLabel("Mot de passe", { exact: true }).fill(person.password);
-  await page.getByLabel("Confirmer le mot de passe").fill(person.password);
+  await next();
   if ("code" in pharmacy) {
     await page.getByLabel("Code de la pharmacie").fill(pharmacy.code);
   } else {
     await page.getByLabel("Nom de la pharmacie").fill(pharmacy.name);
     await page.getByLabel("Ville").fill(pharmacy.city);
-    await page.getByLabel("Adresse").fill(pharmacy.address);
   }
+  await next();
+  await page.getByLabel("Nom complet").fill(person.name);
+  await page.getByLabel("Téléphone").fill(person.phone);
+  await next();
+  await page.getByLabel("Email").fill(person.email);
+  await next();
+  await page.getByLabel("Mot de passe", { exact: true }).fill(person.password);
+  await page.getByLabel("Confirmer le mot de passe").fill(person.password);
   const sent = pageSend(page, "POST", "/auth/signup");
   await page.getByRole("button", { name: "Envoyer ma demande" }).click();
   expect(await sent, "POST /auth/signup").toEqual({ detail: "Demande envoyée" });
@@ -102,13 +107,20 @@ const requestRow = (page: Page, email: string) => page.getByRole("row").filter({
 test.describe("visiteur", () => {
   test.use({ storageState: LOGGED_OUT });
 
-  test("nouvelle pharmacie : « Envoyer ma demande » grisé jusqu'au choix, demande envoyée, pas de connexion avant l'accord", async ({
+  test("nouvelle pharmacie : 5 écrans, « Suivant » grisé jusqu'au choix, demande envoyée, pas de connexion avant l'accord", async ({
     page,
   }) => {
+    // Screen 1 of 5: « Suivant » waits for a choice; a wrong field stops on its screen.
     await page.goto("/login");
     await page.getByRole("link", { name: "Créer un compte" }).click();
-    await expect(page.getByRole("button", { name: "Envoyer ma demande" })).toBeDisabled();
-    await expect(page.getByText("Choisissez une des 3 options ci-dessus.")).toBeVisible();
+    await expect(page.getByText("Créer un compte · Étape 1 sur 5")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Suivant" })).toBeDisabled();
+    await expect(page.getByText("Choisissez une des 3 options.")).toBeVisible();
+    await page.getByRole("radio", { name: /^Propriétaire d'une nouvelle pharmacie/ }).click();
+    await page.getByRole("button", { name: "Suivant" }).click();
+    await page.getByRole("button", { name: "Suivant" }).click(); // empty pharmacy name → stays
+    await expect(page.getByText("Ce champ est requis.").first()).toBeVisible();
+    await expect(page.getByText("Créer un compte · Étape 2 sur 5")).toBeVisible();
 
     await signUp(page, "Propriétaire d'une nouvelle pharmacie", NEW_OWNER, NEW_PHARMACY);
     await loginRefused(page, NEW_OWNER);
@@ -137,7 +149,7 @@ test.describe("admin", () => {
         pharmacy_code: null,
         new_pharmacy_name: NEW_PHARMACY.name,
         new_pharmacy_city: NEW_PHARMACY.city,
-        new_pharmacy_address: NEW_PHARMACY.address,
+        new_pharmacy_address: null,
         email_taken: false,
         code_unknown: false,
       },

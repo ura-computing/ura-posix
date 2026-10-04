@@ -94,7 +94,7 @@ export default function LoginPage() {
             to={ROUTES.SIGNUP}
             className={cn(
               "inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-              "bg-secondary text-secondary-foreground transition-colors hover:bg-muted",
+              "bg-primary text-primary-foreground transition-colors hover:bg-primary-hover active:bg-primary-active",
             )}
           >
             {t("misc.createAccount")}

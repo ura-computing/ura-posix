@@ -22,9 +22,7 @@ Updated 2026-10-04. One list, top to bottom. Open items only: a step leaves this
 
 | # | Ticket | Today | To do |
 |---|---|---|---|
-| T1 | Same email typed with other capitals or spaces | **done, waiting for your `make tests`**: `normalize_email` (`app/core/utils.py`) on login, forgot-password, create / invite user; migration `0022` lowercases stored emails (2 accounts that would collide: left as they are, logged) | `12-equipe` (invite in capitals → `emailTaken`), `13-compte` (forgot-password + login in capitals) |
-| T2 | /imports: select several imports, delete them at once | **done, waiting for your `make tests`**: `Checkbox` (`_components/Checkbox.tsx`, app colors) per import not deleted + « Tout sélectionner » in the header, « Supprimer la sélection (N) », one confirmation listing the files, one `DELETE /data/imports/{id}` per import (`useDeleteImports`), toast with the count / the failed ones | `15-imports` (new test « supprimer plusieurs imports d'un coup ») |
-| T4 | Sign up: a pharmacist creates their own account | no signup: admin / owner create accounts | **decisions 2026-10-04**: admin accepts every new account before its first login; owner = new pharmacy (all its info) **or** joins one by its code (`CAS0001`); employee = own info + pharmacy code; never reveal which pharmacies exist (no list, same answer whether the code exists or not) → `/inscription` page + routes, account « en attente », admin Accepter / Refuser in « Pharmacies et utilisateurs », email when accepted, every feature ON, E2E |
+| T4 | Sign up: a pharmacist creates their own account | **done, waiting for `make tests 17`** (decisions 2026-10-04: admin accepts every new account; owner = new pharmacy **or** joins by its code; employee = code; never reveal which pharmacies exist): `/auth/signup` page + « Créer un compte » on login, table `signup_requests` (migration `0023`), admin tab « Demandes (N) » with Accepter / Refuser, emails on both | `17-inscription` |
 
 ---
 
