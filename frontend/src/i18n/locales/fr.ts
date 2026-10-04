@@ -1124,6 +1124,7 @@ export const fr = {
     skipDuplicate: "{{n}} doublon(s) ignoré(s)",
     skipNoPid: "{{n}} ligne(s) sans PID",
     skipNoMed: "{{n}} médicament(s) introuvable(s)",
+    skipBadDate: "{{n}} ligne(s) non importée(s) : date illisible (exemple de date correcte : 23/01/2026)",
     skipGeneric: "{{n}} ligne(s) ignorée(s)",
     linesImported: "lignes importées",
     newProductSingular: "nouveau produit détecté",

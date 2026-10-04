@@ -16,11 +16,13 @@ from app.ingestion.csv_parse import (
     classify_product_type,
     col,
     existing_by_name,
+    normalize_date,
+    normalize_datetime,
     normalized_name,
     parse_catalog_csv,
+    parse_date,
     parse_float,
     parse_int,
-    parse_iso_date,
 )
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
@@ -144,7 +146,7 @@ COL_DISCOUNT = "Remise"
 
 @dataclass(frozen=True)
 class TransactionConfig:
-    """Captures the 5 things that differ between an Achat ingest and a Vente ingest.
+    """Captures the 6 things that differ between an Achat ingest and a Vente ingest.
     Everything else (medicament resolve, dedup, batch accounting, commit) is in
     `_insert_transactions` and runs against either config unchanged."""
 
@@ -152,6 +154,7 @@ class TransactionConfig:
     model: type  # Achat | Vente (SQLAlchemy class)
     dedup_column: str  # CSV column to dedup on
     dedup_attr: str  # corresponding model attribute name
+    date_column: str  # CSV column of the line's date: unreadable → line skipped
     build_row_dict: Callable[
         [dict[str, Any], int, int, int], dict[str, Any]
     ]  # (row, pharmacy_id, med_id, batch_id) → dict for bulk_insert
@@ -162,17 +165,18 @@ ACHAT_CFG = TransactionConfig(
     model=Achat,
     dedup_column=COL_DELIVERY_REF,
     dedup_attr="delivery_ref",
+    date_column=COL_DELIVERY_DATE,
     build_row_dict=lambda row, pharm_id, med_id, batch_id: {
         "pharmacy_id": pharm_id,
         "medicament_id": med_id,
         "import_batch_id": batch_id,
-        "created_at_source": col(row, COL_CREATED),
-        "delivery_date": col(row, COL_DELIVERY_DATE),
+        "created_at_source": normalize_datetime(col(row, COL_CREATED)),
+        "delivery_date": normalize_date(col(row, COL_DELIVERY_DATE)),
         "delivery_ref": col(row, COL_DELIVERY_REF),
         "supplier": col(row, COL_SUPPLIER),
         "quantity": parse_float(col(row, COL_QUANTITY)),
         "unit_price": parse_float(col(row, COL_UNIT_PRICE)),
-        "expiry_date": col(row, COL_EXPIRY),
+        "expiry_date": normalize_date(col(row, COL_EXPIRY)),
         "stock_min": parse_float(col(row, COL_STOCK_MIN)),
         "stock_max": parse_float(col(row, COL_STOCK_MAX)),
         "total": parse_float(col(row, COL_TOTAL)),
@@ -184,11 +188,12 @@ VENTE_CFG = TransactionConfig(
     model=Vente,
     dedup_column=COL_TXN_REF,
     dedup_attr="transaction_ref",
+    date_column=COL_DATE,
     build_row_dict=lambda row, pharm_id, med_id, batch_id: {
         "pharmacy_id": pharm_id,
         "medicament_id": med_id,
         "import_batch_id": batch_id,
-        "date": col(row, COL_DATE),
+        "date": normalize_date(col(row, COL_DATE)),
         "transaction_ref": col(row, COL_TXN_REF),
         "client": col(row, COL_CLIENT),
         "quantity": parse_float(col(row, COL_QUANTITY)),
@@ -344,6 +349,7 @@ def _insert_transactions(
     skipped_no_pid = 0
     skipped_no_med = 0
     skipped_dup = 0
+    skipped_bad_date = 0
     for row in rows:
         pid = col(row, COL_PID)
         if not pid:
@@ -352,6 +358,10 @@ def _insert_transactions(
         med_id = med_id_by_pid.get(pid)
         if not med_id:
             skipped_no_med += 1
+            continue
+        day = col(row, cfg.date_column)
+        if (day or "").strip() and not normalize_date(day):  # « 31/02/2026 », « hier »: no date to file it under
+            skipped_bad_date += 1
             continue
         ref = col(row, cfg.dedup_column)
         if ref and (ref, med_id) in existing:
@@ -365,7 +375,7 @@ def _insert_transactions(
         db.bulk_insert_mappings(cfg.model, to_insert, render_nulls=True)
 
     inserted = len(to_insert)
-    skipped = skipped_no_pid + skipped_no_med + skipped_dup
+    skipped = skipped_no_pid + skipped_no_med + skipped_dup + skipped_bad_date
     batch.rows_inserted += inserted
     batch.rows_skipped += skipped
     # Stays `in_progress`: only the browser's final PATCH « success » (after the last
@@ -378,6 +388,7 @@ def _insert_transactions(
         "skipped_no_pid": skipped_no_pid,
         "skipped_no_medicament": skipped_no_med,
         "skipped_duplicate": skipped_dup,
+        "skipped_bad_date": skipped_bad_date,
         "batch_id": batch.id,
         "new_medicaments": {
             "count": len(new_medicaments),
@@ -431,7 +442,7 @@ def _insert_stock(
                 "current_stock": parse_int(col(row, "Stock")) or 0,
                 "stock_min": parse_int(col(row, COL_STOCK_MIN)),
                 "stock_max": parse_int(col(row, COL_STOCK_MAX)),
-                "expiry_date": parse_iso_date(col(row, COL_EXPIRY)),
+                "expiry_date": parse_date(col(row, COL_EXPIRY)),
                 "zone": col(row, COL_ZONE),
             }
         )

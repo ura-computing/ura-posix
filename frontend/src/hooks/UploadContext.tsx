@@ -41,6 +41,7 @@ export interface UploadProgress {
   skipped_no_pid?: number;
   skipped_no_medicament?: number;
   skipped_duplicate?: number;
+  skipped_bad_date?: number;
   /** F19: products created during this import that weren't in the catalogue. */
   new_medicaments?: { count: number; sample: string[] };
 }
@@ -139,6 +140,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       let skippedNoPid = 0;
       let skippedNoMed = 0;
       let skippedDup = 0;
+      let skippedBadDate = 0;
       let newMedCount = 0;
       const newMedSample: string[] = [];
       const skippedUnknownAcc: { pid: string; product: string | null }[] = [];
@@ -181,6 +183,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             skippedNoPid += result.skipped_no_pid;
             skippedNoMed += result.skipped_no_medicament;
             skippedDup += result.skipped_duplicate;
+            skippedBadDate += result.skipped_bad_date;
           }
           if (result.new_medicaments) {
             newMedCount += result.new_medicaments.count;
@@ -199,6 +202,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
               skipped_no_pid: skippedNoPid,
               skipped_no_medicament: skippedNoMed,
               skipped_duplicate: skippedDup,
+              skipped_bad_date: skippedBadDate,
               new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
             },
             batchId,
@@ -230,6 +234,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             skipped_no_pid: skippedNoPid,
             skipped_no_medicament: skippedNoMed,
             skipped_duplicate: skippedDup,
+            skipped_bad_date: skippedBadDate,
             new_medicaments: { count: newMedCount, sample: newMedSample.slice() },
           },
           batchId,

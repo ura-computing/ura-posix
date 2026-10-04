@@ -23,6 +23,7 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 | What | Where |
 |---|---|
 | B4: `upload_catalog` is a plain `def` (thread) + `file.file.read()`: a big catalogue upload no longer freezes the other requests. B9: « today » = pharmacy date (`app/core/utils.py` `today()`, Africa/Casablanca) in `stats_queries` + `stock_queries` (5 places), and `generate.py --today` defaults to the same date | `14-admin` (catalogue CSV), `03`, `04`, `05` (today-based windows) |
+| B8: files saved again by hand (Excel) read like Sobrus files. Dates `23/1/26`, ` 05/02/2026 `, `23.01.2026 14:19` → stored `2026-01-23` (`csv_parse.normalize_date` / `normalize_datetime` / `parse_date`); impossible date (`31/02/2026`) → line not imported, « 1 ligne(s) non importée(s) : date illisible (exemple de date correcte : 23/01/2026) ». Numbers with no-break spaces (`1 234,50`). Migration `0021` rewrites the lines already stored the same way (production: runs at deploy, no manual SQL). `generate.py`: 40 lines per file + 1 stock expiry in 25 written by hand, oracle unchanged | `15-imports` (new test « dates tapées à la main »), `02` to `07` (hand lines inside every number) |
 | B5: new products created with `INSERT … ON CONFLICT (pid) DO NOTHING RETURNING pid` + one SELECT (`_batch_resolve_medicaments`, `app/ingestion/router.py`): two imports creating the same new PID at once → no 500; « N nouveaux produits » counts only the ones this import created. New test: 2 chunks sent together with the same unknown PID → created once, 2 lines | `15-imports` (new test before the last one), `02-import` |
 
 ---
@@ -62,7 +63,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | B2 | Auth needs the DB | every request loads user + session + 3 permission layers → a new service needs `JWT_SECRET` + DB, or a gateway |
 | B3 | In-memory rate limit (`app/core/rate_limit.py`) | 2 workers → login limit 10/min instead of 5 → `Limiter(storage_uri=<Valkey URL>)` |
 | B7 | CA = `qty × Medicament.ppv`, and `ppv` is global and mutable | January sold 100 × 15.00 = 1 500; June import sets PPV 16.50 → January becomes 1 650 for every pharmacy → every cache is cleared on catalogue edits |
-| B8 | `Vente.date`, `Achat.delivery_date` are text (`app/core/models.py`) | `cast(date as Date)` can't use the index; « 15/01/2024 » → 500 → real `DATE` columns |
+| B8 | `Vente.date`, `Achat.delivery_date` are ISO text (`app/core/models.py`) | `cast(date as Date)` can't use the index → real `DATE` columns |
 
 ---
 

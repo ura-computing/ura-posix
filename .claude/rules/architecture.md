@@ -30,6 +30,7 @@ All code in `backend/app/`, one folder per business area (like `frontend/src/pag
 | Imports always absolute from `app` | `from app.core.models import User` |
 | Errors: `raise ApiError(status, ErrorCode.X, "French detail")` (`app/core/errors.py`) | frontend shows `errors.<code>`; codes equal on both sides (gate) |
 | Run: `uv run uvicorn main:app`; scripts: `uv run python scripts/seed.py` | Makefile (`make dev`), `entrypoint.sh` (Docker: demo, E2E, production) |
+| Import dates: always `csv_parse.normalize_date` / `normalize_datetime` / `parse_date` (files saved by hand: `23/1/26`) | stored as ISO text `2026-01-23`: period filters compare text |
 | Schema changes: Alembic (`alembic/versions/`), applied by `scripts/bootstrap.py` | `make migrate` |
 
 - Stack: FastAPI + SQLAlchemy 2 + Postgres (unaccent) + Alembic.

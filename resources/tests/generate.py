@@ -23,6 +23,8 @@ Data design (keeps expected values exact and unambiguous):
 - ~3 % products bought ABOVE their PPV (negative margin), ~5 % never bought
   (ventes sans achat), 10 stock-only products (never sold, never bought)
 - dates are relative to --today so "today"-based windows stay valid
+- B8: 40 lines of each file and 1 stock expiry in 25 are written like a file saved again
+  by hand in Excel (23/1/26, « 05/02/2026 », 23.01.2026 14:19): the app reads the same day
 """
 from __future__ import annotations
 
@@ -110,6 +112,7 @@ class Vente:
     unit:     float
     total:    float
     client:   str             # "" → anonymous
+    hand:     bool = False    # date written as typed by hand (B8)
 
 
 @dataclass(slots=True)
@@ -123,6 +126,7 @@ class Achat:
     qty:      int
     unit:     float
     total:    float
+    hand:     bool = False
 
 
 # ─── Generation ──────────────────────────────────────────────────────────────
@@ -226,6 +230,15 @@ def repeat_lines(rng: random.Random, lines: list) -> None:
         lines.append(replace(line, seq=len(lines)))
 
 
+def mark_hand_edited(rng: random.Random, lines: list) -> None:
+    """B8: 40 lines get their dates written like a file saved again by hand. The app
+    keeps minutes only for « Créée le » there, so the line's own value drops its seconds."""
+    for line in rng.sample(lines, 40):
+        line.hand = True
+        if isinstance(line, Achat):
+            line.created = line.created[:16] + ":00"
+
+
 def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
                df: date, dt: date) -> list[dict]:
     """Analyses → Liste input: sold products (exact names), a stock-only product,
@@ -280,8 +293,21 @@ def _write(path: Path, header: list[str], rows, delimiter: str = ";") -> None:
         w.writerows(rows)
 
 
+def hand_date(d: date, k: int) -> str:
+    """A date as Excel / Numbers writes it back (day first), or typed with spaces (B8)."""
+    return [f"{d.day}/{d.month}/{d:%y}", f"{d:%d/%m/%Y}", f" {d:%d/%m/%Y} ", f"{d:%d.%m.%Y}"][k % 4]
+
+
+def _day(line) -> str:
+    return hand_date(line.day, line.seq) if line.hand else line.day.isoformat()
+
+
+def _created(a) -> str:
+    return f"{hand_date(date.fromisoformat(a.created[:10]), a.seq)} {a.created[11:16]}" if a.hand else a.created
+
+
 def _achat_rows(achats):
-    return ([a.created, a.day.isoformat(), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
+    return ([_created(a), _day(a), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
              _fmt(a.p.pph), _fmt(a.p.ppv), a.p.category, a.p.zone, a.qty, _fmt(a.unit), "", "", "", _fmt(a.total)]
             for a in achats)
 
@@ -299,14 +325,15 @@ def write_files(products, ventes, achats, liste, extra, catalog, start: date, en
         [c["product"], c["category"], c["tva"], _fmt(c["ppv"]), _fmt(c["pph"]), c["barcode1"], c["barcode2"] or "",
          c["laboratoire"]] for c in catalog), delimiter=",")
     _write(vente_path, VENTE_HEADER, (
-        [v.p.pid, v.p.name, v.day.isoformat(), v.ref, v.client, v.p.tva_label, _fmt(v.p.pph),
+        [v.p.pid, v.p.name, _day(v), v.ref, v.client, v.p.tva_label, _fmt(v.p.pph),
          _fmt(v.p.ppv), v.p.category, v.p.zone, v.qty, _fmt(v.discount), _fmt(v.unit), _fmt(v.total)]
         for v in ventes))
     stocked = [p for p in products if p.stock is not None]
     _write(stock_path, STOCK_HEADER, (
         [p.pid, p.name, p.category, p.tva_label, _fmt(p.ppv), _fmt(p.pph), p.zone, p.stock,
-         p.expiry.isoformat() if p.expiry else "", "", "", p.barcode, ""]
-        for p in stocked))
+         (hand_date(p.expiry, i) if i % 25 == 0 else p.expiry.isoformat()) if p.expiry else "", "", "",
+         p.barcode, ""]
+        for i, p in enumerate(stocked)))
     _write(liste_path, ["Produit", "PID"], ([it["name"], it["pid"] or ""] for it in liste))
     rel = lambda p: str(p.relative_to(HERE.parent.parent))   # noqa: E731 — repo-relative
     return {
@@ -382,6 +409,9 @@ def main() -> None:
     repeat_rng = random.Random(args.seed + 2)            # own stream: the rest of the data is unchanged
     repeat_lines(repeat_rng, achats)
     repeat_lines(repeat_rng, ventes)
+    hand_rng = random.Random(args.seed + 3)              # own stream too
+    mark_hand_edited(hand_rng, achats)
+    mark_hand_edited(hand_rng, ventes)
     liste = make_liste(rng, products, ventes, window_from, window_to)
     extra = make_extra_achats(random.Random(args.seed + 1), products, data_end)
     catalog = make_catalog()

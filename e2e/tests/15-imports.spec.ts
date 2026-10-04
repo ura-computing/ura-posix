@@ -4,6 +4,7 @@
  *  imported again, then deleted from the list (DELETE → rows removed). After
  *  both undos the Rapport and the achats list still equal the oracle. An import
  *  marks every cached query stale: /analyses (cached 60 s) refetches after it. Serial. */
+import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
@@ -325,6 +326,46 @@ test("navigateur fermé pendant un import : « En cours », pas « Réussi » ; 
     .getByRole("button", { name: "Supprimer", exact: true })
     .click();
   expect(await deleted, "DELETE /data/imports").toEqual({ id: c1.batch_id, deleted_rows: 2000, file_type: "achat" });
+});
+
+test("dates tapées à la main : lues comme Sobrus ; date impossible : ligne non importée, message clair", async ({
+  page,
+}) => {
+  // A file saved again in Excel: day first, spaces. The 3rd line's date does not exist.
+  const [header, first] = readFileSync(resolve(REPO_DIR, expected().files.extra_achats.path), "utf-8").split("\n");
+  const rest = first.split(";").slice(3); // known product of the extra file, its own prices
+  const line = (created: string, day: string, bl: string) => [created, day, bl, ...rest].join(";");
+  await page.goto("/upload-file?type=achat");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "Sobrus - Achats 2026-01-01 - 2026-01-31.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      [
+        header,
+        line("23/1/26 14:19", "23/1/26", "E2E-DATE-1"),
+        line("05.01.2026 09:05", '" 05/01/2026 "', "E2E-DATE-2"),
+        line("31/02/2026 10:00", "31/02/2026", "E2E-DATE-3"),
+      ].join("\n") + "\n",
+    ),
+  });
+  const sent = pageSend(page, "POST", "/uploads/achat-json");
+  await page.getByRole("button", { name: "Importer dans la base" }).click();
+  await expect(page.getByRole("heading", { level: 3, name: "2 lignes importées" })).toBeVisible();
+  await expect(
+    page.getByText("1 ligne(s) non importée(s) : date illisible (exemple de date correcte : 23/01/2026)"),
+  ).toBeVisible();
+  const result = await sent;
+  expectSame(result, { inserted: 2, skipped: 1, skipped_bad_date: 1 }, "POST /uploads/achat-json");
+
+  // Exact extra check: stored as Sobrus writes it, so every period filter finds them.
+  const lines = (await apiGet(page, "/achats", { search: "e2e-date" })).data as Row[];
+  expect(lines.map((l) => [l.delivery_ref, l.delivery_date]).sort(), "dates enregistrées").toEqual([
+    ["E2E-DATE-1", "2026-01-23"],
+    ["E2E-DATE-2", "2026-01-05"],
+  ]);
+
+  // Cleanup: the last test checks the Rapport is back to the oracle.
+  await apiDelete(page, `/data/imports/${result.batch_id}`);
 });
 
 test("deux imports créent le même nouveau produit au même moment : pas d'erreur, un seul produit", async ({ page }) => {

@@ -11,12 +11,14 @@ export type ImportBatchStatus = "in_progress" | "success" | "cancelled" | "error
 /** Response from /v1/uploads/{achat|vente}{,-json} */
 export interface UploadTxResult {
   inserted: number;
-  skipped: number; // total = no_pid + no_medicament + duplicate
+  skipped: number; // total = no_pid + no_medicament + duplicate + bad_date
   /** Per-reason breakdown so the post-upload card can show an honest cause
    *  instead of blaming every skip on "doublons". */
   skipped_no_pid: number;
   skipped_no_medicament: number;
   skipped_duplicate: number;
+  /** Date unreadable (« 31/02/2026 », « hier »): the line is not imported. */
+  skipped_bad_date: number;
   batch_id: number;
   /** F19: products that didn't exist in the catalogue and were created during
    *  this import. Owner sees them as "needs admin classification" — they'll

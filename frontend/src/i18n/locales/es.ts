@@ -1113,6 +1113,7 @@ export const es: Dict = {
     skipDuplicate: "{{n}} duplicado(s) ignorado(s)",
     skipNoPid: "{{n}} línea(s) sin PID",
     skipNoMed: "{{n}} medicamento(s) no encontrado(s)",
+    skipBadDate: "{{n}} línea(s) no importada(s): fecha ilegible (ejemplo de fecha correcta: 23/01/2026)",
     skipGeneric: "{{n}} línea(s) ignorada(s)",
     linesImported: "líneas importadas",
     newProductSingular: "nuevo producto detectado",

@@ -18,7 +18,7 @@ import io
 import re
 import unicodedata
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime
 from functools import lru_cache
 from typing import Any
 
@@ -143,7 +143,7 @@ def _decode(content: bytes) -> str:
 def parse_float(val: str | None) -> float | None:
     if not val:
         return None
-    s = str(val).strip().replace(" ", "").replace(",", ".")
+    s = "".join(str(val).split()).replace(",", ".")  # every space, also the no-break one: « 1 234,50 »
     if not s:
         return None
     try:
@@ -157,17 +157,49 @@ def parse_int(val: str | None) -> int | None:
     return int(f) if f is not None else None
 
 
-def parse_iso_date(val: str | None) -> date | None:
-    """Sobrus stock CSVs use ISO YYYY-MM-DD; achat/vente use VARCHAR strings stored as-is."""
-    if not val:
+# Sobrus writes ISO (2026-01-23, 2026-01-23 14:19:05). A file opened and saved again
+# by hand (Excel, Numbers) comes back day first: 23/1/26, 23/01/2026 14:19.
+_DATE_RE = re.compile(
+    r"(?:(?P<y>\d{4}) ?[-/.] ?(?P<m>\d{1,2}) ?[-/.] ?(?P<d>\d{1,2})"
+    r"|(?P<dd>\d{1,2}) ?[-/.] ?(?P<mm>\d{1,2}) ?[-/.] ?(?P<yy>\d{4}|\d{2}))"
+    r"(?:[T ](?P<H>\d{1,2}):(?P<M>\d{2})(?::(?P<S>\d{2})(?:[.,]\d+)?)?)?"
+)
+
+
+@lru_cache(maxsize=8192)  # pure; the same few hundred dates repeat on every line
+def _parse_datetime(val: str) -> datetime | None:
+    s = " ".join(val.split()).strip("\"' ")  # spaces anywhere, also the no-break one
+    m = _DATE_RE.fullmatch(s)
+    if not m:
         return None
-    s = str(val).strip()
-    if not s:
-        return None
+    if m["y"]:
+        y, mo, d = int(m["y"]), int(m["m"]), int(m["d"])
+    else:
+        y, mo, d = int(m["yy"]), int(m["mm"]), int(m["dd"])
+        if y < 100:
+            y += 2000
     try:
-        return date.fromisoformat(s[:10])
-    except ValueError:
+        return datetime(y, mo, d, int(m["H"] or 0), int(m["M"] or 0), int(m["S"] or 0))
+    except ValueError:  # 31/02/2026, 25:00
         return None
+
+
+def parse_date(val: str | None) -> date | None:
+    """« 2026-01-23 », « 23/1/26 », « 23/01/2026 » → date(2026, 1, 23). Unreadable (« 31/02/2026 », « hier ») → None."""
+    dt = _parse_datetime(val) if val else None
+    return dt.date() if dt else None
+
+
+def normalize_date(val: str | None) -> str | None:
+    """Dates stored as text (ventes.date, achats.delivery_date …): « 23/1/26 » → "2026-01-23"."""
+    d = parse_date(val)
+    return d.isoformat() if d else None
+
+
+def normalize_datetime(val: str | None) -> str | None:
+    """achats.created_at_source: « 23/1/26 14:19 » → "2026-01-23 14:19:00"."""
+    dt = _parse_datetime(val) if val else None
+    return dt.isoformat(sep=" ") if dt else None
 
 
 # ─── CSV parsing ──────────────────────────────────────────────────────────────

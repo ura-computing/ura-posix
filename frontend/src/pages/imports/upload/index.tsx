@@ -275,6 +275,9 @@ function Success({
         ...(progress.skipped_no_medicament
           ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })]
           : []),
+        ...(progress.skipped_bad_date
+          ? [t("uploadFile.skipBadDate", { n: formatNumStr(progress.skipped_bad_date) })]
+          : []),
       ];
   // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
   if (skipReasons.length === 0 && progress.skipped > 0) {
