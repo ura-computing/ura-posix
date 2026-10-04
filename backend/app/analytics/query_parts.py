@@ -51,23 +51,33 @@ def _product_ids(pharma: bool):
     return select(Medicament.id).where(pharma_expr() == pharma).correlate(None)
 
 
+def ca_line():
+    """One sale line's CA: qty × coalesce(PPV, unit_price) (caller joins Medicament)."""
+    return Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price)
+
+
 def ca_sum():
-    """CA = Σ qty × coalesce(PPV, unit_price) — Rapport, Comptabilité and Analyses
-    KPIs (caller joins Medicament)."""
-    return func.sum(Vente.quantity * func.coalesce(Medicament.ppv, Vente.unit_price))
+    """CA = Σ qty × coalesce(PPV, unit_price) — every screen: Rapport, Comptabilité,
+    Analyses KPIs and rows (caller joins Medicament)."""
+    return func.sum(ca_line())
+
+
+# Purchase lines that count in an average PU, on every screen (Q1): a price and qty > 0.
+# PU 0 (free units from the lab) counts: 10 bought at 20 + 2 free → average 16.67.
+PRICED_PURCHASE = (Achat.quantity > 0, Achat.unit_price.isnot(None))
 
 
 def avg_pu_expr():
-    """Weighted average purchase price: Σ(PU × qty) / Σ qty."""
+    """Weighted average purchase price: Σ(PU × qty) / Σ qty (caller filters PRICED_PURCHASE)."""
     return func.sum(Achat.unit_price * Achat.quantity) / func.sum(Achat.quantity)
 
 
 def avg_pu_subquery(db: Session, *filters, id_label: str = "medicament_id", label: str = "avg_pu"):
-    """Subquery: one row per medicament with its weighted average PU over the Achat
-    rows matching `filters`."""
+    """Subquery: one row per medicament with its weighted average PU over the priced
+    Achat rows matching `filters`."""
     return (
         db.query(Achat.medicament_id.label(id_label), avg_pu_expr().label(label))
-        .filter(*filters)
+        .filter(*filters, *PRICED_PURCHASE)
         .group_by(Achat.medicament_id)
         .subquery()
     )

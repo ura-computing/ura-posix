@@ -15,12 +15,20 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from sqlalchemy import Date, and_, func
+from sqlalchemy import Date, func
 from sqlalchemy.orm import Session
 
 from app.ingestion.csv_parse import strip_accents
 from app.core.models import Achat, Medicament, PharmacyStock, Vente
-from app.analytics.query_parts import Filters, avg_pu_expr, avg_pu_subquery, ca_sum, category_filter
+from app.analytics.query_parts import (
+    PRICED_PURCHASE,
+    Filters,
+    avg_pu_expr,
+    avg_pu_subquery,
+    ca_line,
+    ca_sum,
+    category_filter,
+)
 from app.analytics.stats_queries import _strip_pct
 
 
@@ -124,7 +132,7 @@ def _mode_produit(
             func.min(Achat.unit_price).label("pu_min"),
             func.sum(Achat.unit_price * Achat.quantity).label("total_achat_cost"),
         )
-        .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
+        .filter(*base_filter_a, *PRICED_PURCHASE)
         .group_by(Achat.medicament_id)
         .subquery()
     )
@@ -142,7 +150,7 @@ def _mode_produit(
             Medicament.ppv,
             achat_prices_sub.c.avg_pu.label("pu"),
             func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.total).label("ca"),
+            ca_sum().label("ca"),
             achat_prices_sub.c.pu_max.label("prix_max"),
             achat_prices_sub.c.pu_min.label("prix_min"),
             achat_prices_sub.c.avg_pu.label("prix_avg"),
@@ -258,7 +266,7 @@ def _mode_categorie(db: Session, base_filter_v: list, base_filter_a: list, cat_f
         db.query(
             Medicament.category,
             func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.total).label("ca"),
+            ca_sum().label("ca"),
             func.max(Vente.unit_price).label("prix_max"),
             func.min(Vente.unit_price).label("prix_min"),
             func.sum(Vente.unit_price).label("pu_sum"),
@@ -346,36 +354,42 @@ def _supplier_axis(
     base_filter_v: list,
     base_filter_a: list,
     *,
-    supplier_clause,
+    grossiste: bool,
     key: str,
 ) -> list[dict]:
     """Marge grouped by `Achat.supplier` — the shared engine behind the Grossiste
-    and Laboratoire tabs (the two supplier axes). `supplier_clause` selects which
-    suppliers belong to this axis (grossiste = name starts "GROSSISTE"; laboratoire
-    = every OTHER non-null supplier). `key` is the output field name. CA/qty/prix
-    come from Ventes joined by medicament_id; PU + cost from Achats. PG-010 marge."""
-    supplier_med_sub = (
+    and Laboratoire tabs (the two supplier axes): grossiste = name starts "GROSSISTE",
+    laboratoire = every OTHER named supplier. `key` is the output field name. CA/qty/prix
+    come from Ventes joined by medicament_id; PU + cost from Achats. PG-010 marge.
+
+    A product bought from several suppliers shares its sales by units bought (G3):
+    X bought 60 from GROSSISTE A + 40 from LABO B, 100 sold → A 60, B 40 (sum = 100)."""
+    bought = func.sum(Achat.quantity)
+    every_supplier_sub = (
         db.query(
             Achat.supplier.label("supplier"),
             Achat.medicament_id.label("medicament_id"),
             avg_pu_expr().label("avg_pu"),
             func.sum(Achat.unit_price * Achat.quantity).label("total_cost"),
+            (bought / func.sum(bought).over(partition_by=Achat.medicament_id)).label("share"),
         )
-        .filter(*base_filter_a, Achat.quantity > 0, Achat.unit_price.isnot(None))
-        .filter(supplier_clause)
+        .filter(*base_filter_a, *PRICED_PURCHASE, Achat.supplier.isnot(None))
         .group_by(Achat.supplier, Achat.medicament_id)
         .subquery()
     )
+    is_grossiste = func.upper(every_supplier_sub.c.supplier).like("GROSSISTE%")
+    supplier_med_sub = db.query(every_supplier_sub).filter(is_grossiste if grossiste else ~is_grossiste).subquery()
     q = (
         db.query(
             supplier_med_sub.c.supplier.label(key),
-            func.sum(Vente.quantity).label("qty"),
-            func.sum(Vente.total).label("ca"),
+            func.sum(Vente.quantity * supplier_med_sub.c.share).label("qty"),
+            func.sum(ca_line() * supplier_med_sub.c.share).label("ca"),
             func.max(Vente.unit_price).label("prix_max"),
             func.min(Vente.unit_price).label("prix_min"),
             func.avg(Vente.unit_price).label("prix_avg"),
         )
         .join(Vente, Vente.medicament_id == supplier_med_sub.c.medicament_id)
+        .join(Medicament, Vente.medicament_id == Medicament.id, isouter=True)
         .filter(*base_filter_v)
         .group_by(supplier_med_sub.c.supplier)
     )
@@ -384,7 +398,7 @@ def _supplier_axis(
             supplier_med_sub.c.supplier.label("supplier"),
             Medicament.ppv,
             supplier_med_sub.c.avg_pu.label("pu"),
-            func.sum(Vente.quantity).label("qty"),
+            func.sum(Vente.quantity * supplier_med_sub.c.share).label("qty"),
         )
         .join(Medicament, Medicament.id == supplier_med_sub.c.medicament_id)
         .join(Vente, Vente.medicament_id == supplier_med_sub.c.medicament_id)
@@ -440,7 +454,7 @@ def _mode_grossiste(db: Session, base_filter_v: list, base_filter_a: list) -> li
         db,
         base_filter_v,
         base_filter_a,
-        supplier_clause=func.upper(Achat.supplier).like("GROSSISTE%"),
+        grossiste=True,
         key="grossiste",
     )
 
@@ -456,10 +470,7 @@ def _mode_laboratoire(db: Session, base_filter_v: list, base_filter_a: list) -> 
         db,
         base_filter_v,
         base_filter_a,
-        supplier_clause=and_(
-            Achat.supplier.isnot(None),
-            func.upper(Achat.supplier).notlike("GROSSISTE%"),
-        ),
+        grossiste=False,
         key="laboratoire",
     )
 

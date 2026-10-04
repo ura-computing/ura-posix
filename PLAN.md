@@ -3,7 +3,7 @@
 Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §1 run → §3 production tools (DO console, yours).
+**Order:** §1 run → §2 currency → §3 production tools (DO console, yours).
 
 ---
 
@@ -24,7 +24,24 @@ Updated 2026-10-03. One list, top to bottom. Open items only: a step leaves this
 |---|---|
 | B4: `upload_catalog` is a plain `def` (thread) + `file.file.read()`: a big catalogue upload no longer freezes the other requests. B9: « today » = pharmacy date (`app/core/utils.py` `today()`, Africa/Casablanca) in `stats_queries` + `stock_queries` (5 places), and `generate.py --today` defaults to the same date | `14-admin` (catalogue CSV), `03`, `04`, `05` (today-based windows) |
 | B8: files saved again by hand (Excel) read like Sobrus files. Dates `23/1/26`, ` 05/02/2026 `, `23.01.2026 14:19` → stored `2026-01-23` (`csv_parse.normalize_date` / `normalize_datetime` / `parse_date`); impossible date (`31/02/2026`) → line not imported, « 1 ligne(s) non importée(s) : date illisible (exemple de date correcte : 23/01/2026) ». Numbers with no-break spaces (`1 234,50`). Migration `0021` rewrites the lines already stored the same way (production: runs at deploy, no manual SQL). `generate.py`: 40 lines per file + 1 stock expiry in 25 written by hand, oracle unchanged | `15-imports` (new test « dates tapées à la main »), `02` to `07` (hand lines inside every number) |
+| G2 (decision 2026-10-04: CA = qty × PPV on every screen): Analyses rows Produit / Catégorie / Grossiste / Laboratoire (and Liste) use `ca_sum()` like the KPIs and the Rapport. 10 × 20 DH with 10 % remise → row 200 = KPI 200. Oracle: same `ca(v)` | `08-analyses` (every row) |
+| Q1 (decision 2026-10-04): one rule for every average PU, `PRICED_PURCHASE` in `app/analytics/query_parts.py` (price set, qty > 0), applied inside `avg_pu_subquery`. PU 0 (free units, 352 lines in the real files) counts: 10 at 20 + 2 free → 16.67. Real files have no line without price or with qty ≤ 0, test data neither → no number moves | every spec (no change expected) |
+| G3 (decision 2026-10-04: share by units bought): Grossiste / Laboratoire tabs split a product's sales between its suppliers by the units bought from each in the period (`_supplier_axis`, window `share`). X bought 60 from GROSSISTE A + 40 from LABO B, 100 sold → A 60, B 40; each margin uses that supplier's own PU; both tabs together = the sales once. Units can show decimals (« 33,33 »). Test data: 1 bought product in 4 also from a 2nd supplier (`add_second_suppliers`, real files: 1 in 2) → many oracle numbers move (avg PU, margins, ABCD, exclusions) | `08-analyses`, `03`, `05`, `07`, `10`, every spec |
 | B5: new products created with `INSERT … ON CONFLICT (pid) DO NOTHING RETURNING pid` + one SELECT (`_batch_resolve_medicaments`, `app/ingestion/router.py`): two imports creating the same new PID at once → no 500; « N nouveaux produits » counts only the ones this import created. New test: 2 chunks sent together with the same unknown PID → created once, 2 lines | `15-imports` (new test before the last one), `02-import` |
+
+---
+
+## 2. Next: Q2 currency per pharmacy (decision 2026-10-04, plan — on your « go »)
+
+Pharmacies in Spain / France work in euros. One currency per pharmacy, chosen by the admin.
+
+| Part | Change | Example |
+|---|---|---|
+| DB | `pharmacies.currency` (`MAD` \| `EUR`, default `MAD`), migration `0022` | every existing pharmacy → `MAD`, nothing moves |
+| Admin | « Monnaie » on create / edit pharmacy: « Dirham (MAD) » / « Euro (€) » | Madrid pharmacy → Euro |
+| API | `/auth/me` returns the pharmacy `currency` | `{"currency": "EUR"}` |
+| Frontend | `formatMAD` → `formatMoney` (currency of the signed-in pharmacy, set once like the language); labels « CA (MAD) » → « CA ({{cur}}) »; Excel headers the same | « 1 234,56 € », header « CA (€) » |
+| E2E | owner pharmacy stays MAD (every spec unchanged); 1 new test: admin sets a 2nd pharmacy to Euro → its owner sees « € » on the Rapport + Excel header | `14-admin` |
 
 ---
 
@@ -46,16 +63,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 
 ---
 
-## 7. Open bugs and blockers
-
-**Bugs**
-
-| # | Bug | Example |
-|---|---|---|
-| G2 | Analyse row CA = `Vente.total`, KPI CA = `qty × PPV` (`app/analytics/analyse_queries.py`) | 10 × 20 DH with a 10 % discount → row shows 180, KPI shows 200 |
-| G3 | Supplier axes join sales once per supplier (`app/analytics/analyse_queries.py`) | product X bought from GROSSISTE A and LABO B, 100 sold → counted 100 in both rows |
-
-**Blockers for the microservice split**
+## 7. Blockers for the microservice split
 
 | # | Problem | Example → fix |
 |---|---|---|
@@ -77,11 +85,3 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | « Today » per user (pharmacies in Spain / France) | browser sends `X-Timezone`; `app/core/utils.py today()` uses it (Casablanca today). Only near midnight: Péremptions, default ABCD window, trend last point |
 | « Ma boutique en ligne » | hidden; add its E2E specs the day it is shown (allowlisted in `99-gates.spec.ts`) |
 
----
-
-## 9. Open questions (your call)
-
-| # | Question | Example |
-|---|---|---|
-| Q1 | Average PU: some places skip purchase lines with no price or qty ≤ 0 (ventes ledger, stock, top categories, analyse produit), others keep them (Rapport marge, margin alerts, analyse catégorie). Same filter everywhere? Locked formula | qty 5, PU empty kept → Σqty 15 instead of 10 → avg PU lower. Test data has no such line today |
-| Q2 | Currency: everything shows MAD (`formatMAD`, Excel headers « (MAD) »). Pharmacies in Spain / France work in EUR → currency per pharmacy? | Madrid pharmacy: « 1 234,56 MAD » instead of « 1 234,56 € » |

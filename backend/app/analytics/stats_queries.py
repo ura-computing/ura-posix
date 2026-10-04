@@ -732,13 +732,7 @@ def _top_categories(db, f: Filters, cat_filter: list) -> list[dict]:
     """Aggregate Vente by category, merge percent suffixes, sort by CA desc.
     The category marge uses the ALL-TIME average PU (no date window)."""
     all_time = Filters(f.pharmacy_id, include_non_declared=f.include_non_declared)
-    avg_pu_sub = avg_pu_subquery(
-        db,
-        Achat.quantity > 0,
-        Achat.unit_price.isnot(None),
-        *all_time.achats(db),
-        label="pu",
-    )
+    avg_pu_sub = avg_pu_subquery(db, *all_time.achats(db), label="pu")
 
     q = (
         db.query(

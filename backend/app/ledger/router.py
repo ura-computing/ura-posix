@@ -127,13 +127,7 @@ def _avg_pu_subq(
     match visible rows). include_non_declared=False (comptabilité) drops the
     excluded products."""
     f = Filters(pharmacy_id, date_from, date_to, include_non_declared)
-    return avg_pu_subquery(
-        db,
-        Achat.quantity > 0,
-        Achat.unit_price.isnot(None),
-        *f.achats(db),
-        id_label="med_id",
-    )
+    return avg_pu_subquery(db, *f.achats(db), id_label="med_id")
 
 
 def _apply_med_join_filters(q, search: str | None, category: list[str] | None, tva: list[str] | None):

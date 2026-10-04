@@ -17,7 +17,8 @@ Outputs (git-ignored, regenerated on every run):
 
 Data design (keeps expected values exact and unambiguous):
 - one PPV / PPH / category / TVA per product, identical in all 3 files
-- one supplier per product; product names are unique ("E2E PRODUIT 00042")
+- one main supplier per product; 1 bought product in 4 is also bought from a 2nd supplier
+  (G3; the real files: 1 in 2). Product names are unique ("E2E PRODUIT 00042")
 - (BL, product) and (ticket, product) pairs are unique, except 3 lines of each file
   repeated at the end (same values, like the real Sobrus files): both are stored (G1)
 - ~3 % products bought ABOVE their PPV (negative margin), ~5 % never bought
@@ -222,6 +223,29 @@ def make_achats(rng: random.Random, products: list[Product], n_lines: int,
     return lines
 
 
+def add_second_suppliers(rng: random.Random, products: list[Product], achats: list[Achat],
+                         start: date, end: date) -> None:
+    """G3: 1 bought product in 4 also comes from another supplier, on its own BLs
+    (refs 200001…), at its PPH minus that supplier's own discount."""
+    bought = [p for p in products if p.supplier]
+    by_second: dict[str, list[Product]] = defaultdict(list)
+    for p in rng.sample(bought, len(bought) // 4):
+        by_second[rng.choice([s for s in GROSSISTES + LABS if s != p.supplier])].append(p)
+    span = (end - start).days
+    ref = 200000
+    for supplier in sorted(by_second):
+        pool = by_second[supplier]
+        for _ in range(max(1, len(pool) // 2)):
+            ref += 1
+            day = start + timedelta(days=rng.randint(0, span))
+            created = datetime.combine(day, datetime.min.time()) + timedelta(seconds=rng.randint(8 * 3600, 19 * 3600))
+            for p in rng.sample(pool, min(rng.randint(3, 10), len(pool))):
+                qty = rng.randint(2, 12)
+                unit = round(p.pph * (1 - rng.choice([0.0, 0.05, 0.10, 0.15])), 2)
+                achats.append(Achat(len(achats), day, created.strftime("%Y-%m-%d %H:%M:%S"), str(ref),
+                                    supplier, p, qty, unit, round(qty * unit, 2)))
+
+
 def repeat_lines(rng: random.Random, lines: list) -> None:
     """G1: 3 lines appear twice in their file (same BL / ticket + product, same
     values). Both are real and both are stored; the 2nd copy sits at the end, in
@@ -409,6 +433,7 @@ def main() -> None:
     repeat_rng = random.Random(args.seed + 2)            # own stream: the rest of the data is unchanged
     repeat_lines(repeat_rng, achats)
     repeat_lines(repeat_rng, ventes)
+    add_second_suppliers(random.Random(args.seed + 4), products, achats, data_start, data_end)
     hand_rng = random.Random(args.seed + 3)              # own stream too
     mark_hand_edited(hand_rng, achats)
     mark_hand_edited(hand_rng, ventes)

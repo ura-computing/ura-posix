@@ -179,8 +179,6 @@ def compute_stock_abcd(
         db,
         Achat.pharmacy_id == pharmacy_id,
         Achat.medicament_id.isnot(None),
-        Achat.quantity > 0,
-        Achat.unit_price.isnot(None),
     )
 
     # Collect every medicament that was either sold or stocked
