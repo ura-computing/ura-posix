@@ -19,3 +19,6 @@
 
 + security module:
     + protect both frotnend and backend from any known hakcing or scrapping data way
+
+
++ check cursor pagination

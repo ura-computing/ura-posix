@@ -180,6 +180,8 @@ test("gate: the React Compiler compiles every component (0 react-hooks lint erro
     encoding: "utf-8",
     maxBuffer: 64 * 1024 * 1024,
   });
+  // No JSON = eslint itself failed (not installed, config error…): show its own message.
+  expect(run.stdout.trim(), `npx eslint failed (exit ${run.status}): ${run.stderr || run.error?.message}`).not.toBe("");
   const files: { filePath: string; messages: { ruleId: string | null; line: number }[] }[] = JSON.parse(run.stdout);
   const found = files
     .flatMap((f) =>

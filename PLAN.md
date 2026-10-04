@@ -1,9 +1,9 @@
 # PharmaGest — the plan (everything left, in order)
 
-Updated 2026-10-04. One list, top to bottom. Open items only: a step leaves this file when
+Updated 2026-10-05. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §1 tickets → §3 production tools (DO console, yours) → §8 Later.
+**Order:** §3 production tools (DO console, yours) → §8 Later.
 
 ---
 
@@ -15,14 +15,6 @@ Updated 2026-10-04. One list, top to bottom. Open items only: a step leaves this
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
 | Hidden store website (`backend/app/store_website/`, `frontend/src/pages/store/*`): moved as-is, never rewritten | hidden, must not break |
-
----
-
-## 1. Tickets (ClickUp, 2026-10-04)
-
-| # | Ticket | Today | To do |
-|---|---|---|---|
-| T4 | Sign up: a pharmacist creates their own account | **done, waiting for `make tests 17`** (decisions 2026-10-04: admin accepts every new account; owner = new pharmacy **or** joins by its code; employee = code; never reveal which pharmacies exist): `/auth/signup` page + « Créer un compte » on login, table `signup_requests` (migration `0023`), admin tab « Demandes (N) » with Accepter / Refuser, emails on both | `17-inscription` |
 
 ---
 
