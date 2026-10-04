@@ -190,7 +190,7 @@ test.describe("déconnecté", () => {
     await page.getByRole("link", { name: "Mot de passe oublié ?" }).click();
     // In-app navigation: the login page's own « Email » field is still there for a moment.
     await expect(page.getByRole("heading", { level: 1, name: "Mot de passe oublié" })).toBeVisible();
-    await page.getByLabel("Email").fill(USER.email);
+    await page.getByLabel("Email").fill(USER.email.toUpperCase()); // capitals: same account (T1)
     const sent = pageSend(page, "POST", "/auth/forgot-password");
     await page.getByRole("button", { name: "Envoyer le lien" }).click();
     expect(await sent).toEqual({
@@ -229,6 +229,7 @@ test.describe("déconnecté", () => {
     await refused;
     await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
-    await login(page, { ...USER, password: PASSWORD_3 }, "account");
+    // Email typed in capitals: same account (T1).
+    await login(page, { ...USER, email: USER.email.toUpperCase(), password: PASSWORD_3 }, "account");
   });
 });

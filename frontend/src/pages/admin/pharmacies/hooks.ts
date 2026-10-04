@@ -8,6 +8,7 @@
  *    useCreateUser()               — returns CreateUserOut for the credentials reveal
  *    useSetUserPermissions()       — Screen 3 bulk save (owners only)
  *    useResetUserPassword() / useSetUserStatus() / useDeleteUser()
+ *    useSignupRequests() / useAcceptSignup() / useRefuseSignup() — « Demandes » tab
  *
  *  Every mutation refreshes what its `API.admin.*` entry lists (`refreshes`):
  *  the pharmacy list + every detail (member counts, features), the users tab. */
@@ -25,6 +26,8 @@ import type {
   PharmacyDetail,
   PharmacyIn,
   ResetPasswordOut,
+  SignupAcceptOut,
+  SignupRequestRow,
 } from "@/types";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
@@ -210,5 +213,49 @@ export function useAssignPharmacy() {
   return {
     assignPharmacy: mutateAsync,
     isAssigning: isPending,
+  };
+}
+
+// ── « Demandes » (Créer un compte) ────────────────────────────────────────────
+
+export function useSignupRequests() {
+  const { data, isLoading } = useQuery({
+    queryKey: API.admin.signupRequests.key,
+    queryFn: () => api.get<SignupRequestRow[]>(API.admin.signupRequests.url),
+    staleTime: 30_000,
+  });
+  return {
+    requests: data ?? [],
+    isLoading,
+  };
+}
+
+/** « Accepter »: account (+ maybe a new pharmacy) created, the person gets an email. */
+export function useAcceptSignup() {
+  const qc = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (id: number) => api.post<SignupAcceptOut>(API.admin.acceptSignup.url(id)),
+    onSuccess: () => {
+      void refresh(qc, API.admin.acceptSignup);
+    },
+  });
+  return {
+    acceptSignup: mutateAsync,
+    isAccepting: isPending,
+  };
+}
+
+/** « Refuser »: nothing created, the person gets an email. */
+export function useRefuseSignup() {
+  const qc = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (id: number) => api.post(API.admin.refuseSignup.url(id)),
+    onSuccess: () => {
+      void refresh(qc, API.admin.refuseSignup);
+    },
+  });
+  return {
+    refuseSignup: mutateAsync,
+    isRefusing: isPending,
   };
 }

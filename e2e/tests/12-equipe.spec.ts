@@ -85,12 +85,13 @@ test.describe("propriétaire", () => {
     saveState({ employeeId: member.id });
   });
 
-  test("inviter avec un email déjà utilisé → refusé, message, équipe inchangée", async ({ page }) => {
+  test("inviter avec un email déjà utilisé (en majuscules) → refusé, message, équipe inchangée", async ({ page }) => {
     await open(page);
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Nom complet").fill("Doublon E2E");
-    await dialog.getByLabel("Email").fill(EMP.email);
+    // Same email in capitals: still the same person (T1), so refused like the exact spelling.
+    await dialog.getByLabel("Email").fill(EMP.email.toUpperCase());
     await dialog.getByLabel("Mot de passe", { exact: true }).fill(EMP.password);
     const refused = page.waitForResponse(
       (res) => new URL(res.url()).pathname === "/v1/owner/employees" && res.request().method() === "POST",

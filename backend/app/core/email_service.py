@@ -80,3 +80,41 @@ def send_magic_link(*, to: str, name: str, magic_link: str, is_setup: bool) -> N
         log.info("magic_link.sent to=%s is_setup=%s", to, is_setup)
     except Exception:
         log.exception("magic_link.send_failed to=%s", to)
+
+
+def send_signup_decision(*, to: str, name: str, accepted: bool, login_url: str) -> None:
+    """« Créer un compte » answered by the admin: the account is ready (with the login
+    link), or the request was not accepted. Same no-SMTP fallback and same « never
+    raise » rule as the magic links."""
+    flow = "SIGNUP_ACCEPTED" if accepted else "SIGNUP_REFUSED"
+    if not settings.MAIL_USERNAME:
+        print(f"\n>>> [{flow}] EMAIL for {to}: {login_url}\n", flush=True)
+        return
+
+    if accepted:
+        subject = "Votre compte PharmaGest est prêt"
+        text = (
+            f"Bonjour {name},\n\nVotre compte PharmaGest est prêt. Connectez-vous avec votre email "
+            f"et le mot de passe choisi à l'inscription :\n{login_url}"
+        )
+    else:
+        subject = "Votre demande de compte PharmaGest"
+        text = (
+            f"Bonjour {name},\n\nVotre demande de compte PharmaGest n'a pas été acceptée. "
+            "Pour toute question, contactez votre administrateur."
+        )
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+    msg["To"] = to
+    msg.set_content(text)
+    try:
+        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
+            if settings.MAIL_STARTTLS:
+                smtp.starttls(context=ssl.create_default_context())
+            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+            smtp.send_message(msg)
+        log.info("signup_decision.sent to=%s accepted=%s", to, accepted)
+    except Exception:
+        log.exception("signup_decision.send_failed to=%s", to)

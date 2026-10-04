@@ -5,7 +5,7 @@ import { AppLayout } from "@/_components/AppLayout";
 import { RequireFeature } from "@/_components/RequireFeature";
 import { RequireGuest } from "@/_components/RequireGuest";
 import { RequireRole } from "@/_components/RequireRole";
-import HomePage from "@/pages/auth/home";
+import HomePage from "@/pages/home";
 import LoginPage from "@/pages/auth/login";
 import NotFoundPage from "@/pages/auth/not-found";
 import { ROLES, ROUTES } from "@/types";
@@ -20,10 +20,11 @@ const PAGES = {
   OwnerEmployeesPage: () => import("@/pages/team"),
   ProduitsSpeciauxPage: () => import("@/pages/accounting/produits-speciaux"),
   ForgotPasswordPage: () => import("@/pages/auth/forgot-password"),
+  SignupPage: () => import("@/pages/auth/signup"),
   MePage: () => import("@/pages/auth/me"),
   SetPasswordPage: () => import("@/pages/auth/set-password"),
   ImportsPage: () => import("@/pages/imports/history"),
-  RapportPage: () => import("@/pages/dashboard/rapport"),
+  RapportPage: () => import("@/pages/rapport"),
   AchatsPage: () => import("@/pages/operations/achats"),
   AlertesPage: () => import("@/pages/analytics/alertes"),
   AnalysePage: () => import("@/pages/analytics/analyses"),
@@ -49,6 +50,7 @@ const ProduitsSpeciauxPage = lazy(PAGES.ProduitsSpeciauxPage);
 // import StoreWebsitePage from "@/pages/store/store-website";
 // import StoreWebsiteNewPage from "@/pages/store/store-website/new";
 const ForgotPasswordPage = lazy(PAGES.ForgotPasswordPage);
+const SignupPage = lazy(PAGES.SignupPage);
 const MePage = lazy(PAGES.MePage);
 const SetPasswordPage = lazy(PAGES.SetPasswordPage);
 // HIDDEN 2026-07-03 — public preview page renders customization data from the
@@ -87,6 +89,7 @@ export default function App() {
         <Route element={<RequireGuest />}>
           <Route path={ROUTES.LOGIN} element={<LoginPage />} />
           <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
           <Route path={ROUTES.SET_PASSWORD} element={<SetPasswordPage />} />
         </Route>
 

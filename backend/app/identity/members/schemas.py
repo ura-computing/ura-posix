@@ -5,9 +5,11 @@ Statuses: "active" | "inactive"."""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+
+from app.core.utils import normalize_email
 
 
 # ═══ Admin: pharmacies + members ═════════════════════════════════════════════
@@ -139,7 +141,8 @@ class CreateUserIn(BaseModel):
     hashed only."""
 
     full_name: str | None = Field(None, max_length=200)
-    email: str = Field(..., max_length=200)
+    # Trimmed + lower case, like every stored email: « Ali@Gmail.com » = « ali@gmail.com ».
+    email: Annotated[str, BeforeValidator(normalize_email)] = Field(..., max_length=200)
     password: str = Field(..., min_length=8, max_length=128)
     role: MemberRole
     pharmacy_id: int
@@ -220,3 +223,42 @@ class OwnerEmployeesResponse(BaseModel):
     employees: list[MemberOut]
     pharmacy_features: list[str]
     my_permissions: list[str]
+
+
+# ── Sign-up requests (admin « Demandes » tab) ─────────────────────────────────
+
+
+class SignupPharmacyRef(BaseModel):
+    """The pharmacy a « join » request names, when its code exists."""
+
+    id: int
+    name: str
+    code: str
+    city: str | None
+
+
+class SignupRequestRow(BaseModel):
+    """One pending « Créer un compte ». `pharmacy_code` set = join; else `new_pharmacy_*` =
+    a new pharmacy. `email_taken` / `code_unknown`: « Accepter » would be refused."""
+
+    id: int
+    created_at: datetime
+    role: MemberRole
+    full_name: str
+    email: str
+    phone: str
+    pharmacy_code: str | None
+    pharmacy: SignupPharmacyRef | None
+    new_pharmacy_name: str | None
+    new_pharmacy_city: str | None
+    new_pharmacy_address: str | None
+    email_taken: bool
+    code_unknown: bool
+
+
+class SignupAcceptOut(BaseModel):
+    """« Accepter »: the account + its pharmacy (new or joined)."""
+
+    user_id: int
+    pharmacy_id: int
+    pharmacy_code: str

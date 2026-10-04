@@ -1,8 +1,9 @@
-/** /admin/pharmacies — « Pharmacies et utilisateurs ». Two tabs:
- *    Pharmacies   — the pharmacies list (_components/PharmaciesTab)
- *    Utilisateurs — EVERY account, with or without a pharmacy (_components/UsersTab):
+/** /admin/pharmacies — « Pharmacies et utilisateurs ». Three tabs:
+ *    Pharmacies   — the pharmacies list (PharmaciesTab)
+ *    Utilisateurs — EVERY account, with or without a pharmacy (UsersTab):
  *                   the only admin view where nobody is hidden.
- *  The tab lives in the URL (?tab=utilisateurs) so a reload keeps it. */
+ *    Demandes (N) — pending « Créer un compte » (_components/SignupRequestsTab).
+ *  The tab lives in the URL (?tab=utilisateurs / ?tab=demandes) so a reload keeps it. */
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 
 import { TabBar } from "@/_components/TabBar";
@@ -28,6 +29,7 @@ import type {
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
 import { FeaturePills } from "@/_components/FeaturePills";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
+import { SignupRequestsTab } from "./_components/SignupRequestsTab";
 import {
   useCreatePharmacy,
   useCreateUser,
@@ -36,6 +38,7 @@ import {
   useDeleteUser,
   useResetUserPassword,
   useSetUserStatus,
+  useSignupRequests,
 } from "./hooks";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
@@ -528,10 +531,14 @@ function AssignPharmacyDialog({
   );
 }
 
+/** URL value of each tab (?tab=…); the pharmacies list has none. */
+const TAB_PARAM: Record<string, string | null> = { pharmacies: null, users: "utilisateurs", requests: "demandes" };
+
 export default function AdminPharmaciesIndex() {
   const t = useT();
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "utilisateurs" ? "users" : "pharmacies";
+  const tab = Object.keys(TAB_PARAM).find((id) => TAB_PARAM[id] === params.get("tab")) ?? "pharmacies";
+  const { requests } = useSignupRequests(); // the count on the « Demandes » tab
 
   return (
     <Page title={t("adminUsers.pageTitle")} subtitle={t("adminUsers.pageSubtitle")}>
@@ -539,12 +546,16 @@ export default function AdminPharmaciesIndex() {
         tabs={[
           { id: "pharmacies", label: t("adminUsers.tabPharmacies") },
           { id: "users", label: t("adminUsers.tabUsers") },
+          { id: "requests", label: t("adminUsers.tabRequests", { n: requests.length }) },
         ]}
         activeId={tab}
-        onChange={(id) => setParams(id === "users" ? { tab: "utilisateurs" } : {})}
+        onChange={(id) => {
+          const value = TAB_PARAM[id];
+          setParams(value ? { tab: value } : {});
+        }}
       />
 
-      {tab === "pharmacies" ? <PharmaciesTab /> : <UsersTab />}
+      {tab === "pharmacies" ? <PharmaciesTab /> : tab === "users" ? <UsersTab /> : <SignupRequestsTab />}
     </Page>
   );
 }

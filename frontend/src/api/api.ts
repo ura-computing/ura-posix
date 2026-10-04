@@ -108,6 +108,7 @@ export const API = {
       refreshes: (): Read[] => [API.auth.me, API.sessions.list],
     },
     forgotPassword: { url: "/auth/forgot-password" },
+    signup: { url: "/auth/signup" },
     validateToken: {
       url: "/auth/validate-token",
       key: (token: string) => ["auth", "validate-token", token] as const,
@@ -400,6 +401,16 @@ export const API = {
       all: ["admin", "pharmacy-analyse"],
     },
     users: { url: "/admin/users", key: ["admin", "users"] },
+    signupRequests: { url: "/admin/signup-requests", key: ["admin", "signup-requests"] },
+    // A new account (and maybe a new pharmacy): both admin lists change.
+    acceptSignup: {
+      url: (id: number) => `/admin/signup-requests/${id}/accept`,
+      refreshes: (): Read[] => [API.admin.signupRequests, API.admin.pharmacies, API.admin.users],
+    },
+    refuseSignup: {
+      url: (id: number) => `/admin/signup-requests/${id}/refuse`,
+      refreshes: (): Read[] => [API.admin.signupRequests],
+    },
     setUserPermissions: {
       url: (id: number) => `/admin/users/${id}/permissions`,
       refreshes: (): Read[] => [API.admin.pharmacy, API.admin.users],

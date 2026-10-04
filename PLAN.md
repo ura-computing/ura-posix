@@ -3,7 +3,7 @@
 Updated 2026-10-04. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §3 production tools (DO console, yours) → last step (§8).
+**Order:** §1 tickets → §3 production tools (DO console, yours) → §8 Later.
 
 ---
 
@@ -18,14 +18,24 @@ Updated 2026-10-04. One list, top to bottom. Open items only: a step leaves this
 
 ---
 
+## 1. Tickets (ClickUp, 2026-10-04)
+
+| # | Ticket | Today | To do |
+|---|---|---|---|
+| T1 | Same email typed with other capitals or spaces | **done, waiting for your `make tests`**: `normalize_email` (`app/core/utils.py`) on login, forgot-password, create / invite user; migration `0022` lowercases stored emails (2 accounts that would collide: left as they are, logged) | `12-equipe` (invite in capitals → `emailTaken`), `13-compte` (forgot-password + login in capitals) |
+| T2 | /imports: select several imports, delete them at once | **done, waiting for your `make tests`**: `Checkbox` (`_components/Checkbox.tsx`, app colors) per import not deleted + « Tout sélectionner » in the header, « Supprimer la sélection (N) », one confirmation listing the files, one `DELETE /data/imports/{id}` per import (`useDeleteImports`), toast with the count / the failed ones | `15-imports` (new test « supprimer plusieurs imports d'un coup ») |
+| T4 | Sign up: a pharmacist creates their own account | no signup: admin / owner create accounts | **decisions 2026-10-04**: admin accepts every new account before its first login; owner = new pharmacy (all its info) **or** joins one by its code (`CAS0001`); employee = own info + pharmacy code; never reveal which pharmacies exist (no list, same answer whether the code exists or not) → `/inscription` page + routes, account « en attente », admin Accepter / Refuser in « Pharmacies et utilisateurs », email when accepted, every feature ON, E2E |
+
+---
+
 ## 3. Production tools (DigitalOcean)
 
 Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **managed Postgres 17**.
 
 | When | Tool | What it gives | Watch out |
 |---|---|---|---|
-| Now (DO console, once) | `pg_stat_statements`: `CREATE EXTENSION pg_stat_statements;` on the managed DB | list of the slowest real queries in production | read-only, no app change |
 | Now (DO console) | Frontend as an App Platform **static site** (build `npm run build`, output `dist`, catch-all → `index.html`) | served from DO's CDN; hashed assets cached 1 year, `index.html` never cached | needs S2 for small chunks |
+| Later (decision 2026-10-04), before any row below | `pg_stat_statements`: `CREATE EXTENSION pg_stat_statements;` on the managed DB (DO console, once) | list of the slowest real queries in production | read-only, no app change; the rows below depend on its numbers |
 | Later | **S6 daily pre-aggregates**: table `daily_sales(pharmacy_id, date, medicament_id, qty, ca)` refreshed after each import / undo; Rapport trend + Analyses mois / année read it | ~365 rows per product-year instead of every sale line | only if `pg_stat_statements` shows `/stats` / analyse slow: today 248 ms / 88 ms at 100k rows, and a 2nd copy of the sales must stay right after every import, undo, catalogue change |
 | Later | Rapport server cache keyed by a data version (bumped on import, exclusion, catalogue change) | repeat visits only; first view after an import stays the same | add only if `/stats` is still a problem in production (`pg_stat_statements`) |
 | Later | **Valkey** (DO Managed Caching; open-source Redis fork) | shared Rapport cache + shared rate limit (B3) + job queue for all workers | one more paid DO part |
@@ -49,8 +59,6 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 ---
 
 ## 8. Later
-
-**Last step of all (decision 2026-10-03):** re-check every commit on `dev` and reorganize them (one clear commit per topic, messages that match the content: amended commits mixed topics, e.g. `63e6292` holds G8 + /stock). `dev` is pushed → needs a force push, only on your OK. Then README update (one final docs pass).
 
 | What | Notes |
 |---|---|

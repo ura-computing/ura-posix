@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.database import DbDep
 from app.core.email_service import send_magic_link
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Session as UserSession, User
+from app.core.models import Session as UserSession, SignupRequest, User
 from app.core.permissions import effective_permissions
 from app.core.rate_limit import limiter
 from app.identity.auth.schemas import (
@@ -20,6 +20,7 @@ from app.identity.auth.schemas import (
     PharmacyOut,
     SessionOut,
     SetPasswordRequest,
+    SignupIn,
     UpdateProfileRequest,
     UserOut,
     ValidateTokenResponse,
@@ -221,6 +222,30 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
             is_setup=is_setup,
         )
     return {"detail": "Si votre compte existe, un email a été envoyé"}
+
+
+@router.post("/auth/signup", status_code=200)
+@limiter.limit("5/hour")
+def signup(body: SignupIn, request: Request, db: DbDep) -> dict:
+    """« Créer un compte »: stored until the admin accepts or refuses it (nobody logs in
+    before). Same answer whatever was typed: it never says whether the email already has
+    an account or the pharmacy code exists — the client keeps his pharmacies private."""
+    db.add(
+        SignupRequest(
+            role=body.role,
+            full_name=body.full_name,
+            email=body.email,
+            phone=body.phone,
+            password_hash=hash_password(body.password),
+            pharmacy_code=body.pharmacy_code,
+            pharmacy_name=body.pharmacy_name,
+            pharmacy_city=body.pharmacy_city,
+            pharmacy_address=body.pharmacy_address,
+            status="pending",
+        )
+    )
+    db.commit()
+    return {"detail": "Demande envoyée"}
 
 
 @router.get("/auth/validate-token")

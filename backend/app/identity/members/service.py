@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import unicodedata
 
+from fastapi import status
 from sqlalchemy import Integer, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.models import ALLOWED_FEATURES, Pharmacy, User, UserPermission
+from app.core.errors import ApiError, ErrorCode
+from app.core.models import ALLOWED_FEATURES, Pharmacy, PharmacyFeature, User, UserPermission
 from app.identity.members.schemas import MemberOut
 from app.core.security import hash_password
 
@@ -72,17 +75,22 @@ def create_member(
     *,
     email: str,
     name: str | None,
-    password: str,
+    password: str | None = None,
+    password_hash: str | None = None,
+    phone: str | None = None,
     role: str,
     pharmacy_id: int,
 ) -> User:
     """Create an active owner/employee with EVERY permission granted (client
     decision 2026-09-28 — effective access is still capped by the pharmacy /
-    owner ceiling at read time). Caller checks email uniqueness first."""
+    owner ceiling at read time). Caller checks email uniqueness first.
+    `password` = typed by the admin / owner; `password_hash` = already hashed
+    (sign-up: the pharmacist typed it, only its hash was kept)."""
     user = User(
         email=email,
         name=name,
-        password_hash=hash_password(password),
+        phone=phone,
+        password_hash=password_hash or hash_password(password or ""),
         role=role,
         status="active",
         pharmacy_id=pharmacy_id,
@@ -123,7 +131,7 @@ def generate_pharmacy_code(db: Session, city: str) -> str:
       4. Format as `{PREFIX}{N:04d}` — e.g. Bouskoura → BOU0001 → BOU0002 …
 
     A concurrent create with the same prefix can race on the unique index;
-    `create_pharmacy` wraps this in a retry loop to handle that.
+    `add_pharmacy` wraps this in a retry loop to handle that.
     """
     norm = "".join(c for c in unicodedata.normalize("NFD", city) if not unicodedata.combining(c)).upper()
     prefix = "".join(c for c in norm if c.isalpha())[:3].ljust(3, "X")
@@ -135,3 +143,42 @@ def generate_pharmacy_code(db: Session, city: str) -> str:
         or 0
     )
     return f"{prefix}{max_seq + 1:04d}"
+
+
+def add_pharmacy(
+    db: Session,
+    *,
+    name: str,
+    city: str,
+    address: str | None = None,
+    phone: str | None = None,
+    email: str | None = None,
+) -> Pharmacy:
+    """New pharmacy with its code from the city (Casablanca → CAS0001) and EVERY
+    feature on (client decision 2026-09-28). Flushed, not committed: the caller
+    commits with whatever goes with it (admin « Nouvelle pharmacie », an accepted
+    sign-up). A few retries cover two pharmacies of the same city at once."""
+    for _ in range(5):
+        pharm = Pharmacy(
+            name=name,
+            code=generate_pharmacy_code(db, city),
+            city=city,
+            address=address,
+            phone=phone,
+            email=email,
+        )
+        db.add(pharm)
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            continue
+        for feature in ALLOWED_FEATURES:
+            db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feature, enabled=True))
+        db.flush()
+        return pharm
+    raise ApiError(
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+        ErrorCode.PHARMACY_CODE_FAILED,
+        "Impossible de générer un code unique pour cette ville. Réessayez.",
+    )

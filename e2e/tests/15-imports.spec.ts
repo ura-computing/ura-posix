@@ -368,6 +368,61 @@ test("dates tapées à la main : lues comme Sobrus ; date impossible : ligne non
   await apiDelete(page, `/data/imports/${result.batch_id}`);
 });
 
+test("supprimer plusieurs imports d'un coup : cocher, « Supprimer la sélection », une confirmation", async ({
+  page,
+}) => {
+  // Two small achats files: a known product of the extra file on new BLs, imported through the wizard.
+  const [header, first] = readFileSync(resolve(REPO_DIR, expected().files.extra_achats.path), "utf-8").split("\n");
+  const rest = first.split(";").slice(3);
+  const names = ["Sobrus - Achats 2026-02-01 - 2026-02-28.csv", "Sobrus - Achats 2026-03-01 - 2026-03-31.csv"];
+  for (const [i, name] of names.entries()) {
+    await page.goto("/upload-file?type=achat");
+    await page.locator('input[type="file"]').setInputFiles({
+      name,
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        `${header}\n${["2026-02-02 10:00:00", "2026-02-02", `E2E-MULTI-${i + 1}`, ...rest].join(";")}\n`,
+      ),
+    });
+    await page.getByRole("button", { name: "Importer dans la base" }).click();
+    await expect(page.getByRole("heading", { level: 3, name: "1 lignes importées" })).toBeVisible();
+  }
+
+  const list = pageCall(page, "/data/imports");
+  await page.goto("/imports");
+  const rows = (await list).data as Row[];
+  const ids = rows.filter((r) => names.includes(r.filename) && !r.deleted_at).map((r) => r.id);
+  expect(ids.length, "les 2 imports dans la liste").toBe(2);
+
+  // The button is always there, disabled until a line is ticked.
+  await expect(page.getByRole("button", { name: "Supprimer la sélection (0)" })).toBeDisabled();
+  await expect(page.getByText("Cochez les imports à supprimer.")).toBeVisible();
+
+  // « Tout sélectionner » ticks every import not deleted yet; unticked again → disabled.
+  const all = page.getByRole("checkbox", { name: "Tout sélectionner" });
+  await all.check();
+  await expect(
+    page.getByRole("button", { name: `Supprimer la sélection (${rows.filter((r) => !r.deleted_at).length})` }),
+  ).toBeVisible();
+  await all.uncheck();
+  await expect(page.getByRole("button", { name: "Supprimer la sélection (0)" })).toBeDisabled();
+
+  for (const name of names) await page.getByRole("checkbox", { name: `Sélectionner « ${name} »` }).check();
+  await page.getByRole("button", { name: "Supprimer la sélection (2)" }).click();
+  const dialog = page.getByRole("dialog", { name: "Supprimer 2 import(s) ?" });
+  for (const name of names) await expect(dialog.getByText(name, { exact: false }), "fichier listé").toBeVisible();
+  const deletes = ids.map((id) => pageSend(page, "DELETE", `/data/imports/${id}`));
+  await dialog.getByRole("button", { name: "Supprimer (2)" }).click();
+  for (const res of await Promise.all(deletes)) {
+    expectSame(res, { deleted_rows: 1, file_type: "achat" }, "DELETE /data/imports");
+  }
+  await expect(page.getByText("2 import(s) supprimé(s) · 2 ligne(s) effacée(s)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Supprimer la sélection (0)" }), "sélection vidée").toBeDisabled();
+
+  // Exact extra check: their lines are gone (the last test checks the Rapport is back to the oracle).
+  expect((await apiGet(page, "/achats", { search: "e2e-multi" })).data, "lignes retirées").toEqual([]);
+});
+
 test("deux imports créent le même nouveau produit au même moment : pas d'erreur, un seul produit", async ({ page }) => {
   // Two chunks sent together (2 backend workers): both name the same unknown PID.
   const row = (ref: string) => ({

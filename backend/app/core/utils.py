@@ -14,6 +14,12 @@ def today() -> date:
     return datetime.now(PHARMACY_TZ).date()
 
 
+def normalize_email(value: object) -> object:
+    """One spelling per email, stored and compared: spaces removed at both ends, lower case.
+    « Ali@Gmail.com » finds the account « ali@gmail.com » (login, « email déjà utilisé »)."""
+    return value.strip().lower() if isinstance(value, str) else value
+
+
 def generate_token(byte_len: int = 32) -> str:
     """Returns a URL-safe random string (~43 chars for byte_len=32, 256 bits of entropy).
     Used for both magic-link tokens and session tokens."""

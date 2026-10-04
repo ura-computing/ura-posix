@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
+import { Button } from "@/_components/button";
+import { Checkbox } from "@/_components/Checkbox";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { TabBar } from "@/_components/TabBar";
 import type { TabItem } from "@/_components/TabBar";
-import { formatDateTime, formatQty } from "@/utils/format";
+import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
 import type { DataImport, DocType, ImportBatchStatus } from "@/types";
 
-import { useDeleteImport, useImports } from "./hooks";
+import { useDeleteImport, useDeleteImports, useImports } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { Page } from "@/_components/Page";
 
@@ -56,9 +58,25 @@ function ImportsTab() {
   const t = useT();
   const { imports, isLoading } = useImports();
   const { deleteImport, isDeleting } = useDeleteImport();
+  const { deleteImports, isDeletingMany } = useDeleteImports();
   const [pendingRow, setPendingRow] = useState<DataImport | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  const [confirmMany, setConfirmMany] = useState(false);
 
   const sorted = useMemo(() => [...imports].sort((a, b) => b.imported_at.localeCompare(a.imported_at)), [imports]);
+  // Only imports not deleted yet can be ticked; an id that left the list is simply ignored.
+  const deletable = useMemo(() => sorted.filter((r) => r.deleted_at === null), [sorted]);
+  const selectedRows = useMemo(() => deletable.filter((r) => selected.has(r.id)), [deletable, selected]);
+  const allSelected = deletable.length > 0 && selectedRows.length === deletable.length;
+
+  const toggle = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(deletable.map((r) => r.id)));
 
   if (isLoading) {
     return (
@@ -83,10 +101,28 @@ function ImportsTab() {
 
   return (
     <>
+      {/* Always there (users look for it), usable once a line is ticked. */}
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
+        {selectedRows.length === 0 && <span className="text-sm text-muted-foreground">{t("imports.selectHint")}</span>}
+        <Button variant="destructive" disabled={selectedRows.length === 0} onClick={() => setConfirmMany(true)}>
+          <Trash2 className="size-4" />
+          {t("imports.deleteSelection", { n: selectedRows.length })}
+        </Button>
+      </div>
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface-subtle text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th className="w-10 px-4 py-2.5">
+                <Checkbox
+                  aria-label={t("imports.selectAll")}
+                  title={t("imports.selectAll")}
+                  checked={allSelected}
+                  mixed={selectedRows.length > 0 && !allSelected}
+                  disabled={deletable.length === 0}
+                  onChange={toggleAll}
+                />
+              </th>
               <th className="px-4 py-2.5">{t("imports.colDate")}</th>
               <th className="px-4 py-2.5">{t("imports.colType")}</th>
               <th className="px-4 py-2.5">{t("imports.colFile")}</th>
@@ -105,6 +141,15 @@ function ImportsTab() {
                   key={row.id}
                   className={`border-b border-border last:border-0 ${isDeleted ? "bg-surface-subtle/40" : "hover:bg-surface-subtle/50"}`}
                 >
+                  <td className="px-4 py-3">
+                    {!isDeleted && (
+                      <Checkbox
+                        aria-label={t("imports.selectRow", { name: row.filename ?? t("imports.noName") })}
+                        checked={selected.has(row.id)}
+                        onChange={() => toggle(row.id)}
+                      />
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs tabular-nums text-muted-foreground">
                     {formatDateTime(row.imported_at)}
                   </td>
@@ -199,6 +244,31 @@ function ImportsTab() {
         confirmLabel={pendingRow?.file_type === "stock" ? t("imports.markDeleted") : t("imports.deleteBtn")}
         loadingLabel={t("imports.deleting")}
         isLoading={isDeleting}
+      />
+
+      <ConfirmDialog
+        open={confirmMany}
+        onClose={() => setConfirmMany(false)}
+        onConfirm={() => {
+          void deleteImports(selectedRows).then(() => {
+            setSelected(new Set());
+            setConfirmMany(false);
+          });
+        }}
+        title={t("imports.confirmManyTitle", { n: selectedRows.length })}
+        description={t("imports.confirmManyCopy")}
+        bullets={selectedRows.map(
+          (r) =>
+            `${r.filename ?? t("imports.noName")} · ${
+              r.file_type === "stock"
+                ? t("imports.confirmManyStock")
+                : t("imports.confirmManyRows", { rows: formatNumStr(r.rows_inserted) })
+            }`,
+        )}
+        variant="destructive"
+        confirmLabel={t("imports.deleteMany", { n: selectedRows.length })}
+        loadingLabel={t("imports.deleting")}
+        isLoading={isDeletingMany}
       />
     </>
   );

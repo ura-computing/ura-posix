@@ -63,6 +63,20 @@ export interface ForgotPasswordRequest {
   email: string;
 }
 
+/** « Créer un compte » (POST /auth/signup). Owner: a new pharmacy (name + city) or an
+ *  existing one (its code). Employee: always a code. */
+export interface SignupIn {
+  full_name: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: "owner" | "employee";
+  pharmacy_code?: string;
+  pharmacy_name?: string;
+  pharmacy_city?: string;
+  pharmacy_address?: string;
+}
+
 export interface ValidateTokenResponse {
   is_setup: boolean;
   full_name: string;

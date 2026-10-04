@@ -87,6 +87,19 @@ export default function LoginPage() {
             </Link>
           </div>
         </form>
+
+        <div className="flex flex-col gap-3 border-t border-border pt-6">
+          <p className="text-center text-[13px] text-muted-foreground">{t("misc.noAccount")}</p>
+          <Link
+            to={ROUTES.SIGNUP}
+            className={cn(
+              "inline-flex w-full items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
+              "bg-secondary text-secondary-foreground transition-colors hover:bg-muted",
+            )}
+          >
+            {t("misc.createAccount")}
+          </Link>
+        </div>
       </div>
     </AuthLayout>
   );

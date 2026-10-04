@@ -29,6 +29,7 @@ FK_MEDICAMENTS_ID = "medicaments.id"
 FK_IMPORT_BATCHES_ID = "import_batches.id"
 
 PAYMENT_METHODS = ("tpe", "especes", "cheques", "virement")
+SIGNUP_STATUSES = ("pending", "accepted", "refused")
 
 ALLOWED_FEATURES = (
     "rapports",
@@ -96,6 +97,37 @@ class Session(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class SignupRequest(Base):
+    """« Créer un compte » (/auth/signup), waiting for the admin's « Accepter » / « Refuser ».
+    Kept apart from `users`: nobody logs in before the admin accepts. `pharmacy_code` set =
+    join that pharmacy; else `pharmacy_name` + `pharmacy_city` (+ address) = a new one."""
+
+    __tablename__ = "signup_requests"
+    __table_args__ = (
+        CheckConstraint("role IN ('owner', 'employee')", name="ck_signup_requests_role"),
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in SIGNUP_STATUSES) + ")", name="ck_signup_requests_status"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    full_name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    phone: Mapped[str] = mapped_column(String, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    pharmacy_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    pharmacy_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    pharmacy_city: Mapped[str | None] = mapped_column(String, nullable=True)
+    pharmacy_address: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    # The account created on « Accepter ».
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
 
 
 class PharmacyFeature(Base):

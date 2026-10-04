@@ -21,17 +21,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query, status
+from fastapi import APIRouter, Path, Query
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
+from app.core.config import settings
 from app.core.database import DbDep
+from app.core.email_service import send_signup_decision
 from app.core.errors import ApiError, ErrorCode
 from app.identity.members.service import (
     apply_permissions_bulk,
+    add_pharmacy,
     create_member,
-    generate_pharmacy_code,
     granted_permissions_map,
     member_out,
     member_to_out,
@@ -42,10 +43,11 @@ from app.core.models import (
     ALLOWED_FEATURES,
     Pharmacy,
     PharmacyFeature,
+    SignupRequest,
     User,
     UserPermission,
 )
-from app.core.permissions import admin_only
+from app.core.permissions import AdminDep, admin_only
 from app.identity.members.schemas import (
     AdminUserRow,
     AssignPharmacyIn,
@@ -59,18 +61,15 @@ from app.identity.members.schemas import (
     PharmacyListRow,
     ResetPasswordIn,
     ResetPasswordOut,
+    SignupAcceptOut,
+    SignupPharmacyRef,
+    SignupRequestRow,
     StatusPatchIn,
     UserPharmacyRef,
 )
 
 
 router = APIRouter(tags=["admin-pharmacies"], dependencies=[admin_only])
-
-
-# ── Defaults applied to a newly-created pharmacy ─────────────────────────────
-# Every feature on by default (client decision 2026-09-28); admin can toggle
-# them off later via Screen 2. Same set is granted to newly-created users.
-DEFAULT_ENABLED_FEATURES = ALLOWED_FEATURES
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -235,39 +234,10 @@ def get_pharmacy(
 
 @router.post("/admin/pharmacies", response_model=PharmacyDetail)
 def create_pharmacy(body: PharmacyIn, db: DbDep) -> PharmacyDetail:
-    """Create + auto-enable DEFAULT_ENABLED_FEATURES. The pharmacy `code` is
-    auto-generated from `city` (e.g. Bouskoura → BOU0001); any client-sent
-    `body.code` is ignored on create. A small retry loop handles the rare
-    concurrent-insert race against the unique-on-code index."""
-
-    pharm: Pharmacy | None = None
-    for _ in range(5):
-        code = generate_pharmacy_code(db, body.city)
-        pharm = Pharmacy(
-            name=body.name,
-            code=code,
-            city=body.city,
-            address=body.address,
-            phone=body.phone,
-            email=body.email,
-        )
-        db.add(pharm)
-        try:
-            db.flush()
-            break
-        except IntegrityError:
-            db.rollback()
-            pharm = None
-            continue
-    if pharm is None:
-        raise ApiError(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            ErrorCode.PHARMACY_CODE_FAILED,
-            "Impossible de générer un code unique pour cette ville. Réessayez.",
-        )
-
-    for feat in DEFAULT_ENABLED_FEATURES:
-        db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feat, enabled=True))
+    """Create with every feature on. The pharmacy `code` is auto-generated from
+    `city` (e.g. Bouskoura → BOU0001); any client-sent `body.code` is ignored on
+    create (members/service.add_pharmacy)."""
+    pharm = add_pharmacy(db, name=body.name, city=body.city, address=body.address, phone=body.phone, email=body.email)
     db.commit()
     return get_pharmacy(db, pharm.id)
 
@@ -480,3 +450,111 @@ def delete_user(
         raise ApiError(400, ErrorCode.ADMIN_NOT_DELETABLE, "Impossible de supprimer un administrateur.")
     db.delete(target)
     db.commit()
+
+
+# ── Sign-up requests (« Demandes » tab) ───────────────────────────────────────
+
+
+def _pharmacy_by_code(db, code: str | None) -> Pharmacy | None:
+    """Active pharmacy with this code (any case), else None."""
+    if not code:
+        return None
+    return db.query(Pharmacy).filter(func.upper(Pharmacy.code) == code.upper(), Pharmacy.archived_at.is_(None)).first()
+
+
+def _pending_signup_or_error(db, signup_id: int) -> SignupRequest:
+    req = db.get(SignupRequest, signup_id)
+    if req is None:
+        raise ApiError(404, ErrorCode.SIGNUP_NOT_FOUND, "Demande introuvable.")
+    if req.status != "pending":
+        raise ApiError(409, ErrorCode.SIGNUP_ALREADY_DECIDED, "Cette demande a déjà été traitée.")
+    return req
+
+
+@router.get("/admin/signup-requests", response_model=list[SignupRequestRow])
+def list_signup_requests(db: DbDep) -> list[SignupRequestRow]:
+    """Pending « Créer un compte », newest first. Flags what « Accepter » would refuse:
+    an email that already has an account, a code no active pharmacy has."""
+    pending = (
+        db.query(SignupRequest)
+        .filter(SignupRequest.status == "pending")
+        .order_by(SignupRequest.created_at.desc())
+        .all()
+    )
+    taken = (
+        {e for (e,) in db.query(User.email).filter(User.email.in_({r.email for r in pending})).all()}
+        if pending
+        else set()
+    )
+    rows: list[SignupRequestRow] = []
+    for r in pending:
+        pharm = _pharmacy_by_code(db, r.pharmacy_code)
+        rows.append(
+            SignupRequestRow(
+                id=r.id,
+                created_at=r.created_at,
+                role=r.role,
+                full_name=r.full_name,
+                email=r.email,
+                phone=r.phone,
+                pharmacy_code=r.pharmacy_code,
+                pharmacy=SignupPharmacyRef(id=pharm.id, name=pharm.name, code=pharm.code, city=pharm.city)
+                if pharm
+                else None,
+                new_pharmacy_name=r.pharmacy_name,
+                new_pharmacy_city=r.pharmacy_city,
+                new_pharmacy_address=r.pharmacy_address,
+                email_taken=r.email in taken,
+                code_unknown=bool(r.pharmacy_code) and pharm is None,
+            )
+        )
+    return rows
+
+
+@router.post("/admin/signup-requests/{signup_id}/accept", response_model=SignupAcceptOut)
+def accept_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: DbDep) -> SignupAcceptOut:
+    """Create the account (every permission on) in the pharmacy it names, or in a new
+    pharmacy (code from the city, every feature on), then email « Votre compte est prêt »."""
+    req = _pending_signup_or_error(db, signup_id)
+    if db.query(User).filter(User.email == req.email).first():
+        raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
+    if req.pharmacy_code:
+        pharm = _pharmacy_by_code(db, req.pharmacy_code)
+        if pharm is None:
+            raise ApiError(
+                409,
+                ErrorCode.PHARMACY_CODE_UNKNOWN,
+                f"Aucune pharmacie avec le code {req.pharmacy_code}.",
+                code=req.pharmacy_code,
+            )
+    else:
+        pharm = add_pharmacy(
+            db, name=req.pharmacy_name or "", city=req.pharmacy_city or "", address=req.pharmacy_address
+        )
+    user = create_member(
+        db,
+        email=req.email,
+        name=req.full_name,
+        password_hash=req.password_hash,
+        phone=req.phone,
+        role=req.role,
+        pharmacy_id=pharm.id,
+    )
+    req.status = "accepted"
+    req.decided_at = datetime.now(timezone.utc)
+    req.decided_by = admin.id
+    req.user_id = user.id
+    db.commit()
+    send_signup_decision(to=req.email, name=req.full_name, accepted=True, login_url=f"{settings.FRONTEND_URL}/login")
+    return SignupAcceptOut(user_id=user.id, pharmacy_id=pharm.id, pharmacy_code=pharm.code or "")
+
+
+@router.post("/admin/signup-requests/{signup_id}/refuse", status_code=204)
+def refuse_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: DbDep) -> None:
+    """Nothing is created; the person gets an email saying the request was not accepted."""
+    req = _pending_signup_or_error(db, signup_id)
+    req.status = "refused"
+    req.decided_at = datetime.now(timezone.utc)
+    req.decided_by = admin.id
+    db.commit()
+    send_signup_decision(to=req.email, name=req.full_name, accepted=False, login_url=f"{settings.FRONTEND_URL}/login")

@@ -92,3 +92,27 @@ export interface OwnerEmployeesResponse {
   pharmacy_features: string[];
   my_permissions: string[];
 }
+
+/** One pending « Créer un compte » (admin « Demandes » tab, mirrors SignupRequestRow).
+ *  `pharmacy_code` set = join; else `new_pharmacy_*` = a new pharmacy. */
+export interface SignupRequestRow {
+  id: number;
+  created_at: string;
+  role: MemberRole;
+  full_name: string;
+  email: string;
+  phone: string;
+  pharmacy_code: string | null;
+  pharmacy: { id: number; name: string; code: string; city: string | null } | null;
+  new_pharmacy_name: string | null;
+  new_pharmacy_city: string | null;
+  new_pharmacy_address: string | null;
+  email_taken: boolean;
+  code_unknown: boolean;
+}
+
+export interface SignupAcceptOut {
+  user_id: number;
+  pharmacy_id: number;
+  pharmacy_code: string;
+}

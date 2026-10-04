@@ -51,6 +51,9 @@ class ErrorCode(StrEnum):
     ADMIN_STATUS_LOCKED = "adminStatusLocked"
     ADMIN_NOT_DELETABLE = "adminNotDeletable"
     ONLY_MEMBERS_HAVE_PHARMACY = "onlyMembersHavePharmacy"
+    SIGNUP_NOT_FOUND = "signupNotFound"
+    SIGNUP_ALREADY_DECIDED = "signupAlreadyDecided"
+    PHARMACY_CODE_UNKNOWN = "pharmacyCodeUnknown"
     # Catalogue + category suffixes
     PRODUCT_NAME_REQUIRED = "productNameRequired"
     MEDICAMENT_EXISTS = "medicamentExists"
