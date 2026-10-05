@@ -272,18 +272,33 @@ function MarginAnalysisTable({ mode, onModeChange, rows, isLoading }: MarginAnal
   const t = useT();
   const columns = columnsFor(mode, t);
   const tabs = buildTabs(t);
+  // Every row is loaded; show them page by page (same as /analyses). The page is kept with
+  // the (tab, rows) it was picked for: another tab, pharmacy or period shows page 1 again.
+  const pageFor = `${mode}|${rows.length}`;
+  const [picked, setPicked] = useState({ pageFor, page: 1 });
+  const page = picked.pageFor === pageFor ? picked.page : 1;
+  const [pageSize, setPageSize] = useState(25);
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="flex flex-col gap-3.5">
       <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.analyseMarge")}</h2>
       <TabBar<MargeMode> tabs={tabs} activeId={mode} onChange={onModeChange} />
       <DataTable
-        rows={rows}
+        rows={pageRows}
         columns={columns}
         isLoading={isLoading}
-        rowKey={(_r, i) => i}
+        rowKey={(_r, i) => (page - 1) * pageSize + i}
         emptyTitle={t("rapportAdmin.aucuneLigne")}
         emptyHint={t("rapportAdmin.aucuneDonneeRegroupement")}
+        scrollOnPage="table"
+        pagination={{
+          page,
+          pageSize,
+          total: rows.length,
+          onPage: (next) => setPicked({ pageFor, page: next }),
+          onPageSize: setPageSize,
+        }}
       />
     </div>
   );

@@ -239,6 +239,20 @@ test("rapport admin : le tableau « Analyse de marge » affiche les valeurs de l
         });
         expect(bad.slice(0, 10), `${mode}: « ${header} »`).toEqual([]);
       }
+      if (mode === "produit") {
+        // 25 products per page; « Suivant » shows the next 25, in the API's order.
+        expect(names.length, "produit: 25 lignes par page").toBe(Math.min(25, rows.length));
+        await page
+          .locator("div")
+          .filter({ has: page.getByRole("heading", { name: "Analyse de marge", exact: true }) })
+          .last()
+          .locator("button", { hasText: "Suivant" })
+          .click();
+        await expect(table.locator("tbody tr").first()).toContainText(String(rows[25]?.[nameKey] ?? "—"));
+        expect(await columnTexts(page, nameCol, table), "produit: page 2").toEqual(
+          rows.slice(25, 50).map((r) => String(r[nameKey] ?? "—")),
+        );
+      }
     });
   }
 });

@@ -34,6 +34,21 @@ function scrollNearestAncestorToTop(el: HTMLElement | null) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// `scrollOnPage="table"`: a table low on a page (admin Rapport) — scroll back only up to
+// the TABLE's top, and only when that top is out of view (`scroll-mt-24` leaves room
+// above it).
+const STICKY_ROOM = 96; // px, = scroll-mt-24
+
+function scrollTableTopIntoView(el: HTMLElement | null) {
+  if (!el) return;
+  let node = el.parentElement;
+  while (node && !(/(auto|scroll)/.test(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight)) {
+    node = node.parentElement;
+  }
+  const viewTop = node ? node.getBoundingClientRect().top : 0;
+  if (el.getBoundingClientRect().top < viewTop + STICKY_ROOM) el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 export interface ColumnDef<R, K extends string = string> {
   key: K;
   label: string;
@@ -66,6 +81,9 @@ export interface DataTableProps<R, K extends string = string> {
   /** Optional unique row key extractor. Defaults to index. */
   rowKey?: (row: R, index: number) => string | number;
   className?: string;
+  /** Page change scrolls back to the page's top (default: list pages like Achats / Ventes)
+   *  or only to this table's top (`"table"`: a table low on a page, e.g. admin Rapport). */
+  scrollOnPage?: "page" | "table";
 }
 
 function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" }) {
@@ -86,6 +104,7 @@ export function DataTable<R, K extends string = string>({
   topBanner,
   rowKey,
   className,
+  scrollOnPage = "page",
 }: DataTableProps<R, K>) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -144,7 +163,7 @@ export function DataTable<R, K extends string = string>({
   }
 
   return (
-    <div ref={rootRef} className={cn("flex flex-col gap-3", className)}>
+    <div ref={rootRef} className={cn("flex flex-col gap-3", scrollOnPage === "table" && "scroll-mt-24", className)}>
       {topBanner}
       {/* Table card. Stays overflow-hidden so the rounded corners clip the
           horizontal scrollbar cleanly. Pagination footer is a SIBLING (below)
@@ -215,7 +234,8 @@ export function DataTable<R, K extends string = string>({
         <PaginationFooter
           {...pagination}
           onPage={(p) => {
-            scrollNearestAncestorToTop(rootRef.current);
+            if (scrollOnPage === "table") scrollTableTopIntoView(rootRef.current);
+            else scrollNearestAncestorToTop(rootRef.current);
             pagination.onPage(p);
           }}
         />
