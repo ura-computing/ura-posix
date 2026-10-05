@@ -12,19 +12,20 @@
 
 export interface ParsedCsv {
   headers: string[];
-  rows:    Record<string, string>[];
+  rows: Record<string, string>[];
 }
-
 
 export async function readFileText(file: File): Promise<string> {
   // BOM-aware: strip the leading byte-order-mark Sobrus often prepends.
   const text = await file.text();
-  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
-
 export function parseSobrusCsv(text: string): ParsedCsv {
-  const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.length > 0);
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((l) => l.length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
 
   const headers = splitLine(lines[0]).map(unquote);
@@ -39,7 +40,6 @@ export function parseSobrusCsv(text: string): ParsedCsv {
   }
   return { headers, rows };
 }
-
 
 function splitLine(line: string): string[] {
   // Honors paired double quotes around a field that contains the delimiter.
@@ -62,12 +62,10 @@ function splitLine(line: string): string[] {
   return out;
 }
 
-
 function unquote(s: string): string {
   const t = s.trim();
   return t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
 }
-
 
 /** Chunk an array into N-row pieces. Used by UploadContext for batched uploads. */
 export function chunk<T>(arr: T[], size: number): T[][] {
@@ -79,13 +77,11 @@ export function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-
 // ─── Filename regex (mirror backend constants) ──────────────────────────────
 
 export const ACHAT_FILENAME_RE = /^Sobrus - Achats \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i;
 export const VENTE_FILENAME_RE = /^Sobrus - Ventes \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$/i;
 export const STOCK_FILENAME_RE = /^Sobrus - Stock \d{8}( \(\d+\))?\.csv$/i;
-
 
 /** Extract the date range from a Sobrus filename. Returns { from, to } as ISO strings or null. */
 export function parseDatesFromFilename(name: string): { from: string; to: string } | null {

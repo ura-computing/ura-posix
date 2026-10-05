@@ -5,10 +5,34 @@ import { useI18n } from "./I18nProvider";
 import type { Lang } from "./config";
 
 const MONTHS: Record<Lang, string[]> = {
-  fr: ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-       "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"],
-  es: ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"],
+  fr: [
+    "Janvier",
+    "Février",
+    "Mars",
+    "Avril",
+    "Mai",
+    "Juin",
+    "Juillet",
+    "Août",
+    "Septembre",
+    "Octobre",
+    "Novembre",
+    "Décembre",
+  ],
+  es: [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ],
 };
 
 const MONTHS_SHORT: Record<Lang, string[]> = {

@@ -28,6 +28,7 @@ syntactically) and the planner actually picks up the index.
 CREATE INDEX CONCURRENTLY can't run inside the transaction Alembic normally
 wraps each migration in, hence `autocommit_block()`.
 """
+
 from typing import Sequence, Union
 
 from alembic import op

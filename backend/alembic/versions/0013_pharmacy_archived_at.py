@@ -8,6 +8,7 @@ Admin's pharmacy management page does a SOFT delete (per locked spec) — the ro
 stays, related transactions/stock/payments still link to it, but it disappears
 from default listings. `archived_at` is the marker.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

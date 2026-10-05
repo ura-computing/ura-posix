@@ -1,53 +1,53 @@
 /** Create + edit pharmacy basic info (Screen 4). No special states — just a
  *  form. Field set: name (required), code, city, address, phone, email. */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Building2, Info, Loader2, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { AsyncButton } from "@/components/shared/AsyncButton";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { AsyncButton } from "@/_components/AsyncButton";
+import { FormField, FormInput } from "@/_components/FormField";
+import { Dialog, DialogContent } from "@/_components/dialog";
 import type { PharmacyIn } from "@/types";
 
-
 const EMPTY: PharmacyIn = {
-  name:    "",
-  code:    "",
-  city:    "",
+  name: "",
+  code: "",
+  city: "",
   address: "",
-  phone:   "",
-  email:   "",
+  phone: "",
+  email: "",
 };
 
-
 export interface PharmacyFormDialogProps {
-  open:           boolean;
-  onClose:        () => void;
+  open: boolean;
+  onClose: () => void;
   /** Pass an existing pharmacy's values to edit; omit to create. */
   initialValues?: PharmacyIn;
   /** Display name for the edit-mode title. */
-  pharmacyName?:  string;
-  isSaving?:      boolean;
-  onSubmit:       (values: PharmacyIn) => void;
+  pharmacyName?: string;
+  isSaving?: boolean;
+  onSubmit: (values: PharmacyIn) => void;
 }
 
+/** Mounted only while open: the fields start from `initialValues` on every open. */
+export function PharmacyFormDialog(props: PharmacyFormDialogProps) {
+  return props.open ? <PharmacyFormBody {...props} /> : null;
+}
 
-export function PharmacyFormDialog({
-  open, onClose, initialValues, pharmacyName, isSaving, onSubmit,
-}: PharmacyFormDialogProps) {
+function PharmacyFormBody({ open, onClose, initialValues, pharmacyName, isSaving, onSubmit }: PharmacyFormDialogProps) {
   const t = useT();
   const isCreate = !initialValues;
   const [values, setValues] = useState<PharmacyIn>(initialValues ?? EMPTY);
 
-  // Reset values when the dialog (re)opens or the target pharmacy changes.
-  useEffect(() => {
-    if (open) setValues(initialValues ?? EMPTY);
-  }, [open, initialValues]);
-
-  const set = <K extends keyof PharmacyIn>(key: K, v: PharmacyIn[K]) =>
-    setValues((prev) => ({ ...prev, [key]: v }));
+  const set = <K extends keyof PharmacyIn>(key: K, v: PharmacyIn[K]) => setValues((prev) => ({ ...prev, [key]: v }));
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div className="flex items-center gap-2.5">
@@ -56,7 +56,9 @@ export function PharmacyFormDialog({
             </span>
             <div className="flex flex-wrap items-baseline gap-2">
               <h3 className="text-[17px] font-semibold text-foreground">
-                {isCreate ? t("adminPharm.newPharmacy") : t("adminPharm.editPharmacy", { name: pharmacyName ?? values.name })}
+                {isCreate
+                  ? t("adminPharm.newPharmacy")
+                  : t("adminPharm.editPharmacy", { name: pharmacyName ?? values.name })}
               </h3>
               {!isCreate && values.code && (
                 <span className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] font-semibold text-muted-foreground">
@@ -65,42 +67,62 @@ export function PharmacyFormDialog({
               )}
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label={t("common.close")} className="cursor-pointer text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("common.close")}
+            className="cursor-pointer text-muted-foreground hover:text-foreground"
+          >
             <X className="size-4" />
           </button>
         </div>
 
         <form
           className="flex flex-col gap-3.5 p-5"
-          onSubmit={(e) => { e.preventDefault(); onSubmit(values); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit(values);
+          }}
         >
-          <Field label={t("adminPharm.name")} required>
-            <Input value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
-          </Field>
+          <FormField label={t("adminPharm.name")} required>
+            <FormInput value={values.name} onChange={(v) => set("name", v)} placeholder="Pharmacie Centre" required />
+          </FormField>
 
-          <Field label={t("adminPharm.city")} required hint={isCreate ? t("adminPharm.cityHint") : undefined}>
-            <Input value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
-          </Field>
+          <FormField label={t("adminPharm.city")} required hint={isCreate ? t("adminPharm.cityHint") : undefined}>
+            <FormInput value={values.city ?? ""} onChange={(v) => set("city", v)} placeholder="Casablanca" required />
+          </FormField>
 
-          <Field label={t("adminPharm.address")}>
-            <Textarea value={values.address ?? ""} onChange={(v) => set("address", v)} placeholder="24 Bd Mohammed V…" />
-          </Field>
+          <FormField label={t("adminPharm.address")}>
+            <Textarea
+              value={values.address ?? ""}
+              onChange={(v) => set("address", v)}
+              placeholder="24 Bd Mohammed V…"
+            />
+          </FormField>
 
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <Field label={t("adminPharm.phone")}>
-              <Input value={values.phone ?? ""} onChange={(v) => set("phone", v)} placeholder="+212 522 00 00 00" className="font-mono" />
-            </Field>
-            <Field label={t("adminPharm.email")}>
-              <Input type="email" value={values.email ?? ""} onChange={(v) => set("email", v)} placeholder="contact@pharmacie.ma" />
-            </Field>
+            <FormField label={t("adminPharm.phone")}>
+              <FormInput
+                value={values.phone ?? ""}
+                onChange={(v) => set("phone", v)}
+                placeholder="+212 522 00 00 00"
+                className="font-mono"
+              />
+            </FormField>
+            <FormField label={t("adminPharm.email")}>
+              <FormInput
+                type="email"
+                value={values.email ?? ""}
+                onChange={(v) => set("email", v)}
+                placeholder="contact@pharmacie.ma"
+              />
+            </FormField>
           </div>
 
           {isCreate && (
             <div className="flex items-start gap-2.5 rounded-lg border border-info-border bg-info-subtle px-3 py-2.5 text-info-subtle-foreground">
               <Info className="mt-0.5 size-4 shrink-0" />
-              <span className="text-[12.5px] leading-snug">
-                {t("adminPharm.createFeaturesHint")}
-              </span>
+              <span className="text-[12.5px] leading-snug">{t("adminPharm.createFeaturesHint")}</span>
             </div>
           )}
 
@@ -118,37 +140,14 @@ export function PharmacyFormDialog({
     </Dialog>
   );
 }
-
-
-// ─── Tiny inline form primitives ──────────────────────────────────────────
-// Kept inline since they're only used by this dialog + CreateUserDialog. If a
-// third caller appears we can promote them to shared/.
-
-function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-foreground">
-        {label}
-        {required && <span className="ml-1 text-error">*</span>}
-      </span>
-      {children}
-      {hint && <span className="text-[11.5px] leading-snug text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function Input({ value, onChange, ...rest }: { value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${rest.className ?? ""}`}
-    />
-  );
-}
-
-function Textarea({ value, onChange, ...rest }: { value: string; onChange: (v: string) => void } & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange">) {
+function Textarea({
+  value,
+  onChange,
+  ...rest
+}: { value: string; onChange: (v: string) => void } & Omit<
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+  "value" | "onChange"
+>) {
   return (
     <textarea
       {...rest}

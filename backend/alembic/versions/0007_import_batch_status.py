@@ -8,6 +8,7 @@ Page 2 (Upload-file) prerequisite — lets the Imports tab show "Cancelled at
 412 / 2000 rows" instead of misleading "Succeeded with 412". `status` defaults
 to "success" so existing batches keep their semantics.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

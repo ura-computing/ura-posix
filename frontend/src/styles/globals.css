@@ -115,7 +115,9 @@
   --ease-standard: var(--ease-standard);
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -129,6 +131,29 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Every scrollbar in the app colors (light + dark): thin, muted thumb, no track.
+   `scrollbar-*` = Firefox + Chrome / Edge; `::-webkit-scrollbar` = Safari. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background: var(--scrollbar-thumb) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
 .tabular {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -136,6 +161,11 @@ body {
 
 /* Headings get a sane default line-height so arbitrary text-[Npx] sizes
    don't inherit the body's tight 20px leading. Override per-heading when needed. */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   line-height: 1.2;
 }

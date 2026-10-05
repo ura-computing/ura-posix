@@ -36,7 +36,9 @@ htmlcov/
 
 # Design handoff files (presentational TSX — not wired)
 handoff/
-.claude/
+
+# Claude Code: .claude/ (rules + shared settings) is committed; personal settings are not
+.claude/settings.local.json
 
 # Raw Sobrus CSV exports dropped into resources/ (test data, not source)
 resources/Sobrus*

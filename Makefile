@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend cli migrate seed db build build-backend build-frontend demo down clean logs test test-backend test-frontend install-hooks e2e-tests e2e-ui
+.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -13,12 +13,11 @@ help:
 	@echo ""
 	@echo "  Local dev (dockerized DB + host backend/frontend):"
 	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
-	@echo "    make backend   — only the backend (auto-starts the DB; uvicorn :8000, hot reload)"
+	@echo "    make backend   — only the backend (starts the DB, applies new migrations; uvicorn :8000, hot reload)"
 	@echo "    make frontend  — only the frontend (Vite dev :5173)"
 	@echo "    make db        — start the Postgres 17 container + create the dev DB if missing"
 	@echo "    make migrate   — apply Alembic migrations against the dev DB"
 	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
-	@echo "    make cli       — interactive Python CLI"
 	@echo ""
 	@echo "  Build:"
 	@echo "    make build          — build-backend + build-frontend"
@@ -33,16 +32,12 @@ help:
 	@echo "    make logs      — tail container logs"
 	@echo "    make clean     — DESTRUCTIVE: stop + wipe ALL DB volumes (dev, demo, old Postgres 16 backup)"
 	@echo ""
-	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
-	@echo "    make e2e-tests     — every test, headless"
-	@echo "    make e2e-ui        — one test file (or all) in a real browser, slowed down"
+	@echo "  Code style:"
+	@echo "    make format    — format the whole repo (Prettier: frontend + e2e, ruff: backend)"
 	@echo ""
-	@echo "  Tests + git hooks:"
-	@echo "    make test          — backend (pytest) + frontend (vitest) suites"
-	@echo "    make test-backend  — backend pytest only"
-	@echo "    make test-frontend — frontend vitest only"
-	@echo "    make install-hooks — install .git/hooks/pre-push → scripts/pre-push.sh"
-	@echo "                         (run once per clone; bypass with git push --no-verify)"
+	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
+	@echo "    make tests     — every test, headless (make tests 99 / 06 15: only those test files)"
+	@echo "    make tests-ui  — one test file (or all) in a real browser, slowed down"
 
 # ── Setup (fresh clone) ─────────────────────────────────────────────────────
 
@@ -90,22 +85,19 @@ db:
 	    docker compose exec -T db psql -U apcm -d postgres -c "CREATE DATABASE $(DEV_DB);"; \
 	  }
 
-backend: db
+backend: db migrate
 	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
 
 frontend:
 	cd $(FRONTEND_DIR) && npm run dev
 
-cli:
-	cd $(BACKEND_DIR) && uv run python -m cli
-
 migrate: db
-	cd $(BACKEND_DIR) && uv run python bootstrap.py
+	cd $(BACKEND_DIR) && uv run python scripts/bootstrap.py
 
 # Run the same seed.py the docker entrypoint runs — but against the dev DB
 # (the backend's local .env / DATABASE_URL).
 seed: db migrate
-	cd $(BACKEND_DIR) && uv run python seed.py
+	cd $(BACKEND_DIR) && uv run python scripts/seed.py
 
 # ── Build ───────────────────────────────────────────────────────────────────
 
@@ -149,29 +141,33 @@ logs:
 
 clean:
 	docker compose down -v
-	@echo "✓ Volume removed. Next `make demo` starts from an empty DB."
+	@echo "✓ Volume removed. Next 'make demo' starts from an empty DB."
 
-# ── Tests + git hooks ──────────────────────────────────────────────────────
-
-test: test-backend test-frontend
-
-test-backend:
-	cd $(BACKEND_DIR) && uv run pytest
-
-test-frontend:
-	cd $(FRONTEND_DIR) && npm test -- --run
-
-install-hooks:
-	@bash scripts/install-hooks.sh
+# ── Code style ──────────────────────────────────────────────────────────────
+# One style everywhere: Prettier for frontend + e2e (.prettierrc.json, width 120),
+# ruff for the backend (pyproject.toml, line-length 120). Rewrites only spacing,
+# wrapping and quotes, never what the code does.
+format:
+	cd $(FRONTEND_DIR) && npx prettier --write --log-level warn --ignore-path ../.prettierignore . ../e2e
+	cd $(BACKEND_DIR) && uv run ruff format .
 
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
 # Two commands. The script asks for its inputs (Enter = default); with no
 # terminal (git pre-push) it uses the defaults. First run installs Playwright.
-#   make e2e-tests   headless, every test
-#   make e2e-ui      real browser, slowed down; asks which test file
+#   make tests      headless, every test        make tests 99 / make tests 06 15: only those files
+#   make tests-ui   real browser, slowed down; asks which test file (or: make tests-ui 06)
 
-e2e-tests:
-	@bash e2e/scripts/run.sh tests
+# `make tests 99`, `make tests 06 15`, `make tests-ui ventes`: only those test files (number
+# or part of the name; the setup tests 01-02 always run first). `make test` = `make tests`.
+ifneq ($(filter test tests tests-ui,$(firstword $(MAKECMDGOALS))),)
+SPECS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+ifneq ($(SPECS),)
+$(eval $(SPECS):;@:)
+endif
+endif
 
-e2e-ui:
-	@bash e2e/scripts/run.sh ui
+test tests:
+	@bash e2e/scripts/run.sh tests $(SPECS)
+
+tests-ui:
+	@bash e2e/scripts/run.sh ui $(SPECS)

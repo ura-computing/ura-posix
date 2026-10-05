@@ -8,31 +8,34 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { listDevelopers, type DeveloperAccountOut } from "@/api/storeWebsite";
+import { api } from "@/api/client";
+import { API } from "@/api/api";
+import { useT } from "@/i18n/I18nProvider";
 import { matchesFields } from "@/utils/text";
+
 import type { DeveloperAccount } from "@/types/storeWebsite";
+import type { DeveloperAccountOut } from "@/types/storeWebsite";
 
 import { DevelopersPage } from "./_components/DevelopersPage";
 
-
-function toAccount(api: DeveloperAccountOut): DeveloperAccount {
+function toAccount(out: DeveloperAccountOut): DeveloperAccount {
   return {
-    id:             api.id,
-    name:           api.name,
-    email:          api.email,
-    status:         api.status,
-    activeRequests: api.active_requests,
-    lastActiveAt:   api.last_active_at,
+    id: out.id,
+    name: out.name,
+    email: out.email,
+    status: out.status,
+    activeRequests: out.active_requests,
+    lastActiveAt: out.last_active_at,
   };
 }
 
-
 export default function AdminDevelopersRoute() {
+  const t = useT();
   const [search, setSearch] = useState("");
 
   const q = useQuery({
-    queryKey: ["admin", "developers"],
-    queryFn:  listDevelopers,
+    queryKey: API.storeWebsite.developers.key,
+    queryFn: () => api.get<DeveloperAccountOut[]>(API.storeWebsite.developers.url),
   });
 
   const filtered = useMemo(() => {
@@ -47,9 +50,9 @@ export default function AdminDevelopersRoute() {
       search={search}
       isLoading={q.isLoading}
       onSearch={setSearch}
-      onInvite={() => toast.info("Invitation d'un développeur — endpoint à venir")}
-      onResetPassword={() => toast.info("Réinitialisation du mot de passe — endpoint à venir")}
-      onToggleActive={() => toast.info("Activer/désactiver un compte — endpoint à venir")}
+      onInvite={() => toast.info(t("store.inviteSoon"))}
+      onResetPassword={() => toast.info(t("store.resetPasswordSoon"))}
+      onToggleActive={() => toast.info(t("store.toggleActiveSoon"))}
     />
   );
 }

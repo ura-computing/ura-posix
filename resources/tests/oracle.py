@@ -1,6 +1,6 @@
 """Oracle v2: every value the app returns for the generated data, field by field.
 
-It pins TODAY'S app behavior (backend/stats_queries.py, analyse_queries.py,
+It pins TODAY'S app behavior (backend/app/analytics/stats_queries.py, analyse_queries.py,
 stock_queries.py, routers/transactions.py) so the refactor can't change any
 number silently. It never imports app code: the formulas are re-written here in
 plain Python from the generated rows. Where today's behavior breaks a business
@@ -27,8 +27,12 @@ PCT_SUFFIX = re.compile(r"\s*\(\d+(?:\.\d+)?%\)")
 ANALYSE_MODES = ("produit", "categorie", "laboratoire", "grossiste", "operateur", "mois", "annee")
 
 # Search / suggestion queries replayed by the E2E suite (typed in the search box).
-VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042"]
-ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042"]
+VENTE_QUERIES = ["00042", "client 00", "fac-1234*", "*042", "00*42"]
+ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042", "00*42"]
+# /analyses search box (client-side, Produit × Mixte): `00*42` = one word, `médicament`
+# matches the category column. Année mode sends the box text as `product` (ILIKE %x%).
+ANALYSE_QUERIES = ["00*42", "médicament"]
+ANNEE_PRODUCT = "PRODUIT 0004"
 
 # Produits spéciaux scenario (e2e/tests/10-exclusions.spec.ts).
 EXCLUDED_SUPPLIER = "Laboratoire WELEDA"
@@ -61,6 +65,11 @@ def month_start(d: date) -> date:
 
 def next_month(d: date) -> date:
     return date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
+
+
+def name_has(p, product: str | None) -> bool:
+    """Backend `Medicament.product ILIKE %product%` (case-insensitive substring)."""
+    return not product or product.strip().lower() in p.name.lower()
 
 
 def cat_ok(p, ct: str) -> bool:
@@ -122,7 +131,7 @@ def default_abcd_window(today: date) -> tuple[date, date]:
     return date(today.year - 1, 7, 1), date(today.year, 6, 30)
 
 
-# ── Search grammar (backend/search.py) ──────────────────────────────────────
+# ── Search grammar (backend/app/core/search.py) ──────────────────────────────────────
 
 def tokenize(query: str) -> list[str]:
     seen: list[str] = []
@@ -526,8 +535,8 @@ class Oracle:
 
     # ── Analyses ────────────────────────────────────────────────────────────
 
-    def units_available(self, ct: str) -> int | None:
-        total = sum(p.stock for p in self.stocked if cat_ok(p, ct))
+    def units_available(self, ct: str, product: str | None = None) -> int | None:
+        total = sum(p.stock for p in self.stocked if cat_ok(p, ct) and name_has(p, product))
         return round(total) if total else None
 
     def produit_rows(self, ct: str) -> list[dict]:
@@ -543,7 +552,7 @@ class Oracle:
             if cat_ok(v.p, ct):
                 r = per.setdefault(v.p.pid, {"p": v.p, "qty": 0.0, "ca": 0.0})
                 r["qty"] += v.qty
-                r["ca"] += v.total
+                r["ca"] += ca(v)
         rows = []
         for pid, r in per.items():
             p, g = r["p"], prices.get(pid)
@@ -576,9 +585,9 @@ class Oracle:
         for v in self.vw:
             if not cat_ok(v.p, ct):
                 continue
-            g = raw.setdefault(v.p.category, {"qty": 0.0, "ca": 0.0, "units": []})
+            g = raw.setdefault(strip_pct(v.p.category), {"qty": 0.0, "ca": 0.0, "units": []})
             g["qty"] += v.qty
-            g["ca"] += v.total
+            g["ca"] += ca(v)
             g["units"].append(v.unit)
             med_qty[v.p.pid] += v.qty
         by_pid = {p.pid: p for p in self.products}
@@ -607,12 +616,17 @@ class Oracle:
         return rows
 
     def supplier_rows(self, is_grossiste: bool, key: str) -> list[dict]:
+        """G3: a product bought from several suppliers shares its sales by units bought
+        (60 from A + 40 from B, 100 sold → A 60, B 40)."""
         sub: dict[tuple[str, str], dict] = {}
+        bought: dict[str, float] = defaultdict(float)
         for a in self.aw:
-            if a.qty > 0 and a.supplier.upper().startswith("GROSSISTE") == is_grossiste:
-                g = sub.setdefault((a.supplier, a.p.pid), {"num": 0.0, "den": 0.0})
-                g["num"] += a.unit * a.qty
-                g["den"] += a.qty
+            if a.qty > 0:
+                bought[a.p.pid] += a.qty
+                if a.supplier.upper().startswith("GROSSISTE") == is_grossiste:
+                    g = sub.setdefault((a.supplier, a.p.pid), {"num": 0.0, "den": 0.0})
+                    g["num"] += a.unit * a.qty
+                    g["den"] += a.qty
         ventes_by_pid: dict[str, list] = defaultdict(list)
         for v in self.vw:
             ventes_by_pid[v.p.pid].append(v)
@@ -625,9 +639,10 @@ class Oracle:
             if not vs:
                 continue
             r = rows.setdefault(supplier, {"qty": 0.0, "ca": 0.0, "units": [], "m_pct": 0.0, "m_dh": 0.0, "m_qty": 0.0})
-            qty = sum(v.qty for v in vs)
+            share = g["den"] / bought[pid]
+            qty = sum(v.qty for v in vs) * share
             r["qty"] += qty
-            r["ca"] += sum(v.total for v in vs)
+            r["ca"] += sum(ca(v) for v in vs) * share
             r["units"].extend(v.unit for v in vs)
             ppv, pu = by_pid[pid].ppv, g["num"] / g["den"]
             if ppv:
@@ -643,10 +658,10 @@ class Oracle:
             "total_achat_cost": r2(cost[s]),
         } for s, r in rows.items()]
 
-    def simple_rows(self, ct: str, mode: str) -> list[dict]:
+    def simple_rows(self, ct: str, mode: str, product: str | None = None) -> list[dict]:
         out: dict = {}
         for v in self.vw:
-            if not cat_ok(v.p, ct):
+            if not cat_ok(v.p, ct) or not name_has(v.p, product):
                 continue
             if mode == "annee":
                 row = out.setdefault(v.day.year, {"annee": v.day.year, **{k: {"qty": 0.0, "ca": 0.0} for k in MONTH_KEYS},
@@ -740,7 +755,8 @@ class Oracle:
         })
         return k, ties
 
-    def analyse(self, ct: str, mode: str) -> dict:
+    def analyse(self, ct: str, mode: str, product: str | None = None) -> dict:
+        """`product` = année-mode search box (ILIKE %product% on the product name)."""
         if mode == "produit":
             rows = self.produit_rows(ct)
         elif mode == "categorie":
@@ -750,13 +766,26 @@ class Oracle:
         elif mode == "laboratoire":
             rows = self.supplier_rows(False, "laboratoire")
         else:
-            rows = self.simple_rows(ct, mode)
-        total = sum(ca(v) for v in self.vw if cat_ok(v.p, ct))
-        kpis, ties = self.kpis_from_rows(rows, total, self.units_available(ct))
+            rows = self.simple_rows(ct, mode, product)
+        total = sum(ca(v) for v in self.vw if cat_ok(v.p, ct) and name_has(v.p, product))
+        kpis, ties = self.kpis_from_rows(rows, total, self.units_available(ct, product))
         return {"rows": rows, "kpis": kpis, "ties": ties}
 
-    def liste(self, items: list[dict]) -> dict:
-        """compute_analyse_liste (items = what parseListeCsv sends)."""
+    def analyse_search(self, q: str) -> dict:
+        """/analyses search box on Produit × Mixte — all in the browser: rows where every
+        token matches the product OR the category (matchesFields), KPIs recomputed from
+        those rows (computeKpisFromRows), suggestions = product names matching."""
+        toks, all_rows = tokenize(q), self.produit_rows("all")
+        hit = lambda r, fields: all(any(token_match(r[f], t, unaccent=True) for f in fields) for t in toks)
+        rows = [r for r in all_rows if hit(r, ("product", "category"))]
+        units = sum(float(r["stock_dispo"] or 0) for r in rows)
+        kpis, ties = self.kpis_from_rows(rows, sum(r["ca"] for r in rows), r2(units) if units else None)
+        return {"rows": rows, "kpis": kpis, "ties": ties,
+                "suggestions": sorted({r["product"] for r in all_rows if hit(r, ("product",))})}
+
+    def liste(self, items: list[dict], ct: str = "all") -> dict:
+        """compute_analyse_liste (items = what parseListeCsv sends). `ct` filters the
+        sales rows; a matched product with no row in it still shows as a 0-sales stub."""
         norm_inputs: dict[str, str] = {}
         item_by_norm: dict[str, dict] = {}
         for it in items:
@@ -781,7 +810,7 @@ class Oracle:
                 matched[found.pid] = found
         matched_norms = {strip_accents(p.name.strip().lower()) for p in matched.values()}
         rows, covered = [], set()
-        for row in self.produit_rows("all"):
+        for row in self.produit_rows(ct):
             n = strip_accents(row["product"].strip().lower())
             if n in matched_norms or any(n == k or n in k or k in n for k in norm_inputs):
                 rows.append({**row, "match_status": "found"})
@@ -840,7 +869,7 @@ class Oracle:
 
     def unique_query(self, p) -> str | None:
         """`PRODUIT 00123` when it finds p alone. Barcodes count too
-        (routers/special_products + bl_exclusions search them): `00012` is inside
+        (the special-products + BL searches in routers/exclusions.py use them): `00012` is inside
         6119000000123, so low numbers are skipped."""
         q = f"PRODUIT {p.name.rsplit(' ', 1)[1]}"
         toks = tokenize(q)
@@ -882,12 +911,13 @@ class Oracle:
         # Special product: sold + bought, not on that BL, not from the excluded supplier.
         sold = {v.p.pid for v in self.ventes}
         bought = {a.p.pid for a in self.achats}
+        from_supplier = {a.p.pid for a in self.achats if a.supplier == EXCLUDED_SUPPLIER}
         special = next(p for p in self.products
                        if p.pid in sold and p.pid in bought and p.pid not in bl_pids
-                       and p.supplier != EXCLUDED_SUPPLIER and self.unique_query(p))
+                       and p.pid not in from_supplier and self.unique_query(p))
 
         suppliers = sorted({a.supplier for a in self.achats})
-        excluded = {special.pid} | bl_pids | {a.p.pid for a in self.achats if a.supplier == EXCLUDED_SUPPLIER}
+        excluded = {special.pid} | bl_pids | from_supplier
         compta = Oracle(self.products, [v for v in self.ventes if v.p.pid not in excluded],
                         [a for a in self.achats if a.p.pid not in excluded], self.today, self.df, self.dt)
         return {
@@ -930,5 +960,8 @@ class Oracle:
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},
+            "liste_ct": {ct: self.liste(liste_items, ct) for ct in ("pharmacie", "parapharmacie")},
+            "analyse_search": {q: self.analyse_search(q) for q in ANALYSE_QUERIES},
+            "analyse_annee_product": {"q": ANNEE_PRODUCT, **self.analyse("all", "annee", ANNEE_PRODUCT)},
             "exclusions": self.exclusion_scenario(),
         }

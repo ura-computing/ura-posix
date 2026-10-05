@@ -8,6 +8,7 @@ Page 3 (Ventes) prerequisite — global table mapping a category name to its
 transaction reference suffix + colour key. Drives the SuffixBadge column
 appended to N° Transaction cells. Owner-managed CRUD.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -26,11 +27,11 @@ def upgrade() -> None:
         return
     op.create_table(
         "category_suffixes",
-        sa.Column("id",         sa.Integer(),                primary_key=True),
-        sa.Column("category",   sa.String(),                 nullable=False, unique=True),
-        sa.Column("suffix",     sa.String(),                 nullable=False),
-        sa.Column("color",      sa.String(),                 nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True),  server_default=sa.func.now(), nullable=False),
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("category", sa.String(), nullable=False, unique=True),
+        sa.Column("suffix", sa.String(), nullable=False),
+        sa.Column("color", sa.String(), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
 
 

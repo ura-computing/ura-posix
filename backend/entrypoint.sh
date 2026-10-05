@@ -25,8 +25,8 @@ print("✓ Postgres reachable")
 PY
 
 # 2. Schema bootstrap (extensions + migrations or stamp). Shared with
-#    `make migrate` — single source of truth in bootstrap.py.
-uv run python bootstrap.py
+#    `make migrate` — single source of truth in scripts/bootstrap.py.
+uv run python scripts/bootstrap.py
 
 # 4. Seed admin + owner + catalog. Idempotent: seed.py self-skips if the
 #    admin user already exists. We short-circuit here too so the container
@@ -34,8 +34,8 @@ uv run python bootstrap.py
 #    bootstrap.py already touched the DB and proved tables exist.
 NEEDS_SEED=$(uv run python <<'PY'
 from sqlalchemy import inspect
-from database import engine, SessionLocal
-from models import User
+from app.core.database import engine, SessionLocal
+from app.core.models import User
 
 if not inspect(engine).has_table("users"):
     print("yes")
@@ -50,11 +50,13 @@ PY
 
 if [ "$NEEDS_SEED" = "yes" ]; then
   echo "▸ Seeding accounts + catalogue…"
-  uv run python seed.py
+  uv run python scripts/seed.py
 else
   echo "▸ Admin already present — skipping seed (data preserved)."
 fi
 
 # 5. Serve.
 echo "▸ Starting uvicorn on :${PORT:-8000}"
-exec uv run uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}"
+# WEB_CONCURRENCY processes (default 2): CPU-heavy requests (exports, imports) run in
+# parallel instead of sharing one Python process. Login rate limit counts per process.
+exec uv run uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers "${WEB_CONCURRENCY:-2}"

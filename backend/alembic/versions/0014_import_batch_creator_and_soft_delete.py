@@ -14,6 +14,7 @@ an index.
 
 Pre-migration rows backfill to NULL — frontend renders "—" for them.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -37,13 +38,16 @@ def upgrade() -> None:
         )
         op.create_foreign_key(
             "fk_import_batches_created_by_user_id_users",
-            "import_batches", "users",
-            ["created_by_user_id"], ["id"],
+            "import_batches",
+            "users",
+            ["created_by_user_id"],
+            ["id"],
             ondelete="SET NULL",
         )
         op.create_index(
             "ix_import_batches_created_by_user_id",
-            "import_batches", ["created_by_user_id"],
+            "import_batches",
+            ["created_by_user_id"],
         )
 
     if "deleted_at" not in existing:
@@ -59,8 +63,10 @@ def upgrade() -> None:
         )
         op.create_foreign_key(
             "fk_import_batches_deleted_by_user_id_users",
-            "import_batches", "users",
-            ["deleted_by_user_id"], ["id"],
+            "import_batches",
+            "users",
+            ["deleted_by_user_id"],
+            ["id"],
             ondelete="SET NULL",
         )
 

@@ -4,42 +4,184 @@
  *  shared DataTable primitive so empty/loading/sort states stay consistent
  *  with the rest of the app. */
 import { useState } from "react";
-import { Loader2, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
 
-import { AsyncButton } from "@/components/shared/AsyncButton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { DataTable } from "@/components/shared/DataTable";
-import { SuffixBadge } from "@/components/shared/SuffixBadge";
+import { AsyncButton } from "@/_components/AsyncButton";
+import { FormField, FormInput } from "@/_components/FormField";
+import { ConfirmDialog } from "@/_components/ConfirmDialog";
+import { DataTable } from "@/_components/DataTable";
+import { SuffixBadge } from "@/_components/SuffixBadge";
 import { useT } from "@/i18n/I18nProvider";
-import type { ColumnDef } from "@/components/shared/DataTable";
-import type { CategorySuffixOut } from "@/types";
+import type { ColumnDef } from "@/_components/DataTable";
+import type { CategorySuffixOut, CategorySuffixIn, SuffixColor } from "@/types";
 
-import { CategorySuffixDialog } from "./_components/CategorySuffixDialog";
 import {
   useCategorySuffixes,
   useCreateCategorySuffix,
   useDeleteCategorySuffix,
   useUpdateCategorySuffix,
-} from "./_hooks/useCategorySuffixes";
+} from "./hooks";
+import { Dialog, DialogContent } from "@/_components/dialog";
+import { SUFFIX_COLORS } from "@/types";
+import { Page } from "@/_components/Page";
 
+/** Create / edit dialog for a CategorySuffix. Mirrors the handoff design via
+ *  our shared primitives (Dialog, AsyncButton, SuffixBadge). The category is
+ *  saved as typed (spaces tidied); the backend matches it ignoring accents,
+ *  case and the « (x%) » part (`csv_parse.suffix_key`). */
 
-function normalizeCategory(input: string): string {
-  return input.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+/** Hex for the swatch fill — solids matching the SuffixBadge palette tone. */
+const SWATCH_SOLID: Record<SuffixColor, string> = {
+  teal: "#0E9E8C",
+  blue: "#1D6FB8",
+  purple: "#7C3AED",
+  amber: "#B7791F",
+  rose: "#D6447B",
+  emerald: "#1E9E63",
+  orange: "#E07F1F",
+  pink: "#E84A7B",
+};
+
+interface CategorySuffixDialogProps {
+  open: boolean;
+  onClose: () => void;
+  /** Pass an item to edit; omit to create. */
+  item?: CategorySuffixOut | null;
+  isSaving?: boolean;
+  onSubmit: (values: CategorySuffixIn) => Promise<unknown>;
 }
 
+/** Mounted only while open, once per item: the fields start from `item`. */
+function CategorySuffixDialog(props: CategorySuffixDialogProps) {
+  return props.open ? <CategorySuffixBody key={props.item?.id ?? "new"} {...props} /> : null;
+}
+
+function CategorySuffixBody({ open, onClose, item, isSaving, onSubmit }: CategorySuffixDialogProps) {
+  const t = useT();
+  const [values, setValues] = useState<CategorySuffixIn>({
+    category: item?.category ?? "",
+    suffix: item?.suffix ?? "",
+    color: item?.color ?? "teal",
+  });
+
+  const set = <K extends keyof CategorySuffixIn>(k: K, v: CategorySuffixIn[K]) => setValues((p) => ({ ...p, [k]: v }));
+
+  const previewSuffix = values.suffix || "-?";
+  const previewCategory = values.category
+    ? normalizeCategory(values.category)
+    : t("categories.previewCategoryFallback");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSubmit({ ...values, category: normalizeCategory(values.category) });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
+        <div className="border-b border-border px-5 py-4">
+          <h3 className="text-[17px] font-semibold text-foreground">
+            {item ? t("categories.editMapping") : t("categories.newMapping")}
+          </h3>
+        </div>
+
+        {/* Live preview */}
+        <div className="flex items-center gap-3 border-b border-border bg-surface-subtle px-5 py-3.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("categories.preview")}
+          </span>
+          <SuffixBadge text={previewSuffix} color={values.color ?? "teal"} />
+          <span className="ml-auto font-mono text-xs text-muted-foreground">{previewCategory}</span>
+        </div>
+
+        <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
+          <FormField label={t("col.categorie")} required>
+            <FormInput
+              value={values.category}
+              onChange={(v) => set("category", v)}
+              placeholder={t("categories.categoryPlaceholderEx")}
+              required
+              autoFocus
+            />
+          </FormField>
+
+          <FormField label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
+            <FormInput
+              value={values.suffix}
+              onChange={(v) => set("suffix", v)}
+              placeholder="-1"
+              maxLength={6}
+              required
+              className="max-w-[140px] font-mono"
+            />
+          </FormField>
+
+          <FormField label={t("categories.color")}>
+            <div className="flex flex-wrap items-center gap-2">
+              {SUFFIX_COLORS.map((c) => {
+                const selected = values.color === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={c}
+                    onClick={() => set("color", c)}
+                    className="flex size-7 cursor-pointer items-center justify-center rounded-md border-2 transition-transform hover:scale-110"
+                    style={{
+                      background: SWATCH_SOLID[c],
+                      borderColor: selected ? "var(--foreground)" : "transparent",
+                    }}
+                  >
+                    {selected && <Check className="size-3.5 text-white" />}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                aria-label={t("categories.colorNone")}
+                onClick={() => set("color", null)}
+                className="flex size-7 cursor-pointer items-center justify-center rounded-md border-2 bg-surface-subtle transition-transform hover:scale-110"
+                style={{ borderColor: values.color === null ? "var(--foreground)" : "transparent" }}
+              >
+                <Minus className="size-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          </FormField>
+
+          <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+            <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+              {t("common.cancel")}
+            </AsyncButton>
+            <AsyncButton type="submit" variant="primary" isLoading={isSaving} loadingText={t("categories.saving")}>
+              {t("common.save")}
+            </AsyncButton>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function normalizeCategory(input: string): string {
+  return input.replace(/\s+/g, " ").trim();
+}
 
 export default function AdminCategoriesPage() {
   const t = useT();
-  const list = useCategorySuffixes();
-  const createMut = useCreateCategorySuffix();
-  const updateMut = useUpdateCategorySuffix();
-  const deleteMut = useDeleteCategorySuffix();
+  const { suffixes, isLoading, isError, reload } = useCategorySuffixes();
+  const { createSuffix, isCreating } = useCreateCategorySuffix();
+  const { updateSuffix, isUpdating } = useUpdateCategorySuffix();
+  const { deleteSuffix, isDeleting } = useDeleteCategorySuffix();
 
-  const [editing,        setEditing]        = useState<CategorySuffixOut | null>(null);
-  const [createOpen,     setCreateOpen]     = useState(false);
-  const [removeTarget,   setRemoveTarget]   = useState<CategorySuffixOut | null>(null);
+  const [editing, setEditing] = useState<CategorySuffixOut | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<CategorySuffixOut | null>(null);
 
-  const items = list.data ?? [];
+  const items = suffixes;
 
   const columns: ColumnDef<CategorySuffixOut>[] = [
     {
@@ -57,13 +199,7 @@ export default function AdminCategoriesPage() {
       key: "suffix",
       label: t("categories.suffix"),
       sortable: false,
-      render: (row) => (
-        // SuffixBadge returns null when color is null — render a fallback gray pill so
-        // the cell isn't empty for un-colored mappings.
-        row.color
-          ? <SuffixBadge text={row.suffix} color={row.color} />
-          : <span className="inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-px font-mono text-[10px] font-semibold text-muted-foreground">{row.suffix}</span>
-      ),
+      render: (row) => <SuffixBadge text={row.suffix} color={row.color} />,
     },
     {
       key: "actions",
@@ -95,27 +231,25 @@ export default function AdminCategoriesPage() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-[920px] flex-col gap-4 p-4 sm:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("categories.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("categories.subtitle")}</p>
-        </div>
+    <Page
+      title={t("categories.title")}
+      subtitle={t("categories.subtitle")}
+      actions={
         <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
           {t("categories.newMapping")}
         </AsyncButton>
-      </header>
-
-      {list.isError ? (
+      }
+    >
+      {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("categories.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={() => list.refetch()}>
+          <AsyncButton variant="secondary" onClick={reload}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
           </AsyncButton>
         </div>
-      ) : list.isLoading ? (
+      ) : isLoading ? (
         <div className="flex items-center justify-center rounded-2xl border border-border bg-card py-16">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
@@ -133,9 +267,9 @@ export default function AdminCategoriesPage() {
       <CategorySuffixDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        isSaving={createMut.isPending}
+        isSaving={isCreating}
         onSubmit={async (values) => {
-          await createMut.mutateAsync(values);
+          await createSuffix(values);
           setCreateOpen(false);
         }}
       />
@@ -145,10 +279,10 @@ export default function AdminCategoriesPage() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         item={editing}
-        isSaving={updateMut.isPending}
+        isSaving={isUpdating}
         onSubmit={async (values) => {
           if (!editing) return;
-          await updateMut.mutateAsync({ id: editing.id, body: values });
+          await updateSuffix({ id: editing.id, body: values });
           setEditing(null);
         }}
       />
@@ -159,7 +293,7 @@ export default function AdminCategoriesPage() {
         onClose={() => setRemoveTarget(null)}
         onConfirm={async () => {
           if (!removeTarget) return;
-          await deleteMut.mutateAsync(removeTarget.id);
+          await deleteSuffix(removeTarget.id);
           setRemoveTarget(null);
         }}
         title={removeTarget ? t("categories.deleteTitle", { category: removeTarget.category }) : ""}
@@ -167,8 +301,8 @@ export default function AdminCategoriesPage() {
         variant="destructive"
         confirmLabel={t("common.delete")}
         loadingLabel={t("categories.deleting")}
-        isLoading={deleteMut.isPending}
+        isLoading={isDeleting}
       />
-    </div>
+    </Page>
   );
 }

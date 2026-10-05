@@ -8,6 +8,7 @@ Revision ID: 0009
 Revises: 0008
 Create Date: 2026-06-23
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -20,13 +21,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 _FEATURES_NEW = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
     "special_products",
 )
 _FEATURES_OLD = (
-    "rapports", "import", "achats", "ventes",
-    "stock", "analyse", "accounting", "bl_exclusions",
+    "rapports",
+    "import",
+    "achats",
+    "ventes",
+    "stock",
+    "analyse",
+    "accounting",
+    "bl_exclusions",
 )
 
 

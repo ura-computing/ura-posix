@@ -12,10 +12,12 @@
       (function () {
         try {
           var mode = localStorage.getItem("pg-theme") || "system";
-          var dark = mode === "dark"
-            || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var dark =
+            mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
           if (dark) document.documentElement.classList.add("dark");
-        } catch (_) { /* localStorage disabled — ignore, default light */ }
+        } catch (_) {
+          /* localStorage disabled — ignore, default light */
+        }
       })();
     </script>
   </head>

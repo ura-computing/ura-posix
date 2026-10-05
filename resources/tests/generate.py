@@ -12,16 +12,20 @@ Outputs (git-ignored, regenerated on every run):
     resources/tests/stock/Sobrus - Stock <yyyymmdd>.csv
     resources/tests/liste/liste.csv                    (Analyses → Liste mode)
     resources/tests/catalog/catalog.csv                (admin catalogue import: 5 new products)
-    resources/tests/extra/Sobrus - Achats <d> - <d>.csv (600 extra lines: import then cancel / delete)
+    resources/tests/extra/Sobrus - Achats <d> - <d>.csv (2400 extra lines: import then cancel / delete)
     resources/tests/expected.json                      (oracle.py: every value, field by field)
 
 Data design (keeps expected values exact and unambiguous):
 - one PPV / PPH / category / TVA per product, identical in all 3 files
-- one supplier per product; product names are unique ("E2E PRODUIT 00042")
-- (BL, product) and (ticket, product) pairs are unique → no import dedup skips
+- one main supplier per product; 1 bought product in 4 is also bought from a 2nd supplier
+  (G3; the real files: 1 in 2). Product names are unique ("E2E PRODUIT 00042")
+- (BL, product) and (ticket, product) pairs are unique, except 3 lines of each file
+  repeated at the end (same values, like the real Sobrus files): both are stored (G1)
 - ~3 % products bought ABOVE their PPV (negative margin), ~5 % never bought
   (ventes sans achat), 10 stock-only products (never sold, never bought)
 - dates are relative to --today so "today"-based windows stay valid
+- B8: 40 lines of each file and 1 stock expiry in 25 are written like a file saved again
+  by hand in Excel (23/1/26, « 05/02/2026 », 23.01.2026 14:19): the app reads the same day
 """
 from __future__ import annotations
 
@@ -31,8 +35,9 @@ import json
 import random
 import time
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from oracle import Oracle
@@ -108,6 +113,7 @@ class Vente:
     unit:     float
     total:    float
     client:   str             # "" → anonymous
+    hand:     bool = False    # date written as typed by hand (B8)
 
 
 @dataclass(slots=True)
@@ -121,6 +127,7 @@ class Achat:
     qty:      int
     unit:     float
     total:    float
+    hand:     bool = False
 
 
 # ─── Generation ──────────────────────────────────────────────────────────────
@@ -216,6 +223,46 @@ def make_achats(rng: random.Random, products: list[Product], n_lines: int,
     return lines
 
 
+def add_second_suppliers(rng: random.Random, products: list[Product], achats: list[Achat],
+                         start: date, end: date) -> None:
+    """G3: 1 bought product in 4 also comes from another supplier, on its own BLs
+    (refs 200001…), at its PPH minus that supplier's own discount."""
+    bought = [p for p in products if p.supplier]
+    by_second: dict[str, list[Product]] = defaultdict(list)
+    for p in rng.sample(bought, len(bought) // 4):
+        by_second[rng.choice([s for s in GROSSISTES + LABS if s != p.supplier])].append(p)
+    span = (end - start).days
+    ref = 200000
+    for supplier in sorted(by_second):
+        pool = by_second[supplier]
+        for _ in range(max(1, len(pool) // 2)):
+            ref += 1
+            day = start + timedelta(days=rng.randint(0, span))
+            created = datetime.combine(day, datetime.min.time()) + timedelta(seconds=rng.randint(8 * 3600, 19 * 3600))
+            for p in rng.sample(pool, min(rng.randint(3, 10), len(pool))):
+                qty = rng.randint(2, 12)
+                unit = round(p.pph * (1 - rng.choice([0.0, 0.05, 0.10, 0.15])), 2)
+                achats.append(Achat(len(achats), day, created.strftime("%Y-%m-%d %H:%M:%S"), str(ref),
+                                    supplier, p, qty, unit, round(qty * unit, 2)))
+
+
+def repeat_lines(rng: random.Random, lines: list) -> None:
+    """G1: 3 lines appear twice in their file (same BL / ticket + product, same
+    values). Both are real and both are stored; the 2nd copy sits at the end, in
+    another import chunk than the 1st."""
+    for line in rng.sample(lines, 3):
+        lines.append(replace(line, seq=len(lines)))
+
+
+def mark_hand_edited(rng: random.Random, lines: list) -> None:
+    """B8: 40 lines get their dates written like a file saved again by hand. The app
+    keeps minutes only for « Créée le » there, so the line's own value drops its seconds."""
+    for line in rng.sample(lines, 40):
+        line.hand = True
+        if isinstance(line, Achat):
+            line.created = line.created[:16] + ":00"
+
+
 def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
                df: date, dt: date) -> list[dict]:
     """Analyses → Liste input: sold products (exact names), a stock-only product,
@@ -232,15 +279,15 @@ def make_liste(rng: random.Random, products: list[Product], ventes: list[Vente],
 
 
 def make_extra_achats(rng: random.Random, products: list[Product], day: date) -> list[Achat]:
-    """Imports spec: 600 lines (= 2 chunks of 500) of known products at their own
+    """Imports spec: 2400 lines (= 2 chunks of 2000) of known products at their own
     PPH / PPV, on new BL refs. The test cancels one upload and deletes another,
     so no number of the app changes."""
     bought = [p for p in products if p.supplier]
     lines: list[Achat] = []
     bl = 0
-    while len(lines) < 600:
+    while len(lines) < 2400:
         bl += 1
-        for p in rng.sample(bought, min(10, 600 - len(lines))):   # distinct per BL
+        for p in rng.sample(bought, min(10, 2400 - len(lines))):   # distinct per BL
             qty = rng.randint(1, 5)
             lines.append(Achat(len(lines), day, f"{day} 10:00:00", f"E2E-EXTRA-{bl:03d}",
                                p.supplier, p, qty, p.pph, round(qty * p.pph, 2)))
@@ -270,8 +317,21 @@ def _write(path: Path, header: list[str], rows, delimiter: str = ";") -> None:
         w.writerows(rows)
 
 
+def hand_date(d: date, k: int) -> str:
+    """A date as Excel / Numbers writes it back (day first), or typed with spaces (B8)."""
+    return [f"{d.day}/{d.month}/{d:%y}", f"{d:%d/%m/%Y}", f" {d:%d/%m/%Y} ", f"{d:%d.%m.%Y}"][k % 4]
+
+
+def _day(line) -> str:
+    return hand_date(line.day, line.seq) if line.hand else line.day.isoformat()
+
+
+def _created(a) -> str:
+    return f"{hand_date(date.fromisoformat(a.created[:10]), a.seq)} {a.created[11:16]}" if a.hand else a.created
+
+
 def _achat_rows(achats):
-    return ([a.created, a.day.isoformat(), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
+    return ([_created(a), _day(a), a.ref, a.supplier, a.p.pid, a.p.name, a.p.tva_label,
              _fmt(a.p.pph), _fmt(a.p.ppv), a.p.category, a.p.zone, a.qty, _fmt(a.unit), "", "", "", _fmt(a.total)]
             for a in achats)
 
@@ -289,14 +349,15 @@ def write_files(products, ventes, achats, liste, extra, catalog, start: date, en
         [c["product"], c["category"], c["tva"], _fmt(c["ppv"]), _fmt(c["pph"]), c["barcode1"], c["barcode2"] or "",
          c["laboratoire"]] for c in catalog), delimiter=",")
     _write(vente_path, VENTE_HEADER, (
-        [v.p.pid, v.p.name, v.day.isoformat(), v.ref, v.client, v.p.tva_label, _fmt(v.p.pph),
+        [v.p.pid, v.p.name, _day(v), v.ref, v.client, v.p.tva_label, _fmt(v.p.pph),
          _fmt(v.p.ppv), v.p.category, v.p.zone, v.qty, _fmt(v.discount), _fmt(v.unit), _fmt(v.total)]
         for v in ventes))
     stocked = [p for p in products if p.stock is not None]
     _write(stock_path, STOCK_HEADER, (
         [p.pid, p.name, p.category, p.tva_label, _fmt(p.ppv), _fmt(p.pph), p.zone, p.stock,
-         p.expiry.isoformat() if p.expiry else "", "", "", p.barcode, ""]
-        for p in stocked))
+         (hand_date(p.expiry, i) if i % 25 == 0 else p.expiry.isoformat()) if p.expiry else "", "", "",
+         p.barcode, ""]
+        for i, p in enumerate(stocked)))
     _write(liste_path, ["Produit", "PID"], ([it["name"], it["pid"] or ""] for it in liste))
     rel = lambda p: str(p.relative_to(HERE.parent.parent))   # noqa: E731 — repo-relative
     return {
@@ -349,8 +410,10 @@ def main() -> None:
     ap.add_argument("--achat-rows", type=int, help="achat lines (default rows / 3)")
     ap.add_argument("--products", type=int, help="distinct products (default max(300, rows / 250))")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--today", type=date.fromisoformat, default=date.today(),
-                    help="reference day, YYYY-MM-DD (default: today)")
+    # Same « today » as the backend (app/core/utils.py: pharmacy time, Africa/Casablanca).
+    ap.add_argument("--today", type=date.fromisoformat,
+                    default=datetime.now(ZoneInfo("Africa/Casablanca")).date(),
+                    help="reference day, YYYY-MM-DD (default: today in Casablanca)")
     args = ap.parse_args()
     if args.rows < 1000:
         ap.error("--rows must be ≥ 1000: below that, the exclusions scenario finds no product "
@@ -367,6 +430,13 @@ def main() -> None:
     products = make_products(rng, args.products or max(300, args.rows // 250), today)
     achats = make_achats(rng, products, args.achat_rows or args.rows // 3, data_start, data_end)
     ventes = make_ventes(rng, products, args.rows, data_start, data_end)
+    repeat_rng = random.Random(args.seed + 2)            # own stream: the rest of the data is unchanged
+    repeat_lines(repeat_rng, achats)
+    repeat_lines(repeat_rng, ventes)
+    add_second_suppliers(random.Random(args.seed + 4), products, achats, data_start, data_end)
+    hand_rng = random.Random(args.seed + 3)              # own stream too
+    mark_hand_edited(hand_rng, achats)
+    mark_hand_edited(hand_rng, ventes)
     liste = make_liste(rng, products, ventes, window_from, window_to)
     extra = make_extra_achats(random.Random(args.seed + 1), products, data_end)
     catalog = make_catalog()

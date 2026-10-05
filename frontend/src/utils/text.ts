@@ -3,7 +3,10 @@
  *  Use for every client-side search/filter so a query without accents still matches
  *  accented records (mirrors the backend's SQL `unaccent`). */
 export function normalizeText(s: unknown): string {
-  return String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
 }
 
 /** Build a `(fullText) => boolean` predicate for one normalized token, honoring the
@@ -11,25 +14,22 @@ export function normalizeText(s: unknown): string {
  *    "med"     → contains "med"          (full.includes)
  *    "*med"    → contains "med"          (full.includes)
  *    "med*"    → starts with "med"       (full.startsWith)
- *    "a*b"     → infix WITHIN one word   (per-word regex, mirrors backend _token_to_regex_sql)
- *    "*a*b*c"  → contains a OR b OR c    (OR of contains — no word boundary)
+ *    "ra*ol"   → one word starting "ra", ending "ol"   ("rabeprazol" ✓, "rabeprazole" ✗)
  */
 function makeTokenTest(token: string): (full: string) => boolean {
   const parts = token.split("*").filter(Boolean);
-  if (parts.length === 0) return () => true;                       // lone "*"
+  if (parts.length === 0) return () => true; // lone "*"
   if (parts.length === 1) {
     const seg = parts[0];
     if (token.endsWith("*") && !token.startsWith("*")) {
-      return (full) => full.startsWith(seg);                       // starts with
+      return (full) => full.startsWith(seg); // starts with
     }
-    return (full) => full.includes(seg);                           // contains
+    return (full) => full.includes(seg); // contains
   }
-  // 2+ parts: infix a*b*c → must match WITHIN ONE WORD
-  // (mirrors backend _token_to_regex_sql: \ma[^[:space:]]*b\M)
+  // 2+ parts: one whole word (backend SQL: \ma[^[:space:]]*b\M)
   const inner = parts.map(escapeRegex).join("[^\\s]*");
-  const pattern = new RegExp(inner);
-  const words = (full: string) => full.split(/\s+/);
-  return (full) => words(full).some((w) => pattern.test(w));
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])${inner}(?![\\p{L}\\p{N}_])`, "u");
+  return (full) => pattern.test(full);
 }
 
 function escapeRegex(s: string): string {
@@ -44,7 +44,7 @@ function compileQuery(query: string): Array<(full: string) => boolean> {
 
 /** True when `query` (trimmed) matches `haystack` accent/case-insensitively.
  *  Multi-word queries AND their tokens; each token supports the `*` grammar
- *  (contains / starts-with / OR). Mirrors backend `search.py`. */
+ *  (contains / starts-with / whole-word `a*b`). Mirrors backend `search.py`. */
 export function matchesText(haystack: unknown, query: string): boolean {
   const full = normalizeText(haystack);
   return compileQuery(query).every((pred) => pred(full));

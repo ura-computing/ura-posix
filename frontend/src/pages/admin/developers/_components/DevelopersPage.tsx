@@ -1,23 +1,19 @@
 import { Plus, Search, UserCog } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { KebabMenu } from "@/components/shared/KebabMenu";
-import { Button } from "@/components/ui/button";
-import {
-  type DeveloperAccount, type DeveloperStatus,
-} from "@/types/storeWebsite";
+import { KebabMenu } from "@/_components/KebabMenu";
+import { Button } from "@/_components/button";
+import { type DeveloperAccount, type DeveloperStatus } from "@/types/storeWebsite";
 
-import { formatRelative } from "../../../store-website/_format";
-
+import { formatRelative } from "@/pages/store/store-website/_format";
 
 /** i18n key per developer status — the source enum values ("actif" | …) stay
  *  as logic; only the displayed label is translated. */
 const STATUS_KEY: Record<DeveloperStatus, string> = {
-  actif:      "developers.statusActif",
+  actif: "developers.statusActif",
   en_attente: "developers.statusEnAttente",
-  desactive:  "developers.statusDesactive",
+  desactive: "developers.statusDesactive",
 };
-
 
 /** /admin/developers — admin user-management page for developer accounts.
  *
@@ -27,17 +23,16 @@ const STATUS_KEY: Record<DeveloperStatus, string> = {
  *  — AppLayout already provides `p-7`. */
 
 export interface DevelopersPageProps {
-  developers:      DeveloperAccount[];
-  isLoading?:      boolean;
-  isError?:        boolean;
-  search:          string;
-  onSearch:        (q: string) => void;
-  onInvite:        () => void;
+  developers: DeveloperAccount[];
+  isLoading?: boolean;
+  isError?: boolean;
+  search: string;
+  onSearch: (q: string) => void;
+  onInvite: () => void;
   onResetPassword: (id: string) => void;
-  onToggleActive:  (id: string, activate: boolean) => void;
-  onRetry?:        () => void;
+  onToggleActive: (id: string, activate: boolean) => void;
+  onRetry?: () => void;
 }
-
 
 export function DevelopersPage(props: DevelopersPageProps) {
   const t = useT();
@@ -48,9 +43,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("developers.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("developers.subtitle")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("developers.subtitle")}</p>
         </div>
         <Button onClick={props.onInvite}>
           <Plus className="size-4" />
@@ -118,7 +111,10 @@ export function DevelopersPage(props: DevelopersPageProps) {
                         <>
                           <button
                             type="button"
-                            onClick={() => { props.onResetPassword(d.id); close(); }}
+                            onClick={() => {
+                              props.onResetPassword(d.id);
+                              close();
+                            }}
                             className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
                           >
                             {t("developers.resetPassword")}
@@ -126,7 +122,10 @@ export function DevelopersPage(props: DevelopersPageProps) {
                           {d.status === "desactive" ? (
                             <button
                               type="button"
-                              onClick={() => { props.onToggleActive(d.id, true); close(); }}
+                              onClick={() => {
+                                props.onToggleActive(d.id, true);
+                                close();
+                              }}
                               className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
                             >
                               {t("developers.activateAccount")}
@@ -134,7 +133,10 @@ export function DevelopersPage(props: DevelopersPageProps) {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => { props.onToggleActive(d.id, false); close(); }}
+                              onClick={() => {
+                                props.onToggleActive(d.id, false);
+                                close();
+                              }}
                               className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-error-subtle-foreground hover:bg-error-subtle"
                             >
                               {t("developers.deactivateAccount")}
@@ -154,7 +156,6 @@ export function DevelopersPage(props: DevelopersPageProps) {
   );
 }
 
-
 function StatusBadge({ status }: { status: DeveloperStatus }) {
   const t = useT();
   const tone =
@@ -171,7 +172,6 @@ function StatusBadge({ status }: { status: DeveloperStatus }) {
   );
 }
 
-
 function EmptyState({ onInvite }: { onInvite: () => void }) {
   const t = useT();
   return (
@@ -179,9 +179,7 @@ function EmptyState({ onInvite }: { onInvite: () => void }) {
       <span className="flex size-12 items-center justify-center rounded-xl bg-surface-subtle text-primary">
         <UserCog className="size-5" />
       </span>
-      <p className="text-sm text-muted-foreground">
-        {t("developers.empty")}
-      </p>
+      <p className="text-sm text-muted-foreground">{t("developers.empty")}</p>
       <Button onClick={onInvite}>
         <Plus className="size-4" />
         {t("developers.invite")}
@@ -190,16 +188,12 @@ function EmptyState({ onInvite }: { onInvite: () => void }) {
   );
 }
 
-
 function TableSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="h-11 border-b border-border bg-surface-subtle" />
       {Array.from({ length: 5 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0"
-        >
+        <div key={i} className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0">
           <div className="h-4 flex-1 animate-pulse rounded bg-muted" />
           <div className="h-4 w-20 animate-pulse rounded bg-muted" />
           <div className="h-4 w-24 animate-pulse rounded bg-muted" />

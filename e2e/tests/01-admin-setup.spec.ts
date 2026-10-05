@@ -5,9 +5,8 @@ import { apiGet } from "../lib/api";
 import { ADMIN, ALL_FEATURES, OWNER, PHARMACY, login, saveState } from "../lib/auth";
 import { expect, test } from "../lib/fixtures";
 
-
 test("backend: /health", async ({ page }) => {
-  expect(await apiGet(page, "/health")).toBeTruthy();   // only route no page calls (Docker healthcheck)
+  expect(await apiGet(page, "/health")).toBeTruthy(); // only route no page calls (Docker healthcheck)
 });
 
 test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
@@ -37,8 +36,10 @@ test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
 
   await expect(dialog.getByText("Compte créé", { exact: true })).toBeVisible();
   await expect(dialog.getByText(OWNER.password)).toBeVisible();
-  await expect(dialog.getByRole("link", { name: "Ouvrir dans Gmail" }))
-    .toHaveAttribute("href", /mail\.google\.com\/mail\/\?view=cm/);
+  await expect(dialog.getByRole("link", { name: "Ouvrir dans Gmail" })).toHaveAttribute(
+    "href",
+    /mail\.google\.com\/mail\/\?view=cm/,
+  );
   await dialog.getByRole("button", { name: "Fermer" }).last().click();
 
   const after = await apiGet(page, `/admin/pharmacies/${pharmacyId}`);

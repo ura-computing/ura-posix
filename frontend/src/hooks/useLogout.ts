@@ -2,16 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { logout } from "@/api/auth";
-import { ApiErr } from "@/api/client";
+import { ApiErr, api } from "@/api/client";
+import { API } from "@/api/api";
 import { ROUTES } from "@/types";
 
 export function useLogout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<void, ApiErr>({
-    mutationFn: logout,
+  const { mutate, isPending } = useMutation<void, ApiErr>({
+    mutationFn: () => api.post<void>(API.auth.logout.url),
     onSuccess: () => {
       queryClient.clear();
       navigate(ROUTES.LOGIN);
@@ -21,10 +21,10 @@ export function useLogout() {
     },
   });
 
-  const handleLogout = () => mutation.mutate();
+  const handleLogout = () => mutate();
 
   return {
     handleLogout,
-    isPending: mutation.isPending,
+    isPending,
   };
 }
