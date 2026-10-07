@@ -31,6 +31,7 @@ One feature at a time: backend + frontend + its part of `e2e/tests/18-produits.s
 | F4 | « Ventes et achats par mois » Tableau ⇄ Graphique (per year: a Ventes row + an Achats row; chart: one color per curve, purchases dashed) + Statistiques tab (`GET /products/{id}/stats`) | done, waiting `make tests` |
 | F5 | Mouvements tab (achats + ventes, period / type / search, file of each line, pages, Excel, « Voir tout » from Général; `GET /products/{id}/movements`) | done, waiting `make tests` |
 | F6 | Owner edit: « Modifier » / « Enregistrer », his pharmacy only, hand edit wins over imports, « Revenir à la valeur importée »; the type (pharmacie / parapharmacie) is NOT editable (user) (`pharmacy_product_edits`, migration 0027, `PUT /products/{id}`) | done, waiting `make tests` |
+| fix | Stock import fills a product's missing barcodes from « Code barre 1 / 2 » (never overwrites; more photos found); charts: no dashed curves, one color per curve (product chart + Rapport) | done, waiting `make tests` |
 | F7 | `README.md` | |
 
 ---

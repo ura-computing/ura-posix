@@ -1482,7 +1482,6 @@ function TrendChart({
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeDasharray="5 4"
                   initial={{ pathLength: 0 }}
                   animate={{ pathLength: 1 }}
                   transition={{ duration: 0.7, ease: "easeInOut" }}

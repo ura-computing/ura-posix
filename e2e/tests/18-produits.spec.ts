@@ -476,14 +476,17 @@ test("fiche produit: ventes et achats par mois, tableau puis graphique = oracle"
       const totals = (await columnTexts(page, "Total", table)).map((x) => frNumber(x) ?? 0);
       expect(totals, "totaux").toEqual(series.map((r) => r.total));
 
-      // Chart: one curve per series, each its own color (purchases dashed); the month under the
-      // mouse shows every series' value.
+      // Chart: one solid curve per series, each its own color; the month under the mouse shows
+      // every series' value.
       await card.getByRole("button", { name: "Graphique", exact: true }).click();
       await expect(table).toHaveCount(0);
       const chart = card.locator("svg.touch-none");
       const curves = chart.locator("path");
       await expect(curves).toHaveCount(series.length);
-      await expect(chart.locator('path[stroke-dasharray="5 4"]'), "achats en pointillés").toHaveCount(e.monthly.length);
+      await expect(
+        chart.locator('path[stroke-dasharray="5 4"]'),
+        "même trait plein, seule la couleur change",
+      ).toHaveCount(0);
       const colors = await curves.evaluateAll((els) => els.map((el) => el.getAttribute("stroke")));
       expect(new Set(colors).size, "une couleur par courbe").toBe(series.length);
       const m = 6; // July: the mouse right above its x-axis label

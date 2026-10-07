@@ -134,6 +134,9 @@ COL_SUPPLIER = "Fournisseur"
 COL_EXPIRY = "Date de péremption"
 COL_STOCK_MIN = "Stock min"
 COL_STOCK_MAX = "Stock max"
+# Stock-only
+COL_BARCODE1 = "Code barre 1"
+COL_BARCODE2 = "Code barre 2"
 # Vente-only
 COL_TXN_REF = "Numéro de transaction"
 COL_DATE = "Date"
@@ -227,8 +230,9 @@ def _batch_resolve_medicaments(
     existing: dict[str, Medicament] = {m.pid: m for m in db.query(Medicament).filter(Medicament.pid.in_(pids)).all()}
 
     def _update_fields(med: Medicament, r: dict[str, Any]) -> None:
-        # Fill missing TVA / zone, refresh prices. Category intentionally NOT
-        # overwritten — admin-curated.
+        # Fill missing TVA / zone / barcodes (stock file: « Code barre 1 / 2 », they find
+        # the product's photos), refresh prices. Category and a barcode already there
+        # intentionally NOT overwritten — admin-curated.
         tva = col(r, COL_TVA)
         pph = parse_float(col(r, COL_PPH))
         ppv = parse_float(col(r, COL_PPV))
@@ -241,6 +245,10 @@ def _batch_resolve_medicaments(
             med.ppv = ppv
         if zone and not med.zone:
             med.zone = zone
+        for attr, column in (("barcode1", COL_BARCODE1), ("barcode2", COL_BARCODE2)):
+            code = (col(r, column) or "").strip()
+            if code and not getattr(med, attr):
+                setattr(med, attr, code)
 
     # Name-dedup: a row whose PID is new but whose product NAME already exists
     # (under a different PID — e.g. a catalog row that carries the laboratoire)
@@ -274,6 +282,8 @@ def _batch_resolve_medicaments(
             "ppv": parse_float(col(r, COL_PPV)),
             "category": col(r, COL_CATEGORY),
             "zone": col(r, COL_ZONE),
+            "barcode1": (col(r, COL_BARCODE1) or "").strip() or None,
+            "barcode2": (col(r, COL_BARCODE2) or "").strip() or None,
         }
         if nkey:
             new_by_name[nkey] = pid

@@ -162,7 +162,9 @@ def token_match(value: str | None, token: str, *, unaccent: bool) -> bool:
 
 
 def product_match(p, token: str) -> bool:
-    return (token_match(p.name, token, unaccent=True) or token_match(p.pid, token, unaccent=False))
+    """Name, PID, or the barcode the stock file gave it (« Code barre 1 »: products in that file)."""
+    return (token_match(p.name, token, unaccent=True) or token_match(p.pid, token, unaccent=False)
+            or (p.stock is not None and token_match(p.barcode, token, unaccent=False)))
 
 
 def is_grossiste(supplier: str) -> bool:
@@ -445,7 +447,8 @@ class Oracle:
         return {
             "pid": p.pid, "product": p.name, "laboratoire": None, "category": p.category,
             "category_type": "pharmacie" if p.pharma else "parapharmacie", "tva": p.tva_label,
-            "barcode1": barcode1, "barcode2": None, "info": info,
+            # The stock file's « Code barre 1 » fills it at import; 18-produits' admin gives the photo one.
+            "barcode1": barcode1 or (p.barcode if p.stock is not None else None), "barcode2": None, "info": info,
             "prices": {
                 "ppv": r2(p.ppv), "pph": r2(p.pph), "avg_pu": r4(pu) if pu is not None else None,
                 "last_pu": r4(last.unit) if last else None, "last_pu_date": last.day.isoformat() if last else None,
@@ -581,9 +584,7 @@ class Oracle:
                        for pid in self.sheet_pids(rows, infos)},
             "stats": {pid: self.product_stats(by_pid[pid]) for pid in self.sheet_pids(rows, infos)},
             "movements": self.movements_scenarios(by_pid[rows[0]["pid"]], files),
-            "search": {q: [r["pid"] for r in rows
-                           if all(token_match(r["product"], t, unaccent=True) or token_match(r["pid"], t, unaccent=False)
-                                  for t in tokenize(q))]
+            "search": {q: [r["pid"] for r in rows if all(product_match(by_pid[r["pid"]], t) for t in tokenize(q))]
                        for q in PRODUCT_QUERIES},
         }
 

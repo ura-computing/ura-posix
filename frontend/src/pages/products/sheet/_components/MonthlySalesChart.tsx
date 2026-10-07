@@ -1,6 +1,6 @@
 /** « Ventes et achats par mois » as a chart: Jan → Déc across, one curve per series
- *  (« Ventes 2026 », « Achats 2026 », « Ventes 2025 »…), each its own color; purchases dashed
- *  (like Rapport's trend chart). Hover = the month's value of every series. A month with more
+ *  (« Ventes 2026 », « Achats 2026 », « Ventes 2025 »…): same solid line, only the color differs
+ *  (user). Hover = the month's value of every series. A month with more
  *  returns than sales is drawn at 0 (the tooltip shows the real number). */
 import { useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -23,25 +23,16 @@ const color = (i: number) => `var(--chart-${ORDER[i % ORDER.length]})`;
 interface Series {
   key: string;
   label: string;
-  dashed: boolean;
   values: number[];
   color: string;
 }
 
-/** Line sample for the legend, in the series' color (dashed = purchases). */
+/** Line sample for the legend, in the series' color. */
 function LineKey({ s }: { s: Series }) {
   return (
     <span className="flex items-center gap-1.5">
       <svg width="18" height="6" aria-hidden>
-        <line
-          x1="0"
-          y1="3"
-          x2="18"
-          y2="3"
-          stroke={s.color}
-          strokeWidth="2.5"
-          strokeDasharray={s.dashed ? "5 3" : undefined}
-        />
+        <line x1="0" y1="3" x2="18" y2="3" stroke={s.color} strokeWidth="2.5" />
       </svg>
       <span className="text-muted-foreground">{s.label}</span>
     </span>
@@ -69,11 +60,10 @@ export function MonthlySalesChart({ years }: { years: MonthlySales[] }) {
 
   const series: Series[] = years
     .flatMap((y) => [
-      { key: `${y.year}-sold`, label: t("products.salesOfYear", { year: y.year }), dashed: false, values: y.sold },
+      { key: `${y.year}-sold`, label: t("products.salesOfYear", { year: y.year }), values: y.sold },
       {
         key: `${y.year}-bought`,
         label: t("products.purchasesOfYear", { year: y.year }),
-        dashed: true,
         values: y.bought,
       },
     ])
@@ -144,21 +134,18 @@ export function MonthlySalesChart({ years }: { years: MonthlySales[] }) {
             );
           })}
 
-          {/* Oldest series first, so the newest year is drawn on top. Sales are drawn from left
-              to right; purchases fade in: the drawing animation (pathLength) would replace
-              their dashes with its own. */}
+          {/* Oldest series first, so the newest year is drawn on top. */}
           {[...series].reverse().map((s) => (
             <motion.path
               key={s.key}
               d={smoothPath(s.values.map((v, m) => ({ x: xAt(m), y: yAt(v) })))}
               fill="none"
               stroke={s.color}
-              strokeWidth={s.dashed ? 2 : 2.5}
-              strokeDasharray={s.dashed ? "5 4" : undefined}
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              initial={s.dashed ? { opacity: 0 } : { pathLength: 0 }}
-              animate={s.dashed ? { opacity: 1 } : { pathLength: 1 }}
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
               transition={{ duration: 0.7, ease: "easeInOut" }}
             />
           ))}
