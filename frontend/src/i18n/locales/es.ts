@@ -686,13 +686,9 @@ export const es: Dict = {
     skipped: "ignoradas",
     deletedBy: "Eliminado por {{who}} · {{when}}",
     deleteBtn: "Eliminar",
-    confirmStockTitle: "¿Marcar esta importación como eliminada?",
     confirmTitle: "¿Eliminar esta importación?",
-    confirmStockCopy:
-      "¿Marcar la importación « {{name}} » como eliminada? Los niveles de stock importados permanecerán en la base — una importación UPSERT no se puede deshacer.",
     confirmCopy:
       "¿Eliminar definitivamente la importación « {{name}} »? Las {{rows}} línea(s) importada(s) se retirarán y la entrada se marcará como eliminada.",
-    markDeleted: "Marcar eliminado",
     deleting: "Eliminando…",
     noName: "sin nombre",
     typeAchat: "Compras",
@@ -705,10 +701,8 @@ export const es: Dict = {
     selectRow: "Seleccionar « {{name}} »",
     deleteSelection: "Eliminar la selección ({{n}})",
     confirmManyTitle: "¿Eliminar {{n}} importación(es)?",
-    confirmManyCopy:
-      "Las líneas importadas de estos archivos se retirarán. Una importación de stock solo se marca como eliminada: sus niveles de stock permanecen.",
+    confirmManyCopy: "Las líneas importadas de estos archivos se retirarán: compras, ventas y stock.",
     confirmManyRows: "{{rows}} línea(s) retirada(s)",
-    confirmManyStock: "stock, marcada como eliminada",
     deleteMany: "Eliminar ({{n}})",
     toastDeletedMany: "{{n}} importación(es) eliminada(s) · {{rows}} fila(s) borrada(s)",
     toastDeleteFailed: "No eliminada(s): {{names}}. Inténtelo de nuevo.",

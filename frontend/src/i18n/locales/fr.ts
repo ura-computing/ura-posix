@@ -693,13 +693,9 @@ export const fr = {
     skipped: "ignorées",
     deletedBy: "Supprimé par {{who}} · {{when}}",
     deleteBtn: "Supprimer",
-    confirmStockTitle: "Marquer cet import comme supprimé ?",
     confirmTitle: "Supprimer cet import ?",
-    confirmStockCopy:
-      "Marquer l'import « {{name}} » comme supprimé ? Les niveaux de stock importés resteront en base — un import UPSERT ne peut pas être défait.",
     confirmCopy:
       "Supprimer définitivement l'import « {{name}} » ? Les {{rows}} ligne(s) importée(s) seront retirées et l'entrée sera marquée comme supprimée.",
-    markDeleted: "Marquer supprimé",
     deleting: "Suppression…",
     noName: "sans nom",
     typeAchat: "Achats",
@@ -712,10 +708,8 @@ export const fr = {
     selectRow: "Sélectionner « {{name}} »",
     deleteSelection: "Supprimer la sélection ({{n}})",
     confirmManyTitle: "Supprimer {{n}} import(s) ?",
-    confirmManyCopy:
-      "Les lignes importées de ces fichiers seront retirées. Un import de stock est seulement marqué supprimé : ses niveaux de stock restent.",
+    confirmManyCopy: "Les lignes importées de ces fichiers seront retirées : achats, ventes et stock.",
     confirmManyRows: "{{rows}} ligne(s) retirée(s)",
-    confirmManyStock: "stock, marqué supprimé",
     deleteMany: "Supprimer ({{n}})",
     toastDeletedMany: "{{n}} import(s) supprimé(s) · {{rows}} ligne(s) effacée(s)",
     toastDeleteFailed: "Pas supprimé(s) : {{names}}. Réessayez.",

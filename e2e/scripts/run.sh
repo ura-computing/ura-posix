@@ -27,8 +27,10 @@ ask() {                                 # ask "question" default → answer
 if [ ! -d node_modules/@playwright/test ] || [ ! -d node_modules/xlsx ]; then
   echo "▸ Installing the E2E packages…"
   npm install --silent
-  npx playwright install chromium
 fi
+# The browser too, every run: packages can be there without it (npm install run by hand,
+# fresh clone). Nothing to download when it is already installed.
+npx playwright install chromium
 
 # Below 1000 lines the generated data is too thin for some scenarios (e.g. a
 # product both sold and bought for the exclusions test) → ask again.

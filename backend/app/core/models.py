@@ -312,7 +312,8 @@ class Vente(Base):
 
 
 class PharmacyStock(Base):
-    """Per-pharmacy product stock snapshot. Updated by `/uploads/stock`."""
+    """Per-pharmacy product stock snapshot. Updated by `/uploads/stock`. `import_batch_id` =
+    the stock import that wrote the row last: deleting / cancelling that import removes it."""
 
     __tablename__ = "pharmacy_stock"
     __table_args__ = (UniqueConstraint("pharmacy_id", "medicament_id", name="uq_pharmacy_stock"),)
@@ -326,6 +327,9 @@ class PharmacyStock(Base):
     expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     zone: Mapped[str | None] = mapped_column(String, nullable=True)
     imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    import_batch_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(FK_IMPORT_BATCHES_ID, ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class PharmacyMedicamentStatus(Base):

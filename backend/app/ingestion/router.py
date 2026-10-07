@@ -414,7 +414,9 @@ def _insert_stock(
 
     batch_id threading: first chunk passes None → creates an ImportBatch and returns
     its id. Subsequent chunks pass that id → _get_or_create_batch reuses the row and
-    we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente."""
+    we accumulate rows_inserted / rows_skipped on it. Mirrors achat/vente.
+
+    Each row keeps `import_batch_id` = this import: deleting / cancelling it removes them."""
     batch = _get_or_create_batch(
         db, pharmacy_id=pharmacy_id, file_type="stock", filename=filename, batch_id=batch_id, user_id=user_id
     )
@@ -444,6 +446,7 @@ def _insert_stock(
                 "stock_max": parse_int(col(row, COL_STOCK_MAX)),
                 "expiry_date": parse_date(col(row, COL_EXPIRY)),
                 "zone": col(row, COL_ZONE),
+                "import_batch_id": batch.id,
             }
         )
 
@@ -457,6 +460,7 @@ def _insert_stock(
                 "stock_max": stmt.excluded.stock_max,
                 "expiry_date": stmt.excluded.expiry_date,
                 "zone": stmt.excluded.zone,
+                "import_batch_id": stmt.excluded.import_batch_id,
             },
         )
         db.execute(stmt)
@@ -640,11 +644,10 @@ def patch_batch_status(
 ) -> dict:
     """Update a batch's status. Two semantics:
 
-    - `status="cancelled"`: TRUE UNDO. Deletes every Achat / Vente row that was
-      inserted under this batch_id and resets the audit counters to 0. The
+    - `status="cancelled"`: TRUE UNDO. Deletes every Achat / Vente / stock row that
+      was written under this batch_id and resets the audit counters to 0. The
       ImportBatch row stays for auditing ("this user attempted then cancelled").
-      Stock batches are exempt — they use UPSERT, so the prior snapshot is
-      already gone and there's nothing to roll back.
+      Stock: the values the file replaced are not brought back (UPSERT).
     - `status="error"`: same audit-only flip + carry the error_message. Rows
       already inserted stay (the failing chunk was likely network-side, not data-side).
     - `status="success"`: sent once after the last chunk → refresh table statistics.
@@ -669,10 +672,10 @@ def patch_batch_status(
             deleted_rows = db.query(Achat).filter(Achat.import_batch_id == batch.id).delete()
         elif batch.file_type == "vente":
             deleted_rows = db.query(Vente).filter(Vente.import_batch_id == batch.id).delete()
-        # stock: UPSERT replaced prior state, no undo possible — leave rows.
-        if batch.file_type in ("achat", "vente"):
-            batch.rows_inserted = 0
-            batch.rows_skipped = 0
+        else:
+            deleted_rows = db.query(PharmacyStock).filter(PharmacyStock.import_batch_id == batch.id).delete()
+        batch.rows_inserted = 0
+        batch.rows_skipped = 0
 
     batch.status = body.status
     if body.error_message is not None:
@@ -697,8 +700,8 @@ def patch_batch_status(
 # DELETE is a SOFT delete: the achat/vente rows are still removed (true undo
 # for transactional data), but the batch row stays with `deleted_at` +
 # `deleted_by_user_id` populated, so the /imports page can show it as history.
-# Stock batches: data not removed (UPSERT can't be undone — the snapshot already
-# overwrote prior values); only the batch row is marked deleted.
+# Stock batches: the stock rows this import wrote last are removed too (the values it
+# replaced are not brought back: UPSERT).
 #
 # Per-role visibility + authz (mirrors the listing scope):
 #   - admin    → only batches they created (in practice ~empty)
@@ -809,10 +812,9 @@ def delete_import(
     user: CurrentUserDep,
     db: DbDep,
 ) -> dict:
-    """Soft-delete: removes the Achat/Vente rows belonging to this batch (stock
-    skipped — UPSERT can't be undone), then marks the batch row with
-    `deleted_at` + `deleted_by_user_id`. The row remains visible on /imports
-    as history.
+    """Soft-delete: removes the Achat / Vente / stock rows belonging to this batch, then
+    marks the batch row with `deleted_at` + `deleted_by_user_id`. The row remains
+    visible on /imports as history.
 
     Per-role authz mirrors the list scope (see `_visible_batches_query`):
     if you can see it, you can delete it. 404 on out-of-scope to avoid
@@ -831,7 +833,8 @@ def delete_import(
         deleted_rows = db.query(Achat).filter(Achat.import_batch_id == batch.id).delete()
     elif batch.file_type == "vente":
         deleted_rows = db.query(Vente).filter(Vente.import_batch_id == batch.id).delete()
-    # stock: no row-level undo (UPSERT semantics)
+    else:
+        deleted_rows = db.query(PharmacyStock).filter(PharmacyStock.import_batch_id == batch.id).delete()
 
     batch.deleted_at = datetime.now(timezone.utc)
     batch.deleted_by_user_id = user.id

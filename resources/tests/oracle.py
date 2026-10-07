@@ -496,6 +496,9 @@ class Oracle:
         return {
             "sales_from": start.isoformat(), "sales_to": end.isoformat(), "rows": rows,
             "barcode_setup": barcode,
+            # 15-imports deletes the stock import: only sold / bought products stay listed.
+            "count_without_stock_file": sum(1 for r in rows if r["pid"] in {v.p.pid for v in self.ventes}
+                                            | {a.p.pid for a in self.achats}),
             "sheets": {pid: self.product_sheet(by_pid[pid], infos.get(pid),
                                                barcode["barcode1"] if by_pid[pid].name == barcode["product"] else None)
                        for pid in self.sheet_pids(rows, infos)},

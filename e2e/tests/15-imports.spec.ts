@@ -3,14 +3,16 @@
  *  BLs) is cancelled after its first chunk (PATCH batch → its rows removed),
  *  imported again, then deleted from the list (DELETE → rows removed). After
  *  both undos the Rapport and the achats list still equal the oracle. An import
- *  marks every cached query stale: /analyses (cached 60 s) refetches after it. Serial. */
+ *  marks every cached query stale: /analyses (cached 60 s) refetches after it.
+ *  Deleting the stock import removes its stock (Produits, Stock); importing it again puts
+ *  it back. Serial. */
 import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost } from "../lib/api";
 import { OWNER, loadState, saveState, sessionFile } from "../lib/auth";
-import { checkLedgerPage, checkStats, type Row } from "../lib/checks";
+import { checkLedgerPage, checkStats, checkStockSummary, type Row } from "../lib/checks";
 import { expectSame, expectSameSet } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
@@ -444,6 +446,61 @@ test("deux imports créent le même nouveau produit au même moment : pas d'erre
 
   // Cleanup: the next test checks the Rapport is back to the oracle.
   for (const id of new Set([a.batch_id, b.batch_id])) await apiDelete(page, `/data/imports/${id}`);
+});
+
+test("supprimer l'import de stock retire son stock ; le réimporter le remet", async ({ page }) => {
+  const e = expected();
+  const stockId = loadState().batch_stock;
+  const produits = async (): Promise<Row> => {
+    const list = pageCall(page, "/products", { page: "1" });
+    await page.getByRole("navigation").getByRole("link", { name: "Produits", exact: true }).click();
+    return list;
+  };
+
+  const list = pageCall(page, "/data/imports");
+  await page.goto("/imports");
+  await list;
+  await page
+    .getByRole("row")
+    .filter({ hasText: basename(e.files.stock.path) })
+    .getByRole("button", { name: "Supprimer" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Supprimer cet import ?" });
+  await expect(dialog.getByText(`Les ${e.import.stock.inserted} ligne(s) importée(s) seront retirées`)).toBeVisible();
+  const deleted = pageSend(page, "DELETE", `/data/imports/${stockId}`);
+  await dialog.getByRole("button", { name: "Supprimer", exact: true }).click();
+  expect(await deleted, "DELETE /data/imports (stock)").toEqual({
+    id: stockId,
+    deleted_rows: e.import.stock.inserted,
+    file_type: "stock",
+  });
+
+  // No stock left: Produits lists only sold / bought products, none with a stock.
+  const empty = await produits();
+  expect(empty.pagination.total, "produits sans le fichier de stock").toBe(e.products.count_without_stock_file);
+  expect(
+    empty.data.every((r: Row) => r.current_stock === null),
+    "aucun stock",
+  ).toBe(true);
+  expectSame(await apiGet(page, "/stats/stock-summary"), { total_references: 0, ppv_potentiel: 0 }, "stock vide");
+
+  // The same file again (wizard): the stock is back, the oracle's.
+  await page.goto("/upload-file?type=stock");
+  await page.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, e.files.stock.path));
+  const sent = pageSend(page, "POST", "/uploads/stock-json");
+  await page.getByRole("button", { name: "Importer dans la base" }).click();
+  const outcome = page.getByRole("heading", { level: 3, name: /lignes importées$/ });
+  await expect(outcome).toBeVisible();
+  expect((await outcome.textContent())?.replace(/\D/g, ""), "lignes importées").toBe(String(e.import.stock.inserted));
+  saveState({ batch_stock: (await sent).batch_id });
+  checkStockSummary(await apiGet(page, "/stats/stock-summary"));
+  const back = await produits();
+  expect(back.pagination.total, "produits avec le stock").toBe(e.products.rows.length);
+  expectSame(
+    back.data.map((r: Row) => ({ pid: r.pid, current_stock: r.current_stock })),
+    e.products.rows.slice(0, 25).map((r: Row) => ({ pid: r.pid, current_stock: r.current_stock })),
+    "stock de la page 1",
+  );
 });
 
 test("après l'annulation et la suppression, rien n'a bougé", async ({ page }) => {

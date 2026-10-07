@@ -94,9 +94,7 @@ function ImportsTab() {
   }
 
   const confirmCopy = pendingRow
-    ? pendingRow.file_type === "stock"
-      ? t("imports.confirmStockCopy", { name: pendingRow.filename ?? t("imports.noName") })
-      : t("imports.confirmCopy", { name: pendingRow.filename ?? t("imports.noName"), rows: pendingRow.rows_inserted })
+    ? t("imports.confirmCopy", { name: pendingRow.filename ?? t("imports.noName"), rows: pendingRow.rows_inserted })
     : "";
 
   return (
@@ -238,10 +236,10 @@ function ImportsTab() {
           if (!pendingRow) return;
           deleteImport(pendingRow.id, { onSuccess: () => setPendingRow(null) });
         }}
-        title={pendingRow?.file_type === "stock" ? t("imports.confirmStockTitle") : t("imports.confirmTitle")}
+        title={t("imports.confirmTitle")}
         description={confirmCopy}
         variant="destructive"
-        confirmLabel={pendingRow?.file_type === "stock" ? t("imports.markDeleted") : t("imports.deleteBtn")}
+        confirmLabel={t("imports.deleteBtn")}
         loadingLabel={t("imports.deleting")}
         isLoading={isDeleting}
       />
@@ -259,11 +257,7 @@ function ImportsTab() {
         description={t("imports.confirmManyCopy")}
         bullets={selectedRows.map(
           (r) =>
-            `${r.filename ?? t("imports.noName")} · ${
-              r.file_type === "stock"
-                ? t("imports.confirmManyStock")
-                : t("imports.confirmManyRows", { rows: formatNumStr(r.rows_inserted) })
-            }`,
+            `${r.filename ?? t("imports.noName")} · ${t("imports.confirmManyRows", { rows: formatNumStr(r.rows_inserted) })}`,
         )}
         variant="destructive"
         confirmLabel={t("imports.deleteMany", { n: selectedRows.length })}

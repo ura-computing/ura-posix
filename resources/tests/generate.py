@@ -388,6 +388,7 @@ def write_files(products, ventes, achats, liste, extra, catalog, product_infos, 
     extra_path = HERE / "extra" / f"Sobrus - Achats {end} - {end}.csv"
     catalog_path = HERE / "catalog" / "catalog.csv"
     infos_path = HERE / "catalog" / "product-infos.json"
+    infos_path.parent.mkdir(parents=True, exist_ok=True)
     infos_path.write_text(json.dumps(product_infos, ensure_ascii=False, indent=1), encoding="utf-8")
     _write(achat_path, ACHAT_HEADER, _achat_rows(achats))
     _write(extra_path, ACHAT_HEADER, _achat_rows(extra))
