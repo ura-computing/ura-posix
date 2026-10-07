@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from datetime import date
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 from app.ledger.schemas import Pagination
 
@@ -110,6 +111,43 @@ class ProductSheet(BaseModel):
     prices: ProductPrices
     stock: ProductStock
     recent_movements: list[ProductMovement]  # 10 latest, newest first
+    # Fields the owner edited → their imported value (« Revenir à la valeur importée »).
+    imported: dict[str, str | float | int | None]
+
+
+def _blank_to_none(v: object) -> object:
+    """« » or spaces = no value (back to the imported one)."""
+    if isinstance(v, str):
+        v = v.strip()
+        return v or None
+    return v
+
+
+# The length limit applies to the text, not to null (= back to the imported value).
+Text = Annotated[Annotated[str, StringConstraints(max_length=300)] | None, BeforeValidator(_blank_to_none)]
+LongText = Annotated[Annotated[str, StringConstraints(max_length=5000)] | None, BeforeValidator(_blank_to_none)]
+
+
+class ProductEditIn(BaseModel):
+    """PUT /products/{id}: only the fields sent change; null = back to the imported value.
+    Any other field (e.g. the type pharmacie / parapharmacie) is refused (422)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product: Text = None
+    laboratoire: Text = None
+    category: Text = None
+    tva: Text = None
+    ppv: float | None = Field(default=None, ge=0)
+    pph: float | None = Field(default=None, ge=0)
+    zone: Text = None
+    current_stock: int | None = None
+    stock_min: int | None = Field(default=None, ge=0)
+    stock_max: int | None = Field(default=None, ge=0)
+    expiry_date: date | None = None
+    barcode1: Text = None
+    barcode2: Text = None
+    description: LongText = None
 
 
 # ═══ Statistiques ════════════════════════════════════════════════════════════

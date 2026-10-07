@@ -99,7 +99,30 @@ export interface ProductSheet {
   stock: ProductStock;
   /** 10 latest, newest first. */
   recent_movements: ProductMovement[];
+  /** Fields the owner edited → their imported value (« Revenir à la valeur importée »). */
+  imported: Partial<Record<EditField, string | number | null>>;
 }
+
+/** Fields the owner can change (« Modifier »), as PUT /products/{id} names them. Not the type
+ *  (pharmacie / parapharmacie): it stays the catalogue's. */
+export type EditField =
+  | "product"
+  | "laboratoire"
+  | "category"
+  | "tva"
+  | "ppv"
+  | "pph"
+  | "zone"
+  | "current_stock"
+  | "stock_min"
+  | "stock_max"
+  | "expiry_date"
+  | "barcode1"
+  | "barcode2"
+  | "description";
+
+/** PUT /products/{id}: only the fields sent change; null = back to the imported value. */
+export type ProductEditIn = Partial<Record<EditField, string | number | null>>;
 
 // ── Statistiques (GET /products/{id}/stats) ────────────────────────────────
 

@@ -7,19 +7,34 @@ GET /v1/products/{med_id}   One product's sheet (Général + Codes tabs). Not on
 GET /v1/products/{med_id}/stats   « Ventes et achats par mois » + Statistiques tab (same 404).
 GET /v1/products/{med_id}/movements   « Mouvements » tab: purchase + sale lines, period, type,
                     search (document / supplier / client), page, export=true (same 404).
+PUT /v1/products/{med_id}   Owner only: « Modifier » → « Enregistrer » (his pharmacy only, shown in
+                    « Produits » only); a field sent as null = back to the imported value.
 """
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Path, Query, status
 
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.permissions import member
-from app.products.product_queries import list_products, product_movements, product_sheet, product_stats
-from app.products.schemas import ProductMovementsResponse, ProductSheet, ProductStats, ProductsListResponse
+from app.core.security import CurrentUserDep
+from app.products.product_queries import (
+    list_products,
+    product_movements,
+    product_sheet,
+    product_stats,
+    save_product_edits,
+)
+from app.products.schemas import (
+    ProductEditIn,
+    ProductMovementsResponse,
+    ProductSheet,
+    ProductStats,
+    ProductsListResponse,
+)
 
 
 router = APIRouter(tags=["products"])
@@ -106,3 +121,20 @@ def get_product_movements(
     if moves is None:
         raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
     return moves
+
+
+@router.put("/products/{med_id}", response_model=ProductSheet)
+def put_product(
+    med_id: Annotated[int, Path(ge=1)],
+    body: ProductEditIn,
+    pharmacy_id: Annotated[int, member("produits")],
+    user: CurrentUserDep,
+    db: DbDep,
+) -> dict:
+    if user.role != "owner":
+        raise ApiError(status.HTTP_403_FORBIDDEN, ErrorCode.OWNER_ONLY, "Réservé aux propriétaires.")
+    changes = {f: getattr(body, f) for f in body.model_fields_set}
+    sheet = save_product_edits(db, pharmacy_id, med_id, user.id, changes)
+    if sheet is None:
+        raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
+    return sheet

@@ -61,6 +61,7 @@ class ErrorCode(StrEnum):
     MEDICAMENTS_NOT_FOUND = "medicamentsNotFound"
     MEDICAMENT_IN_USE = "medicamentInUse"
     PRODUCT_NOT_FOUND = "productNotFound"
+    STOCK_MIN_ABOVE_MAX = "stockMinAboveMax"
     SUFFIX_EXISTS = "suffixExists"
     SUFFIX_NOT_FOUND = "suffixNotFound"
     # Imports

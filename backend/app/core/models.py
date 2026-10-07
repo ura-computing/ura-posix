@@ -332,6 +332,43 @@ class PharmacyStock(Base):
     )
 
 
+class PharmacyProductEdit(Base):
+    """A pharmacy's own values for one product: the owner's « Modifier » on the product sheet.
+    Shown in « Produits » only (Rapport, Stock, Comptabilité keep the imported values). NULL =
+    not edited. Imports never write here, so a hand edit stays until « Revenir à la valeur
+    importée ». The type (pharmacie / parapharmacie) is not editable. Deleted with the
+    pharmacy or the product (CASCADE)."""
+
+    __tablename__ = "pharmacy_product_edits"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "medicament_id", name="uq_pharmacy_product_edit"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False, index=True
+    )
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False, index=True
+    )
+    product: Mapped[str | None] = mapped_column(String, nullable=True)
+    laboratoire: Mapped[str | None] = mapped_column(String, nullable=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)  # its text only: the type stays the catalogue's
+    tva: Mapped[str | None] = mapped_column(String, nullable=True)
+    ppv: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    zone: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_stock: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stock_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stock_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    barcode1: Mapped[str | None] = mapped_column(String, nullable=True)
+    barcode2: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+
+
 class PharmacyMedicamentStatus(Base):
     """Per-pharmacy non-declared (= 'spécial') flag. Row with declared=False
     ⇒ medicament excluded from this pharmacy's stats. Absence of row ⇒ declared

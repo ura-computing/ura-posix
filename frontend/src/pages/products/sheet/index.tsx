@@ -2,9 +2,10 @@
  *  description, mouvements récents, ventes et achats par mois), « Statistiques », « Mouvements »
  *  and « Codes ». Not one of its products → the 404
  *  inside the layout (never says whether it exists elsewhere). */
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Pencil, Save, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
+import { AsyncButton } from "@/_components/AsyncButton";
 import { Page } from "@/_components/Page";
 import { TabBar } from "@/_components/TabBar";
 import { TypeBadge } from "@/_components/TypeBadge";
@@ -13,10 +14,11 @@ import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
 import { CodesTab } from "./_components/CodesTab";
+import { SheetEditContext } from "./_components/editContext";
 import { GeneralTab } from "./_components/GeneralTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { StatsTab } from "./_components/StatsTab";
-import { useProduitPage, type SheetTab } from "./hooks";
+import { useProduitPage, useSheetEditor, type SheetEditor, type SheetTab } from "./hooks";
 
 function BackToList({ name }: { name: string }) {
   const t = useT();
@@ -57,10 +59,45 @@ function Badges({ sheet }: { sheet: ProductSheet }) {
   );
 }
 
+/** Owner: « Modifier », then « Annuler » + « Enregistrer ». Employee: « Modifier » shown,
+ *  disabled, with the reason under it. */
+function EditActions({ editor, onStart }: { editor: SheetEditor; onStart: () => void }) {
+  const t = useT();
+  if (editor.editing) {
+    return (
+      <>
+        <AsyncButton variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
+          <X className="size-4" />
+          {t("common.cancel")}
+        </AsyncButton>
+        <AsyncButton
+          variant="primary"
+          onClick={() => void editor.save()}
+          isLoading={editor.isSaving}
+          loadingText={t("products.saving")}
+        >
+          <Save className="size-4" />
+          {t("common.save")}
+        </AsyncButton>
+      </>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <AsyncButton variant="primary" onClick={onStart} disabled={!editor.canEdit}>
+        <Pencil className="size-4" />
+        {t("common.edit")}
+      </AsyncButton>
+      {!editor.canEdit && <span className="text-xs text-muted-foreground">{t("products.ownerOnly")}</span>}
+    </div>
+  );
+}
+
 export default function ProduitPage() {
   const t = useT();
   const { id } = useParams<{ id: string }>();
   const { sheet, stats, isLoading, notFound, tab, setTab } = useProduitPage(Number(id));
+  const editor = useSheetEditor(sheet);
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
@@ -73,13 +110,30 @@ export default function ProduitPage() {
     { id: "movements", label: t("products.tabMovements") },
     { id: "codes", label: t("products.tabCodes") },
   ];
+  // The editable values are on Général and Codes: editing starts on Général from the other tabs.
+  const startEditing = () => {
+    editor.start();
+    if (tab === "stats" || tab === "movements") setTab("general");
+  };
   return (
-    <Page above={<BackToList name={sheet.product} />} title={sheet.product} subtitle={<Badges sheet={sheet} />}>
-      <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
-      {tab === "general" && <GeneralTab sheet={sheet} stats={stats} onShowMovements={() => setTab("movements")} />}
-      {tab === "stats" && <StatsTab sheet={sheet} stats={stats} />}
-      {tab === "movements" && <MovementsTab sheet={sheet} />}
-      {tab === "codes" && <CodesTab sheet={sheet} />}
-    </Page>
+    <SheetEditContext value={{ editor, sheet }}>
+      <Page
+        above={<BackToList name={sheet.product} />}
+        title={sheet.product}
+        subtitle={<Badges sheet={sheet} />}
+        actions={<EditActions editor={editor} onStart={startEditing} />}
+      >
+        <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
+        {editor.editing && (
+          <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
+            {t("products.editHint")}
+          </p>
+        )}
+        {tab === "general" && <GeneralTab sheet={sheet} stats={stats} onShowMovements={() => setTab("movements")} />}
+        {tab === "stats" && <StatsTab sheet={sheet} stats={stats} />}
+        {tab === "movements" && <MovementsTab sheet={sheet} />}
+        {tab === "codes" && <CodesTab sheet={sheet} />}
+      </Page>
+    </SheetEditContext>
   );
 }

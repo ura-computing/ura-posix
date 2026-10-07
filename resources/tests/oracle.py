@@ -466,6 +466,7 @@ class Oracle:
                  "party": party}
                 for day, kind, _, qty, unit, ref, party in moves[:10]
             ],
+            "imported": {},   # no owner edit (18-produits « modifier » puts everything back)
         }
 
     def product_stats(self, p) -> dict:

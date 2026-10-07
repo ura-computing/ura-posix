@@ -259,6 +259,8 @@ export const API = {
       key: (id: number) => ["products", "stats", id] as const,
       all: ["products", "stats"],
     },
+    /** Owner's « Enregistrer » / « Revenir à la valeur importée ». */
+    save: { url: (id: number) => `/products/${id}`, refreshes: (): Read[] => [API.products.list, API.products.sheet] },
     movements: {
       url: (id: number) => `/products/${id}/movements`,
       key: (id: number, f: MovementsFilters) => ["products", "movements", id, f] as const,

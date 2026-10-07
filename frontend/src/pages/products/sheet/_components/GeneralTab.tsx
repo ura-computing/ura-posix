@@ -11,6 +11,7 @@ import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 
+import { Editable } from "./Editable";
 import { MonthlySalesCard } from "./MonthlySalesCard";
 import { PhotoGallery } from "./PhotoGallery";
 import { FieldList, SheetCard } from "./SheetCard";
@@ -77,12 +78,42 @@ export function GeneralTab({
         <SheetCard title={t("products.general")}>
           <FieldList
             fields={[
-              { label: t("col.categorie"), value: sheet.category ?? dash },
+              {
+                label: t("products.nameLabel"),
+                value: (
+                  <Editable field="product" label={t("products.nameLabel")}>
+                    {sheet.product}
+                  </Editable>
+                ),
+              },
+              {
+                label: t("col.categorie"),
+                value: (
+                  <Editable field="category" label={t("col.categorie")}>
+                    {sheet.category ?? dash}
+                  </Editable>
+                ),
+              },
+              // The type is not editable (stays the catalogue's).
               { label: t("col.type"), value: <TypeBadge type={sheet.category_type} /> },
-              { label: t("col.laboratoire"), value: sheet.laboratoire ?? dash },
+              {
+                label: t("col.laboratoire"),
+                value: (
+                  <Editable field="laboratoire" label={t("col.laboratoire")}>
+                    {sheet.laboratoire ?? dash}
+                  </Editable>
+                ),
+              },
               { label: t("products.brand"), value: info?.brand ?? dash },
               { label: t("products.shopCategory"), value: info?.category ?? dash },
-              { label: t("col.tva"), value: sheet.tva ?? dash },
+              {
+                label: t("col.tva"),
+                value: (
+                  <Editable field="tva" label={t("col.tva")}>
+                    {sheet.tva ?? dash}
+                  </Editable>
+                ),
+              },
             ]}
           />
         </SheetCard>
@@ -90,8 +121,22 @@ export function GeneralTab({
         <SheetCard title={t("products.prices")}>
           <FieldList
             fields={[
-              { label: t("products.ppv"), value: mad(prices.ppv) },
-              { label: t("products.pph"), value: mad(prices.pph) },
+              {
+                label: t("products.ppv"),
+                value: (
+                  <Editable field="ppv" kind="price" label={t("products.ppv")}>
+                    {mad(prices.ppv)}
+                  </Editable>
+                ),
+              },
+              {
+                label: t("products.pph"),
+                value: (
+                  <Editable field="pph" kind="price" label={t("products.pph")}>
+                    {mad(prices.pph)}
+                  </Editable>
+                ),
+              },
               { label: t("products.avgPu"), value: mad(prices.avg_pu) },
               {
                 label: t("products.lastPu"),
@@ -118,17 +163,49 @@ export function GeneralTab({
             fields={[
               {
                 label: t("products.stockCurrent"),
-                value: stock.current_stock != null ? formatQty(stock.current_stock) : t("products.notInStock"),
+                value: (
+                  <Editable field="current_stock" kind="int" label={t("products.stockCurrent")}>
+                    {stock.current_stock != null ? formatQty(stock.current_stock) : t("products.notInStock")}
+                  </Editable>
+                ),
               },
-              { label: t("products.stockMin"), value: formatQty(stock.stock_min) },
-              { label: t("products.stockMax"), value: formatQty(stock.stock_max) },
+              {
+                label: t("products.stockMin"),
+                value: (
+                  <Editable field="stock_min" kind="int" label={t("products.stockMin")}>
+                    {formatQty(stock.stock_min)}
+                  </Editable>
+                ),
+              },
+              {
+                label: t("products.stockMax"),
+                value: (
+                  <Editable field="stock_max" kind="int" label={t("products.stockMax")}>
+                    {formatQty(stock.stock_max)}
+                  </Editable>
+                ),
+              },
               {
                 label: t("products.coverage"),
                 value: stock.coverage_days != null ? t("products.coverageDays", { n: stock.coverage_days }) : dash,
               },
               { label: t("products.status"), value: <StockStatusPill status={stock.status} /> },
-              { label: t("col.peremption"), value: stock.expiry_date ? formatDate(stock.expiry_date) : dash },
-              { label: t("products.zone"), value: stock.zone ?? dash },
+              {
+                label: t("col.peremption"),
+                value: (
+                  <Editable field="expiry_date" kind="date" label={t("col.peremption")}>
+                    {stock.expiry_date ? formatDate(stock.expiry_date) : dash}
+                  </Editable>
+                ),
+              },
+              {
+                label: t("products.zone"),
+                value: (
+                  <Editable field="zone" label={t("products.zone")}>
+                    {stock.zone ?? dash}
+                  </Editable>
+                ),
+              },
             ]}
           />
           <p className="text-xs text-muted-foreground">
@@ -141,11 +218,15 @@ export function GeneralTab({
         </SheetCard>
 
         <SheetCard title={t("products.description")} className="lg:col-span-2">
-          {info?.description ? (
-            <p className="whitespace-pre-line text-base leading-relaxed text-foreground">{info.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">{t("products.noDescription")}</p>
-          )}
+          <Editable field="description" kind="textarea" label={t("products.description")}>
+            {info?.description ? (
+              <span className="block whitespace-pre-line text-base leading-relaxed text-foreground">
+                {info.description}
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground">{t("products.noDescription")}</span>
+            )}
+          </Editable>
           {info && info.details.length > 0 && (
             <FieldList fields={info.details.map((d) => ({ label: d.label, value: d.value }))} />
           )}

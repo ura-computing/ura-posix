@@ -9,10 +9,13 @@
  *  « Ventes et achats par mois » (table, then chart + tooltip) and the Statistiques tab = oracle.
  *  « Mouvements » (from « Voir tout »): all lines, page 2, Achats, Ventes over the test window,
  *  search, Excel = oracle.
+ *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
+ *  import keeps them; « Revenir à la valeur importée », « Annuler », min > max refused. Employee:
+ *  « Modifier » disabled + reason, PUT refused.
  *  An employee sees the list + a sheet; feature OFF → no menu entry, 404 inside the layout. */
 import type { Page } from "@playwright/test";
 
-import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../lib/api";
 import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
 import type { Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
@@ -129,12 +132,13 @@ const field = (page: Page, label: string) =>
   page.locator(`xpath=//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
 
 async function expectNumber(page: Page, label: string, want: number | null): Promise<void> {
-  const got = frNumber(await field(page, label).innerText());
+  // 1st line: an edited value also shows « modifié · Valeur importée … » under it.
+  const got = frNumber((await field(page, label).innerText()).split("\n")[0]);
   if (want == null) expect(got, label).toBeNull();
   else expect(Math.abs((got ?? NaN) - want), `${label}: écran ${got} ≠ ${want}`).toBeLessThanOrEqual(0.011);
 }
 
-test("produits: liste = oracle (pages 1 et 2, période « Vendus 12 mois »)", async ({ page }) => {
+test("produits: liste = oracle (pages 1 et 2, 50 par page, période « Vendus 12 mois »)", async ({ page }) => {
   const e = expected().products;
   const first = await open(page);
   expectSame(
@@ -154,6 +158,11 @@ test("produits: liste = oracle (pages 1 et 2, période « Vendus 12 mois »)", a
   const second = pageCall(page, "/products", { page: "2" });
   await page.getByRole("button", { name: "Page suivante" }).click();
   expectSame((await second).data, e.rows.slice(LIMIT, 2 * LIMIT), "page 2");
+
+  const fifty = pageCall(page, "/products", { page: "1", limit: "50" });
+  await page.getByRole("button", { name: "25 / page" }).click();
+  await page.getByRole("button", { name: "50 / page", exact: true }).click();
+  expectSame((await fifty).data, e.rows.slice(0, 50), "50 par page (retour page 1)");
 });
 
 test("produits: photos (PID, code-barres, adresse morte → icône)", async ({ page }) => {
@@ -187,7 +196,7 @@ test("produits: tri de chaque colonne (desc puis asc)", async ({ page }) => {
   }
 });
 
-test("produits: recherche + Pharmacie / Parapharmacie", async ({ page }) => {
+test("produits: recherche + Pharmacie / Parapharmacie + « Tout réinitialiser »", async ({ page }) => {
   await open(page);
   const box = page.getByPlaceholder("Nom, code-barres, PID, laboratoire…");
   for (const [q, pids] of Object.entries<string[]>(expected().products.search)) {
@@ -222,6 +231,16 @@ test("produits: recherche + Pharmacie / Parapharmacie", async ({ page }) => {
       expectSame(got.data, want.slice(0, LIMIT), `${label}: page 1`);
     });
   }
+
+  await test.step("« Tout réinitialiser »", async () => {
+    const searched = pageCall(page, "/products", { search: "90010" });
+    await box.fill("90010");
+    await searched;
+    const back = pageCall(page, "/products", { category_type: "all", search: null, page: "1" });
+    await page.getByRole("button", { name: "Tout réinitialiser" }).click();
+    expectSame((await back).data, rows().slice(0, LIMIT), "liste du départ");
+    await expect(box).toHaveValue("");
+  });
 });
 
 test("produits: export Excel = toute la liste, en-têtes en français", async ({ page }) => {
@@ -287,6 +306,13 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     const sheet = pageCall(other, `/products/${got.data[0].id}`);
     await other.locator("tbody").getByText(first.product, { exact: true }).click();
     expectSame(await sheet, expected().products.sheets[first.pid], "fiche (employé)");
+    await expect(
+      other.getByRole("button", { name: "Modifier", exact: true }),
+      "employé : lecture seule",
+    ).toBeDisabled();
+    await expect(other.getByText("Seul le propriétaire peut modifier ce produit.")).toBeVisible();
+    const refused = await apiPut(other, `/products/${got.data[0].id}`, { ppv: 1 }, 403);
+    expect(refused.code, "PUT par un employé").toBe("ownerOnly");
   } finally {
     await ctx.close();
     await apiDelete(page, `/owner/employees/${member.id}`, 204);
@@ -371,13 +397,38 @@ test("fiche produit: onglet « Codes » gardé dans l'adresse, retour à la list
   await openSheet(page, pid);
   await page.getByRole("tab", { name: "Codes", exact: true }).click();
   await expect(page).toHaveURL(/\?tab=codes$/);
+  await expect(page.getByRole("heading", { name: "Codes du produit", exact: true })).toBeVisible();
   expect(await columnTexts(page, "Code"), "codes").toEqual([pid, barcode1, "—"]);
   await page.reload();
   await expect(page.getByRole("tab", { name: "Codes", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Général", exact: true }).click();
   await expect(page).not.toHaveURL(/tab=/);
+  // Breadcrumb « Produits › name », then the browser's back button, then « Retour aux produits ».
+  await page.locator("main").getByRole("link", { name: "Produits", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { level: 1, name: product, exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Retour aux produits" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
+});
+
+test("fiche produit: en espagnol (onglets, blocs, boutons), choix gardé, retour en français", async ({ page }) => {
+  await openSheet(page, Object.keys(expected().products.sheets)[0]);
+  await page.getByRole("button", { name: "Espagnol", exact: true }).click();
+  for (const name of ["General", "Estadísticas", "Movimientos", "Códigos"]) {
+    await expect(page.getByRole("tab", { name, exact: true }), `onglet ${name}`).toBeVisible();
+  }
+  for (const title of ["Datos generales", "Precios", "Movimientos recientes", "Ventas y compras por mes"]) {
+    await expect(page.getByRole("heading", { name: title, exact: true }), title).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: "Editar", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Volver a los productos" })).toBeVisible();
+  await page.reload(); // the language is remembered
+  await expect(page.getByRole("tab", { name: "Estadísticas", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Estadísticas", exact: true }).click();
+  await expect(page.getByText("Ventas 12 meses", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Francés", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Statistiques", exact: true })).toBeVisible();
 });
 
 test("fiche produit: produit sans ligne dans la pharmacie → 404 dans le cadre", async ({ page, browser }) => {
@@ -416,6 +467,7 @@ test("fiche produit: ventes et achats par mois, tableau puis graphique = oracle"
         { label: `Achats ${y.year}`, months: y.bought, total: y.bought_total },
       ]);
       const table = card.locator("table");
+      await expect(table.locator("tbody tr"), "lignes dessinées").toHaveCount(series.length);
       expect(await columnTexts(page, "Série", table), "lignes").toEqual(series.map((r) => r.label));
       for (const [m, label] of MONTHS_SHORT.entries()) {
         const shown = (await columnTexts(page, label, table)).map((x) => frNumber(x) ?? 0);
@@ -525,6 +577,7 @@ test("fiche produit: onglet « Mouvements » = oracle (filtres, pages, recherche
   await section(page, "Mouvements récents").getByRole("button", { name: "Voir tout" }).click();
   await expect(page).toHaveURL(/\?tab=movements$/);
   check(await call, e.all, "tout");
+  await expect(page.locator("tbody tr"), "lignes dessinées").toHaveCount(e.all.page.length);
   expect((await columnTexts(page, "Quantité")).map(frNumber), "quantités à l'écran").toEqual(
     e.all.page.map((m: Row) => m.quantity),
   );
@@ -586,4 +639,277 @@ test("fiche produit: onglet « Mouvements » = oracle (filtres, pages, recherche
     ],
     "1re ligne du fichier",
   );
+});
+
+// ── « Modifier » (owner) ────────────────────────────────────────────────────
+
+/** 2nd product the oracle opens (sold, bought, in the stock file, with a description). */
+const editPid = (): string => Object.keys(expected().products.sheets)[1];
+const frDecimal = (n: number) => n.toFixed(2).replace(".", ",");
+const round2 = (n: number) => Number(n.toFixed(2));
+
+/** The pharmacy's stock import of one line (setup): stock / zone / expiry of that product. */
+async function importStockLine(page: Page, e: Row, stock: number): Promise<void> {
+  const row = {
+    PID: e.pid,
+    Produit: e.product,
+    Stock: String(stock),
+    Zone: e.stock.zone ?? "",
+    "Date de péremption": e.stock.expiry_date ?? "",
+    "Stock min": "",
+    "Stock max": "",
+  };
+  const sent = await apiPost(page, "/uploads/stock-json", { rows: [row], filename: "Sobrus - Stock 20260101.csv" });
+  await apiPatch(page, `/uploads/batches/${sent.batch_id}`, { status: "success" });
+}
+
+/** Every editable value: [input label (tab), value typed, value sent, imported value]. */
+function editPlan(
+  e: Row,
+): { label: string; tab: "Général" | "Codes"; typed: string; field: string; sent: unknown; imported: unknown }[] {
+  const ppv = round2(e.prices.ppv + 10);
+  const pph = round2(e.prices.pph + 1);
+  return [
+    {
+      label: "Nom du produit",
+      tab: "Général",
+      typed: `${e.product} (pharmacie)`,
+      field: "product",
+      sent: `${e.product} (pharmacie)`,
+      imported: e.product,
+    },
+    {
+      label: "Catégorie",
+      tab: "Général",
+      typed: "Catégorie E2E",
+      field: "category",
+      sent: "Catégorie E2E",
+      imported: e.category,
+    },
+    {
+      label: "Laboratoire",
+      tab: "Général",
+      typed: "Laboratoire E2E modifié",
+      field: "laboratoire",
+      sent: "Laboratoire E2E modifié",
+      imported: e.laboratoire,
+    },
+    { label: "TVA", tab: "Général", typed: "TVA (10.00%)", field: "tva", sent: "TVA (10.00%)", imported: e.tva },
+    {
+      label: "Prix de vente (PPV)",
+      tab: "Général",
+      typed: frDecimal(ppv),
+      field: "ppv",
+      sent: ppv,
+      imported: e.prices.ppv,
+    },
+    {
+      label: "Prix pharmacien (PPH)",
+      tab: "Général",
+      typed: frDecimal(pph),
+      field: "pph",
+      sent: pph,
+      imported: e.prices.pph,
+    },
+    {
+      label: "Stock actuel",
+      tab: "Général",
+      typed: "12",
+      field: "current_stock",
+      sent: 12,
+      imported: e.stock.current_stock,
+    },
+    { label: "Stock minimum", tab: "Général", typed: "3", field: "stock_min", sent: 3, imported: e.stock.stock_min },
+    { label: "Stock maximum", tab: "Général", typed: "9", field: "stock_max", sent: 9, imported: e.stock.stock_max },
+    {
+      label: "Péremption",
+      tab: "Général",
+      typed: "31/12/2027",
+      field: "expiry_date",
+      sent: "2027-12-31",
+      imported: e.stock.expiry_date,
+    },
+    { label: "Zone", tab: "Général", typed: "ZONE E2E", field: "zone", sent: "ZONE E2E", imported: e.stock.zone },
+    {
+      label: "Description",
+      tab: "Général",
+      typed: "Description du pharmacien.",
+      field: "description",
+      sent: "Description du pharmacien.",
+      imported: e.info?.description ?? null,
+    },
+    {
+      label: "Code-barres 1",
+      tab: "Codes",
+      typed: "3760000000082",
+      field: "barcode1",
+      sent: "3760000000082",
+      imported: e.barcode1,
+    },
+    {
+      label: "Code-barres 2",
+      tab: "Codes",
+      typed: "3760000000099",
+      field: "barcode2",
+      sent: "3760000000099",
+      imported: e.barcode2,
+    },
+  ];
+}
+
+// The 3 tests follow each other: edit every value, an import, then everything back.
+test.describe("modifier", () => {
+  test.describe.configure({ mode: "serial" });
+
+  test("modifier : chaque valeur changée par le propriétaire, « modifié » sur la fiche, la liste suit", async ({
+    page,
+  }) => {
+    const pid = editPid();
+    const e = expected().products.sheets[pid];
+    const plan = editPlan(e);
+    const { id } = await openSheet(page, pid);
+
+    await page.getByRole("button", { name: "Modifier", exact: true }).click();
+    await expect(page.getByText("Ces valeurs comptent seulement pour votre pharmacie")).toBeVisible();
+    // The type (Pharmacie / Parapharmacie) stays the catalogue's: no switch for it.
+    await expect(page.getByRole("button", { name: "Parapharmacie", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Pharmacie", exact: true })).toHaveCount(0);
+    for (const tab of ["Général", "Codes"] as const) {
+      await page.getByRole("tab", { name: tab, exact: true }).click(); // still editing on each tab
+      for (const f of plan.filter((x) => x.tab === tab)) await page.getByLabel(f.label, { exact: true }).fill(f.typed);
+    }
+    const put = page.waitForResponse((r) => r.url().endsWith(`/v1/products/${id}`) && r.request().method() === "PUT");
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    const res = await put;
+    expect(res.status(), "PUT /products/{id}").toBe(200);
+    expect(res.request().postDataJSON(), "seuls les champs changés").toEqual(
+      Object.fromEntries(plan.map((f) => [f.field, f.sent])),
+    );
+    const ppv = plan.find((f) => f.field === "ppv")?.sent as number;
+    expectSame(
+      await res.json(),
+      {
+        product: `${e.product} (pharmacie)`,
+        category: "Catégorie E2E",
+        category_type: e.category_type, // unchanged
+        laboratoire: "Laboratoire E2E modifié",
+        tva: "TVA (10.00%)",
+        barcode1: "3760000000082",
+        barcode2: "3760000000099",
+        info: { description: "Description du pharmacien." },
+        prices: {
+          ppv,
+          pph: plan.find((f) => f.field === "pph")?.sent,
+          marge_pct: e.prices.avg_pu == null ? null : (1 - e.prices.avg_pu / ppv) * 100, // follows the PPV shown
+        },
+        stock: { current_stock: 12, stock_min: 3, stock_max: 9, expiry_date: "2027-12-31", zone: "ZONE E2E" },
+        imported: Object.fromEntries(plan.map((f) => [f.field, f.imported])),
+      },
+      "fiche après Enregistrer",
+    );
+    await expect(page.getByText("Fiche enregistrée")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Modifier", exact: true }), "fin de la modification").toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: `${e.product} (pharmacie)`, exact: true })).toBeVisible();
+    await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Codes »").toHaveCount(2);
+    await page.getByRole("tab", { name: "Général", exact: true }).click();
+    await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Général »").toHaveCount(12);
+    await expectNumber(page, "Prix de vente (PPV)", ppv);
+    await expect(field(page, "Prix de vente (PPV)")).toContainText("Valeur importée :");
+    await expect(page.getByText("Description du pharmacien.", { exact: true })).toBeVisible();
+
+    // The list shows his values too (Produits only); the type is still the catalogue's.
+    await open(page);
+    const found = pageCall(page, "/products", { search: pid });
+    await page.getByPlaceholder("Nom, code-barres, PID, laboratoire…").fill(pid);
+    expectSame(
+      (await found).data[0],
+      {
+        pid,
+        product: `${e.product} (pharmacie)`,
+        category: "Catégorie E2E",
+        laboratoire: "Laboratoire E2E modifié",
+        ppv,
+        current_stock: 12,
+        category_type: e.category_type,
+      },
+      "liste après modification",
+    );
+    // The server refuses a type change too (not an editable value).
+    const refused = await apiPut(page, `/products/${id}`, { product_type: "parapharmacie" }, 422);
+    expect(refused.code, "type non modifiable").toBe("invalidInput");
+  });
+
+  test("modifier : un import de stock garde la valeur du propriétaire, à l'écran aussi", async ({ page }) => {
+    const pid = editPid();
+    const e = expected().products.sheets[pid];
+    const { id } = await openSheet(page, pid);
+    await importStockLine(page, e, 999);
+    const after = await apiGet(page, `/products/${id}`);
+    expect(after.stock.current_stock, "valeur du propriétaire gardée").toBe(12);
+    expect(after.imported.current_stock, "nouvelle valeur importée").toBe(999);
+    await page.reload();
+    await expectNumber(page, "Stock actuel", 12);
+    await expect(field(page, "Stock actuel")).toContainText("Valeur importée : 999");
+    await importStockLine(page, e, e.stock.current_stock); // back to the oracle's stock
+  });
+
+  test("modifier : valeurs fausses refusées, « Annuler », « Revenir à la valeur importée »", async ({ page }) => {
+    const pid = editPid();
+    const e = expected().products.sheets[pid];
+    const ppv = editPlan(e).find((f) => f.field === "ppv")?.sent as number;
+    const { id } = await openSheet(page, pid);
+    let puts = 0;
+    page.on("request", (r) => {
+      if (r.method() === "PUT") puts += 1;
+    });
+
+    // « Annuler »: nothing sent, nothing changed.
+    await page.getByRole("button", { name: "Modifier", exact: true }).click();
+    await page.getByLabel("Prix de vente (PPV)", { exact: true }).fill("1,00");
+    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    expect(puts, "Annuler : rien envoyé").toBe(0);
+    await expectNumber(page, "Prix de vente (PPV)", ppv);
+
+    // Wrong values: one message under each, nothing sent.
+    await page.getByRole("button", { name: "Modifier", exact: true }).click();
+    await page.getByLabel("Prix de vente (PPV)", { exact: true }).fill("douze");
+    await page.getByLabel("Stock actuel", { exact: true }).fill("1,5");
+    await page.getByLabel("Péremption", { exact: true }).fill("31/02/2027");
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await expect(page.getByText("Prix invalide (exemple : 12,50).")).toBeVisible();
+    await expect(page.getByText("Nombre entier attendu (exemple : 12).")).toBeVisible();
+    await expect(page.getByText("Date invalide (exemple : 31/12/2026).")).toBeVisible();
+    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    // Minimum above maximum (checked once the other values are right).
+    await page.getByRole("button", { name: "Modifier", exact: true }).click();
+    await page.getByLabel("Stock minimum", { exact: true }).fill("50");
+    await page.getByLabel("Stock maximum", { exact: true }).fill("10");
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await expect(page.getByText("Le stock minimum ne peut pas dépasser le stock maximum.")).toBeVisible();
+    expect(puts, "valeurs fausses : rien envoyé").toBe(0);
+    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    const refused = await apiPut(page, `/products/${id}`, { stock_min: 50, stock_max: 10 }, 400);
+    expect(refused.code, "min > max côté serveur").toBe("stockMinAboveMax");
+
+    // « Revenir à la valeur importée » on every edited value → the oracle's sheet again.
+    for (const [tab, block] of [
+      ["Codes", "Codes du produit"],
+      ["Général", "Données générales"],
+    ]) {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
+      // Count only once the tab is on screen (else: 0 buttons, the loop stops early).
+      await expect(page.getByRole("heading", { name: block, exact: true })).toBeVisible();
+      const revert = page.getByRole("button", { name: "Revenir à la valeur importée" });
+      for (let left = await revert.count(); left > 0; left--) {
+        const done = page.waitForResponse((r) => r.request().method() === "PUT");
+        await revert.first().click();
+        expect((await done).status(), "Revenir").toBe(200);
+        await expect(revert, "une valeur de moins").toHaveCount(left - 1);
+      }
+    }
+    await expect(page.getByText("modifié", { exact: true })).toHaveCount(0);
+    const back = await apiGet(page, `/products/${id}`);
+    expectSame(back, e, "fiche revenue aux valeurs importées");
+    expect(back.imported, "plus rien de modifié").toEqual({});
+  });
 });

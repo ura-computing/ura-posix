@@ -13,7 +13,6 @@
 
 + make sure all file uses translation
 
-+ add ui tutorial for new user to show the m how to use the app
 
 + make sure tests-ui tests everything that have to do with ui
 
@@ -22,3 +21,5 @@
 
 
 + check cursor pagination
+
++ add ui tutorial for new user to show the m how to use the app
