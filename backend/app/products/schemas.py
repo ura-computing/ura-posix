@@ -96,3 +96,47 @@ class ProductSheet(BaseModel):
     prices: ProductPrices
     stock: ProductStock
     recent_movements: list[ProductMovement]  # 10 latest, newest first
+
+
+# ═══ Statistiques ════════════════════════════════════════════════════════════
+
+
+class MonthlySales(BaseModel):
+    """« Ventes et achats par mois »: one entry per year with a sale or a purchase."""
+
+    year: int
+    sold: list[float]  # units sold, 12 values, January first
+    sold_total: float
+    bought: list[float]  # units bought, 12 values, January first
+    bought_total: float
+
+
+class BestMonth(BaseModel):
+    month: str  # YYYY-MM
+    units: float
+
+
+class YearSummary(BaseModel):
+    year: int
+    units_sold: float
+    ca: float  # Σ qty × PPV (Rapport rule)
+    units_bought: float
+    amount_bought: float  # Σ purchase line totals
+
+
+class ProductStats(BaseModel):
+    """« 12 mois » = the Stock page's window (`sales_from` → `sales_to`), like the sheet."""
+
+    sales_from: str
+    sales_to: str
+    units_30d: float  # today and the 29 days before
+    units_12m: float
+    ca_12m: float
+    avg_per_month: float  # units_12m ÷ 12
+    avg_per_day: float  # units_12m ÷ days of the window
+    months_without_sale: int  # months of the window with no sale line
+    first_sale: str | None
+    last_sale: str | None
+    best_month: BestMonth | None  # most units ever; tie → the latest month
+    monthly: list[MonthlySales]  # newest year first (same years as `yearly`)
+    yearly: list[YearSummary]  # newest year first

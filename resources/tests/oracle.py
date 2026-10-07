@@ -468,6 +468,47 @@ class Oracle:
             ],
         }
 
+    def product_stats(self, p) -> dict:
+        """GET /products/{id}/stats: sales + purchases per month (units; CA = qty × PPV, amount bought
+        = Σ line totals), « 12 mois » = the Stock page window, 30 days = today and the 29 before."""
+        start, end = default_abcd_window(self.today)
+        sales: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
+        for v in self.ventes:
+            if v.p is p:
+                sales[v.day.isoformat()[:7]][0] += v.qty
+                sales[v.day.isoformat()[:7]][1] += ca(v)
+        days = [v.day for v in self.ventes if v.p is p]
+        window = [m for m in sales if start.isoformat()[:7] <= m <= end.isoformat()[:7]]
+        units_12m = sum(sales[m][0] for m in window)
+        since = self.today - timedelta(days=29)
+        best = max(sales.items(), key=lambda kv: (kv[1][0], kv[0]), default=None)
+        mine = [a for a in self.achats if a.p is p]
+        years = sorted({int(m[:4]) for m in sales} | {a.day.year for a in mine}, reverse=True)
+        sold = {y: [0.0] * 12 for y in years}
+        bought = {y: [0.0] * 12 for y in years}
+        for m, (units, _) in sales.items():
+            sold[int(m[:4])][int(m[5:7]) - 1] += units
+        for a in mine:
+            bought[a.day.year][a.day.month - 1] += a.qty
+        return {
+            "sales_from": start.isoformat(), "sales_to": end.isoformat(),
+            "units_30d": sum(v.qty for v in self.ventes if v.p is p and since <= v.day <= self.today),
+            "units_12m": units_12m, "ca_12m": r2(sum(sales[m][1] for m in window)),
+            "avg_per_month": r2(units_12m / 12), "avg_per_day": r2(units_12m / ((end - start).days + 1)),
+            "months_without_sale": 12 - len(window),
+            "first_sale": min(days).isoformat() if days else None,
+            "last_sale": max(days).isoformat() if days else None,
+            "best_month": {"month": best[0], "units": best[1][0]} if best and best[1][0] > 0 else None,
+            "monthly": [{"year": y, "sold": sold[y], "sold_total": sum(sold[y]), "bought": bought[y],
+                         "bought_total": sum(bought[y])} for y in years],
+            "yearly": [
+                {"year": y, "units_sold": sum(sold[y]),
+                 "ca": r2(sum(sales[m][1] for m in sales if int(m[:4]) == y)),
+                 "units_bought": sum(bought[y]), "amount_bought": r2(sum(a.total for a in mine if a.day.year == y))}
+                for y in years
+            ],
+        }
+
     def sheet_pids(self, rows: list[dict], infos: dict[str, dict]) -> list[str]:
         """Products 18-produits opens: the 4 with scraped info, then one never bought (no PU),
         one not in the stock file, one stock-only (no line at all), one with a negative stock."""
@@ -502,6 +543,7 @@ class Oracle:
             "sheets": {pid: self.product_sheet(by_pid[pid], infos.get(pid),
                                                barcode["barcode1"] if by_pid[pid].name == barcode["product"] else None)
                        for pid in self.sheet_pids(rows, infos)},
+            "stats": {pid: self.product_stats(by_pid[pid]) for pid in self.sheet_pids(rows, infos)},
             "search": {q: [r["pid"] for r in rows
                            if all(token_match(r["product"], t, unaccent=True) or token_match(r["pid"], t, unaccent=False)
                                   for t in tokenize(q))]

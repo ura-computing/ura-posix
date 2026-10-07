@@ -1,13 +1,14 @@
 /** « Général »: photos, données générales, prix, stock (Stock page rules), description,
- *  the 10 latest purchases / sales. */
+ *  the 10 latest purchases / sales, « Ventes par mois » (table or chart). */
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { StockStatusPill } from "@/_components/StockStatusPill";
 import { TypeBadge } from "@/_components/TypeBadge";
-import type { ProductMovement, ProductSheet } from "@/types";
+import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 
+import { MonthlySalesCard } from "./MonthlySalesCard";
 import { PhotoGallery } from "./PhotoGallery";
 import { FieldList, SheetCard } from "./SheetCard";
 
@@ -51,7 +52,7 @@ const movementColumns = (t: TFn): ColumnDef<ProductMovement>[] => [
   { key: "party", label: t("products.colParty"), width: 200, sortable: false, render: (m) => m.party ?? dash },
 ];
 
-export function GeneralTab({ sheet }: { sheet: ProductSheet }) {
+export function GeneralTab({ sheet, stats }: { sheet: ProductSheet; stats: ProductStats | null }) {
   const t = useT();
   const { info, prices, stock } = sheet;
   return (
@@ -147,6 +148,8 @@ export function GeneralTab({ sheet }: { sheet: ProductSheet }) {
           rowKey={(_, i) => i}
         />
       </SheetCard>
+
+      <MonthlySalesCard stats={stats} />
     </div>
   );
 }

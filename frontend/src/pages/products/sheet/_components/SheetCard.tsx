@@ -3,10 +3,24 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/utils/cn";
 
-export function SheetCard({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+export function SheetCard({
+  title,
+  actions,
+  children,
+  className,
+}: {
+  title: string;
+  /** Right of the title (e.g. a Tableau / Graphique switch). */
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <section className={cn("flex flex-col gap-3 rounded-xl border border-border bg-card p-4", className)}>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
+        {actions}
+      </div>
       {children}
     </section>
   );

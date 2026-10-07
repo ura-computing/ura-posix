@@ -100,3 +100,43 @@ export interface ProductSheet {
   /** 10 latest, newest first. */
   recent_movements: ProductMovement[];
 }
+
+// ── Statistiques (GET /products/{id}/stats) ────────────────────────────────
+
+export interface MonthlySales {
+  year: number;
+  /** Units sold, January first (12 values). */
+  sold: number[];
+  sold_total: number;
+  /** Units bought, January first (12 values). */
+  bought: number[];
+  bought_total: number;
+}
+
+export interface YearSummary {
+  year: number;
+  units_sold: number;
+  /** Σ qty × PPV (Rapport rule). */
+  ca: number;
+  units_bought: number;
+  amount_bought: number;
+}
+
+export interface ProductStats {
+  /** « 12 mois » = the Stock page window. */
+  sales_from: string;
+  sales_to: string;
+  units_30d: number;
+  units_12m: number;
+  ca_12m: number;
+  avg_per_month: number;
+  avg_per_day: number;
+  months_without_sale: number;
+  first_sale: string | null;
+  last_sale: string | null;
+  best_month: { month: string; units: number } | null;
+  /** Newest year first. */
+  monthly: MonthlySales[];
+  /** Newest year first. */
+  yearly: YearSummary[];
+}

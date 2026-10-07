@@ -9,10 +9,19 @@ always show the same numbers (`stock_queries`)."""
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from sqlalchemy import and_, case, func, literal, or_, select, union, union_all
 from sqlalchemy.orm import Session
 
-from app.analytics.query_parts import PRICED_PURCHASE, avg_pu_expr, avg_pu_subquery, category_filter, pharma_expr
+from app.analytics.query_parts import (
+    PRICED_PURCHASE,
+    avg_pu_expr,
+    avg_pu_subquery,
+    ca_line,
+    category_filter,
+    pharma_expr,
+)
 from app.analytics.stock_queries import (
     _stock_max_for,
     _stock_min_for,
@@ -271,5 +280,111 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
                 "party": m.party,
             }
             for m in recent
+        ],
+    }
+
+
+# ─── Statistiques ────────────────────────────────────────────────────────────
+
+
+def product_stats(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
+    """« Ventes et achats par mois » + the Statistiques tab; None = not one of the pharmacy's
+    products. Sales and purchases are summed per month in SQL (one product: a few hundred rows)."""
+    if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
+        return None
+    today = pharmacy_today()
+    start, end = stock_abcd_window(today)
+    sales_from, sales_to = start.isoformat(), end.isoformat()
+
+    month = func.substr(Vente.date, 1, 7)
+    by_month = (
+        db.query(
+            month.label("month"),
+            func.sum(Vente.quantity).label("units"),
+            func.sum(ca_line()).label("ca"),
+        )
+        .join(Medicament, Medicament.id == Vente.medicament_id)
+        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id, Vente.date.isnot(None))
+        .group_by(month)
+        .all()
+    )
+    sales = {r.month: (float(r.units or 0), float(r.ca or 0)) for r in by_month}
+    first_sale, last_sale = (
+        db.query(func.min(Vente.date), func.max(Vente.date))
+        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id)
+        .one()
+    )
+    units_30d = (
+        db.query(func.coalesce(func.sum(Vente.quantity), 0))
+        .filter(
+            Vente.pharmacy_id == pharmacy_id,
+            Vente.medicament_id == med_id,
+            Vente.date >= (today - timedelta(days=29)).isoformat(),
+            Vente.date <= today.isoformat(),
+        )
+        .scalar()
+    )
+    achat_month = func.substr(Achat.delivery_date, 1, 7)
+    purchases = {
+        r.month: (float(r.units or 0), float(r.amount or 0))
+        for r in db.query(
+            achat_month.label("month"),
+            func.sum(Achat.quantity).label("units"),
+            func.sum(Achat.total).label("amount"),
+        )
+        .filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id, Achat.delivery_date.isnot(None))
+        .group_by(achat_month)
+        .all()
+    }
+
+    window = [m for m in sales if sales_from[:7] <= m <= sales_to[:7]]
+    units_12m = sum(sales[m][0] for m in window)
+    months_in_window = (end.year - start.year) * 12 + end.month - start.month + 1
+    best = max(sales.items(), key=lambda kv: (kv[1][0], kv[0]), default=None)
+
+    # Per year: units sold / bought each month (January first), CA and amount bought.
+    years = sorted({int(m[:4]) for m in [*sales, *purchases]}, reverse=True)
+    sold = {y: [0.0] * 12 for y in years}
+    bought = {y: [0.0] * 12 for y in years}
+    ca = dict.fromkeys(years, 0.0)
+    amount = dict.fromkeys(years, 0.0)
+    for m, (units, line_ca) in sales.items():
+        sold[int(m[:4])][int(m[5:7]) - 1] += units
+        ca[int(m[:4])] += line_ca
+    for m, (units, line_amount) in purchases.items():
+        bought[int(m[:4])][int(m[5:7]) - 1] += units
+        amount[int(m[:4])] += line_amount
+
+    return {
+        "sales_from": sales_from,
+        "sales_to": sales_to,
+        "units_30d": float(units_30d or 0),
+        "units_12m": units_12m,
+        "ca_12m": round(sum(sales[m][1] for m in window), 2),
+        "avg_per_month": round(units_12m / 12, 2),
+        "avg_per_day": round(units_12m / ((end - start).days + 1), 2),
+        "months_without_sale": months_in_window - len(window),
+        "first_sale": first_sale,
+        "last_sale": last_sale,
+        "best_month": {"month": best[0], "units": best[1][0]} if best and best[1][0] > 0 else None,
+        "monthly": [
+            {
+                "year": y,
+                "sold": sold[y],
+                "sold_total": sum(sold[y]),
+                "bought": bought[y],
+                "bought_total": sum(bought[y]),
+            }
+            for y in years
+        ],
+        "yearly": [
+            {
+                "year": y,
+                "units_sold": sum(sold[y]),
+                "ca": round(ca[y], 2),
+                "units_bought": sum(bought[y]),
+                "amount_bought": round(amount[y], 2),
+            }
+            for y in years
         ],
     }

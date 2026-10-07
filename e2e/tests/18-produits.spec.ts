@@ -6,6 +6,7 @@
  *  Product sheet (from the list): every case the oracle picked (photos, never bought, not in
  *  the stock file, stock only, negative stock) = oracle, on screen too; photo gallery; « Codes »
  *  tab kept in the address; a product of no pharmacy line → 404 inside the layout.
+ *  « Ventes et achats par mois » (table, then chart + tooltip) and the Statistiques tab = oracle.
  *  An employee sees the list + a sheet; feature OFF → no menu entry, 404 inside the layout. */
 import type { Page } from "@playwright/test";
 
@@ -15,7 +16,7 @@ import type { Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expected } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
-import { columnTexts, downloadXlsx, frNumber, pageCall, pickCategoryType } from "../lib/ui";
+import { columnTexts, downloadXlsx, frNumber, kpiValue, pageCall, pickCategoryType } from "../lib/ui";
 
 test.use({ storageState: sessionFile("owner") });
 
@@ -65,17 +66,52 @@ async function open(page: Page): Promise<Row> {
   return list;
 }
 
-/** List → type the PID → click the product: its id + the sheet the page loaded. */
-async function openSheet(page: Page, pid: string): Promise<{ id: number; sheet: Row }> {
+/** List → type the PID → click the product: its id + the sheet and statistics the page loaded. */
+async function openSheet(page: Page, pid: string): Promise<{ id: number; sheet: Row; stats: Row }> {
   await open(page);
   const found = pageCall(page, "/products", { search: pid });
   await page.getByPlaceholder("Nom, code-barres, PID, laboratoire…").fill(pid);
   const { id, product } = (await found).data.find((r: Row) => r.pid === pid);
   const sheet = pageCall(page, `/products/${id}`);
+  const stats = pageCall(page, `/products/${id}/stats`);
   await page.locator("tbody").getByText(product, { exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: product, exact: true })).toBeVisible();
-  return { id, sheet: await sheet };
+  return { id, sheet: await sheet, stats: await stats };
 }
+
+const MONTHS_SHORT = [
+  "Janv.",
+  "Févr.",
+  "Mars",
+  "Avr.",
+  "Mai",
+  "Juin",
+  "Juil.",
+  "Août",
+  "Sept.",
+  "Oct.",
+  "Nov.",
+  "Déc.",
+];
+const MONTHS = [
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
+];
+/** « 01 juil. 2025 »: utils/format.tsx formatDate. */
+const frDate = (iso: string) =>
+  new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(iso));
+const section = (page: Page, title: string) =>
+  page.locator("section").filter({ has: page.getByRole("heading", { name: title, exact: true }) });
 
 /** The value printed next to a label in a sheet block (« Prix de vente (PPV) » → « 307,48 MAD »). */
 const field = (page: Page, label: string) =>
@@ -346,5 +382,112 @@ test("fiche produit: produit sans ligne dans la pharmacie → 404 dans le cadre"
   } finally {
     await apiDelete(admin, `/admin/catalog/${med.id}`, 204);
     await ctx.close();
+  }
+});
+
+test("fiche produit: ventes et achats par mois, tableau puis graphique = oracle", async ({ page }) => {
+  const all = expected().products.stats;
+  for (const pid of Object.keys(all)) {
+    await test.step(pid, async () => {
+      const e = all[pid];
+      const { stats } = await openSheet(page, pid);
+      expectSame(stats, e, `statistiques ${pid}`);
+      const card = section(page, "Ventes et achats par mois");
+      if (e.monthly.length === 0) {
+        await expect(card.getByText("Aucune vente ni achat pour ce produit.")).toBeVisible();
+        return;
+      }
+      // Table: per year a « Ventes » row then an « Achats » row.
+      const series = (e.monthly as Row[]).flatMap((y) => [
+        { label: `Ventes ${y.year}`, months: y.sold, total: y.sold_total },
+        { label: `Achats ${y.year}`, months: y.bought, total: y.bought_total },
+      ]);
+      const table = card.locator("table");
+      expect(await columnTexts(page, "Série", table), "lignes").toEqual(series.map((r) => r.label));
+      for (const [m, label] of MONTHS_SHORT.entries()) {
+        const shown = (await columnTexts(page, label, table)).map((x) => frNumber(x) ?? 0);
+        expect(shown, label).toEqual(series.map((r) => r.months[m]));
+      }
+      const totals = (await columnTexts(page, "Total", table)).map((x) => frNumber(x) ?? 0);
+      expect(totals, "totaux").toEqual(series.map((r) => r.total));
+
+      // Chart: one curve per series, each its own color (purchases dashed); the month under the
+      // mouse shows every series' value.
+      await card.getByRole("button", { name: "Graphique", exact: true }).click();
+      await expect(table).toHaveCount(0);
+      const chart = card.locator("svg.touch-none");
+      const curves = chart.locator("path");
+      await expect(curves).toHaveCount(series.length);
+      await expect(chart.locator("path[stroke-dasharray]")).toHaveCount(e.monthly.length);
+      const colors = await curves.evaluateAll((els) => els.map((el) => el.getAttribute("stroke")));
+      expect(new Set(colors).size, "une couleur par courbe").toBe(series.length);
+      const m = 6; // July: the mouse right above its x-axis label
+      const label = await chart.locator("text", { hasText: MONTHS_SHORT[m] }).boundingBox();
+      const box = await chart.boundingBox();
+      if (!label || !box) throw new Error("pas de graphique");
+      await page.mouse.move(label.x + label.width / 2, box.y + box.height / 2);
+      const tip = card.locator("div.pointer-events-none").filter({ hasText: MONTHS[m] });
+      await expect(tip).toBeVisible();
+      for (const r of series) {
+        const line = tip.locator("div.justify-between").filter({ hasText: r.label });
+        expect(frNumber(await line.locator("span.font-mono").innerText()), `${MONTHS[m]} ${r.label}`).toBe(r.months[m]);
+      }
+      await card.getByRole("button", { name: "Tableau", exact: true }).click();
+      await expect(table).toBeVisible();
+    });
+  }
+});
+
+test("fiche produit: onglet « Statistiques » = oracle", async ({ page }) => {
+  const all = expected().products.stats;
+  const sheets = expected().products.sheets;
+  for (const pid of Object.keys(all)) {
+    await test.step(pid, async () => {
+      const e = all[pid];
+      const s = sheets[pid];
+      await openSheet(page, pid);
+      await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
+      await expect(page).toHaveURL(/\?tab=stats$/);
+      const tile = async (label: string, want: number | null) => {
+        const got = frNumber(await kpiValue(page, label).innerText());
+        if (want == null) expect(got, label).toBeNull();
+        else expect(Math.abs((got ?? NaN) - want), `${label}: écran ${got} ≠ ${want}`).toBeLessThanOrEqual(0.011);
+      };
+      await tile("Ventes 30 jours", e.units_30d);
+      await tile("Ventes 12 mois", e.units_12m);
+      await tile("Chiffre d'affaires 12 mois", e.ca_12m);
+      await tile("Marge moyenne", s.prices.marge_pct);
+      await tile("Stock actuel", s.stock.current_stock);
+      await expect(kpiValue(page, "Couverture")).toHaveText(
+        s.stock.coverage_days == null ? "—" : `${s.stock.coverage_days} jours`,
+      );
+
+      await expectNumber(page, "Vente moyenne par mois", e.avg_per_month);
+      await expectNumber(page, "Vente moyenne par jour", e.avg_per_day);
+      await expect(field(page, "Première vente")).toHaveText(e.first_sale ? frDate(e.first_sale) : "—");
+      await expect(field(page, "Dernière vente")).toHaveText(e.last_sale ? frDate(e.last_sale) : "—");
+      const best = e.best_month;
+      await expect(field(page, "Meilleur mois")).toHaveText(
+        best
+          ? new RegExp(`^${MONTHS[Number(best.month.slice(5, 7)) - 1]} ${best.month.slice(0, 4)} · .+ vendus$`)
+          : /^—$/,
+      );
+      await expect(field(page, "Mois sans vente")).toHaveText(`${e.months_without_sale} sur 12`);
+
+      const years = section(page, "Ventes et achats par année").locator("table");
+      if (e.yearly.length === 0) return;
+      expect((await columnTexts(page, "Année", years)).map(Number), "années").toEqual(e.yearly.map((y: Row) => y.year));
+      for (const [label, key] of [
+        ["Unités vendues", "units_sold"],
+        ["Chiffre d'affaires", "ca"],
+        ["Unités achetées", "units_bought"],
+        ["Montant des achats", "amount_bought"],
+      ] as const) {
+        const shown = (await columnTexts(page, label, years)).map(frNumber);
+        shown.forEach((v, i) =>
+          expect(Math.abs((v ?? NaN) - e.yearly[i][key]), `${label} ${e.yearly[i].year}`).toBeLessThanOrEqual(0.011),
+        );
+      }
+    });
   }
 });

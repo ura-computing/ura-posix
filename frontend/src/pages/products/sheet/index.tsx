@@ -1,5 +1,5 @@
 /** /produits/:id — one product of the pharmacy: « Général » (photos, données, prix, stock,
- *  description, mouvements récents) and « Codes ». Not one of its products → the 404
+ *  description, mouvements récents, ventes par mois), « Statistiques » and « Codes ». Not one of its products → the 404
  *  inside the layout (never says whether it exists elsewhere). */
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
@@ -13,6 +13,7 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { CodesTab } from "./_components/CodesTab";
 import { GeneralTab } from "./_components/GeneralTab";
+import { StatsTab } from "./_components/StatsTab";
 import { useProduitPage, type SheetTab } from "./hooks";
 
 function BackToList({ name }: { name: string }) {
@@ -57,7 +58,7 @@ function Badges({ sheet }: { sheet: ProductSheet }) {
 export default function ProduitPage() {
   const t = useT();
   const { id } = useParams<{ id: string }>();
-  const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(Number(id));
+  const { sheet, stats, isLoading, notFound, tab, setTab } = useProduitPage(Number(id));
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
@@ -66,12 +67,15 @@ export default function ProduitPage() {
 
   const tabs: { id: SheetTab; label: string }[] = [
     { id: "general", label: t("products.tabGeneral") },
+    { id: "stats", label: t("products.tabStats") },
     { id: "codes", label: t("products.tabCodes") },
   ];
   return (
     <Page above={<BackToList name={sheet.product} />} title={sheet.product} subtitle={<Badges sheet={sheet} />}>
       <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
-      {tab === "general" ? <GeneralTab sheet={sheet} /> : <CodesTab sheet={sheet} />}
+      {tab === "general" && <GeneralTab sheet={sheet} stats={stats} />}
+      {tab === "stats" && <StatsTab sheet={sheet} stats={stats} />}
+      {tab === "codes" && <CodesTab sheet={sheet} />}
     </Page>
   );
 }
