@@ -459,7 +459,7 @@ class Oracle:
                 "coverage_days": round(stock * 365 / units) if stock is not None and stock >= 0 and units > 0 else None,
                 "status": coverage_status(stock, units),
                 "expiry_date": p.expiry.isoformat() if stock is not None and p.expiry else None,
-                "zone": p.zone,
+                "zone": p.zone.strip(),   # the browser trims every cell of the file
             },
             "recent_movements": [
                 {"kind": kind, "date": day.isoformat(), "quantity": qty, "unit_price": unit, "document": ref,

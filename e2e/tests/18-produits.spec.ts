@@ -11,7 +11,7 @@
 import type { Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
-import { loadState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
 import type { Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expected } from "../lib/expected";
@@ -257,7 +257,7 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     role: "employee",
     pharmacy_id: loadState().pharmacyId,
   });
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({ storageState: LOGGED_OUT }); // else: the owner's session
   try {
     const other = await ctx.newPage();
     await other.goto("/login");
@@ -418,7 +418,7 @@ test("fiche produit: ventes et achats par mois, tableau puis graphique = oracle"
       const chart = card.locator("svg.touch-none");
       const curves = chart.locator("path");
       await expect(curves).toHaveCount(series.length);
-      await expect(chart.locator("path[stroke-dasharray]")).toHaveCount(e.monthly.length);
+      await expect(chart.locator('path[stroke-dasharray="5 4"]'), "achats en pointillés").toHaveCount(e.monthly.length);
       const colors = await curves.evaluateAll((els) => els.map((el) => el.getAttribute("stroke")));
       expect(new Set(colors).size, "une couleur par courbe").toBe(series.length);
       const m = 6; // July: the mouse right above its x-axis label

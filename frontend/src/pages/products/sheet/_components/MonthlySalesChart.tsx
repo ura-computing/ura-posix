@@ -144,7 +144,9 @@ export function MonthlySalesChart({ years }: { years: MonthlySales[] }) {
             );
           })}
 
-          {/* Oldest series first, so the newest year is drawn on top. */}
+          {/* Oldest series first, so the newest year is drawn on top. Sales are drawn from left
+              to right; purchases fade in: the drawing animation (pathLength) would replace
+              their dashes with its own. */}
           {[...series].reverse().map((s) => (
             <motion.path
               key={s.key}
@@ -155,8 +157,8 @@ export function MonthlySalesChart({ years }: { years: MonthlySales[] }) {
               strokeDasharray={s.dashed ? "5 4" : undefined}
               strokeLinecap="round"
               strokeLinejoin="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
+              initial={s.dashed ? { opacity: 0 } : { pathLength: 0 }}
+              animate={s.dashed ? { opacity: 1 } : { pathLength: 1 }}
               transition={{ duration: 0.7, ease: "easeInOut" }}
             />
           ))}
