@@ -52,6 +52,7 @@ export const es: Dict = {
     alertes: "Alertas",
     comptabilite: "Contabilidad",
     produitsSpeciaux: "Productos especiales",
+    produits: "Productos",
     equipe: "Gestionar mi equipo",
     pharmacies: "Farmacias y usuarios",
     catalogue: "Catálogo",
@@ -250,6 +251,17 @@ export const es: Dict = {
     annee: "Año",
     totalCA: "Total Fact.",
     totalQte: "Total cant.",
+  },
+
+  products: {
+    title: "Productos",
+    subtitle: "Todos los productos de su farmacia: en stock, vendidos o comprados.",
+    searchPh: "Nombre, código de barras, PID, laboratorio…",
+    empty: "Ningún producto encontrado",
+    emptyHint: "Cambie la búsqueda o importe sus archivos Sobrus.",
+    vendus12m: "Vendidos 12 meses",
+    salesWindow: "« Vendidos 12 meses »: del {{from}} al {{to}}, como la página Stock.",
+    exportFailed: "La exportación ha fallado.",
   },
 
   achats: {
@@ -779,6 +791,8 @@ export const es: Dict = {
     alertesD: "Alertas de margen + notificaciones",
     special: "Productos especiales",
     specialD: "Excluir productos del cálculo de márgenes",
+    produits: "Productos",
+    produitsD: "Lista de productos y ficha de cada producto",
     roleOwner: "Propietario",
     roleEmployee: "Empleado",
     statusActive: "Activo",

@@ -1,4 +1,4 @@
-/** Single source of truth for the 9 permission features rendered on the admin
+/** Single source of truth for the 10 permission features rendered on the admin
  *  permission pages. Same keys as backend's ALLOWED_FEATURES (see models.py). */
 import {
   LayoutDashboard,
@@ -10,11 +10,21 @@ import {
   Wallet,
   Bell,
   Star,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 
 export type FeatureKey =
-  "rapports" | "import" | "achats" | "ventes" | "stock" | "analyse" | "accounting" | "alertes" | "special_products";
+  | "rapports"
+  | "import"
+  | "achats"
+  | "ventes"
+  | "stock"
+  | "analyse"
+  | "accounting"
+  | "alertes"
+  | "special_products"
+  | "produits";
 
 export interface FeatureDef {
   key: FeatureKey;
@@ -34,6 +44,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "accounting", label: "adminFeat.accounting", description: "adminFeat.accountingD", icon: Wallet },
   { key: "alertes", label: "adminFeat.alertes", description: "adminFeat.alertesD", icon: Bell },
   { key: "special_products", label: "adminFeat.special", description: "adminFeat.specialD", icon: Star },
+  { key: "produits", label: "adminFeat.produits", description: "adminFeat.produitsD", icon: Package },
 ];
 
 export const FEATURE_KEYS: readonly FeatureKey[] = FEATURES.map((f) => f.key);

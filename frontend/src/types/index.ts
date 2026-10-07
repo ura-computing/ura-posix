@@ -26,6 +26,7 @@ export const FEATURES = [
   "accounting",
   "alertes",
   "special_products",
+  "produits",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -47,6 +48,7 @@ export const ROUTES = {
   ALERTES: "/alertes",
   COMPTABILITE: "/comptabilite",
   PRODUITS_SPECIAUX: "/produits-speciaux",
+  PRODUITS: "/produits",
   IMPORTS: "/imports",
 
   // Gestion
@@ -84,3 +86,4 @@ export * from "./transactions";
 export * from "./exclusions";
 export * from "./members";
 export * from "./storeWebsite";
+export * from "./products";

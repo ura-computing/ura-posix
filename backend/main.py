@@ -16,6 +16,7 @@ from app.analytics import router as stats
 from app.catalog import router as catalog
 from app.ingestion import router as imports
 from app.ledger import router as transactions
+from app.products import router as products
 from app.store_website import router as store_website
 
 
@@ -55,6 +56,7 @@ app.include_router(admin_pharmacies.router, prefix="/v1")
 app.include_router(owner_employees.router, prefix="/v1")
 app.include_router(imports.router, prefix="/v1")
 app.include_router(transactions.router, prefix="/v1")
+app.include_router(products.router, prefix="/v1")
 app.include_router(exclusions.router, prefix="/v1")
 app.include_router(accounting.router, prefix="/v1")
 app.include_router(store_website.router, prefix="/v1")

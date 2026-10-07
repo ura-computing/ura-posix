@@ -41,6 +41,7 @@ ALLOWED_FEATURES = (
     "accounting",
     "alertes",
     "special_products",
+    "produits",
 )
 # Same rule as migrations 0009 / 0016, so a fresh DB (create_all) rejects unknown features too.
 _FEATURES_SQL = "(" + ", ".join(f"'{f}'" for f in ALLOWED_FEATURES) + ")"

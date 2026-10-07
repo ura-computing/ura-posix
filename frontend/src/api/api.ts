@@ -12,7 +12,15 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 
-import type { AchatsFilters, CatalogFilters, MargeMode, StockFilters, VentesFilters, VentesFiltersKey } from "@/types";
+import type {
+  AchatsFilters,
+  CatalogFilters,
+  MargeMode,
+  ProductsFilters,
+  StockFilters,
+  VentesFilters,
+  VentesFiltersKey,
+} from "@/types";
 
 type Key = readonly unknown[];
 
@@ -41,6 +49,7 @@ const afterImport = {
     API.stats.stockAbcdFull,
     API.stats.stockAbcdFiltered,
     API.specialProducts.suggestions,
+    API.products.list,
     ...blExclusionReads(),
     ...supplierExclusionReads(),
   ],
@@ -55,6 +64,7 @@ const afterImport = {
     API.stats.stockAbcdFiltered,
     API.stats.stockSummary,
     API.specialProducts.suggestions,
+    API.products.list,
   ],
   stock: (): Read[] => [
     API.imports.list,
@@ -63,6 +73,7 @@ const afterImport = {
     API.stats.peremptions,
     API.stats.stockSummary,
     API.stats.analyseMarge,
+    API.products.list,
   ],
 };
 
@@ -221,6 +232,14 @@ export const API = {
       url: "/achats/suggestions",
       key: (q: string) => ["achats", "suggestions", q] as const,
       all: ["achats", "suggestions"],
+    },
+  },
+
+  products: {
+    list: {
+      url: "/products",
+      key: (f: ProductsFilters) => ["products", "list", f] as const,
+      all: ["products", "list"],
     },
   },
 

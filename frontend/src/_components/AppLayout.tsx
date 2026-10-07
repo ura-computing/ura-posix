@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   TrendingUp,
   Boxes,
+  Package,
   BarChart3,
   Bell,
   Coins,
@@ -85,6 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "nav.achats", to: ROUTES.ACHATS, icon: ShoppingCart, roles: DATA, ready: true, feature: "achats" },
       { label: "nav.ventes", to: ROUTES.VENTES, icon: TrendingUp, roles: DATA, ready: true, feature: "ventes" },
       { label: "nav.stock", to: ROUTES.STOCK, icon: Boxes, roles: DATA, ready: true, feature: "stock" },
+      { label: "nav.produits", to: ROUTES.PRODUITS, icon: Package, roles: DATA, ready: true, feature: "produits" },
       { label: "nav.analyses", to: ROUTES.ANALYSES, icon: BarChart3, roles: DATA, ready: true, feature: "analyse" },
       { label: "nav.alertes", to: ROUTES.ALERTES, icon: Bell, roles: DATA, ready: true, feature: "alertes" },
       {

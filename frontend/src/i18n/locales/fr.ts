@@ -54,6 +54,7 @@ export const fr = {
     alertes: "Alertes",
     comptabilite: "Comptabilité",
     produitsSpeciaux: "Produits spéciaux",
+    produits: "Produits",
     equipe: "Gérer mon équipe",
     pharmacies: "Pharmacies et utilisateurs",
     catalogue: "Catalogue",
@@ -257,6 +258,17 @@ export const fr = {
     annee: "Année",
     totalCA: "Total CA",
     totalQte: "Total qté",
+  },
+
+  products: {
+    title: "Produits",
+    subtitle: "Tous les produits de votre pharmacie : en stock, vendus ou achetés.",
+    searchPh: "Nom, code-barres, PID, laboratoire…",
+    empty: "Aucun produit trouvé",
+    emptyHint: "Changez la recherche ou importez vos fichiers Sobrus.",
+    vendus12m: "Vendus 12 mois",
+    salesWindow: "« Vendus 12 mois » : du {{from}} au {{to}}, comme la page Stock.",
+    exportFailed: "L'export a échoué.",
   },
 
   achats: {
@@ -788,6 +800,8 @@ export const fr = {
     alertesD: "Alertes de marge + notifications",
     special: "Produits spéciaux",
     specialD: "Exclure des produits du calcul des marges",
+    produits: "Produits",
+    produitsD: "Liste des produits et fiche de chaque produit",
     roleOwner: "Propriétaire",
     roleEmployee: "Employé",
     statusActive: "Actif",

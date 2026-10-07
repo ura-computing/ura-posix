@@ -1,9 +1,9 @@
 # PharmaGest — the plan (everything left, in order)
 
-Updated 2026-10-05. One list, top to bottom. Open items only: a step leaves this file when
+Updated 2026-10-07. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §3 production tools (DO console, yours) → §8 Later.
+**Order:** §1 Produits module → §3 production tools (DO console, yours) → §8 Later.
 
 ---
 
@@ -15,6 +15,22 @@ Updated 2026-10-05. One list, top to bottom. Open items only: a step leaves this
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
 | Hidden store website (`backend/app/store_website/`, `frontend/src/pages/store/*`): moved as-is, never rewritten | hidden, must not break |
+
+---
+
+## 1. Produits module (PO design: the 2 PNGs in `resources/`)
+
+One feature at a time: backend + frontend + its part of `e2e/tests/18-produits.spec.ts` → review → next.
+
+| # | Feature | State |
+|---|---|---|
+| F1 | « Produits » list: feature `produits` (migration 0024, ON for everyone), `GET /products`, sidebar, search, Mixte / Pharmacie / Parapharmacie, sort, Excel | done |
+| F2 | Photos + description from the scraped catalogue (`product_infos`, loaded at every start, matched by PID then barcode) | |
+| F3 | Fiche produit: Général (données, prix, stock, description, mouvements récents) + Codes | |
+| F4 | « Ventes par mois » Tableau ⇄ Graphique + Statistiques tab | |
+| F5 | Mouvements tab (achats + ventes, filters, Excel) | |
+| F6 | Owner edit: « Modifier » / « Enregistrer », his pharmacy only, hand edit wins over imports, « Revenir à la valeur importée » | |
+| F7 | `README.md` | |
 
 ---
 

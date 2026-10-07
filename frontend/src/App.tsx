@@ -30,6 +30,7 @@ const PAGES = {
   AnalysePage: () => import("@/pages/analytics/analyses"),
   ComptabilitePage: () => import("@/pages/accounting/comptabilite"),
   StockPage: () => import("@/pages/analytics/stock"),
+  ProduitsPage: () => import("@/pages/products/list"),
   UploadFilePage: () => import("@/pages/imports/upload"),
   VentesPage: () => import("@/pages/operations/ventes"),
 };
@@ -63,6 +64,7 @@ const AlertesPage = lazy(PAGES.AlertesPage);
 const AnalysePage = lazy(PAGES.AnalysePage);
 const ComptabilitePage = lazy(PAGES.ComptabilitePage);
 const StockPage = lazy(PAGES.StockPage);
+const ProduitsPage = lazy(PAGES.ProduitsPage);
 const UploadFilePage = lazy(PAGES.UploadFilePage);
 const VentesPage = lazy(PAGES.VentesPage);
 
@@ -117,6 +119,9 @@ export default function App() {
           </Route>
           <Route element={<RequireFeature feature="stock" />}>
             <Route path={ROUTES.STOCK} element={<StockPage />} />
+          </Route>
+          <Route element={<RequireFeature feature="produits" />}>
+            <Route path={ROUTES.PRODUITS} element={<ProduitsPage />} />
           </Route>
           <Route element={<RequireFeature feature="analyse" />}>
             <Route path={ROUTES.ANALYSES} element={<AnalysePage />} />

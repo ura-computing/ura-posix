@@ -34,6 +34,9 @@ ACHAT_QUERIES = ["00042", "grossiste s", "10012*", "*042", "00*42"]
 ANALYSE_QUERIES = ["00*42", "médicament"]
 ANNEE_PRODUCT = "PRODUIT 0004"
 
+# /produits search box (e2e/tests/18-produits.spec.ts): one word with `*`, a PID part.
+PRODUCT_QUERIES = ["00*42", "90010"]
+
 # Produits spéciaux scenario (e2e/tests/10-exclusions.spec.ts).
 EXCLUDED_SUPPLIER = "Laboratoire WELEDA"
 SUPPLIER_QUERY = "weleda"
@@ -400,6 +403,42 @@ class Oracle:
         return {"date_from": start_12m.isoformat(), "date_to": end.isoformat(),
                 "distribution": dict(sorted(distribution.items())),
                 "total_references": len(products), "ppv_potentiel": r2(ppv_pot), "products": products}
+
+    # ── Produits ────────────────────────────────────────────────────────────
+
+    def products_list(self) -> list[dict]:
+        """GET /products rows (no id): every product in the stock file, sold or bought (any
+        date); « vendus 12 mois » + average PU = the Stock page's (no exclusions)."""
+        start, end = default_abcd_window(self.today)
+        units: dict[str, int] = defaultdict(int)
+        for v in self.ventes:
+            if start <= v.day <= end:
+                units[v.p.pid] += v.qty
+        linked = {p.pid for p in self.stocked} | {v.p.pid for v in self.ventes} | {a.p.pid for a in self.achats}
+        rows = []
+        for p in self.products:
+            if p.pid not in linked:
+                continue
+            pu = self.pu_alltime.get(p.pid)
+            rows.append({
+                "pid": p.pid, "product": p.name, "laboratoire": None, "category": p.category,
+                "category_type": "pharmacie" if p.pharma else "parapharmacie",
+                "current_stock": p.stock, "units_sold_12m": units.get(p.pid, 0), "ppv": r2(p.ppv),
+                "avg_pu": r4(pu) if pu is not None else None,
+                "marge_pct": r2((1 - pu / p.ppv) * 100) if pu is not None and p.ppv > 0 else None,
+            })
+        return sorted(rows, key=lambda r: r["product"])
+
+    def produits(self) -> dict:
+        rows = self.products_list()
+        start, end = default_abcd_window(self.today)
+        return {
+            "sales_from": start.isoformat(), "sales_to": end.isoformat(), "rows": rows,
+            "search": {q: [r["pid"] for r in rows
+                           if all(token_match(r["product"], t, unaccent=True) or token_match(r["pid"], t, unaccent=False)
+                                  for t in tokenize(q))]
+                       for q in PRODUCT_QUERIES},
+        }
 
     def peremptions(self) -> dict:
         b6, b12 = self.today + timedelta(days=180), self.today + timedelta(days=360)
@@ -957,6 +996,7 @@ class Oracle:
             "stock_abcd_default": self.stock_abcd(*default_abcd_window(self.today)),
             "stock_abcd_window": self.stock_abcd(self.df, self.dt),
             "peremptions": self.peremptions(),
+            "products": self.produits(),
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},

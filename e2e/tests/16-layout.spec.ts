@@ -25,6 +25,7 @@ const PAGES: [string, string, string][] = [
   ["/alertes", "Alertes", "Alertas"],
   ["/comptabilite", "Comptabilité", "Contabilidad"],
   ["/produits-speciaux", "Produits spéciaux", "Productos especiales"],
+  ["/produits", "Produits", "Productos"],
   ["/imports", "Gestion des imports", "Gestión de importaciones"],
   ["/owner/employees", "Gérer mon équipe", "Gestionar mi equipo"],
   ["/auth/me", "Mon compte", "Mi cuenta"],
