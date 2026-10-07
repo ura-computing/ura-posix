@@ -71,12 +71,16 @@ is in `PLAN.md` « Later »).
 | `/produits-speciaux` | Leave products / BLs / suppliers out of Comptabilité | `special_products` |
 | `/upload-file`, `/imports` | Import wizard, import history (cancel / delete) | `import` |
 | `/owner/employees` | Gérer mon équipe | role `owner` |
-| `/admin/pharmacies` (+ `/:id`) | Pharmacies et utilisateurs; one pharmacy: info, features, members | role `admin` |
+| `/admin/pharmacies` (+ `/:id`) | Pharmacies et utilisateurs: tabs Pharmacies · Utilisateurs · Demandes (N) (sign-ups to accept); one pharmacy: info, features, members | role `admin` |
 | `/admin/catalogue`, `/admin/categories` | Global catalogue (CRUD + CSV import); category → reference suffix | role `admin` |
 | `/auth/me` | Mon compte: profile, password, sessions | any logged-in user |
-| `/login`, `/auth/forgot-password`, `/auth/set-password` | Auth (guests only) | none |
+| `/login`, `/auth/signup`, `/auth/forgot-password`, `/auth/set-password` | Auth (guests only); `/auth/signup` = « Créer un compte » | none |
 
 No access to a page → 404 inside the layout (the sidebar stays).
+
+**Privacy (client rule):** nobody may learn which pharmacies use PharmaGest. No public list of pharmacies,
+a pharmacy is joined only by typing its code (`CAS0001`), and public answers never say whether a code or an
+email exists (sign-up always answers « Demande envoyée », forgot-password always 200).
 
 ### Glossary
 | Term | Meaning |
@@ -140,7 +144,7 @@ apcm-pharma/
 │   ├── main.py                the app: middlewares + routers (deployments run main:app)
 │   ├── app/                   all code, one folder per business area (§5.1)
 │   ├── scripts/               bootstrap.py (schema), seed.py + seed.json, one-time legacy migration
-│   ├── alembic/versions/      migrations 0001 → 0022 (head)
+│   ├── alembic/versions/      migrations 0001 → 0023 (head)
 │   ├── entrypoint.sh          container boot (§9)
 │   ├── Dockerfile · .env.example
 │   └── pyproject.toml         deps + ruff (line-length 120)
@@ -250,7 +254,7 @@ flowchart TB
   DEP -. "refused" .-> ERR["ApiError → {detail, code, params}<br/>frontend shows errors.code (FR / ES)"]
 ```
 
-- Every route is under `/v1` (102 routes). `/openapi.json` + `/docs` are outside `/v1`.
+- Every route is under `/v1` (106 routes). `/openapi.json` + `/docs` are outside `/v1`.
 - Errors: `raise ApiError(404, ErrorCode.BL_NOT_FOUND, "French detail", ref=ref)` (`app/core/errors.py`).
   `detail` stays French for logs; the user reads `errors.<code>` from `fr.ts` / `es.ts`.
 - Lists answer `{data, pagination: {page, limit, total, total_pages}, summary?}`; export = the same list
@@ -284,6 +288,7 @@ erDiagram
 | `pharmacies` | name, city, code (`CAS0001`, from the city), address, phone, email, `archived_at` |
 | `users` | email, name, role, status (`active` / `inactive`), `pharmacy_id`, `token_version`, hashed reset token |
 | `sessions` | one row per logged-in device |
+| `signup_requests` | « Créer un compte » waiting for the admin (`pending` / `accepted` / `refused`), kept out of `users` so nobody logs in before « Accepter » |
 | `medicaments` | **one global catalogue**: `pid` (Sobrus id, unique), product, tva, pph, ppv, category, zone, barcodes, laboratoire, `product_type` |
 | `import_batches` | one row per imported file: type, counts, status, `last_chunk_at`, creator, soft delete |
 | `achats` | purchase lines: `delivery_date`, `delivery_ref` (BL), supplier, quantity, unit_price (PU), total, expiry, `created_at_source` |
@@ -332,14 +337,30 @@ sequenceDiagram
   the current device logged in). Removing a session row logs that device out at once.
 - Emails are stored and compared trimmed + lower case (`normalize_email`): `Ali@Gmail.com` = `ali@gmail.com`.
 - Forgot password: always 200, 60-min hashed token, link `FRONTEND_URL/auth/set-password?token=…`.
-- Rate limits (slowapi, in memory, per process): login **5/min**, forgot-password **3/hour** per IP.
+- Rate limits (slowapi, in memory, per process): login **5/min**, forgot-password **3/hour**, sign-up **5/hour** per IP.
+
+**Sign up (« Créer un compte », `/auth/signup`)**: 5 short screens, like Gmail (who you are → your pharmacy or its
+code → name + phone → email → password twice), then the admin decides:
+
+```mermaid
+flowchart LR
+  F["/auth/signup<br/>5 screens"] -- "POST /v1/auth/signup<br/>always « Demande envoyée »" --> R[("signup_requests<br/>pending")]
+  R --> A{"Admin › Pharmacies et utilisateurs<br/>› Demandes (N)"}
+  A -- "Accepter" --> C["new pharmacy (code from the city: Tanger → TAN0001)<br/>or the pharmacy of the typed code<br/>+ the account, every feature ON"]
+  A -- "Refuser" --> X["nothing created"]
+  C --> M1["email « Votre compte est prêt »"]
+  X --> M2["email « demande non acceptée »"]
+```
+
+- Owner: a new pharmacy (name + city) or an existing one (its code). Employee: always a code.
+- « Accepter » is greyed out, with the reason, when the email already has an account or no pharmacy has the code.
 
 ### 5.6 Routers (all under `/v1`)
 | File | Main routes | Guard |
 |---|---|---|
 | `core/health.py` | `GET /health` | none |
-| `identity/auth/router.py` | `/auth/login`, `/auth/me`, `/auth/change-password`, `/auth/logout`, `/auth/forgot-password`, `/auth/validate-token`, `/auth/set-password`, `/sessions…` | cookie |
-| `identity/members/admin_router.py` | pharmacies CRUD (`DELETE` = archive), features, users, `GET /admin/users` | admin |
+| `identity/auth/router.py` | `/auth/login`, `/auth/signup`, `/auth/me`, `/auth/change-password`, `/auth/logout`, `/auth/forgot-password`, `/auth/validate-token`, `/auth/set-password`, `/sessions…` | cookie (signup, forgot, login: none) |
+| `identity/members/admin_router.py` | pharmacies CRUD (`DELETE` = archive), features, users, `GET /admin/users`, `/admin/signup-requests` (+ `/{id}/accept`, `/{id}/refuse`) | admin |
 | `identity/members/owner_router.py` | `/owner/employees…` (invite, permissions, status, reset, delete) | owner |
 | `catalog/router.py` | `/admin/catalog…`, `/category-suffixes…` | admin |
 | `ingestion/router.py` | `/uploads/{achat,vente,stock}-json`, `PATCH /uploads/batches/{id}`, `/uploads/catalog`, `/data/imports` | import + type |
@@ -392,8 +413,8 @@ stateDiagram-v2
 - `scripts/bootstrap.py` (`make migrate` + container start): `CREATE EXTENSION pg_trgm, unaccent` →
   `immutable_unaccent()` (schema-qualified) + self-check under `search_path = pg_catalog, pg_temp` →
   fresh DB: `create_all` + `alembic stamp head`; managed DB: `alembic upgrade head`.
-- Head **0022** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
-  0022: emails stored trimmed + lower case).
+- Head **0023** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
+  0022: emails stored trimmed + lower case; 0023: `signup_requests`).
 - A new column needs **both** the model change and a migration (fresh DBs use `create_all`).
 
 ---
@@ -434,7 +455,7 @@ so the E2E gate requires **0** of them (`npx eslint src` in `frontend/`). Rules:
 |---|---|
 | 1 page | that page's `index.tsx` / `hooks.ts` / `_components/` |
 | several routes of 1 area | `pages/area/_components/` or `pages/area/hooks.ts` |
-| several areas | `src/_components/` (`Page`, `DataTable`, `filterBar`, `KpiTile`, `GaugeTiles`, `FormField`, `MembersSection`, `ConfirmDialog`, `TabBar`, …) |
+| several areas | `src/_components/` (`Page`, `DataTable`, `filterBar`, `KpiTile`, `GaugeTiles`, `FormField`, `MembersSection`, `ConfirmDialog`, `TabBar`, `Checkbox`, …) |
 
 Every page uses `Page` (same title block and width). Lists use `filterBar` (search, period,
 Mixte / Pharmacie / Parapharmacie, selects, chips) + `DataTable`.
@@ -538,7 +559,7 @@ flowchart LR
   subgraph stack["e2e/docker-compose.e2e.yml"]
     DB[("Postgres 17<br/>in memory")] --- BE["backend image<br/>entrypoint.sh · :8001"] --- FE["frontend image<br/>serve · :5174"]
   end
-  CSV --> PW["Playwright specs 01 → 16<br/>click and type like a user"]
+  CSV --> PW["Playwright specs 01 → 17<br/>click and type like a user"]
   PW --> FE
   PW -- "every API answer + screen value" --> CMP{"same as<br/>expected.json?"}
   EXP --> CMP
@@ -571,8 +592,9 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 08-analyses | every mode × type, search, liste, export |
 | 10-exclusions · 11-comptabilite | exclude / reintegrate, Comptabilité numbers, payments, export |
 | 12-equipe · 13-compte · 14-admin | team, account + passwords + sessions, admin pages and drill-down |
-| 15-imports | history, cancel, delete, interrupted, damaged file, hand-typed dates, 2 imports at once |
+| 15-imports | history, cancel, delete, delete several at once, interrupted, damaged file, hand-typed dates, 2 imports at once |
 | 16-layout | FR ⇄ ES, theme, sidebar, « Session expirée » |
+| 17-inscription | sign-up (5 screens), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
 | 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** |
 
 ### 8.4 When a test fails
