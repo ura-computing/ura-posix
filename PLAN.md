@@ -3,7 +3,7 @@
 Updated 2026-10-07. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
-**Order:** §1 Produits module → §3 production tools (DO console, yours) → §8 Later.
+**Order:** §3 production tools (DO console, yours) → §8 Later.
 
 ---
 
@@ -15,24 +15,6 @@ Updated 2026-10-07. One list, top to bottom. Open items only: a step leaves this
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
 | Hidden store website (`backend/app/store_website/`, `frontend/src/pages/store/*`): moved as-is, never rewritten | hidden, must not break |
-
----
-
-## 1. Produits module (PO design: the 2 PNGs in `resources/`)
-
-One feature at a time: backend + frontend + its part of `e2e/tests/18-produits.spec.ts` → review → next.
-
-| # | Feature | State |
-|---|---|---|
-| F1 | « Produits » list: feature `produits` (migration 0024, ON for everyone), `GET /products`, sidebar, search, Mixte / Pharmacie / Parapharmacie, sort, Excel | done |
-| F2 | Photos + description from the scraped catalogue (`product_infos`, migration 0025, loaded at every start, matched by PID then barcode) | done |
-| F3 | Fiche produit: Général (données, prix, stock, description, mouvements récents) + Codes | done |
-| fix | Deleting / cancelling a stock import removes the stock it wrote (`pharmacy_stock.import_batch_id`, migration 0026); found on real data: a deleted les-joyeux stock stayed in Produits / Stock | done |
-| F4 | « Ventes et achats par mois » Tableau ⇄ Graphique (per year: a Ventes row + an Achats row; chart: one color per curve, purchases dashed) + Statistiques tab (`GET /products/{id}/stats`) | done, waiting `make tests` |
-| F5 | Mouvements tab (achats + ventes, period / type / search, file of each line, pages, Excel, « Voir tout » from Général; `GET /products/{id}/movements`) | done, waiting `make tests` |
-| F6 | Owner edit: « Modifier » / « Enregistrer », his pharmacy only, hand edit wins over imports, « Revenir à la valeur importée »; the type (pharmacie / parapharmacie) is NOT editable (user) (`pharmacy_product_edits`, migration 0027, `PUT /products/{id}`) | done, waiting `make tests` |
-| fix | Stock import fills a product's missing barcodes from « Code barre 1 / 2 » (never overwrites; more photos found); charts: no dashed curves, one color per curve (product chart + Rapport) | done, waiting `make tests` |
-| F7 | `README.md` | |
 
 ---
 

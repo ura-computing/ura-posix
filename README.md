@@ -40,6 +40,7 @@ flowchart LR
   DB --> L["Achats · Ventes<br/>ledgers + Excel"]
   DB --> A["Analyses · Alertes · Stock"]
   DB --> C["Comptabilité<br/>+ Produits spéciaux"]
+  DB --> P["Produits<br/>list + product sheet"]
 ```
 
 **Languages:** French (default) ⇄ Spanish, every text from `fr.ts` + `es.ts`, server errors included
@@ -56,7 +57,7 @@ is in `PLAN.md` « Later »).
 
 ### Features (permission keys, `ALLOWED_FEATURES` in `app/core/models.py`)
 `rapports`, `import`, `achats`, `ventes`, `stock`, `analyse`, `accounting`, `alertes`,
-`special_products`. A new pharmacy / user gets every feature. Who sees what: [§5.4](#54-permissions-3-layers).
+`special_products`, `produits`. A new pharmacy / user gets every feature. Who sees what: [§5.4](#54-permissions-3-layers).
 
 ### Pages
 | Route | Page | Feature |
@@ -65,6 +66,8 @@ is in `PLAN.md` « Later »).
 | `/achats` | Purchases ledger (bons de livraison) | `achats` |
 | `/ventes` | Sales ledger + « à surveiller » tabs | `ventes` |
 | `/stock` | ABCD rotation + péremptions (expiry) | `stock` |
+| `/produits` | Every product of the pharmacy (stock file, sold or bought): photo, stock, sold 12 months, PPV, marge; search, Mixte / Pharmacie / Parapharmacie, sort, Excel | `produits` |
+| `/produits/:id` | Product sheet, tabs Général · Statistiques · Mouvements · Codes (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
 | `/analyses` | Analyse de marge: produit, catégorie, laboratoire, grossiste, client, mois, année, liste | `analyse` |
 | `/alertes` | Margin alerts, ventes sans achat, stock and expiry alerts | `alertes` |
 | `/comptabilite` | Accounting KPIs (exclusions applied), payment methods per month, sales journal | `accounting` |
@@ -95,6 +98,7 @@ email exists (sign-up always answers « Demande envoyée », forgot-password alw
 | TVA | VAT (0 %, 7 %, 20 % in the data) |
 | Péremption | Expiry date |
 | Produits spéciaux | Products the owner leaves out of Comptabilité |
+| Fiche produit | One product's page (`/produits/:id`), not to mix up with Produits spéciaux |
 | Pharmacie / Parapharmacie / Mixte | Medicine / non-medicine / both |
 
 ---
@@ -143,8 +147,9 @@ apcm-pharma/
 ├── backend/                   FastAPI (§5)
 │   ├── main.py                the app: middlewares + routers (deployments run main:app)
 │   ├── app/                   all code, one folder per business area (§5.1)
-│   ├── scripts/               bootstrap.py (schema), seed.py + seed.json, one-time legacy migration
-│   ├── alembic/versions/      migrations 0001 → 0023 (head)
+│   ├── scripts/               bootstrap.py (schema), seed.py + seed.json, load_product_infos.py, one-time legacy migration
+│   ├── data/product_infos.json  photos + descriptions scraped from parapharmacy shops (loaded at every start)
+│   ├── alembic/versions/      migrations 0001 → 0027 (head)
 │   ├── entrypoint.sh          container boot (§9)
 │   ├── Dockerfile · .env.example
 │   └── pyproject.toml         deps + ruff (line-length 120)
@@ -159,7 +164,7 @@ apcm-pharma/
         ├── pages/              one folder per area, then one per route (§6.3)
         ├── i18n/               I18nProvider (useT) + locales/fr.ts, es.ts
         ├── types/              one file per backend area, import from "@/types"
-        ├── utils/              format.tsx, text.ts, csv.ts, table.ts, dateRange.ts, cn.ts
+        ├── utils/              format.tsx, text.ts, csv.ts, table.ts, dateRange.ts, chart.ts, cn.ts
         └── styles/             tokens.css (colors), globals.css
 ```
 
@@ -178,7 +183,7 @@ flowchart LR
 |---|---|
 | `make install` | `uv sync` + `npm install`; creates `backend/.env` (random `JWT_SECRET`) and `frontend/.env` if missing |
 | `make db` | starts Postgres 17 (volume `pg17_data`) and creates the dev DB `apcm` |
-| `make migrate` | `scripts/bootstrap.py`: extensions, `immutable_unaccent()`, migrations |
+| `make migrate` | `scripts/bootstrap.py`: extensions, `immutable_unaccent()`, migrations; then `scripts/load_product_infos.py` (product photos) |
 | `make seed` | seed accounts + « Pharmacie Demo » + catalogue (idempotent) |
 | `make dev` | backend uvicorn **:8000** (hot reload, applies new migrations first) + Vite **:5173** |
 | `make backend` · `make frontend` | one of the two |
@@ -208,6 +213,7 @@ flowchart LR
 | `WEB_CONCURRENCY` | uvicorn processes in Docker (default 2) |
 | `PORT` | container port (default 8000) |
 | `RATE_LIMIT=0`, `SEED_CATALOG=0` | **E2E only**: no login limit, no catalogue in the seed |
+| `PRODUCT_INFOS_FILE` | **E2E only**: another photos file than `backend/data/product_infos.json` (the test fixture) |
 
 **Frontend** (`frontend/.env`): `VITE_BACKEND_URL` (dev `http://localhost:8000`), read at **build time**.
 
@@ -228,11 +234,12 @@ flowchart TB
     LED["ledger/<br/>ventes + achats lists, exports"]
     ANA["analytics/<br/>stats · alerts · stock · analyse"]
     ACC["accounting/<br/>payments · exclusions"]
+    PRD["products/<br/>list · sheet · stats · movements · edits"]
     STO["store_website/<br/>hidden, moved as-is"]
     CORE["core/<br/>config · database · models · errors · security<br/>permissions · rate_limit · search · utils · email · /health"]
   end
-  MAIN --> ID & CAT & ING & LED & ANA & ACC & STO
-  ID & CAT & ING & LED & ANA & ACC & STO --> CORE
+  MAIN --> ID & CAT & ING & LED & ANA & ACC & PRD & STO
+  ID & CAT & ING & LED & ANA & ACC & PRD & STO --> CORE
 ```
 
 | Rule | Example |
@@ -254,7 +261,7 @@ flowchart TB
   DEP -. "refused" .-> ERR["ApiError → {detail, code, params}<br/>frontend shows errors.code (FR / ES)"]
 ```
 
-- Every route is under `/v1` (106 routes). `/openapi.json` + `/docs` are outside `/v1`.
+- Every route is under `/v1` (111 routes). `/openapi.json` + `/docs` are outside `/v1`.
 - Errors: `raise ApiError(404, ErrorCode.BL_NOT_FOUND, "French detail", ref=ref)` (`app/core/errors.py`).
   `detail` stays French for logs; the user reads `errors.<code>` from `fr.ts` / `es.ts`.
 - Lists answer `{data, pagination: {page, limit, total, total_pages}, summary?}`; export = the same list
@@ -277,6 +284,9 @@ erDiagram
   medicaments ||--o{ pharmacy_stock : "product"
   import_batches ||--o{ achats : "undo = delete its rows"
   import_batches ||--o{ ventes : "undo = delete its rows"
+  import_batches ||--o{ pharmacy_stock : "undo = delete its rows"
+  pharmacies ||--o{ pharmacy_product_edits : "owner's own values"
+  medicaments ||--o{ pharmacy_product_edits : "product"
   pharmacies ||--o{ pharmacy_medicament_status : "produits spéciaux"
   pharmacies ||--o{ pharmacy_bl_exclusions : "excluded BLs"
   pharmacies ||--o{ pharmacy_supplier_exclusions : "excluded suppliers"
@@ -293,7 +303,9 @@ erDiagram
 | `import_batches` | one row per imported file: type, counts, status, `last_chunk_at`, creator, soft delete |
 | `achats` | purchase lines: `delivery_date`, `delivery_ref` (BL), supplier, quantity, unit_price (PU), total, expiry, `created_at_source` |
 | `ventes` | sale lines: `date`, `transaction_ref`, client, quantity, discount (%), unit_price, total |
-| `pharmacy_stock` | latest stock per (pharmacy, medicament), UPSERTed by stock imports |
+| `pharmacy_stock` | latest stock per (pharmacy, medicament), UPSERTed by stock imports; `import_batch_id` = the import that wrote it last (deleting / cancelling it removes the row) |
+| `product_infos` | **global**, read-only: photos, brand, shop category, description, details (Gamme, Emballage) scraped from parapharmacy shops; replaced from `backend/data/product_infos.json` at every start; a product finds its row by PID, then barcode, when shown |
+| `pharmacy_product_edits` | the owner's own values for a product (« Modifier »), one row per (pharmacy, medicament), NULL = not edited; shown in Produits only |
 | `category_suffixes` | category → reference suffix + color (shown on ventes / achats refs) |
 | `store_website_*` | hidden « Ma boutique en ligne » |
 
@@ -366,6 +378,7 @@ flowchart LR
 | `ingestion/router.py` | `/uploads/{achat,vente,stock}-json`, `PATCH /uploads/batches/{id}`, `/uploads/catalog`, `/data/imports` | import + type |
 | `ledger/router.py` | `/ventes…`, `/achats…` (lists, categories, tva, suggestions, summaries, export) | ventes / achats |
 | `analytics/router.py` | `/stats`, `/stats/margin-alerts`, `/ventes-sans-achat`, `/stock-summary`, `/stock-abcd`, `/peremptions`, `/analyse-marge`, `/analyse-liste`; admin `/admin/stats`, `/admin/pharmacy/{id}/stats…` | rapports / alertes / stock / analyse; admin |
+| `products/router.py` | `GET /products`, `GET /products/{id}`, `/products/{id}/stats`, `/products/{id}/movements`, `PUT /products/{id}` | produits (`PUT`: owner) |
 | `accounting/payments/router.py` | `/accounting/payments` | accounting |
 | `accounting/exclusions/router.py` | `/special-products/…`, `/bl-exclusions/…`, `/supplier-exclusions/…` | special_products |
 | `store_website/router.py` | `/store-website/*` (hidden) | owner / developer |
@@ -406,15 +419,17 @@ stateDiagram-v2
 | Dates saved by hand are read day first | `23/1/26`, ` 05/02/2026 `, `23.01.2026 14:19` → `2026-01-23` |
 | Impossible date on a vente / BL date → line not imported, counted, explained | `31/02/2026` → « 1 ligne(s) non importée(s) : date illisible … » |
 | Damaged file (NUL / control character) → refused before anything is written | `fileCorrupted` |
-| Stock = UPSERT per (pharmacy, medicament) | can't be undone |
+| Stock = UPSERT per (pharmacy, medicament); each row keeps its import | delete / cancel that import → its rows removed (the values it replaced don't come back) |
+| A product without barcode gets the file's « Code barre 1 / 2 » (stock file); one already there is kept | more products find their photo ([§7.8](#78-produits-list--product-sheet)) |
 | Admin catalogue CSV (`Nom,Categorie,TVA,PPV,PPH,Code barre 1,Code barre 2,Laboratoire`) | sets `product_type` from the category |
 
 ### 5.8 Schema and migrations
 - `scripts/bootstrap.py` (`make migrate` + container start): `CREATE EXTENSION pg_trgm, unaccent` →
   `immutable_unaccent()` (schema-qualified) + self-check under `search_path = pg_catalog, pg_temp` →
   fresh DB: `create_all` + `alembic stamp head`; managed DB: `alembic upgrade head`.
-- Head **0023** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
-  0022: emails stored trimmed + lower case; 0023: `signup_requests`).
+- Head **0027** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
+  0022: emails stored trimmed + lower case; 0023: `signup_requests`; 0024: feature `produits` ON for
+  everyone; 0025: `product_infos`; 0026: `pharmacy_stock.import_batch_id`; 0027: `pharmacy_product_edits`).
 - A new column needs **both** the model change and a migration (fresh DBs use `create_all`).
 
 ---
@@ -455,7 +470,7 @@ so the E2E gate requires **0** of them (`npx eslint src` in `frontend/`). Rules:
 |---|---|
 | 1 page | that page's `index.tsx` / `hooks.ts` / `_components/` |
 | several routes of 1 area | `pages/area/_components/` or `pages/area/hooks.ts` |
-| several areas | `src/_components/` (`Page`, `DataTable`, `filterBar`, `KpiTile`, `GaugeTiles`, `FormField`, `MembersSection`, `ConfirmDialog`, `TabBar`, `Checkbox`, …) |
+| several areas | `src/_components/` (`Page`, `DataTable`, `filterBar`, `KpiTile`, `GaugeTiles`, `FormField`, `MembersSection`, `ConfirmDialog`, `TabBar`, `Checkbox`, `StockStatusPill`, …) |
 
 Every page uses `Page` (same title block and width). Lists use `filterBar` (search, period,
 Mixte / Pharmacie / Parapharmacie, selects, chips) + `DataTable`.
@@ -542,6 +557,37 @@ pie showData
 Accent- and case-insensitive; product search also matches PID and barcodes. Backend
 `app/core/search.py`, frontend twin `utils/text.ts`.
 
+### 7.8 Produits (list + product sheet)
+| Rule | Value |
+|---|---|
+| The pharmacy's products | in its stock file, sold or bought (any date); exclusions don't apply (Comptabilité only) |
+| « Vendus 12 mois », min / max, coverage, status | the Stock page's rules and default window ([§7.5](#75-stock-stock_queriespy)) |
+| Marge | (1 − average PU / PPV) × 100, every purchase of the pharmacy, with the PPV shown |
+| Photos, description, gamme, emballage | the `product_infos` row with the same PID, else the same barcode (1 or 2), matched when shown: a product imported later finds its photo. Dead photo address → box icon |
+| « Ventes et achats par mois » | units sold and bought each month, a « Ventes » row and an « Achats » row per year; chart: one solid curve per row, one color each |
+| Statistiques | 30 days = today + the 29 before; CA 12 mois = Σ qty × PPV; best month = most units (tie → the latest); months without a sale line, in the 12-month window |
+| Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), with the file each came from |
+
+**Owner edits (« Modifier » → « Enregistrer », `PUT /products/{id}`)**
+
+```mermaid
+flowchart LR
+  I["imports<br/>medicaments · pharmacy_stock"] --> S["value shown<br/>= the owner's if any, else the imported one"]
+  E["pharmacy_product_edits<br/>the owner's values, his pharmacy"] --> S
+  S --> P["Produits list + sheet only"]
+  I --> O["Rapport · Stock · Comptabilité · …<br/>always the imported values"]
+```
+
+- Editable: name, category (its text), lab, TVA, PPV, PPH, stock, min, max, expiry, zone, description,
+  barcodes 1 / 2. **Not** the type pharmacie / parapharmacie (refused, 422), the PID, computed values.
+- Imports never write the edits: a hand edit stays. The sheet shows « modifié », the imported value and
+  « Revenir à la valeur importée » (= the field sent as `null`). Typing the imported value back = not edited.
+- A typed minimum above the maximum → `stockMinAboveMax`; going back to an imported value is never blocked.
+- Employees: read only (« Modifier » disabled with the reason; `PUT` → 403 `ownerOnly`).
+
+Example: import PPV 189 → the owner types 165 → the next import writes 195 → the sheet shows 165
+« modifié · Valeur importée : 195,00 MAD » → « Revenir » → 195.
+
 ---
 
 ## 8. Tests: the Playwright E2E suite
@@ -559,7 +605,7 @@ flowchart LR
   subgraph stack["e2e/docker-compose.e2e.yml"]
     DB[("Postgres 17<br/>in memory")] --- BE["backend image<br/>entrypoint.sh · :8001"] --- FE["frontend image<br/>serve · :5174"]
   end
-  CSV --> PW["Playwright specs 01 → 17<br/>click and type like a user"]
+  CSV --> PW["Playwright specs 01 → 18<br/>click and type like a user"]
   PW --> FE
   PW -- "every API answer + screen value" --> CMP{"same as<br/>expected.json?"}
   EXP --> CMP
@@ -579,7 +625,9 @@ actions, API calls.
 
 ### 8.2 Test data (`resources/tests/generate.py`)
 Deterministic products `E2E PRODUIT 00000…`, achats (≈ rows / 3), ventes, stock, a « liste » file,
-2 400 extra achats (cancel / delete tests), 5 catalogue rows. On purpose, like the real files:
+2 400 extra achats (cancel / delete tests), 5 catalogue rows, a product photos file
+(`catalog/product-infos.json`: found by PID, by a barcode, a dead address, 2 shop pages with one barcode).
+On purpose, like the real files:
 3 lines of each file repeated, 1 bought product in 4 also bought from a 2nd supplier, 40 lines per file
 and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app code.
 
@@ -592,9 +640,10 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 08-analyses | every mode × type, search, liste, export |
 | 10-exclusions · 11-comptabilite | exclude / reintegrate, Comptabilité numbers, payments, export |
 | 12-equipe · 13-compte · 14-admin | team, account + passwords + sessions, admin pages and drill-down |
-| 15-imports | history, cancel, delete, delete several at once, interrupted, damaged file, hand-typed dates, 2 imports at once |
+| 15-imports | history, cancel, delete, delete several at once, interrupted, damaged file, hand-typed dates, 2 imports at once, delete the stock import (its stock goes) + import it again |
 | 16-layout | FR ⇄ ES, theme, sidebar, « Session expirée » |
 | 17-inscription | sign-up (5 screens), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
+| 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos, every tab of 8 product sheets = oracle, table ⇄ chart, Mouvements filters + Excel, owner edits (every field, wrong values, an import keeps them, « Revenir »), type not editable, employee read only, feature OFF, 404, Spanish |
 | 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** |
 
 ### 8.4 When a test fails
@@ -627,7 +676,7 @@ The backend container boots like this (same in the demo and the E2E stack):
 
 ```mermaid
 flowchart LR
-  A["wait for Postgres<br/>(up to 60 s)"] --> B["scripts/bootstrap.py<br/>extensions · immutable_unaccent<br/>alembic upgrade head"] --> C{"admin exists?"}
+  A["wait for Postgres<br/>(up to 60 s)"] --> B["scripts/bootstrap.py<br/>extensions · immutable_unaccent<br/>alembic upgrade head"] --> L["scripts/load_product_infos.py<br/>product photos, every start"] --> C{"admin exists?"}
   C -- "no" --> D["scripts/seed.py"] --> E
   C -- "yes" --> E["uvicorn main:app<br/>× WEB_CONCURRENCY (default 2)"]
 ```
