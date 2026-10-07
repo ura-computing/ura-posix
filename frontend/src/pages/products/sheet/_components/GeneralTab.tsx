@@ -1,5 +1,8 @@
 /** « Général »: photos, données générales, prix, stock (Stock page rules), description,
  *  the 10 latest purchases / sales, « Ventes par mois » (table or chart). */
+import { ArrowRight } from "lucide-react";
+
+import { Button } from "@/_components/button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { StockStatusPill } from "@/_components/StockStatusPill";
 import { TypeBadge } from "@/_components/TypeBadge";
@@ -52,7 +55,16 @@ const movementColumns = (t: TFn): ColumnDef<ProductMovement>[] => [
   { key: "party", label: t("products.colParty"), width: 200, sortable: false, render: (m) => m.party ?? dash },
 ];
 
-export function GeneralTab({ sheet, stats }: { sheet: ProductSheet; stats: ProductStats | null }) {
+export function GeneralTab({
+  sheet,
+  stats,
+  onShowMovements,
+}: {
+  sheet: ProductSheet;
+  stats: ProductStats | null;
+  /** « Voir tout »: the Mouvements tab. */
+  onShowMovements: () => void;
+}) {
   const t = useT();
   const { info, prices, stock } = sheet;
   return (
@@ -140,7 +152,15 @@ export function GeneralTab({ sheet, stats }: { sheet: ProductSheet; stats: Produ
         </SheetCard>
       </div>
 
-      <SheetCard title={t("products.recent")}>
+      <SheetCard
+        title={t("products.recent")}
+        actions={
+          <Button variant="outline" onClick={onShowMovements}>
+            {t("products.seeAll")}
+            <ArrowRight className="size-4" />
+          </Button>
+        }
+      >
         <DataTable<ProductMovement>
           rows={sheet.recent_movements}
           columns={movementColumns(t)}

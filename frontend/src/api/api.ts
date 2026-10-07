@@ -16,6 +16,7 @@ import type {
   AchatsFilters,
   CatalogFilters,
   MargeMode,
+  MovementsFilters,
   ProductsFilters,
   StockFilters,
   VentesFilters,
@@ -52,6 +53,7 @@ const afterImport = {
     API.products.list,
     API.products.sheet,
     API.products.stats,
+    API.products.movements,
     ...blExclusionReads(),
     ...supplierExclusionReads(),
   ],
@@ -69,6 +71,7 @@ const afterImport = {
     API.products.list,
     API.products.sheet,
     API.products.stats,
+    API.products.movements,
   ],
   stock: (): Read[] => [
     API.imports.list,
@@ -255,6 +258,11 @@ export const API = {
       url: (id: number) => `/products/${id}/stats`,
       key: (id: number) => ["products", "stats", id] as const,
       all: ["products", "stats"],
+    },
+    movements: {
+      url: (id: number) => `/products/${id}/movements`,
+      key: (id: number, f: MovementsFilters) => ["products", "movements", id, f] as const,
+      all: ["products", "movements"],
     },
   },
 

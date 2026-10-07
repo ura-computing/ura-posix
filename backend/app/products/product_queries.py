@@ -29,8 +29,8 @@ from app.analytics.stock_queries import (
     _vente_units_subq,
     stock_abcd_window,
 )
-from app.core.models import Achat, Medicament, PharmacyStock, ProductInfo, Vente
-from app.core.search import product_search_clauses, tokenize_search
+from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, ProductInfo, Vente
+from app.core.search import product_search_clauses, supplier_search_clauses, tokenize_search
 from app.core.utils import today as pharmacy_today
 from app.ledger.schemas import paginate
 
@@ -176,6 +176,8 @@ def _movements(pharmacy_id: int, med_id: int):
         Achat.unit_price,
         Achat.delivery_ref.label("document"),
         Achat.supplier.label("party"),
+        Achat.total,
+        Achat.import_batch_id,
     ).where(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id)
     ventes = select(
         literal("vente").label("kind"),
@@ -185,6 +187,8 @@ def _movements(pharmacy_id: int, med_id: int):
         Vente.unit_price,
         Vente.transaction_ref.label("document"),
         Vente.client.label("party"),
+        Vente.total,
+        Vente.import_batch_id,
     ).where(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id)
     return union_all(achats, ventes).subquery()
 
@@ -387,4 +391,69 @@ def product_stats(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             }
             for y in years
         ],
+    }
+
+
+# ─── Mouvements ──────────────────────────────────────────────────────────────
+
+
+def product_movements(
+    db: Session,
+    pharmacy_id: int,
+    med_id: int,
+    *,
+    date_from: str | None,
+    date_to: str | None,
+    kind: str,
+    search: str | None,
+    page: int,
+    limit: int,
+    export: bool,
+) -> dict | None:
+    """Every purchase / sale line of one product, newest first (same order as « Mouvements
+    récents »), + the file each came from; None = not one of the pharmacy's products."""
+    if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
+        return None
+    moves = _movements(pharmacy_id, med_id)
+    where = []
+    if date_from:
+        where.append(moves.c.date >= date_from)
+    if date_to:
+        where.append(moves.c.date <= date_to)
+    if kind in ("achat", "vente"):
+        where.append(moves.c.kind == kind)
+    where += supplier_search_clauses(tokenize_search(search), [moves.c.document, moves.c.party])
+
+    totals = db.execute(
+        select(
+            func.count(),
+            func.coalesce(func.sum(case((moves.c.kind == "achat", moves.c.quantity))), 0),
+            func.coalesce(func.sum(case((moves.c.kind == "vente", -moves.c.quantity))), 0),
+        ).where(*where)
+    ).one()
+    q = (
+        select(moves, ImportBatch.filename)
+        .outerjoin(ImportBatch, ImportBatch.id == moves.c.import_batch_id)
+        .where(*where)
+        .order_by(*_newest_first(moves))
+    )
+    rows = db.execute(q if export else q.offset((page - 1) * limit).limit(limit)).all()
+    total = int(totals[0])
+    return {
+        "data": [
+            {
+                "kind": r.kind,
+                "date": r.date,
+                "quantity": r.quantity,
+                "unit_price": r.unit_price,
+                "total": r.total,
+                "document": r.document,
+                "party": r.party,
+                "filename": r.filename,
+            }
+            for r in rows
+        ],
+        "pagination": paginate(total, 1 if export else page, max(total, 1) if export else limit),
+        "units_bought": float(totals[1]),
+        "units_sold": float(totals[2]),
     }

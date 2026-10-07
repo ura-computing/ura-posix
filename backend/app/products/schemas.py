@@ -82,6 +82,20 @@ class ProductMovement(BaseModel):
     party: str | None  # supplier / client
 
 
+class ProductMovementLine(ProductMovement):
+    total: float | None  # the line's total, as in the file
+    filename: str | None  # the import it came from
+
+
+class ProductMovementsResponse(BaseModel):
+    """« Mouvements »: the filtered lines (page, or every line with export=true) + their sums."""
+
+    data: list[ProductMovementLine]
+    pagination: Pagination
+    units_bought: float  # Σ qty of the filtered purchase lines
+    units_sold: float  # Σ qty of the filtered sale lines
+
+
 class ProductSheet(BaseModel):
     id: int
     pid: str

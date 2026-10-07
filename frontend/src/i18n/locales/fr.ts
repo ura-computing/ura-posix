@@ -274,6 +274,12 @@ export const fr = {
     tabGeneral: "Général",
     tabCodes: "Codes",
     tabStats: "Statistiques",
+    tabMovements: "Mouvements",
+    seeAll: "Voir tout",
+    kindAll: "Tous",
+    colFile: "Fichier importé",
+    movementsSearchPh: "Document, fournisseur, client…",
+    movementsSummary: "Lignes affichées : {{bought}} unités achetées · {{sold}} unités vendues.",
     salesByMonth: "Ventes et achats par mois",
     salesByMonthHint:
       "Unités vendues et achetées chaque mois : une ligne « Ventes » et une ligne « Achats » par année.",

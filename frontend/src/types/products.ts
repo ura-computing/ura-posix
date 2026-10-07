@@ -140,3 +140,31 @@ export interface ProductStats {
   /** Newest year first. */
   yearly: YearSummary[];
 }
+
+// ── Mouvements (GET /products/{id}/movements) ──────────────────────────────
+
+export interface ProductMovementLine extends ProductMovement {
+  /** The line's total, as in the file. */
+  total: number | null;
+  /** The import it came from. */
+  filename: string | null;
+}
+
+export interface ProductMovementsResponse {
+  data: ProductMovementLine[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  /** Σ qty of the filtered purchase / sale lines. */
+  units_bought: number;
+  units_sold: number;
+}
+
+export interface MovementsFilters {
+  page: number;
+  limit: number;
+  search: string;
+  kind: "all" | "achat" | "vente";
+  sort_by: string | null;
+  sort_order: "asc" | "desc";
+  date_from: string | null;
+  date_to: string | null;
+}

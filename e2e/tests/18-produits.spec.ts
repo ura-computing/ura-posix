@@ -7,6 +7,8 @@
  *  the stock file, stock only, negative stock) = oracle, on screen too; photo gallery; « Codes »
  *  tab kept in the address; a product of no pharmacy line → 404 inside the layout.
  *  « Ventes et achats par mois » (table, then chart + tooltip) and the Statistiques tab = oracle.
+ *  « Mouvements » (from « Voir tout »): all lines, page 2, Achats, Ventes over the test window,
+ *  search, Excel = oracle.
  *  An employee sees the list + a sheet; feature OFF → no menu entry, 404 inside the layout. */
 import type { Page } from "@playwright/test";
 
@@ -14,9 +16,18 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
 import type { Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
-import { expected } from "../lib/expected";
+import { expected, testWindow } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
-import { columnTexts, downloadXlsx, frNumber, kpiValue, pageCall, pickCategoryType } from "../lib/ui";
+import {
+  columnTexts,
+  downloadXlsx,
+  frNumber,
+  kpiValue,
+  pageCall,
+  period,
+  pickCategoryType,
+  setPeriod,
+} from "../lib/ui";
 
 test.use({ storageState: sessionFile("owner") });
 
@@ -265,6 +276,8 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     await other.locator('input[autocomplete="current-password"]').fill(employee.password);
     await other.locator('button[type="submit"]').click();
     await expect(other).not.toHaveURL(/\/login/);
+    // Login lands on the home page (no sidebar): « Aller à mon espace » opens the app.
+    await other.getByRole("link", { name: "Aller à mon espace" }).first().click();
     const list = pageCall(other, "/products", { page: "1" });
     await other.locator("aside").getByRole("link", { name: "Produits", exact: true }).click();
     const got = await list;
@@ -490,4 +503,87 @@ test("fiche produit: onglet « Statistiques » = oracle", async ({ page }) => {
       }
     });
   }
+});
+
+test("fiche produit: onglet « Mouvements » = oracle (filtres, pages, recherche, export)", async ({ page }) => {
+  const e = expected().products.movements;
+  const w = testWindow();
+  const { id } = await openSheet(page, e.pid);
+  const path = `/products/${id}/movements`;
+  const check = (got: Row, want: Row, what: string) => {
+    expect(got.pagination.total, `${what}: nombre de lignes`).toBe(want.total);
+    expectSame(
+      { units_bought: got.units_bought, units_sold: got.units_sold },
+      { units_bought: want.units_bought, units_sold: want.units_sold },
+      `${what}: sommes`,
+    );
+    expectSame(got.data, want.page, `${what}: lignes`);
+  };
+
+  // « Voir tout » under « Mouvements récents » opens the tab.
+  let call = pageCall(page, path, { page: "1", kind: "all" });
+  await section(page, "Mouvements récents").getByRole("button", { name: "Voir tout" }).click();
+  await expect(page).toHaveURL(/\?tab=movements$/);
+  check(await call, e.all, "tout");
+  expect((await columnTexts(page, "Quantité")).map(frNumber), "quantités à l'écran").toEqual(
+    e.all.page.map((m: Row) => m.quantity),
+  );
+  expect(await columnTexts(page, "Fichier importé"), "fichiers à l'écran").toEqual(
+    e.all.page.map((m: Row) => m.filename),
+  );
+
+  call = pageCall(page, path, { page: "2" });
+  await page.getByRole("button", { name: "Page suivante" }).click();
+  check(await call, e.all_page2, "page 2");
+
+  call = pageCall(page, path, { kind: "achat" });
+  await pickCategoryType(page, "Achats");
+  check(await call, e.achats, "achats");
+
+  await pickCategoryType(page, "Ventes");
+  call = pageCall(page, path, { kind: "vente", ...period(w) });
+  await setPeriod(page, w.date_from, w.date_to);
+  check(await call, e.ventes_window, "ventes sur la période");
+
+  call = pageCall(page, path, { kind: "all", date_from: null, date_to: null });
+  await page.getByRole("button", { name: "Tout réinitialiser" }).click();
+  check(await call, e.all, "tout réinitialisé");
+  call = pageCall(page, path, { search: e.client });
+  await page.getByPlaceholder("Document, fournisseur, client…").fill(e.client);
+  check(await call, e.search, `recherche « ${e.client} »`);
+
+  // Excel: every line of the search, French headers.
+  const answer = pageCall(page, path, { export: "true" });
+  const { filename, rows: sheet } = await downloadXlsx(page, () =>
+    page.getByRole("button", { name: "Exporter Excel" }).click(),
+  );
+  const all = await answer;
+  expect(filename, "nom du fichier").toMatch(new RegExp(`^APCM - MOUVEMENTS ${e.pid} \\d{4}-\\d{2}-\\d{2} - `));
+  expect(sheet[0], "en-têtes").toEqual([
+    "Date",
+    "Type",
+    "Quantité",
+    "Prix unitaire",
+    "Total",
+    "Document",
+    "Fournisseur / client",
+    "Fichier importé",
+  ]);
+  expect(sheet.length - 1, "lignes du fichier").toBe(e.search.total);
+  expect(all.data.length, "réponse de l'export").toBe(e.search.total);
+  const first = e.search.page[0];
+  expectSame(
+    sheet[1],
+    [
+      first.date,
+      first.kind === "achat" ? "Achat" : "Vente",
+      first.quantity,
+      first.unit_price,
+      first.total,
+      first.document,
+      first.party ?? "",
+      first.filename,
+    ],
+    "1re ligne du fichier",
+  );
 });

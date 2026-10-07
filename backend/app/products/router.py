@@ -4,7 +4,9 @@ GET /v1/products    The pharmacy's products: search, Mixte / Pharmacie / Parapha
                     sort, page; export=true → every matching row (Excel).
 GET /v1/products/{med_id}   One product's sheet (Général + Codes tabs). Not one of the
                     pharmacy's products → 404 `productNotFound` (never says it exists elsewhere).
-GET /v1/products/{med_id}/stats   « Ventes par mois » + Statistiques tab (same 404).
+GET /v1/products/{med_id}/stats   « Ventes et achats par mois » + Statistiques tab (same 404).
+GET /v1/products/{med_id}/movements   « Mouvements » tab: purchase + sale lines, period, type,
+                    search (document / supplier / client), page, export=true (same 404).
 """
 
 from __future__ import annotations
@@ -16,8 +18,8 @@ from fastapi import APIRouter, Path, Query
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.permissions import member
-from app.products.product_queries import list_products, product_sheet, product_stats
-from app.products.schemas import ProductSheet, ProductStats, ProductsListResponse
+from app.products.product_queries import list_products, product_movements, product_sheet, product_stats
+from app.products.schemas import ProductMovementsResponse, ProductSheet, ProductStats, ProductsListResponse
 
 
 router = APIRouter(tags=["products"])
@@ -29,6 +31,8 @@ CategoryTypeQ = Annotated[str, Query(description="all | pharmacie | parapharmaci
 SortByQ = Annotated[str | None, Query(description="product | laboratoire | category | current_stock | …")]
 SortOrderQ = Annotated[str, Query(description="asc | desc")]
 ExportQ = Annotated[bool, Query(description="If true, return every matching row (skip pagination)")]
+DateQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD, inclusive")]
+KindQ = Annotated[str, Query(description="all | achat | vente")]
 
 
 @router.get("/products", response_model=ProductsListResponse)
@@ -72,3 +76,33 @@ def get_product_stats(
     if stats is None:
         raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
     return stats
+
+
+@router.get("/products/{med_id}/movements", response_model=ProductMovementsResponse)
+def get_product_movements(
+    med_id: Annotated[int, Path(ge=1)],
+    pharmacy_id: Annotated[int, member("produits")],
+    db: DbDep,
+    date_from: DateQ = None,
+    date_to: DateQ = None,
+    kind: KindQ = "all",
+    search: SearchQ = None,
+    page: PageQ = 1,
+    limit: LimitQ = 25,
+    export: ExportQ = False,
+) -> dict:
+    moves = product_movements(
+        db,
+        pharmacy_id,
+        med_id,
+        date_from=date_from,
+        date_to=date_to,
+        kind=kind,
+        search=search,
+        page=page,
+        limit=limit,
+        export=export,
+    )
+    if moves is None:
+        raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
+    return moves

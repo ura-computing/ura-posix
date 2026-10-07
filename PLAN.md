@@ -28,8 +28,8 @@ One feature at a time: backend + frontend + its part of `e2e/tests/18-produits.s
 | F2 | Photos + description from the scraped catalogue (`product_infos`, migration 0025, loaded at every start, matched by PID then barcode) | done |
 | F3 | Fiche produit: Général (données, prix, stock, description, mouvements récents) + Codes | done |
 | fix | Deleting / cancelling a stock import removes the stock it wrote (`pharmacy_stock.import_batch_id`, migration 0026); found on real data: a deleted les-joyeux stock stayed in Produits / Stock | done |
-| F4 | « Ventes et achats par mois » Tableau ⇄ Graphique (per year: a Ventes row + an Achats row; chart: one color per curve, purchases dashed) + Statistiques tab (`GET /products/{id}/stats`) | done, waiting `make tests` |
-| F5 | Mouvements tab (achats + ventes, filters, Excel) | |
+| F4 | « Ventes et achats par mois » Tableau ⇄ Graphique (per year: a Ventes row + an Achats row; chart: one color per curve, purchases dashed) + Statistiques tab (`GET /products/{id}/stats`) | done, waiting `make tests` (3 fixes since the last run) |
+| F5 | Mouvements tab (achats + ventes, period / type / search, file of each line, pages, Excel, « Voir tout » from Général; `GET /products/{id}/movements`) | done, waiting `make tests` |
 | F6 | Owner edit: « Modifier » / « Enregistrer », his pharmacy only, hand edit wins over imports, « Revenir à la valeur importée » | |
 | F7 | `README.md` | |
 

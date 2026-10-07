@@ -509,6 +509,41 @@ class Oracle:
             ],
         }
 
+    def product_movements(self, p, files: dict[str, str], df: date | None = None, dt: date | None = None,
+                          kind: str = "all", query: str | None = None, page: int = 1) -> dict:
+        """GET /products/{id}/movements: purchase (+qty) and sale (−qty) lines, newest day first
+        (same day: sales, then purchases; then the latest line), search = every word in the
+        document or the supplier / client (accents ignored), 25 per page + the filtered sums."""
+        lines = [(a.day, "achat", a.seq, a.qty, a.unit, a.total, a.ref, a.supplier, files["achats"]) for a in self.achats if a.p is p]
+        lines += [(v.day, "vente", v.seq, -v.qty, v.unit, v.total, v.ref, v.client or None, files["ventes"])
+                  for v in self.ventes if v.p is p]
+        tokens = tokenize(query or "")
+        keep = [m for m in lines
+                if (df is None or m[0] >= df) and (dt is None or m[0] <= dt) and (kind == "all" or m[1] == kind)
+                and all(token_match(m[6], t, unaccent=True) or token_match(m[7], t, unaccent=True) for t in tokens)]
+        keep.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
+        return {
+            "total": len(keep),
+            "units_bought": sum(m[3] for m in keep if m[1] == "achat"),
+            "units_sold": sum(-m[3] for m in keep if m[1] == "vente"),
+            "page": [{"kind": k, "date": d.isoformat(), "quantity": q, "unit_price": u, "total": tot, "document": ref,
+                      "party": party, "filename": f}
+                     for d, k, _, q, u, tot, ref, party, f in keep[(page - 1) * 25:page * 25]],
+        }
+
+    def movements_scenarios(self, p, files: dict[str, str]) -> dict:
+        """18-produits « Mouvements » tab, best-selling product: no filter (pages 1 + 2), Achats,
+        Ventes over the test window, search = the client of its latest sale with a client."""
+        client = next(v.client for v in sorted(self.ventes, key=lambda v: (v.day, v.seq), reverse=True)
+                      if v.p is p and v.client)
+        return {
+            "pid": p.pid, "client": client,
+            "all": self.product_movements(p, files), "all_page2": self.product_movements(p, files, page=2),
+            "achats": self.product_movements(p, files, kind="achat"),
+            "ventes_window": self.product_movements(p, files, self.df, self.dt, "vente"),
+            "search": self.product_movements(p, files, query=client),
+        }
+
     def sheet_pids(self, rows: list[dict], infos: dict[str, dict]) -> list[str]:
         """Products 18-produits opens: the 4 with scraped info, then one never bought (no PU),
         one not in the stock file, one stock-only (no line at all), one with a negative stock."""
@@ -528,7 +563,7 @@ class Oracle:
                 picks.append(pid)
         return picks
 
-    def produits(self, photo_setup: dict) -> dict:
+    def produits(self, photo_setup: dict, files: dict[str, str]) -> dict:
         infos = photo_setup["infos"]
         rows = self.products_list(infos)
         by_pid = {p.pid: p for p in self.products}
@@ -544,6 +579,7 @@ class Oracle:
                                                barcode["barcode1"] if by_pid[pid].name == barcode["product"] else None)
                        for pid in self.sheet_pids(rows, infos)},
             "stats": {pid: self.product_stats(by_pid[pid]) for pid in self.sheet_pids(rows, infos)},
+            "movements": self.movements_scenarios(by_pid[rows[0]["pid"]], files),
             "search": {q: [r["pid"] for r in rows
                            if all(token_match(r["product"], t, unaccent=True) or token_match(r["pid"], t, unaccent=False)
                                   for t in tokenize(q))]
@@ -1096,7 +1132,7 @@ class Oracle:
 
     # ── Everything ──────────────────────────────────────────────────────────
 
-    def build(self, liste_items: list[dict], photo_setup: dict) -> dict:
+    def build(self, liste_items: list[dict], photo_setup: dict, files: dict[str, str]) -> dict:
         return {
             "window": {"date_from": self.df.isoformat(), "date_to": self.dt.isoformat()},
             "stats": {ct: self.stats(ct) for ct in CATEGORY_TYPES},
@@ -1106,7 +1142,7 @@ class Oracle:
             "stock_abcd_default": self.stock_abcd(*default_abcd_window(self.today)),
             "stock_abcd_window": self.stock_abcd(self.df, self.dt),
             "peremptions": self.peremptions(),
-            "products": self.produits(photo_setup),
+            "products": self.produits(photo_setup, files),
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},
