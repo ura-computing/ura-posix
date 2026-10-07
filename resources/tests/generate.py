@@ -336,7 +336,7 @@ def make_product_infos(products, ventes, achats) -> tuple[dict, dict]:
         by_barcode,
         info("PRODUIT ABSENT DE LA PHARMACIE", 999999, None, [PHOTO_URL]),
     ]}
-    shown = ("brand", "category", "images", "description", "details", "source_url")   # GET /products/{id} « info »
+    shown = ("brand", "category", "images", "description", "details")   # GET /products/{id} « info »
     setup = {
         "infos": {p.pid: {k: e[k] for k in shown} for p, e in zip(first, [*by_pid, by_barcode])},
         "barcode": {"product": first[3].name, "barcode1": PHOTO_BARCODE},

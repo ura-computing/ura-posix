@@ -46,7 +46,6 @@ export interface ProductInfo {
   description: string | null;
   /** « Gamme », « Emballage »… */
   details: { label: string; value: string }[];
-  source_url: string | null;
 }
 
 export interface ProductPrices {

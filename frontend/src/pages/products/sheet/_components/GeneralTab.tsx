@@ -1,7 +1,5 @@
 /** « Général »: photos, données générales, prix, stock (Stock page rules), description,
  *  the 10 latest purchases / sales. */
-import { ExternalLink } from "lucide-react";
-
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { StockStatusPill } from "@/_components/StockStatusPill";
 import { TypeBadge } from "@/_components/TypeBadge";
@@ -137,17 +135,6 @@ export function GeneralTab({ sheet }: { sheet: ProductSheet }) {
           )}
           {info && info.details.length > 0 && (
             <FieldList fields={info.details.map((d) => ({ label: d.label, value: d.value }))} />
-          )}
-          {info?.source_url && (
-            <a
-              href={info.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary-hover"
-            >
-              <ExternalLink className="size-4" aria-hidden />
-              {t("products.seeShop")}
-            </a>
           )}
         </SheetCard>
       </div>

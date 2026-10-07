@@ -288,7 +288,6 @@ export const es: Dict = {
     stockRule: "Mínimo y máximo: {{n}} vendidos del {{from}} al {{to}}, como la página Stock.",
     description: "Descripción",
     noDescription: "Sin descripción para este producto.",
-    seeShop: "Ver en la tienda",
     recent: "Movimientos recientes",
     kindAchat: "Compra",
     kindVente: "Venta",

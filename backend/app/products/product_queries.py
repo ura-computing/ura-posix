@@ -231,7 +231,6 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
                 "images": info.images,
                 "description": info.description,
                 "details": info.details,
-                "source_url": info.source_url,
             }
             if info
             else None

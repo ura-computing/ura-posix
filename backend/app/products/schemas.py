@@ -47,7 +47,6 @@ class ProductInfoOut(BaseModel):
     images: list[str]
     description: str | None
     details: list[ProductDetail]
-    source_url: str | None
 
 
 class ProductPrices(BaseModel):

@@ -295,7 +295,6 @@ export const fr = {
     stockRule: "Minimum et maximum : {{n}} vendus du {{from}} au {{to}}, comme la page Stock.",
     description: "Description",
     noDescription: "Pas de description pour ce produit.",
-    seeShop: "Voir sur la boutique",
     recent: "Mouvements récents",
     kindAchat: "Achat",
     kindVente: "Vente",
