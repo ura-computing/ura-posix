@@ -406,9 +406,10 @@ class Oracle:
 
     # ── Produits ────────────────────────────────────────────────────────────
 
-    def products_list(self) -> list[dict]:
+    def products_list(self, infos: dict[str, dict]) -> list[dict]:
         """GET /products rows (no id): every product in the stock file, sold or bought (any
-        date); « vendus 12 mois » + average PU = the Stock page's (no exclusions)."""
+        date); « vendus 12 mois » + average PU = the Stock page's (no exclusions). `infos`:
+        scraped info per PID, once 18-produits gave the barcode (generate.make_product_infos)."""
         start, end = default_abcd_window(self.today)
         units: dict[str, int] = defaultdict(int)
         for v in self.ventes:
@@ -426,14 +427,78 @@ class Oracle:
                 "current_stock": p.stock, "units_sold_12m": units.get(p.pid, 0), "ppv": r2(p.ppv),
                 "avg_pu": r4(pu) if pu is not None else None,
                 "marge_pct": r2((1 - pu / p.ppv) * 100) if pu is not None and p.ppv > 0 else None,
+                "photo": infos[p.pid]["images"][0] if p.pid in infos else None,
             })
         return sorted(rows, key=lambda r: r["product"])
 
-    def produits(self) -> dict:
-        rows = self.products_list()
+    def product_sheet(self, p, info: dict | None, barcode1: str | None) -> dict:
+        """GET /products/{id} (no id): Stock page rules for min / max / status, the 10
+        latest lines (newest day first; same day: sales, then purchases; then latest line)."""
+        start, end = default_abcd_window(self.today)
+        units = sum(v.qty for v in self.ventes if v.p is p and start <= v.day <= end)
+        pu = self.pu_alltime.get(p.pid)
+        last = max((a for a in self.achats if a.p is p and a.qty > 0), key=lambda a: (a.day, a.seq), default=None)
+        moves = [(a.day, "achat", a.seq, a.qty, a.unit, a.ref, a.supplier) for a in self.achats if a.p is p]
+        moves += [(v.day, "vente", v.seq, -v.qty, v.unit, v.ref, v.client or None) for v in self.ventes if v.p is p]
+        moves.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
+        stock = p.stock
+        return {
+            "pid": p.pid, "product": p.name, "laboratoire": None, "category": p.category,
+            "category_type": "pharmacie" if p.pharma else "parapharmacie", "tva": p.tva_label,
+            "barcode1": barcode1, "barcode2": None, "info": info,
+            "prices": {
+                "ppv": r2(p.ppv), "pph": r2(p.pph), "avg_pu": r4(pu) if pu is not None else None,
+                "last_pu": r4(last.unit) if last else None, "last_pu_date": last.day.isoformat() if last else None,
+                "marge_pct": r2((1 - pu / p.ppv) * 100) if pu is not None and p.ppv > 0 else None,
+            },
+            "stock": {
+                "current_stock": stock, "units_sold_12m": units,
+                "stock_min": round(units / 300 * 14) if units > 0 else 0,
+                "stock_max": round(units / 300 * 15) if units > 0 else 0,
+                "sales_from": start.isoformat(), "sales_to": end.isoformat(),
+                "coverage_days": round(stock * 365 / units) if stock is not None and stock >= 0 and units > 0 else None,
+                "status": coverage_status(stock, units),
+                "expiry_date": p.expiry.isoformat() if stock is not None and p.expiry else None,
+                "zone": p.zone,
+            },
+            "recent_movements": [
+                {"kind": kind, "date": day.isoformat(), "quantity": qty, "unit_price": unit, "document": ref,
+                 "party": party}
+                for day, kind, _, qty, unit, ref, party in moves[:10]
+            ],
+        }
+
+    def sheet_pids(self, rows: list[dict], infos: dict[str, dict]) -> list[str]:
+        """Products 18-produits opens: the 4 with scraped info, then one never bought (no PU),
+        one not in the stock file, one stock-only (no line at all), one with a negative stock."""
+        listed = {r["pid"] for r in rows}
+        sold = {v.p.pid for v in self.ventes}
+        bought = {a.p.pid for a in self.achats}
+        picks = list(infos)
+        for keep in (
+            lambda p: p.pid in sold and p.pid not in bought,
+            lambda p: p.stock is None,
+            lambda p: p.pid not in sold and p.pid not in bought,
+            lambda p: p.stock is not None and p.stock < 0,
+        ):
+            pid = next((p.pid for p in sorted(self.products, key=lambda p: p.name)
+                        if p.pid in listed and p.pid not in picks and keep(p)), None)
+            if pid:
+                picks.append(pid)
+        return picks
+
+    def produits(self, photo_setup: dict) -> dict:
+        infos = photo_setup["infos"]
+        rows = self.products_list(infos)
+        by_pid = {p.pid: p for p in self.products}
+        barcode = photo_setup["barcode"]
         start, end = default_abcd_window(self.today)
         return {
             "sales_from": start.isoformat(), "sales_to": end.isoformat(), "rows": rows,
+            "barcode_setup": barcode,
+            "sheets": {pid: self.product_sheet(by_pid[pid], infos.get(pid),
+                                               barcode["barcode1"] if by_pid[pid].name == barcode["product"] else None)
+                       for pid in self.sheet_pids(rows, infos)},
             "search": {q: [r["pid"] for r in rows
                            if all(token_match(r["product"], t, unaccent=True) or token_match(r["pid"], t, unaccent=False)
                                   for t in tokenize(q))]
@@ -986,7 +1051,7 @@ class Oracle:
 
     # ── Everything ──────────────────────────────────────────────────────────
 
-    def build(self, liste_items: list[dict]) -> dict:
+    def build(self, liste_items: list[dict], photo_setup: dict) -> dict:
         return {
             "window": {"date_from": self.df.isoformat(), "date_to": self.dt.isoformat()},
             "stats": {ct: self.stats(ct) for ct in CATEGORY_TYPES},
@@ -996,7 +1061,7 @@ class Oracle:
             "stock_abcd_default": self.stock_abcd(*default_abcd_window(self.today)),
             "stock_abcd_window": self.stock_abcd(self.df, self.dt),
             "peremptions": self.peremptions(),
-            "products": self.produits(),
+            "products": self.produits(photo_setup),
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},

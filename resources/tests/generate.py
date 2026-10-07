@@ -12,6 +12,7 @@ Outputs (git-ignored, regenerated on every run):
     resources/tests/stock/Sobrus - Stock <yyyymmdd>.csv
     resources/tests/liste/liste.csv                    (Analyses → Liste mode)
     resources/tests/catalog/catalog.csv                (admin catalogue import: 5 new products)
+    resources/tests/catalog/product-infos.json         (scraped photos fixture: backend PRODUCT_INFOS_FILE)
     resources/tests/extra/Sobrus - Achats <d> - <d>.csv (2400 extra lines: import then cancel / delete)
     resources/tests/expected.json                      (oracle.py: every value, field by field)
 
@@ -301,6 +302,48 @@ def make_catalog() -> list[dict]:
              "laboratoire": "Laboratoire E2E"} for i in range(1, 6)]
 
 
+# Scraped photos fixture (backend PRODUCT_INFOS_FILE, e2e/docker-compose.e2e.yml). The photos
+# are the E2E frontend's own files: no internet needed.
+PHOTO_URL = "http://localhost:5174/favicon.svg"
+PHOTO_URL_2 = "http://localhost:5174/icons.svg"
+DEAD_PHOTO_URL = "http://localhost:5174/e2e-photo-introuvable.png"
+PHOTO_BARCODE = "3760000000017"   # 18-produits gives it to a product in the admin catalogue
+
+
+def make_product_infos(products, ventes, achats) -> tuple[dict, dict]:
+    """The 4 first listed products (name order): 2 found by PID with photos that load, 1 by
+    PID with a dead photo address, 1 by a barcode the admin catalogue gets in 18-produits —
+    2 shop pages carry that barcode, the one with more photos wins (load_product_infos);
+    + 1 unknown PID (never shown). Returns (file, oracle setup)."""
+    linked = {p.pid for p in products if p.stock is not None} | {v.p.pid for v in ventes} | {a.p.pid for a in achats}
+    first = sorted((p for p in products if p.pid in linked), key=lambda p: p.name)[:4]
+
+    def info(name: str, pid: int | None, barcode: str | None, images: list[str]) -> dict:
+        return {"pid": pid, "barcode1": barcode, "barcode2": None, "name": name, "brand": "Marque E2E",
+                "category": "Soins visage", "images": images, "description": f"Description de {name}.",
+                "details": [{"label": "Gamme", "value": "Gamme E2E"}, {"label": "Emballage", "value": "Tube 50 ml"}],
+                "source_url": "https://boutique.example/e2e"}
+
+    by_barcode = info(f"{first[3].name} (autre boutique)", None, PHOTO_BARCODE, [PHOTO_URL_2, PHOTO_URL])
+    by_pid = [
+        info(first[0].name, int(first[0].pid), None, [PHOTO_URL, PHOTO_URL_2]),
+        info(first[1].name, int(first[1].pid), None, [PHOTO_URL_2]),
+        info(first[2].name, int(first[2].pid), None, [DEAD_PHOTO_URL]),
+    ]
+    file = {"source": "E2E", "products": [
+        *by_pid,
+        info(first[3].name, None, PHOTO_BARCODE, [PHOTO_URL]),
+        by_barcode,
+        info("PRODUIT ABSENT DE LA PHARMACIE", 999999, None, [PHOTO_URL]),
+    ]}
+    shown = ("brand", "category", "images", "description", "details", "source_url")   # GET /products/{id} « info »
+    setup = {
+        "infos": {p.pid: {k: e[k] for k in shown} for p, e in zip(first, [*by_pid, by_barcode])},
+        "barcode": {"product": first[3].name, "barcode1": PHOTO_BARCODE},
+    }
+    return file, setup
+
+
 # ─── CSV writers ─────────────────────────────────────────────────────────────
 
 def _fmt(x: float) -> str:
@@ -336,13 +379,16 @@ def _achat_rows(achats):
             for a in achats)
 
 
-def write_files(products, ventes, achats, liste, extra, catalog, start: date, end: date, today: date) -> dict:
+def write_files(products, ventes, achats, liste, extra, catalog, product_infos, start: date, end: date,
+                today: date) -> dict:
     achat_path = HERE / "achats" / f"Sobrus - Achats {start} - {end}.csv"
     vente_path = HERE / "ventes" / f"Sobrus - Ventes {start} - {end}.csv"
     stock_path = HERE / "stock" / f"Sobrus - Stock {today:%Y%m%d}.csv"
     liste_path = HERE / "liste" / "liste.csv"
     extra_path = HERE / "extra" / f"Sobrus - Achats {end} - {end}.csv"
     catalog_path = HERE / "catalog" / "catalog.csv"
+    infos_path = HERE / "catalog" / "product-infos.json"
+    infos_path.write_text(json.dumps(product_infos, ensure_ascii=False, indent=1), encoding="utf-8")
     _write(achat_path, ACHAT_HEADER, _achat_rows(achats))
     _write(extra_path, ACHAT_HEADER, _achat_rows(extra))
     _write(catalog_path, CATALOG_HEADER, (
@@ -367,6 +413,7 @@ def write_files(products, ventes, achats, liste, extra, catalog, start: date, en
         "liste":  {"path": rel(liste_path), "rows": len(liste)},
         "extra_achats": {"path": rel(extra_path), "rows": len(extra)},
         "catalog": {"path": rel(catalog_path), "rows": len(catalog)},
+        "product_infos": {"path": rel(infos_path), "rows": len(product_infos["products"])},
     }
 
 
@@ -440,7 +487,8 @@ def main() -> None:
     liste = make_liste(rng, products, ventes, window_from, window_to)
     extra = make_extra_achats(random.Random(args.seed + 1), products, data_end)
     catalog = make_catalog()
-    files = write_files(products, ventes, achats, liste, extra, catalog, data_start, data_end, today)
+    product_infos, photo_setup = make_product_infos(products, ventes, achats)
+    files = write_files(products, ventes, achats, liste, extra, catalog, product_infos, data_start, data_end, today)
 
     oracle = Oracle(products, ventes, achats, today, window_from, window_to)
     expected = {
@@ -450,7 +498,7 @@ def main() -> None:
         "files": files,
         "import": import_section(products, ventes, achats),
         "catalog": catalog_section(products, ventes, achats, catalog),
-        **oracle.build(liste),
+        **oracle.build(liste, photo_setup),
     }
     (HERE / "expected.json").write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
 

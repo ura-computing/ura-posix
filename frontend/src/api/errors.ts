@@ -37,6 +37,7 @@ export const ErrorCode = {
   MEDICAMENT_NOT_FOUND: "medicamentNotFound",
   MEDICAMENTS_NOT_FOUND: "medicamentsNotFound",
   MEDICAMENT_IN_USE: "medicamentInUse",
+  PRODUCT_NOT_FOUND: "productNotFound",
   SUFFIX_EXISTS: "suffixExists",
   SUFFIX_NOT_FOUND: "suffixNotFound",
   FILE_TOO_LARGE: "fileTooLarge",

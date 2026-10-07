@@ -23,11 +23,12 @@ import { NeedleGauge } from "@/_components/NeedleGauge";
 import { cn } from "@/utils/cn";
 import { formatQty, formatPct, formatMAD, formatNumStr } from "@/utils/format";
 import type { AbcdClass, StockRow, PeremptionBracket, PeremptionsResponse } from "@/types";
-import { ABCD_COLORS, ABCD_ORDER, abcdFontSize, STATUS_META, STATUS_OPTIONS } from "../constants";
+import { ABCD_COLORS, ABCD_ORDER, abcdFontSize, STATUS_OPTIONS } from "../constants";
 import { useMemo, type ReactNode } from "react";
 import type { DialogDescriptor } from "@/pages/analytics/hooks";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
+import { StockStatusPill } from "@/_components/StockStatusPill";
 import type { StockSortKey } from "./hooks";
 import { Page } from "@/_components/Page";
 
@@ -367,17 +368,6 @@ function ClassPill({ klass }: { klass: AbcdClass }) {
   );
 }
 
-function StatusPill({ status }: { status: StockRow["status"] }) {
-  const t = useT();
-  const meta = STATUS_META[status];
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium", meta.pill)}>
-      <span className={cn("size-1.5 rounded-full", meta.dot)} aria-hidden />
-      {t(`stockStatus.${status}`)}
-    </span>
-  );
-}
-
 const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
   {
     key: "product",
@@ -439,7 +429,7 @@ const buildColumns = (t: TFn): ColumnDef<StockRow, StockSortKey>[] => [
     key: "status",
     label: t("col.statut"),
     width: 140,
-    render: (r) => <StatusPill status={r.status} />,
+    render: (r) => <StockStatusPill status={r.status} />,
   },
 ];
 

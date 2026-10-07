@@ -205,6 +205,26 @@ class Medicament(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
 
+class ProductInfo(Base):
+    """Photos + description scraped from parapharmacy shops (`backend/data/product_infos.json`).
+    Global and read-only: `scripts/load_product_infos.py` replaces every row at each start.
+    A product finds its row when shown (« Produits »): same PID first, then a same barcode."""
+
+    __tablename__ = "product_infos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # file priority: the lower id wins a shared code
+    pid: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    barcode1: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    barcode2: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    brand: Mapped[str | None] = mapped_column(String, nullable=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)  # the shop's, e.g. « Soins visage »
+    images: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # photo URLs, best first
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    details: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # [{label: « Gamme », value}, …]
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class ImportBatch(Base):
     """Per-import audit row. Drives the Imports tab and cascade-delete UX.
 

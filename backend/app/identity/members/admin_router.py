@@ -282,7 +282,7 @@ def set_pharmacy_features(
     db: DbDep,
     pharmacy_id: Annotated[int, Path(ge=1)],
 ) -> PharmacyDetail:
-    """Single bulk write of the 9 PharmacyFeature toggles. Frontend builds
+    """Single bulk write of the 10 PharmacyFeature toggles. Frontend builds
     the full dict (saves 9 separate round-trips) and POSTs it on the
     'Enregistrer' click in Screen 2 Section A."""
     _get_pharmacy_or_404(db, pharmacy_id)
@@ -297,7 +297,7 @@ def set_user_permissions(
     db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
-    """Admin sets one user's 9 permissions in bulk — owners OR employees.
+    """Admin sets one user's 10 permissions in bulk — owners OR employees.
     The 3-layer intersection at read time still applies, so an admin-granted
     employee permission only becomes effective when the pharmacy AND at least
     one active owner also have it (see effective_permissions in

@@ -50,6 +50,7 @@ const afterImport = {
     API.stats.stockAbcdFiltered,
     API.specialProducts.suggestions,
     API.products.list,
+    API.products.sheet,
     ...blExclusionReads(),
     ...supplierExclusionReads(),
   ],
@@ -65,6 +66,7 @@ const afterImport = {
     API.stats.stockSummary,
     API.specialProducts.suggestions,
     API.products.list,
+    API.products.sheet,
   ],
   stock: (): Read[] => [
     API.imports.list,
@@ -74,6 +76,7 @@ const afterImport = {
     API.stats.stockSummary,
     API.stats.analyseMarge,
     API.products.list,
+    API.products.sheet,
   ],
 };
 
@@ -240,6 +243,11 @@ export const API = {
       url: "/products",
       key: (f: ProductsFilters) => ["products", "list", f] as const,
       all: ["products", "list"],
+    },
+    sheet: {
+      url: (id: number) => `/products/${id}`,
+      key: (id: number) => ["products", "sheet", id] as const,
+      all: ["products", "sheet"],
     },
   },
 

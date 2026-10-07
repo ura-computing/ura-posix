@@ -28,6 +28,9 @@ PY
 #    `make migrate` — single source of truth in scripts/bootstrap.py.
 uv run python scripts/bootstrap.py
 
+# 3. Scraped product photos + descriptions (« Produits »): the table = the file, every start.
+uv run python scripts/load_product_infos.py
+
 # 4. Seed admin + owner + catalog. Idempotent: seed.py self-skips if the
 #    admin user already exists. We short-circuit here too so the container
 #    doesn't even open a session when there's clearly nothing to seed —

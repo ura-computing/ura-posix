@@ -1,38 +1,47 @@
 /** /produits — every product of the pharmacy: in its last stock import, sold or bought.
  *  « Vendus 12 mois », stock and marge follow the Stock page's rules (same numbers). */
 import { Download } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { useCategoryTypeOptions } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
 import { Page } from "@/_components/Page";
 import { TypeBadge } from "@/_components/TypeBadge";
-import type { ProductRow } from "@/types";
+import { ROUTES, type ProductRow } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 
+import { ProductPhoto } from "../_components/ProductPhoto";
 import { useProduitsPage } from "./hooks";
 
 const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
   {
     key: "product",
     label: t("col.produit"),
-    width: 260,
+    width: 370,
     render: (r) => (
-      <div className="flex flex-col">
-        <span className="block max-w-[250px] truncate text-base" title={r.product}>
-          {r.product}
-        </span>
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid}</span>
-      </div>
+      // The whole block (photo + name) opens the product sheet.
+      <Link to={`${ROUTES.PRODUITS}/${r.id}`} className="group flex items-center gap-3">
+        <ProductPhoto key={r.photo} src={r.photo} name={r.product} className="size-10" />
+        <div className="flex min-w-0 flex-col">
+          <span
+            className="line-clamp-1 break-all text-base group-hover:text-primary group-hover:underline"
+            title={r.product}
+          >
+            {r.product}
+          </span>
+          <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid}</span>
+        </div>
+      </Link>
     ),
   },
   {
     key: "laboratoire",
     label: t("col.laboratoire"),
-    width: 150,
+    width: 140,
     render: (r) => (
-      <span className="block max-w-[140px] truncate text-sm text-muted-foreground" title={r.laboratoire ?? ""}>
+      <span className="line-clamp-1 break-all text-sm text-muted-foreground" title={r.laboratoire ?? ""}>
         {r.laboratoire ?? "—"}
       </span>
     ),
@@ -40,9 +49,9 @@ const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
   {
     key: "category",
     label: t("col.categorie"),
-    width: 140,
+    width: 182,
     render: (r) => (
-      <span className="block max-w-[130px] truncate text-sm text-muted-foreground" title={r.category ?? ""}>
+      <span className="line-clamp-1 break-all text-sm text-muted-foreground" title={r.category ?? ""}>
         {r.category ?? "—"}
       </span>
     ),
@@ -50,37 +59,37 @@ const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
   {
     key: "category_type",
     label: t("col.type"),
-    width: 110,
+    width: 88,
     sortable: false,
     render: (r) => <TypeBadge type={r.category_type} />,
   },
   {
     key: "current_stock",
     label: t("col.stock"),
-    width: 80,
+    width: 56,
     align: "right",
     render: (r) => (r.current_stock != null ? formatQty(r.current_stock) : "—"),
   },
   {
     key: "units_sold_12m",
     label: t("products.vendus12m"),
-    width: 120,
+    width: 84,
     align: "right",
     render: (r) => formatQty(r.units_sold_12m),
   },
   {
     key: "ppv",
     label: t("col.ppv"),
-    width: 110,
+    width: 88,
     align: "right",
-    render: (r) => (r.ppv != null ? formatMAD(r.ppv) : "—"),
+    render: (r) => <span className="whitespace-nowrap">{r.ppv != null ? formatMAD(r.ppv) : "—"}</span>,
   },
   {
     key: "marge_pct",
     label: t("col.margePct"),
-    width: 90,
+    width: 72,
     align: "right",
-    render: (r) => (r.marge_pct != null ? formatPct(r.marge_pct) : "—"),
+    render: (r) => <span className="whitespace-nowrap">{r.marge_pct != null ? formatPct(r.marge_pct) : "—"}</span>,
   },
 ];
 

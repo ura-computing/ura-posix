@@ -1,6 +1,6 @@
 /** Gérer mon équipe — owner's employee management page.
  *
- *  Section A: read-only summary of the 9 features with their availability
+ *  Section A: read-only summary of the 10 features with their availability
  *    state (active / pharmacy-blocked / owner-blocked). Helps the owner
  *    understand the 2-layer ceiling before opening any dialog.
  *  Section B: employees table + actions (Inviter / Gérer les permissions /

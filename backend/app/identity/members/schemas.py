@@ -118,14 +118,14 @@ class PharmacyIn(BaseModel):
 
 
 class FeaturesBulkSet(BaseModel):
-    """Bulk-set the 9 PharmacyFeature rows. Keys not present in `features`
+    """Bulk-set the 10 PharmacyFeature rows. Keys not present in `features`
     are left untouched — send the full set to fully replace."""
 
     features: dict[str, bool]
 
 
 class PermissionsBulkSet(BaseModel):
-    """Bulk-set the 9 UserPermission rows for one user. Same shape + semantics
+    """Bulk-set the 10 UserPermission rows for one user. Same shape + semantics
     as FeaturesBulkSet."""
 
     permissions: dict[str, bool]

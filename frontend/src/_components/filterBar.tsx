@@ -622,7 +622,8 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
         placeholder={placeholder}
         className="h-9 w-full rounded-md border border-input bg-surface-subtle pl-8 pr-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
       />
-      {open && draft.length >= 2 && (
+      {/* Only a page with suggestions opens the list: else « Aucun résultat » shows above found rows. */}
+      {open && draft.length >= 2 && (suggestions || isLoading) && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
           {isLoading && <div className="px-3 py-2 text-xs text-muted-foreground">{t("common.searching")}</div>}
           {!isLoading && !hasAny && (

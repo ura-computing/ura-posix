@@ -25,8 +25,8 @@ One feature at a time: backend + frontend + its part of `e2e/tests/18-produits.s
 | # | Feature | State |
 |---|---|---|
 | F1 | « Produits » list: feature `produits` (migration 0024, ON for everyone), `GET /products`, sidebar, search, Mixte / Pharmacie / Parapharmacie, sort, Excel | done |
-| F2 | Photos + description from the scraped catalogue (`product_infos`, loaded at every start, matched by PID then barcode) | |
-| F3 | Fiche produit: Général (données, prix, stock, description, mouvements récents) + Codes | |
+| F2 | Photos + description from the scraped catalogue (`product_infos`, migration 0025, loaded at every start, matched by PID then barcode) | done, waiting `make tests` |
+| F3 | Fiche produit: Général (données, prix, stock, description, mouvements récents) + Codes | done, waiting `make tests` |
 | F4 | « Ventes par mois » Tableau ⇄ Graphique + Statistiques tab | |
 | F5 | Mouvements tab (achats + ventes, filters, Excel) | |
 | F6 | Owner edit: « Modifier » / « Enregistrer », his pharmacy only, hand edit wins over imports, « Revenir à la valeur importée » | |

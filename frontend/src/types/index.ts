@@ -49,6 +49,7 @@ export const ROUTES = {
   COMPTABILITE: "/comptabilite",
   PRODUITS_SPECIAUX: "/produits-speciaux",
   PRODUITS: "/produits",
+  PRODUIT: "/produits/:id",
   IMPORTS: "/imports",
 
   // Gestion

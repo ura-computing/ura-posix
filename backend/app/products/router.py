@@ -2,18 +2,21 @@
 
 GET /v1/products    The pharmacy's products: search, Mixte / Pharmacie / Parapharmacie,
                     sort, page; export=true → every matching row (Excel).
+GET /v1/products/{med_id}   One product's sheet (Général + Codes tabs). Not one of the
+                    pharmacy's products → 404 `productNotFound` (never says it exists elsewhere).
 """
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 
 from app.core.database import DbDep
+from app.core.errors import ApiError, ErrorCode
 from app.core.permissions import member
-from app.products.product_queries import list_products
-from app.products.schemas import ProductsListResponse
+from app.products.product_queries import list_products, product_sheet
+from app.products.schemas import ProductSheet, ProductsListResponse
 
 
 router = APIRouter(tags=["products"])
@@ -50,3 +53,11 @@ def get_products(
         limit=limit,
         export=export,
     )
+
+
+@router.get("/products/{med_id}", response_model=ProductSheet)
+def get_product(med_id: Annotated[int, Path(ge=1)], pharmacy_id: Annotated[int, member("produits")], db: DbDep) -> dict:
+    sheet = product_sheet(db, pharmacy_id, med_id)
+    if sheet is None:
+        raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
+    return sheet

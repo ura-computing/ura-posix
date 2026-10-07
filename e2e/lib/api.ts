@@ -17,7 +17,7 @@ function url(path: string, params: Params = {}): URL {
 
 async function call<T>(
   page: Page,
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   params: Params,
   body?: unknown,
@@ -35,6 +35,8 @@ async function call<T>(
 export const apiGet = <T = any>(page: Page, path: string, params: Params = {}) => call<T>(page, "GET", path, params);
 export const apiPost = <T = any>(page: Page, path: string, body: unknown, params: Params = {}, status = 200) =>
   call<T>(page, "POST", path, params, body, status);
+export const apiPut = <T = any>(page: Page, path: string, body: unknown, status = 200) =>
+  call<T>(page, "PUT", path, {}, body, status);
 /** Cleanup helper (the UI deletes are tested with pageSend); `status` = what the route answers. */
 export const apiDelete = (page: Page, path: string, status = 200) =>
   call<unknown>(page, "DELETE", path, {}, undefined, status);

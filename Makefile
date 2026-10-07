@@ -16,7 +16,7 @@ help:
 	@echo "    make backend   — only the backend (starts the DB, applies new migrations; uvicorn :8000, hot reload)"
 	@echo "    make frontend  — only the frontend (Vite dev :5173)"
 	@echo "    make db        — start the Postgres 17 container + create the dev DB if missing"
-	@echo "    make migrate   — apply Alembic migrations against the dev DB"
+	@echo "    make migrate   — apply Alembic migrations against the dev DB + reload product photos"
 	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
 	@echo ""
 	@echo "  Build:"
@@ -93,6 +93,7 @@ frontend:
 
 migrate: db
 	cd $(BACKEND_DIR) && uv run python scripts/bootstrap.py
+	cd $(BACKEND_DIR) && uv run python scripts/load_product_infos.py
 
 # Run the same seed.py the docker entrypoint runs — but against the dev DB
 # (the backend's local .env / DATABASE_URL).

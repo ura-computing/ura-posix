@@ -29,9 +29,12 @@ services:
       COOKIE_SECURE: "false"
       MAIL_USERNAME: "" # no SMTP: magic links are printed to the log (e2e/lib/mail.ts)
       SEED_CATALOG: "0" # catalogue = generated products only (every value known to the oracle)
+      PRODUCT_INFOS_FILE: /app/data/product-infos.e2e.json # photos of a few generated products
       RATE_LIMIT: "0" # the suite logs in more than 5 times a minute
       PORT: "8001"
       PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../resources/tests/catalog/product-infos.json:/app/data/product-infos.e2e.json:ro
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
