@@ -9,7 +9,7 @@ import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
 import type { ProductMovementLine, ProductSheet } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
+import { formatDate, formatMAD, formatNumStr, formatPct, formatQty } from "@/utils/format";
 
 import { useMovements } from "../hooks";
 import { tvaShort } from "../labels";
@@ -128,30 +128,54 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
       : null,
   ].filter(Boolean) as ActiveFilter[];
 
+  // Printed instead of the filter fields: what the lines are (type, period, search, which lines).
+  const first = total === 0 ? 0 : (filters.page - 1) * filters.limit + 1;
+  const printed = [
+    kinds.find((k) => k.value === filters.kind)?.label,
+    filters.date_from || filters.date_to
+      ? t("products.printMovesPeriod", {
+          from: filters.date_from ? formatDate(filters.date_from) : "…",
+          to: filters.date_to ? formatDate(filters.date_to) : "…",
+        })
+      : t("products.printMovesAllDates"),
+    filters.search ? t("products.printMovesSearch", { q: filters.search }) : null,
+    t("products.printMovesLines", {
+      first: formatNumStr(first),
+      last: formatNumStr(first === 0 ? 0 : first + rows.length - 1),
+      total: formatNumStr(total),
+    }),
+  ].filter(Boolean);
+
   return (
     <div className="flex flex-col gap-4">
-      <FilterBar
-        search={{ value: filters.search, onChange: setSearch, placeholder: t("products.movementsSearchPh") }}
-        dateRange={{ from: filters.date_from, to: filters.date_to, onChange: setDateRange }}
-        segment={{ value: filters.kind, onChange: setKind, options: kinds }}
-        activeFilters={activeFilters}
-        onResetAll={reset}
-      />
+      <p className="hidden text-sm text-foreground print:block">{printed.join(" · ")}</p>
+      <div className="print:hidden">
+        <FilterBar
+          search={{ value: filters.search, onChange: setSearch, placeholder: t("products.movementsSearchPh") }}
+          dateRange={{ from: filters.date_from, to: filters.date_to, onChange: setDateRange }}
+          segment={{ value: filters.kind, onChange: setKind, options: kinds }}
+          activeFilters={activeFilters}
+          onResetAll={reset}
+        />
+      </div>
 
-      <DataTable<ProductMovementLine>
-        rows={rows}
-        columns={columns(t, sheet.tva, canSeeDetail, seeDetail)}
-        isLoading={isLoading}
-        pagination={{
-          page: filters.page,
-          pageSize: filters.limit,
-          total,
-          onPage: setPage,
-          onPageSize: setPageSize,
-        }}
-        emptyTitle={t("products.noMovement")}
-        rowKey={(_, i) => i}
-      />
+      {/* On paper: no « Action » column (its buttons are not printed). */}
+      <div className="print:[&_td:last-child]:hidden print:[&_th:last-child]:hidden">
+        <DataTable<ProductMovementLine>
+          rows={rows}
+          columns={columns(t, sheet.tva, canSeeDetail, seeDetail)}
+          isLoading={isLoading}
+          pagination={{
+            page: filters.page,
+            pageSize: filters.limit,
+            total,
+            onPage: setPage,
+            onPageSize: setPageSize,
+          }}
+          emptyTitle={t("products.noMovement")}
+          rowKey={(_, i) => i}
+        />
+      </div>
     </div>
   );
 }

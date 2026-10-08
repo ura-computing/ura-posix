@@ -1,6 +1,6 @@
 /** Top of the product sheet, on every tab: breadcrumb, « PID | Catégorie | TVA », type + stock
  *  badges, « Code barre(s) » card, « Modifier » (owner) / « Annuler » + « Enregistrer ». */
-import { ChevronRight, House, Pencil, Save, X } from "lucide-react";
+import { ChevronRight, House, Pencil, Printer, Save, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { AsyncButton } from "@/_components/AsyncButton";
@@ -8,6 +8,7 @@ import { TypeBadge } from "@/_components/TypeBadge";
 import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
+import { printLight } from "@/utils/print";
 
 import type { SheetEditor } from "../hooks";
 import { tvaShort, withoutRate } from "../labels";
@@ -17,7 +18,7 @@ import { CopyButton } from "./CopyButton";
 export function SheetBreadcrumb({ name }: { name: string }) {
   const t = useT();
   return (
-    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground print:hidden">
       <Link to={ROUTES.HOME} aria-label={t("nav.home")} className="hover:text-foreground">
         <House className="size-4" />
       </Link>
@@ -102,6 +103,23 @@ export function BarcodeCard({ code }: { code: string | null }) {
         <span className="text-sm text-muted-foreground">{t("products.notAvailable")}</span>
       )}
     </div>
+  );
+}
+
+/** « Imprimer »: the header + the open tab on paper / PDF (no menu, no buttons, light theme).
+ *  Everyone; disabled while editing (the values shown are not saved yet). */
+export function PrintButton({ disabled }: { disabled: boolean }) {
+  const t = useT();
+  return (
+    <AsyncButton
+      variant="secondary"
+      onClick={printLight}
+      disabled={disabled}
+      title={disabled ? t("products.printAfterEdit") : undefined}
+    >
+      <Printer className="size-4" />
+      {t("products.print")}
+    </AsyncButton>
   );
 }
 

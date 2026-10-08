@@ -14,6 +14,7 @@
  *  « Mouvements » (from « Voir tout »): all lines, page 2, Achats, Ventes over the test window,
  *  search = oracle, every column on screen (remise, TVA, total), 10 per page. « Voir détail » =
  *  the whole ticket on Ventes / BL on Achats (exact number, period cleared, removable filter).
+ *  « Imprimer »: header + open tab, light theme, no menu / buttons / tabs; disabled while editing.
  *  « Codes »: PID / barcodes + « Copier », barcode drawn, format + length, « Scanner / Rechercher
  *  un code barre » (barcode, PID, unknown code, Échap / Annuler).
  *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
@@ -348,6 +349,7 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
       other.getByRole("button", { name: "Modifier", exact: true }),
       "employé : lecture seule",
     ).toBeDisabled();
+    await expect(other.getByRole("button", { name: "Imprimer", exact: true }), "employé : imprimer").toBeEnabled();
     const blocks = other.getByRole("button", { name: "Éditer", exact: true });
     await expect(blocks, "« Éditer » de Stock + Informations générales").toHaveCount(2);
     for (const button of await blocks.all()) await expect(button).toBeDisabled();
@@ -459,7 +461,9 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
       ];
       for (const [label, want] of infos) await expect(field(page, label), label).toHaveText(want);
       await expectNumber(page, "PPV", ppv);
-      await expectNumber(page, "Prix d'achat moyen", avg_pu);
+      // Never bought with a price: « Non disponible » (the tile shows « — »).
+      if (avg_pu == null) await expect(field(page, "Prix d'achat moyen")).toHaveText("Non disponible");
+      else await expectNumber(page, "Prix d'achat moyen", avg_pu);
       if (last_pu_date) await expect(field(page, "Dernier prix d'achat")).toContainText(`(${frDate(last_pu_date)})`);
       else await expect(field(page, "Dernier prix d'achat")).toHaveText("Non disponible");
 
@@ -484,6 +488,56 @@ test("fiche produit: copier le code barre (en-tête)", async ({ page }) => {
   await page.locator("main header").getByRole("button", { name: "Copier le code barre", exact: true }).click();
   await expect(page.getByText(`Copié : ${e.barcode1}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText()), "presse-papiers").toBe(e.barcode1);
+});
+
+test("fiche produit: « Imprimer » = l'en-tête + l'onglet ouvert, en thème clair, sans menu ni boutons", async ({
+  page,
+}) => {
+  const [pid, e] = Object.entries<Row>(expected().products.sheets)[0];
+  await openSheet(page, pid);
+  await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
+  const print = page.getByRole("button", { name: "Imprimer", exact: true });
+
+  // window.print opens the browser's print window: replaced here to see the theme it prints in.
+  await page.evaluate(() => {
+    document.documentElement.classList.add("dark");
+    const w = window as unknown as { printed: boolean[] };
+    w.printed = [];
+    window.print = () => w.printed.push(document.documentElement.classList.contains("dark"));
+  });
+  await print.click();
+  expect(await page.evaluate(() => (window as unknown as { printed: boolean[] }).printed), "imprimé en clair").toEqual([
+    false,
+  ]);
+  expect(await page.evaluate(() => document.documentElement.classList.contains("dark")), "sombre ensuite").toBe(true);
+  await page.evaluate(() => document.documentElement.classList.remove("dark"));
+
+  // On paper: the header and the open tab (its name as a title), no menu, buttons or tabs.
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator("aside"), "menu").toBeHidden();
+  await expect(print).toBeHidden();
+  await expect(page.getByRole("button", { name: "Modifier", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "30 jours", exact: true })).toBeHidden();
+  await expect(page.getByRole("tablist")).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1, name: e.product, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Statistiques", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Ventes par mois", exact: true })).toBeVisible();
+  await expect(page.getByText(/^Du .+ au .+ · les % comparent/), "la période").toBeVisible();
+  // « Mouvements » on paper: a line says which lines (no filter fields), no « Action » column.
+  await page.goto(page.url().replace("tab=stats", "tab=movements"));
+  await expect(page.getByText(/^Tous · toutes les dates · lignes 1 à 10 sur [\d\s\u202f]+$/)).toBeVisible();
+  await expect(page.getByPlaceholder("Rechercher une référence, un client…")).toBeHidden();
+  await expect(page.getByRole("columnheader", { name: "Action" })).toBeHidden();
+  await expect(page.getByRole("columnheader", { name: "Total" })).toBeVisible();
+  await page.emulateMedia({ media: null });
+  await expect(page.getByRole("heading", { level: 2, name: "Statistiques", exact: true }), "écran").toBeHidden();
+
+  // While editing: disabled, with the reason.
+  await page.getByRole("button", { name: "Modifier", exact: true }).click();
+  await expect(print).toBeDisabled();
+  await expect(print).toHaveAttribute("title", "Enregistrez ou annulez la modification avant d'imprimer.");
+  await page.getByRole("button", { name: "Annuler", exact: true }).click();
+  await expect(print).toBeEnabled();
 });
 
 test("fiche produit: photo de l'en-tête (première photo, adresse morte, aucune)", async ({ page }) => {
@@ -647,6 +701,7 @@ test("fiche produit: en espagnol (onglets, blocs, boutons), choix gardé, retour
     await expect(page.getByText(label, { exact: true }), label).toBeVisible();
   }
   await expect(page.getByRole("button", { name: "Editar", exact: true }), "Editar + 2 « Editar »").toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Imprimir", exact: true })).toBeVisible();
   await page.reload(); // the language is remembered
   await expect(page.getByRole("tab", { name: "Estadísticas", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Estadísticas", exact: true }).click();

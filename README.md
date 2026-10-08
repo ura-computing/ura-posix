@@ -67,7 +67,7 @@ is in `PLAN.md` « Later »).
 | `/ventes` | Sales ledger + « à surveiller » tabs | `ventes` |
 | `/stock` | ABCD rotation + péremptions (expiry) | `stock` |
 | `/produits` | Every product of the pharmacy (stock file, sold or bought): photo, stock, sold 12 months, PPV, marge; search, Mixte / Pharmacie / Parapharmacie, sort, Excel | `produits` |
-| `/produits/:id` | Product sheet: header (photo, PID · catégorie · TVA, type + stock badges, code barre drawn + copy), tabs Général · Statistiques (period) · Mouvements (« Voir détail ») · Codes (scanner) (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
+| `/produits/:id` | Product sheet: header (photo, PID · catégorie · TVA, type + stock badges, code barre drawn + copy, « Imprimer »), tabs Général · Statistiques (period) · Mouvements (« Voir détail ») · Codes (scanner) (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
 | `/analyses` | Analyse de marge: produit, catégorie, laboratoire, grossiste, client, mois, année, liste | `analyse` |
 | `/alertes` | Margin alerts, ventes sans achat, stock and expiry alerts | `alertes` |
 | `/comptabilite` | Accounting KPIs (exclusions applied), payment methods per month, sales journal | `accounting` |
@@ -571,6 +571,7 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 | Statistiques: 12 months | 3 charts (ventes bars, achats bars, ventes vs achats: solid lines, one color each) + « Détail mensuel » (« Copier » → Excel), always this month and the 11 before |
 | Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), 10 a page; remise = the sale's (purchase: —); TVA = the product's |
 | « Voir détail » | opens Ventes (`?ref=` ticket) or Achats (`?ref=` BL): every line of that exact number, period removed, a filter chip to remove it. Disabled without the Ventes / Achats permission |
+| « Imprimer » | the header + the open tab (its name as a title), A4 landscape, light theme; no menu, buttons, tabs or fields. Everyone; disabled while editing |
 | Codes | PID, code barre 1 / 2 + « Copier »; format EAN-13 / UPC-A / EAN-8 when the length and check digit fit, else « Autre ». « Scanner / Rechercher un code barre »: a USB reader (code + Entrée) or typing → the pharmacy's product with that exact PID / barcode (the owner's barcodes too), else « Aucun produit » |
 
 **Owner edits (« Modifier » → « Enregistrer », `PUT /products/{id}`)**

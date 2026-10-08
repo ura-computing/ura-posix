@@ -30,9 +30,16 @@ export function StatsPeriodPicker({
   return (
     <>
       {period === "custom" && (
-        <DateRangePopover from={range.from} to={range.to} onChange={onRange} showPresets={false} />
+        <DateRangePopover
+          from={range.from}
+          to={range.to}
+          onChange={onRange}
+          showPresets={false}
+          className="print:hidden"
+        />
       )}
-      <CategorySegment value={period} options={options} onChange={onPeriod} />
+      {/* Printed: the dates are in the line « Du … au … » under the tabs. */}
+      <CategorySegment value={period} options={options} onChange={onPeriod} className="print:hidden" />
     </>
   );
 }

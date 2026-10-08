@@ -145,7 +145,7 @@ export function GeneralTab({
         <KpiTile label={t("col.margePct")} value={prices.marge_pct != null ? formatPct(prices.marge_pct) : "—"} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2 print:grid-cols-2">
         <div className="flex flex-col gap-4">
           <SheetCard title={t("products.stock")} icon={<Boxes className="size-5" />} actions={<EditBlockButton />}>
             <dl className="grid gap-4 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-border">

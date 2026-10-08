@@ -71,7 +71,7 @@ export function MonthsChart(props: MonthsChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const w = useWidth(wrapRef);
   return (
-    <div ref={wrapRef} className="relative w-full" style={{ height: H }}>
+    <div ref={wrapRef} className="relative w-full print:h-auto!" style={{ height: H }}>
       {w != null && <DrawnMonthsChart {...props} W={Math.max(MIN_W, w)} />}
     </div>
   );
@@ -114,7 +114,7 @@ function DrawnMonthsChart({ months, series, kind, label, W }: MonthsChartProps &
         viewBox={`0 0 ${W} ${H}`}
         role="img"
         aria-label={label}
-        className="block touch-none select-none"
+        className="block h-auto max-w-full touch-none select-none"
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
       >
@@ -274,7 +274,7 @@ export function TrendLine(props: TrendLineProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const w = useWidth(wrapRef);
   return (
-    <div ref={wrapRef} className="w-full" style={{ height: TREND_H }}>
+    <div ref={wrapRef} className="w-full print:h-auto!" style={{ height: TREND_H }}>
       {w != null && <DrawnTrendLine {...props} W={Math.max(120, w)} />}
     </div>
   );
@@ -290,7 +290,14 @@ function DrawnTrendLine({ values, titles, color, label, W }: TrendLineProps & { 
     hi === lo ? TREND_H / 2 : TREND_H - TREND_PAD - ((v - lo) / range) * (TREND_H - 2 * TREND_PAD);
   const pts = values.map((v, i) => ({ x: xAt(i), y: yAt(v) }));
   return (
-    <svg width={W} height={TREND_H} viewBox={`0 0 ${W} ${TREND_H}`} role="img" aria-label={label} className="block">
+    <svg
+      width={W}
+      height={TREND_H}
+      viewBox={`0 0 ${W} ${TREND_H}`}
+      role="img"
+      aria-label={label}
+      className="block h-auto max-w-full"
+    >
       <motion.path
         d={smoothPath(pts)}
         fill="none"

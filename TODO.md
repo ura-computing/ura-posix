@@ -22,4 +22,6 @@
 
 + check cursor pagination
 
-+ add ui tutorial for new user to show the m how to use the app
++ add ui tutorial for new user to show them how to use the app
+
+

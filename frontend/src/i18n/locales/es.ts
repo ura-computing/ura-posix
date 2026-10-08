@@ -371,6 +371,12 @@ export const es: Dict = {
     scanSearch: "Buscar",
     scanNotFound: "Ningún producto con el código {{code}} en su farmacia.",
     exportFailed: "La exportación ha fallado.",
+    print: "Imprimir",
+    printAfterEdit: "Guarde o anule la modificación antes de imprimir.",
+    printMovesPeriod: "del {{from}} al {{to}}",
+    printMovesAllDates: "todas las fechas",
+    printMovesSearch: "búsqueda « {{q}} »",
+    printMovesLines: "líneas {{first}} a {{last}} de {{total}}",
   },
 
   achats: {

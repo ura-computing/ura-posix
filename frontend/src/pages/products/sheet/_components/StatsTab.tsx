@@ -184,7 +184,7 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
         </SheetCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2 print:grid-cols-2">
         <SheetCard
           title={t("products.monthlyDetail")}
           icon={<FileText className="size-5" />}

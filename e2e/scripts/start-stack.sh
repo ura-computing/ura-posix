@@ -24,7 +24,12 @@ trap 'stop; exit 0' INT TERM
 trap stop EXIT
 
 echo "▸ Building + starting the production images (backend, frontend) on Postgres 17…"
-$COMPOSE up --build --wait
+# Not up (e.g. « backend is unhealthy »): print why before the containers are removed.
+if ! $COMPOSE up --build --wait; then
+  echo "▸ Backend log (the stack did not start):"
+  $COMPOSE logs --no-color --no-log-prefix backend 2>&1 | tail -n 80
+  exit 1
+fi
 
 echo "▸ Stack ready: API http://localhost:8001, app http://localhost:5174"
 $COMPOSE logs -f --no-color --no-log-prefix backend >> "$LOG"

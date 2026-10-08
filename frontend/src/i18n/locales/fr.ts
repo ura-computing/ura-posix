@@ -379,6 +379,12 @@ export const fr = {
     scanSearch: "Rechercher",
     scanNotFound: "Aucun produit avec le code {{code}} dans votre pharmacie.",
     exportFailed: "L'export a échoué.",
+    print: "Imprimer",
+    printAfterEdit: "Enregistrez ou annulez la modification avant d'imprimer.",
+    printMovesPeriod: "du {{from}} au {{to}}",
+    printMovesAllDates: "toutes les dates",
+    printMovesSearch: "recherche « {{q}} »",
+    printMovesLines: "lignes {{first}} à {{last}} sur {{total}}",
   },
 
   achats: {
