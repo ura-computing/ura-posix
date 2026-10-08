@@ -66,6 +66,9 @@ LimitQ = Annotated[int, Query(ge=1, le=200)]
 DateFromQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
 DateToQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD")]
 SearchQ = Annotated[str | None, Query(description="Substring search on product / supplier / client / refs")]
+RefQ = Annotated[
+    str | None, Query(description="Exact ticket / BL number: every line of it (« Voir détail » in Produits)")
+]
 BatchIdQ = Annotated[int | None, Query(ge=1, description="Filter to a specific ImportBatch.id")]
 SortByQ = Annotated[str | None, Query(description="Sort column whitelist per endpoint")]
 SortOrderQ = Annotated[str, Query(description="asc | desc")]
@@ -153,12 +156,15 @@ def _apply_vente_filters(
     date_from: str | None = None,
     date_to: str | None = None,
     search: str | None = None,
+    ref: str | None = None,
     category: list[str] | None = None,
     tva: list[str] | None = None,
     include_non_declared: bool = True,
 ):
     """Reusable WHERE-chain shared by list + surveillance-counts."""
     q = q.filter(Vente.pharmacy_id == pharmacy_id)
+    if ref:
+        q = q.filter(Vente.transaction_ref == ref)
     if not include_non_declared:
         q = q.filter(vente_filter(q.session, pharmacy_id))
     if date_from:
@@ -231,12 +237,15 @@ def _apply_achat_filters(
     date_from: str | None = None,
     date_to: str | None = None,
     search: str | None = None,
+    ref: str | None = None,
     category: list[str] | None = None,
     tva: list[str] | None = None,
 ):
     """Shared WHERE-chain for list + supplier-summary. Joins Medicament when
     any of search/category/tva is set (PG-006 tokenized search needs it)."""
     q = q.filter(Achat.pharmacy_id == pharmacy_id)
+    if ref:
+        q = q.filter(Achat.delivery_ref == ref)
     if date_from:
         q = q.filter(Achat.delivery_date >= date_from)
     if date_to:
@@ -261,6 +270,7 @@ def list_achats(
     date_from: DateFromQ = None,
     date_to: DateToQ = None,
     search: SearchQ = None,
+    ref: RefQ = None,
     category: CategoryMultiQ = None,
     tva: TvaMultiQ = None,
     include_non_declared: IncludeNDQ = True,
@@ -274,6 +284,7 @@ def list_achats(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        ref=ref,
         category=category,
         tva=tva,
     )
@@ -435,6 +446,7 @@ def achat_supplier_summary(
     date_from: DateFromQ = None,
     date_to: DateToQ = None,
     search: SearchQ = None,
+    ref: RefQ = None,
     category: CategoryMultiQ = None,
     tva: TvaMultiQ = None,
     include_non_declared: IncludeNDQ = True,
@@ -448,6 +460,7 @@ def achat_supplier_summary(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        ref=ref,
         category=category,
         tva=tva,
     ).filter(Achat.supplier.isnot(None), Achat.supplier != "")
@@ -490,6 +503,7 @@ def list_ventes(
     date_from: DateFromQ = None,
     date_to: DateToQ = None,
     search: SearchQ = None,
+    ref: RefQ = None,
     category: CategoryMultiQ = None,
     tva: TvaMultiQ = None,
     surveillance: SurveillanceQ = None,
@@ -504,6 +518,7 @@ def list_ventes(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        ref=ref,
         category=category,
         tva=tva,
         include_non_declared=include_non_declared,
@@ -688,6 +703,7 @@ def vente_surveillance_counts(
     date_from: DateFromQ = None,
     date_to: DateToQ = None,
     search: SearchQ = None,
+    ref: RefQ = None,
     category: CategoryMultiQ = None,
     tva: TvaMultiQ = None,
 ) -> dict:
@@ -702,6 +718,7 @@ def vente_surveillance_counts(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        ref=ref,
         category=category,
         tva=tva,
         include_non_declared=True,
@@ -745,6 +762,7 @@ def vente_discount_summary(
     date_from: DateFromQ = None,
     date_to: DateToQ = None,
     search: SearchQ = None,
+    ref: RefQ = None,
     category: CategoryMultiQ = None,
     tva: TvaMultiQ = None,
 ) -> dict:
@@ -758,6 +776,7 @@ def vente_discount_summary(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        ref=ref,
         category=category,
         tva=tva,
         include_non_declared=True,

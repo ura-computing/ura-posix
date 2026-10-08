@@ -12,9 +12,9 @@ always show the same numbers (`stock_queries`)."""
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
-from sqlalchemy import and_, case, func, literal, or_, select, union, union_all
+from sqlalchemy import Float, and_, case, func, literal, or_, select, union, union_all
 from sqlalchemy.orm import Session
 
 from app.analytics.query_parts import (
@@ -34,7 +34,6 @@ from app.analytics.stock_queries import (
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import (
     Achat,
-    ImportBatch,
     Medicament,
     PharmacyProductEdit,
     PharmacyStock,
@@ -198,7 +197,7 @@ def _movements(pharmacy_id: int, med_id: int):
         Achat.delivery_ref.label("document"),
         Achat.supplier.label("party"),
         Achat.total,
-        Achat.import_batch_id,
+        literal(None, Float).label("discount"),
     ).where(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id)
     ventes = select(
         literal("vente").label("kind"),
@@ -209,7 +208,7 @@ def _movements(pharmacy_id: int, med_id: int):
         Vente.transaction_ref.label("document"),
         Vente.client.label("party"),
         Vente.total,
-        Vente.import_batch_id,
+        Vente.discount,
     ).where(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id)
     return union_all(achats, ventes).subquery()
 
@@ -297,6 +296,30 @@ def _edited_values(edit: PharmacyProductEdit | None) -> dict:
     return values
 
 
+def _last_30_days(db: Session, pharmacy_id: int, med_id: int) -> dict:
+    """« Ventes / Achats 30 jours » + « Performance »: units sold / bought today and the 29 days
+    before, and in the 30 days before those (the % change)."""
+    today = pharmacy_today()
+    since, before = (today - timedelta(days=29)).isoformat(), (today - timedelta(days=59)).isoformat()
+    out = {}
+    for name, model, day in (("sold", Vente, Vente.date), ("bought", Achat, Achat.delivery_date)):
+        recent, older = (
+            db.query(
+                func.coalesce(func.sum(case((day >= since, model.quantity))), 0),
+                func.coalesce(func.sum(case((day < since, model.quantity))), 0),
+            )
+            .filter(
+                model.pharmacy_id == pharmacy_id,
+                model.medicament_id == med_id,
+                day >= before,
+                day <= today.isoformat(),
+            )
+            .one()
+        )
+        out[name], out[f"{name}_before"] = float(recent), float(older)
+    return out
+
+
 def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
     """Everything the « Général » and « Codes » tabs show; None = not one of the pharmacy's
     products. Each editable field shows the owner's value when there is one (`imported` = the
@@ -314,7 +337,7 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
     last = db.query(Achat.unit_price, Achat.delivery_date).filter(*priced)
     last = last.order_by(Achat.delivery_date.desc().nullslast(), Achat.id.desc()).first()
     moves = _movements(pharmacy_id, med_id)
-    recent = db.execute(select(moves).order_by(*_newest_first(moves)).limit(10)).all()
+    recent = db.execute(select(moves).order_by(*_newest_first(moves)).limit(5)).all()
     current, ppv = v["current_stock"], v["ppv"]
 
     return {
@@ -371,6 +394,7 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             }
             for m in recent
         ],
+        "last_30d": _last_30_days(db, pharmacy_id, med_id),
         "imported": {f: imported[f] for f in edited},
     }
 
@@ -416,106 +440,125 @@ def save_product_edits(db: Session, pharmacy_id: int, med_id: int, user_id: int,
 # ─── Statistiques ────────────────────────────────────────────────────────────
 
 
-def product_stats(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
-    """« Ventes et achats par mois » + the Statistiques tab; None = not one of the pharmacy's
-    products. Sales and purchases are summed per month in SQL (one product: a few hundred rows)."""
+def _previous_period(date_from: date, date_to: date) -> tuple[date, date]:
+    """The same number of days, just before the period (7 → the 7 days before)."""
+    days = (date_to - date_from).days + 1
+    return date_from - timedelta(days=days), date_from - timedelta(days=1)
+
+
+def _trend_buckets(date_from: date, date_to: date) -> tuple[str, list[tuple[date, date]]]:
+    """« Tendances »: one point a day up to 31 days, a week (7 days from the start) up to 92,
+    else a calendar month (the first and last ones cut to the period)."""
+    days = (date_to - date_from).days + 1
+    if days <= 31:
+        starts, unit = [date_from + timedelta(days=i) for i in range(days)], "day"
+    elif days <= 92:
+        starts, unit = [date_from + timedelta(days=i) for i in range(0, days, 7)], "week"
+    else:
+        starts, unit = [date_from], "month"
+        d = date_from.replace(day=1)
+        while (d := date(d.year + d.month // 12, d.month % 12 + 1, 1)) <= date_to:
+            starts.append(d)
+    ends = [s - timedelta(days=1) for s in starts[1:]] + [date_to]
+    return unit, list(zip(starts, ends, strict=True))
+
+
+def _last_12_months(today: date) -> list[str]:
+    """This month and the 11 before, oldest first: ["2025-11", …, "2026-10"]."""
+    n = today.year * 12 + today.month - 1
+    return [f"{m // 12}-{m % 12 + 1:02d}" for m in range(n - 11, n + 1)]
+
+
+def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date) -> dict | None:
+    """Statistiques tab; None = not one of the pharmacy's products. The period (and the one just
+    before, same length) drives the KPIs, « Tendances » and « Top fournisseurs »; the charts and
+    « Détail mensuel » are always the last 12 months. CA = Rapport rule (qty × PPV); marge =
+    CA − units sold × average purchase price (every purchase, as on « Général ») = CA × marge %.
+    One product = a few thousand lines at most: summed in Python."""
     if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     today = pharmacy_today()
-    start, end = stock_abcd_window(today)
-    sales_from, sales_to = start.isoformat(), end.isoformat()
-
-    month = func.substr(Vente.date, 1, 7)
-    by_month = (
-        db.query(
-            month.label("month"),
-            func.sum(Vente.quantity).label("units"),
-            func.sum(ca_line()).label("ca"),
-        )
+    prev_from, prev_to = _previous_period(date_from, date_to)
+    months = _last_12_months(today)
+    lo = min(prev_from.isoformat(), f"{months[0]}-01")
+    hi = max(date_to, today).isoformat()
+    sales = db.execute(
+        select(Vente.date, Vente.quantity, ca_line().label("ca"), Vente.transaction_ref)
         .join(Medicament, Medicament.id == Vente.medicament_id)
-        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id, Vente.date.isnot(None))
-        .group_by(month)
-        .all()
-    )
-    sales = {r.month: (float(r.units or 0), float(r.ca or 0)) for r in by_month}
-    first_sale, last_sale = (
-        db.query(func.min(Vente.date), func.max(Vente.date))
-        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id)
-        .one()
-    )
-    units_30d = (
-        db.query(func.coalesce(func.sum(Vente.quantity), 0))
-        .filter(
-            Vente.pharmacy_id == pharmacy_id,
-            Vente.medicament_id == med_id,
-            Vente.date >= (today - timedelta(days=29)).isoformat(),
-            Vente.date <= today.isoformat(),
+        .where(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id, Vente.date >= lo, Vente.date <= hi)
+    ).all()
+    mine = (Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id)
+    purchases = db.execute(
+        select(Achat.delivery_date.label("date"), Achat.quantity, Achat.supplier).where(
+            *mine, Achat.delivery_date >= lo, Achat.delivery_date <= hi
         )
-        .scalar()
-    )
-    achat_month = func.substr(Achat.delivery_date, 1, 7)
-    purchases = {
-        r.month: (float(r.units or 0), float(r.amount or 0))
-        for r in db.query(
-            achat_month.label("month"),
-            func.sum(Achat.quantity).label("units"),
-            func.sum(Achat.total).label("amount"),
-        )
-        .filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id, Achat.delivery_date.isnot(None))
-        .group_by(achat_month)
-        .all()
-    }
+    ).all()
+    avg_pu = db.query(avg_pu_expr()).filter(*mine, *PRICED_PURCHASE).scalar()
 
-    window = [m for m in sales if sales_from[:7] <= m <= sales_to[:7]]
-    units_12m = sum(sales[m][0] for m in window)
-    months_in_window = (end.year - start.year) * 12 + end.month - start.month + 1
-    best = max(sales.items(), key=lambda kv: (kv[1][0], kv[0]), default=None)
+    def figures(first: str, last: str) -> dict:
+        """Sums of the sale / purchase lines dated first → last (ISO text, inclusive)."""
+        sold_lines = [v for v in sales if first <= v.date <= last]
+        sold = sum(float(v.quantity or 0) for v in sold_lines)
+        ca = sum(float(v.ca or 0) for v in sold_lines)
+        return {
+            "sold": sold,
+            "bought": sum(float(a.quantity or 0) for a in purchases if first <= a.date <= last),
+            "ca": round(ca, 2),
+            "marge": round(ca - sold * float(avg_pu), 2) if avg_pu is not None else None,
+            "transactions": len({v.transaction_ref for v in sold_lines if v.transaction_ref}),
+        }
 
-    # Per year: units sold / bought each month (January first), CA and amount bought.
-    years = sorted({int(m[:4]) for m in [*sales, *purchases]}, reverse=True)
-    sold = {y: [0.0] * 12 for y in years}
-    bought = {y: [0.0] * 12 for y in years}
-    ca = dict.fromkeys(years, 0.0)
-    amount = dict.fromkeys(years, 0.0)
-    for m, (units, line_ca) in sales.items():
-        sold[int(m[:4])][int(m[5:7]) - 1] += units
-        ca[int(m[:4])] += line_ca
-    for m, (units, line_amount) in purchases.items():
-        bought[int(m[:4])][int(m[5:7]) - 1] += units
-        amount[int(m[:4])] += line_amount
+    unit, buckets = _trend_buckets(date_from, date_to)
+    trend = []
+    for first, last in buckets:
+        f = figures(first.isoformat(), last.isoformat())
+        trend.append({"start": first.isoformat(), "sold": f["sold"], "bought": f["bought"]})
+
+    # « Top fournisseurs »: units bought in the period per supplier, the 3 biggest + the rest.
+    by_supplier: dict[str | None, float] = {}
+    for a in purchases:
+        if date_from.isoformat() <= a.date <= date_to.isoformat():
+            by_supplier[a.supplier] = by_supplier.get(a.supplier, 0.0) + float(a.quantity or 0)
+    total = sum(by_supplier.values())
+    ranked = sorted(by_supplier.items(), key=lambda kv: (-kv[1], kv[0] or ""))
+
+    def share(supplier: str | None, quantity: float) -> dict:
+        return {
+            "supplier": supplier,
+            "quantity": quantity,
+            "pct": round(quantity / total * 100, 2) if total > 0 else None,
+        }
+
+    # « Derniers prix d'achat par fournisseur »: each supplier's latest priced purchase (any date).
+    last_prices: list[dict] = []
+    seen: set[str | None] = set()
+    for a in db.execute(
+        select(Achat.supplier, Achat.unit_price, Achat.delivery_date)
+        .where(*mine, *PRICED_PURCHASE)
+        .order_by(Achat.delivery_date.desc().nullslast(), Achat.id.desc())
+    ):
+        if a.supplier not in seen:
+            seen.add(a.supplier)
+            last_prices.append({"supplier": a.supplier, "unit_price": round(a.unit_price, 4), "date": a.delivery_date})
+        if len(last_prices) == 5:
+            break
 
     return {
-        "sales_from": sales_from,
-        "sales_to": sales_to,
-        "units_30d": float(units_30d or 0),
-        "units_12m": units_12m,
-        "ca_12m": round(sum(sales[m][1] for m in window), 2),
-        "avg_per_month": round(units_12m / 12, 2),
-        "avg_per_day": round(units_12m / ((end - start).days + 1), 2),
-        "months_without_sale": months_in_window - len(window),
-        "first_sale": first_sale,
-        "last_sale": last_sale,
-        "best_month": {"month": best[0], "units": best[1][0]} if best and best[1][0] > 0 else None,
+        "date_from": date_from.isoformat(),
+        "date_to": date_to.isoformat(),
+        "previous_from": prev_from.isoformat(),
+        "previous_to": prev_to.isoformat(),
+        "period": figures(date_from.isoformat(), date_to.isoformat()),
+        "previous": figures(prev_from.isoformat(), prev_to.isoformat()),
         "monthly": [
-            {
-                "year": y,
-                "sold": sold[y],
-                "sold_total": sum(sold[y]),
-                "bought": bought[y],
-                "bought_total": sum(bought[y]),
-            }
-            for y in years
+            {"month": m, **{k: v for k, v in figures(f"{m}-01", f"{m}-31").items() if k != "transactions"}}
+            for m in months
         ],
-        "yearly": [
-            {
-                "year": y,
-                "units_sold": sum(sold[y]),
-                "ca": round(ca[y], 2),
-                "units_bought": sum(bought[y]),
-                "amount_bought": round(amount[y], 2),
-            }
-            for y in years
-        ],
+        "trend_unit": unit,
+        "trend": trend,
+        "top_suppliers": [share(name, qty) for name, qty in ranked[:3]],
+        "other_suppliers": share(None, sum(qty for _, qty in ranked[3:])) if len(ranked) > 3 else None,
+        "last_prices": last_prices,
     }
 
 
@@ -533,10 +576,9 @@ def product_movements(
     search: str | None,
     page: int,
     limit: int,
-    export: bool,
 ) -> dict | None:
     """Every purchase / sale line of one product, newest first (same order as « Mouvements
-    récents »), + the file each came from; None = not one of the pharmacy's products."""
+    récents »), with the sale's remise; None = not one of the pharmacy's products."""
     if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     moves = _movements(pharmacy_id, med_id)
@@ -549,21 +591,8 @@ def product_movements(
         where.append(moves.c.kind == kind)
     where += supplier_search_clauses(tokenize_search(search), [moves.c.document, moves.c.party])
 
-    totals = db.execute(
-        select(
-            func.count(),
-            func.coalesce(func.sum(case((moves.c.kind == "achat", moves.c.quantity))), 0),
-            func.coalesce(func.sum(case((moves.c.kind == "vente", -moves.c.quantity))), 0),
-        ).where(*where)
-    ).one()
-    q = (
-        select(moves, ImportBatch.filename)
-        .outerjoin(ImportBatch, ImportBatch.id == moves.c.import_batch_id)
-        .where(*where)
-        .order_by(*_newest_first(moves))
-    )
-    rows = db.execute(q if export else q.offset((page - 1) * limit).limit(limit)).all()
-    total = int(totals[0])
+    total = db.execute(select(func.count()).select_from(moves).where(*where)).scalar_one()
+    q = select(moves).where(*where).order_by(*_newest_first(moves)).offset((page - 1) * limit).limit(limit)
     return {
         "data": [
             {
@@ -572,13 +601,38 @@ def product_movements(
                 "quantity": r.quantity,
                 "unit_price": r.unit_price,
                 "total": r.total,
+                "discount": r.discount,
                 "document": r.document,
                 "party": r.party,
-                "filename": r.filename,
             }
-            for r in rows
+            for r in db.execute(q)
         ],
-        "pagination": paginate(total, 1 if export else page, max(total, 1) if export else limit),
-        "units_bought": float(totals[1]),
-        "units_sold": float(totals[2]),
+        "pagination": paginate(total, page, limit),
     }
+
+
+# ─── Codes ───────────────────────────────────────────────────────────────────
+
+
+def product_lookup(db: Session, pharmacy_id: int, code: str) -> int | None:
+    """« Scanner / Rechercher un code barre »: the pharmacy's product whose PID or barcode is
+    exactly `code` (imported, or the owner's own barcode). None = none (never says whether it
+    exists in another pharmacy)."""
+    code = code.strip()
+    if not code:
+        return None
+    own = select(PharmacyProductEdit.medicament_id).where(
+        PharmacyProductEdit.pharmacy_id == pharmacy_id,
+        or_(PharmacyProductEdit.barcode1 == code, PharmacyProductEdit.barcode2 == code),
+    )
+    return db.scalars(
+        select(Medicament.id)
+        .where(
+            or_(
+                Medicament.pid == code, Medicament.barcode1 == code, Medicament.barcode2 == code, Medicament.id.in_(own)
+            ),
+            Medicament.id.in_(select(_linked_ids(pharmacy_id))),
+        )
+        .order_by(Medicament.product, Medicament.id)
+        .limit(1)
+    ).first()

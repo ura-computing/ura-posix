@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -40,10 +41,25 @@ export function useAchatsPage() {
 
   // Merge global dates + local fields into the AchatsFilters payload the
   // existing API + sub-components expect.
+  // « Voir détail » from a product's « Mouvements »: `?ref=` = every line of that one
+  // BL, until its filter is removed.
+  const [params, setParams] = useSearchParams();
+  const ref = params.get("ref") ?? "";
   const filters: AchatsFilters = useMemo(
-    () => ({ ...localFilters, date_from: dateFrom, date_to: dateTo }),
-    [localFilters, dateFrom, dateTo],
+    () => ({ ...localFilters, ...(ref ? { ref } : {}), date_from: dateFrom, date_to: dateTo }),
+    [localFilters, ref, dateFrom, dateTo],
   );
+  const clearRef = () => {
+    setPage(1);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("ref");
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const {
     data: list,
@@ -60,10 +76,11 @@ export function useAchatsPage() {
       date_from: filters.date_from,
       date_to: filters.date_to,
       search: filters.search,
+      ref: filters.ref,
       category: filters.category,
       tva: filters.tva,
     }),
-    [filters.date_from, filters.date_to, filters.search, filters.category, filters.tva],
+    [filters.date_from, filters.date_to, filters.search, filters.ref, filters.category, filters.tva],
   );
   const { data: supplierSummary, isLoading: supplierLoading } = useQuery({
     queryKey: API.achats.supplierSummary.key(summaryKey),
@@ -102,6 +119,7 @@ export function useAchatsPage() {
   const reset = () => {
     resetLocal();
     setRange(null, null);
+    clearRef();
   };
 
   // ── Excel export ─────────────────────────────────────────────────────────
@@ -149,6 +167,7 @@ export function useAchatsPage() {
 
   return {
     filters,
+    clearRef,
     setSearch,
     setDateRange,
     setCategories,

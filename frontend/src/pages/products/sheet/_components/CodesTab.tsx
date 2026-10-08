@@ -1,54 +1,118 @@
-/** « Codes »: the codes that name this product (Sobrus PID, barcodes). */
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
+/** « Codes »: the codes that name this product (Sobrus PID, barcodes 1 and 2) with « Copier »,
+ *  barcode 1 drawn, each barcode's format and length, and « Scanner / Rechercher un code barre ».
+ *  The owner changes the barcodes here too (« Modifier »); the PID never. */
+import { useState, type ReactNode } from "react";
+import { Barcode, FileText, Info, ScanBarcode } from "lucide-react";
+
+import { Button } from "@/_components/button";
 import type { ProductSheet } from "@/types";
-import { useT, type TFn } from "@/i18n/I18nProvider";
+import { useT } from "@/i18n/I18nProvider";
+import { barcodeFormat } from "@/utils/barcode";
 
+import { BarcodeImage } from "./BarcodeImage";
+import { CopyButton } from "./CopyButton";
 import { Editable } from "./Editable";
-import { SheetCard } from "./SheetCard";
+import { ScanDialog } from "./ScanDialog";
+import { FieldList, SheetCard } from "./SheetCard";
 
-interface CodeRow {
-  type: string;
-  code: string | null;
-  /** Barcodes: the owner can change them (« Modifier »); the PID never. */
-  field?: "barcode1" | "barcode2";
+function InfoNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex gap-3 rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
+      <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+      <span>{children}</span>
+    </p>
+  );
 }
 
-const columns = (t: TFn): ColumnDef<CodeRow>[] => [
-  { key: "type", label: t("products.codeType"), width: 200, sortable: false, render: (r) => r.type },
-  {
-    key: "code",
-    label: t("products.code"),
-    width: 260,
-    sortable: false,
-    render: (r) => {
-      const code = r.code ? (
-        <span className="font-mono">{r.code}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      );
-      return r.field ? (
-        <span className="flex justify-start">
-          <Editable field={r.field} label={r.type}>
-            {code}
-          </Editable>
-        </span>
-      ) : (
-        code
-      );
-    },
-  },
-];
+/** One identifier: label, then its value in a box + « Copier » (an input in edit mode). */
+function CodeRow({ label, value, copy }: { label: string; value: ReactNode; copy: ReactNode }) {
+  return (
+    <div className="grid items-center gap-2 sm:grid-cols-[140px_minmax(0,1fr)]">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-1.5 text-base text-foreground">
+        <span className="min-w-0 break-all font-mono">{value}</span>
+        {copy}
+      </dd>
+    </div>
+  );
+}
 
 export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   const t = useT();
-  const rows: CodeRow[] = [
-    { type: t("products.pidLabel"), code: sheet.pid },
-    { type: t("products.barcode1"), code: sheet.barcode1, field: "barcode1" },
-    { type: t("products.barcode2"), code: sheet.barcode2, field: "barcode2" },
+  const [scanning, setScanning] = useState(false);
+  const missing = <span className="font-sans text-muted-foreground">{t("products.notAvailable")}</span>;
+  const barcodes = [
+    { n: 1 as const, field: "barcode1" as const, code: sheet.barcode1 },
+    { n: 2 as const, field: "barcode2" as const, code: sheet.barcode2 },
   ];
+  const drawn = sheet.barcode1 ?? sheet.barcode2;
   return (
-    <SheetCard title={t("products.codes")}>
-      <DataTable<CodeRow> rows={rows} columns={columns(t)} rowKey={(r) => r.type} />
-    </SheetCard>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <SheetCard title={t("products.identifiers")} icon={<FileText className="size-5" />}>
+        <InfoNote>{t("products.pidInfo")}</InfoNote>
+        <dl className="flex flex-col gap-3">
+          <CodeRow
+            label={t("col.pid")}
+            value={sheet.pid}
+            copy={<CopyButton value={sheet.pid} label={t("products.copyPid")} />}
+          />
+          {barcodes.map(({ n, field, code }) => (
+            <CodeRow
+              key={field}
+              label={t("products.barcodeN", { n })}
+              value={
+                <Editable field={field} label={t("products.barcodeN", { n })}>
+                  {code ?? missing}
+                </Editable>
+              }
+              copy={<CopyButton value={code} label={t("products.copyBarcodeN", { n })} />}
+            />
+          ))}
+        </dl>
+        {drawn && (
+          <div className="flex flex-col items-center gap-1 py-2">
+            <BarcodeImage code={drawn} className="h-20 w-60" />
+            <span className="font-mono text-sm text-foreground">{drawn}</span>
+          </div>
+        )}
+        <Button size="lg" onClick={() => setScanning(true)} className="w-full">
+          <ScanBarcode className="size-5" />
+          {t("products.scan")}
+        </Button>
+        <ScanDialog open={scanning} onClose={() => setScanning(false)} />
+      </SheetCard>
+
+      <div className="flex flex-col gap-4">
+        {barcodes.map(({ n, code }) => {
+          const format = code ? barcodeFormat(code) : null;
+          const digits = code ? /^\d+$/.test(code) : false;
+          return (
+            <SheetCard key={n} title={t("products.barcodeN", { n })} icon={<Barcode className="size-5" />}>
+              <FieldList
+                fields={[
+                  {
+                    label: t("products.barcodeN", { n }),
+                    value: (
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="font-mono">{code ?? missing}</span>
+                        <CopyButton value={code} label={t("products.copyBarcodeN", { n })} />
+                      </span>
+                    ),
+                  },
+                  { label: t("products.format"), value: code ? (format ?? t("products.formatOther")) : missing },
+                  {
+                    label: t("products.length"),
+                    value: code
+                      ? t(digits ? "products.lengthDigits" : "products.lengthChars", { n: code.length })
+                      : missing,
+                  },
+                ]}
+              />
+              {!code && <InfoNote>{t("products.barcodeMissing", { n })}</InfoNote>}
+            </SheetCard>
+          );
+        })}
+      </div>
+    </div>
   );
 }

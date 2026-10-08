@@ -201,6 +201,7 @@ export default function AchatsPage() {
   const t = useT();
   const {
     categories,
+    clearRef,
     filters,
     handleExport,
     isLoading,
@@ -231,6 +232,17 @@ export default function AchatsPage() {
 
   // Build active filter pills array — empty when no filter set, FilterBar hides the row.
   const activeFilters: ActiveFilter[] = [
+    filters.ref
+      ? {
+          key: "ref",
+          label: (
+            <>
+              {t("achats.blFilter")} {filters.ref}
+            </>
+          ),
+          onClear: clearRef,
+        }
+      : null,
     filters.search
       ? {
           key: "search",

@@ -294,6 +294,7 @@ export default function VentesPage() {
     counts,
     discountLoading,
     discountSummary,
+    clearRef,
     filters,
     handleExport,
     isLoading,
@@ -323,6 +324,17 @@ export default function VentesPage() {
 
   // Active filter pills (surveillance has its own dedicated tab row, so it stays out of this array).
   const activeFilters: ActiveFilter[] = [
+    filters.ref
+      ? {
+          key: "ref",
+          label: (
+            <>
+              {t("ventes.ticketFilter")} {filters.ref}
+            </>
+          ),
+          onClear: clearRef,
+        }
+      : null,
     filters.search
       ? {
           key: "search",

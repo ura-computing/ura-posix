@@ -85,16 +85,27 @@ class ProductMovement(BaseModel):
 
 class ProductMovementLine(ProductMovement):
     total: float | None  # the line's total, as in the file
-    filename: str | None  # the import it came from
+    discount: float | None  # sale: « Remise » in %; purchase: None
 
 
 class ProductMovementsResponse(BaseModel):
-    """« Mouvements »: the filtered lines (page, or every line with export=true) + their sums."""
+    """« Mouvements »: one page of the filtered lines."""
 
     data: list[ProductMovementLine]
     pagination: Pagination
-    units_bought: float  # Σ qty of the filtered purchase lines
-    units_sold: float  # Σ qty of the filtered sale lines
+
+
+class ProductLookup(BaseModel):
+    id: int  # the product's sheet: /produits/{id}
+
+
+class Last30Days(BaseModel):
+    """Today and the 29 days before; `*_before` = the 30 days before those."""
+
+    sold: float
+    bought: float
+    sold_before: float
+    bought_before: float
 
 
 class ProductSheet(BaseModel):
@@ -110,7 +121,8 @@ class ProductSheet(BaseModel):
     info: ProductInfoOut | None  # None = no scraped row for this product
     prices: ProductPrices
     stock: ProductStock
-    recent_movements: list[ProductMovement]  # 10 latest, newest first
+    recent_movements: list[ProductMovement]  # 5 latest, newest first
+    last_30d: Last30Days
     # Fields the owner edited → their imported value (« Revenir à la valeur importée »).
     imported: dict[str, str | float | int | None]
 
@@ -153,42 +165,53 @@ class ProductEditIn(BaseModel):
 # ═══ Statistiques ════════════════════════════════════════════════════════════
 
 
-class MonthlySales(BaseModel):
-    """« Ventes et achats par mois »: one entry per year with a sale or a purchase."""
-
-    year: int
-    sold: list[float]  # units sold, 12 values, January first
-    sold_total: float
-    bought: list[float]  # units bought, 12 values, January first
-    bought_total: float
-
-
-class BestMonth(BaseModel):
-    month: str  # YYYY-MM
-    units: float
-
-
-class YearSummary(BaseModel):
-    year: int
-    units_sold: float
+class PeriodFigures(BaseModel):
+    sold: float  # units sold
+    bought: float  # units bought
     ca: float  # Σ qty × PPV (Rapport rule)
-    units_bought: float
-    amount_bought: float  # Σ purchase line totals
+    marge: float | None  # CA − units sold × average purchase price; None = never bought with a price
+    transactions: int  # distinct sale tickets
+
+
+class MonthFigures(BaseModel):
+    month: str  # YYYY-MM
+    sold: float
+    bought: float
+    ca: float
+    marge: float | None
+
+
+class TrendPoint(BaseModel):
+    start: str  # first day of the point (day, week or month)
+    sold: float
+    bought: float
+
+
+class SupplierShare(BaseModel):
+    supplier: str | None  # None = no supplier name in the file
+    quantity: float  # units bought in the period
+    pct: float | None  # % of every unit bought in the period
+
+
+class SupplierPrice(BaseModel):
+    supplier: str | None
+    unit_price: float
+    date: str | None
 
 
 class ProductStats(BaseModel):
-    """« 12 mois » = the Stock page's window (`sales_from` → `sales_to`), like the sheet."""
+    """Statistiques tab: the period vs the one just before (same number of days); the charts and
+    « Détail mensuel » = the last 12 months (this month and the 11 before)."""
 
-    sales_from: str
-    sales_to: str
-    units_30d: float  # today and the 29 days before
-    units_12m: float
-    ca_12m: float
-    avg_per_month: float  # units_12m ÷ 12
-    avg_per_day: float  # units_12m ÷ days of the window
-    months_without_sale: int  # months of the window with no sale line
-    first_sale: str | None
-    last_sale: str | None
-    best_month: BestMonth | None  # most units ever; tie → the latest month
-    monthly: list[MonthlySales]  # newest year first (same years as `yearly`)
-    yearly: list[YearSummary]  # newest year first
+    date_from: str
+    date_to: str
+    previous_from: str
+    previous_to: str
+    period: PeriodFigures
+    previous: PeriodFigures
+    monthly: list[MonthFigures]  # 12 months, oldest first
+    trend_unit: Literal["day", "week", "month"]  # « Tendances »: a day up to 31 days, a week up to 92
+    trend: list[TrendPoint]
+    top_suppliers: list[SupplierShare]  # the 3 biggest of the period
+    other_suppliers: SupplierShare | None  # « Autres »: every other supplier together
+    last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first, 5 at most

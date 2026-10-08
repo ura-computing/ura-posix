@@ -499,8 +499,7 @@ def main() -> None:
         "files": files,
         "import": import_section(products, ventes, achats),
         "catalog": catalog_section(products, ventes, achats, catalog),
-        # Import file names: the Mouvements tab shows the file each line came from.
-        **oracle.build(liste, photo_setup, {k: Path(files[k]["path"]).name for k in ("achats", "ventes")}),
+        **oracle.build(liste, photo_setup),
     }
     (HERE / "expected.json").write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
 

@@ -97,8 +97,10 @@ export interface ProductSheet {
   info: ProductInfo | null;
   prices: ProductPrices;
   stock: ProductStock;
-  /** 10 latest, newest first. */
+  /** 5 latest, newest first. */
   recent_movements: ProductMovement[];
+  /** Units sold / bought today and the 29 days before; `*_before` = the 30 days before those. */
+  last_30d: { sold: number; bought: number; sold_before: number; bought_before: number };
   /** Fields the owner edited → their imported value (« Revenir à la valeur importée »). */
   imported: Partial<Record<EditField, string | number | null>>;
 }
@@ -126,42 +128,52 @@ export type ProductEditIn = Partial<Record<EditField, string | number | null>>;
 
 // ── Statistiques (GET /products/{id}/stats) ────────────────────────────────
 
-export interface MonthlySales {
-  year: number;
-  /** Units sold, January first (12 values). */
-  sold: number[];
-  sold_total: number;
-  /** Units bought, January first (12 values). */
-  bought: number[];
-  bought_total: number;
-}
-
-export interface YearSummary {
-  year: number;
-  units_sold: number;
+export interface PeriodFigures {
+  sold: number;
+  bought: number;
   /** Σ qty × PPV (Rapport rule). */
   ca: number;
-  units_bought: number;
-  amount_bought: number;
+  /** CA − units sold × average purchase price; null = never bought with a price. */
+  marge: number | null;
+  /** Distinct sale tickets. */
+  transactions: number;
+}
+
+export interface MonthFigures {
+  /** YYYY-MM */
+  month: string;
+  sold: number;
+  bought: number;
+  ca: number;
+  marge: number | null;
+}
+
+export interface SupplierShare {
+  /** null = no supplier name in the file. */
+  supplier: string | null;
+  quantity: number;
+  /** % of every unit bought in the period. */
+  pct: number | null;
 }
 
 export interface ProductStats {
-  /** « 12 mois » = the Stock page window. */
-  sales_from: string;
-  sales_to: string;
-  units_30d: number;
-  units_12m: number;
-  ca_12m: number;
-  avg_per_month: number;
-  avg_per_day: number;
-  months_without_sale: number;
-  first_sale: string | null;
-  last_sale: string | null;
-  best_month: { month: string; units: number } | null;
-  /** Newest year first. */
-  monthly: MonthlySales[];
-  /** Newest year first. */
-  yearly: YearSummary[];
+  date_from: string;
+  date_to: string;
+  /** The same number of days, just before. */
+  previous_from: string;
+  previous_to: string;
+  period: PeriodFigures;
+  previous: PeriodFigures;
+  /** The last 12 months (this month and the 11 before), oldest first. */
+  monthly: MonthFigures[];
+  /** « Tendances »: a point a day up to 31 days, a week up to 92, else a month. */
+  trend_unit: "day" | "week" | "month";
+  trend: { start: string; sold: number; bought: number }[];
+  /** The 3 biggest suppliers of the period, then « Autres » (every other one together). */
+  top_suppliers: SupplierShare[];
+  other_suppliers: SupplierShare | null;
+  /** Each supplier's latest priced purchase, newest first (5 at most). */
+  last_prices: { supplier: string | null; unit_price: number; date: string | null }[];
 }
 
 // ── Mouvements (GET /products/{id}/movements) ──────────────────────────────
@@ -169,16 +181,13 @@ export interface ProductStats {
 export interface ProductMovementLine extends ProductMovement {
   /** The line's total, as in the file. */
   total: number | null;
-  /** The import it came from. */
-  filename: string | null;
+  /** Sale: « Remise » in %; purchase: null. */
+  discount: number | null;
 }
 
 export interface ProductMovementsResponse {
   data: ProductMovementLine[];
   pagination: { page: number; limit: number; total: number; total_pages: number };
-  /** Σ qty of the filtered purchase / sale lines. */
-  units_bought: number;
-  units_sold: number;
 }
 
 export interface MovementsFilters {

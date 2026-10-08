@@ -256,9 +256,11 @@ export const API = {
     },
     stats: {
       url: (id: number) => `/products/${id}/stats`,
-      key: (id: number) => ["products", "stats", id] as const,
+      key: (id: number, from: string, to: string) => ["products", "stats", id, from, to] as const,
       all: ["products", "stats"],
     },
+    /** « Scanner / Rechercher un code barre »: exact PID / barcode → the product's id (404 = none). */
+    lookup: { url: "/products/lookup" },
     /** Owner's « Enregistrer » / « Revenir à la valeur importée ». */
     save: { url: (id: number) => `/products/${id}`, refreshes: (): Read[] => [API.products.list, API.products.sheet] },
     movements: {

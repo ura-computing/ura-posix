@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api, ApiErr } from "@/api/client";
@@ -11,32 +11,28 @@ import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import type {
-  EditField,
-  MovementsFilters,
-  ProductEditIn,
-  ProductMovementsResponse,
-  ProductSheet,
-  ProductStats,
+import {
+  ROUTES,
+  type EditField,
+  type MovementsFilters,
+  type ProductEditIn,
+  type ProductMovementLine,
+  type ProductMovementsResponse,
+  type ProductSheet,
+  type ProductStats,
 } from "@/types";
-import { downloadXlsx, exportFilename } from "@/utils/table";
+import { dayAfter, daysAgo, monthsAgo, todayIso } from "@/utils/dateRange";
 
 export const SHEET_TABS = ["general", "stats", "movements", "codes"] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
 
-/** One product's sheet, its statistics (« Ventes par mois » + Statistiques tab) and the
- *  tab in the URL (`?tab=codes`, kept on reload / back). */
+/** One product's sheet and the tab in the URL (`?tab=codes`, kept on reload / back). */
 export function useProduitPage(id: number) {
   const valid = Number.isInteger(id) && id > 0;
   const { data, isLoading, error } = useQuery({
     queryKey: API.products.sheet.key(id),
     queryFn: () => api.get<ProductSheet>(API.products.sheet.url(id)),
     enabled: valid,
-  });
-  const { data: stats } = useQuery({
-    queryKey: API.products.stats.key(id),
-    queryFn: () => api.get<ProductStats>(API.products.stats.url(id)),
-    enabled: valid && !!data,
   });
 
   const [params, setParams] = useSearchParams();
@@ -55,7 +51,6 @@ export function useProduitPage(id: number) {
 
   return {
     sheet: data ?? null,
-    stats: stats ?? null,
     isLoading,
     // Not one of the pharmacy's products (or a wrong address): the 404 inside the layout.
     notFound: !valid || (error instanceof ApiErr && error.status === 404),
@@ -64,36 +59,91 @@ export function useProduitPage(id: number) {
   };
 }
 
+// ── Statistiques ────────────────────────────────────────────────────────────
+
+export const STATS_PERIODS = ["7d", "30d", "3m", "12m", "custom"] as const;
+export type StatsPeriod = (typeof STATS_PERIODS)[number];
+export interface StatsRange {
+  from: string | null;
+  to: string | null;
+}
+
+/** A period button → its dates: the last 7 / 30 days or 3 / 12 months, today included
+ *  (« 3 mois » on 08/10/2026 = 09/07/2026 → 08/10/2026). */
+function presetRange(period: Exclude<StatsPeriod, "custom">): StatsRange {
+  const to = todayIso();
+  if (period === "7d") return { from: daysAgo(6), to };
+  if (period === "30d") return { from: daysAgo(29), to };
+  return { from: dayAfter(monthsAgo(period === "3m" ? 3 : 12)), to };
+}
+
+/** The Statistiques period (buttons on the tab row): 30 days first; « Personnalisé » starts from
+ *  the dates shown, then the two date fields change it. Kept while switching tabs. */
+export function useStatsPeriod() {
+  const [period, setPeriodState] = useState<StatsPeriod>("30d");
+  const [custom, setCustom] = useState<StatsRange>(() => presetRange("30d"));
+  const range = period === "custom" ? custom : presetRange(period);
+  const setPeriod = (next: StatsPeriod) => {
+    if (next === "custom" && period !== "custom") setCustom(range);
+    setPeriodState(next);
+  };
+  const setCustomRange = (from: string | null, to: string | null) => setCustom({ from, to });
+  return {
+    period,
+    setPeriod,
+    range,
+    setCustomRange,
+  };
+}
+
+/** One product's statistics over a period, asked with the sheet (`enabled` once it is there):
+ *  « Statistiques » opens at once, without a « Chargement… » first. Nothing asked while a custom
+ *  date is missing. */
+export function useProductStats(id: number, { from, to }: StatsRange, enabled: boolean) {
+  const { data } = useQuery({
+    queryKey: API.products.stats.key(id, from ?? "", to ?? ""),
+    queryFn: () => api.get<ProductStats>(API.products.stats.url(id), { params: { date_from: from, date_to: to } }),
+    enabled: enabled && !!from && !!to,
+    placeholderData: keepPreviousData,
+  });
+  return {
+    stats: from && to ? (data ?? null) : null,
+  };
+}
+
 const DEFAULT_MOVES: Omit<MovementsFilters, "date_from" | "date_to"> = {
   page: 1,
-  limit: 25,
+  limit: 10,
   search: "",
   kind: "all",
   sort_by: null,
   sort_order: "desc",
 };
 
-/** Query string of the movements call (no sort: always newest first). */
-const toParams = (f: MovementsFilters) => ({
-  date_from: f.date_from,
-  date_to: f.date_to,
-  kind: f.kind,
-  search: f.search,
-  page: f.page,
-  limit: f.limit,
-});
-
-/** « Mouvements »: one product's purchase / sale lines, filtered (period shared with the other
- *  pages, type, search), paged; Excel = every filtered line. */
-export function useMovements(id: number, pid: string) {
-  const t = useT();
+/** « Mouvements »: one product's purchase / sale lines, filtered (type, period shared with the
+ *  other pages, search), 10 per page. « Voir détail » opens the whole ticket (Ventes) or BL
+ *  (Achats): every period, that number only. */
+export function useMovements(id: number) {
+  const navigate = useNavigate();
+  const { me } = useMe();
   const { from, to, setRange } = useGlobalDateRange();
   const { filters: local, patch, setPage, setPageSize, reset: resetLocal } = useListFilters(DEFAULT_MOVES, "desc");
   const filters: MovementsFilters = useMemo(() => ({ ...local, date_from: from, date_to: to }), [local, from, to]);
 
   const { data, isLoading } = useQuery({
     queryKey: API.products.movements.key(id, filters),
-    queryFn: () => api.get<ProductMovementsResponse>(API.products.movements.url(id), { params: toParams(filters) }),
+    queryFn: () =>
+      api.get<ProductMovementsResponse>(API.products.movements.url(id), {
+        // No sort: always newest first.
+        params: {
+          date_from: from,
+          date_to: to,
+          kind: filters.kind,
+          search: filters.search,
+          page: filters.page,
+          limit: filters.limit,
+        },
+      }),
   });
 
   // Every filter change goes back to page 1 (`patch`); the period is shared between pages.
@@ -103,37 +153,14 @@ export function useMovements(id: number, pid: string) {
     resetLocal();
     setRange(null, null);
   };
-
-  const handleExport = useCallback(async () => {
-    try {
-      const { data: lines } = await api.get<ProductMovementsResponse>(API.products.movements.url(id), {
-        params: { ...toParams(filters), page: undefined, limit: undefined, export: true },
-      });
-      const header = [
-        "Date",
-        "Type",
-        "Quantité",
-        "Prix unitaire",
-        "Total",
-        "Document",
-        "Fournisseur / client",
-        "Fichier importé",
-      ];
-      const body = lines.map((m) => [
-        m.date ?? "",
-        m.kind === "achat" ? "Achat" : "Vente",
-        m.quantity ?? "",
-        m.unit_price ?? "",
-        m.total ?? "",
-        m.document ?? "",
-        m.party ?? "",
-        m.filename ?? "",
-      ]);
-      await downloadXlsx([header, ...body], exportFilename(`MOUVEMENTS ${pid}`, "xlsx", from, to));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("products.exportFailed"));
-    }
-  }, [id, pid, filters, from, to, t]);
+  /** Ventes / Achats open for this user (an employee may not have them). */
+  const canSeeDetail = (kind: ProductMovementLine["kind"]) =>
+    me?.role === "admin" || !!me?.permissions.includes(kind === "achat" ? "achats" : "ventes");
+  const seeDetail = (m: ProductMovementLine) => {
+    if (!m.document) return;
+    setRange(null, null);
+    navigate(`${m.kind === "achat" ? ROUTES.ACHATS : ROUTES.VENTES}?ref=${encodeURIComponent(m.document)}`);
+  };
 
   return {
     filters,
@@ -143,40 +170,69 @@ export function useMovements(id: number, pid: string) {
     setPage,
     setPageSize,
     reset,
-    handleExport,
+    canSeeDetail,
+    seeDetail,
     rows: data?.data ?? [],
     total: data?.pagination.total ?? 0,
-    unitsBought: data?.units_bought ?? 0,
-    unitsSold: data?.units_sold ?? 0,
     isLoading,
+  };
+}
+
+// ── Codes ───────────────────────────────────────────────────────────────────
+
+/** « Scanner / Rechercher un code barre »: a PID or barcode (typed, or a USB scanner = digits +
+ *  Entrée) → that product's sheet. Resolves false when no product of the pharmacy has it, null
+ *  when the search failed (error toast). */
+export function useBarcodeLookup() {
+  const t = useT();
+  const navigate = useNavigate();
+  const [isSearching, setSearching] = useState(false);
+  const lookup = async (raw: string): Promise<boolean | null> => {
+    const code = raw.trim();
+    if (!code) return false;
+    setSearching(true);
+    try {
+      // Called directly, not through the query cache: « no product » is an answer shown in the
+      // dialog, not an error toast.
+      const { id } = await api.get<{ id: number }>(API.products.lookup.url, { params: { code } });
+      navigate(ROUTES.PRODUIT.replace(":id", String(id)));
+      return true;
+    } catch (e) {
+      if (e instanceof ApiErr && e.status === 404) return false;
+      toast.error(e instanceof ApiErr ? e.detail : t("toast.genericError"));
+      return null;
+    } finally {
+      setSearching(false);
+    }
+  };
+  return {
+    lookup,
+    isSearching,
   };
 }
 
 // ── « Modifier » (owner) ────────────────────────────────────────────────────
 
-export type EditValues = Record<EditField, string>;
-
-const EDIT_FIELDS: EditField[] = [
+// The values the page shows and the owner can change (PPH, zone, péremption and description
+// are no longer on the page: their edits stay as they are).
+const EDIT_FIELDS = [
   "product",
   "laboratoire",
   "category",
   "tva",
   "ppv",
-  "pph",
-  "zone",
   "current_stock",
   "stock_min",
   "stock_max",
-  "expiry_date",
   "barcode1",
   "barcode2",
-  "description",
-];
-const PRICES: EditField[] = ["ppv", "pph"];
-const INTEGERS: EditField[] = ["current_stock", "stock_min", "stock_max"];
+] as const satisfies readonly EditField[];
+export type FormField = (typeof EDIT_FIELDS)[number];
+export type EditValues = Record<FormField, string>;
+
+const INTEGERS: FormField[] = ["current_stock", "stock_min", "stock_max"];
 
 const decimal = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
-const isoToFr = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
 
 /** The form starts from what the sheet shows (edited or imported). */
 function toForm(s: ProductSheet): EditValues {
@@ -186,33 +242,21 @@ function toForm(s: ProductSheet): EditValues {
     category: s.category ?? "",
     tva: s.tva ?? "",
     ppv: decimal(s.prices.ppv),
-    pph: decimal(s.prices.pph),
-    zone: s.stock.zone ?? "",
     current_stock: s.stock.current_stock == null ? "" : String(s.stock.current_stock),
     stock_min: String(s.stock.stock_min),
     stock_max: String(s.stock.stock_max),
-    expiry_date: isoToFr(s.stock.expiry_date),
     barcode1: s.barcode1 ?? "",
     barcode2: s.barcode2 ?? "",
-    description: s.info?.description ?? "",
   };
 }
 
 /** A changed input → what PUT /products/{id} takes. Empty = back to the imported value. */
-function toApi(field: EditField, raw: string): string | number | null {
+function toApi(field: FormField, raw: string): string | number | null {
   const v = raw.trim();
   if (!v) return null;
-  if (PRICES.includes(field)) return Number(v.replace(/\s/g, "").replace(",", "."));
+  if (field === "ppv") return Number(v.replace(/\s/g, "").replace(",", "."));
   if (INTEGERS.includes(field)) return Number(v.replace(/\s/g, ""));
-  if (field === "expiry_date") return v.split("/").reverse().join("-");
   return v;
-}
-
-function validDate(v: string): boolean {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v.trim());
-  if (!m) return false;
-  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-  return d.getDate() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1;
 }
 
 function editSchema(t: TFn) {
@@ -226,11 +270,9 @@ function editSchema(t: TFn) {
   return z
     .object({
       ppv: price,
-      pph: price,
       current_stock: count(true),
       stock_min: count(false),
       stock_max: count(false),
-      expiry_date: z.string().refine((v) => !v.trim() || validDate(v), t("products.invalidDate")),
     })
     .refine((v) => !v.stock_min.trim() || !v.stock_max.trim() || Number(v.stock_min) <= Number(v.stock_max), {
       path: ["stock_min"],
@@ -269,7 +311,7 @@ export function useSheetEditor(sheet: ProductSheet | null) {
     const checked = editSchema(t).safeParse(values);
     if (!checked.success) {
       for (const issue of checked.error.issues) {
-        form.setError(issue.path[0] as EditField, { message: issue.message });
+        form.setError(issue.path[0] as FormField, { message: issue.message });
       }
       return;
     }
@@ -283,7 +325,7 @@ export function useSheetEditor(sheet: ProductSheet | null) {
     setEditing(false);
   };
 
-  const revert = async (field: EditField) => {
+  const revert = async (field: FormField) => {
     if (sheet) await mutateAsync({ id: sheet.id, body: { [field]: null } });
   };
 

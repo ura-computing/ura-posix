@@ -62,6 +62,12 @@ def subtract_year(d: date) -> date:
     return date(y, d.month, min(d.day, calendar.monthrange(y, d.month)[1]))
 
 
+def months_back(d: date, n: int) -> date:
+    """Same day n months before, cut to the month's length (frontend utils/dateRange monthsAgo)."""
+    y, m = divmod(d.year * 12 + d.month - 1 - n, 12)
+    return date(y, m + 1, min(d.day, calendar.monthrange(y, m + 1)[1]))
+
+
 def month_start(d: date) -> date:
     return d.replace(day=1)
 
@@ -434,8 +440,9 @@ class Oracle:
         return sorted(rows, key=lambda r: r["product"])
 
     def product_sheet(self, p, info: dict | None, barcode1: str | None) -> dict:
-        """GET /products/{id} (no id): Stock page rules for min / max / status, the 10
-        latest lines (newest day first; same day: sales, then purchases; then latest line)."""
+        """GET /products/{id} (no id): Stock page rules for min / max / status, the 5
+        latest lines (newest day first; same day: sales, then purchases; then latest line),
+        units sold / bought in the last 30 days (today and the 29 before) and the 30 before."""
         start, end = default_abcd_window(self.today)
         units = sum(v.qty for v in self.ventes if v.p is p and start <= v.day <= end)
         pu = self.pu_alltime.get(p.pid)
@@ -444,6 +451,11 @@ class Oracle:
         moves += [(v.day, "vente", v.seq, -v.qty, v.unit, v.ref, v.client or None) for v in self.ventes if v.p is p]
         moves.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
         stock = p.stock
+        since, before = self.today - timedelta(days=29), self.today - timedelta(days=59)
+
+        def units_in(lines, first: date, last: date) -> float:
+            return float(sum(x.qty for x in lines if x.p is p and first <= x.day <= last))
+
         return {
             "pid": p.pid, "product": p.name, "laboratoire": None, "category": p.category,
             "category_type": "pharmacie" if p.pharma else "parapharmacie", "tva": p.tva_label,
@@ -467,85 +479,125 @@ class Oracle:
             "recent_movements": [
                 {"kind": kind, "date": day.isoformat(), "quantity": qty, "unit_price": unit, "document": ref,
                  "party": party}
-                for day, kind, _, qty, unit, ref, party in moves[:10]
+                for day, kind, _, qty, unit, ref, party in moves[:5]
             ],
+            "last_30d": {
+                "sold": units_in(self.ventes, since, self.today),
+                "bought": units_in(self.achats, since, self.today),
+                "sold_before": units_in(self.ventes, before, since - timedelta(days=1)),
+                "bought_before": units_in(self.achats, before, since - timedelta(days=1)),
+            },
             "imported": {},   # no owner edit (18-produits « modifier » puts everything back)
         }
 
-    def product_stats(self, p) -> dict:
-        """GET /products/{id}/stats: sales + purchases per month (units; CA = qty × PPV, amount bought
-        = Σ line totals), « 12 mois » = the Stock page window, 30 days = today and the 29 before."""
-        start, end = default_abcd_window(self.today)
-        sales: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
-        for v in self.ventes:
-            if v.p is p:
-                sales[v.day.isoformat()[:7]][0] += v.qty
-                sales[v.day.isoformat()[:7]][1] += ca(v)
-        days = [v.day for v in self.ventes if v.p is p]
-        window = [m for m in sales if start.isoformat()[:7] <= m <= end.isoformat()[:7]]
-        units_12m = sum(sales[m][0] for m in window)
-        since = self.today - timedelta(days=29)
-        best = max(sales.items(), key=lambda kv: (kv[1][0], kv[0]), default=None)
-        mine = [a for a in self.achats if a.p is p]
-        years = sorted({int(m[:4]) for m in sales} | {a.day.year for a in mine}, reverse=True)
-        sold = {y: [0.0] * 12 for y in years}
-        bought = {y: [0.0] * 12 for y in years}
-        for m, (units, _) in sales.items():
-            sold[int(m[:4])][int(m[5:7]) - 1] += units
-        for a in mine:
-            bought[a.day.year][a.day.month - 1] += a.qty
+    def stats_periods(self) -> dict[str, tuple[date, date]]:
+        """Statistiques period buttons (frontend sheet/hooks.ts): the last 7 / 30 days, 3 / 12 months,
+        today included; « Personnalisé » = the test window."""
+        t = self.today
         return {
-            "sales_from": start.isoformat(), "sales_to": end.isoformat(),
-            "units_30d": sum(v.qty for v in self.ventes if v.p is p and since <= v.day <= self.today),
-            "units_12m": units_12m, "ca_12m": r2(sum(sales[m][1] for m in window)),
-            "avg_per_month": r2(units_12m / 12), "avg_per_day": r2(units_12m / ((end - start).days + 1)),
-            "months_without_sale": 12 - len(window),
-            "first_sale": min(days).isoformat() if days else None,
-            "last_sale": max(days).isoformat() if days else None,
-            "best_month": {"month": best[0], "units": best[1][0]} if best and best[1][0] > 0 else None,
-            "monthly": [{"year": y, "sold": sold[y], "sold_total": sum(sold[y]), "bought": bought[y],
-                         "bought_total": sum(bought[y])} for y in years],
-            "yearly": [
-                {"year": y, "units_sold": sum(sold[y]),
-                 "ca": r2(sum(sales[m][1] for m in sales if int(m[:4]) == y)),
-                 "units_bought": sum(bought[y]), "amount_bought": r2(sum(a.total for a in mine if a.day.year == y))}
-                for y in years
-            ],
+            "7d": (t - timedelta(days=6), t),
+            "30d": (t - timedelta(days=29), t),
+            "3m": (months_back(t, 3) + timedelta(days=1), t),
+            "12m": (months_back(t, 12) + timedelta(days=1), t),
+            "custom": (self.df, self.dt),
         }
 
-    def product_movements(self, p, files: dict[str, str], df: date | None = None, dt: date | None = None,
-                          kind: str = "all", query: str | None = None, page: int = 1) -> dict:
-        """GET /products/{id}/movements: purchase (+qty) and sale (−qty) lines, newest day first
-        (same day: sales, then purchases; then the latest line), search = every word in the
-        document or the supplier / client (accents ignored), 25 per page + the filtered sums."""
-        lines = [(a.day, "achat", a.seq, a.qty, a.unit, a.total, a.ref, a.supplier, files["achats"]) for a in self.achats if a.p is p]
-        lines += [(v.day, "vente", v.seq, -v.qty, v.unit, v.total, v.ref, v.client or None, files["ventes"])
+    def product_stats(self, p, df: date, dt: date) -> dict:
+        """GET /products/{id}/stats?date_from&date_to: the period vs the days just before (same
+        number); the last 12 months; « Tendances » = a point a day (≤ 31 days), a week (≤ 92), else a
+        month; top 3 suppliers + the rest; each supplier's latest priced purchase (5, newest first).
+        CA = qty × PPV, marge = CA − units sold × average PU (every purchase)."""
+        days = (dt - df).days + 1
+        pf, pt = df - timedelta(days=days), df - timedelta(days=1)
+        pu = self.pu_alltime.get(p.pid)
+        sales = [v for v in self.ventes if v.p is p]
+        buys = [a for a in self.achats if a.p is p]
+
+        def figures(first: date, last: date) -> dict:
+            lines = [v for v in sales if first <= v.day <= last]
+            sold = sum(v.qty for v in lines)
+            c = sum(ca(v) for v in lines)
+            return {"sold": sold, "bought": sum(a.qty for a in buys if first <= a.day <= last), "ca": r2(c),
+                    "marge": r2(c - sold * pu) if pu is not None else None,
+                    "transactions": len({v.ref for v in lines})}
+
+        if days <= 31:
+            unit, starts = "day", [df + timedelta(days=i) for i in range(days)]
+        elif days <= 92:
+            unit, starts = "week", [df + timedelta(days=i) for i in range(0, days, 7)]
+        else:
+            unit, starts = "month", [df]
+            while (m := next_month(starts[-1].replace(day=1))) <= dt:
+                starts.append(m)
+        ends = [x - timedelta(days=1) for x in starts[1:]] + [dt]
+        trend = [{"start": a.isoformat(), **{k: f[k] for k in ("sold", "bought")}}
+                 for a, b in zip(starts, ends) for f in [figures(a, b)]]
+
+        months = [months_back(month_start(self.today), n) for n in range(11, -1, -1)]
+        monthly = [{"month": m.isoformat()[:7], **{k: v for k, v in figures(m, next_month(m) - timedelta(days=1)).items()
+                                                  if k != "transactions"}} for m in months]
+
+        qty: dict[str, int] = defaultdict(int)
+        for a in buys:
+            if df <= a.day <= dt:
+                qty[a.supplier] += a.qty
+        total = sum(qty.values())
+        ranked = sorted(qty.items(), key=lambda kv: (-kv[1], kv[0]))
+
+        def share(supplier: str | None, q: float) -> dict:
+            return {"supplier": supplier, "quantity": q, "pct": r2(q / total * 100) if total > 0 else None}
+
+        last_prices, seen = [], set()
+        for a in sorted((a for a in buys if a.qty > 0), key=lambda a: (a.day, a.seq), reverse=True):
+            if a.supplier not in seen and len(last_prices) < 5:
+                seen.add(a.supplier)
+                last_prices.append({"supplier": a.supplier, "unit_price": r4(a.unit), "date": a.day.isoformat()})
+        return {
+            "date_from": df.isoformat(), "date_to": dt.isoformat(),
+            "previous_from": pf.isoformat(), "previous_to": pt.isoformat(),
+            "period": figures(df, dt), "previous": figures(pf, pt),
+            "monthly": monthly, "trend_unit": unit, "trend": trend,
+            "top_suppliers": [share(name, q) for name, q in ranked[:3]],
+            "other_suppliers": share(None, sum(q for _, q in ranked[3:])) if len(ranked) > 3 else None,
+            "last_prices": last_prices,
+        }
+
+    def product_movements(self, p, df: date | None = None, dt: date | None = None, kind: str = "all",
+                          query: str | None = None, page: int = 1) -> dict:
+        """GET /products/{id}/movements: purchase (+qty) and sale (−qty, with its remise) lines,
+        newest day first (same day: sales, then purchases; then the latest line), search = every
+        word in the document or the supplier / client (accents ignored), 10 per page."""
+        lines = [(a.day, "achat", a.seq, a.qty, a.unit, a.total, None, a.ref, a.supplier) for a in self.achats if a.p is p]
+        lines += [(v.day, "vente", v.seq, -v.qty, v.unit, v.total, v.discount, v.ref, v.client or None)
                   for v in self.ventes if v.p is p]
         tokens = tokenize(query or "")
         keep = [m for m in lines
                 if (df is None or m[0] >= df) and (dt is None or m[0] <= dt) and (kind == "all" or m[1] == kind)
-                and all(token_match(m[6], t, unaccent=True) or token_match(m[7], t, unaccent=True) for t in tokens)]
+                and all(token_match(m[7], t, unaccent=True) or token_match(m[8], t, unaccent=True) for t in tokens)]
         keep.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
         return {
             "total": len(keep),
-            "units_bought": sum(m[3] for m in keep if m[1] == "achat"),
-            "units_sold": sum(-m[3] for m in keep if m[1] == "vente"),
-            "page": [{"kind": k, "date": d.isoformat(), "quantity": q, "unit_price": u, "total": tot, "document": ref,
-                      "party": party, "filename": f}
-                     for d, k, _, q, u, tot, ref, party, f in keep[(page - 1) * 25:page * 25]],
+            "page": [{"kind": k, "date": d.isoformat(), "quantity": q, "unit_price": u, "total": tot, "discount": disc,
+                      "document": ref, "party": party}
+                     for d, k, _, q, u, tot, disc, ref, party in keep[(page - 1) * 10:page * 10]],
         }
 
-    def movements_scenarios(self, p, files: dict[str, str]) -> dict:
+    def movements_scenarios(self, p) -> dict:
         """18-produits « Mouvements » tab, best-selling product: no filter (pages 1 + 2), Achats,
-        Ventes over the test window, search = the client of its latest sale with a client."""
+        Ventes over the test window, search = the client of its latest sale with a client.
+        « Voir détail » of its latest sale / purchase = every line of that ticket / BL (any product)."""
         client = next(v.client for v in sorted(self.ventes, key=lambda v: (v.day, v.seq), reverse=True)
                       if v.p is p and v.client)
+        sale = max((v for v in self.ventes if v.p is p), key=lambda v: (v.day, v.seq))
+        buy = max((a for a in self.achats if a.p is p), key=lambda a: (a.day, a.seq))
         return {
             "pid": p.pid, "client": client,
-            "all": self.product_movements(p, files), "all_page2": self.product_movements(p, files, page=2),
-            "achats": self.product_movements(p, files, kind="achat"),
-            "ventes_window": self.product_movements(p, files, self.df, self.dt, "vente"),
-            "search": self.product_movements(p, files, query=client),
+            "all": self.product_movements(p), "all_page2": self.product_movements(p, page=2),
+            "achats": self.product_movements(p, kind="achat"),
+            "ventes_window": self.product_movements(p, self.df, self.dt, "vente"),
+            "search": self.product_movements(p, query=client),
+            "ticket": {"ref": sale.ref, "products": sorted(v.p.name for v in self.ventes if v.ref == sale.ref)},
+            "bl": {"ref": buy.ref, "products": sorted(a.p.name for a in self.achats if a.ref == buy.ref)},
         }
 
     def sheet_pids(self, rows: list[dict], infos: dict[str, dict]) -> list[str]:
@@ -567,7 +619,7 @@ class Oracle:
                 picks.append(pid)
         return picks
 
-    def produits(self, photo_setup: dict, files: dict[str, str]) -> dict:
+    def produits(self, photo_setup: dict) -> dict:
         infos = photo_setup["infos"]
         rows = self.products_list(infos)
         by_pid = {p.pid: p for p in self.products}
@@ -582,8 +634,10 @@ class Oracle:
             "sheets": {pid: self.product_sheet(by_pid[pid], infos.get(pid),
                                                barcode["barcode1"] if by_pid[pid].name == barcode["product"] else None)
                        for pid in self.sheet_pids(rows, infos)},
-            "stats": {pid: self.product_stats(by_pid[pid]) for pid in self.sheet_pids(rows, infos)},
-            "movements": self.movements_scenarios(by_pid[rows[0]["pid"]], files),
+            # Statistiques: every period button, for every product the test opens.
+            "stats": {pid: {k: self.product_stats(by_pid[pid], *r) for k, r in self.stats_periods().items()}
+                      for pid in self.sheet_pids(rows, infos)},
+            "movements": self.movements_scenarios(by_pid[rows[0]["pid"]]),
             "search": {q: [r["pid"] for r in rows if all(product_match(by_pid[r["pid"]], t) for t in tokenize(q))]
                        for q in PRODUCT_QUERIES},
         }
@@ -1134,7 +1188,7 @@ class Oracle:
 
     # ── Everything ──────────────────────────────────────────────────────────
 
-    def build(self, liste_items: list[dict], photo_setup: dict, files: dict[str, str]) -> dict:
+    def build(self, liste_items: list[dict], photo_setup: dict) -> dict:
         return {
             "window": {"date_from": self.df.isoformat(), "date_to": self.dt.isoformat()},
             "stats": {ct: self.stats(ct) for ct in CATEGORY_TYPES},
@@ -1144,7 +1198,7 @@ class Oracle:
             "stock_abcd_default": self.stock_abcd(*default_abcd_window(self.today)),
             "stock_abcd_window": self.stock_abcd(self.df, self.dt),
             "peremptions": self.peremptions(),
-            "products": self.produits(photo_setup, files),
+            "products": self.produits(photo_setup),
             **self.ledgers(),
             "analyse": {ct: {mode: self.analyse(ct, mode) for mode in ANALYSE_MODES} for ct in CATEGORY_TYPES},
             "liste": {"items": liste_items, **self.liste(liste_items)},

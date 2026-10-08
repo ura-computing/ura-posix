@@ -1,139 +1,90 @@
-/** /produits/:id — one product of the pharmacy: « Général » (photos, données, prix, stock,
- *  description, mouvements récents, ventes et achats par mois), « Statistiques », « Mouvements »
- *  and « Codes ». Not one of its products → the 404
- *  inside the layout (never says whether it exists elsewhere). */
-import { ArrowLeft, ChevronRight, Pencil, Save, X } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+/** /produits/:id — one product of the pharmacy: header (photo, PID / catégorie / TVA, badges,
+ *  code barre, « Modifier »), then « Général », « Statistiques », « Mouvements » and « Codes ».
+ *  Not one of its products → the 404 inside the layout (never says whether it exists elsewhere). */
+import { ArrowLeftRight, BarChart3, Box, ScanLine } from "lucide-react";
+import { useParams } from "react-router-dom";
 
-import { AsyncButton } from "@/_components/AsyncButton";
 import { Page } from "@/_components/Page";
-import { TabBar } from "@/_components/TabBar";
-import { TypeBadge } from "@/_components/TypeBadge";
+import { TabBar, type TabItem } from "@/_components/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
-import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
+import { ProductPhoto } from "../_components/ProductPhoto";
 import { CodesTab } from "./_components/CodesTab";
 import { SheetEditContext } from "./_components/editContext";
 import { GeneralTab } from "./_components/GeneralTab";
 import { MovementsTab } from "./_components/MovementsTab";
+import { BarcodeCard, EditActions, SheetBreadcrumb, SheetMeta } from "./_components/SheetHeader";
+import { StatsPeriodPicker } from "./_components/StatsPeriodPicker";
 import { StatsTab } from "./_components/StatsTab";
-import { useProduitPage, useSheetEditor, type SheetEditor, type SheetTab } from "./hooks";
+import { useProductStats, useProduitPage, useSheetEditor, useStatsPeriod, type SheetTab } from "./hooks";
 
-function BackToList({ name }: { name: string }) {
+function ProductSheetPage({ id }: { id: number }) {
   const t = useT();
-  return (
-    <>
-      <Link
-        to={ROUTES.PRODUITS}
-        className="inline-flex h-9 w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface-subtle"
-      >
-        <ArrowLeft className="size-4" />
-        {t("products.backToList")}
-      </Link>
-      <nav className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Link to={ROUTES.PRODUITS} className="hover:text-foreground">
-          {t("products.title")}
-        </Link>
-        <ChevronRight className="size-3" />
-        <span className="text-foreground">{name}</span>
-      </nav>
-    </>
-  );
-}
-
-/** Under the name: brand / laboratoire, then PID · type · catégorie · TVA. */
-function Badges({ sheet }: { sheet: ProductSheet }) {
-  const chip = "rounded border border-border bg-surface-subtle px-1.5 py-px text-xs";
-  const maker = sheet.info?.brand ?? sheet.laboratoire;
-  return (
-    <div className="flex flex-col gap-2">
-      {maker && <span className="text-base text-muted-foreground">{maker}</span>}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`${chip} font-mono`}>PID {sheet.pid}</span>
-        <TypeBadge type={sheet.category_type} />
-        {sheet.category && <span className={chip}>{sheet.category}</span>}
-        {sheet.tva && <span className={chip}>{sheet.tva}</span>}
-      </div>
-    </div>
-  );
-}
-
-/** Owner: « Modifier », then « Annuler » + « Enregistrer ». Employee: « Modifier » shown,
- *  disabled, with the reason under it. */
-function EditActions({ editor, onStart }: { editor: SheetEditor; onStart: () => void }) {
-  const t = useT();
-  if (editor.editing) {
-    return (
-      <>
-        <AsyncButton variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
-          <X className="size-4" />
-          {t("common.cancel")}
-        </AsyncButton>
-        <AsyncButton
-          variant="primary"
-          onClick={() => void editor.save()}
-          isLoading={editor.isSaving}
-          loadingText={t("products.saving")}
-        >
-          <Save className="size-4" />
-          {t("common.save")}
-        </AsyncButton>
-      </>
-    );
-  }
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <AsyncButton variant="primary" onClick={onStart} disabled={!editor.canEdit}>
-        <Pencil className="size-4" />
-        {t("common.edit")}
-      </AsyncButton>
-      {!editor.canEdit && <span className="text-xs text-muted-foreground">{t("products.ownerOnly")}</span>}
-    </div>
-  );
-}
-
-export default function ProduitPage() {
-  const t = useT();
-  const { id } = useParams<{ id: string }>();
-  const { sheet, stats, isLoading, notFound, tab, setTab } = useProduitPage(Number(id));
+  const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(id);
   const editor = useSheetEditor(sheet);
+  const { period, setPeriod, range, setCustomRange } = useStatsPeriod();
+  const { stats } = useProductStats(id, range, !!sheet);
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
     return <div className="py-10 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
   }
 
-  const tabs: { id: SheetTab; label: string }[] = [
-    { id: "general", label: t("products.tabGeneral") },
-    { id: "stats", label: t("products.tabStats") },
-    { id: "movements", label: t("products.tabMovements") },
-    { id: "codes", label: t("products.tabCodes") },
+  const icon = "size-4";
+  const tabs: TabItem<SheetTab>[] = [
+    { id: "general", label: t("products.tabGeneral"), icon: <Box className={icon} /> },
+    { id: "stats", label: t("products.tabStats"), icon: <BarChart3 className={icon} /> },
+    { id: "movements", label: t("products.tabMovements"), icon: <ArrowLeftRight className={icon} /> },
+    { id: "codes", label: t("products.tabCodes"), icon: <ScanLine className={icon} /> },
   ];
   // The editable values are on Général and Codes: editing starts on Général from the other tabs.
   const startEditing = () => {
     editor.start();
     if (tab === "stats" || tab === "movements") setTab("general");
   };
+  const photo = sheet.info?.images[0] ?? null;
   return (
     <SheetEditContext value={{ editor, sheet }}>
       <Page
-        above={<BackToList name={sheet.product} />}
+        above={<SheetBreadcrumb name={sheet.product} />}
+        media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="h-40 w-52 rounded-xl p-2" />}
         title={sheet.product}
-        subtitle={<Badges sheet={sheet} />}
-        actions={<EditActions editor={editor} onStart={startEditing} />}
+        subtitle={<SheetMeta sheet={sheet} />}
+        actions={
+          <div className="flex flex-wrap items-start gap-3">
+            <BarcodeCard code={sheet.barcode1} />
+            <EditActions editor={editor} onStart={startEditing} />
+          </div>
+        }
       >
-        <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
+        <TabBar
+          tabs={tabs}
+          activeId={tab}
+          onChange={setTab}
+          actions={
+            tab === "stats" && (
+              <StatsPeriodPicker period={period} onPeriod={setPeriod} range={range} onRange={setCustomRange} />
+            )
+          }
+        />
         {editor.editing && (
           <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
             {t("products.editHint")}
           </p>
         )}
-        {tab === "general" && <GeneralTab sheet={sheet} stats={stats} onShowMovements={() => setTab("movements")} />}
-        {tab === "stats" && <StatsTab sheet={sheet} stats={stats} />}
+        {tab === "general" && <GeneralTab sheet={sheet} onShowMovements={() => setTab("movements")} />}
+        {tab === "stats" && <StatsTab stats={stats} range={range} />}
         {tab === "movements" && <MovementsTab sheet={sheet} />}
         {tab === "codes" && <CodesTab sheet={sheet} />}
       </Page>
     </SheetEditContext>
   );
+}
+
+/** A new product (« Scanner / Rechercher un code barre », browser back) starts fresh: not
+ *  editing, Statistiques on 30 jours. */
+export default function ProduitPage() {
+  const { id } = useParams<{ id: string }>();
+  return <ProductSheetPage key={id} id={Number(id)} />;
 }

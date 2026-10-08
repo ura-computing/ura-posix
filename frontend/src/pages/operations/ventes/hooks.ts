@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -57,10 +58,25 @@ export function useVentesPage() {
 
   // Merge global dates + local fields into the VentesFilters payload the
   // existing API + sub-components expect.
+  // « Voir détail » from a product's « Mouvements »: `?ref=` = every line of that one
+  // ticket, until its filter is removed.
+  const [params, setParams] = useSearchParams();
+  const ref = params.get("ref") ?? "";
   const filters: VentesFilters = useMemo(
-    () => ({ ...localFilters, date_from: dateFrom, date_to: dateTo }),
-    [localFilters, dateFrom, dateTo],
+    () => ({ ...localFilters, ...(ref ? { ref } : {}), date_from: dateFrom, date_to: dateTo }),
+    [localFilters, ref, dateFrom, dateTo],
   );
+  const clearRef = () => {
+    setPage(1);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("ref");
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const key = useMemo(() => trimForKey(filters), [filters]);
 
@@ -119,6 +135,7 @@ export function useVentesPage() {
   const reset = () => {
     resetLocal();
     setRange(null, null);
+    clearRef();
   };
 
   // ── Excel export ─────────────────────────────────────────────────────────
@@ -170,6 +187,7 @@ export function useVentesPage() {
 
   return {
     filters,
+    clearRef,
     setSearch,
     setDateRange,
     setCategories,

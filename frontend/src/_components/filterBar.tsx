@@ -91,7 +91,7 @@ interface DateRangePopoverProps {
   className?: string;
 }
 
-function DateRangePopover({ from, to, onChange, showPresets = true, className }: DateRangePopoverProps) {
+export function DateRangePopover({ from, to, onChange, showPresets = true, className }: DateRangePopoverProps) {
   const t = useT();
   const fromIso = from ?? "";
   const toIso = to ?? "";

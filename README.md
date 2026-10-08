@@ -67,7 +67,7 @@ is in `PLAN.md` « Later »).
 | `/ventes` | Sales ledger + « à surveiller » tabs | `ventes` |
 | `/stock` | ABCD rotation + péremptions (expiry) | `stock` |
 | `/produits` | Every product of the pharmacy (stock file, sold or bought): photo, stock, sold 12 months, PPV, marge; search, Mixte / Pharmacie / Parapharmacie, sort, Excel | `produits` |
-| `/produits/:id` | Product sheet, tabs Général · Statistiques · Mouvements · Codes (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
+| `/produits/:id` | Product sheet: header (photo, PID · catégorie · TVA, type + stock badges, code barre drawn + copy), tabs Général · Statistiques (period) · Mouvements (« Voir détail ») · Codes (scanner) (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
 | `/analyses` | Analyse de marge: produit, catégorie, laboratoire, grossiste, client, mois, année, liste | `analyse` |
 | `/alertes` | Margin alerts, ventes sans achat, stock and expiry alerts | `alertes` |
 | `/comptabilite` | Accounting KPIs (exclusions applied), payment methods per month, sales journal | `accounting` |
@@ -261,7 +261,7 @@ flowchart TB
   DEP -. "refused" .-> ERR["ApiError → {detail, code, params}<br/>frontend shows errors.code (FR / ES)"]
 ```
 
-- Every route is under `/v1` (111 routes). `/openapi.json` + `/docs` are outside `/v1`.
+- Every route is under `/v1` (112 routes). `/openapi.json` + `/docs` are outside `/v1`.
 - Errors: `raise ApiError(404, ErrorCode.BL_NOT_FOUND, "French detail", ref=ref)` (`app/core/errors.py`).
   `detail` stays French for logs; the user reads `errors.<code>` from `fr.ts` / `es.ts`.
 - Lists answer `{data, pagination: {page, limit, total, total_pages}, summary?}`; export = the same list
@@ -376,9 +376,9 @@ flowchart LR
 | `identity/members/owner_router.py` | `/owner/employees…` (invite, permissions, status, reset, delete) | owner |
 | `catalog/router.py` | `/admin/catalog…`, `/category-suffixes…` | admin |
 | `ingestion/router.py` | `/uploads/{achat,vente,stock}-json`, `PATCH /uploads/batches/{id}`, `/uploads/catalog`, `/data/imports` | import + type |
-| `ledger/router.py` | `/ventes…`, `/achats…` (lists, categories, tva, suggestions, summaries, export) | ventes / achats |
+| `ledger/router.py` | `/ventes…`, `/achats…` (lists, categories, tva, suggestions, summaries, export; `?ref=` = one ticket / BL, exact) | ventes / achats |
 | `analytics/router.py` | `/stats`, `/stats/margin-alerts`, `/ventes-sans-achat`, `/stock-summary`, `/stock-abcd`, `/peremptions`, `/analyse-marge`, `/analyse-liste`; admin `/admin/stats`, `/admin/pharmacy/{id}/stats…` | rapports / alertes / stock / analyse; admin |
-| `products/router.py` | `GET /products`, `GET /products/{id}`, `/products/{id}/stats`, `/products/{id}/movements`, `PUT /products/{id}` | produits (`PUT`: owner) |
+| `products/router.py` | `GET /products`, `/products/lookup?code=`, `GET /products/{id}`, `/products/{id}/stats?date_from&date_to`, `/products/{id}/movements`, `PUT /products/{id}` | produits (`PUT`: owner) |
 | `accounting/payments/router.py` | `/accounting/payments` | accounting |
 | `accounting/exclusions/router.py` | `/special-products/…`, `/bl-exclusions/…`, `/supplier-exclusions/…` | special_products |
 | `store_website/router.py` | `/store-website/*` (hidden) | owner / developer |
@@ -563,10 +563,15 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 | The pharmacy's products | in its stock file, sold or bought (any date); exclusions don't apply (Comptabilité only) |
 | « Vendus 12 mois », min / max, coverage, status | the Stock page's rules and default window ([§7.5](#75-stock-stock_queriespy)) |
 | Marge | (1 − average PU / PPV) × 100, every purchase of the pharmacy, with the PPV shown |
-| Photos, description, gamme, emballage | the `product_infos` row with the same PID, else the same barcode (1 or 2), matched when shown: a product imported later finds its photo. Dead photo address → box icon |
-| « Ventes et achats par mois » | units sold and bought each month, a « Ventes » row and an « Achats » row per year; chart: one solid curve per row, one color each |
-| Statistiques | 30 days = today + the 29 before; CA 12 mois = Σ qty × PPV; best month = most units (tie → the latest); months without a sale line, in the 12-month window |
-| Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), with the file each came from |
+| Photo (header, list) | the `product_infos` row with the same PID, else the same barcode (1 or 2), matched when shown: a product imported later finds its photo. Dead photo address → box icon |
+| Header badges | Pharmacie / Parapharmacie; stock: « En stock » (> 0), « Rupture » (≤ 0), « Hors stock » (not in the stock file). Catégorie / TVA without their rate: « Médicament (33.930%) » → « Médicament », « TVA (20.00%) » → « 20,00 % » |
+| Général | PPV, prix d'achat moyen, dernier prix d'achat, marge brute (PPV − prix d'achat moyen), marge %; stock; ventes / achats 30 jours (today + the 29 before) and « Performance » = % vs the 30 days before; 5 latest lines |
+| Statistiques: period | 7 jours · 30 jours · 3 mois · 12 mois (today included: « 3 mois » on 08/10/2026 = 09/07 → 08/10) · Personnalisé. Each % = vs the same number of days just before |
+| Statistiques: figures | quantités vendues / achetées, CA = Σ qty × PPV, marge générée = CA − quantité vendue × prix d'achat moyen, transactions = distinct tickets. « Tendances »: a point a day (≤ 31 days), a week (≤ 92), else a month. Top 3 suppliers of the period + « Autres »; each supplier's latest priced purchase (5) |
+| Statistiques: 12 months | 3 charts (ventes bars, achats bars, ventes vs achats: solid lines, one color each) + « Détail mensuel » (« Copier » → Excel), always this month and the 11 before |
+| Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), 10 a page; remise = the sale's (purchase: —); TVA = the product's |
+| « Voir détail » | opens Ventes (`?ref=` ticket) or Achats (`?ref=` BL): every line of that exact number, period removed, a filter chip to remove it. Disabled without the Ventes / Achats permission |
+| Codes | PID, code barre 1 / 2 + « Copier »; format EAN-13 / UPC-A / EAN-8 when the length and check digit fit, else « Autre ». « Scanner / Rechercher un code barre »: a USB reader (code + Entrée) or typing → the pharmacy's product with that exact PID / barcode (the owner's barcodes too), else « Aucun produit » |
 
 **Owner edits (« Modifier » → « Enregistrer », `PUT /products/{id}`)**
 
@@ -578,8 +583,10 @@ flowchart LR
   I --> O["Rapport · Stock · Comptabilité · …<br/>always the imported values"]
 ```
 
-- Editable: name, category (its text), lab, TVA, PPV, PPH, stock, min, max, expiry, zone, description,
-  barcodes 1 / 2. **Not** the type pharmacie / parapharmacie (refused, 422), the PID, computed values.
+- Editable on the page (« Modifier », or « Éditer » of Stock / Informations générales, same edit mode):
+  name, category (its text), lab, TVA, PPV, stock, min, max, barcodes 1 / 2. The API also takes PPH,
+  expiry, zone, description (no longer on the page). **Not** the type pharmacie / parapharmacie (refused,
+  422), the PID, computed values.
 - Imports never write the edits: a hand edit stays. The sheet shows « modifié », the imported value and
   « Revenir à la valeur importée » (= the field sent as `null`). Typing the imported value back = not edited.
 - A typed minimum above the maximum → `stockMinAboveMax`; going back to an imported value is never blocked.
@@ -643,7 +650,7 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 15-imports | history, cancel, delete, delete several at once, interrupted, damaged file, hand-typed dates, 2 imports at once, delete the stock import (its stock goes) + import it again |
 | 16-layout | FR ⇄ ES, theme, sidebar, « Session expirée » |
 | 17-inscription | sign-up (5 screens), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
-| 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos, every tab of 8 product sheets = oracle, table ⇄ chart, Mouvements filters + Excel, owner edits (every field, wrong values, an import keeps them, « Revenir »), type not editable, employee read only, feature OFF, 404, Spanish |
+| 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos; product sheet of 8 products = oracle on screen (header, badges, barcode copy, Général, Statistiques at 30 days); best seller: every period + Personnalisé, 3 charts + tooltips, « Détail mensuel » + « Copier », Tendances, suppliers; Mouvements (filters, 10 / page, every column), « Voir détail » → the whole ticket / BL; Codes (copy, format, length), scanner (barcode, PID, unknown, Échap); owner edits (every field, « Éditer », wrong values, an import keeps them, « Revenir », lookup by his barcode), type not editable, employee read only + « Voir détail » by permission, feature OFF, 404, Spanish |
 | 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** |
 
 ### 8.4 When a test fails

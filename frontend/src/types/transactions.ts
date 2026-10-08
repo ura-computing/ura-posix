@@ -73,6 +73,8 @@ export interface VentesFilters {
   include_non_declared: boolean;
   sort_by: string | null;
   sort_order: "asc" | "desc";
+  /** One ticket, exact number (« Voir détail » of a product's movement, `/ventes?ref=`). */
+  ref?: string;
 }
 
 /** Stable serialization key used in API query keys — excludes sort + pagination so a
@@ -153,4 +155,6 @@ export interface AchatsFilters {
   tva: string[];
   sort_by: string | null;
   sort_order: "asc" | "desc";
+  /** One BL, exact number (« Voir détail » of a product's movement, `/achats?ref=`). */
+  ref?: string;
 }

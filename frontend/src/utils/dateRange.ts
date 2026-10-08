@@ -20,6 +20,17 @@ export function todayIso(now: Date = new Date()): string {
   return fmt(now);
 }
 
+/** ISO date `n` days before today (0 = today). */
+export function daysAgo(n: number, now: Date = new Date()): string {
+  return fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate() - n));
+}
+
+/** ISO date the day after `iso`. */
+export function dayAfter(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return fmt(new Date(y, m - 1, d + 1));
+}
+
 /** ISO date `n` years before today (same month/day). */
 export function yearsAgo(n: number, now: Date = new Date()): string {
   return fmt(new Date(now.getFullYear() - n, now.getMonth(), now.getDate()));
