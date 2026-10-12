@@ -59,7 +59,7 @@ export function ConfirmDialog({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative w-full max-w-[420px] rounded-lg border border-border bg-card p-5 shadow-md"
+            className="relative max-h-[calc(100vh-2rem)] w-full max-w-[550px] overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-md"
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
@@ -74,13 +74,15 @@ export function ConfirmDialog({
               >
                 <Icon className="size-[18px]" aria-hidden />
               </span>
-              <div className="flex flex-col gap-2">
+              <div className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
                 {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
                 {bullets && bullets.length > 0 && (
-                  <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
-                    {bullets.map((b) => (
-                      <li key={b} className="flex gap-1.5">
+                  // A long list (e.g. 36 imports) scrolls inside: the buttons stay on screen.
+                  <ul className="flex max-h-[45vh] flex-col gap-1 overflow-y-auto pr-1 text-sm text-muted-foreground">
+                    {bullets.map((b, i) => (
+                      // The same text can repeat (one file imported twice).
+                      <li key={i} className="flex gap-1.5">
                         <span aria-hidden>·</span>
                         <span>{b}</span>
                       </li>

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     JWT_ACCESS_EXPIRY_MIN: int = 60 * 24 * 7
     COOKIE_SECURE: bool = False
     FRONTEND_URL: str
+    # Demo recordings only: « today » for every rule that depends on it (YYYY-MM-DD, e.g. the last
+    # day of the imported files). Empty = the real date in Casablanca (dev, E2E, production).
+    TODAY: str = ""
 
     @field_validator("JWT_SECRET")
     @classmethod

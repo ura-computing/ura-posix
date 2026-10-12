@@ -174,6 +174,17 @@ export interface ProductStats {
   other_suppliers: SupplierShare | null;
   /** Each supplier's latest priced purchase, newest first (5 at most). */
   last_prices: { supplier: string | null; unit_price: number; date: string | null }[];
+  /** « Historique des ventes (par année) »: every year with a sale, newest first. */
+  history: YearSales[];
+}
+
+export interface YearSales {
+  year: number;
+  /** Units sold, January first (12 values). */
+  sold: number[];
+  total: number;
+  /** Σ qty × PPV (Rapport rule). */
+  ca: number;
 }
 
 // ── Mouvements (GET /products/{id}/movements) ──────────────────────────────

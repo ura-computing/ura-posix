@@ -505,7 +505,8 @@ class Oracle:
     def product_stats(self, p, df: date, dt: date) -> dict:
         """GET /products/{id}/stats?date_from&date_to: the period vs the days just before (same
         number); the last 12 months; « Tendances » = a point a day (≤ 31 days), a week (≤ 92), else a
-        month; top 3 suppliers + the rest; each supplier's latest priced purchase (5, newest first).
+        month; top 3 suppliers + the rest; each supplier's latest priced purchase (5, newest first);
+        units sold per month of every year with a sale (newest first).
         CA = qty × PPV, marge = CA − units sold × average PU (every purchase)."""
         days = (dt - df).days + 1
         pf, pt = df - timedelta(days=days), df - timedelta(days=1)
@@ -560,6 +561,13 @@ class Oracle:
             "top_suppliers": [share(name, q) for name, q in ranked[:3]],
             "other_suppliers": share(None, sum(q for _, q in ranked[3:])) if len(ranked) > 3 else None,
             "last_prices": last_prices,
+            "history": [
+                {"year": y, "sold": [float(sum(v.qty for v in sales if v.day.year == y and v.day.month == m))
+                                     for m in range(1, 13)],
+                 "total": float(sum(v.qty for v in sales if v.day.year == y)),
+                 "ca": r2(sum(ca(v) for v in sales if v.day.year == y))}
+                for y in sorted({v.day.year for v in sales}, reverse=True)
+            ],
         }
 
     def product_movements(self, p, df: date | None = None, dt: date | None = None, kind: str = "all",

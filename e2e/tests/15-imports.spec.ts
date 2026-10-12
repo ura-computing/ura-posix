@@ -370,25 +370,52 @@ test("dates tapées à la main : lues comme Sobrus ; date impossible : ligne non
   await apiDelete(page, `/data/imports/${result.batch_id}`);
 });
 
-test("supprimer plusieurs imports d'un coup : cocher, « Supprimer la sélection », une confirmation", async ({
+test("plusieurs fichiers d'un coup, puis les supprimer d'un coup : cocher, « Supprimer la sélection »", async ({
   page,
 }) => {
-  // Two small achats files: a known product of the extra file on new BLs, imported through the wizard.
+  // Two small achats files (a known product of the extra file on new BLs) + a file with a wrong
+  // name, picked together in the wizard: the wrong one is left out, the 2 others imported in order.
   const [header, first] = readFileSync(resolve(REPO_DIR, expected().files.extra_achats.path), "utf-8").split("\n");
   const rest = first.split(";").slice(3);
   const names = ["Sobrus - Achats 2026-02-01 - 2026-02-28.csv", "Sobrus - Achats 2026-03-01 - 2026-03-31.csv"];
-  for (const [i, name] of names.entries()) {
-    await page.goto("/upload-file?type=achat");
-    await page.locator('input[type="file"]').setInputFiles({
-      name,
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        `${header}\n${["2026-02-02 10:00:00", "2026-02-02", `E2E-MULTI-${i + 1}`, ...rest].join(";")}\n`,
-      ),
-    });
-    await page.getByRole("button", { name: "Importer dans la base" }).click();
-    await expect(page.getByRole("heading", { level: 3, name: "1 lignes importées" })).toBeVisible();
+  const file = (name: string, i: number) => ({
+    name,
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      `${header}\n${["2026-02-02 10:00:00", "2026-02-02", `E2E-MULTI-${i + 1}`, ...rest].join(";")}\n`,
+    ),
+  });
+  await page.goto("/upload-file?type=achat");
+  await expect(page.getByText("Glissez un ou plusieurs fichiers ici")).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles([...names.map(file), file("achats février.csv", 2)]);
+  await expect(page.getByRole("heading", { level: 3, name: "3 fichiers choisis" })).toBeVisible();
+  await expect(page.getByText("2 lignes à importer")).toBeVisible();
+  for (const name of names) {
+    const line = page.locator("li").filter({ hasText: name });
+    await expect(line, name).toContainText("1 lignes");
+    await expect(line, name).toContainText(
+      name.includes("02-01") ? "du 01 févr. 2026 au 28 févr. 2026" : "du 01 mars 2026 au 31 mars 2026",
+    );
   }
+  await expect(page.locator("li").filter({ hasText: "achats février.csv" })).toContainText(
+    "Ce fichier ne sera pas importé. Nom de fichier invalide.",
+  );
+  await page.getByRole("button", { name: "Importer les 2 fichiers" }).click();
+  await expect(page.getByRole("heading", { level: 3, name: "Import de 2 fichiers" })).toBeVisible();
+  for (const name of names) {
+    await expect(page.locator("li").filter({ hasText: name }), `${name} importé`).toContainText("1 lignes importées");
+  }
+  await expect(page.getByText("2 sur 2 terminé(s)")).toBeVisible();
+  // The results stay on the page until « Nouvel import »; the corner cards hide 4 s after success.
+  await page.waitForTimeout(4_500);
+  await expect(page.getByText("2 sur 2 terminé(s)")).toBeVisible();
+  await expect(page.getByRole("status").getByText(names[0]), "carte du coin cachée").toHaveCount(0);
+  await page.getByRole("button", { name: "Nouvel import" }).click();
+  await expect(page.getByRole("heading", { level: 3, name: "Import de 2 fichiers" })).toHaveCount(0);
+
+  // Stock: one file only (each stock file replaces the previous one).
+  await page.goto("/upload-file?type=stock");
+  await expect(page.getByText("Glissez votre fichier ici")).toBeVisible();
 
   const list = pageCall(page, "/data/imports");
   await page.goto("/imports");

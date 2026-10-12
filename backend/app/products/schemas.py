@@ -199,6 +199,13 @@ class SupplierPrice(BaseModel):
     date: str | None
 
 
+class YearSales(BaseModel):
+    year: int
+    sold: list[float]  # units sold, 12 values, January first
+    total: float
+    ca: float  # Σ qty × PPV (Rapport rule)
+
+
 class ProductStats(BaseModel):
     """Statistiques tab: the period vs the one just before (same number of days); the charts and
     « Détail mensuel » = the last 12 months (this month and the 11 before)."""
@@ -215,3 +222,4 @@ class ProductStats(BaseModel):
     top_suppliers: list[SupplierShare]  # the 3 biggest of the period
     other_suppliers: SupplierShare | None  # « Autres »: every other supplier together
     last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first, 5 at most
+    history: list[YearSales]  # « Historique des ventes (par année) »: every year with a sale, newest first

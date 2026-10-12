@@ -1,12 +1,12 @@
 /** « Statistiques »: the period's figures vs the days just before (same number), the last 12
  *  months (3 charts + « Détail mensuel », copied for Excel), « Tendances » over the period,
  *  « Top fournisseurs » of the period and each supplier's latest purchase price. */
-import { BarChart3, FileText, LineChart, Receipt, TrendingUp, Truck } from "lucide-react";
+import { BarChart3, CalendarRange, FileText, LineChart, Receipt, TrendingUp, Truck } from "lucide-react";
 
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
-import type { MonthFigures, ProductStats, SupplierShare } from "@/types";
-import { useMonths } from "@/i18n/dates";
+import type { MonthFigures, ProductStats, SupplierShare, YearSales } from "@/types";
+import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";
 
@@ -49,6 +49,32 @@ const monthColumns = (t: TFn, monthName: (m: string) => string): ColumnDef<Month
     sortable: false,
     render: (r) => money(r.marge),
   },
+];
+
+// « Historique des ventes (par année) »: one line per year, the units sold each month.
+const unitsOrDash = (n: number) => (n === 0 ? dash : formatQty(n));
+const yearColumns = (t: TFn, monthsShort: string[]): ColumnDef<YearSales>[] => [
+  {
+    key: "year",
+    label: t("col.annee"),
+    sortable: false,
+    render: (r) => <span className="font-semibold">{r.year}</span>,
+  },
+  ...monthsShort.map((label, m): ColumnDef<YearSales> => ({
+    key: `m${m + 1}`,
+    label: label.replace(/\.$/, ""),
+    align: "right",
+    sortable: false,
+    render: (r) => unitsOrDash(r.sold[m]),
+  })),
+  {
+    key: "total",
+    label: t("col.total"),
+    align: "right",
+    sortable: false,
+    render: (r) => <span className="font-semibold">{unitsOrDash(r.total)}</span>,
+  },
+  { key: "ca", label: t("products.colCaMad"), align: "right", sortable: false, render: (r) => money(r.ca) },
 ];
 
 const supplierColumns = (t: TFn): ColumnDef<SupplierShare>[] => [
@@ -97,6 +123,7 @@ const priceColumns = (t: TFn): ColumnDef<LastPrice>[] => [
 export function StatsTab({ stats, range }: { stats: ProductStats | null; range: StatsRange }) {
   const t = useT();
   const months = useMonths();
+  const monthsShort = useMonthsShort();
   if (!range.from || !range.to) {
     return <p className="py-10 text-center text-base text-muted-foreground">{t("products.pickDates")}</p>;
   }
@@ -132,6 +159,13 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
   const tsv = [
     header,
     ...monthly.map((m) => [monthName(m.month), cell(m.sold, 0), cell(m.bought, 0), cell(m.ca, 2), cell(m.marge, 2)]),
+  ]
+    .map((r) => r.join("\t"))
+    .join("\n");
+  // « Historique des ventes (par année) » for Excel, same columns as on screen.
+  const historyTsv = [
+    [t("col.annee"), ...monthsShort.map((m) => m.replace(/\.$/, "")), t("col.total"), t("products.colCaMad")],
+    ...stats.history.map((y) => [String(y.year), ...y.sold.map((n) => cell(n, 0)), cell(y.total, 0), cell(y.ca, 2)]),
   ]
     .map((r) => r.join("\t"))
     .join("\n");
@@ -183,6 +217,21 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
           <MonthsChart months={monthKeys} series={[sold, bought]} kind="lines" label={t("products.salesVsPurchases")} />
         </SheetCard>
       </div>
+
+      <SheetCard
+        title={t("products.salesHistory")}
+        icon={<CalendarRange className="size-5" />}
+        actions={
+          <CopyButton value={historyTsv} label={t("products.copyHistory")} copiedText={t("products.tableCopied")} />
+        }
+      >
+        <DataTable<YearSales>
+          rows={stats.history}
+          columns={yearColumns(t, monthsShort)}
+          emptyTitle={t("products.noSale")}
+          rowKey={(r) => r.year}
+        />
+      </SheetCard>
 
       <div className="grid gap-4 xl:grid-cols-2 print:grid-cols-2">
         <SheetCard

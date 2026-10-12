@@ -503,11 +503,14 @@ const TYPE_LABEL: Record<DocType, string> = {
 /** Cap visible cards — older finished ones drop off the bottom of the stack.
  *  Auto-dismiss already trims successful ones; this is the floor for everything
  *  else (queue length, cancelled, errored). */
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 3;
 
 function UploadProgressWidget() {
-  const { jobs, cancelUpload, dismissJob } = useUploadCtx();
+  const t = useT();
+  const { jobs: all, cancelUpload, dismissJob } = useUploadCtx();
   const nav = useNavigate();
+  // Files imported together leave the corner 4 s after their success (their wizard list keeps them).
+  const jobs = all.filter((j) => !j.hidden);
 
   if (jobs.length === 0) return null;
 
@@ -530,6 +533,15 @@ function UploadProgressWidget() {
           onDismiss={() => dismissJob(job.id)}
         />
       ))}
+      {jobs.length > MAX_VISIBLE && (
+        <button
+          type="button"
+          onClick={() => nav(`${ROUTES.UPLOAD_FILE}?type=${visible[visible.length - 1].docType}`)}
+          className="cursor-pointer self-end rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground shadow-md hover:text-foreground"
+        >
+          {t("upload.moreJobs", { n: jobs.length - MAX_VISIBLE })}
+        </button>
+      )}
     </div>
   );
 }

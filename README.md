@@ -214,6 +214,7 @@ flowchart LR
 | `PORT` | container port (default 8000) |
 | `RATE_LIMIT=0`, `SEED_CATALOG=0` | **E2E only**: no login limit, no catalogue in the seed |
 | `PRODUCT_INFOS_FILE` | **E2E only**: another photos file than `backend/data/product_infos.json` (the test fixture) |
+| `TODAY=2026-05-02` | **Demo recordings only**: « today » for every date rule (30 jours, Stock window, péremptions); empty = the real date |
 
 **Frontend** (`frontend/.env`): `VITE_BACKEND_URL` (dev `http://localhost:8000`), read at **build time**.
 
@@ -417,6 +418,7 @@ stateDiagram-v2
 | A line is skipped only if **another** import already stored the same (BL or ticket, product) | same file twice → 0 added; BL with lot A ×10 + lot B ×5 → 15 stored |
 | New PID with an existing **normalized name** (unaccent, lower, single spaces) merges onto that product | « Doliprane  1000 » = « DOLIPRANE 1000 » |
 | Dates saved by hand are read day first | `23/1/26`, ` 05/02/2026 `, `23.01.2026 14:19` → `2026-01-23` |
+| Achats / Ventes: several files at once; each is checked, a wrong one is left out with why; they run one after the other; the page lists each file (imported, ignored lines + why) until « Nouvel import »; the corner cards hide 4 s after success. Stock: one file at a time (each replaces the previous) | 3 Achats files (2024, 2025, 2026) → « Importer les 3 fichiers » |
 | Impossible date on a vente / BL date → line not imported, counted, explained | `31/02/2026` → « 1 ligne(s) non importée(s) : date illisible … » |
 | Damaged file (NUL / control character) → refused before anything is written | `fileCorrupted` |
 | Stock = UPSERT per (pharmacy, medicament); each row keeps its import | delete / cancel that import → its rows removed (the values it replaced don't come back) |
@@ -568,6 +570,7 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 | Général | PPV, prix d'achat moyen, dernier prix d'achat, marge brute (PPV − prix d'achat moyen), marge %; stock; ventes / achats 30 jours (today + the 29 before) and « Performance » = % vs the 30 days before; 5 latest lines |
 | Statistiques: period | 7 jours · 30 jours · 3 mois · 12 mois (today included: « 3 mois » on 08/10/2026 = 09/07 → 08/10) · Personnalisé. Each % = vs the same number of days just before |
 | Statistiques: figures | quantités vendues / achetées, CA = Σ qty × PPV, marge générée = CA − quantité vendue × prix d'achat moyen, transactions = distinct tickets. « Tendances »: a point a day (≤ 31 days), a week (≤ 92), else a month. Top 3 suppliers of the period + « Autres »; each supplier's latest priced purchase (5) |
+| Historique des ventes (par année) | every year with a sale, newest first: units sold each month, total, CA; « Copier » (Excel); not tied to the period |
 | Statistiques: 12 months | 3 charts (ventes bars, achats bars, ventes vs achats: solid lines, one color each) + « Détail mensuel » (« Copier » → Excel), always this month and the 11 before |
 | Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), 10 a page; remise = the sale's (purchase: —); TVA = the product's |
 | « Voir détail » | opens Ventes (`?ref=` ticket) or Achats (`?ref=` BL): every line of that exact number, period removed, a filter chip to remove it. Disabled without the Ventes / Achats permission |

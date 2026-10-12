@@ -385,6 +385,9 @@ export const fr = {
     printMovesAllDates: "toutes les dates",
     printMovesSearch: "recherche « {{q}} »",
     printMovesLines: "lignes {{first}} à {{last}} sur {{total}}",
+    salesHistory: "Historique des ventes (par année)",
+    copyHistory: "Copier l'historique des ventes",
+    noSale: "Aucune vente pour ce produit.",
   },
 
   achats: {
@@ -933,6 +936,7 @@ export const fr = {
     typeAchat: "Achats",
     typeVente: "Ventes",
     typeStock: "Stock",
+    moreJobs: "+ {{n}} autre(s) import(s)",
   },
   adminPharm: {
     roleDescOwner: "Gère la pharmacie et son équipe. Une pharmacie peut en avoir plusieurs.",
@@ -1350,6 +1354,20 @@ export const fr = {
     or: "ou",
     browse: "cliquez pour parcourir",
     csvHint: "CSV exporté depuis Sobrus, délimiteur « ; »",
+    dropHereMany: "Glissez un ou plusieurs fichiers ici",
+    oneStockFile: "Un seul fichier de stock à la fois : chaque fichier de stock remplace le précédent.",
+    manyTitle: "{{n}} fichiers choisis",
+    manyTotal: "{{n}} lignes à importer",
+    manyImport: "Importer les {{n}} fichiers",
+    manyPeriod: "du {{from}} au {{to}}",
+    manyLines: "{{n}} lignes",
+    manySkipped: "Ce fichier ne sera pas importé. {{reason}}",
+    chooseOthers: "Choisir d'autres fichiers",
+    batchTitle: "Import de {{n}} fichiers",
+    batchProgress: "{{done}} sur {{n}} terminé(s)",
+    batchQueued: "En attente",
+    batchRunning: "En cours · {{pct}} %",
+    cancelAll: "Annuler les imports restants",
   },
   store: {
     claimedOpenEditor: "Demande réclamée — vous pouvez ouvrir l'éditeur.",

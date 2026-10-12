@@ -472,9 +472,10 @@ def _last_12_months(today: date) -> list[str]:
 def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date) -> dict | None:
     """Statistiques tab; None = not one of the pharmacy's products. The period (and the one just
     before, same length) drives the KPIs, « Tendances » and « Top fournisseurs »; the charts and
-    « Détail mensuel » are always the last 12 months. CA = Rapport rule (qty × PPV); marge =
-    CA − units sold × average purchase price (every purchase, as on « Général ») = CA × marge %.
-    One product = a few thousand lines at most: summed in Python."""
+    « Détail mensuel » are always the last 12 months; « Historique des ventes (par année) » = every
+    year with a sale. CA = Rapport rule (qty × PPV); marge = CA − units sold × average purchase price
+    (every purchase, as on « Général ») = CA × marge %. One product = a few thousand lines at most:
+    summed in Python."""
     if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     today = pharmacy_today()
@@ -494,6 +495,20 @@ def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, d
         )
     ).all()
     avg_pu = db.query(avg_pu_expr()).filter(*mine, *PRICED_PURCHASE).scalar()
+
+    # « Historique des ventes (par année) »: units sold each month of every year, newest year first.
+    month = func.substr(Vente.date, 1, 7)
+    history: dict[int, dict] = {}
+    for m, units, ca in db.execute(
+        select(month, func.sum(Vente.quantity), func.sum(ca_line()))
+        .join(Medicament, Medicament.id == Vente.medicament_id)
+        .where(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id, Vente.date.isnot(None))
+        .group_by(month)
+    ):
+        year = history.setdefault(int(m[:4]), {"year": int(m[:4]), "sold": [0.0] * 12, "total": 0.0, "ca": 0.0})
+        year["sold"][int(m[5:7]) - 1] = float(units or 0)
+        year["total"] += float(units or 0)
+        year["ca"] += float(ca or 0)
 
     def figures(first: str, last: str) -> dict:
         """Sums of the sale / purchase lines dated first → last (ISO text, inclusive)."""
@@ -559,6 +574,7 @@ def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, d
         "top_suppliers": [share(name, qty) for name, qty in ranked[:3]],
         "other_suppliers": share(None, sum(qty for _, qty in ranked[3:])) if len(ranked) > 3 else None,
         "last_prices": last_prices,
+        "history": [{**y, "ca": round(y["ca"], 2)} for _, y in sorted(history.items(), reverse=True)],
     }
 
 

@@ -23,17 +23,19 @@ import { ROLES } from "@/types";
 import type { DocType, Feature, UploadStockResult } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 
-import { useUpload } from "./hooks";
+import { useUpload, type PickedFile } from "./hooks";
 import { cn } from "@/utils/cn";
-import { formatNumStr, formatQty } from "@/utils/format";
-import type { UploadPhase, UploadProgress } from "@/hooks/UploadContext";
+import { formatDate, formatNumStr, formatQty } from "@/utils/format";
+import type { UploadJob, UploadPhase, UploadProgress } from "@/hooks/UploadContext";
 import type { ReactNode } from "react";
 import { Page } from "@/_components/Page";
 
 interface DropZoneProps {
   docType: DocType;
   example: string;
-  onAccept: (file: File) => void;
+  /** Achats / Ventes: several files at once (stock: one). */
+  multiple: boolean;
+  onAccept: (files: File[]) => void;
   errorMsg: string | null;
   onClearError: () => void;
 }
@@ -44,7 +46,7 @@ interface DropZoneProps {
  * the zone so the entire surface is clickable.
  */
 
-function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZoneProps) {
+function DropZone({ docType, example, multiple, onAccept, errorMsg, onClearError }: DropZoneProps) {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -53,16 +55,16 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
   const pick = () => inputRef.current?.click();
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) onAccept(f);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length > 0) onAccept(files);
     e.target.value = ""; // allow re-picking the same file after a rejection
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) onAccept(f);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) onAccept(multiple ? files : files.slice(0, 1));
   };
 
   return (
@@ -96,7 +98,9 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
           <UploadCloud className="size-6" aria-hidden />
         </div>
         <div className="flex flex-col gap-1">
-          <p className="text-base font-semibold text-foreground">{t("uploadFile.dropHere")}</p>
+          <p className="text-base font-semibold text-foreground">
+            {t(multiple ? "uploadFile.dropHereMany" : "uploadFile.dropHere")}
+          </p>
           <p className="text-sm text-muted-foreground">
             {t("uploadFile.or")}{" "}
             <span className="font-semibold underline" style={{ color: ring }}>
@@ -106,7 +110,15 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{t("uploadFile.csvHint")}</p>
         <p className="font-mono text-[11px] text-muted-foreground">{example}</p>
-        <input ref={inputRef} type="file" accept=".csv" onChange={onChange} className="sr-only" tabIndex={-1} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv"
+          multiple={multiple}
+          onChange={onChange}
+          className="sr-only"
+          tabIndex={-1}
+        />
       </div>
 
       {errorMsg && (
@@ -122,6 +134,169 @@ function DropZone({ docType, example, onAccept, errorMsg, onClearError }: DropZo
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Several files picked: one line each (period from its name, lines), a wrong one in red with
+ *  why it is left out; « Importer les N fichiers » imports the good ones. */
+function PickedFiles({ files, onImport }: { files: PickedFile[]; onImport: () => void }) {
+  const t = useT();
+  const good = files.filter((f) => f.error === null);
+  const total = good.reduce((n, f) => n + f.rows.length, 0);
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+          <h3 className="text-base font-semibold text-foreground">{t("uploadFile.manyTitle", { n: files.length })}</h3>
+          <span className="text-sm text-muted-foreground">{t("uploadFile.manyTotal", { n: formatNumStr(total) })}</span>
+        </div>
+        <ul className="divide-y divide-border">
+          {files.map((f) => (
+            <li key={f.name} className="flex items-start gap-3 px-5 py-3">
+              {f.error ? (
+                <AlertCircle className="mt-0.5 size-4 shrink-0 text-error" aria-hidden />
+              ) : (
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+              )}
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate font-mono text-sm text-foreground">{f.name}</span>
+                {f.error ? (
+                  <span className="text-sm text-error">{t("uploadFile.manySkipped", { reason: f.error })}</span>
+                ) : (
+                  f.dates && (
+                    <span className="text-xs text-muted-foreground">
+                      {t("uploadFile.manyPeriod", { from: formatDate(f.dates.from), to: formatDate(f.dates.to) })}
+                    </span>
+                  )
+                )}
+              </div>
+              {!f.error && (
+                <span className="shrink-0 font-mono text-sm text-foreground">
+                  {t("uploadFile.manyLines", { n: formatNumStr(f.rows.length) })}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onImport}
+          disabled={good.length === 0}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <UploadCloud className="size-4" />
+          {t("uploadFile.manyImport", { n: good.length })}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Files imported together: one line each, in the order they run (en attente → en cours % →
+ *  « N lignes importées » / erreur / annulé). Cancel the rest while it runs, then « Nouvel import ». */
+function BatchFiles({
+  jobs,
+  onCancel,
+  onNewImport,
+}: {
+  jobs: UploadJob[];
+  onCancel: () => void;
+  onNewImport: () => void;
+}) {
+  const t = useT();
+  const running = jobs.some((j) => j.phase === "queued" || j.phase === "uploading");
+  const done = jobs.filter((j) => j.phase !== "queued" && j.phase !== "uploading").length;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+          <h3 className="text-base font-semibold text-foreground">{t("uploadFile.batchTitle", { n: jobs.length })}</h3>
+          <span className="text-sm text-muted-foreground">
+            {t("uploadFile.batchProgress", { done, n: jobs.length })}
+          </span>
+        </div>
+        <ul className="divide-y divide-border">
+          {jobs.map((j) => {
+            const pct = j.progress.total ? Math.round((j.progress.current / j.progress.total) * 100) : 0;
+            return (
+              <li key={j.id} className="flex flex-col gap-2 px-5 py-3">
+                <div className="flex items-center gap-3">
+                  {j.phase === "queued" && <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+                  {j.phase === "uploading" && (
+                    <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
+                  )}
+                  {j.phase === "success" && <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />}
+                  {j.phase === "error" && <AlertCircle className="size-4 shrink-0 text-error" aria-hidden />}
+                  {j.phase === "cancelled" && <Ban className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
+                  <span className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">{j.filename}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm",
+                      j.phase === "success"
+                        ? "font-semibold text-success"
+                        : j.phase === "error"
+                          ? "text-error"
+                          : "text-muted-foreground",
+                    )}
+                  >
+                    {j.phase === "queued" && t("uploadFile.batchQueued")}
+                    {j.phase === "uploading" && t("uploadFile.batchRunning", { pct })}
+                    {j.phase === "success" && `${formatNumStr(j.progress.inserted)} ${t("uploadFile.linesImported")}`}
+                    {j.phase === "error" && (j.error ?? t("uploadFile.unknownError"))}
+                    {j.phase === "cancelled" && t("uploadFile.cancelledTitle")}
+                  </span>
+                </div>
+                {j.phase === "success" &&
+                  (skipReasonsOf(t, j.progress, j.stockResult).length > 0 || !!j.progress.new_medicaments?.count) && (
+                    <p className="pl-7 text-xs text-muted-foreground">
+                      {[
+                        ...skipReasonsOf(t, j.progress, j.stockResult),
+                        ...(j.progress.new_medicaments?.count
+                          ? [
+                              `${formatNumStr(j.progress.new_medicaments.count)} ${
+                                j.progress.new_medicaments.count > 1
+                                  ? t("uploadFile.newProductPlural")
+                                  : t("uploadFile.newProductSingular")
+                              }`,
+                            ]
+                          : []),
+                      ].join(" · ")}
+                    </p>
+                  )}
+                {j.phase === "uploading" && (
+                  <div className="h-1.5 overflow-hidden rounded-full bg-surface-subtle">
+                    <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="flex justify-end">
+        {running ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-subtle"
+          >
+            <X className="size-4" />
+            {t("uploadFile.cancelAll")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onNewImport}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+          >
+            <UploadCloud className="size-4" />
+            {t("uploadFile.newImport")}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -242,6 +417,33 @@ function Uploading({
   );
 }
 
+/** Why lines were not imported (Success card, list of files imported together). Stock: unknown
+ *  PIDs; achats / ventes: one line per reason the backend counted. formatNumStr (plain string), not
+ *  formatQty (JSX): these are strings. */
+function skipReasonsOf(t: TFn, progress: UploadProgress, stockResult: UploadStockResult | null): string[] {
+  const reasons: string[] = stockResult
+    ? stockResult.skipped_unknown.length > 0
+      ? [t("uploadFile.skipUnknownPid", { n: formatNumStr(stockResult.skipped_unknown.length) })]
+      : []
+    : [
+        ...(progress.skipped_duplicate
+          ? [t("uploadFile.skipDuplicate", { n: formatNumStr(progress.skipped_duplicate) })]
+          : []),
+        ...(progress.skipped_no_pid ? [t("uploadFile.skipNoPid", { n: formatNumStr(progress.skipped_no_pid) })] : []),
+        ...(progress.skipped_no_medicament
+          ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })]
+          : []),
+        ...(progress.skipped_bad_date
+          ? [t("uploadFile.skipBadDate", { n: formatNumStr(progress.skipped_bad_date) })]
+          : []),
+      ];
+  // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
+  if (reasons.length === 0 && progress.skipped > 0) {
+    reasons.push(t("uploadFile.skipGeneric", { n: formatNumStr(progress.skipped) }));
+  }
+  return reasons;
+}
+
 function Success({
   docType,
   progress,
@@ -259,30 +461,7 @@ function Success({
   const ring = `var(--color-doc-${docType})`;
   const newMeds = progress.new_medicaments;
 
-  // Skip breakdown — stock surfaces unknowns via stockResult.skipped_unknown,
-  // achat/vente use the per-reason counters now populated by the backend.
-  // formatNumStr (plain string) NOT formatQty (returns JSX) — these build string
-  // list items, and interpolating JSX into a template literal yields "[object Object]".
-  const skipReasons: string[] = stockResult
-    ? stockResult.skipped_unknown.length > 0
-      ? [t("uploadFile.skipUnknownPid", { n: formatNumStr(stockResult.skipped_unknown.length) })]
-      : []
-    : [
-        ...(progress.skipped_duplicate
-          ? [t("uploadFile.skipDuplicate", { n: formatNumStr(progress.skipped_duplicate) })]
-          : []),
-        ...(progress.skipped_no_pid ? [t("uploadFile.skipNoPid", { n: formatNumStr(progress.skipped_no_pid) })] : []),
-        ...(progress.skipped_no_medicament
-          ? [t("uploadFile.skipNoMed", { n: formatNumStr(progress.skipped_no_medicament) })]
-          : []),
-        ...(progress.skipped_bad_date
-          ? [t("uploadFile.skipBadDate", { n: formatNumStr(progress.skipped_bad_date) })]
-          : []),
-      ];
-  // Defensive fallback: total skipped > 0 but no per-reason data (shouldn't happen).
-  if (skipReasons.length === 0 && progress.skipped > 0) {
-    skipReasons.push(t("uploadFile.skipGeneric", { n: formatNumStr(progress.skipped) }));
-  }
+  const skipReasons = skipReasonsOf(t, progress, stockResult);
 
   return (
     <div
@@ -706,7 +885,11 @@ export default function UploadFilePage() {
   const typeFromUrl = parseTypeParam(searchParams.get("type"));
 
   const {
-    acceptFile,
+    acceptFiles,
+    batchJobs,
+    cancelBatch,
+    picked,
+    startImportAll,
     pickType,
     backToType,
     cancel,
@@ -834,7 +1017,8 @@ export default function UploadFilePage() {
           <DropZone
             docType={docType}
             example={examples[docType]}
-            onAccept={(f) => acceptFile(f, docType!)}
+            multiple={docType !== "stock"}
+            onAccept={(files) => acceptFiles(files, docType!)}
             errorMsg={filenameError}
             onClearError={clearFilenameError}
           />
@@ -851,18 +1035,26 @@ export default function UploadFilePage() {
       */}
       {step === 3 && docType && (
         <section className="flex flex-col gap-4">
-          {(file || phase !== "idle") && (
+          {batchJobs.length === 0 && (file || picked.length > 0 || phase !== "idle") && (
             <button
               type="button"
-              onClick={file ? changeFile : reset}
+              onClick={file || picked.length > 0 ? changeFile : reset}
               className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" />
-              {file ? t("uploadFile.chooseAnother") : t("uploadFile.newImport")}
+              {picked.length > 0
+                ? t("uploadFile.chooseOthers")
+                : file
+                  ? t("uploadFile.chooseAnother")
+                  : t("uploadFile.newImport")}
             </button>
           )}
 
-          {file && phase === "idle" ? (
+          {batchJobs.length > 0 ? (
+            <BatchFiles jobs={batchJobs} onCancel={cancelBatch} onNewImport={reset} />
+          ) : picked.length > 0 ? (
+            <PickedFiles files={picked} onImport={startImportAll} />
+          ) : file && phase === "idle" ? (
             <>
               <PreviewTable
                 headers={headers}

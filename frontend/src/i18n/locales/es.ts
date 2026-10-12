@@ -377,6 +377,9 @@ export const es: Dict = {
     printMovesAllDates: "todas las fechas",
     printMovesSearch: "búsqueda « {{q}} »",
     printMovesLines: "líneas {{first}} a {{last}} de {{total}}",
+    salesHistory: "Historial de ventas (por año)",
+    copyHistory: "Copiar el historial de ventas",
+    noSale: "Ninguna venta para este producto.",
   },
 
   achats: {
@@ -923,6 +926,7 @@ export const es: Dict = {
     typeAchat: "Compras",
     typeVente: "Ventas",
     typeStock: "Stock",
+    moreJobs: "+ {{n}} importación(es) más",
   },
   adminPharm: {
     roleDescOwner: "Gestiona la farmacia y su equipo. Una farmacia puede tener varios.",
@@ -1338,6 +1342,20 @@ export const es: Dict = {
     or: "o",
     browse: "haz clic para explorar",
     csvHint: "CSV exportado desde Sobrus, delimitador « ; »",
+    dropHereMany: "Arrastre uno o varios archivos aquí",
+    oneStockFile: "Un solo archivo de stock a la vez: cada archivo de stock sustituye al anterior.",
+    manyTitle: "{{n}} archivos elegidos",
+    manyTotal: "{{n}} líneas por importar",
+    manyImport: "Importar los {{n}} archivos",
+    manyPeriod: "del {{from}} al {{to}}",
+    manyLines: "{{n}} líneas",
+    manySkipped: "Este archivo no se importará. {{reason}}",
+    chooseOthers: "Elegir otros archivos",
+    batchTitle: "Importación de {{n}} archivos",
+    batchProgress: "{{done}} de {{n}} terminado(s)",
+    batchQueued: "En espera",
+    batchRunning: "En curso · {{pct}} %",
+    cancelAll: "Cancelar las importaciones restantes",
   },
   store: {
     claimedOpenEditor: "Solicitud asignada — ya puedes abrir el editor.",

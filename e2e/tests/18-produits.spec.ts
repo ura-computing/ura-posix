@@ -102,6 +102,8 @@ async function openSheet(page: Page, pid: string): Promise<{ id: number; sheet: 
   return { id, sheet: await sheet, stats: await stats };
 }
 
+/** Short month names as the year table prints them (utils « Janv. » without its dot). */
+const MONTHS_SHORT = ["Janv", "Févr", "Mars", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
 const MONTHS = [
   "Janvier",
   "Février",
@@ -826,6 +828,27 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     });
   }
 
+  // « Historique des ventes (par année) »: every year with a sale (newest first), units per month.
+  const history: Row[] = e.history;
+  const years = section(page, "Historique des ventes (par année)").locator("table");
+  if (history.length === 0)
+    await expect(section(page, "Historique des ventes (par année)")).toContainText("Aucune vente");
+  else {
+    expect((await columnTexts(page, "Année", years)).map(Number), "années").toEqual(history.map((y) => y.year));
+    for (const [m, label] of MONTHS_SHORT.entries()) {
+      const shown = (await columnTexts(page, label, years)).map((x) => frNumber(x) ?? 0);
+      expect(shown, `historique ${label}`).toEqual(history.map((y) => y.sold[m]));
+    }
+    expect(
+      (await columnTexts(page, "Total", years)).map((x) => frNumber(x) ?? 0),
+      "total par année",
+    ).toEqual(history.map((y) => y.total));
+    const ca = (await columnTexts(page, "CA (MAD)", years)).map(frNumber);
+    ca.forEach((v, i) =>
+      expect(Math.abs((v ?? NaN) - history[i].ca), `CA ${history[i].year}`).toBeLessThanOrEqual(0.011),
+    );
+  }
+
   // « Tendances »: the same % as the quantities, one dot per day / week / month (value on hover).
   const trend: Row[] = e.trend;
   for (const [label, key] of [
@@ -928,6 +951,19 @@ test("fiche produit: Statistiques, chaque période + Personnalisé, « Copier »
     );
     const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-");
     expect(copied.split("\n"), "presse-papiers").toEqual(lines);
+
+    // « Historique des ventes (par année) » copied the same way.
+    await section(page, "Historique des ventes (par année)")
+      .getByRole("button", { name: "Copier l'historique des ventes", exact: true })
+      .click();
+    const yearLines = [["Année", ...MONTHS_SHORT, "Total", "CA (MAD)"].join("\t")].concat(
+      (e.history as Row[]).map((y) =>
+        [String(y.year), ...y.sold.map((n: number) => excel(n, 0)), excel(y.total, 0), excel(y.ca, 2)].join("\t"),
+      ),
+    );
+    await expect
+      .poll(async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-").split("\n"))
+      .toEqual(yearLines);
   });
 });
 

@@ -64,6 +64,11 @@ export interface UploadJob {
    *  countdown. Distinct from createdAt because the queue can stall a job
    *  for arbitrary minutes before it runs. */
   successAt: number | null;
+  /** One of several files imported together: kept until the wizard's « Nouvel import », so its
+   *  list of files keeps every result; its corner card still hides 4 s after success (`hidden`). */
+  keep: boolean;
+  /** Corner card hidden (a kept job that succeeded); the wizard's list still shows it. */
+  hidden: boolean;
 }
 
 interface UploadCtxValue {
@@ -73,7 +78,7 @@ interface UploadCtxValue {
   /** Add a job to the queue tail. Returns the new job's id. Runner wakes up
    *  automatically. Same file twice → two separate jobs (backend dedup handles
    *  the actual duplicate detection). */
-  enqueueUpload: (docType: DocType, rows: Record<string, string>[], filename: string) => string;
+  enqueueUpload: (docType: DocType, rows: Record<string, string>[], filename: string, keep?: boolean) => string;
 
   /** Cancel a job by id. Queued → immediate flip to cancelled. Running →
    *  request cancel + the chunked loop catches it between chunks and PATCHes
@@ -291,7 +296,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const newId = (): string => `up_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
   const enqueueUpload = useCallback<UploadCtxValue["enqueueUpload"]>(
-    (docType, rows, filename) => {
+    (docType, rows, filename, keep = false) => {
       const id = newId();
       const job: UploadJob = {
         id,
@@ -305,6 +310,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         stockResult: null,
         createdAt: Date.now(),
         successAt: null,
+        keep,
+        hidden: false,
       };
       upsertJob(job);
       // No explicit wake — the runner-wake effect picks up the jobs change
@@ -353,12 +360,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     for (const job of jobs.values()) {
-      if (job.phase !== "success" || job.successAt == null) continue;
+      if (job.phase !== "success" || job.successAt == null || job.hidden) continue;
       if (dismissTimersRef.current.has(job.id)) continue;
       const remaining = Math.max(0, AUTO_DISMISS_MS - (Date.now() - job.successAt));
       const t = window.setTimeout(() => {
         dismissTimersRef.current.delete(job.id);
-        dismissJob(job.id);
+        // A kept job only leaves the corner; the wizard's list of files still shows it.
+        if (job.keep) patchJob(job.id, { hidden: true });
+        else dismissJob(job.id);
       }, remaining);
       dismissTimersRef.current.set(job.id, t);
     }
@@ -369,7 +378,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         dismissTimersRef.current.delete(id);
       }
     }
-  }, [jobs, dismissJob]);
+  }, [jobs, dismissJob, patchJob]);
 
   // ── Memoize the list view + provide ─────────────────────────────────────
 
