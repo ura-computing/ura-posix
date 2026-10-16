@@ -585,6 +585,22 @@ class Oracle:
                      for m in keep[(page - 1) * 20:page * 20]],
         }
 
+    def traced_product(self, rows: list[dict], by_pid: dict):
+        """The product of the « Traçabilité » scenarios: the first row of the list (the best seller
+        with big files) with a purchase, a sale to a named client and a 2nd page (more than 20 lines).
+        Small files (1 000 lines): the best seller may have no purchase."""
+        buys, sales, named = defaultdict(int), defaultdict(int), set()
+        for a in self.achats:
+            buys[a.p.pid] += 1
+        for v in self.ventes:
+            sales[v.p.pid] += 1
+            if v.client:
+                named.add(v.p.pid)
+        pid = next((r["pid"] for r in rows
+                    if buys[r["pid"]] and r["pid"] in named and buys[r["pid"]] + sales[r["pid"]] > 20),
+                   None) or next(r["pid"] for r in rows if buys[r["pid"]] and r["pid"] in named)
+        return by_pid[pid]
+
     def movements_scenarios(self, p) -> dict:
         """18-produits « Traçabilité » tab, best-selling product: no filter (pages 1 + 2), sorted by
         type, Achats, Ventes over the test window, search = the client of its latest sale with a client.
@@ -641,7 +657,7 @@ class Oracle:
             # Statistiques: every period button, for every product the test opens.
             "stats": {pid: {k: self.product_stats(by_pid[pid], *r) for k, r in self.stats_periods().items()}
                       for pid in self.sheet_pids(rows, infos)},
-            "movements": self.movements_scenarios(by_pid[rows[0]["pid"]]),
+            "movements": self.movements_scenarios(self.traced_product(rows, by_pid)),
             "search": {q: [r["pid"] for r in rows if all(product_match(by_pid[r["pid"]], t) for t in tokenize(q))]
                        for q in PRODUCT_QUERIES},
         }

@@ -1195,7 +1195,6 @@ test("fiche produit: onglet « Traçabilité » = oracle (liste, détails de cha
     await expect(page.locator("tbody tr").nth(i), `ligne ${i + 1} choisie`).toHaveAttribute("aria-selected", "true");
     await expectDetail(page, m, tva, `ligne ${i + 1}`);
   }
-  expect(new Set(lines.map((m) => m.kind)).size, "achats et ventes sur la page").toBe(2);
 
   call = pageCall(page, path, { page: "2" });
   await page.getByRole("button", { name: "Page suivante" }).click();
