@@ -8,7 +8,7 @@ import { AsyncButton } from "@/_components/AsyncButton";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { useT } from "@/i18n/I18nProvider";
 
-import { useBarcodeLookup } from "../hooks";
+import { useBarcodeLookup } from "./barcodeLookup";
 
 function ScanForm({ onClose }: { onClose: () => void }) {
   const t = useT();

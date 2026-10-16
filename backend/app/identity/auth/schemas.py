@@ -95,7 +95,8 @@ class UserOut(BaseModel):
     name: str | None
     phone: str | None
     role: Literal["admin", "owner", "employee", "developer"]
-    status: MemberStatus
+    # `pending` = signed up, not accepted yet (no pharmacy, empty menu).
+    status: MemberStatus | Literal["pending"]
     pharmacy_id: int | None
     last_login_at: datetime | None
 

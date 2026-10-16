@@ -21,7 +21,7 @@ import {
   type ProductSheet,
   type ProductStats,
 } from "@/types";
-import { dayAfter, daysAgo, monthsAgo, todayIso } from "@/utils/dateRange";
+import { daysAgo, todayIso } from "@/utils/dateRange";
 
 export const SHEET_TABS = ["general", "stats", "movements", "codes"] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
@@ -61,38 +61,19 @@ export function useProduitPage(id: number) {
 
 // ── Statistiques ────────────────────────────────────────────────────────────
 
-export const STATS_PERIODS = ["7d", "30d", "3m", "12m", "custom"] as const;
-export type StatsPeriod = (typeof STATS_PERIODS)[number];
 export interface StatsRange {
   from: string | null;
   to: string | null;
 }
 
-/** A period button → its dates: the last 7 / 30 days or 3 / 12 months, today included
- *  (« 3 mois » on 08/10/2026 = 09/07/2026 → 08/10/2026). */
-function presetRange(period: Exclude<StatsPeriod, "custom">): StatsRange {
-  const to = todayIso();
-  if (period === "7d") return { from: daysAgo(6), to };
-  if (period === "30d") return { from: daysAgo(29), to };
-  return { from: dayAfter(monthsAgo(period === "3m" ? 3 : 12)), to };
-}
-
-/** The Statistiques period (buttons on the tab row): 30 days first; « Personnalisé » starts from
- *  the dates shown, then the two date fields change it. Kept while switching tabs. */
-export function useStatsPeriod() {
-  const [period, setPeriodState] = useState<StatsPeriod>("30d");
-  const [custom, setCustom] = useState<StatsRange>(() => presetRange("30d"));
-  const range = period === "custom" ? custom : presetRange(period);
-  const setPeriod = (next: StatsPeriod) => {
-    if (next === "custom" && period !== "custom") setCustom(range);
-    setPeriodState(next);
-  };
-  const setCustomRange = (from: string | null, to: string | null) => setCustom({ from, to });
+/** The Statistiques dates (the Ventes date picker, on the tab row): the last 30 days first, today
+ *  included; kept while switching tabs. Its own: the Ventes / Achats dates do not move. */
+export function useStatsRange() {
+  const [range, setRangeState] = useState<StatsRange>(() => ({ from: daysAgo(29), to: todayIso() }));
+  const setRange = (from: string | null, to: string | null) => setRangeState({ from, to });
   return {
-    period,
-    setPeriod,
     range,
-    setCustomRange,
+    setRange,
   };
 }
 
@@ -113,16 +94,17 @@ export function useProductStats(id: number, { from, to }: StatsRange, enabled: b
 
 const DEFAULT_MOVES: Omit<MovementsFilters, "date_from" | "date_to"> = {
   page: 1,
-  limit: 10,
+  limit: 20,
   search: "",
   kind: "all",
+  order: "date",
   sort_by: null,
   sort_order: "desc",
 };
 
-/** « Mouvements »: one product's purchase / sale lines, filtered (type, period shared with the
- *  other pages, search), 10 per page. « Voir détail » opens the whole ticket (Ventes) or BL
- *  (Achats): every period, that number only. */
+/** « Traçabilité »: one product's purchase / sale lines, filtered (type, period shared with the
+ *  other pages, search), sorted by date or by type, 20 per page. « Voir tout le ticket / BL »
+ *  opens it in Ventes / Achats: every period, that number only. */
 export function useMovements(id: number) {
   const navigate = useNavigate();
   const { me } = useMe();
@@ -134,12 +116,12 @@ export function useMovements(id: number) {
     queryKey: API.products.movements.key(id, filters),
     queryFn: () =>
       api.get<ProductMovementsResponse>(API.products.movements.url(id), {
-        // No sort: always newest first.
         params: {
           date_from: from,
           date_to: to,
           kind: filters.kind,
           search: filters.search,
+          order: filters.order,
           page: filters.page,
           limit: filters.limit,
         },
@@ -149,6 +131,7 @@ export function useMovements(id: number) {
   // Every filter change goes back to page 1 (`patch`); the period is shared between pages.
   const setSearch = (search: string) => patch({ search });
   const setKind = (kind: MovementsFilters["kind"]) => patch({ kind });
+  const setOrder = (order: MovementsFilters["order"]) => patch({ order });
   const reset = () => {
     resetLocal();
     setRange(null, null);
@@ -166,6 +149,7 @@ export function useMovements(id: number) {
     filters,
     setSearch,
     setKind,
+    setOrder,
     setDateRange: setRange,
     setPage,
     setPageSize,
@@ -178,43 +162,10 @@ export function useMovements(id: number) {
   };
 }
 
-// ── Codes ───────────────────────────────────────────────────────────────────
-
-/** « Scanner / Rechercher un code barre »: a PID or barcode (typed, or a USB scanner = digits +
- *  Entrée) → that product's sheet. Resolves false when no product of the pharmacy has it, null
- *  when the search failed (error toast). */
-export function useBarcodeLookup() {
-  const t = useT();
-  const navigate = useNavigate();
-  const [isSearching, setSearching] = useState(false);
-  const lookup = async (raw: string): Promise<boolean | null> => {
-    const code = raw.trim();
-    if (!code) return false;
-    setSearching(true);
-    try {
-      // Called directly, not through the query cache: « no product » is an answer shown in the
-      // dialog, not an error toast.
-      const { id } = await api.get<{ id: number }>(API.products.lookup.url, { params: { code } });
-      navigate(ROUTES.PRODUIT.replace(":id", String(id)));
-      return true;
-    } catch (e) {
-      if (e instanceof ApiErr && e.status === 404) return false;
-      toast.error(e instanceof ApiErr ? e.detail : t("toast.genericError"));
-      return null;
-    } finally {
-      setSearching(false);
-    }
-  };
-  return {
-    lookup,
-    isSearching,
-  };
-}
-
 // ── « Modifier » (owner) ────────────────────────────────────────────────────
 
-// The values the page shows and the owner can change (PPH, zone, péremption and description
-// are no longer on the page: their edits stay as they are).
+// The values the page shows and the owner can change (PPH and description are no longer on the
+// page: their edits stay as they are).
 const EDIT_FIELDS = [
   "product",
   "laboratoire",
@@ -224,6 +175,8 @@ const EDIT_FIELDS = [
   "current_stock",
   "stock_min",
   "stock_max",
+  "zone",
+  "expiry_date",
   "barcode1",
   "barcode2",
 ] as const satisfies readonly EditField[];
@@ -233,6 +186,17 @@ export type EditValues = Record<FormField, string>;
 const INTEGERS: FormField[] = ["current_stock", "stock_min", "stock_max"];
 
 const decimal = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+/** « 2027-03-31 » ⇄ « 31/03/2027 » (the date typed in the form). */
+const isoToTyped = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
+const TYPED_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+function typedToIso(typed: string): string | null {
+  const m = TYPED_DATE.exec(typed.trim());
+  if (!m) return null;
+  const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(y, mo - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo - 1 || date.getDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
 
 /** The form starts from what the sheet shows (edited or imported). */
 function toForm(s: ProductSheet): EditValues {
@@ -245,6 +209,8 @@ function toForm(s: ProductSheet): EditValues {
     current_stock: s.stock.current_stock == null ? "" : String(s.stock.current_stock),
     stock_min: String(s.stock.stock_min),
     stock_max: String(s.stock.stock_max),
+    zone: s.stock.zone ?? "",
+    expiry_date: isoToTyped(s.stock.expiry_date),
     barcode1: s.barcode1 ?? "",
     barcode2: s.barcode2 ?? "",
   };
@@ -255,6 +221,7 @@ function toApi(field: FormField, raw: string): string | number | null {
   const v = raw.trim();
   if (!v) return null;
   if (field === "ppv") return Number(v.replace(/\s/g, "").replace(",", "."));
+  if (field === "expiry_date") return typedToIso(v);
   if (INTEGERS.includes(field)) return Number(v.replace(/\s/g, ""));
   return v;
 }
@@ -273,6 +240,7 @@ function editSchema(t: TFn) {
       current_stock: count(true),
       stock_min: count(false),
       stock_max: count(false),
+      expiry_date: z.string().refine((v) => !v.trim() || typedToIso(v) != null, t("products.invalidDate")),
     })
     .refine((v) => !v.stock_min.trim() || !v.stock_max.trim() || Number(v.stock_min) <= Number(v.stock_max), {
       path: ["stock_min"],

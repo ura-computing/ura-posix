@@ -65,18 +65,3 @@ export function barcodeBars(code: string): { width: number; bars: { x: number; w
   const bars = [...modules.matchAll(/1+/g)].map((m) => ({ x: m.index, w: m[0].length }));
   return { width: modules.length, bars };
 }
-
-/** « EAN-13 » / « UPC-A » / « EAN-8 » when the length and the check digit (last digit) fit;
- *  null = another kind of code (« Autre »). `barcodeFormat("3400930003917")` → "EAN-13". */
-export function barcodeFormat(code: string): "EAN-13" | "UPC-A" | "EAN-8" | null {
-  const text = code.trim();
-  if (!/^(\d{8}|\d{12}|\d{13})$/.test(text)) return null;
-  const digits = [...text].map(Number);
-  // From the right, before the check digit: × 3, × 1, × 3…
-  const sum = digits
-    .slice(0, -1)
-    .reverse()
-    .reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0);
-  if ((10 - (sum % 10)) % 10 !== digits[digits.length - 1]) return null;
-  return text.length === 13 ? "EAN-13" : text.length === 12 ? "UPC-A" : "EAN-8";
-}

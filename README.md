@@ -67,7 +67,7 @@ is in `PLAN.md` « Later »).
 | `/ventes` | Sales ledger + « à surveiller » tabs | `ventes` |
 | `/stock` | ABCD rotation + péremptions (expiry) | `stock` |
 | `/produits` | Every product of the pharmacy (stock file, sold or bought): photo, stock, sold 12 months, PPV, marge; search, Mixte / Pharmacie / Parapharmacie, sort, Excel | `produits` |
-| `/produits/:id` | Product sheet: header (photo, PID · catégorie · TVA, type + stock badges, code barre drawn + copy, « Imprimer »), tabs Général · Statistiques (period) · Mouvements (« Voir détail ») · Codes (scanner) (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
+| `/produits/:id` | Product sheet: header (big « Retour à la liste des produits » + breadcrumb, photo, PID · catégorie · TVA, type + stock badges, big « Emplacement » card, code barre drawn + copy), tabs Général · Statistiques (period) · Traçabilité (list + details of a line) · Codes (scanner) (`?tab=`); the owner can change its values for his pharmacy ([§7.8](#78-produits-list--product-sheet)) | `produits` |
 | `/analyses` | Analyse de marge: produit, catégorie, laboratoire, grossiste, client, mois, année, liste | `analyse` |
 | `/alertes` | Margin alerts, ventes sans achat, stock and expiry alerts | `alertes` |
 | `/comptabilite` | Accounting KPIs (exclusions applied), payment methods per month, sales journal | `accounting` |
@@ -149,7 +149,7 @@ apcm-pharma/
 │   ├── app/                   all code, one folder per business area (§5.1)
 │   ├── scripts/               bootstrap.py (schema), seed.py + seed.json, load_product_infos.py, one-time legacy migration
 │   ├── data/product_infos.json  photos + descriptions scraped from parapharmacy shops (loaded at every start)
-│   ├── alembic/versions/      migrations 0001 → 0027 (head)
+│   ├── alembic/versions/      migrations 0001 → 0028 (head)
 │   ├── entrypoint.sh          container boot (§9)
 │   ├── Dockerfile · .env.example
 │   └── pyproject.toml         deps + ruff (line-length 120)
@@ -299,7 +299,7 @@ erDiagram
 | `pharmacies` | name, city, code (`CAS0001`, from the city), address, phone, email, `archived_at` |
 | `users` | email, name, role, status (`active` / `inactive`), `pharmacy_id`, `token_version`, hashed reset token |
 | `sessions` | one row per logged-in device |
-| `signup_requests` | « Créer un compte » waiting for the admin (`pending` / `accepted` / `refused`), kept out of `users` so nobody logs in before « Accepter » |
+| `signup_requests` | « Créer un compte » waiting for the admin (`pending` / `accepted` / `refused`); `user_id` = its account (`users.status = 'pending'` until « Accepter ») |
 | `medicaments` | **one global catalogue**: `pid` (Sobrus id, unique), product, tva, pph, ppv, category, zone, barcodes, laboratoire, `product_type` |
 | `import_batches` | one row per imported file: type, counts, status, `last_chunk_at`, creator, soft delete |
 | `achats` | purchase lines: `delivery_date`, `delivery_ref` (BL), supplier, quantity, unit_price (PU), total, expiry, `created_at_source` |
@@ -357,16 +357,19 @@ code → name + phone → email → password twice), then the admin decides:
 
 ```mermaid
 flowchart LR
-  F["/auth/signup<br/>5 screens"] -- "POST /v1/auth/signup<br/>always « Demande envoyée »" --> R[("signup_requests<br/>pending")]
+  F["/auth/signup<br/>5 screens"] -- "POST /v1/auth/signup<br/>always « Demande envoyée »" --> R[("signup_requests<br/>+ users status pending")]
   R --> A{"Admin › Pharmacies et utilisateurs<br/>› Demandes (N)"}
-  A -- "Accepter" --> C["new pharmacy (code from the city: Tanger → TAN0001)<br/>or the pharmacy of the typed code<br/>+ the account, every feature ON"]
-  A -- "Refuser" --> X["nothing created"]
+  A -- "Accepter" --> C["new pharmacy (code from the city: Tanger → TAN0001)<br/>or the pharmacy of the typed code<br/>account active, every feature ON"]
+  A -- "Refuser" --> X["pending account deleted"]
   C --> M1["email « Votre compte est prêt »"]
   X --> M2["email « demande non acceptée »"]
 ```
 
 - Owner: a new pharmacy (name + city) or an existing one (its code). Employee: always a code.
 - « Accepter » is greyed out, with the reason, when the email already has an account or no pharmacy has the code.
+- Before « Accepter » the person logs in: no pharmacy, no menu entry, every page = the 404 inside the layout with
+  « Votre compte attend l'accord de l'administrateur ». Not in « Utilisateurs » (only in « Demandes »). An email
+  that already has an account gets no second one (its login stays « Email ou mot de passe incorrect »).
 
 ### 5.6 Routers (all under `/v1`)
 | File | Main routes | Guard |
@@ -429,9 +432,10 @@ stateDiagram-v2
 - `scripts/bootstrap.py` (`make migrate` + container start): `CREATE EXTENSION pg_trgm, unaccent` →
   `immutable_unaccent()` (schema-qualified) + self-check under `search_path = pg_catalog, pg_temp` →
   fresh DB: `create_all` + `alembic stamp head`; managed DB: `alembic upgrade head`.
-- Head **0027** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
+- Head **0028** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
   0022: emails stored trimmed + lower case; 0023: `signup_requests`; 0024: feature `produits` ON for
-  everyone; 0025: `product_infos`; 0026: `pharmacy_stock.import_batch_id`; 0027: `pharmacy_product_edits`).
+  everyone; 0025: `product_infos`; 0026: `pharmacy_stock.import_batch_id`; 0027: `pharmacy_product_edits`;
+  0028: waiting sign-ups get their `pending` account).
 - A new column needs **both** the model change and a migration (fresh DBs use `create_all`).
 
 ---
@@ -567,15 +571,15 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 | Marge | (1 − average PU / PPV) × 100, every purchase of the pharmacy, with the PPV shown |
 | Photo (header, list) | the `product_infos` row with the same PID, else the same barcode (1 or 2), matched when shown: a product imported later finds its photo. Dead photo address → box icon |
 | Header badges | Pharmacie / Parapharmacie; stock: « En stock » (> 0), « Rupture » (≤ 0), « Hors stock » (not in the stock file). Catégorie / TVA without their rate: « Médicament (33.930%) » → « Médicament », « TVA (20.00%) » → « 20,00 % » |
-| Général | PPV, prix d'achat moyen, dernier prix d'achat, marge brute (PPV − prix d'achat moyen), marge %; stock; ventes / achats 30 jours (today + the 29 before) and « Performance » = % vs the 30 days before; 5 latest lines |
-| Statistiques: period | 7 jours · 30 jours · 3 mois · 12 mois (today included: « 3 mois » on 08/10/2026 = 09/07 → 08/10) · Personnalisé. Each % = vs the same number of days just before |
-| Statistiques: figures | quantités vendues / achetées, CA = Σ qty × PPV, marge générée = CA − quantité vendue × prix d'achat moyen, transactions = distinct tickets. « Tendances »: a point a day (≤ 31 days), a week (≤ 92), else a month. Top 3 suppliers of the period + « Autres »; each supplier's latest priced purchase (5) |
-| Historique des ventes (par année) | every year with a sale, newest first: units sold each month, total, CA; « Copier » (Excel); not tied to the period |
+| Général | PPV, prix d'achat moyen, dernier prix d'achat, marge brute (PPV − prix d'achat moyen), marge %; stock + « Emplacement » (file « Zone »: PLACARD 2…; also big in the header, every tab) + « Date de péremption » with « Périmé » / « Moins de 30 jours » (red) / « Moins de 90 jours » (orange); « Traçabilité récente » (5 latest lines); « Performance » = ventes / achats over the Statistiques dates (same picker on Général, last 30 days first) + % vs the same number of days just before |
+| Statistiques: period | the Ventes date picker (2 date fields, calendar, « Périodes rapides »); opens on the last 30 days (today included); also on Général (« Performance » follows), its own dates (Ventes / Achats keep theirs). Each % = vs the same number of days just before |
+| Statistiques: figures | quantités vendues / achetées, CA = Σ qty × PPV, marge générée = CA − quantité vendue × prix d'achat moyen, transactions = distinct tickets. Top 3 suppliers of the period + « Autres »; the 5 latest prices (each supplier's latest priced purchase); « Voir tout (N) » = the whole list in a window (prices with their date) |
+| Historique (par année) | « Ventes · Achats »: every year with a sale (a purchase), newest first: units each month, total, CA (sales) or « Montant » = Σ line totals (purchases); « Copier » (Excel); not tied to the period |
 | Statistiques: 12 months | 3 charts (ventes bars, achats bars, ventes vs achats: solid lines, one color each) + « Détail mensuel » (« Copier » → Excel), always this month and the 11 before |
-| Mouvements | purchase (+) and sale (−) lines, newest day first (same day: sales, then purchases), 10 a page; remise = the sale's (purchase: —); TVA = the product's |
-| « Voir détail » | opens Ventes (`?ref=` ticket) or Achats (`?ref=` BL): every line of that exact number, period removed, a filter chip to remove it. Disabled without the Ventes / Achats permission |
-| « Imprimer » | the header + the open tab (its name as a title), A4 landscape, light theme; no menu, buttons, tabs or fields. Everyone; disabled while editing |
-| Codes | PID, code barre 1 / 2 + « Copier »; format EAN-13 / UPC-A / EAN-8 when the length and check digit fit, else « Autre ». « Scanner / Rechercher un code barre »: a USB reader (code + Entrée) or typing → the pharmacy's product with that exact PID / barcode (the owner's barcodes too), else « Aucun produit » |
+| Traçabilité | like a pharmacy « Rastro »: list (type, date, heure, quantité) + « Détails de la ligne » of the clicked one (the first by default). Purchase: fournisseur, N° de BL, date du BL, « Créée le » (date + hour), PU, total, lot expiry, stock min / max of the file; sale: N° de transaction, client, PU, remise, TVA (the product's), total; both: imported on / by / file. « Heure » = « Créée le » when it is the BL's day (sales: day only in Sobrus). Sort « Par date » (newest day first; same day: sales, then purchases) or « Par type » (purchases, then sales); 20 a page |
+| « Voir tout le ticket / BL » | opens Ventes (`?ref=` ticket) or Achats (`?ref=` BL): every line of that exact number, period removed, a filter chip to remove it. Disabled without the Ventes / Achats permission (with the reason) |
+| Codes | PID, code barre 1 / 2 + « Copier », barcode 1 drawn. « Scanner / Rechercher un code barre » (also on the list): a USB reader (code + Entrée) or typing → the pharmacy's product with that exact PID / barcode (the owner's barcodes too), else « Aucun produit » |
+| List search + reader | code + Entrée in the search field: exactly a barcode / PID → that sheet; else the list stays filtered by the text |
 
 **Owner edits (« Modifier » → « Enregistrer », `PUT /products/{id}`)**
 
@@ -588,8 +592,9 @@ flowchart LR
 ```
 
 - Editable on the page (« Modifier », or « Éditer » of Stock / Informations générales, same edit mode):
-  name, category (its text), lab, TVA, PPV, stock, min, max, barcodes 1 / 2. The API also takes PPH,
-  expiry, zone, description (no longer on the page). **Not** the type pharmacie / parapharmacie (refused,
+  name, category (its text), lab, TVA, PPV, stock, min, max, emplacement, date de péremption (« JJ/MM/AAAA »,
+  a date that does not exist is refused), barcodes 1 / 2. The API also takes PPH and description (no
+  longer on the page). **Not** the type pharmacie / parapharmacie (refused,
   422), the PID, computed values.
 - Imports never write the edits: a hand edit stays. The sheet shows « modifié », the imported value and
   « Revenir à la valeur importée » (= the field sent as `null`). Typing the imported value back = not edited.
@@ -653,8 +658,8 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 12-equipe · 13-compte · 14-admin | team, account + passwords + sessions, admin pages and drill-down |
 | 15-imports | history, cancel, delete, delete several at once, interrupted, damaged file, hand-typed dates, 2 imports at once, delete the stock import (its stock goes) + import it again |
 | 16-layout | FR ⇄ ES, theme, sidebar, « Session expirée » |
-| 17-inscription | sign-up (5 screens), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
-| 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos; product sheet of 8 products = oracle on screen (header, badges, barcode copy, Général, Statistiques at 30 days); best seller: every period + Personnalisé, 3 charts + tooltips, « Détail mensuel » + « Copier », Tendances, suppliers; Mouvements (filters, 10 / page, every column), « Voir détail » → the whole ticket / BL; Codes (copy, format, length), scanner (barcode, PID, unknown, Échap); owner edits (every field, « Éditer », wrong values, an import keeps them, « Revenir », lookup by his barcode), type not editable, employee read only + « Voir détail » by permission, feature OFF, 404, Spanish |
+| 17-inscription | sign-up (5 screens), login before « Accepter » (empty menu, 404 + hint), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
+| 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos; product sheet of 8 products = oracle on screen (header, badges, barcode copy, Général, Statistiques at 30 days); best seller: the date picker (quick periods, typed dates), 3 charts + tooltips, « Détail mensuel » + « Copier », Historique ventes / achats, suppliers + prices « Voir tout », no Tendances; Traçabilité (filters, sort, 20 / page, every line's details), « Voir tout le ticket / BL »; emplacement + péremption hints; Codes (copy), scanner (barcode, PID, unknown, Échap), list search + reader; owner edits (every field, « Éditer », wrong values, an import keeps them, « Revenir », lookup by his barcode), type not editable, employee read only + « Voir tout le ticket / BL » by permission, feature OFF, 404, Spanish |
 | 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** |
 
 ### 8.4 When a test fails

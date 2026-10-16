@@ -13,7 +13,7 @@ import { Navigate, Outlet } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
 import NotFoundPage from "@/pages/auth/not-found";
-import { ROLES, ROUTES } from "@/types";
+import { ROLES, ROUTES, STATUSES } from "@/types";
 import type { Feature } from "@/types";
 
 export function RequireFeature({ feature }: { feature: Feature }) {
@@ -21,6 +21,8 @@ export function RequireFeature({ feature }: { feature: Feature }) {
   if (isLoading) return null;
   if (!me) return <Navigate to={ROUTES.LOGIN} replace />;
   if (me.role === ROLES.ADMIN) return <Outlet />;
-  if (!me.permissions.includes(feature)) return <NotFoundPage embedded />;
+  if (!me.permissions.includes(feature)) {
+    return <NotFoundPage embedded pending={me.status === STATUSES.PENDING} />;
+  }
   return <Outlet />;
 }

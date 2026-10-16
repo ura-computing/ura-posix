@@ -1,5 +1,7 @@
-/** « Général »: prices + marge, stock (Stock page rules), ventes / achats 30 jours,
- *  informations générales, the 5 latest purchases / sales, performance vs the 30 days before. */
+/** « Général »: prices + marge, stock (Stock page rules) + emplacement + date de péremption (with
+ *  « Périmé » / « Moins de 30 / 90 jours », the Alertes thresholds), informations générales, the
+ *  5 latest purchases / sales, « Performance » = ventes / achats over the Statistiques dates (picker on
+ *  the tab row, last 30 days first) + % vs the same number of days just before. */
 import { useContext, type ReactNode } from "react";
 import {
   ArrowDownToLine,
@@ -7,8 +9,10 @@ import {
   ArrowUpToLine,
   BarChart3,
   Boxes,
+  CalendarClock,
   Clock,
   FileText,
+  MapPin,
   Package,
   Pencil,
   ShoppingCart,
@@ -17,12 +21,13 @@ import {
 import { Button } from "@/_components/button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
-import type { ProductMovement, ProductSheet } from "@/types";
+import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
+import { todayIso } from "@/utils/dateRange";
 import { formatDate, formatMAD, formatPct, formatQty, pctChange } from "@/utils/format";
 
-import type { FormField } from "../hooks";
+import type { FormField, StatsRange } from "../hooks";
 import { Editable, type EditKind } from "./Editable";
 import { SheetEditContext } from "./editContext";
 import { KindBadge } from "./KindBadge";
@@ -74,17 +79,20 @@ function EditBlockButton() {
   );
 }
 
-/** One of the 3 stock figures: icon, label, value (an input in edit mode). */
+/** One stock figure: icon, label, big value (an input in edit mode). Numbers in mono; the
+ *  emplacement / date in plain big text. */
 function StockFigure({
   field,
   label,
   icon,
   value,
+  kind = "int",
 }: {
   field: FormField;
   label: string;
   icon: ReactNode;
   value: ReactNode;
+  kind?: EditKind;
 }) {
   return (
     <div className="flex items-start gap-3 px-4 first:pl-0">
@@ -93,8 +101,8 @@ function StockFigure({
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         <dt className="text-sm text-muted-foreground">{label}</dt>
-        <dd className="font-mono text-2xl font-bold text-foreground">
-          <Editable field={field} kind="int" label={label}>
+        <dd className={cn("font-bold text-foreground", kind === "int" ? "font-mono text-2xl" : "text-xl break-words")}>
+          <Editable field={field} kind={kind} label={label}>
             {value}
           </Editable>
         </dd>
@@ -103,16 +111,36 @@ function StockFigure({
   );
 }
 
+/** Next to the expiry date: « Périmé » (past), « Moins de 30 jours » (red), « Moins de 90 jours »
+ *  (orange); nothing further away. */
+function ExpiryHint({ iso }: { iso: string }) {
+  const t = useT();
+  const days = Math.round((Date.parse(`${iso}T00:00:00`) - Date.parse(`${todayIso()}T00:00:00`)) / 86_400_000);
+  if (days >= 90) return null;
+  const [label, tone] =
+    days < 0
+      ? [t("products.expired"), "border-error/30 bg-error-subtle text-error-subtle-foreground"]
+      : days < 30
+        ? [t("products.expiresIn30"), "border-error/30 bg-error-subtle text-error-subtle-foreground"]
+        : [t("products.expiresIn90"), "border-warning-border bg-warning-subtle text-warning-subtle-foreground"];
+  return <span className={cn("rounded-md border px-2 py-0.5 text-xs font-semibold", tone)}>{label}</span>;
+}
+
 export function GeneralTab({
   sheet,
+  stats,
+  range,
   onShowMovements,
 }: {
   sheet: ProductSheet;
-  /** « Voir tout »: the Mouvements tab. */
+  /** « Performance »: the Statistiques figures of `range` (null while they load). */
+  stats: ProductStats | null;
+  range: StatsRange;
+  /** « Voir tout »: the Traçabilité tab. */
   onShowMovements: () => void;
 }) {
   const t = useT();
-  const { prices, stock, last_30d: last } = sheet;
+  const { prices, stock } = sheet;
   const units = (n: number) => (
     <>
       {formatQty(n)} {t("common.wUnites")}
@@ -128,9 +156,14 @@ export function GeneralTab({
     ),
   });
   const marge = prices.ppv != null && prices.avg_pu != null ? prices.ppv - prices.avg_pu : null;
-  // « Performance »: % vs the 30 days before (none when nothing was sold / bought then).
-  const salesChange = pctChange(last.sold, last.sold_before);
-  const purchasesChange = pctChange(last.bought, last.bought_before);
+  // « Performance »: the period vs the same number of days just before (no % when nothing then).
+  const now = stats?.period;
+  const before = stats?.previous;
+  const salesChange = now && before ? pctChange(now.sold, before.sold) : null;
+  const purchasesChange = now && before ? pctChange(now.bought, before.bought) : null;
+  const vsBefore = stats
+    ? t("products.vsPeriod", { from: formatDate(stats.previous_from), to: formatDate(stats.previous_to) })
+    : undefined;
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -145,7 +178,7 @@ export function GeneralTab({
         <KpiTile label={t("col.margePct")} value={prices.marge_pct != null ? formatPct(prices.marge_pct) : "—"} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2 print:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <div className="flex flex-col gap-4">
           <SheetCard title={t("products.stock")} icon={<Boxes className="size-5" />} actions={<EditBlockButton />}>
             <dl className="grid gap-4 sm:grid-cols-3 sm:gap-0 sm:divide-x sm:divide-border">
@@ -174,6 +207,32 @@ export function GeneralTab({
                 label={t("products.stockMax")}
                 icon={<ArrowUpToLine className="size-5" />}
                 value={formatQty(stock.stock_max)}
+              />
+            </dl>
+            {/* Where the product is (« PLACARD 2 ») and until when: as big as the stock figures. */}
+            <dl className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-border">
+              <StockFigure
+                field="zone"
+                kind="text"
+                label={t("products.location")}
+                icon={<MapPin className="size-5" />}
+                value={stock.zone ?? <span className="text-base font-medium">{missing}</span>}
+              />
+              <StockFigure
+                field="expiry_date"
+                kind="date"
+                label={t("products.expiryDate")}
+                icon={<CalendarClock className="size-5" />}
+                value={
+                  stock.expiry_date ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      {formatDate(stock.expiry_date)}
+                      <ExpiryHint iso={stock.expiry_date} />
+                    </span>
+                  ) : (
+                    <span className="text-base font-medium">{missing}</span>
+                  )
+                }
               />
             </dl>
           </SheetCard>
@@ -210,20 +269,6 @@ export function GeneralTab({
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <KpiTile
-              label={t("products.sales30d")}
-              value={units(last.sold)}
-              icon={<ShoppingCart className="size-5" />}
-            />
-            <KpiTile
-              label={t("products.purchases30d")}
-              value={units(last.bought)}
-              icon={<ShoppingCart className="size-5" />}
-              iconTone="info"
-            />
-          </div>
-
           <SheetCard
             title={t("products.recent")}
             icon={<Clock className="size-5" />}
@@ -244,27 +289,37 @@ export function GeneralTab({
 
           <SheetCard
             title={t("products.performance")}
-            hint={t("products.last30Days")}
+            hint={
+              range.from && range.to
+                ? t("products.periodFromTo", { from: formatDate(range.from), to: formatDate(range.to) })
+                : undefined
+            }
             icon={<BarChart3 className="size-5" />}
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <KpiTile
-                label={t("nav.ventes")}
-                value={units(last.sold)}
-                icon={<ShoppingCart className="size-5" />}
-                iconTone="success"
-                delta={salesChange == null ? null : { value: salesChange }}
-                sub={salesChange == null ? undefined : t("products.vs30Before")}
-              />
-              <KpiTile
-                label={t("nav.achats")}
-                value={units(last.bought)}
-                icon={<ShoppingCart className="size-5" />}
-                iconTone="success"
-                delta={purchasesChange == null ? null : { value: purchasesChange }}
-                sub={purchasesChange == null ? undefined : t("products.vs30Before")}
-              />
-            </div>
+            {!range.from || !range.to ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
+            ) : !now ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <KpiTile
+                  label={t("nav.ventes")}
+                  value={units(now.sold)}
+                  icon={<ShoppingCart className="size-5" />}
+                  iconTone="success"
+                  delta={salesChange == null ? null : { value: salesChange }}
+                  sub={salesChange == null ? undefined : vsBefore}
+                />
+                <KpiTile
+                  label={t("nav.achats")}
+                  value={units(now.bought)}
+                  icon={<ShoppingCart className="size-5" />}
+                  iconTone="success"
+                  delta={purchasesChange == null ? null : { value: purchasesChange }}
+                  sub={purchasesChange == null ? undefined : vsBefore}
+                />
+              </div>
+            )}
           </SheetCard>
         </div>
       </div>

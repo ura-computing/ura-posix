@@ -2,7 +2,7 @@ import { Suspense, useState } from "react";
 import { Navigate, Outlet, useLocation, NavLink, Link, useNavigate } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
-import { ROLES, ROUTES } from "@/types";
+import { ROLES, ROUTES, STATUSES } from "@/types";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -250,7 +250,7 @@ function Header({ onOpenMobile }: HeaderProps) {
   const roleLabel = me ? t(ROLE_KEYS[me.role]) : "";
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-5 print:hidden">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-5">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
@@ -322,6 +322,8 @@ interface SidebarProps {
    *  feature-flag filter on nav items. Admin's bypass is handled inside
    *  visibleGroups; this prop is still required (pass [] for admin). */
   permissions: readonly string[];
+  /** Signed up, not accepted yet: no menu entry (only « Mon compte » + « Déconnexion »). */
+  pending: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
@@ -386,10 +388,10 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
   );
 }
 
-function Sidebar({ role, permissions, collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
+function Sidebar({ role, permissions, pending, collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
   const t = useT();
   const { handleLogout } = useLogout();
-  const groups = visibleGroups(role, permissions);
+  const groups = pending ? [] : visibleGroups(role, permissions);
   const unclassifiedCount = useUnclassifiedCount(role);
 
   /** Lookup: route path → badge number. Currently only the admin Catalogue row
@@ -406,7 +408,7 @@ function Sidebar({ role, permissions, collapsed, onToggleCollapse, mobileOpen, o
           stays clickable. */}
       <div
         className={cn(
-          "fixed inset-0 z-30 bg-black/40 transition-opacity duration-300 ease-out md:hidden print:hidden",
+          "fixed inset-0 z-30 bg-black/40 transition-opacity duration-300 ease-out md:hidden",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onCloseMobile}
@@ -415,7 +417,7 @@ function Sidebar({ role, permissions, collapsed, onToggleCollapse, mobileOpen, o
       <aside
         style={{ willChange: "transform" }}
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card print:hidden",
+          "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card",
           // Mobile: only transform animates (slide). Desktop: width animates on collapse.
           "transition-transform duration-300 ease-out md:transition-[width] md:duration-200",
           "w-[264px] md:static md:h-auto md:min-h-screen md:translate-x-0",
@@ -705,11 +707,11 @@ export function AppLayout() {
   };
 
   return (
-    // Printed (product sheet « Imprimer »): the page only, every page of it (no menus, no scroll box).
-    <div className="flex h-screen bg-background print:block print:h-auto print:bg-transparent">
+    <div className="flex h-screen bg-background">
       <Sidebar
         role={me.role}
         permissions={me.permissions}
+        pending={me.status === STATUSES.PENDING}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
@@ -717,7 +719,7 @@ export function AppLayout() {
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobile={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-auto p-7 print:overflow-visible print:p-0">
+        <main className="flex-1 overflow-auto p-7">
           {/* Pages load on first visit (App.tsx lazy): sidebar + header stay meanwhile. */}
           <Suspense fallback={<PageLoading />}>
             <Outlet />

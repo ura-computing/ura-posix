@@ -1,85 +1,122 @@
-/** « Mouvements »: every purchase (+) and sale (−) line of the product, newest first: type,
- *  period (shared with the other pages), search; 10 per page. « Voir détail » = the whole
- *  ticket (Ventes) or BL (Achats) of that line. */
-import { ExternalLink } from "lucide-react";
+/** « Traçabilité »: every purchase (+) and sale (−) line of the product, like a pharmacy's
+ *  « Rastro »: the list on the left (type, date, hour, quantity), the clicked line's details on
+ *  the right (the first line until one is clicked). Type, period (shared with the other pages),
+ *  search, sort by date or by type; 20 per page. « Voir tout le ticket / BL » opens it in
+ *  Ventes / Achats. */
+import { useState } from "react";
+import { ExternalLink, ListTree } from "lucide-react";
 
 import { Button } from "@/_components/button";
+import { CategorySegment } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
 import type { ProductMovementLine, ProductSheet } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatDate, formatMAD, formatNumStr, formatPct, formatQty } from "@/utils/format";
+import { formatDate, formatDateTime, formatMAD, formatPct, formatQty } from "@/utils/format";
 
 import { useMovements } from "../hooks";
 import { tvaShort } from "../labels";
 import { KindBadge } from "./KindBadge";
+import { FieldList, SheetCard } from "./SheetCard";
 
 const ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 const dash = <span className="text-muted-foreground">—</span>;
 const mad = (n: number | null) => (n != null ? <span className="whitespace-nowrap">{formatMAD(n)}</span> : dash);
+const keyOf = (m: ProductMovementLine) => `${m.kind}-${m.id}`;
 
-// No fixed widths: the columns fit the page (no sideways scroll on a laptop screen).
-const columns = (
-  t: TFn,
-  tva: string | null,
-  canSeeDetail: (kind: ProductMovementLine["kind"]) => boolean,
-  seeDetail: (m: ProductMovementLine) => void,
-): ColumnDef<ProductMovementLine>[] => [
-  { key: "date", label: t("col.date"), sortable: false, render: (m) => formatDate(m.date) },
+function Quantity({ n }: { n: number | null }) {
+  if (n == null) return dash;
+  return (
+    <span className={cn("font-semibold", n > 0 ? "text-success" : "text-error")}>
+      {n > 0 ? "+" : ""}
+      {formatQty(n)}
+    </span>
+  );
+}
+
+const columns = (t: TFn): ColumnDef<ProductMovementLine>[] => [
   { key: "kind", label: t("col.type"), sortable: false, render: (m) => <KindBadge kind={m.kind} /> },
-  { key: "document", label: t("col.reference"), sortable: false, render: (m) => m.document ?? dash },
-  { key: "party", label: t("products.colParty"), sortable: false, render: (m) => m.party ?? dash },
+  { key: "date", label: t("col.date"), sortable: false, render: (m) => formatDate(m.date) },
+  { key: "time", label: t("products.colTime"), sortable: false, render: (m) => m.time ?? dash },
   {
     key: "quantity",
     label: t("products.colQty"),
     align: "right",
     sortable: false,
-    render: (m) =>
-      m.quantity == null ? (
-        dash
-      ) : (
-        <span className={cn("font-semibold", m.quantity > 0 ? "text-success" : "text-error")}>
-          {m.quantity > 0 ? "+" : ""}
-          {formatQty(m.quantity)}
-        </span>
-      ),
-  },
-  {
-    key: "unit_price",
-    label: t("products.colPu"),
-    align: "right",
-    sortable: false,
-    render: (m) => mad(m.unit_price),
-  },
-  {
-    key: "discount",
-    label: t("col.remise"),
-    align: "right",
-    sortable: false,
-    // A purchase has no remise; a sale without one = 0 %.
-    render: (m) => (m.kind === "achat" ? dash : formatPct(m.discount ?? 0)),
-  },
-  { key: "tva", label: t("col.tva"), sortable: false, render: () => (tva ? tvaShort(tva) : dash) },
-  { key: "total", label: t("col.total"), align: "right", sortable: false, render: (m) => mad(m.total) },
-  {
-    key: "action",
-    label: t("products.colAction"),
-    sortable: false,
-    render: (m) => (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => seeDetail(m)}
-        disabled={!m.document || !canSeeDetail(m.kind)}
-        title={t(m.kind === "achat" ? "products.seeBl" : "products.seeTicket", { ref: m.document ?? "" })}
-      >
-        <ExternalLink className="size-3.5" />
-        {t("products.seeDetail")}
-      </Button>
-    ),
+    render: (m) => <Quantity n={m.quantity} />,
   },
 ];
+
+/** « Créée le » of a purchase: « 19/03/2026 17:12 ». */
+const createdAt = (iso: string | null) => (iso ? `${formatDate(iso.slice(0, 10))} ${iso.slice(11, 16)}` : null);
+
+/** The clicked line, field by field (as the file and its import give it). */
+function LineDetail({
+  line,
+  tva,
+  canSeeDetail,
+  seeDetail,
+}: {
+  line: ProductMovementLine;
+  tva: string | null;
+  canSeeDetail: (kind: ProductMovementLine["kind"]) => boolean;
+  seeDetail: (m: ProductMovementLine) => void;
+}) {
+  const t = useT();
+  const text = (v: string | null) => v ?? dash;
+  const imported = [
+    { label: t("products.dImportedAt"), value: line.imported_at ? formatDateTime(line.imported_at) : dash },
+    { label: t("products.dImportedBy"), value: text(line.imported_by) },
+    { label: t("products.dFile"), value: text(line.filename) },
+  ];
+  const fields =
+    line.kind === "achat"
+      ? [
+          { label: t("col.type"), value: <KindBadge kind={line.kind} /> },
+          { label: t("products.dSupplier"), value: text(line.party) },
+          { label: t("products.dBl"), value: text(line.document) },
+          { label: t("products.dBlDate"), value: line.date ? formatDate(line.date) : dash },
+          { label: t("products.dCreatedAt"), value: text(createdAt(line.created_at)) },
+          { label: t("products.dQty"), value: <Quantity n={line.quantity} /> },
+          { label: t("products.colPu"), value: mad(line.unit_price) },
+          { label: t("products.dLineTotal"), value: mad(line.total) },
+          { label: t("products.dLotExpiry"), value: line.expiry_date ? formatDate(line.expiry_date) : dash },
+          { label: t("products.dStockMinFile"), value: line.stock_min != null ? formatQty(line.stock_min) : dash },
+          { label: t("products.dStockMaxFile"), value: line.stock_max != null ? formatQty(line.stock_max) : dash },
+          ...imported,
+        ]
+      : [
+          { label: t("col.type"), value: <KindBadge kind={line.kind} /> },
+          { label: t("products.dTicket"), value: text(line.document) },
+          { label: t("col.date"), value: line.date ? formatDate(line.date) : dash },
+          { label: t("products.dClient"), value: text(line.party) },
+          { label: t("products.dQty"), value: <Quantity n={line.quantity} /> },
+          { label: t("products.colPu"), value: mad(line.unit_price) },
+          { label: t("col.remise"), value: formatPct(line.discount ?? 0) },
+          { label: t("col.tva"), value: tva ? tvaShort(tva) : dash },
+          { label: t("col.total"), value: mad(line.total) },
+          ...imported,
+        ];
+  const allowed = canSeeDetail(line.kind);
+  return (
+    <div className="flex flex-col gap-3">
+      <FieldList fields={fields} />
+      <div className="flex flex-col items-start gap-1">
+        <Button
+          variant="outline"
+          onClick={() => seeDetail(line)}
+          disabled={!line.document || !allowed}
+          title={t(line.kind === "achat" ? "products.seeBl" : "products.seeTicket", { ref: line.document ?? "" })}
+        >
+          <ExternalLink className="size-4" />
+          {t(line.kind === "achat" ? "products.seeWholeBl" : "products.seeWholeTicket")}
+        </Button>
+        {!allowed && <span className="text-xs text-muted-foreground">{t("products.noDetailAccess")}</span>}
+      </div>
+    </div>
+  );
+}
 
 export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
   const t = useT();
@@ -92,16 +129,24 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
     seeDetail,
     setDateRange,
     setKind,
+    setOrder,
     setPage,
     setPageSize,
     setSearch,
     total,
   } = useMovements(sheet.id);
+  // The clicked line; another page / filter without it → its first line.
+  const [picked, setPicked] = useState<string | null>(null);
+  const selected = rows.find((m) => keyOf(m) === picked) ?? rows[0] ?? null;
 
   const kinds = [
     { value: "all" as const, label: t("products.kindAll"), activeBg: ACTIVE },
     { value: "vente" as const, label: t("nav.ventes"), activeBg: ACTIVE },
     { value: "achat" as const, label: t("nav.achats"), activeBg: ACTIVE },
+  ];
+  const orders = [
+    { value: "date" as const, label: t("products.sortByDate"), activeBg: ACTIVE },
+    { value: "kind" as const, label: t("products.sortByKind"), activeBg: ACTIVE },
   ];
   const activeFilters: ActiveFilter[] = [
     filters.search
@@ -128,42 +173,24 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
       : null,
   ].filter(Boolean) as ActiveFilter[];
 
-  // Printed instead of the filter fields: what the lines are (type, period, search, which lines).
-  const first = total === 0 ? 0 : (filters.page - 1) * filters.limit + 1;
-  const printed = [
-    kinds.find((k) => k.value === filters.kind)?.label,
-    filters.date_from || filters.date_to
-      ? t("products.printMovesPeriod", {
-          from: filters.date_from ? formatDate(filters.date_from) : "…",
-          to: filters.date_to ? formatDate(filters.date_to) : "…",
-        })
-      : t("products.printMovesAllDates"),
-    filters.search ? t("products.printMovesSearch", { q: filters.search }) : null,
-    t("products.printMovesLines", {
-      first: formatNumStr(first),
-      last: formatNumStr(first === 0 ? 0 : first + rows.length - 1),
-      total: formatNumStr(total),
-    }),
-  ].filter(Boolean);
-
   return (
     <div className="flex flex-col gap-4">
-      <p className="hidden text-sm text-foreground print:block">{printed.join(" · ")}</p>
-      <div className="print:hidden">
-        <FilterBar
-          search={{ value: filters.search, onChange: setSearch, placeholder: t("products.movementsSearchPh") }}
-          dateRange={{ from: filters.date_from, to: filters.date_to, onChange: setDateRange }}
-          segment={{ value: filters.kind, onChange: setKind, options: kinds }}
-          activeFilters={activeFilters}
-          onResetAll={reset}
-        />
+      <FilterBar
+        search={{ value: filters.search, onChange: setSearch, placeholder: t("products.movementsSearchPh") }}
+        dateRange={{ from: filters.date_from, to: filters.date_to, onChange: setDateRange }}
+        segment={{ value: filters.kind, onChange: setKind, options: kinds }}
+        activeFilters={activeFilters}
+        onResetAll={reset}
+      />
+      <div className="flex items-center gap-3" role="group" aria-label={t("products.sortLabel")}>
+        <span className="text-sm font-medium text-muted-foreground">{t("products.sortLabel")}</span>
+        <CategorySegment value={filters.order} options={orders} onChange={setOrder} />
       </div>
 
-      {/* On paper: no « Action » column (its buttons are not printed). */}
-      <div className="print:[&_td:last-child]:hidden print:[&_th:last-child]:hidden">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <DataTable<ProductMovementLine>
           rows={rows}
-          columns={columns(t, sheet.tva, canSeeDetail, seeDetail)}
+          columns={columns(t)}
           isLoading={isLoading}
           pagination={{
             page: filters.page,
@@ -171,10 +198,20 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
             total,
             onPage: setPage,
             onPageSize: setPageSize,
+            pageSizes: [20, 50, 100],
           }}
           emptyTitle={t("products.noMovement")}
-          rowKey={(_, i) => i}
+          rowKey={keyOf}
+          onRowClick={(m) => setPicked(keyOf(m))}
+          isRowSelected={(m) => selected != null && keyOf(m) === keyOf(selected)}
         />
+        <SheetCard title={t("products.lineDetail")} icon={<ListTree className="size-5" />}>
+          {selected ? (
+            <LineDetail line={selected} tva={sheet.tva} canSeeDetail={canSeeDetail} seeDetail={seeDetail} />
+          ) : (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t("products.pickLine")}</p>
+          )}
+        </SheetCard>
       </div>
     </div>
   );

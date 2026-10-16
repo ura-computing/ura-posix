@@ -1,8 +1,7 @@
-/** Statistiques charts, hand-drawn SVG like Rapport (no chart library):
- *  - `MonthsChart`: the last 12 months across, as bars or as solid lines (one color per series).
- *    Hover = the month's value of every series. A month with more returns than sales is drawn
- *    at 0 (the tooltip shows the real number).
- *  - `TrendLine`: a small line with a dot per point (« Tendances »); hover a dot = its value. */
+/** Statistiques charts, hand-drawn SVG like Rapport (no chart library): `MonthsChart` = the last
+ *  12 months across, as bars or as solid lines (one color per series). Hover = the month's value
+ *  of every series. A month with more returns than sales is drawn at 0 (the tooltip shows the
+ *  real number). */
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -71,7 +70,7 @@ export function MonthsChart(props: MonthsChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const w = useWidth(wrapRef);
   return (
-    <div ref={wrapRef} className="relative w-full print:h-auto!" style={{ height: H }}>
+    <div ref={wrapRef} className="relative w-full" style={{ height: H }}>
       {w != null && <DrawnMonthsChart {...props} W={Math.max(MIN_W, w)} />}
     </div>
   );
@@ -256,64 +255,5 @@ function DrawnMonthsChart({ months, series, kind, label, W }: MonthsChartProps &
         )}
       </AnimatePresence>
     </>
-  );
-}
-
-const TREND_H = 72;
-const TREND_PAD = 6;
-
-interface TrendLineProps {
-  values: number[];
-  /** One per point, shown on hover: « 12/09/2026 : 4 ». */
-  titles: string[];
-  color: string;
-  label: string;
-}
-
-export function TrendLine(props: TrendLineProps) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const w = useWidth(wrapRef);
-  return (
-    <div ref={wrapRef} className="w-full print:h-auto!" style={{ height: TREND_H }}>
-      {w != null && <DrawnTrendLine {...props} W={Math.max(120, w)} />}
-    </div>
-  );
-}
-
-function DrawnTrendLine({ values, titles, color, label, W }: TrendLineProps & { W: number }) {
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const range = hi - lo || 1;
-  const xAt = (i: number) => (values.length > 1 ? TREND_PAD + (i * (W - 2 * TREND_PAD)) / (values.length - 1) : W / 2);
-  // All the same → a flat line in the middle.
-  const yAt = (v: number) =>
-    hi === lo ? TREND_H / 2 : TREND_H - TREND_PAD - ((v - lo) / range) * (TREND_H - 2 * TREND_PAD);
-  const pts = values.map((v, i) => ({ x: xAt(i), y: yAt(v) }));
-  return (
-    <svg
-      width={W}
-      height={TREND_H}
-      viewBox={`0 0 ${W} ${TREND_H}`}
-      role="img"
-      aria-label={label}
-      className="block h-auto max-w-full"
-    >
-      <motion.path
-        d={smoothPath(pts)}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 0.7, ease: "easeInOut" }}
-      />
-      {pts.map((p, i) => (
-        <circle key={titles[i]} cx={p.x} cy={p.y} r={values.length > 40 ? 1.5 : 2.5} fill={color}>
-          <title>{titles[i]}</title>
-        </circle>
-      ))}
-    </svg>
   );
 }

@@ -5,8 +5,9 @@ import { ROUTES } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 
 /** `embedded` = rendered inside AppLayout (sidebar + header stay visible, so a
- *  user without access can still navigate or log out). */
-export default function NotFoundPage({ embedded = false }: { embedded?: boolean }) {
+ *  user without access can still navigate or log out). `pending` = an account not
+ *  accepted yet: one more line says why every page is empty. */
+export default function NotFoundPage({ embedded = false, pending = false }: { embedded?: boolean; pending?: boolean }) {
   const t = useT();
   return (
     <div
@@ -60,6 +61,11 @@ export default function NotFoundPage({ embedded = false }: { embedded?: boolean 
           <div className="pg-anim flex flex-col items-center gap-3" style={{ animationDelay: ".12s" }}>
             <h1 className="text-[26px] font-semibold tracking-tight">{t("misc.notFoundTitle")}</h1>
             <p className="max-w-[40ch] text-[15px] leading-relaxed text-muted-foreground">{t("misc.notFoundDesc")}</p>
+            {pending && (
+              <p className="max-w-[44ch] text-[15px] font-medium leading-relaxed text-foreground">
+                {t("misc.pendingAccount")}
+              </p>
+            )}
           </div>
 
           <div className="pg-anim flex flex-wrap justify-center gap-3" style={{ animationDelay: ".22s" }}>

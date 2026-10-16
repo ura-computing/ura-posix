@@ -1,19 +1,18 @@
 /** « Codes »: the codes that name this product (Sobrus PID, barcodes 1 and 2) with « Copier »,
- *  barcode 1 drawn, each barcode's format and length, and « Scanner / Rechercher un code barre ».
- *  The owner changes the barcodes here too (« Modifier »); the PID never. */
+ *  barcode 1 drawn, and « Scanner / Rechercher un code barre ». The owner changes the barcodes
+ *  here too (« Modifier »); the PID never. */
 import { useState, type ReactNode } from "react";
-import { Barcode, FileText, Info, ScanBarcode } from "lucide-react";
+import { FileText, Info, ScanBarcode } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import type { ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
-import { barcodeFormat } from "@/utils/barcode";
 
+import { ScanDialog } from "../../_components/ScanDialog";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
 import { Editable } from "./Editable";
-import { ScanDialog } from "./ScanDialog";
-import { FieldList, SheetCard } from "./SheetCard";
+import { SheetCard } from "./SheetCard";
 
 function InfoNote({ children }: { children: ReactNode }) {
   return (
@@ -47,7 +46,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   ];
   const drawn = sheet.barcode1 ?? sheet.barcode2;
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="max-w-3xl">
       <SheetCard title={t("products.identifiers")} icon={<FileText className="size-5" />}>
         <InfoNote>{t("products.pidInfo")}</InfoNote>
         <dl className="flex flex-col gap-3">
@@ -81,38 +80,6 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
         </Button>
         <ScanDialog open={scanning} onClose={() => setScanning(false)} />
       </SheetCard>
-
-      <div className="flex flex-col gap-4">
-        {barcodes.map(({ n, code }) => {
-          const format = code ? barcodeFormat(code) : null;
-          const digits = code ? /^\d+$/.test(code) : false;
-          return (
-            <SheetCard key={n} title={t("products.barcodeN", { n })} icon={<Barcode className="size-5" />}>
-              <FieldList
-                fields={[
-                  {
-                    label: t("products.barcodeN", { n }),
-                    value: (
-                      <span className="flex items-center justify-between gap-3">
-                        <span className="font-mono">{code ?? missing}</span>
-                        <CopyButton value={code} label={t("products.copyBarcodeN", { n })} />
-                      </span>
-                    ),
-                  },
-                  { label: t("products.format"), value: code ? (format ?? t("products.formatOther")) : missing },
-                  {
-                    label: t("products.length"),
-                    value: code
-                      ? t(digits ? "products.lengthDigits" : "products.lengthChars", { n: code.length })
-                      : missing,
-                  },
-                ]}
-              />
-              {!code && <InfoNote>{t("products.barcodeMissing", { n })}</InfoNote>}
-            </SheetCard>
-          );
-        })}
-      </div>
     </div>
   );
 }

@@ -84,6 +84,9 @@ export interface DataTableProps<R, K extends string = string> {
   /** Page change scrolls back to the page's top (default: list pages like Achats / Ventes)
    *  or only to this table's top (`"table"`: a table low on a page, e.g. admin Rapport). */
   scrollOnPage?: "page" | "table";
+  /** A list with its details beside it (« Traçabilité »): click / Entrée picks a row, shown selected. */
+  onRowClick?: (row: R, index: number) => void;
+  isRowSelected?: (row: R, index: number) => boolean;
 }
 
 function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" }) {
@@ -105,6 +108,8 @@ export function DataTable<R, K extends string = string>({
   rowKey,
   className,
   scrollOnPage = "page",
+  onRowClick,
+  isRowSelected,
 }: DataTableProps<R, K>) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -209,7 +214,24 @@ export function DataTable<R, K extends string = string>({
               {rows.map((row, i) => (
                 <tr
                   key={rowKey ? rowKey(row, i) : i}
-                  className="border-b border-border last:border-0 hover:bg-surface-subtle/50"
+                  aria-selected={isRowSelected ? isRowSelected(row, i) : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onClick={onRowClick ? () => onRowClick(row, i) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onRowClick(row, i);
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "border-b border-border last:border-0 hover:bg-surface-subtle/50",
+                    onRowClick && "cursor-pointer focus-visible:outline-2 focus-visible:outline-ring",
+                    isRowSelected?.(row, i) && "bg-accent hover:bg-accent",
+                  )}
                 >
                   {columns.map((col) => (
                     <td

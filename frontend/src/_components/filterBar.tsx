@@ -567,6 +567,8 @@ interface SearchAutocompleteProps<G extends Record<string, string[]>> {
   onPick: (label: string, group: keyof G) => void;
   isLoading?: boolean;
   debounceMs?: number;
+  /** Entrée in the field (a barcode reader types the code + Entrée): the search applies at once. */
+  onEnter?: (value: string) => void;
 }
 
 export function SearchAutocomplete<G extends Record<string, string[]>>({
@@ -577,6 +579,7 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
   onPick,
   isLoading = false,
   debounceMs = 300,
+  onEnter,
 }: SearchAutocompleteProps<G>) {
   const t = useT();
   const [draft, setDraft] = useState(value);
@@ -619,6 +622,13 @@ export function SearchAutocomplete<G extends Record<string, string[]>>({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || !onEnter) return;
+          e.preventDefault();
+          setOpen(false);
+          if (draft !== value) onChange(draft);
+          onEnter(draft.trim());
+        }}
         placeholder={placeholder}
         className="h-9 w-full rounded-md border border-input bg-surface-subtle pl-8 pr-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
       />
@@ -758,6 +768,8 @@ export interface SearchConfig {
   suggestions?: Record<string, string[]> | null;
   onPick?: (label: string) => void;
   isLoading?: boolean;
+  /** Entrée in the field: e.g. Produits opens the product whose barcode / PID is exactly the text. */
+  onEnter?: (value: string) => void;
 }
 
 export interface DateRangeConfig {
@@ -840,6 +852,7 @@ export function FilterBar<V extends string = string>({
             suggestions={search.suggestions ?? null}
             onPick={search.onPick ?? (() => {})}
             isLoading={search.isLoading}
+            onEnter={search.onEnter}
           />
         )}
 

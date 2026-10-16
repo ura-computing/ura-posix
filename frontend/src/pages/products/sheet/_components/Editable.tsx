@@ -1,18 +1,18 @@
 /** One editable value of the product sheet (owner's « Modifier »).
  *  - View: the value; when the owner changed it, « modifié », the imported value and (owner)
  *    « Revenir à la valeur importée ».
- *  - Edit mode: its input (text, price, whole number). */
+ *  - Edit mode: its input (text, price, whole number, date « JJ/MM/AAAA »). */
 import { useContext, type ReactNode } from "react";
 import { useFormState } from "react-hook-form";
 
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatMADStr, formatNumStr } from "@/utils/format";
+import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
 
 import type { FormField } from "../hooks";
 import { SheetEditContext } from "./editContext";
 
-export type EditKind = "text" | "price" | "int";
+export type EditKind = "text" | "price" | "int" | "date";
 
 const INPUT =
   "w-full rounded-md border bg-surface-subtle px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
@@ -28,10 +28,12 @@ function importedText(kind: EditKind, v: string | number | null | undefined): st
   if (v == null || v === "") return "—";
   if (kind === "price") return formatMADStr(Number(v));
   if (kind === "int") return formatNumStr(Number(v));
+  if (kind === "date") return formatDate(String(v));
   return String(v);
 }
 
 function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; label: string }) {
+  const t = useT();
   const { editor } = useSheetEdit();
   const { register, control } = editor.form;
   const { errors } = useFormState({ control, name: field });
@@ -42,10 +44,11 @@ function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; l
         aria-label={label}
         aria-invalid={error ? true : undefined}
         inputMode={kind === "price" ? "decimal" : kind === "int" ? "numeric" : undefined}
+        placeholder={kind === "date" ? t("products.datePlaceholder") : undefined}
         className={cn(
           INPUT,
           "h-9 max-w-[260px]",
-          kind === "text" ? "text-left" : "text-right font-mono",
+          kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono",
           error ? "border-error" : "border-input",
         )}
         {...register(field)}

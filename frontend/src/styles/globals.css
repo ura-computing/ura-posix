@@ -169,22 +169,3 @@ h5,
 h6 {
   line-height: 1.2;
 }
-
-/* Printing (product sheet « Imprimer »): A4 landscape, colors as on screen (badges, charts). */
-@page {
-  size: A4 landscape;
-  margin: 12mm;
-}
-@media print {
-  html {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-  /* White paper (no grey page background), every page of the content. */
-  html,
-  body,
-  #root {
-    height: auto;
-    background: #fff;
-  }
-}

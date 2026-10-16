@@ -52,7 +52,8 @@ def get_current_user(db: DbDep, access_token: AccessCookieDep = None) -> User:
         raise creds_exc
 
     user = db.get(User, int(payload["sub"]))
-    if not user or user.status != "active" or user.token_version != payload.get("tv"):
+    # `pending` (signed up, not accepted yet) is let in: no pharmacy, so no data route answers.
+    if not user or user.status not in ("active", "pending") or user.token_version != payload.get("tv"):
         raise creds_exc
 
     # Bind JWT to session row: if the session was killed (DELETE /sessions/{id}

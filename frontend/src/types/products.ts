@@ -99,8 +99,6 @@ export interface ProductSheet {
   stock: ProductStock;
   /** 5 latest, newest first. */
   recent_movements: ProductMovement[];
-  /** Units sold / bought today and the 29 days before; `*_before` = the 30 days before those. */
-  last_30d: { sold: number; bought: number; sold_before: number; bought_before: number };
   /** Fields the owner edited → their imported value (« Revenir à la valeur importée »). */
   imported: Partial<Record<EditField, string | number | null>>;
 }
@@ -166,34 +164,56 @@ export interface ProductStats {
   previous: PeriodFigures;
   /** The last 12 months (this month and the 11 before), oldest first. */
   monthly: MonthFigures[];
-  /** « Tendances »: a point a day up to 31 days, a week up to 92, else a month. */
-  trend_unit: "day" | "week" | "month";
-  trend: { start: string; sold: number; bought: number }[];
-  /** The 3 biggest suppliers of the period, then « Autres » (every other one together). */
-  top_suppliers: SupplierShare[];
-  other_suppliers: SupplierShare | null;
-  /** Each supplier's latest priced purchase, newest first (5 at most). */
-  last_prices: { supplier: string | null; unit_price: number; date: string | null }[];
-  /** « Historique des ventes (par année) »: every year with a sale, newest first. */
-  history: YearSales[];
+  /** Every supplier of the period, most units first (card: the 3 biggest + « Autres »). */
+  suppliers: SupplierShare[];
+  /** Each supplier's latest priced purchase, newest first (card: the 5 latest). */
+  last_prices: SupplierPrice[];
+  /** « Historique (par année) »: every year with a sale or a purchase, newest first. */
+  history: YearHistory[];
 }
 
-export interface YearSales {
+export interface SupplierPrice {
+  supplier: string | null;
+  unit_price: number;
+  date: string | null;
+}
+
+export interface YearHistory {
   year: number;
   /** Units sold, January first (12 values). */
   sold: number[];
   total: number;
   /** Σ qty × PPV (Rapport rule). */
   ca: number;
+  /** Units bought, January first (12 values). */
+  bought: number[];
+  bought_total: number;
+  /** Σ purchase line totals (as in the files). */
+  spent: number;
 }
 
-// ── Mouvements (GET /products/{id}/movements) ──────────────────────────────
+// ── Traçabilité (GET /products/{id}/movements) ────────────────────────────
 
 export interface ProductMovementLine extends ProductMovement {
+  /** Its purchase / sale line (unique with `kind`). */
+  id: number;
+  /** Purchase: HH:MM of « Créée le » when it is the line's day; sale: null (Sobrus gives the day). */
+  time: string | null;
+  /** Purchase « Créée le » (date + hour, as in the file). */
+  created_at: string | null;
   /** The line's total, as in the file. */
   total: number | null;
   /** Sale: « Remise » in %; purchase: null. */
   discount: number | null;
+  /** Purchase: the lot's « Date de péremption ». */
+  expiry_date: string | null;
+  /** Purchase: « Stock min » / « Stock max » of the file. */
+  stock_min: number | null;
+  stock_max: number | null;
+  /** The import that brought the line: when, who, which file. */
+  imported_at: string | null;
+  imported_by: string | null;
+  filename: string | null;
 }
 
 export interface ProductMovementsResponse {
@@ -206,6 +226,8 @@ export interface MovementsFilters {
   limit: number;
   search: string;
   kind: "all" | "achat" | "vente";
+  /** « date »: newest first; « kind »: purchases, then sales (each newest first). */
+  order: "date" | "kind";
   sort_by: string | null;
   sort_order: "asc" | "desc";
   date_from: string | null;

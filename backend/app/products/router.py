@@ -8,8 +8,9 @@ GET /v1/products/{med_id}   One product's sheet (Général + Codes tabs). Not on
                     pharmacy's products → 404 `productNotFound` (never says it exists elsewhere).
 GET /v1/products/{med_id}/stats   Statistiques tab: date_from → date_to (default: the last
                     30 days) vs the days just before, the last 12 months, suppliers (same 404).
-GET /v1/products/{med_id}/movements   « Mouvements » tab: purchase + sale lines, period, type,
-                    search (document / supplier / client), page (same 404).
+GET /v1/products/{med_id}/movements   « Traçabilité » tab: purchase + sale lines with their details
+                    (hour, lot expiry, import), period, type, search (document / supplier / client),
+                    sort (date | kind), page (same 404).
 PUT /v1/products/{med_id}   Owner only: « Modifier » → « Enregistrer » (his pharmacy only, shown in
                     « Produits » only); a field sent as null = back to the imported value.
 """
@@ -55,6 +56,7 @@ SortOrderQ = Annotated[str, Query(description="asc | desc")]
 ExportQ = Annotated[bool, Query(description="If true, return every matching row (skip pagination)")]
 DateQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD, inclusive")]
 KindQ = Annotated[str, Query(description="all | achat | vente")]
+OrderQ = Annotated[str, Query(description="date (newest first) | kind (purchases, then sales)")]
 PeriodQ = Annotated[date | None, Query(description="ISO date YYYY-MM-DD, inclusive")]
 
 
@@ -130,6 +132,7 @@ def get_product_movements(
     date_to: DateQ = None,
     kind: KindQ = "all",
     search: SearchQ = None,
+    order: OrderQ = "date",
     page: PageQ = 1,
     limit: LimitQ = 10,
 ) -> dict:
@@ -141,6 +144,7 @@ def get_product_movements(
         date_to=date_to,
         kind=kind,
         search=search,
+        order=order,
         page=page,
         limit=limit,
     )

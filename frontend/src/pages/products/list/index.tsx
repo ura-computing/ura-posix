@@ -1,8 +1,12 @@
 /** /produits — every product of the pharmacy: in its last stock import, sold or bought.
- *  « Vendus 12 mois », stock and marge follow the Stock page's rules (same numbers). */
-import { Download } from "lucide-react";
+ *  « Vendus 12 mois », stock and marge follow the Stock page's rules (same numbers). A barcode
+ *  reader works in the search field (code + Entrée = that product's sheet when the code is exactly
+ *  one of its barcodes / its PID) and in « Scanner / Rechercher un code barre ». */
+import { useState } from "react";
+import { Download, ScanBarcode } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { Button } from "@/_components/button";
 import { useCategoryTypeOptions } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
@@ -12,7 +16,9 @@ import { ROUTES, type ProductRow } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 
+import { useBarcodeLookup } from "../_components/barcodeLookup";
 import { ProductPhoto } from "../_components/ProductPhoto";
+import { ScanDialog } from "../_components/ScanDialog";
 import { useProduitsPage } from "./hooks";
 
 const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
@@ -111,6 +117,8 @@ export default function ProduitsPage() {
     setSort,
     total,
   } = useProduitsPage();
+  const { lookup } = useBarcodeLookup();
+  const [scanning, setScanning] = useState(false);
 
   const activeFilters: ActiveFilter[] = filters.search
     ? [
@@ -127,9 +135,24 @@ export default function ProduitsPage() {
     : [];
 
   return (
-    <Page title={t("products.title")} subtitle={t("products.subtitle")}>
+    <Page
+      title={t("products.title")}
+      subtitle={t("products.subtitle")}
+      actions={
+        <Button size="lg" onClick={() => setScanning(true)}>
+          <ScanBarcode className="size-5" />
+          {t("products.scan")}
+        </Button>
+      }
+    >
       <FilterBar
-        search={{ value: filters.search, onChange: setSearch, placeholder: t("products.searchPh") }}
+        search={{
+          value: filters.search,
+          onChange: setSearch,
+          placeholder: t("products.searchPh"),
+          // Not one exact code: the list stays filtered by the text.
+          onEnter: (code) => void lookup(code),
+        }}
         segment={{ value: filters.category_type, onChange: setCategoryType, options: categoryTypeOptions }}
         rightActions={[
           {
@@ -167,6 +190,7 @@ export default function ProduitsPage() {
         emptyHint={t("products.emptyHint")}
         rowKey={(r) => r.id}
       />
+      <ScanDialog open={scanning} onClose={() => setScanning(false)} />
     </Page>
   );
 }

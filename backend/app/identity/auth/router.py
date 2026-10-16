@@ -105,7 +105,8 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise ApiError(status.HTTP_401_UNAUTHORIZED, ErrorCode.BAD_CREDENTIALS, BAD_CREDS_DETAIL)
-    if user.status != "active":
+    # `pending` = signed up, not accepted yet: logs in, sees an empty menu (no pharmacy).
+    if user.status not in ("active", "pending"):
         raise ApiError(
             status.HTTP_401_UNAUTHORIZED,
             ErrorCode.ACCOUNT_DISABLED,
@@ -227,21 +228,36 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
 @router.post("/auth/signup", status_code=200)
 @limiter.limit("5/hour")
 def signup(body: SignupIn, request: Request, db: DbDep) -> dict:
-    """« Créer un compte »: stored until the admin accepts or refuses it (nobody logs in
-    before). Same answer whatever was typed: it never says whether the email already has
+    """« Créer un compte »: stored until the admin accepts or refuses it. An email without an
+    account also gets a `pending` user: it logs in at once and sees an empty menu until
+    « Accepter ». Same answer whatever was typed: it never says whether the email already has
     an account or the pharmacy code exists — the client keeps his pharmacies private."""
+    password_hash = hash_password(body.password)
+    pending_user = None
+    if not db.query(User).filter(User.email == body.email).first():
+        pending_user = User(
+            email=body.email,
+            name=body.full_name,
+            phone=body.phone,
+            password_hash=password_hash,
+            role=body.role,
+            status="pending",
+        )
+        db.add(pending_user)
+        db.flush()
     db.add(
         SignupRequest(
             role=body.role,
             full_name=body.full_name,
             email=body.email,
             phone=body.phone,
-            password_hash=hash_password(body.password),
+            password_hash=password_hash,
             pharmacy_code=body.pharmacy_code,
             pharmacy_name=body.pharmacy_name,
             pharmacy_city=body.pharmacy_city,
             pharmacy_address=body.pharmacy_address,
             status="pending",
+            user_id=pending_user.id if pending_user else None,
         )
     )
     db.commit()

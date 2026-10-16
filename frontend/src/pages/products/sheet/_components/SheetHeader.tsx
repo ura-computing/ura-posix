@@ -1,6 +1,7 @@
-/** Top of the product sheet, on every tab: breadcrumb, « PID | Catégorie | TVA », type + stock
+/** Top of the product sheet, on every tab: « Retour à la liste des produits » + breadcrumb,
+ *  « PID | Catégorie | TVA », « Emplacement » (where it is on the shelves), type + stock
  *  badges, « Code barre(s) » card, « Modifier » (owner) / « Annuler » + « Enregistrer ». */
-import { ChevronRight, House, Pencil, Printer, Save, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, House, MapPin, Pencil, Save, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { AsyncButton } from "@/_components/AsyncButton";
@@ -8,17 +9,33 @@ import { TypeBadge } from "@/_components/TypeBadge";
 import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { printLight } from "@/utils/print";
 
 import type { SheetEditor } from "../hooks";
 import { tvaShort, withoutRate } from "../labels";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
 
+/** A big « Retour à la liste des produits » (easy to spot), then « ⌂ › Produits › name ». */
 export function SheetBreadcrumb({ name }: { name: string }) {
   const t = useT();
   return (
-    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground print:hidden">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+      <Link
+        to={ROUTES.PRODUITS}
+        className="inline-flex h-11 w-fit items-center gap-2 rounded-lg border border-border bg-card px-4 text-base font-semibold text-foreground transition-colors hover:bg-surface-subtle"
+      >
+        <ArrowLeft className="size-5" />
+        {t("products.backToList")}
+      </Link>
+      <Crumbs name={name} />
+    </div>
+  );
+}
+
+function Crumbs({ name }: { name: string }) {
+  const t = useT();
+  return (
+    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
       <Link to={ROUTES.HOME} aria-label={t("nav.home")} className="hover:text-foreground">
         <House className="size-4" />
       </Link>
@@ -87,6 +104,27 @@ export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
   );
 }
 
+/** « Emplacement »: where the product is (« PLACARD 2 », the stock file's « Zone » or the owner's),
+ *  big, first thing seen on every tab; « Non disponible » without one. */
+export function LocationCard({ zone }: { zone: string | null }) {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <MapPin className="size-6" />
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm font-semibold text-muted-foreground">{t("products.location")}</span>
+        {zone ? (
+          <span className="break-words text-xl font-bold text-foreground">{zone}</span>
+        ) : (
+          <span className="text-base text-muted-foreground">{t("products.notAvailable")}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** « Code barre(s) »: barcode 1 drawn + its number + copy; « Non disponible » without one. */
 export function BarcodeCard({ code }: { code: string | null }) {
   const t = useT();
@@ -103,23 +141,6 @@ export function BarcodeCard({ code }: { code: string | null }) {
         <span className="text-sm text-muted-foreground">{t("products.notAvailable")}</span>
       )}
     </div>
-  );
-}
-
-/** « Imprimer »: the header + the open tab on paper / PDF (no menu, no buttons, light theme).
- *  Everyone; disabled while editing (the values shown are not saved yet). */
-export function PrintButton({ disabled }: { disabled: boolean }) {
-  const t = useT();
-  return (
-    <AsyncButton
-      variant="secondary"
-      onClick={printLight}
-      disabled={disabled}
-      title={disabled ? t("products.printAfterEdit") : undefined}
-    >
-      <Printer className="size-4" />
-      {t("products.print")}
-    </AsyncButton>
   );
 }
 

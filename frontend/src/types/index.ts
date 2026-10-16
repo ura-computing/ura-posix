@@ -9,10 +9,12 @@ export const ROLES = {
 } as const;
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
-/** User account status, same values as the backend (`members.py`). */
+/** User account status, same values as the backend (`auth/schemas.py` `UserOut`). `pending` =
+ *  signed up, not accepted yet: logs in, no pharmacy, empty menu, 404 everywhere. */
 export const STATUSES = {
   ACTIVE: "active",
   INACTIVE: "inactive",
+  PENDING: "pending",
 } as const;
 export type Status = (typeof STATUSES)[keyof typeof STATUSES];
 

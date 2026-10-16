@@ -30,6 +30,7 @@ from app.core.database import DbDep
 from app.core.email_service import send_signup_decision
 from app.core.errors import ApiError, ErrorCode
 from app.identity.members.service import (
+    activate_member,
     apply_permissions_bulk,
     add_pharmacy,
     create_member,
@@ -117,8 +118,9 @@ def _apply_features_bulk(db, pharmacy_id: int, features: dict[str, bool]) -> Non
 
 
 def _get_member_or_404(db, user_id: int) -> User:
-    """Target user by id, else 404. Callers add their own admin-role guard."""
-    target = db.query(User).filter(User.id == user_id).first()
+    """Target user by id, else 404. Callers add their own admin-role guard. A `pending`
+    account (sign-up not accepted yet) is handled in « Demandes » only."""
+    target = db.query(User).filter(User.id == user_id, User.status != "pending").first()
     if not target:
         raise ApiError(404, ErrorCode.USER_NOT_FOUND, "Utilisateur introuvable.")
     return target
@@ -400,9 +402,11 @@ def _user_row(u: User, granted: list[str]) -> AdminUserRow:
 def list_users(db: DbDep) -> list[AdminUserRow]:
     """Every account — any role, with or without a pharmacy (archived ones
     too). The pharmacy pages only show the owner/employee members of active
-    pharmacies; this list is the one place where nobody is hidden."""
+    pharmacies; this list is the one place where nobody is hidden, except the
+    `pending` sign-ups (they are in « Demandes »)."""
     users = (
         db.query(User)
+        .filter(User.status != "pending")
         .options(joinedload(User.pharmacy))
         .order_by(User.role.asc(), User.name.asc(), User.email.asc())
         .all()
@@ -474,18 +478,15 @@ def _pending_signup_or_error(db, signup_id: int) -> SignupRequest:
 @router.get("/admin/signup-requests", response_model=list[SignupRequestRow])
 def list_signup_requests(db: DbDep) -> list[SignupRequestRow]:
     """Pending « Créer un compte », newest first. Flags what « Accepter » would refuse:
-    an email that already has an account, a code no active pharmacy has."""
+    an email that already has an account (other than the request's own pending one),
+    a code no active pharmacy has."""
     pending = (
         db.query(SignupRequest)
         .filter(SignupRequest.status == "pending")
         .order_by(SignupRequest.created_at.desc())
         .all()
     )
-    taken = (
-        {e for (e,) in db.query(User.email).filter(User.email.in_({r.email for r in pending})).all()}
-        if pending
-        else set()
-    )
+    accounts = db.query(User.email, User.id).filter(User.email.in_({r.email for r in pending})).all() if pending else []
     rows: list[SignupRequestRow] = []
     for r in pending:
         pharm = _pharmacy_by_code(db, r.pharmacy_code)
@@ -504,7 +505,7 @@ def list_signup_requests(db: DbDep) -> list[SignupRequestRow]:
                 new_pharmacy_name=r.pharmacy_name,
                 new_pharmacy_city=r.pharmacy_city,
                 new_pharmacy_address=r.pharmacy_address,
-                email_taken=r.email in taken,
+                email_taken=any(email == r.email and uid != r.user_id for email, uid in accounts),
                 code_unknown=bool(r.pharmacy_code) and pharm is None,
             )
         )
@@ -513,10 +514,15 @@ def list_signup_requests(db: DbDep) -> list[SignupRequestRow]:
 
 @router.post("/admin/signup-requests/{signup_id}/accept", response_model=SignupAcceptOut)
 def accept_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: DbDep) -> SignupAcceptOut:
-    """Create the account (every permission on) in the pharmacy it names, or in a new
-    pharmacy (code from the city, every feature on), then email « Votre compte est prêt »."""
+    """Activate the request's pending account (or create it, older requests) with every
+    permission on, in the pharmacy it names or in a new pharmacy (code from the city, every
+    feature on), then email « Votre compte est prêt »."""
     req = _pending_signup_or_error(db, signup_id)
-    if db.query(User).filter(User.email == req.email).first():
+    own = db.get(User, req.user_id) if req.user_id else None
+    others = db.query(User).filter(User.email == req.email)
+    if own:
+        others = others.filter(User.id != own.id)
+    if others.first():
         raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
     if req.pharmacy_code:
         pharm = _pharmacy_by_code(db, req.pharmacy_code)
@@ -531,14 +537,18 @@ def accept_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: Db
         pharm = add_pharmacy(
             db, name=req.pharmacy_name or "", city=req.pharmacy_city or "", address=req.pharmacy_address
         )
-    user = create_member(
-        db,
-        email=req.email,
-        name=req.full_name,
-        password_hash=req.password_hash,
-        phone=req.phone,
-        role=req.role,
-        pharmacy_id=pharm.id,
+    user = (
+        activate_member(db, own, pharmacy_id=pharm.id)
+        if own
+        else create_member(
+            db,
+            email=req.email,
+            name=req.full_name,
+            password_hash=req.password_hash,
+            phone=req.phone,
+            role=req.role,
+            pharmacy_id=pharm.id,
+        )
     )
     req.status = "accepted"
     req.decided_at = datetime.now(timezone.utc)
@@ -551,8 +561,13 @@ def accept_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: Db
 
 @router.post("/admin/signup-requests/{signup_id}/refuse", status_code=204)
 def refuse_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: DbDep) -> None:
-    """Nothing is created; the person gets an email saying the request was not accepted."""
+    """The pending account is deleted (logged out); the person gets an email saying the
+    request was not accepted."""
     req = _pending_signup_or_error(db, signup_id)
+    own = db.get(User, req.user_id) if req.user_id else None
+    if own and own.status == "pending":
+        db.delete(own)
+        req.user_id = None
     req.status = "refused"
     req.decided_at = datetime.now(timezone.utc)
     req.decided_by = admin.id

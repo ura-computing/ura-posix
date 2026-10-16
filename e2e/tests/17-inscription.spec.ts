@@ -1,9 +1,11 @@
 /** « Créer un compte » (T4), through the pages:
  *  - a visitor signs up: new pharmacy, or joins one with its code; the page gives the same
  *    answer whatever was typed (it never says whether a code or an email exists);
- *  - nobody logs in before the admin's « Accepter » (« Pharmacies et utilisateurs » →
- *    « Demandes »); « Accepter » creates the pharmacy (code from the city) and the account,
- *    « Refuser » creates nothing; both are emailed;
+ *  - before the admin's « Accepter » (« Pharmacies et utilisateurs » → « Demandes ») the
+ *    account logs in but waits: no menu entry, the 404 page says why, not in « Utilisateurs »;
+ *    an email that already has an account gets no second one (generic login message);
+ *  - « Accepter » creates the pharmacy (code from the city) and opens the account,
+ *    « Refuser » deletes the waiting account; both are emailed;
  *  - a request whose email already has an account, or whose code no pharmacy has, can only
  *    be refused (« Accepter » greyed out, with the reason). Serial. */
 import type { Page } from "@playwright/test";
@@ -71,7 +73,7 @@ async function signUp(page: Page, kind: Kind, person: Person, pharmacy: { code: 
   await expect(page.getByRole("heading", { name: "Demande envoyée" })).toBeVisible();
 }
 
-/** The login page refuses this person (still waiting, or refused). */
+/** The login page refuses this person (refused, or an email that already had an account). */
 async function loginRefused(page: Page, person: Person) {
   await page.goto("/login");
   await page.locator('input[type="email"]').fill(person.email);
@@ -80,6 +82,38 @@ async function loginRefused(page: Page, person: Person) {
   await page.locator('button[type="submit"]').click();
   await refused;
   await expect(page.getByText("Email ou mot de passe incorrect")).toBeVisible();
+}
+
+const PENDING_HINT = "Votre compte attend l'accord de l'administrateur. Vous recevrez un email dès qu'il est prêt.";
+
+/** Signed up, not accepted yet: the login works (status « pending », no pharmacy, no
+ *  permission); « Aller à mon espace » opens the app with no menu entry and a 404 that says
+ *  why; « Équipe » (owner page) is the same 404; « Déconnexion » stays. */
+async function loginPending(page: Page, person: Person) {
+  await page.goto("/login");
+  await page.locator('input[type="email"]').fill(person.email);
+  await page.locator('input[autocomplete="current-password"]').fill(person.password);
+  const me = pageSend(page, "POST", "/auth/login");
+  await page.locator('button[type="submit"]').click();
+  expectSame(
+    await me,
+    { user: { email: person.email, status: "pending", pharmacy_id: null }, pharmacy: null, permissions: [] },
+    "compte en attente (POST /auth/login)",
+  );
+  await expect(page).not.toHaveURL(/\/login/);
+  await page.getByRole("link", { name: "Aller à mon espace" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+  await expect(page.getByText(PENDING_HINT)).toBeVisible();
+  await expect(page.locator("aside nav").getByRole("link"), "menu vide").toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Mon compte", exact: true })).toBeVisible();
+  await page.goto("/owner/employees");
+  await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+  await expect(page.getByText(PENDING_HINT), "« Équipe » : même 404").toBeVisible();
+
+  const out = pageSend(page, "POST", "/auth/logout", 204);
+  await page.getByRole("button", { name: "Déconnexion", exact: true }).click();
+  await out;
+  await expect(page).toHaveURL(/\/login$/);
 }
 
 /** The login page lets this person in (home page), « Aller à mon espace » opens the app,
@@ -107,7 +141,7 @@ const requestRow = (page: Page, email: string) => page.getByRole("row").filter({
 test.describe("visiteur", () => {
   test.use({ storageState: LOGGED_OUT });
 
-  test("nouvelle pharmacie : 5 écrans, « Suivant » grisé jusqu'au choix, demande envoyée, pas de connexion avant l'accord", async ({
+  test("nouvelle pharmacie : 5 écrans, « Suivant » grisé jusqu'au choix, demande envoyée, connexion en attente (menu vide)", async ({
     page,
   }) => {
     // Screen 1 of 5: « Suivant » waits for a choice; a wrong field stops on its screen.
@@ -123,12 +157,15 @@ test.describe("visiteur", () => {
     await expect(page.getByText("Créer un compte · Étape 2 sur 5")).toBeVisible();
 
     await signUp(page, "Propriétaire d'une nouvelle pharmacie", NEW_OWNER, NEW_PHARMACY);
-    await loginRefused(page, NEW_OWNER);
+    await loginPending(page, NEW_OWNER);
   });
 
-  test("code inconnu, email déjà utilisé : même réponse « Demande envoyée »", async ({ page }) => {
+  test("code inconnu, email déjà utilisé : même réponse « Demande envoyée » ; l'email déjà utilisé n'a pas de 2e compte", async ({
+    page,
+  }) => {
     await signUp(page, "Employé d'une pharmacie", UNKNOWN_CODE, { code: "ZZZ9999" });
     await signUp(page, "Propriétaire d'une pharmacie déjà inscrite", TAKEN, { code: "CAS0001" });
+    await loginRefused(page, TAKEN);
   });
 });
 
@@ -138,6 +175,17 @@ test.describe("admin", () => {
   test("« Demandes (3) » : ce qui bloque « Accepter » est montré ; « Accepter » crée la pharmacie et le compte", async ({
     page,
   }) => {
+    // The waiting accounts are in « Demandes » only, not in « Utilisateurs ».
+    const users = pageCall<Row[]>(page, "/admin/users");
+    await page.goto("/admin/pharmacies");
+    await page.getByRole("tab", { name: "Utilisateurs", exact: true }).click();
+    const emails = (await users).map((u) => u.email);
+    for (const person of [NEW_OWNER, UNKNOWN_CODE]) {
+      expect(emails, `« Utilisateurs » sans ${person.email} (en attente)`).not.toContain(person.email);
+    }
+    await expect(page.getByText("admin@gmail.com").first(), "la liste est chargée").toBeVisible();
+    await expect(page.getByText(NEW_OWNER.email)).toHaveCount(0);
+
     const rows = await openRequests(page, 3);
     const byEmail = (email: string) => rows.find((r) => r.email === email);
     expectSame(
@@ -220,8 +268,11 @@ test.describe("après l'accord", () => {
     await loginRefused(page, UNKNOWN_CODE);
   });
 
-  test("un employé rejoint la nouvelle pharmacie avec son code (tapé en minuscules)", async ({ page }) => {
+  test("un employé rejoint la nouvelle pharmacie avec son code (tapé en minuscules) ; connexion en attente", async ({
+    page,
+  }) => {
     await signUp(page, "Employé d'une pharmacie", EMPLOYEE, { code: loadState().signupPharmacyCode.toLowerCase() });
+    await loginPending(page, EMPLOYEE);
   });
 });
 

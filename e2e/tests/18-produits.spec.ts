@@ -1,22 +1,27 @@
 /** Produits (owner): every product of the pharmacy (stock file, sold or bought).
  *  List = oracle: page 1 + 2, the « Vendus 12 mois » dates (Stock page window), every
- *  sortable column (desc + asc), search, Pharmacie / Parapharmacie, Excel export.
+ *  sortable column (desc + asc), search, Pharmacie / Parapharmacie, Excel export; a barcode reader
+ *  in the search field (exact code + Entrée = the sheet) and « Scanner / Rechercher un code barre ».
  *  Photos (scraped fixture, resources/tests/catalog/product-infos.json): found by PID, by a
  *  barcode the admin gives in the catalogue (setup), a dead address → the box icon.
  *  Product sheet (from the list): every case the oracle picked (photos, never bought, not in
  *  the stock file, stock only, negative stock) = oracle, on screen too: header (PID / catégorie /
- *  TVA, type + stock badges, code barre drawn), Général (5 prices, stock, 30 days, informations
- *  générales, 5 latest lines, performance %); copy the barcode; header photo; « Codes » tab kept
- *  in the address, breadcrumb; a product of no pharmacy line → 404 inside the layout.
- *  Statistiques = oracle for every product (30 jours), then every period button + a custom range
- *  + « Copier » on the best seller: KPIs and % vs the days before, 3 charts (12 months, tooltips),
- *  « Détail mensuel », « Tendances », top suppliers, latest prices.
- *  « Mouvements » (from « Voir tout »): all lines, page 2, Achats, Ventes over the test window,
- *  search = oracle, every column on screen (remise, TVA, total), 10 per page. « Voir détail » =
- *  the whole ticket on Ventes / BL on Achats (exact number, period cleared, removable filter).
- *  « Imprimer »: header + open tab, light theme, no menu / buttons / tabs; disabled while editing.
- *  « Codes »: PID / barcodes + « Copier », barcode drawn, format + length, « Scanner / Rechercher
+ *  TVA, type + stock badges, code barre drawn), Général (5 prices, stock, informations générales,
+ *  5 latest lines, performance = the Statistiques dates + %, same picker on both tabs); copy the barcode; header photo; « Codes » tab kept
+ *  in the address, breadcrumb + « Retour à la liste des produits »; a product of no pharmacy line → 404
+ *  inside the layout.
+ *  Statistiques = oracle for every product (last 30 days), then the Ventes date picker (2 quick
+ *  periods, typed dates) + « Copier » on the best seller: KPIs and % vs the days before, 3 charts
+ *  (12 months, tooltips), « Détail mensuel », « Historique » Ventes / Achats, top suppliers + latest
+ *  prices with « Voir tout »; no « Tendances ».
+ *  « Traçabilité » (from « Voir tout »): all lines, page 2, sort by type, Achats, Ventes over the
+ *  test window, search = oracle; list (type, date, heure, quantité) + every line's details (BL /
+ *  ticket, prices, remise, TVA, total, import), 20 per page. « Voir tout le ticket / BL » = the whole
+ *  ticket on Ventes / BL on Achats (exact number, period cleared, removable filter).
+ *  No « Imprimer » button (owner, employee).
+ *  « Codes »: PID / barcodes + « Copier », barcode drawn (no format / length blocks), « Scanner / Rechercher
  *  un code barre » (barcode, PID, unknown code, Échap / Annuler).
+ *  Général: emplacement + date de péremption (file) with « Périmé » / < 30 j / < 90 j.
  *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
  *  import keeps them; « Éditer » of a block = the same edit mode; « Revenir à la valeur importée »,
  *  « Annuler », min > max refused. Employee: « Modifier » and « Éditer » disabled + reason, PUT refused.
@@ -24,7 +29,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "../lib/api";
-import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, OWNER, loadState, sessionFile } from "../lib/auth";
 import type { Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expected, testWindow } from "../lib/expected";
@@ -135,21 +140,26 @@ async function expectNumber(page: Page, label: string, want: number | null): Pro
   else expect(Math.abs((got ?? NaN) - want), `${label}: écran ${got} ≠ ${want}`).toBeLessThanOrEqual(0.011);
 }
 
-/** The value next to a label inside one block (« Code barre 1 » is in 2 blocks of « Codes »). */
+/** The hint next to an expiry date, as the page computes it from today (Alertes thresholds). */
+function expiryHint(iso: string): string | null {
+  const now = new Date();
+  const [y, m, d] = iso.split("-").map(Number);
+  const days = Math.round(
+    (Date.UTC(y, m - 1, d) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86_400_000,
+  );
+  return days < 0 ? "Périmé" : days < 30 ? "Moins de 30 jours" : days < 90 ? "Moins de 90 jours" : null;
+}
+
+/** ISO date `n` days from today (local day, like the page). */
+function daysFromToday(n: number): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** The value next to a label inside one block. */
 const fieldIn = (scope: Locator, label: string) =>
   scope.locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
-
-/** « EAN-13 » / « UPC-A » / « EAN-8 » when the length and the check digit fit, else « Autre ». */
-function barcodeFormat(code: string): string {
-  if (!/^(\d{8}|\d{12}|\d{13})$/.test(code)) return "Autre";
-  const d = [...code].map(Number);
-  const sum = d
-    .slice(0, -1)
-    .reverse()
-    .reduce((acc, x, i) => acc + x * (i % 2 === 0 ? 3 : 1), 0);
-  if ((10 - (sum % 10)) % 10 !== d[d.length - 1]) return "Autre";
-  return code.length === 13 ? "EAN-13" : code.length === 12 ? "UPC-A" : "EAN-8";
-}
 
 /** The big value of the KPI tile labelled `label` in `scope` (« Prix d'achat moyen » is also a
  *  row of « Informations générales »: kpiValue would find both). */
@@ -284,6 +294,41 @@ test("produits: recherche + Pharmacie / Parapharmacie + « Tout réinitialiser �
   });
 });
 
+test("produits: lecteur de code barre dans la recherche (Entrée = la fiche), code inconnu, « Scanner / Rechercher un code barre »", async ({
+  page,
+}) => {
+  const { product, barcode1 } = expected().products.barcode_setup;
+  const search = page.getByPlaceholder("Nom, code-barres, PID, laboratoire…");
+  const sheetShown = async () => {
+    await expect(page.getByRole("heading", { level: 1, name: product, exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/produits\/\d+$/);
+  };
+
+  // The reader types the code + Entrée in the search field → that product's sheet.
+  await open(page);
+  await search.fill(barcode1);
+  await search.press("Enter");
+  await sheetShown();
+
+  // An unknown code: the list stays, filtered by the text (nothing found), no page change.
+  await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
+  const filtered = pageCall(page, "/products", { search: "0000000000000" });
+  await search.fill("0000000000000");
+  await search.press("Enter");
+  expect((await filtered).pagination.total, "code inconnu : liste vide").toBe(0);
+  await expect(page.getByText("Aucun produit trouvé")).toBeVisible();
+  await expect(page).toHaveURL(/\/produits$/);
+
+  // The big button on the list: the same window as on « Codes ».
+  await page.getByRole("button", { name: "Scanner / Rechercher un code barre", exact: true }).click();
+  const input = page.getByLabel("Code barre ou PID", { exact: true });
+  await expect(input).toBeFocused();
+  await input.fill(barcode1);
+  await input.press("Enter");
+  await sheetShown();
+});
+
 test("produits: export Excel = toute la liste, en-têtes en français", async ({ page }) => {
   await open(page);
   const answer = pageCall(page, "/products", { export: "true" });
@@ -351,7 +396,9 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
       other.getByRole("button", { name: "Modifier", exact: true }),
       "employé : lecture seule",
     ).toBeDisabled();
-    await expect(other.getByRole("button", { name: "Imprimer", exact: true }), "employé : imprimer").toBeEnabled();
+    await expect(other.getByRole("button", { name: "Imprimer", exact: true }), "employé : pas d'imprimer").toHaveCount(
+      0,
+    );
     const blocks = other.getByRole("button", { name: "Éditer", exact: true });
     await expect(blocks, "« Éditer » de Stock + Informations générales").toHaveCount(2);
     for (const button of await blocks.all()) await expect(button).toBeDisabled();
@@ -359,14 +406,16 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     const refused = await apiPut(other, `/products/${got.data[0].id}`, { ppv: 1 }, 403);
     expect(refused.code, "PUT par un employé").toBe("ownerOnly");
 
-    // « Voir détail » follows his permissions: no « Achats » → disabled on a purchase only.
+    // « Voir tout le ticket / BL » follows his permissions: no « Achats » → disabled + why, on a purchase only.
     await apiPut(page, `/owner/employees/${member.id}/permissions`, { permissions: { achats: false } });
     await other.reload();
-    await other.getByRole("tab", { name: "Mouvements", exact: true }).click();
+    await other.getByRole("tab", { name: "Traçabilité", exact: true }).click();
+    const details = section(other, "Détails de la ligne");
     await other.getByRole("button", { name: "Achats", exact: true }).click();
-    await expect(other.locator("tbody tr").first().getByRole("button", { name: "Voir détail" })).toBeDisabled();
+    await expect(details.getByRole("button", { name: "Voir tout le BL" })).toBeDisabled();
+    await expect(details.getByText("Vous n'avez pas accès à cette page. Demandez au propriétaire.")).toBeVisible();
     await other.getByRole("button", { name: "Ventes", exact: true }).click();
-    await expect(other.locator("tbody tr").first().getByRole("button", { name: "Voir détail" })).toBeEnabled();
+    await expect(details.getByRole("button", { name: "Voir tout le ticket" })).toBeEnabled();
   } finally {
     await ctx.close();
     await apiDelete(page, `/owner/employees/${member.id}`, 204);
@@ -432,25 +481,34 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
       else await expectNumber(page, "Stock actuel", e.stock.current_stock);
       await expectNumber(page, "Stock minimum", e.stock.stock_min);
       await expectNumber(page, "Stock maximum", e.stock.stock_max);
-
-      // Ventes / Achats 30 jours, and « Performance » = the same units + % vs the 30 days before.
-      const { sold, bought, sold_before, bought_before } = e.last_30d;
-      await expectTile(page, "Ventes 30 jours", sold);
-      await expectTile(page, "Achats 30 jours", bought);
-      const perf = section(page, "Performance");
-      for (const [label, now, before] of [
-        ["Ventes", sold, sold_before],
-        ["Achats", bought, bought_before],
-      ] as const) {
-        await expectTile(perf, label, now);
-        const pill = perf
-          .locator(`xpath=.//div[contains(@class, 'rounded-2xl')][./div/span[normalize-space()="${label}"]]`)
-          .locator("span.rounded-full");
-        const want = change(now, before);
-        if (want == null) await expect(pill, `${label} : pas de %`).toHaveCount(0);
-        else
-          expect(Math.abs((frNumber(await pill.innerText()) ?? NaN) - want), `${label} %`).toBeLessThanOrEqual(0.006);
+      // Emplacement + date de péremption (stock file), with its hint (Périmé / < 30 j / < 90 j).
+      await expect(field(page, "Emplacement")).toHaveText(e.stock.zone || "Non disponible");
+      // ... and big in the header, on every tab.
+      if (e.stock.zone) {
+        await expect(
+          page.locator("main header").getByText(e.stock.zone, { exact: true }),
+          "emplacement en haut",
+        ).toBeVisible();
       }
+      if (!e.stock.expiry_date) await expect(field(page, "Date de péremption")).toHaveText("Non disponible");
+      else {
+        await expect(field(page, "Date de péremption")).toContainText(frDate(e.stock.expiry_date));
+        const hint = expiryHint(e.stock.expiry_date);
+        for (const label of ["Périmé", "Moins de 30 jours", "Moins de 90 jours"]) {
+          await expect(field(page, "Date de péremption").getByText(label, { exact: true }), label).toHaveCount(
+            label === hint ? 1 : 0,
+          );
+        }
+      }
+
+      // « Performance » = the Statistiques dates (last 30 days first) vs the days just before.
+      await expect(page.getByText("Ventes 30 jours", { exact: true }), "pas de tuile en double").toHaveCount(0);
+      await expectDates(
+        page,
+        expected().products.stats[pid]["30d"].date_from,
+        expected().products.stats[pid]["30d"].date_to,
+      );
+      await expectPerformance(page, expected().products.stats[pid]["30d"]);
 
       // Informations générales: the values as imported (« Non disponible » when none).
       const infos: [string, string][] = [
@@ -469,7 +527,7 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
       if (last_pu_date) await expect(field(page, "Dernier prix d'achat")).toContainText(`(${frDate(last_pu_date)})`);
       else await expect(field(page, "Dernier prix d'achat")).toHaveText("Non disponible");
 
-      // Mouvements récents: the 5 latest lines.
+      // Traçabilité récente: the 5 latest lines.
       const moves: Row[] = e.recent_movements;
       if (moves.length === 0) await expect(page.getByText("Aucun achat ni vente pour ce produit.")).toBeVisible();
       else {
@@ -492,54 +550,10 @@ test("fiche produit: copier le code barre (en-tête)", async ({ page }) => {
   expect(await page.evaluate(() => navigator.clipboard.readText()), "presse-papiers").toBe(e.barcode1);
 });
 
-test("fiche produit: « Imprimer » = l'en-tête + l'onglet ouvert, en thème clair, sans menu ni boutons", async ({
-  page,
-}) => {
-  const [pid, e] = Object.entries<Row>(expected().products.sheets)[0];
-  await openSheet(page, pid);
-  await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
-  const print = page.getByRole("button", { name: "Imprimer", exact: true });
-
-  // window.print opens the browser's print window: replaced here to see the theme it prints in.
-  await page.evaluate(() => {
-    document.documentElement.classList.add("dark");
-    const w = window as unknown as { printed: boolean[] };
-    w.printed = [];
-    window.print = () => w.printed.push(document.documentElement.classList.contains("dark"));
-  });
-  await print.click();
-  expect(await page.evaluate(() => (window as unknown as { printed: boolean[] }).printed), "imprimé en clair").toEqual([
-    false,
-  ]);
-  expect(await page.evaluate(() => document.documentElement.classList.contains("dark")), "sombre ensuite").toBe(true);
-  await page.evaluate(() => document.documentElement.classList.remove("dark"));
-
-  // On paper: the header and the open tab (its name as a title), no menu, buttons or tabs.
-  await page.emulateMedia({ media: "print" });
-  await expect(page.locator("aside"), "menu").toBeHidden();
-  await expect(print).toBeHidden();
-  await expect(page.getByRole("button", { name: "Modifier", exact: true })).toBeHidden();
-  await expect(page.getByRole("button", { name: "30 jours", exact: true })).toBeHidden();
-  await expect(page.getByRole("tablist")).toBeHidden();
-  await expect(page.getByRole("heading", { level: 1, name: e.product, exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Statistiques", exact: true })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Ventes par mois", exact: true })).toBeVisible();
-  await expect(page.getByText(/^Du .+ au .+ · les % comparent/), "la période").toBeVisible();
-  // « Mouvements » on paper: a line says which lines (no filter fields), no « Action » column.
-  await page.goto(page.url().replace("tab=stats", "tab=movements"));
-  await expect(page.getByText(/^Tous · toutes les dates · lignes 1 à 10 sur [\d\s\u202f]+$/)).toBeVisible();
-  await expect(page.getByPlaceholder("Rechercher une référence, un client…")).toBeHidden();
-  await expect(page.getByRole("columnheader", { name: "Action" })).toBeHidden();
-  await expect(page.getByRole("columnheader", { name: "Total" })).toBeVisible();
-  await page.emulateMedia({ media: null });
-  await expect(page.getByRole("heading", { level: 2, name: "Statistiques", exact: true }), "écran").toBeHidden();
-
-  // While editing: disabled, with the reason.
-  await page.getByRole("button", { name: "Modifier", exact: true }).click();
-  await expect(print).toBeDisabled();
-  await expect(print).toHaveAttribute("title", "Enregistrez ou annulez la modification avant d'imprimer.");
-  await page.getByRole("button", { name: "Annuler", exact: true }).click();
-  await expect(print).toBeEnabled();
+test("fiche produit: pas de bouton « Imprimer »", async ({ page }) => {
+  await openSheet(page, Object.keys(expected().products.sheets)[0]);
+  await expect(page.getByRole("button", { name: "Modifier", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Imprimer", exact: true })).toHaveCount(0);
 });
 
 test("fiche produit: photo de l'en-tête (première photo, adresse morte, aucune)", async ({ page }) => {
@@ -558,7 +572,7 @@ test("fiche produit: photo de l'en-tête (première photo, adresse morte, aucune
   await expect(header.getByRole("img", { name: "Pas de photo" })).toBeVisible();
 });
 
-test("fiche produit: onglet « Codes » (identifiants, copier, format, longueur), gardé dans l'adresse, fil d'Ariane", async ({
+test("fiche produit: onglet « Codes » (identifiants, copier, sans blocs format / longueur), gardé dans l'adresse, fil d'Ariane", async ({
   page,
 }) => {
   const { product, barcode1 } = expected().products.barcode_setup;
@@ -594,27 +608,19 @@ test("fiche produit: onglet « Codes » (identifiants, copier, format, longueur)
   ).toBeAttached();
   await expect(ids.getByText(barcode1, { exact: true }).last(), "numéro sous le dessin").toBeVisible();
 
-  // One block per barcode: value, format (check digit), length; none → « Non disponible » + a note.
-  const first = section(page, "Code barre 1");
-  await expect(fieldIn(first, "Code barre 1")).toContainText(barcode1);
-  await expect(fieldIn(first, "Format")).toHaveText(barcodeFormat(barcode1));
-  await expect(fieldIn(first, "Longueur")).toHaveText(`${barcode1.length} chiffres`);
-  await expect(first.getByRole("button", { name: "Copier le code barre 1", exact: true })).toBeEnabled();
-  const second = section(page, "Code barre 2");
-  for (const label of ["Code barre 2", "Format", "Longueur"]) {
-    await expect(fieldIn(second, label), label).toContainText("Non disponible");
+  // No more « Code barre 1 » / « Code barre 2 » blocks (format, longueur): only the identifiers.
+  for (const title of ["Code barre 1", "Code barre 2"]) {
+    await expect(page.getByRole("heading", { name: title, exact: true }), `bloc ${title}`).toHaveCount(0);
   }
-  await expect(second.getByText(/^Le code barre 2 n'est pas renseigné pour ce produit\./)).toBeVisible();
-  await expect(second.getByRole("button", { name: "Copier le code barre 2", exact: true })).toBeDisabled();
+  await expect(page.getByText("Longueur", { exact: true })).toHaveCount(0);
 
-  // A barcode from the stock file (not a real EAN: wrong check digit → « Autre »).
+  // A barcode from the stock file: shown in the identifiers.
   const [otherPid, other] = Object.entries<Row>(expected().products.sheets).find(
     ([p, e]) => p !== pid && e.barcode1,
   ) as [string, Row];
   await openSheet(page, otherPid);
   await page.getByRole("tab", { name: "Codes", exact: true }).click();
-  await expect(fieldIn(section(page, "Code barre 1"), "Format")).toHaveText(barcodeFormat(other.barcode1));
-  await expect(fieldIn(section(page, "Code barre 1"), "Longueur")).toHaveText(`${other.barcode1.length} chiffres`);
+  await expect(fieldIn(section(page, "Identifiants du produit"), "Code barre 1")).toContainText(other.barcode1);
 
   // The tab stays on reload; « Général » takes it out of the address.
   await page.reload();
@@ -629,6 +635,11 @@ test("fiche produit: onglet « Codes » (identifiants, copier, format, longueur)
   await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: other.product, exact: true })).toBeVisible();
+  // « Retour à la liste des produits » (big button, on every tab): the list.
+  await page.getByRole("tab", { name: "Traçabilité", exact: true }).click();
+  await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/produits$/);
 });
 
 test("fiche produit: « Scanner / Rechercher un code barre » (code barre, PID, code inconnu, Échap, Annuler)", async ({
@@ -693,24 +704,25 @@ test("fiche produit: « Scanner / Rechercher un code barre » (code barre, PID, 
 test("fiche produit: en espagnol (onglets, blocs, boutons), choix gardé, retour en français", async ({ page }) => {
   await openSheet(page, Object.keys(expected().products.sheets)[0]);
   await page.getByRole("button", { name: "Espagnol", exact: true }).click();
-  for (const name of ["General", "Estadísticas", "Movimientos", "Códigos"]) {
+  for (const name of ["General", "Estadísticas", "Trazabilidad", "Códigos"]) {
     await expect(page.getByRole("tab", { name, exact: true }), `onglet ${name}`).toBeVisible();
   }
-  for (const title of ["Stock", "Información general", "Movimientos recientes", "Rendimiento"]) {
+  for (const title of ["Stock", "Información general", "Trazabilidad reciente", "Rendimiento"]) {
     await expect(page.getByRole("heading", { name: title, exact: true }), title).toBeVisible();
   }
-  for (const label of ["Margen bruto", "Ventas 30 días", "Compras 30 días"]) {
-    await expect(page.getByText(label, { exact: true }), label).toBeVisible();
+  await expect(page.getByText("Margen bruto", { exact: true })).toBeVisible();
+  for (const label of ["Ventas", "Compras"]) {
+    await expect(section(page, "Rendimiento").getByText(label, { exact: true }), label).toBeVisible();
   }
   await expect(page.getByRole("button", { name: "Editar", exact: true }), "Editar + 2 « Editar »").toHaveCount(3);
-  await expect(page.getByRole("button", { name: "Imprimir", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Volver a la lista de productos", exact: true })).toBeVisible();
   await page.reload(); // the language is remembered
   await expect(page.getByRole("tab", { name: "Estadísticas", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Estadísticas", exact: true }).click();
   await expect(page.getByText("Cantidad vendida (total)", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Personalizado", exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Movimientos", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Ver detalle", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Abrir el calendario", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Trazabilidad", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Detalles de la línea", exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("Buscar una referencia, un cliente…")).toBeVisible();
   await page.getByRole("tab", { name: "Códigos", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Identificadores del producto", exact: true })).toBeVisible();
@@ -748,8 +760,43 @@ async function expectChange(scope: Page | Locator, label: string, now: number | 
 }
 
 const monthName = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+
+/** The 2 date fields of the page show `from` → `to`. */
+async function expectDates(page: Page, from: string, to: string) {
+  for (const [side, iso] of [
+    ["Date début", from],
+    ["Date fin", to],
+  ] as const) {
+    const [y, m, d] = iso.split("-");
+    await expect(page.getByLabel(`${side} jour`, { exact: true }), `${side} jour`).toHaveValue(d);
+    await expect(page.getByLabel(`${side} mois`, { exact: true }), `${side} mois`).toHaveValue(m);
+    await expect(page.getByLabel(`${side} année`, { exact: true }), `${side} année`).toHaveValue(y);
+  }
+}
 /** A number as « Copier » puts it for Excel: French style, no thousands space. */
 const excel = (n: number | null, decimals: number) => (n == null ? "" : n.toFixed(decimals).replace(".", ","));
+
+/** « Performance » (Général) for one Statistiques period: its dates, units sold / bought, % vs the
+ *  days just before (none when nothing then). */
+async function expectPerformance(page: Page, s: Row): Promise<void> {
+  const perf = section(page, "Performance");
+  await expect(perf).toContainText(`(du ${frDate(s.date_from)} au ${frDate(s.date_to)})`);
+  for (const [label, key] of [
+    ["Ventes", "sold"],
+    ["Achats", "bought"],
+  ] as const) {
+    await expectTile(perf, label, s.period[key]);
+    const pill = perf
+      .locator(`xpath=.//div[contains(@class, 'rounded-2xl')][./div/span[normalize-space()="${label}"]]`)
+      .locator("span.rounded-full");
+    const want = change(s.period[key], s.previous[key]);
+    if (want == null) await expect(pill, `${label} : pas de %`).toHaveCount(0);
+    else {
+      expect(Math.abs((frNumber(await pill.innerText()) ?? NaN) - want), `${label} %`).toBeLessThanOrEqual(0.006);
+      await expect(perf).toContainText(`vs du ${frDate(s.previous_from)} au ${frDate(s.previous_to)}`);
+    }
+  }
+}
 
 /** Statistiques tab for one period = the oracle, on screen. */
 async function expectStats(page: Page, e: Row): Promise<void> {
@@ -828,67 +875,104 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     });
   }
 
-  // « Historique des ventes (par année) »: every year with a sale (newest first), units per month.
-  const history: Row[] = e.history;
-  const years = section(page, "Historique des ventes (par année)").locator("table");
-  if (history.length === 0)
-    await expect(section(page, "Historique des ventes (par année)")).toContainText("Aucune vente");
-  else {
-    expect((await columnTexts(page, "Année", years)).map(Number), "années").toEqual(history.map((y) => y.year));
-    for (const [m, label] of MONTHS_SHORT.entries()) {
-      const shown = (await columnTexts(page, label, years)).map((x) => frNumber(x) ?? 0);
-      expect(shown, `historique ${label}`).toEqual(history.map((y) => y.sold[m]));
-    }
-    expect(
-      (await columnTexts(page, "Total", years)).map((x) => frNumber(x) ?? 0),
-      "total par année",
-    ).toEqual(history.map((y) => y.total));
-    const ca = (await columnTexts(page, "CA (MAD)", years)).map(frNumber);
-    ca.forEach((v, i) =>
-      expect(Math.abs((v ?? NaN) - history[i].ca), `CA ${history[i].year}`).toBeLessThanOrEqual(0.011),
-    );
-  }
-
-  // « Tendances »: the same % as the quantities, one dot per day / week / month (value on hover).
-  const trend: Row[] = e.trend;
-  for (const [label, key] of [
-    ["Tendance des ventes", "sold"],
-    ["Tendance des achats", "bought"],
+  // « Historique (par année) »: Ventes then Achats, every year with a line of that kind (newest first).
+  for (const [kind, title, units, total, amount, amountHeader, empty] of [
+    ["Ventes", "Historique des ventes (par année)", "sold", "total", "ca", "CA (MAD)", "Aucune vente"],
+    ["Achats", "Historique des achats (par année)", "bought", "bought_total", "spent", "Montant (MAD)", "Aucun achat"],
   ] as const) {
-    await expectChange(section(page, "Tendances"), label, now[key], before[key]);
-    const dots = page.getByRole("img", { name: label, exact: true }).locator("circle title");
-    const values = (await dots.allTextContents()).map((x) => frNumber(x.split(" : ")[1]));
-    expect(values, `${label} : points`).toEqual(trend.map((p) => p[key]));
+    if (kind === "Achats") {
+      await section(page, "Historique des ventes (par année)")
+        .getByRole("button", { name: "Achats", exact: true })
+        .click();
+    }
+    const card = section(page, title);
+    const years = card.locator("table");
+    const history = (e.history as Row[]).filter((y) => (y[units] as number[]).some((n) => n !== 0));
+    if (history.length === 0) await expect(card).toContainText(empty);
+    else {
+      expect((await columnTexts(page, "Année", years)).map(Number), `${kind} : années`).toEqual(
+        history.map((y) => y.year),
+      );
+      for (const [m, label] of MONTHS_SHORT.entries()) {
+        const shown = (await columnTexts(page, label, years)).map((x) => frNumber(x) ?? 0);
+        expect(shown, `${kind} : historique ${label}`).toEqual(history.map((y) => y[units][m]));
+      }
+      expect(
+        (await columnTexts(page, "Total", years)).map((x) => frNumber(x) ?? 0),
+        `${kind} : total par année`,
+      ).toEqual(history.map((y) => y[total]));
+      const amounts = (await columnTexts(page, amountHeader, years)).map(frNumber);
+      amounts.forEach((v, i) =>
+        expect(
+          Math.abs((v ?? NaN) - history[i][amount]),
+          `${kind} ${amountHeader} ${history[i].year}`,
+        ).toBeLessThanOrEqual(0.011),
+      );
+    }
   }
+  await section(page, "Historique des achats (par année)").getByRole("button", { name: "Ventes", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Historique des ventes (par année)", exact: true })).toBeVisible();
 
-  // « Top fournisseurs » (+ « Autres ») and the latest price of each supplier.
+  // No « Tendances » any more.
+  await expect(page.getByRole("heading", { name: "Tendances", exact: true })).toHaveCount(0);
+
+  // « Top fournisseurs »: the 3 biggest + « Autres »; « Voir tout » = every supplier of the period.
+  const all: Row[] = e.suppliers;
+  const bought = all.reduce((sum, r) => sum + r.quantity, 0);
+  const rest = all.slice(3).reduce((sum, r) => sum + r.quantity, 0);
   const suppliers: Row[] = [
-    ...e.top_suppliers,
-    ...(e.other_suppliers ? [{ ...e.other_suppliers, supplier: "Autres" }] : []),
+    ...all.slice(0, 3),
+    ...(all.length > 3
+      ? [{ supplier: "Autres", quantity: rest, pct: bought > 0 ? Math.round((rest / bought) * 10_000) / 100 : null }]
+      : []),
   ];
-  const top = section(page, "Top fournisseurs");
-  if (suppliers.length === 0) await expect(top.getByText("Aucun achat sur la période.")).toBeVisible();
-  else {
-    const t = top.locator("table");
-    expect(await columnTexts(page, "Fournisseur", t), "fournisseurs").toEqual(suppliers.map((r) => r.supplier));
-    expect((await columnTexts(page, "Quantité", t)).map(frNumber), "quantités").toEqual(
-      suppliers.map((r) => r.quantity),
+  const expectSuppliers = async (t: Locator, rows: Row[], what: string) => {
+    expect(await columnTexts(page, "Fournisseur", t), `${what} : fournisseurs`).toEqual(rows.map((r) => r.supplier));
+    expect((await columnTexts(page, "Quantité", t)).map(frNumber), `${what} : quantités`).toEqual(
+      rows.map((r) => r.quantity),
     );
     const pcts = (await columnTexts(page, "% du total", t)).map(frNumber);
-    pcts.forEach((v, i) => expect(Math.abs((v ?? NaN) - suppliers[i].pct), "% du total").toBeLessThanOrEqual(0.006));
+    pcts.forEach((v, i) =>
+      expect(Math.abs((v ?? NaN) - rows[i].pct), `${what} : % du total`).toBeLessThanOrEqual(0.006),
+    );
+  };
+  const top = section(page, "Top fournisseurs");
+  const seeAll = (card: Locator, n: number) => card.getByRole("button", { name: `Voir tout (${n})`, exact: true });
+  if (all.length === 0) {
+    await expect(top.getByText("Aucun achat sur la période.")).toBeVisible();
+    await expect(seeAll(top, 0), "rien à voir : grisé").toBeDisabled();
+  } else {
+    await expectSuppliers(top.locator("table"), suppliers, "top fournisseurs");
+    await seeAll(top, all.length).click();
+    const win = page.getByRole("dialog").filter({ hasText: "Tous les fournisseurs de la période" });
+    await expectSuppliers(win.locator("table"), all, "voir tout : fournisseurs");
+    await win.getByRole("button", { name: "Fermer", exact: true }).click();
+    await expect(win).toHaveCount(0);
   }
+
+  // « Derniers prix d'achat »: the 5 latest; « Voir tout » = each supplier's latest price, with its date.
   const prices: Row[] = e.last_prices;
   const lastPrices = section(page, "Derniers prix d'achat par fournisseur");
-  if (prices.length === 0) await expect(lastPrices.getByText("Aucun achat avec un prix.")).toBeVisible();
-  else {
-    const t = lastPrices.locator("table");
-    expect(await columnTexts(page, "Fournisseur", t), "derniers prix : fournisseurs").toEqual(
-      prices.map((r) => r.supplier),
-    );
+  const expectPrices = async (t: Locator, rows: Row[], what: string) => {
+    expect(await columnTexts(page, "Fournisseur", t), `${what} : fournisseurs`).toEqual(rows.map((r) => r.supplier));
     const pus = (await columnTexts(page, "Prix unitaire", t)).map(frNumber);
     pus.forEach((v, i) =>
-      expect(Math.abs((v ?? NaN) - prices[i].unit_price), "prix unitaire").toBeLessThanOrEqual(0.006),
+      expect(Math.abs((v ?? NaN) - rows[i].unit_price), `${what} : prix unitaire`).toBeLessThanOrEqual(0.006),
     );
+  };
+  if (prices.length === 0) {
+    await expect(lastPrices.getByText("Aucun achat avec un prix.")).toBeVisible();
+    await expect(seeAll(lastPrices, 0), "rien à voir : grisé").toBeDisabled();
+  } else {
+    await expectPrices(lastPrices.locator("table"), prices.slice(0, 5), "derniers prix");
+    await seeAll(lastPrices, prices.length).click();
+    const win = page.getByRole("dialog").filter({ hasText: "Dernier prix d'achat de chaque fournisseur" });
+    await expectPrices(win.locator("table"), prices, "voir tout : prix");
+    expect(await columnTexts(page, "Date", win.locator("table")), "voir tout : dates").toEqual(
+      prices.map((r) => frDate(r.date)),
+    );
+    await win.getByRole("button", { name: "Fermer", exact: true }).click();
+    await expect(win).toHaveCount(0);
   }
 }
 
@@ -901,43 +985,65 @@ test("fiche produit: onglet « Statistiques » (30 jours) = oracle, chaque produ
       expectSame(stats, e, `statistiques ${pid} (30 jours, chargées avec la fiche)`);
       await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
       await expect(page).toHaveURL(/\?tab=stats$/);
-      await expect(page.getByRole("button", { name: "30 jours", exact: true })).toHaveClass(/bg-primary/);
+      // The Ventes date picker, on the last 30 days.
+      await expectDates(page, e.date_from, e.date_to);
       await expectStats(page, e);
     });
   }
 });
 
-test("fiche produit: Statistiques, chaque période + Personnalisé, « Copier » le détail mensuel", async ({ page }) => {
+test("fiche produit: Statistiques, le sélecteur de dates de Ventes (périodes rapides, dates tapées), « Copier »", async ({
+  page,
+}) => {
   const pid = Object.keys(expected().products.stats)[0];
   const all = expected().products.stats[pid];
   const { id } = await openSheet(page, pid);
   await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
-  for (const [button, key] of [
-    ["7 jours", "7d"],
-    ["3 mois", "3m"],
-    ["12 mois", "12m"],
+  await expect(page.getByRole("button", { name: "30 jours", exact: true }), "plus de boutons 7 j / 30 j…").toHaveCount(
+    0,
+  );
+  for (const [preset, key] of [
+    ["Mois antérieur", "previous-month"],
+    ["Année antérieure", "previous-year"],
   ] as const) {
-    await test.step(button, async () => {
+    await test.step(preset, async () => {
       const e = all[key];
       const stats = pageCall(page, `/products/${id}/stats`, { date_from: e.date_from, date_to: e.date_to });
-      await page.getByRole("button", { name: button, exact: true }).click();
-      expectSame(await stats, e, `statistiques ${button}`);
+      await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+      await page.getByRole("button", { name: preset, exact: true }).click();
+      expectSame(await stats, e, `statistiques ${preset}`);
+      await expectDates(page, e.date_from, e.date_to);
       await expectStats(page, e);
     });
   }
-  await test.step("Personnalisé", async () => {
+  await test.step("dates tapées", async () => {
     const e = all.custom;
-    await page.getByRole("button", { name: "Personnalisé", exact: true }).click();
-    // The date fields start from the dates shown (12 mois), then change the period.
-    await expect(page.getByLabel("Date fin année", { exact: true })).toHaveValue(all["12m"].date_to.slice(0, 4));
     const stats = pageCall(page, `/products/${id}/stats`, { date_from: e.date_from, date_to: e.date_to });
     await setPeriod(page, e.date_from, e.date_to);
-    expectSame(await stats, e, "statistiques Personnalisé");
+    expectSame(await stats, e, "statistiques dates tapées");
     await expectStats(page, e);
-    // The period stays while going to another tab and back.
+    // The same dates on « Général »: « Performance » follows; they stay when going back.
     await page.getByRole("tab", { name: "Général", exact: true }).click();
+    await expectDates(page, e.date_from, e.date_to);
+    await expectPerformance(page, e);
     await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
-    await expect(page.getByLabel("Date début année", { exact: true })).toHaveValue(e.date_from.slice(0, 4));
+    await expectDates(page, e.date_from, e.date_to);
+  });
+  await test.step("dates changées sur Général", async () => {
+    const e = all["previous-year"];
+    await page.getByRole("tab", { name: "Général", exact: true }).click();
+    const stats = pageCall(page, `/products/${id}/stats`, { date_from: e.date_from, date_to: e.date_to });
+    await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+    await page.getByRole("button", { name: "Année antérieure", exact: true }).click();
+    expectSame(await stats, e, "statistiques depuis Général");
+    await expectPerformance(page, e);
+    await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
+    await expectDates(page, e.date_from, e.date_to);
+    await expectStats(page, e);
+    await setPeriod(page, all.custom.date_from, all.custom.date_to); // back for « Copier »
+    await expect(page.getByText(/^Du .+ au .+ · les % comparent/)).toContainText(
+      `Du ${frDate(all.custom.date_from)} au ${frDate(all.custom.date_to)}`,
+    );
   });
   await test.step("Copier", async () => {
     const e = all.custom;
@@ -952,22 +1058,96 @@ test("fiche produit: Statistiques, chaque période + Personnalisé, « Copier »
     const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-");
     expect(copied.split("\n"), "presse-papiers").toEqual(lines);
 
-    // « Historique des ventes (par année) » copied the same way.
-    await section(page, "Historique des ventes (par année)")
-      .getByRole("button", { name: "Copier l'historique des ventes", exact: true })
-      .click();
-    const yearLines = [["Année", ...MONTHS_SHORT, "Total", "CA (MAD)"].join("\t")].concat(
-      (e.history as Row[]).map((y) =>
-        [String(y.year), ...y.sold.map((n: number) => excel(n, 0)), excel(y.total, 0), excel(y.ca, 2)].join("\t"),
-      ),
-    );
-    await expect
-      .poll(async () => (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-").split("\n"))
-      .toEqual(yearLines);
+    // « Historique (par année) » copied the same way: Ventes, then Achats.
+    for (const [kind, title, button, units, total, amount, amountHeader] of [
+      [
+        "Ventes",
+        "Historique des ventes (par année)",
+        "Copier l'historique des ventes",
+        "sold",
+        "total",
+        "ca",
+        "CA (MAD)",
+      ],
+      [
+        "Achats",
+        "Historique des achats (par année)",
+        "Copier l'historique des achats",
+        "bought",
+        "bought_total",
+        "spent",
+        "Montant (MAD)",
+      ],
+    ] as const) {
+      if (kind === "Achats") {
+        await section(page, "Historique des ventes (par année)")
+          .getByRole("button", { name: "Achats", exact: true })
+          .click();
+      }
+      await section(page, title).getByRole("button", { name: button, exact: true }).click();
+      const yearLines = [["Année", ...MONTHS_SHORT, "Total", amountHeader].join("\t")].concat(
+        (e.history as Row[])
+          .filter((y) => (y[units] as number[]).some((n) => n !== 0))
+          .map((y) =>
+            [String(y.year), ...y[units].map((n: number) => excel(n, 0)), excel(y[total], 0), excel(y[amount], 2)].join(
+              "\t",
+            ),
+          ),
+      );
+      await expect
+        .poll(async () =>
+          (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-").split("\n"),
+        )
+        .toEqual(yearLines);
+    }
   });
 });
 
-test("fiche produit: onglet « Mouvements » = oracle (type, période, recherche, 10 par page, chaque colonne)", async ({
+/** « Traçabilité »: the value next to `label` in « Détails de la ligne ». */
+const detail = (page: Page, label: string) =>
+  section(page, "Détails de la ligne").locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
+
+/** « Détails de la ligne » = the oracle's line (+ its import: date, owner, file). */
+async function expectDetail(page: Page, m: Row, tva: string, what: string) {
+  const money = async (label: string, want: number | null) => {
+    if (want == null) await expect(detail(page, label), `${what}: ${label}`).toHaveText("—");
+    else
+      expect(
+        Math.abs((frNumber(await detail(page, label).innerText()) ?? NaN) - want),
+        `${what}: ${label}`,
+      ).toBeLessThanOrEqual(0.011);
+  };
+  await expect(detail(page, "Type"), `${what}: type`).toHaveText(m.kind === "achat" ? "Achat" : "Vente");
+  expect(frNumber(await detail(page, "Quantité").innerText()), `${what}: quantité`).toBe(m.quantity);
+  await money("Prix unitaire", m.unit_price);
+  if (m.kind === "achat") {
+    await expect(detail(page, "Fournisseur"), `${what}: fournisseur`).toHaveText(m.party ?? "—");
+    await expect(detail(page, "N° de BL"), `${what}: BL`).toHaveText(m.document ?? "—");
+    await expect(detail(page, "Date du BL"), `${what}: date du BL`).toHaveText(frDate(m.date));
+    await expect(detail(page, "Créée le"), `${what}: créée le`).toHaveText(
+      m.created_at ? `${frDate(m.created_at.slice(0, 10))} ${m.created_at.slice(11, 16)}` : "—",
+    );
+    await money("Total ligne", m.total);
+    for (const label of ["Date de péremption (lot)", "Stock min (fichier)", "Stock max (fichier)"]) {
+      await expect(detail(page, label), `${what}: ${label} (vide dans le fichier)`).toHaveText("—");
+    }
+  } else {
+    await expect(detail(page, "N° de transaction"), `${what}: ticket`).toHaveText(m.document ?? "—");
+    await expect(detail(page, "Date"), `${what}: date`).toHaveText(frDate(m.date));
+    await expect(detail(page, "Client"), `${what}: client`).toHaveText(m.party ?? "—");
+    expect(frNumber(await detail(page, "Remise").innerText()), `${what}: remise`).toBe(m.discount ?? 0);
+    await expect(detail(page, "TVA"), `${what}: TVA`).toHaveText(tva);
+    await money("Total", m.total);
+  }
+  // The import that brought the line: by the owner (02-import), today, a Sobrus file of that kind.
+  await expect(detail(page, "Importé par"), `${what}: importé par`).toHaveText(OWNER.name);
+  await expect(detail(page, "Importé le"), `${what}: importé le`).toHaveText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+  await expect(detail(page, "Fichier"), `${what}: fichier`).toHaveText(
+    new RegExp(`^Sobrus - ${m.kind === "achat" ? "Achats" : "Ventes"} `),
+  );
+}
+
+test("fiche produit: onglet « Traçabilité » = oracle (liste, détails de chaque ligne, type, période, tri, recherche)", async ({
   page,
 }) => {
   const e = expected().products.movements;
@@ -979,54 +1159,57 @@ test("fiche produit: onglet « Mouvements » = oracle (type, période, recherche
     expect(got.pagination.total, `${what}: nombre de lignes`).toBe(want.total);
     expectSame(got.data, want.page, `${what}: lignes`);
   };
-  /** The lines drawn = the oracle's page, column by column. */
+  /** The list = the oracle's page (type, date, heure, quantité); the first line's details shown. */
   const expectRows = async (want: Row[], what: string) => {
     await expect(page.locator("tbody tr"), `${what}: lignes dessinées`).toHaveCount(want.length);
     expect(await columnTexts(page, "Type"), `${what}: types`).toEqual(
       want.map((m) => (m.kind === "achat" ? "Achat" : "Vente")),
     );
-    expect(await columnTexts(page, "Référence"), `${what}: références`).toEqual(want.map((m) => m.document ?? "—"));
-    expect(await columnTexts(page, "Client / Fournisseur"), `${what}: clients / fournisseurs`).toEqual(
-      want.map((m) => m.party ?? "—"),
-    );
+    expect(await columnTexts(page, "Date"), `${what}: dates`).toEqual(want.map((m) => frDate(m.date)));
+    expect(await columnTexts(page, "Heure"), `${what}: heures`).toEqual(want.map((m) => m.time ?? "—"));
     expect((await columnTexts(page, "Quantité")).map(frNumber), `${what}: quantités`).toEqual(
       want.map((m) => m.quantity),
     );
-    for (const [header, key] of [
-      ["Prix unitaire", "unit_price"],
-      ["Total", "total"],
-    ] as const) {
-      const shown = (await columnTexts(page, header)).map(frNumber);
-      shown.forEach((v, i) =>
-        expect(Math.abs((v ?? NaN) - want[i][key]), `${what}: ${header}`).toBeLessThanOrEqual(0.011),
+    if (want.length) {
+      await expect(page.locator("tbody tr").first(), `${what}: 1re ligne choisie`).toHaveAttribute(
+        "aria-selected",
+        "true",
       );
+      await expectDetail(page, want[0], tva, `${what}, 1re ligne`);
     }
-    // Remise: a sale's % (0 when none), « — » for a purchase. TVA: the product's.
-    const remises = await columnTexts(page, "Remise");
-    remises.forEach((v, i) =>
-      want[i].kind === "achat"
-        ? expect(v, `${what}: remise d'un achat`).toBe("—")
-        : expect(frNumber(v), `${what}: remise`).toBe(want[i].discount ?? 0),
-    );
-    expect(await columnTexts(page, "TVA"), `${what}: TVA`).toEqual(want.map(() => tva));
-    await expect(page.getByRole("button", { name: "Voir détail", exact: true }), `${what}: Voir détail`).toHaveCount(
-      want.length,
-    );
   };
 
-  // « Voir tout » under « Mouvements récents » opens the tab: 10 lines a page.
-  let call = pageCall(page, path, { page: "1", kind: "all", limit: "10" });
-  await section(page, "Mouvements récents").getByRole("button", { name: "Voir tout" }).click();
+  // « Voir tout » under « Traçabilité récente » opens the tab: 20 lines a page.
+  let call = pageCall(page, path, { page: "1", kind: "all", order: "date", limit: "20" });
+  await section(page, "Traçabilité récente").getByRole("button", { name: "Voir tout" }).click();
   await expect(page).toHaveURL(/\?tab=movements$/);
+  await expect(page.getByRole("tab", { name: "Traçabilité", exact: true })).toHaveAttribute("aria-selected", "true");
   check(await call, e.all, "tout");
   await expectRows(e.all.page, "tout");
-  await expect(page.getByText(/10 \/ page/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Exporter Excel" }), "plus d'export").toHaveCount(0);
+  await expect(page.getByText(/20 \/ page/).first()).toBeVisible();
+
+  // Every line of the page: click it → its details (purchases and sales).
+  const lines: Row[] = e.all.page;
+  for (const [i, m] of lines.entries()) {
+    await page.locator("tbody tr").nth(i).click();
+    await expect(page.locator("tbody tr").nth(i), `ligne ${i + 1} choisie`).toHaveAttribute("aria-selected", "true");
+    await expectDetail(page, m, tva, `ligne ${i + 1}`);
+  }
+  expect(new Set(lines.map((m) => m.kind)).size, "achats et ventes sur la page").toBe(2);
 
   call = pageCall(page, path, { page: "2" });
   await page.getByRole("button", { name: "Page suivante" }).click();
   check(await call, e.all_page2, "page 2");
   await expectRows(e.all_page2.page, "page 2");
+
+  // « Trier : Par type » = purchases first, then sales (like « Rastro »).
+  call = pageCall(page, path, { order: "kind", page: "1" });
+  await page.getByRole("group", { name: "Trier" }).getByRole("button", { name: "Par type", exact: true }).click();
+  check(await call, e.by_kind, "par type");
+  await expectRows(e.by_kind.page, "par type");
+  call = pageCall(page, path, { order: "date", page: "1" });
+  await page.getByRole("group", { name: "Trier" }).getByRole("button", { name: "Par date", exact: true }).click();
+  await call;
 
   call = pageCall(page, path, { kind: "achat", page: "1" });
   await pickCategoryType(page, "Achats");
@@ -1048,21 +1231,22 @@ test("fiche produit: onglet « Mouvements » = oracle (type, période, recherche
   await expectRows(e.search.page, "recherche");
 });
 
-test("fiche produit: « Voir détail » = tout le ticket dans Ventes, tout le BL dans Achats (période retirée)", async ({
+test("fiche produit: « Voir tout le ticket / BL » = tout le ticket dans Ventes, tout le BL dans Achats (période retirée)", async ({
   page,
 }) => {
   const e = expected().products.movements;
   const w = testWindow();
   const { id } = await openSheet(page, e.pid);
-  await page.getByRole("tab", { name: "Mouvements", exact: true }).click();
+  await page.getByRole("tab", { name: "Traçabilité", exact: true }).click();
 
-  // Its latest sale, with a period chosen: « Voir détail » removes the period (the whole ticket).
+  // Its latest sale, with a period chosen: « Voir tout le ticket » removes the period.
   await pickCategoryType(page, "Ventes");
   let moves = pageCall(page, `/products/${id}/movements`, { kind: "vente", ...period(w) });
   await setPeriod(page, w.date_from, w.date_to);
   expect((await moves).data[0].document, "dernière vente").toBe(e.ticket.ref);
   const ventes = pageCall(page, "/ventes", { ref: e.ticket.ref, date_from: null, date_to: null });
-  await page.locator("tbody tr").first().getByRole("button", { name: "Voir détail", exact: true }).click();
+  await page.locator("tbody tr").first().click();
+  await section(page, "Détails de la ligne").getByRole("button", { name: "Voir tout le ticket", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/ventes\\?ref=${e.ticket.ref}$`));
   const ticket = await ventes;
   expect(ticket.pagination.total, "lignes du ticket").toBe(e.ticket.products.length);
@@ -1087,7 +1271,8 @@ test("fiche produit: « Voir détail » = tout le ticket dans Ventes, tout le BL
   await pickCategoryType(page, "Achats");
   expect((await moves).data[0].document, "dernier achat").toBe(e.bl.ref);
   const achats = pageCall(page, "/achats", { ref: e.bl.ref, date_from: null, date_to: null });
-  await page.locator("tbody tr").first().getByRole("button", { name: "Voir détail", exact: true }).click();
+  await page.locator("tbody tr").first().click();
+  await section(page, "Détails de la ligne").getByRole("button", { name: "Voir tout le BL", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/achats\\?ref=${e.bl.ref}$`));
   const bl = await achats;
   expect(bl.pagination.total, "lignes du BL").toBe(e.bl.products.length);
@@ -1097,6 +1282,34 @@ test("fiche produit: « Voir détail » = tout le ticket dans Ventes, tout le BL
   await page.getByRole("button", { name: "Tout réinitialiser" }).click();
   await expect(page).not.toHaveURL(/ref=/);
   await expect(page.getByText(`BL : ${e.bl.ref}`, { exact: true })).toHaveCount(0);
+});
+
+test("fiche produit: date de péremption → « Périmé », « Moins de 30 jours », « Moins de 90 jours », rien après", async ({
+  page,
+}) => {
+  const pid = Object.keys(expected().products.sheets)[0];
+  const { id } = await openSheet(page, pid);
+  try {
+    for (const [days, hint] of [
+      [-3, "Périmé"],
+      [10, "Moins de 30 jours"],
+      [60, "Moins de 90 jours"],
+      [200, null],
+    ] as const) {
+      const iso = daysFromToday(days);
+      await apiPut(page, `/products/${id}`, { expiry_date: iso }); // setup: the owner's date
+      await page.reload();
+      await expect(field(page, "Date de péremption")).toContainText(frDate(iso));
+      for (const label of ["Périmé", "Moins de 30 jours", "Moins de 90 jours"]) {
+        await expect(
+          field(page, "Date de péremption").getByText(label, { exact: true }),
+          `${days} j : ${label}`,
+        ).toHaveCount(label === hint ? 1 : 0);
+      }
+    }
+  } finally {
+    await apiPut(page, `/products/${id}`, { expiry_date: null });
+  }
 });
 
 // ── « Modifier » (owner) ────────────────────────────────────────────────────
@@ -1171,6 +1384,22 @@ function editPlan(
     { label: "Stock minimum", tab: "Général", typed: "3", field: "stock_min", sent: 3, imported: e.stock.stock_min },
     { label: "Stock maximum", tab: "Général", typed: "9", field: "stock_max", sent: 9, imported: e.stock.stock_max },
     {
+      label: "Emplacement",
+      tab: "Général",
+      typed: "PLACARD E2E 7",
+      field: "zone",
+      sent: "PLACARD E2E 7",
+      imported: e.stock.zone,
+    },
+    {
+      label: "Date de péremption",
+      tab: "Général",
+      typed: "31/12/2030",
+      field: "expiry_date",
+      sent: "2030-12-31",
+      imported: e.stock.expiry_date,
+    },
+    {
       label: "Code barre 1",
       tab: "Codes",
       typed: "3760000000082",
@@ -1232,7 +1461,7 @@ test.describe("modifier", () => {
           ppv,
           marge_pct: e.prices.avg_pu == null ? null : (1 - e.prices.avg_pu / ppv) * 100, // follows the PPV shown
         },
-        stock: { current_stock: 12, stock_min: 3, stock_max: 9 },
+        stock: { current_stock: 12, stock_min: 3, stock_max: 9, zone: "PLACARD E2E 7", expiry_date: "2030-12-31" },
         imported: Object.fromEntries(plan.map((f) => [f.field, f.imported])),
       },
       "fiche après Enregistrer",
@@ -1242,8 +1471,14 @@ test.describe("modifier", () => {
     await expect(page.getByRole("heading", { level: 1, name: `${e.product} (pharmacie)`, exact: true })).toBeVisible();
     await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Codes »").toHaveCount(2);
     await page.getByRole("tab", { name: "Général", exact: true }).click();
-    // 8 values + « Code barre » (= code barre 1); the tiles and the header show his PPV / name too.
-    await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Général »").toHaveCount(9);
+    // 10 values + « Code barre » (= code barre 1); the tiles and the header show his PPV / name too.
+    await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Général »").toHaveCount(11);
+    await expect(field(page, "Emplacement")).toContainText("PLACARD E2E 7");
+    await expect(
+      page.locator("main header").getByText("PLACARD E2E 7", { exact: true }),
+      "emplacement en haut",
+    ).toBeVisible();
+    await expect(field(page, "Date de péremption")).toContainText("31/12/2030");
     await expectNumber(page, "PPV", ppv);
     await expect(field(page, "PPV")).toContainText("Valeur importée :");
     await expectTile(page, "Prix de vente (PPV)", ppv);
@@ -1330,6 +1565,12 @@ test.describe("modifier", () => {
     await page.getByLabel("Stock maximum", { exact: true }).fill("10");
     await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
     await expect(page.getByText("Le stock minimum ne peut pas dépasser le stock maximum.")).toBeVisible();
+    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    // A date that does not exist.
+    await page.getByRole("button", { name: "Modifier", exact: true }).click();
+    await page.getByLabel("Date de péremption", { exact: true }).fill("31/02/2030");
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
+    await expect(page.getByText("Date invalide (exemple : 31/03/2027).")).toBeVisible();
     expect(puts, "valeurs fausses : rien envoyé").toBe(0);
     await page.getByRole("button", { name: "Annuler", exact: true }).click();
     const refused = await apiPut(page, `/products/${id}`, { stock_min: 50, stock_max: 10 }, 400);

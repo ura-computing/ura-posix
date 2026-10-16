@@ -102,8 +102,9 @@ class Session(Base):
 
 class SignupRequest(Base):
     """« Créer un compte » (/auth/signup), waiting for the admin's « Accepter » / « Refuser ».
-    Kept apart from `users`: nobody logs in before the admin accepts. `pharmacy_code` set =
-    join that pharmacy; else `pharmacy_name` + `pharmacy_city` (+ address) = a new one."""
+    An email without an account also gets a `pending` user (no pharmacy, no permission): it logs
+    in and sees an empty menu until « Accepter ». `pharmacy_code` set = join that pharmacy; else
+    `pharmacy_name` + `pharmacy_city` (+ address) = a new one."""
 
     __tablename__ = "signup_requests"
     __table_args__ = (
@@ -127,7 +128,7 @@ class SignupRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decided_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
-    # The account created on « Accepter ».
+    # The account: `pending` from the sign-up (email free then), active after « Accepter ».
     user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
 
 

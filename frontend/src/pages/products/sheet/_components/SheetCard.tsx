@@ -21,12 +21,7 @@ export function SheetCard({
   className?: string;
 }) {
   return (
-    <section
-      className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 print:break-inside-avoid",
-        className,
-      )}
-    >
+    <section className={cn("flex flex-col gap-3 rounded-xl border border-border bg-card p-4", className)}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {icon && <span className="text-primary">{icon}</span>}

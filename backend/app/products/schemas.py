@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
@@ -84,12 +84,23 @@ class ProductMovement(BaseModel):
 
 
 class ProductMovementLine(ProductMovement):
+    """One line of « Traçabilité » with everything shown in its details."""
+
+    id: int  # its purchase / sale line (unique with `kind`)
+    time: str | None  # purchase: HH:MM of « Créée le » when it is the line's day; sale: None (day only)
+    created_at: str | None  # purchase « Créée le » (date + hour, as in the file)
     total: float | None  # the line's total, as in the file
     discount: float | None  # sale: « Remise » in %; purchase: None
+    expiry_date: str | None  # purchase: the lot's « Date de péremption »
+    stock_min: float | None  # purchase: « Stock min » of the file
+    stock_max: float | None
+    imported_at: datetime | None  # the import that brought the line
+    imported_by: str | None  # who imported it (name, else email)
+    filename: str | None
 
 
 class ProductMovementsResponse(BaseModel):
-    """« Mouvements »: one page of the filtered lines."""
+    """« Traçabilité »: one page of the filtered lines."""
 
     data: list[ProductMovementLine]
     pagination: Pagination
@@ -97,15 +108,6 @@ class ProductMovementsResponse(BaseModel):
 
 class ProductLookup(BaseModel):
     id: int  # the product's sheet: /produits/{id}
-
-
-class Last30Days(BaseModel):
-    """Today and the 29 days before; `*_before` = the 30 days before those."""
-
-    sold: float
-    bought: float
-    sold_before: float
-    bought_before: float
 
 
 class ProductSheet(BaseModel):
@@ -122,7 +124,6 @@ class ProductSheet(BaseModel):
     prices: ProductPrices
     stock: ProductStock
     recent_movements: list[ProductMovement]  # 5 latest, newest first
-    last_30d: Last30Days
     # Fields the owner edited → their imported value (« Revenir à la valeur importée »).
     imported: dict[str, str | float | int | None]
 
@@ -181,12 +182,6 @@ class MonthFigures(BaseModel):
     marge: float | None
 
 
-class TrendPoint(BaseModel):
-    start: str  # first day of the point (day, week or month)
-    sold: float
-    bought: float
-
-
 class SupplierShare(BaseModel):
     supplier: str | None  # None = no supplier name in the file
     quantity: float  # units bought in the period
@@ -199,11 +194,14 @@ class SupplierPrice(BaseModel):
     date: str | None
 
 
-class YearSales(BaseModel):
+class YearHistory(BaseModel):
     year: int
     sold: list[float]  # units sold, 12 values, January first
     total: float
     ca: float  # Σ qty × PPV (Rapport rule)
+    bought: list[float]  # units bought, 12 values, January first
+    bought_total: float
+    spent: float  # Σ purchase line totals (as in the files)
 
 
 class ProductStats(BaseModel):
@@ -217,9 +215,6 @@ class ProductStats(BaseModel):
     period: PeriodFigures
     previous: PeriodFigures
     monthly: list[MonthFigures]  # 12 months, oldest first
-    trend_unit: Literal["day", "week", "month"]  # « Tendances »: a day up to 31 days, a week up to 92
-    trend: list[TrendPoint]
-    top_suppliers: list[SupplierShare]  # the 3 biggest of the period
-    other_suppliers: SupplierShare | None  # « Autres »: every other supplier together
-    last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first, 5 at most
-    history: list[YearSales]  # « Historique des ventes (par année) »: every year with a sale, newest first
+    suppliers: list[SupplierShare]  # every supplier of the period, most units first (card: 3 + « Autres »)
+    last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first (card: 5)
+    history: list[YearHistory]  # « Historique (par année) »: every year with a sale or a purchase, newest first

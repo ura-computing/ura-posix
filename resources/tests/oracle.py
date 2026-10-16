@@ -451,11 +451,6 @@ class Oracle:
         moves += [(v.day, "vente", v.seq, -v.qty, v.unit, v.ref, v.client or None) for v in self.ventes if v.p is p]
         moves.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
         stock = p.stock
-        since, before = self.today - timedelta(days=29), self.today - timedelta(days=59)
-
-        def units_in(lines, first: date, last: date) -> float:
-            return float(sum(x.qty for x in lines if x.p is p and first <= x.day <= last))
-
         return {
             "pid": p.pid, "product": p.name, "laboratoire": None, "category": p.category,
             "category_type": "pharmacie" if p.pharma else "parapharmacie", "tva": p.tva_label,
@@ -481,32 +476,26 @@ class Oracle:
                  "party": party}
                 for day, kind, _, qty, unit, ref, party in moves[:5]
             ],
-            "last_30d": {
-                "sold": units_in(self.ventes, since, self.today),
-                "bought": units_in(self.achats, since, self.today),
-                "sold_before": units_in(self.ventes, before, since - timedelta(days=1)),
-                "bought_before": units_in(self.achats, before, since - timedelta(days=1)),
-            },
             "imported": {},   # no owner edit (18-produits « modifier » puts everything back)
         }
 
     def stats_periods(self) -> dict[str, tuple[date, date]]:
-        """Statistiques period buttons (frontend sheet/hooks.ts): the last 7 / 30 days, 3 / 12 months,
-        today included; « Personnalisé » = the test window."""
+        """Statistiques dates (the Ventes picker): the last 30 days first (today included), two
+        « Périodes rapides » (frontend utils/dateRange.ts), dates typed = the test window."""
         t = self.today
+        first = month_start(t)
         return {
-            "7d": (t - timedelta(days=6), t),
             "30d": (t - timedelta(days=29), t),
-            "3m": (months_back(t, 3) + timedelta(days=1), t),
-            "12m": (months_back(t, 12) + timedelta(days=1), t),
+            "previous-month": (months_back(first, 1), first - timedelta(days=1)),
+            "previous-year": (date(t.year - 1, 1, 1), date(t.year - 1, 12, 31)),
             "custom": (self.df, self.dt),
         }
 
     def product_stats(self, p, df: date, dt: date) -> dict:
         """GET /products/{id}/stats?date_from&date_to: the period vs the days just before (same
-        number); the last 12 months; « Tendances » = a point a day (≤ 31 days), a week (≤ 92), else a
-        month; top 3 suppliers + the rest; each supplier's latest priced purchase (5, newest first);
-        units sold per month of every year with a sale (newest first).
+        number); the last 12 months; every supplier of the period (most units first); each supplier's
+        latest priced purchase (newest first); units sold / bought per month of every year with a sale
+        or a purchase (newest first).
         CA = qty × PPV, marge = CA − units sold × average PU (every purchase)."""
         days = (dt - df).days + 1
         pf, pt = df - timedelta(days=days), df - timedelta(days=1)
@@ -521,18 +510,6 @@ class Oracle:
             return {"sold": sold, "bought": sum(a.qty for a in buys if first <= a.day <= last), "ca": r2(c),
                     "marge": r2(c - sold * pu) if pu is not None else None,
                     "transactions": len({v.ref for v in lines})}
-
-        if days <= 31:
-            unit, starts = "day", [df + timedelta(days=i) for i in range(days)]
-        elif days <= 92:
-            unit, starts = "week", [df + timedelta(days=i) for i in range(0, days, 7)]
-        else:
-            unit, starts = "month", [df]
-            while (m := next_month(starts[-1].replace(day=1))) <= dt:
-                starts.append(m)
-        ends = [x - timedelta(days=1) for x in starts[1:]] + [dt]
-        trend = [{"start": a.isoformat(), **{k: f[k] for k in ("sold", "bought")}}
-                 for a, b in zip(starts, ends) for f in [figures(a, b)]]
 
         months = [months_back(month_start(self.today), n) for n in range(11, -1, -1)]
         monthly = [{"month": m.isoformat()[:7], **{k: v for k, v in figures(m, next_month(m) - timedelta(days=1)).items()
@@ -550,49 +527,67 @@ class Oracle:
 
         last_prices, seen = [], set()
         for a in sorted((a for a in buys if a.qty > 0), key=lambda a: (a.day, a.seq), reverse=True):
-            if a.supplier not in seen and len(last_prices) < 5:
+            if a.supplier not in seen:
                 seen.add(a.supplier)
                 last_prices.append({"supplier": a.supplier, "unit_price": r4(a.unit), "date": a.day.isoformat()})
         return {
             "date_from": df.isoformat(), "date_to": dt.isoformat(),
             "previous_from": pf.isoformat(), "previous_to": pt.isoformat(),
             "period": figures(df, dt), "previous": figures(pf, pt),
-            "monthly": monthly, "trend_unit": unit, "trend": trend,
-            "top_suppliers": [share(name, q) for name, q in ranked[:3]],
-            "other_suppliers": share(None, sum(q for _, q in ranked[3:])) if len(ranked) > 3 else None,
+            "monthly": monthly,
+            "suppliers": [share(name, q) for name, q in ranked],
             "last_prices": last_prices,
             "history": [
                 {"year": y, "sold": [float(sum(v.qty for v in sales if v.day.year == y and v.day.month == m))
                                      for m in range(1, 13)],
                  "total": float(sum(v.qty for v in sales if v.day.year == y)),
-                 "ca": r2(sum(ca(v) for v in sales if v.day.year == y))}
-                for y in sorted({v.day.year for v in sales}, reverse=True)
+                 "ca": r2(sum(ca(v) for v in sales if v.day.year == y)),
+                 "bought": [float(sum(a.qty for a in buys if a.day.year == y and a.day.month == m))
+                            for m in range(1, 13)],
+                 "bought_total": float(sum(a.qty for a in buys if a.day.year == y)),
+                 "spent": r2(sum(a.total for a in buys if a.day.year == y))}
+                for y in sorted({v.day.year for v in sales} | {a.day.year for a in buys}, reverse=True)
             ],
         }
 
     def product_movements(self, p, df: date | None = None, dt: date | None = None, kind: str = "all",
-                          query: str | None = None, page: int = 1) -> dict:
-        """GET /products/{id}/movements: purchase (+qty) and sale (−qty, with its remise) lines,
-        newest day first (same day: sales, then purchases; then the latest line), search = every
-        word in the document or the supplier / client (accents ignored), 10 per page."""
-        lines = [(a.day, "achat", a.seq, a.qty, a.unit, a.total, None, a.ref, a.supplier) for a in self.achats if a.p is p]
-        lines += [(v.day, "vente", v.seq, -v.qty, v.unit, v.total, v.discount, v.ref, v.client or None)
+                          query: str | None = None, page: int = 1, order: str = "date") -> dict:
+        """GET /products/{id}/movements (« Traçabilité »): purchase (+qty) and sale (−qty, with its
+        remise) lines, newest day first (same day: sales, then purchases; then the latest line);
+        order « kind » = purchases first, then sales, each newest first. Search = every word in the
+        document or the supplier / client (accents ignored), 20 per page. A purchase also gives
+        « Créée le », its hour when it is the BL's day, the lot expiry and stock min / max of the file
+        (empty in the generated files). The import (date, who, file) is checked by the test."""
+        lines = [{"day": a.day, "kind": "achat", "seq": a.seq, "quantity": a.qty, "unit_price": a.unit,
+                  "total": a.total, "discount": None, "document": a.ref, "party": a.supplier,
+                  "created_at": a.created,
+                  "time": a.created[11:16] if a.created[:10] == a.day.isoformat() else None}
+                 for a in self.achats if a.p is p]
+        lines += [{"day": v.day, "kind": "vente", "seq": v.seq, "quantity": -v.qty, "unit_price": v.unit,
+                   "total": v.total, "discount": v.discount, "document": v.ref, "party": v.client or None,
+                   "created_at": None, "time": None}
                   for v in self.ventes if v.p is p]
         tokens = tokenize(query or "")
         keep = [m for m in lines
-                if (df is None or m[0] >= df) and (dt is None or m[0] <= dt) and (kind == "all" or m[1] == kind)
-                and all(token_match(m[7], t, unaccent=True) or token_match(m[8], t, unaccent=True) for t in tokens)]
-        keep.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
+                if (df is None or m["day"] >= df) and (dt is None or m["day"] <= dt)
+                and (kind == "all" or m["kind"] == kind)
+                and all(token_match(m["document"], t, unaccent=True) or token_match(m["party"], t, unaccent=True)
+                        for t in tokens)]
+        keep.sort(key=lambda m: (m["day"], m["kind"], m["seq"]), reverse=True)
+        if order == "kind":
+            keep.sort(key=lambda m: m["kind"])  # stable: newest first inside each kind
         return {
             "total": len(keep),
-            "page": [{"kind": k, "date": d.isoformat(), "quantity": q, "unit_price": u, "total": tot, "discount": disc,
-                      "document": ref, "party": party}
-                     for d, k, _, q, u, tot, disc, ref, party in keep[(page - 1) * 10:page * 10]],
+            "page": [{"kind": m["kind"], "date": m["day"].isoformat(), "time": m["time"],
+                      "created_at": m["created_at"], "quantity": m["quantity"], "unit_price": m["unit_price"],
+                      "total": m["total"], "discount": m["discount"], "document": m["document"],
+                      "party": m["party"], "expiry_date": None, "stock_min": None, "stock_max": None}
+                     for m in keep[(page - 1) * 20:page * 20]],
         }
 
     def movements_scenarios(self, p) -> dict:
-        """18-produits « Mouvements » tab, best-selling product: no filter (pages 1 + 2), Achats,
-        Ventes over the test window, search = the client of its latest sale with a client.
+        """18-produits « Traçabilité » tab, best-selling product: no filter (pages 1 + 2), sorted by
+        type, Achats, Ventes over the test window, search = the client of its latest sale with a client.
         « Voir détail » of its latest sale / purchase = every line of that ticket / BL (any product)."""
         client = next(v.client for v in sorted(self.ventes, key=lambda v: (v.day, v.seq), reverse=True)
                       if v.p is p and v.client)
@@ -601,6 +596,7 @@ class Oracle:
         return {
             "pid": p.pid, "client": client,
             "all": self.product_movements(p), "all_page2": self.product_movements(p, page=2),
+            "by_kind": self.product_movements(p, order="kind"),
             "achats": self.product_movements(p, kind="achat"),
             "ventes_window": self.product_movements(p, self.df, self.dt, "vente"),
             "search": self.product_movements(p, query=client),

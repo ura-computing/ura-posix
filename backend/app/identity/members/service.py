@@ -103,6 +103,18 @@ def create_member(
     return user
 
 
+def activate_member(db: Session, user: User, *, pharmacy_id: int) -> User:
+    """« Accepter » of a sign-up whose `pending` account exists: the same result as
+    create_member (active, in this pharmacy, every permission granted). Its open
+    sessions stay: the next page shows the whole menu."""
+    user.pharmacy_id = pharmacy_id
+    user.status = "active"
+    apply_permissions_bulk(db, user.id, {f: True for f in ALLOWED_FEATURES})
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def set_member_status(db: Session, target: User, status: str) -> None:
     """Toggle active <-> inactive. Going inactive also bumps token_version so
     existing sessions die immediately."""
