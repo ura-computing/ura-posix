@@ -44,7 +44,9 @@ from app.core.models import (
 )
 from app.core.search import product_search_clauses, supplier_search_clauses, tokenize_search
 from app.core.utils import today as pharmacy_today
+from app.core.audit import AuditAction, log_action
 from app.ledger.schemas import paginate
+from app.products.notes_queries import note_counts
 
 
 def _linked_ids(pharmacy_id: int):
@@ -152,6 +154,7 @@ def list_products(
     q = q.order_by(ordered.nullslast(), product, Medicament.id)
     rows = q.all() if export else q.offset((page - 1) * limit).limit(limit).all()
     photos = {} if export else _photos(db, [r.id for r in rows])  # the Excel file has no photo
+    notes = {} if export else note_counts(db, pharmacy_id, [r.id for r in rows])
 
     return {
         "data": [
@@ -168,6 +171,7 @@ def list_products(
                 "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,
                 "marge_pct": round(float(r.marge_pct), 2) if r.marge_pct is not None else None,
                 "photo": photos.get(r.id),
+                "notes": notes.get(r.id, 0),
             }
             for r in rows
         ],
@@ -186,6 +190,12 @@ def _is_linked(db: Session, pharmacy_id: int, med_id: int) -> bool:
         db.query(model.id).filter(model.pharmacy_id == pharmacy_id, model.medicament_id == med_id).first() is not None
         for model in (PharmacyStock, Vente, Achat)
     )
+
+
+def linked_product(db: Session, pharmacy_id: int, med_id: int) -> Medicament | None:
+    """The product when it is one of the pharmacy's (stock, sales or purchases), else None."""
+    med = db.get(Medicament, med_id)
+    return med if med is not None and _is_linked(db, pharmacy_id, med_id) else None
 
 
 def _movements(pharmacy_id: int, med_id: int):
@@ -384,19 +394,22 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             }
             for m in recent
         ],
+        "notes_count": note_counts(db, pharmacy_id, [med_id]).get(med_id, 0),
         "imported": {f: imported[f] for f in edited},
     }
 
 
-def save_product_edits(db: Session, pharmacy_id: int, med_id: int, user_id: int, changes: dict) -> dict | None:
+def save_product_edits(db: Session, pharmacy_id: int, med_id: int, user: User, changes: dict) -> dict | None:
     """Owner's « Enregistrer »: `changes` = {field: new value | None}. None, or the imported
     value itself, = not edited (« Revenir à la valeur importée »). None = not the pharmacy's
-    product. Raises ApiError when a typed minimum stock ends up above the maximum."""
+    product. Raises ApiError when a typed minimum stock ends up above the maximum. Each value
+    that changes on the sheet goes in the history (before → after)."""
     med = db.get(Medicament, med_id)
     if med is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     imported, _ = _imported_values(db, pharmacy_id, med)
     edit = _edit_row(db, pharmacy_id, med_id) or PharmacyProductEdit(pharmacy_id=pharmacy_id, medicament_id=med_id)
+    before = {**imported, **_edited_values(edit)}  # what the sheet showed
     for field, value in changes.items():
         same = (
             value is None
@@ -416,11 +429,17 @@ def save_product_edits(db: Session, pharmacy_id: int, med_id: int, user_id: int,
     ):
         db.rollback()
         raise ApiError(400, ErrorCode.STOCK_MIN_ABOVE_MAX, "Le stock minimum ne peut pas dépasser le stock maximum.")
+    for field in changes:
+        if shown[field] != before[field]:
+            reverted = getattr(edit, field) is None  # back to the imported value
+            action = AuditAction.PRODUCT_REVERTED if reverted else AuditAction.PRODUCT_EDITED
+            details = {"product": med.product, "field": field, "before": before[field], "after": shown[field]}
+            log_action(db, user, pharmacy_id, action, details, med_id)
     if all(getattr(edit, f) is None for f in EDITABLE_FIELDS):
         if edit.id is not None:
             db.delete(edit)
     else:
-        edit.updated_by = user_id
+        edit.updated_by = user.id
         db.add(edit)
     db.commit()
     return product_sheet(db, pharmacy_id, med_id)
@@ -441,20 +460,22 @@ def _last_12_months(today: date) -> list[str]:
     return [f"{m // 12}-{m % 12 + 1:02d}" for m in range(n - 11, n + 1)]
 
 
-def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date) -> dict | None:
+def product_stats(
+    db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date, months_year: int | None = None
+) -> dict | None:
     """Statistiques tab; None = not one of the pharmacy's products. The period (and the one just
     before, same length) drives the KPIs and « Top fournisseurs »; the charts and « Détail mensuel »
-    are always the last 12 months; « Historique (par année) » = every year with a sale or a
-    purchase. CA = Rapport rule (qty × PPV); marge = CA − units sold × average purchase price
-    (every purchase, as on « Général ») = CA × marge %. One product = a few thousand lines at most:
-    summed in Python."""
+    are the last 12 months, or January → December of `months_year`; « Historique (par année) » =
+    every year with a sale or a purchase. CA = Rapport rule (qty × PPV); marge = CA − units sold ×
+    average purchase price (every purchase, as on « Général ») = CA × marge %. One product = a few
+    thousand lines at most: summed in Python."""
     if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     today = pharmacy_today()
     prev_from, prev_to = _previous_period(date_from, date_to)
-    months = _last_12_months(today)
+    months = [f"{months_year}-{m:02d}" for m in range(1, 13)] if months_year else _last_12_months(today)
     lo = min(prev_from.isoformat(), f"{months[0]}-01")
-    hi = max(date_to, today).isoformat()
+    hi = max(date_to.isoformat(), today.isoformat(), f"{months[-1]}-31")
     sales = db.execute(
         select(Vente.date, Vente.quantity, ca_line().label("ca"), Vente.transaction_ref)
         .join(Medicament, Medicament.id == Vente.medicament_id)

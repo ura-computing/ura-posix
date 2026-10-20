@@ -1,7 +1,8 @@
 /** Top of the product sheet, on every tab: « Retour à la liste des produits » + breadcrumb,
- *  « PID | Catégorie | TVA », « Emplacement » (where it is on the shelves), type + stock
- *  badges, « Code barre(s) » card, « Modifier » (owner) / « Annuler » + « Enregistrer ». */
-import { ArrowLeft, ChevronRight, House, MapPin, Pencil, Save, X } from "lucide-react";
+ *  « PID | Catégorie | TVA », type + stock badges, « Modifier » (owner) / « Annuler » + « Enregistrer »;
+ *  under them one strip: « Emplacement », « Code barre », « Observations ». */
+import { type ReactNode } from "react";
+import { ArrowLeft, Barcode, ChevronRight, House, MapPin, Pencil, Save, StickyNote, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { AsyncButton } from "@/_components/AsyncButton";
@@ -104,42 +105,77 @@ export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
   );
 }
 
-/** « Emplacement »: where the product is (« PLACARD 2 », the stock file's « Zone » or the owner's),
- *  big, first thing seen on every tab; « Non disponible » without one. */
-export function LocationCard({ zone }: { zone: string | null }) {
-  const t = useT();
+/** One cell of the strip under the title: icon, label, value — every cell the same height. */
+function Fact({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+    <div className="flex min-w-0 items-center gap-3 px-5 py-4">
       <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <MapPin className="size-6" />
+        {icon}
       </span>
-      <div className="flex min-w-0 flex-col">
-        <span className="text-sm font-semibold text-muted-foreground">{t("products.location")}</span>
-        {zone ? (
-          <span className="break-words text-xl font-bold text-foreground">{zone}</span>
-        ) : (
-          <span className="text-base text-muted-foreground">{t("products.notAvailable")}</span>
-        )}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        {children}
       </div>
     </div>
   );
 }
 
-/** « Code barre(s) »: barcode 1 drawn + its number + copy; « Non disponible » without one. */
-export function BarcodeCard({ code }: { code: string | null }) {
+/** Under the title, one strip of 3 equal cells: « Emplacement » (where it is on the shelves, big),
+ *  « Code barre » (drawn + number + copy), « Observations » (the whole cell opens their window;
+ *  orange when there are some). « Non disponible » / « Aucune » when empty. */
+export function SheetFacts({
+  zone,
+  barcode,
+  notes,
+  onOpenNotes,
+}: {
+  zone: string | null;
+  barcode: string | null;
+  notes: number;
+  onOpenNotes: () => void;
+}) {
   const t = useT();
+  const none = <span className="text-base text-muted-foreground">{t("products.notAvailable")}</span>;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3">
-      <span className="text-sm font-semibold text-foreground">{t("products.barcodes")}</span>
-      {code ? (
-        <div className="flex items-center gap-3">
-          <BarcodeImage code={code} className="h-11 w-24" />
-          <span className="font-mono text-sm text-foreground">{code}</span>
-          <CopyButton value={code} label={t("products.copyBarcode")} iconOnly />
-        </div>
-      ) : (
-        <span className="text-sm text-muted-foreground">{t("products.notAvailable")}</span>
-      )}
+    <div className="grid overflow-hidden rounded-xl border border-border bg-card max-md:divide-y max-md:divide-border md:grid-cols-3 md:divide-x md:divide-border">
+      <Fact icon={<MapPin className="size-5" />} label={t("products.location")}>
+        {zone ? <span className="break-words text-xl font-bold text-foreground">{zone}</span> : none}
+      </Fact>
+      <Fact icon={<Barcode className="size-5" />} label={t("products.barcode")}>
+        {barcode ? (
+          <span className="flex flex-wrap items-center gap-3">
+            <BarcodeImage code={barcode} className="h-9 w-20" />
+            <span className="font-mono text-base font-semibold text-foreground">{barcode}</span>
+            <CopyButton value={barcode} label={t("products.copyBarcode")} iconOnly />
+          </span>
+        ) : (
+          none
+        )}
+      </Fact>
+      <button
+        type="button"
+        onClick={onOpenNotes}
+        className="flex min-w-0 cursor-pointer items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-surface-subtle"
+      >
+        <span
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-xl",
+            notes > 0 ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-primary/10 text-primary",
+          )}
+        >
+          <StickyNote className="size-5" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-sm text-muted-foreground">{t("products.observations")}</span>
+          <span className={cn("text-xl font-bold", notes > 0 ? "text-foreground" : "text-muted-foreground")}>
+            {notes > 0 ? t("products.notesN", { n: notes }) : t("products.notesNone")}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary">
+          {t(notes > 0 ? "products.notesSee" : "products.notesAddShort")}
+          <ChevronRight className="size-4" />
+        </span>
+      </button>
     </div>
   );
 }

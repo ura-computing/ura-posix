@@ -1,7 +1,8 @@
-/** « Statistiques »: the period's figures vs the days just before (same number), the last 12
- *  months (3 charts + « Détail mensuel », copied for Excel), « Historique (par année) » of the
- *  sales or the purchases, « Top fournisseurs » of the period and each supplier's latest purchase
- *  price (« Voir tout » = the whole list in a window). */
+/** « Statistiques »: the period's figures vs the days just before (same number); 3 charts +
+ *  « Détail mensuel » (copied for Excel) over the last 12 months or one year (« Mois affichés »);
+ *  « Historique (par année) » (sales light green, purchases light blue; « Tous · Ventes · Achats »);
+ *  « Top fournisseurs » of the period and each supplier's latest purchase price (« Voir tout » = the
+ *  whole list in a window). */
 import { useState } from "react";
 import { ArrowRight, BarChart3, CalendarRange, FileText, LineChart, Receipt, Truck } from "lucide-react";
 
@@ -12,6 +13,7 @@ import { KpiTile } from "@/_components/KpiTile";
 import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare, YearHistory } from "@/types";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
+import { cn } from "@/utils/cn";
 import { formatDate, formatMAD, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";
 
 import type { StatsRange } from "../hooks";
@@ -56,42 +58,67 @@ const monthColumns = (t: TFn, monthName: (m: string) => string): ColumnDef<Month
   },
 ];
 
-// « Historique (par année) »: one line per year, the units sold (or bought) each month, the total,
-// then CA (sales) or the amount paid (purchases).
-type HistoryKind = "sales" | "purchases";
+// « Historique (par année) »: per year a Ventes line (light green) and an Achats line (light blue):
+// the units each month, the total, then the amount (CA of the sales, Σ line totals of the purchases).
+type HistoryFilter = "all" | "sales" | "purchases";
+interface HistoryLine {
+  year: number;
+  kind: "sales" | "purchases";
+  units: number[];
+  total: number;
+  amount: number;
+}
+/** The lines of the filter, newest year first; a kind without any unit that year is left out. */
+const historyLines = (history: YearHistory[], filter: HistoryFilter): HistoryLine[] =>
+  history
+    .flatMap((y): HistoryLine[] => [
+      { year: y.year, kind: "sales", units: y.sold, total: y.total, amount: y.ca },
+      { year: y.year, kind: "purchases", units: y.bought, total: y.bought_total, amount: y.spent },
+    ])
+    .filter((l) => (filter === "all" || l.kind === filter) && l.units.some((n) => n !== 0));
+const LINE_TONE: Record<HistoryLine["kind"], string> = {
+  sales: "bg-success-subtle hover:bg-success-subtle",
+  purchases: "bg-info-subtle hover:bg-info-subtle",
+};
 const unitsOrDash = (n: number) => (n === 0 ? dash : formatQty(n));
-const historyOf = (r: YearHistory, kind: HistoryKind) =>
-  kind === "sales"
-    ? { units: r.sold, total: r.total, amount: r.ca }
-    : { units: r.bought, total: r.bought_total, amount: r.spent };
-const yearColumns = (t: TFn, monthsShort: string[], kind: HistoryKind): ColumnDef<YearHistory>[] => [
+const kindLabel = (t: TFn, kind: HistoryLine["kind"]) => t(kind === "sales" ? "nav.ventes" : "nav.achats");
+const yearColumns = (t: TFn, monthsShort: string[]): ColumnDef<HistoryLine>[] => [
   {
     key: "year",
     label: t("col.annee"),
     sortable: false,
     render: (r) => <span className="font-semibold">{r.year}</span>,
   },
-  ...monthsShort.map((label, m): ColumnDef<YearHistory> => ({
+  {
+    key: "kind",
+    label: t("col.type"),
+    sortable: false,
+    render: (r) => (
+      <span
+        className={cn(
+          "font-semibold",
+          r.kind === "sales" ? "text-success-subtle-foreground" : "text-info-subtle-foreground",
+        )}
+      >
+        {kindLabel(t, r.kind)}
+      </span>
+    ),
+  },
+  ...monthsShort.map((label, m): ColumnDef<HistoryLine> => ({
     key: `m${m + 1}`,
     label: label.replace(/\.$/, ""),
     align: "right",
     sortable: false,
-    render: (r) => unitsOrDash(historyOf(r, kind).units[m]),
+    render: (r) => unitsOrDash(r.units[m]),
   })),
   {
     key: "total",
     label: t("col.total"),
     align: "right",
     sortable: false,
-    render: (r) => <span className="font-semibold">{unitsOrDash(historyOf(r, kind).total)}</span>,
+    render: (r) => <span className="font-semibold">{unitsOrDash(r.total)}</span>,
   },
-  {
-    key: "amount",
-    label: t(kind === "sales" ? "products.colCaMad" : "products.colSpentMad"),
-    align: "right",
-    sortable: false,
-    render: (r) => money(historyOf(r, kind).amount),
-  },
+  { key: "amount", label: t("products.colSpentMad"), align: "right", sortable: false, render: (r) => money(r.amount) },
 ];
 
 const supplierColumns = (t: TFn): ColumnDef<SupplierShare>[] => [
@@ -161,11 +188,22 @@ function SeeAllButton({ n, onClick }: { n: number; onClick: () => void }) {
   );
 }
 
-export function StatsTab({ stats, range }: { stats: ProductStats | null; range: StatsRange }) {
+export function StatsTab({
+  stats,
+  range,
+  monthsYear,
+  onMonthsYear,
+}: {
+  stats: ProductStats | null;
+  range: StatsRange;
+  /** Charts + « Détail mensuel »: null = the last 12 months, else that year's 12 months. */
+  monthsYear: number | null;
+  onMonthsYear: (year: number | null) => void;
+}) {
   const t = useT();
   const months = useMonths();
   const monthsShort = useMonthsShort();
-  const [historyKind, setHistoryKind] = useState<HistoryKind>("sales");
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [seeAll, setSeeAll] = useState<"suppliers" | "prices" | null>(null);
   if (!range.from || !range.to) {
     return <p className="py-10 text-center text-base text-muted-foreground">{t("products.pickDates")}</p>;
@@ -205,20 +243,23 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
   ]
     .map((r) => r.join("\t"))
     .join("\n");
-  // « Historique (par année) »: the years with a sale (or a purchase); for Excel, the same columns.
-  const sales = historyKind === "sales";
-  const historyRows = stats.history.filter((y) => historyOf(y, historyKind).units.some((n) => n !== 0));
+  // « Historique (par année) »: the lines of the filter; for Excel, the same columns.
+  const historyRows = historyLines(stats.history, historyFilter);
   const historyTsv = [
     [
       t("col.annee"),
+      t("col.type"),
       ...monthsShort.map((m) => m.replace(/\.$/, "")),
       t("col.total"),
-      t(sales ? "products.colCaMad" : "products.colSpentMad"),
+      t("products.colSpentMad"),
     ],
-    ...historyRows.map((y) => {
-      const { units, total, amount } = historyOf(y, historyKind);
-      return [String(y.year), ...units.map((n) => cell(n, 0)), cell(total, 0), cell(amount, 2)];
-    }),
+    ...historyRows.map((l) => [
+      String(l.year),
+      kindLabel(t, l.kind),
+      ...l.units.map((n) => cell(n, 0)),
+      cell(l.total, 0),
+      cell(l.amount, 2),
+    ]),
   ]
     .map((r) => r.join("\t"))
     .join("\n");
@@ -237,7 +278,18 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
         ]
       : []),
   ];
+  // Charts + « Détail mensuel »: « 12 derniers mois » or a year of the history (all its months).
+  const LAST_12 = "last12";
+  const monthsOptions = [
+    { value: LAST_12, label: t("products.last12Months"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
+    ...stats.history.map((y) => ({
+      value: String(y.year),
+      label: String(y.year),
+      activeBg: "bg-primary text-primary-foreground shadow-sm",
+    })),
+  ];
   const historyOptions = [
+    { value: "all" as const, label: t("products.kindAll"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
     { value: "sales" as const, label: t("nav.ventes"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
     { value: "purchases" as const, label: t("nav.achats"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
   ];
@@ -268,6 +320,15 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
         />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3" role="group" aria-label={t("products.monthsShown")}>
+        <span className="text-sm font-medium text-muted-foreground">{t("products.monthsShown")}</span>
+        <CategorySegment
+          value={monthsYear == null ? LAST_12 : String(monthsYear)}
+          options={monthsOptions}
+          onChange={(v) => onMonthsYear(v === LAST_12 ? null : Number(v))}
+        />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <SheetCard title={t("products.salesByMonth")} icon={<BarChart3 className="size-5" />}>
           <MonthsChart months={monthKeys} series={[sold]} kind="bars" label={t("products.salesByMonth")} />
@@ -285,24 +346,27 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
       </div>
 
       <SheetCard
-        title={t(sales ? "products.salesHistory" : "products.purchasesHistory")}
+        title={t("products.yearHistory")}
         icon={<CalendarRange className="size-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <CategorySegment value={historyKind} options={historyOptions} onChange={setHistoryKind} />
-            <CopyButton
-              value={historyTsv}
-              label={t(sales ? "products.copyHistory" : "products.copyPurchasesHistory")}
-              copiedText={t("products.tableCopied")}
-            />
+            <CategorySegment value={historyFilter} options={historyOptions} onChange={setHistoryFilter} />
+            <CopyButton value={historyTsv} label={t("products.copyHistory")} copiedText={t("products.tableCopied")} />
           </div>
         }
       >
-        <DataTable<YearHistory>
+        <DataTable<HistoryLine>
           rows={historyRows}
-          columns={yearColumns(t, monthsShort, historyKind)}
-          emptyTitle={t(sales ? "products.noSale" : "products.noPurchaseEver")}
-          rowKey={(r) => r.year}
+          columns={yearColumns(t, monthsShort)}
+          emptyTitle={t(
+            historyFilter === "sales"
+              ? "products.noSale"
+              : historyFilter === "purchases"
+                ? "products.noPurchaseEver"
+                : "products.noMovement",
+          )}
+          rowKey={(r) => `${r.year}-${r.kind}`}
+          rowClassName={(r) => LINE_TONE[r.kind]}
         />
       </SheetCard>
 

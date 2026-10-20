@@ -1,7 +1,9 @@
 /** /produits/:id — one product of the pharmacy: header (photo, PID / catégorie / TVA, badges,
- *  emplacement, code barre, « Modifier »), then « Général », « Statistiques », « Traçabilité » and « Codes ».
+ *  emplacement, code barre, « Observations », « Modifier »), then « Général », « Statistiques »,
+ *  « Traçabilité », « Codes » and « Historique ». A product with observations opens their window first.
  *  Not one of its products → the 404 inside the layout (never says whether it exists elsewhere). */
-import { ArrowLeftRight, BarChart3, Box, ScanLine } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
 import { Page } from "@/_components/Page";
@@ -10,21 +12,39 @@ import NotFoundPage from "@/pages/auth/not-found";
 import { useT } from "@/i18n/I18nProvider";
 
 import { ProductPhoto } from "../_components/ProductPhoto";
+import { useScanner } from "../_components/useScanner";
 import { CodesTab } from "./_components/CodesTab";
 import { SheetEditContext } from "./_components/editContext";
 import { GeneralTab } from "./_components/GeneralTab";
+import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
-import { BarcodeCard, EditActions, LocationCard, SheetBreadcrumb, SheetMeta } from "./_components/SheetHeader";
+import { NotesDialog } from "./_components/NotesDialog";
+import { EditActions, SheetBreadcrumb, SheetFacts, SheetMeta } from "./_components/SheetHeader";
 import { StatsPeriodPicker } from "./_components/StatsPeriodPicker";
 import { StatsTab } from "./_components/StatsTab";
-import { useProductStats, useProduitPage, useSheetEditor, useStatsRange, type SheetTab } from "./hooks";
+import {
+  useProductNotes,
+  useProductStats,
+  useProduitPage,
+  useSheetEditor,
+  useStatsRange,
+  type SheetTab,
+} from "./hooks";
 
 function ProductSheetPage({ id }: { id: number }) {
   const t = useT();
   const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(id);
   const editor = useSheetEditor(sheet);
-  const { range, setRange } = useStatsRange();
-  const { stats } = useProductStats(id, range, !!sheet);
+  const { range, setRange, monthsYear, setMonthsYear } = useStatsRange();
+  const { stats } = useProductStats(id, range, monthsYear, !!sheet);
+  useScanner(); // a scan anywhere on the page → that product
+  // « Observations »: their window opens with the page when there are some — once (switching tabs
+  // does not reopen it); « Observations » in the header opens it again.
+  // Decided once, when the sheet arrives: deleting the last note does not close the window.
+  const [notesOpen, setNotesOpen] = useState<boolean | null>(null);
+  if (notesOpen === null && sheet) setNotesOpen(sheet.notes_count > 0);
+  const showNotes = notesOpen === true;
+  const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
@@ -37,6 +57,7 @@ function ProductSheetPage({ id }: { id: number }) {
     { id: "stats", label: t("products.tabStats"), icon: <BarChart3 className={icon} /> },
     { id: "movements", label: t("products.tabMovements"), icon: <ArrowLeftRight className={icon} /> },
     { id: "codes", label: t("products.tabCodes"), icon: <ScanLine className={icon} /> },
+    { id: "history", label: t("products.tabHistory"), icon: <History className={icon} /> },
   ];
   // The editable values are on Général and Codes: editing starts on Général from the other tabs.
   const startEditing = () => {
@@ -48,15 +69,17 @@ function ProductSheetPage({ id }: { id: number }) {
     <SheetEditContext value={{ editor, sheet }}>
       <Page
         above={<SheetBreadcrumb name={sheet.product} />}
-        media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="h-40 w-52 rounded-xl p-2" />}
+        media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-28 rounded-xl p-2" />}
         title={sheet.product}
         subtitle={<SheetMeta sheet={sheet} />}
-        actions={
-          <div className="flex flex-wrap items-start gap-3">
-            <LocationCard zone={sheet.stock.zone} />
-            <BarcodeCard code={sheet.barcode1} />
-            <EditActions editor={editor} onStart={startEditing} />
-          </div>
+        actions={<EditActions editor={editor} onStart={startEditing} />}
+        below={
+          <SheetFacts
+            zone={sheet.stock.zone}
+            barcode={sheet.barcode1}
+            notes={sheet.notes_count}
+            onOpenNotes={() => setNotesOpen(true)}
+          />
         }
       >
         <TabBar
@@ -76,10 +99,24 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "general" && (
           <GeneralTab sheet={sheet} stats={stats} range={range} onShowMovements={() => setTab("movements")} />
         )}
-        {tab === "stats" && <StatsTab stats={stats} range={range} />}
+        {tab === "stats" && (
+          <StatsTab stats={stats} range={range} monthsYear={monthsYear} onMonthsYear={setMonthsYear} />
+        )}
         {tab === "movements" && <MovementsTab sheet={sheet} />}
         {tab === "codes" && <CodesTab sheet={sheet} />}
+        {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
+      <NotesDialog
+        open={showNotes}
+        product={sheet.product}
+        notes={notes}
+        isLoading={notesLoading}
+        onAdd={addNote}
+        isAdding={isAdding}
+        onDelete={deleteNote}
+        isDeleting={isDeleting}
+        onClose={() => setNotesOpen(false)}
+      />
     </SheetEditContext>
   );
 }

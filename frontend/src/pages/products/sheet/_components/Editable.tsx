@@ -1,15 +1,21 @@
 /** One editable value of the product sheet (owner's « Modifier »).
  *  - View: the value; when the owner changed it, « modifié », the imported value and (owner)
  *    « Revenir à la valeur importée ».
- *  - Edit mode: its input (text, price, whole number, date « JJ/MM/AAAA »). */
-import { useContext, type ReactNode } from "react";
-import { useFormState } from "react-hook-form";
+ *  - Edit mode: its input (text, price, whole number, date « JJ/MM/AAAA » typed or picked in the
+ *    calendar next to it). */
+import { useContext, useState, type ReactNode } from "react";
+import { useFormState, useWatch } from "react-hook-form";
+import { DayPicker } from "react-day-picker";
+import { fr } from "date-fns/locale";
+import { autoUpdate, flip, offset, shift, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
+import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/dayPicker";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
 
-import type { FormField } from "../hooks";
+import { isoToTyped, typedToIso, type FormField } from "../hooks";
 import { SheetEditContext } from "./editContext";
 
 export type EditKind = "text" | "price" | "int" | "date";
@@ -32,6 +38,103 @@ function importedText(kind: EditKind, v: string | number | null | undefined): st
   return String(v);
 }
 
+const isoOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** The calendar next to a date field: a day picked = the field's date (« JJ/MM/AAAA »). Year
+ *  buttons above it: an expiry is often 1–3 years away. */
+function CalendarButton({ field, label }: { field: FormField; label: string }) {
+  const t = useT();
+  const { editor } = useSheetEdit();
+  const { control, setValue } = editor.form;
+  const typed = useWatch({ control, name: field });
+  const iso = typedToIso(typed ?? "");
+  const selected = iso ? new Date(`${iso}T00:00:00`) : undefined;
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState<Date>(selected ?? new Date());
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [panelEl, setPanelEl] = useState<HTMLElement | null>(null);
+  const { floatingStyles, context } = useFloating({
+    elements: { reference: anchorEl, floating: panelEl },
+    open,
+    onOpenChange: setOpen,
+    placement: "bottom-start",
+    middleware: [offset(8), flip({ padding: 16 }), shift({ padding: 16 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const { getReferenceProps, getFloatingProps } = useInteractions([useDismiss(context)]);
+  const toggle = () => {
+    if (!open) setMonth(selected ?? new Date());
+    setOpen(!open);
+  };
+  const shiftYear = (n: number) => setMonth(new Date(month.getFullYear() + n, month.getMonth(), 1));
+  const yearButton =
+    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary";
+  return (
+    <>
+      <button
+        ref={setAnchorEl}
+        type="button"
+        aria-label={t("products.pickDate", { label })}
+        {...getReferenceProps({ onClick: toggle })}
+        className={cn(
+          "inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
+          open && "border-primary text-primary",
+        )}
+      >
+        <CalendarIcon className="size-4" />
+      </button>
+      {open && (
+        <div
+          ref={setPanelEl}
+          {...getFloatingProps()}
+          style={floatingStyles}
+          className="z-50 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-base font-normal shadow-2xl"
+        >
+          <div className="flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
+            <button
+              type="button"
+              onClick={() => shiftYear(-1)}
+              aria-label={t("products.prevYear")}
+              className={yearButton}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            {month.getFullYear()}
+            <button
+              type="button"
+              onClick={() => shiftYear(1)}
+              aria-label={t("products.nextYear")}
+              className={yearButton}
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+          {/* `relative`: the month arrows (absolute) stay inside the calendar, under the year row. */}
+          <div className="relative">
+            <DayPicker
+              mode="single"
+              locale={fr}
+              month={month}
+              onMonthChange={setMonth}
+              selected={selected}
+              onSelect={(d) => {
+                if (!d) return;
+                setValue(field, isoToTyped(isoOf(d)), { shouldDirty: true });
+                setOpen(false);
+              }}
+              weekStartsOn={1}
+              showOutsideDays
+              classNames={DAY_PICKER_CLASSES}
+              modifiersClassNames={DAY_PICKER_MODIFIERS}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; label: string }) {
   const t = useT();
   const { editor } = useSheetEdit();
@@ -40,19 +143,22 @@ function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; l
   const error = errors[field]?.message;
   return (
     <span className="flex w-full flex-col items-start gap-1">
-      <input
-        aria-label={label}
-        aria-invalid={error ? true : undefined}
-        inputMode={kind === "price" ? "decimal" : kind === "int" ? "numeric" : undefined}
-        placeholder={kind === "date" ? t("products.datePlaceholder") : undefined}
-        className={cn(
-          INPUT,
-          "h-9 max-w-[260px]",
-          kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono",
-          error ? "border-error" : "border-input",
-        )}
-        {...register(field)}
-      />
+      <span className="flex w-full max-w-[260px] items-center gap-2">
+        <input
+          aria-label={label}
+          aria-invalid={error ? true : undefined}
+          inputMode={kind === "price" ? "decimal" : kind === "int" ? "numeric" : undefined}
+          placeholder={kind === "date" ? t("products.datePlaceholder") : undefined}
+          className={cn(
+            INPUT,
+            "h-9",
+            kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono",
+            error ? "border-error" : "border-input",
+          )}
+          {...register(field)}
+        />
+        {kind === "date" && <CalendarButton field={field} label={label} />}
+      </span>
       {error && <span className="text-xs font-normal text-error">{error}</span>}
     </span>
   );

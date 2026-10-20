@@ -436,6 +436,7 @@ class Oracle:
                 "avg_pu": r4(pu) if pu is not None else None,
                 "marge_pct": r2((1 - pu / p.ppv) * 100) if pu is not None and p.ppv > 0 else None,
                 "photo": infos[p.pid]["images"][0] if p.pid in infos else None,
+                "notes": 0,  # « Observations »: 18-produits adds then deletes its own
             })
         return sorted(rows, key=lambda r: r["product"])
 
@@ -477,6 +478,7 @@ class Oracle:
                 for day, kind, _, qty, unit, ref, party in moves[:5]
             ],
             "imported": {},   # no owner edit (18-produits « modifier » puts everything back)
+            "notes_count": 0,
         }
 
     def stats_periods(self) -> dict[str, tuple[date, date]]:
@@ -491,7 +493,14 @@ class Oracle:
             "custom": (self.df, self.dt),
         }
 
-    def product_stats(self, p, df: date, dt: date) -> dict:
+    def stats_years(self, p) -> dict:
+        """GET /products/{id}/stats?months_year=Y (last 30 days) for every year of the product's history."""
+        df, dt = self.stats_periods()["30d"]
+        years = sorted({v.day.year for v in self.ventes if v.p is p} | {a.day.year for a in self.achats if a.p is p},
+                       reverse=True)
+        return {str(y): self.product_stats(p, df, dt, y) for y in years}
+
+    def product_stats(self, p, df: date, dt: date, months_year: int | None = None) -> dict:
         """GET /products/{id}/stats?date_from&date_to: the period vs the days just before (same
         number); the last 12 months; every supplier of the period (most units first); each supplier's
         latest priced purchase (newest first); units sold / bought per month of every year with a sale
@@ -511,7 +520,9 @@ class Oracle:
                     "marge": r2(c - sold * pu) if pu is not None else None,
                     "transactions": len({v.ref for v in lines})}
 
-        months = [months_back(month_start(self.today), n) for n in range(11, -1, -1)]
+        # Charts + « Détail mensuel »: the last 12 months, or January → December of `months_year`.
+        months = ([date(months_year, m, 1) for m in range(1, 13)] if months_year
+                  else [months_back(month_start(self.today), n) for n in range(11, -1, -1)])
         monthly = [{"month": m.isoformat()[:7], **{k: v for k, v in figures(m, next_month(m) - timedelta(days=1)).items()
                                                   if k != "transactions"}} for m in months]
 
@@ -657,6 +668,8 @@ class Oracle:
             # Statistiques: every period button, for every product the test opens.
             "stats": {pid: {k: self.product_stats(by_pid[pid], *r) for k, r in self.stats_periods().items()}
                       for pid in self.sheet_pids(rows, infos)},
+            # « Détail mensuel » by year (the 1st product of the stats): each year of its history.
+            "stats_years": self.stats_years(by_pid[self.sheet_pids(rows, infos)[0]]),
             "movements": self.movements_scenarios(self.traced_product(rows, by_pid)),
             "search": {q: [r["pid"] for r in rows if all(product_match(by_pid[r["pid"]], t) for t in tokenize(q))]
                        for q in PRODUCT_QUERIES},

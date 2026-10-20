@@ -14,6 +14,7 @@ import {
   Coins,
   Star,
   UsersRound,
+  History,
   Building2,
   BookOpen,
   Tags,
@@ -111,6 +112,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "nav.groupGestion",
     items: [
       { label: "nav.equipe", to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
+      { label: "nav.historique", to: ROUTES.HISTORY, icon: History, roles: [ROLES.OWNER], ready: true },
       // HIDDEN 2026-07-03 — restore when the store-website feature ships.
       // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],

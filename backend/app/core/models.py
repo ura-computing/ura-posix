@@ -370,6 +370,46 @@ class PharmacyProductEdit(Base):
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
 
 
+class ProductNote(Base):
+    """« Observations »: a pharmacy's notes on one product (« à vendre avec … »), shown in a window
+    when its page opens. Anyone with Produits adds one; its author or the owner deletes it (the
+    history keeps its text). `author_name` stays if the account is deleted."""
+
+    __tablename__ = "product_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False, index=True
+    )
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    author_name: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AuditLog(Base):
+    """« Historique des modifications »: who changed what in a pharmacy, kept as proof — never edited
+    or deleted. `action` = a code the page translates (`history.<action>`), `details` = its values
+    (file, field before → after, note text…). `user_name` stays if the account is deleted."""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (Index("ix_audit_logs_pharmacy_created", "pharmacy_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    user_name: Mapped[str] = mapped_column(String, nullable=False)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    medicament_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="SET NULL"), nullable=True, index=True
+    )
+    details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PharmacyMedicamentStatus(Base):
     """Per-pharmacy non-declared (= 'spécial') flag. Row with declared=False
     ⇒ medicament excluded from this pharmacy's stats. Absence of row ⇒ declared

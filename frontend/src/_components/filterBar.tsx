@@ -25,6 +25,7 @@ import { DayPicker, type DateRange as DPRange } from "react-day-picker";
 import { fr } from "date-fns/locale";
 import { autoUpdate, flip, offset, shift, size, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
 import { DATE_PRESETS, type DateRange as IsoRange } from "@/utils/dateRange";
+import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "./dayPicker";
 
 /** Date-range filter: 2 labelled segmented inputs ("DATE DÉBUT" / "DATE FIN")
  *  + a Calendar icon button that opens a 2-month popover with quick-period
@@ -481,46 +482,6 @@ function DateField({ side, label, segs, invalid, registerRef, onUpdate, onKeyDow
     </div>
   );
 }
-
-// ─── react-day-picker v10 className overrides — pinned here (self-contained)
-//
-// v10's classNames API is keyed by the UI enum (see
-// node_modules/react-day-picker/dist/esm/UI.d.ts). Selection + day-flag
-// modifiers live in a separate `modifiersClassNames` prop.
-
-const DAY_PICKER_CLASSES = {
-  months: "flex flex-col gap-6 sm:flex-row",
-  month: "flex flex-col gap-3",
-  month_caption: "flex items-center justify-center relative h-8",
-  caption_label: "text-sm font-bold text-foreground capitalize",
-  nav: "flex items-center justify-between w-full absolute top-0 left-0 right-0 px-1",
-  button_previous:
-    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-  button_next:
-    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-  chevron: "size-4 fill-current",
-  month_grid: "w-full border-collapse",
-  weekdays: "flex",
-  weekday: "w-9 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pb-1.5",
-  weeks: "flex flex-col gap-1",
-  week: "flex w-full",
-  day: "size-9 p-0 text-center text-sm relative",
-  day_button:
-    "inline-flex size-9 cursor-pointer items-center justify-center rounded-md font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-} as const;
-
-const DAY_PICKER_MODIFIERS = {
-  today: "font-bold ring-1 ring-primary/40 ring-inset rounded-md",
-  outside: "text-muted-foreground/40",
-  disabled: "cursor-not-allowed opacity-30",
-  selected:
-    "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:hover:bg-primary/90 [&_button]:hover:text-primary-foreground",
-  range_start: "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-r-none",
-  range_end: "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:rounded-l-none",
-  range_middle:
-    "[&_button]:bg-primary/15 [&_button]:text-foreground [&_button]:hover:bg-primary/20 [&_button]:hover:text-foreground [&_button]:rounded-none",
-  hidden: "invisible",
-} as const;
 
 // ─── Shared popover styles ───────────────────────────────────────────────────
 // Single source of truth for the trigger / panel / option className strings.

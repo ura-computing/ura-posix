@@ -18,6 +18,19 @@ export interface ProductRow {
   marge_pct: number | null;
   /** First scraped photo URL; null = none (always null in the Excel export answer). */
   photo: string | null;
+  /** « Observations » of the pharmacy on it (0 in the Excel export answer). */
+  notes: number;
+}
+
+/** One « Observation » (GET /products/{id}/notes). */
+export interface ProductNote {
+  id: number;
+  text: string;
+  /** Name (else email) of who wrote it. */
+  author: string;
+  created_at: string;
+  /** Its author or the owner. */
+  can_delete: boolean;
 }
 
 export interface ProductsListResponse {
@@ -101,6 +114,8 @@ export interface ProductSheet {
   recent_movements: ProductMovement[];
   /** Fields the owner edited → their imported value (« Revenir à la valeur importée »). */
   imported: Partial<Record<EditField, string | number | null>>;
+  /** « Observations »: > 0 = their window opens with the page. */
+  notes_count: number;
 }
 
 /** Fields the owner can change (« Modifier »), as PUT /products/{id} names them. Not the type

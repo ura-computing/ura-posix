@@ -24,6 +24,7 @@ from app.ingestion.csv_parse import (
     parse_float,
     parse_int,
 )
+from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
@@ -60,6 +61,12 @@ router = APIRouter(tags=["imports"])
 
 MAX_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 ALLOWED_STATUSES = {"in_progress", "success", "cancelled", "error"}
+# A batch's end → its line in the history.
+IMPORT_ENDS = {
+    "success": AuditAction.IMPORT_DONE,
+    "cancelled": AuditAction.IMPORT_CANCELLED,
+    "error": AuditAction.IMPORT_FAILED,
+}
 EMPTY_FILE_DETAIL = "Aucune donnée trouvée dans le fichier."
 EMPTY_BODY_DETAIL = "Aucune ligne dans la requête."
 
@@ -687,9 +694,21 @@ def patch_batch_status(
         batch.rows_inserted = 0
         batch.rows_skipped = 0
 
+    ended = body.status != batch.status and body.status in IMPORT_ENDS
     batch.status = body.status
     if body.error_message is not None:
         batch.error_message = body.error_message
+    if ended:  # « Historique des modifications »: how the import ended
+        details = {
+            "batch_id": batch.id,
+            "type": batch.file_type,
+            "file": batch.filename,
+            "imported": batch.rows_inserted,
+            "skipped": batch.rows_skipped,
+        }
+        if body.status == "error":
+            details["error"] = batch.error_message
+        log_action(db, user, batch.pharmacy_id, IMPORT_ENDS[body.status], details)
     db.commit()
     if body.status in ("success", "cancelled"):
         _analyze(db, batch.file_type)
@@ -848,6 +867,13 @@ def delete_import(
 
     batch.deleted_at = datetime.now(timezone.utc)
     batch.deleted_by_user_id = user.id
+    log_action(
+        db,
+        user,
+        batch.pharmacy_id,
+        AuditAction.IMPORT_DELETED,
+        {"batch_id": batch.id, "type": batch.file_type, "file": batch.filename, "lines": deleted_rows},
+    )
     db.commit()
     _analyze(db, batch.file_type)
     return {"id": batch_id, "deleted_rows": deleted_rows, "file_type": batch.file_type}

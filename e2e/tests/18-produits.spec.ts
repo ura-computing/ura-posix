@@ -11,8 +11,8 @@
  *  in the address, breadcrumb + « Retour à la liste des produits »; a product of no pharmacy line → 404
  *  inside the layout.
  *  Statistiques = oracle for every product (last 30 days), then the Ventes date picker (2 quick
- *  periods, typed dates) + « Copier » on the best seller: KPIs and % vs the days before, 3 charts
- *  (12 months, tooltips), « Détail mensuel », « Historique » Ventes / Achats, top suppliers + latest
+ *  periods, typed dates, « Mois affichés » by year) + « Copier » on the best seller: KPIs and % vs the days before, 3 charts
+ *  (12 months, tooltips), « Détail mensuel », « Historique » Tous / Ventes / Achats (colors), top suppliers + latest
  *  prices with « Voir tout »; no « Tendances ».
  *  « Traçabilité » (from « Voir tout »): all lines, page 2, sort by type, Achats, Ventes over the
  *  test window, search = oracle; list (type, date, heure, quantité) + every line's details (BL /
@@ -22,6 +22,7 @@
  *  « Codes »: PID / barcodes + « Copier », barcode drawn (no format / length blocks), « Scanner / Rechercher
  *  un code barre » (barcode, PID, unknown code, Échap / Annuler).
  *  Général: emplacement + date de péremption (file) with « Périmé » / < 30 j / < 90 j.
+ *  « Observations »: add, the window at opening (click, scan), list badge, employee rights, delete.
  *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
  *  import keeps them; « Éditer » of a block = the same edit mode; « Revenir à la valeur importée »,
  *  « Annuler », min > max refused. Employee: « Modifier » and « Éditer » disabled + reason, PUT refused.
@@ -40,6 +41,7 @@ import {
   frNumber,
   kpiValue,
   pageCall,
+  pageSend,
   period,
   pickCategoryType,
   setPeriod,
@@ -294,7 +296,7 @@ test("produits: recherche + Pharmacie / Parapharmacie + « Tout réinitialiser �
   });
 });
 
-test("produits: lecteur de code barre dans la recherche (Entrée = la fiche), code inconnu, « Scanner / Rechercher un code barre »", async ({
+test("produits: lecteur de code barre (recherche, n'importe où sur la page, sans Entrée, code inconnu), « Scanner / Rechercher un code barre »", async ({
   page,
 }) => {
   const { product, barcode1 } = expected().products.barcode_setup;
@@ -327,6 +329,31 @@ test("produits: lecteur de code barre dans la recherche (Entrée = la fiche), co
   await input.fill(barcode1);
   await input.press("Enter");
   await sheetShown();
+
+  // A reader anywhere on the page, no field clicked: fast keys + Entrée (list), fast keys without
+  // Entrée (product page → another product), an unknown code → a message, the page stays.
+  const [otherPid, other] = Object.entries<Row>(expected().products.sheets).find(
+    ([, e]) => e.barcode1 && e.product !== product,
+  ) as [string, Row];
+  await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
+  await page.getByRole("heading", { level: 1, name: "Produits", exact: true }).click(); // no field focused
+  await expect(page.getByText("Scannez un code barre à tout moment sur cette page")).toBeVisible();
+  await page.keyboard.type(barcode1, { delay: 10 });
+  await page.keyboard.press("Enter");
+  await sheetShown();
+  await page.getByRole("heading", { level: 1, name: product, exact: true }).click();
+  await page.keyboard.type(other.barcode1, { delay: 10 }); // no Entrée: the pause ends the code
+  await expect(page.getByRole("heading", { level: 1, name: other.product, exact: true })).toBeVisible();
+  expect((await apiGet(page, "/products/lookup", { code: other.barcode1 })).id, otherPid).toBeTruthy();
+  await page.getByRole("heading", { level: 1, name: other.product, exact: true }).click();
+  await page.keyboard.type("0000000000000", { delay: 10 });
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Aucun produit avec le code 0000000000000 dans votre pharmacie.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: other.product, exact: true }), "page gardée").toBeVisible();
+  // Typed slowly (a person, not a reader): nothing happens.
+  await page.keyboard.type(barcode1, { delay: 120 });
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: other.product, exact: true }), "frappe lente").toBeVisible();
 });
 
 test("produits: export Excel = toute la liste, en-têtes en français", async ({ page }) => {
@@ -407,9 +434,14 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     expect(refused.code, "PUT par un employé").toBe("ownerOnly");
 
     // « Voir tout le ticket / BL » follows his permissions: no « Achats » → disabled + why, on a purchase only.
+    // On the Traçabilité product (it has purchases and sales, even with small files).
     await apiPut(page, `/owner/employees/${member.id}/permissions`, { permissions: { achats: false } });
-    await other.reload();
-    await other.getByRole("tab", { name: "Traçabilité", exact: true }).click();
+    const traced = rows().find((r) => r.pid === expected().products.movements.pid) as Row;
+    const tracedId = (await apiGet(other, "/products", { search: traced.pid })).data.find(
+      (r: Row) => r.pid === traced.pid,
+    ).id;
+    await other.goto(`/produits/${tracedId}?tab=movements`);
+    await expect(other.getByRole("tab", { name: "Traçabilité", exact: true })).toHaveAttribute("aria-selected", "true");
     const details = section(other, "Détails de la ligne");
     await other.getByRole("button", { name: "Achats", exact: true }).click();
     await expect(details.getByRole("button", { name: "Voir tout le BL" })).toBeDisabled();
@@ -761,6 +793,18 @@ async function expectChange(scope: Page | Locator, label: string, now: number | 
 
 const monthName = (m: string) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
 
+/** « Historique (par année) » lines of a filter: per year (newest first) the Ventes line, then the
+ *  Achats line; a kind without any unit that year is left out. */
+type HistoryLine = { year: number; kind: "Ventes" | "Achats"; units: number[]; total: number; amount: number };
+function historyLines(history: Row[], filter: "Tous" | "Ventes" | "Achats"): HistoryLine[] {
+  return history
+    .flatMap((y): HistoryLine[] => [
+      { year: y.year, kind: "Ventes", units: y.sold, total: y.total, amount: y.ca },
+      { year: y.year, kind: "Achats", units: y.bought, total: y.bought_total, amount: y.spent },
+    ])
+    .filter((l) => (filter === "Tous" || l.kind === filter) && l.units.some((n) => n !== 0));
+}
+
 /** The 2 date fields of the page show `from` → `to`. */
 async function expectDates(page: Page, from: string, to: string) {
   for (const [side, iso] of [
@@ -875,43 +919,46 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     });
   }
 
-  // « Historique (par année) »: Ventes then Achats, every year with a line of that kind (newest first).
-  for (const [kind, title, units, total, amount, amountHeader, empty] of [
-    ["Ventes", "Historique des ventes (par année)", "sold", "total", "ca", "CA (MAD)", "Aucune vente"],
-    ["Achats", "Historique des achats (par année)", "bought", "bought_total", "spent", "Montant (MAD)", "Aucun achat"],
+  // « Historique (par année) »: « Tous » (each year: Ventes light green, Achats light blue), then
+  // « Ventes », « Achats »; a kind without any unit that year has no line. Back to « Tous ».
+  const card = section(page, "Historique (par année)");
+  for (const [filter, empty] of [
+    ["Tous", "Aucun achat ni vente pour ce produit."],
+    ["Ventes", "Aucune vente pour ce produit."],
+    ["Achats", "Aucun achat pour ce produit."],
   ] as const) {
-    if (kind === "Achats") {
-      await section(page, "Historique des ventes (par année)")
-        .getByRole("button", { name: "Achats", exact: true })
-        .click();
-    }
-    const card = section(page, title);
+    if (filter !== "Tous") await card.getByRole("button", { name: filter, exact: true }).click();
+    const lines = historyLines(e.history, filter);
     const years = card.locator("table");
-    const history = (e.history as Row[]).filter((y) => (y[units] as number[]).some((n) => n !== 0));
-    if (history.length === 0) await expect(card).toContainText(empty);
-    else {
-      expect((await columnTexts(page, "Année", years)).map(Number), `${kind} : années`).toEqual(
-        history.map((y) => y.year),
-      );
-      for (const [m, label] of MONTHS_SHORT.entries()) {
-        const shown = (await columnTexts(page, label, years)).map((x) => frNumber(x) ?? 0);
-        expect(shown, `${kind} : historique ${label}`).toEqual(history.map((y) => y[units][m]));
-      }
-      expect(
-        (await columnTexts(page, "Total", years)).map((x) => frNumber(x) ?? 0),
-        `${kind} : total par année`,
-      ).toEqual(history.map((y) => y[total]));
-      const amounts = (await columnTexts(page, amountHeader, years)).map(frNumber);
-      amounts.forEach((v, i) =>
-        expect(
-          Math.abs((v ?? NaN) - history[i][amount]),
-          `${kind} ${amountHeader} ${history[i].year}`,
-        ).toBeLessThanOrEqual(0.011),
+    if (lines.length === 0) {
+      await expect(card, `${filter} : vide`).toContainText(empty);
+      continue;
+    }
+    await expect(years.locator("tbody tr"), `${filter} : lignes`).toHaveCount(lines.length);
+    expect((await columnTexts(page, "Année", years)).map(Number), `${filter} : années`).toEqual(
+      lines.map((l) => l.year),
+    );
+    expect(await columnTexts(page, "Type", years), `${filter} : types`).toEqual(lines.map((l) => l.kind));
+    for (const [m, label] of MONTHS_SHORT.entries()) {
+      const shown = (await columnTexts(page, label, years)).map((x) => frNumber(x) ?? 0);
+      expect(shown, `${filter} : ${label}`).toEqual(lines.map((l) => l.units[m]));
+    }
+    expect(
+      (await columnTexts(page, "Total", years)).map((x) => frNumber(x) ?? 0),
+      `${filter} : total`,
+    ).toEqual(lines.map((l) => l.total));
+    const amounts = (await columnTexts(page, "Montant (MAD)", years)).map(frNumber);
+    amounts.forEach((v, i) =>
+      expect(Math.abs((v ?? NaN) - lines[i].amount), `${filter} : montant ${lines[i].year}`).toBeLessThanOrEqual(0.011),
+    );
+    // Colors: sales light green, purchases light blue.
+    for (const [i, l] of lines.entries()) {
+      await expect(years.locator("tbody tr").nth(i), `${filter} : couleur ${l.kind} ${l.year}`).toHaveClass(
+        l.kind === "Ventes" ? /bg-success-subtle/ : /bg-info-subtle/,
       );
     }
   }
-  await section(page, "Historique des achats (par année)").getByRole("button", { name: "Ventes", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Historique des ventes (par année)", exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Tous", exact: true }).click();
 
   // No « Tendances » any more.
   await expect(page.getByRole("heading", { name: "Tendances", exact: true })).toHaveCount(0);
@@ -1002,6 +1049,24 @@ test("fiche produit: Statistiques, le sélecteur de dates de Ventes (périodes r
   await expect(page.getByRole("button", { name: "30 jours", exact: true }), "plus de boutons 7 j / 30 j…").toHaveCount(
     0,
   );
+  await test.step("mois affichés : une année (ses 12 mois), puis les 12 derniers mois", async () => {
+    const years = expected().products.stats_years;
+    const months = page.getByRole("group", { name: "Mois affichés" });
+    for (const year of [Object.keys(years)[0], Object.keys(years).at(-1) as string]) {
+      const e = years[year];
+      const stats = pageCall(page, `/products/${id}/stats`, { months_year: year });
+      await months.getByRole("button", { name: year, exact: true }).click();
+      expectSame(await stats, e, `statistiques ${year} (mois)`);
+      expect(
+        (e.monthly as Row[]).map((m) => m.month),
+        `${year} : janvier → décembre`,
+      ).toEqual(Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`));
+      await expectStats(page, e);
+    }
+    const back = pageCall(page, `/products/${id}/stats`, { months_year: null });
+    await months.getByRole("button", { name: "12 derniers mois", exact: true }).click();
+    expectSame(await back, all["30d"], "12 derniers mois");
+  });
   for (const [preset, key] of [
     ["Mois antérieur", "previous-month"],
     ["Année antérieure", "previous-year"],
@@ -1058,41 +1123,17 @@ test("fiche produit: Statistiques, le sélecteur de dates de Ventes (périodes r
     const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\u2212/g, "-");
     expect(copied.split("\n"), "presse-papiers").toEqual(lines);
 
-    // « Historique (par année) » copied the same way: Ventes, then Achats.
-    for (const [kind, title, button, units, total, amount, amountHeader] of [
-      [
-        "Ventes",
-        "Historique des ventes (par année)",
-        "Copier l'historique des ventes",
-        "sold",
-        "total",
-        "ca",
-        "CA (MAD)",
-      ],
-      [
-        "Achats",
-        "Historique des achats (par année)",
-        "Copier l'historique des achats",
-        "bought",
-        "bought_total",
-        "spent",
-        "Montant (MAD)",
-      ],
-    ] as const) {
-      if (kind === "Achats") {
-        await section(page, "Historique des ventes (par année)")
-          .getByRole("button", { name: "Achats", exact: true })
-          .click();
-      }
-      await section(page, title).getByRole("button", { name: button, exact: true }).click();
-      const yearLines = [["Année", ...MONTHS_SHORT, "Total", amountHeader].join("\t")].concat(
-        (e.history as Row[])
-          .filter((y) => (y[units] as number[]).some((n) => n !== 0))
-          .map((y) =>
-            [String(y.year), ...y[units].map((n: number) => excel(n, 0)), excel(y[total], 0), excel(y[amount], 2)].join(
-              "\t",
-            ),
+    // « Historique (par année) » copied the same way: what is shown (« Tous », then « Achats »).
+    const card = section(page, "Historique (par année)");
+    for (const filter of ["Tous", "Achats"] as const) {
+      if (filter !== "Tous") await card.getByRole("button", { name: filter, exact: true }).click();
+      await card.getByRole("button", { name: "Copier l'historique", exact: true }).click();
+      const yearLines = [["Année", "Type", ...MONTHS_SHORT, "Total", "Montant (MAD)"].join("\t")].concat(
+        historyLines(e.history, filter).map((l) =>
+          [String(l.year), l.kind, ...l.units.map((n) => excel(n, 0)), excel(l.total, 0), excel(l.amount, 2)].join(
+            "\t",
           ),
+        ),
       );
       await expect
         .poll(async () =>
@@ -1311,6 +1352,113 @@ test("fiche produit: date de péremption → « Périmé », « Moins de 30 jour
   }
 });
 
+test("fiche produit: « Observations » (ajout, fenêtre à l'ouverture, au scan, liste, employé, suppression)", async ({
+  page,
+  browser,
+}) => {
+  const [pid, e] = Object.entries<Row>(expected().products.sheets).find(([, x]) => x.barcode1) as [string, Row];
+  const { id } = await openSheet(page, pid);
+  const win = page.getByRole("dialog").filter({ hasText: "Observations sur ce produit" });
+  const strip = page.locator("main header").getByRole("button", { name: /^Observations/ });
+  await expect(win, "aucune observation : pas de fenêtre").toHaveCount(0);
+  await expect(strip).toContainText("Aucune");
+
+  // The owner adds one from the strip under the title.
+  await strip.click();
+  await expect(win.getByText("Aucune observation pour ce produit.")).toBeVisible();
+  const ownerNote = "À vendre avec la crème E2E (même passage).";
+  await win.getByLabel("Ajouter une observation", { exact: true }).fill(ownerNote);
+  const added = pageSend(page, "POST", `/products/${id}/notes`, 201);
+  await win.getByRole("button", { name: "Enregistrer l'observation", exact: true }).click();
+  expectSame(await added, { text: ownerNote, author: OWNER.name, can_delete: true }, "observation ajoutée");
+  await expect(win.getByRole("heading", { name: "Observations sur ce produit (1)", exact: true })).toBeVisible();
+  await expect(win.getByText(ownerNote)).toBeVisible();
+  await expect(win.getByText(new RegExp(`^par ${OWNER.name} · `))).toBeVisible();
+  await win.getByRole("button", { name: "J'ai lu", exact: true }).click();
+  await expect(win).toHaveCount(0);
+  await expect(strip).toContainText("1 observation(s)");
+
+  // Opening the product again: the window comes by itself, once (switching tabs does not reopen it).
+  const notes = pageCall(page, `/products/${id}/notes`);
+  await page.reload();
+  expectSame(await notes, [{ text: ownerNote, author: OWNER.name }], "GET observations");
+  await expect(win.getByText(ownerNote)).toBeVisible();
+  await win.getByRole("button", { name: "J'ai lu", exact: true }).click();
+  await page.getByRole("tab", { name: "Codes", exact: true }).click();
+  await page.getByRole("tab", { name: "Général", exact: true }).click();
+  await expect(win, "pas rouverte").toHaveCount(0);
+
+  // The list shows it; a scan from the list opens the product with its window.
+  await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
+  const found = pageCall(page, "/products", { search: pid });
+  await page.getByPlaceholder("Nom, code-barres, PID, laboratoire…").fill(pid);
+  expect((await found).data.find((r: Row) => r.pid === pid).notes, "liste : 1 observation").toBe(1);
+  await expect(page.locator("tbody").getByText("1 obs.", { exact: true })).toBeVisible();
+  await page.getByRole("heading", { level: 1, name: "Produits", exact: true }).click();
+  await page.keyboard.type(e.barcode1, { delay: 10 });
+  await page.keyboard.press("Enter");
+  await expect(win.getByText(ownerNote), "ouverte au scan").toBeVisible();
+  await win.getByRole("button", { name: "J'ai lu", exact: true }).click();
+
+  // An employee sees it, adds his own; deletes only his own (the owner's: no button, API 403).
+  const employee = { email: "employe.observations@pharmagest.ma", password: "EmployeObs#2026" };
+  const { member } = await apiPost(page, "/owner/employees", {
+    full_name: "Employé Observations",
+    ...employee,
+    role: "employee",
+    pharmacy_id: loadState().pharmacyId,
+  });
+  const ctx = await browser.newContext({ storageState: LOGGED_OUT });
+  try {
+    const other = await ctx.newPage();
+    await other.goto("/login");
+    await other.locator('input[type="email"]').fill(employee.email);
+    await other.locator('input[autocomplete="current-password"]').fill(employee.password);
+    await other.locator('button[type="submit"]').click();
+    await expect(other).not.toHaveURL(/\/login/);
+    await other.goto(`/produits/${id}`);
+    const otherWin = other.getByRole("dialog").filter({ hasText: "Observations sur ce produit" });
+    await expect(otherWin.getByText(ownerNote), "l'employé la voit à l'ouverture").toBeVisible();
+    const ownerItem = otherWin.locator("li").filter({ hasText: ownerNote });
+    await expect(ownerItem.getByRole("button", { name: "Supprimer" }), "pas la sienne").toHaveCount(0);
+    const empNote = "Demander l'ordonnance (E2E employé).";
+    await otherWin.getByLabel("Ajouter une observation", { exact: true }).fill(empNote);
+    const empAdded = pageSend(other, "POST", `/products/${id}/notes`, 201);
+    await otherWin.getByRole("button", { name: "Enregistrer l'observation", exact: true }).click();
+    expectSame(
+      await empAdded,
+      { text: empNote, author: "Employé Observations", can_delete: true },
+      "observation employé",
+    );
+    const ownerId = (await apiGet(other, `/products/${id}/notes`)).find((n: Row) => n.text === ownerNote).id;
+    const refused = (await apiDelete(other, `/products/${id}/notes/${ownerId}`, 403)) as Row;
+    expect(refused.code, "employé : pas celle du propriétaire").toBe("noteNotYours");
+    const empItem = otherWin.locator("li").filter({ hasText: empNote });
+    await empItem.getByRole("button", { name: "Supprimer", exact: true }).click();
+    const gone = pageSend(other, "DELETE", new RegExp(`/v1/products/${id}/notes/\\d+$`), 204);
+    await empItem.getByRole("button", { name: "Oui, supprimer", exact: true }).click();
+    await gone;
+    await expect(otherWin.getByText(empNote)).toHaveCount(0);
+  } finally {
+    await ctx.close();
+    await apiDelete(page, `/owner/employees/${member.id}`, 204);
+  }
+
+  // The owner deletes his: nothing left, no window, no badge.
+  await page.reload();
+  const ownerItem = win.locator("li").filter({ hasText: ownerNote });
+  await ownerItem.getByRole("button", { name: "Supprimer", exact: true }).click();
+  const deleted = pageSend(page, "DELETE", new RegExp(`/v1/products/${id}/notes/\\d+$`), 204);
+  await ownerItem.getByRole("button", { name: "Oui, supprimer", exact: true }).click();
+  await deleted;
+  await expect(win.getByText("Aucune observation pour ce produit.")).toBeVisible();
+  await win.getByRole("button", { name: "J'ai lu", exact: true }).click();
+  await expect(strip).toContainText("Aucune");
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: e.product, exact: true })).toBeVisible();
+  await expect(win, "plus de fenêtre").toHaveCount(0);
+});
+
 // ── « Modifier » (owner) ────────────────────────────────────────────────────
 
 /** 2nd product the oracle opens (sold, bought, in the stock file). */
@@ -1477,7 +1625,7 @@ test.describe("modifier", () => {
       page.locator("main header").getByText("PLACARD E2E 7", { exact: true }),
       "emplacement en haut",
     ).toBeVisible();
-    await expect(field(page, "Date de péremption")).toContainText("31/12/2030");
+    await expect(field(page, "Date de péremption")).toContainText(frDate("2030-12-31"));
     await expectNumber(page, "PPV", ppv);
     await expect(field(page, "PPV")).toContainText("Valeur importée :");
     await expectTile(page, "Prix de vente (PPV)", ppv);
@@ -1570,6 +1718,16 @@ test.describe("modifier", () => {
     await page.getByLabel("Date de péremption", { exact: true }).fill("31/02/2030");
     await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
     await expect(page.getByText("Date invalide (exemple : 31/03/2027).")).toBeVisible();
+    // ... or picked in the calendar: « Année suivante », then the 15th of the month shown.
+    await page.getByRole("button", { name: "Date de péremption : choisir dans le calendrier", exact: true }).click();
+    await page.getByRole("button", { name: "Année suivante", exact: true }).click();
+    const now = new Date();
+    const day = new Date(now.getFullYear() + 1, now.getMonth(), 15);
+    const dayName = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(day);
+    await page.getByRole("button", { name: new RegExp(dayName) }).click();
+    await expect(page.getByLabel("Date de péremption", { exact: true }), "date choisie").toHaveValue(
+      `15/${String(day.getMonth() + 1).padStart(2, "0")}/${day.getFullYear()}`,
+    );
     expect(puts, "valeurs fausses : rien envoyé").toBe(0);
     await page.getByRole("button", { name: "Annuler", exact: true }).click();
     const refused = await apiPut(page, `/products/${id}`, { stock_min: 50, stock_max: 10 }, 400);

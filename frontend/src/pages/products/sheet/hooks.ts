@@ -18,12 +18,14 @@ import {
   type ProductEditIn,
   type ProductMovementLine,
   type ProductMovementsResponse,
+  type ProductHistoryResponse,
+  type ProductNote,
   type ProductSheet,
   type ProductStats,
 } from "@/types";
 import { daysAgo, todayIso } from "@/utils/dateRange";
 
-export const SHEET_TABS = ["general", "stats", "movements", "codes"] as const;
+export const SHEET_TABS = ["general", "stats", "movements", "codes", "history"] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
 
 /** One product's sheet and the tab in the URL (`?tab=codes`, kept on reload / back). */
@@ -70,20 +72,27 @@ export interface StatsRange {
  *  included; kept while switching tabs. Its own: the Ventes / Achats dates do not move. */
 export function useStatsRange() {
   const [range, setRangeState] = useState<StatsRange>(() => ({ from: daysAgo(29), to: todayIso() }));
+  // Charts + « Détail mensuel »: null = the last 12 months, else January → December of that year.
+  const [monthsYear, setMonthsYear] = useState<number | null>(null);
   const setRange = (from: string | null, to: string | null) => setRangeState({ from, to });
   return {
     range,
     setRange,
+    monthsYear,
+    setMonthsYear,
   };
 }
 
 /** One product's statistics over a period, asked with the sheet (`enabled` once it is there):
  *  « Statistiques » opens at once, without a « Chargement… » first. Nothing asked while a custom
  *  date is missing. */
-export function useProductStats(id: number, { from, to }: StatsRange, enabled: boolean) {
+export function useProductStats(id: number, { from, to }: StatsRange, monthsYear: number | null, enabled: boolean) {
   const { data } = useQuery({
-    queryKey: API.products.stats.key(id, from ?? "", to ?? ""),
-    queryFn: () => api.get<ProductStats>(API.products.stats.url(id), { params: { date_from: from, date_to: to } }),
+    queryKey: API.products.stats.key(id, from ?? "", to ?? "", monthsYear),
+    queryFn: () =>
+      api.get<ProductStats>(API.products.stats.url(id), {
+        params: { date_from: from, date_to: to, months_year: monthsYear },
+      }),
     enabled: enabled && !!from && !!to,
     placeholderData: keepPreviousData,
   });
@@ -162,6 +171,62 @@ export function useMovements(id: number) {
   };
 }
 
+// ── « Historique » ──────────────────────────────────────────────────────────
+
+/** A product's « Historique » tab: its edits, observations and the imports that brought its
+ *  lines, newest first, 20 a page. */
+export function useProductHistory(id: number) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useQuery({
+    queryKey: API.products.history.key(id, page),
+    queryFn: () => api.get<ProductHistoryResponse>(API.products.history.url(id), { params: { page, limit: 20 } }),
+    placeholderData: keepPreviousData,
+  });
+  return {
+    rows: data?.data ?? [],
+    total: data?.pagination.total ?? 0,
+    page,
+    setPage,
+    isLoading,
+  };
+}
+
+// ── « Observations » ────────────────────────────────────────────────────────
+
+/** A product's « Observations » (asked when `enabled`: their window is open); add one, delete one
+ *  (its author or the owner). The sheet's count and the list's icon follow. */
+export function useProductNotes(id: number, enabled: boolean) {
+  const t = useT();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: API.products.notes.key(id),
+    queryFn: () => api.get<ProductNote[]>(API.products.notes.url(id)),
+    enabled,
+  });
+  const { mutateAsync: addNote, isPending: isAdding } = useMutation({
+    mutationFn: (text: string) => api.post<ProductNote>(API.products.addNote.url(id), { text }),
+    onSuccess: () => {
+      toast.success(t("products.noteSaved"));
+      void refresh(qc, API.products.addNote);
+    },
+  });
+  const { mutateAsync: deleteNote, isPending: isDeleting } = useMutation({
+    mutationFn: (noteId: number) => api.delete(API.products.deleteNote.url(id, noteId)),
+    onSuccess: () => {
+      toast.success(t("products.noteDeleted"));
+      void refresh(qc, API.products.deleteNote);
+    },
+  });
+  return {
+    notes: data ?? [],
+    isLoading,
+    addNote,
+    isAdding,
+    deleteNote,
+    isDeleting,
+  };
+}
+
 // ── « Modifier » (owner) ────────────────────────────────────────────────────
 
 // The values the page shows and the owner can change (PPH and description are no longer on the
@@ -187,9 +252,9 @@ const INTEGERS: FormField[] = ["current_stock", "stock_min", "stock_max"];
 
 const decimal = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
 /** « 2027-03-31 » ⇄ « 31/03/2027 » (the date typed in the form). */
-const isoToTyped = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
+export const isoToTyped = (iso: string | null) => (iso ? iso.split("-").reverse().join("/") : "");
 const TYPED_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-function typedToIso(typed: string): string | null {
+export function typedToIso(typed: string): string | null {
   const m = TYPED_DATE.exec(typed.trim());
   if (!m) return null;
   const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];

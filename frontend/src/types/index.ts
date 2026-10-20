@@ -56,6 +56,7 @@ export const ROUTES = {
 
   // Gestion
   OWNER_EMPLOYEES: "/owner/employees",
+  HISTORY: "/historique",
 
   // Admin
   ADMIN_PHARMACIES: "/admin/pharmacies",
@@ -90,3 +91,4 @@ export * from "./exclusions";
 export * from "./members";
 export * from "./storeWebsite";
 export * from "./products";
+export * from "./history";

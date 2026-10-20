@@ -9,10 +9,8 @@ import {
   ArrowUpToLine,
   BarChart3,
   Boxes,
-  CalendarClock,
   Clock,
   FileText,
-  MapPin,
   Package,
   Pencil,
   ShoppingCart,
@@ -79,20 +77,17 @@ function EditBlockButton() {
   );
 }
 
-/** One stock figure: icon, label, big value (an input in edit mode). Numbers in mono; the
- *  emplacement / date in plain big text. */
+/** One of the 3 stock figures: icon, label, value (an input in edit mode). */
 function StockFigure({
   field,
   label,
   icon,
   value,
-  kind = "int",
 }: {
   field: FormField;
   label: string;
   icon: ReactNode;
   value: ReactNode;
-  kind?: EditKind;
 }) {
   return (
     <div className="flex items-start gap-3 px-4 first:pl-0">
@@ -101,8 +96,8 @@ function StockFigure({
       </span>
       <div className="flex min-w-0 flex-col gap-1">
         <dt className="text-sm text-muted-foreground">{label}</dt>
-        <dd className={cn("font-bold text-foreground", kind === "int" ? "font-mono text-2xl" : "text-xl break-words")}>
-          <Editable field={field} kind={kind} label={label}>
+        <dd className="font-mono text-2xl font-bold text-foreground">
+          <Editable field={field} kind="int" label={label}>
             {value}
           </Editable>
         </dd>
@@ -209,32 +204,28 @@ export function GeneralTab({
                 value={formatQty(stock.stock_max)}
               />
             </dl>
-            {/* Where the product is (« PLACARD 2 ») and until when: as big as the stock figures. */}
-            <dl className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-border">
-              <StockFigure
-                field="zone"
-                kind="text"
-                label={t("products.location")}
-                icon={<MapPin className="size-5" />}
-                value={stock.zone ?? <span className="text-base font-medium">{missing}</span>}
+            <div className="border-t border-border">
+              <FieldList
+                fields={[
+                  editable("zone", t("products.location"), stock.zone),
+                  {
+                    label: t("products.expiryDate"),
+                    value: (
+                      <Editable field="expiry_date" kind="date" label={t("products.expiryDate")}>
+                        {stock.expiry_date ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            {formatDate(stock.expiry_date)}
+                            <ExpiryHint iso={stock.expiry_date} />
+                          </span>
+                        ) : (
+                          missing
+                        )}
+                      </Editable>
+                    ),
+                  },
+                ]}
               />
-              <StockFigure
-                field="expiry_date"
-                kind="date"
-                label={t("products.expiryDate")}
-                icon={<CalendarClock className="size-5" />}
-                value={
-                  stock.expiry_date ? (
-                    <span className="flex flex-wrap items-center gap-2">
-                      {formatDate(stock.expiry_date)}
-                      <ExpiryHint iso={stock.expiry_date} />
-                    </span>
-                  ) : (
-                    <span className="text-base font-medium">{missing}</span>
-                  )
-                }
-              />
-            </dl>
+            </div>
           </SheetCard>
 
           <SheetCard title={t("products.infos")} icon={<FileText className="size-5" />} actions={<EditBlockButton />}>

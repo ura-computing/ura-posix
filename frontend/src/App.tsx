@@ -18,6 +18,7 @@ const PAGES = {
   AdminPharmaciesIndex: () => import("@/pages/admin/pharmacies"),
   AdminPharmacyDetail: () => import("@/pages/admin/pharmacies/detail"),
   OwnerEmployeesPage: () => import("@/pages/team"),
+  HistoryPage: () => import("@/pages/history"),
   ProduitsSpeciauxPage: () => import("@/pages/accounting/produits-speciaux"),
   ForgotPasswordPage: () => import("@/pages/auth/forgot-password"),
   SignupPage: () => import("@/pages/auth/signup"),
@@ -40,6 +41,7 @@ const AdminCategoriesPage = lazy(PAGES.AdminCategoriesPage);
 const AdminPharmaciesIndex = lazy(PAGES.AdminPharmaciesIndex);
 const AdminPharmacyDetail = lazy(PAGES.AdminPharmacyDetail);
 const OwnerEmployeesPage = lazy(PAGES.OwnerEmployeesPage);
+const HistoryPage = lazy(PAGES.HistoryPage);
 const ProduitsSpeciauxPage = lazy(PAGES.ProduitsSpeciauxPage);
 // HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
 // admin/developers surfaces are wired end-to-end but not ready to ship. Restore
@@ -148,6 +150,7 @@ export default function App() {
 
           <Route element={<RequireRole role={ROLES.OWNER} />}>
             <Route path={ROUTES.OWNER_EMPLOYEES} element={<OwnerEmployeesPage />} />
+            <Route path={ROUTES.HISTORY} element={<HistoryPage />} />
             {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
             <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
             <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />

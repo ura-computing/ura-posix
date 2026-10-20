@@ -135,9 +135,11 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
     setSearch,
     total,
   } = useMovements(sheet.id);
-  // The clicked line; another page / filter without it → its first line.
-  const [picked, setPicked] = useState<string | null>(null);
-  const selected = rows.find((m) => keyOf(m) === picked) ?? rows[0] ?? null;
+  // The clicked line, for this list only: another page / filter / sort → its first line.
+  const listKey = JSON.stringify(filters);
+  const [picked, setPicked] = useState<{ list: string; key: string } | null>(null);
+  const clicked = picked?.list === listKey ? rows.find((m) => keyOf(m) === picked.key) : undefined;
+  const selected = clicked ?? rows[0] ?? null;
 
   const kinds = [
     { value: "all" as const, label: t("products.kindAll"), activeBg: ACTIVE },
@@ -202,7 +204,7 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
           }}
           emptyTitle={t("products.noMovement")}
           rowKey={keyOf}
-          onRowClick={(m) => setPicked(keyOf(m))}
+          onRowClick={(m) => setPicked({ list: listKey, key: keyOf(m) })}
           isRowSelected={(m) => selected != null && keyOf(m) === keyOf(selected)}
         />
         <SheetCard title={t("products.lineDetail")} icon={<ListTree className="size-5" />}>

@@ -23,6 +23,7 @@ class ProductRow(BaseModel):
     avg_pu: float | None  # weighted average purchase price, every purchase of the pharmacy
     marge_pct: float | None  # (1 − avg_pu / ppv) × 100
     photo: str | None  # first scraped photo URL (`product_infos`); None = none, or export=true
+    notes: int  # « Observations » of the pharmacy on it (0 with export=true)
 
 
 class ProductsListResponse(BaseModel):
@@ -106,6 +107,20 @@ class ProductMovementsResponse(BaseModel):
     pagination: Pagination
 
 
+class ProductNoteOut(BaseModel):
+    """One « Observation » of a product."""
+
+    id: int
+    text: str
+    author: str  # name (else email) of who wrote it, kept if the account is deleted
+    created_at: datetime
+    can_delete: bool  # its author or the owner
+
+
+class ProductNoteIn(BaseModel):
+    text: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+
+
 class ProductLookup(BaseModel):
     id: int  # the product's sheet: /produits/{id}
 
@@ -124,6 +139,7 @@ class ProductSheet(BaseModel):
     prices: ProductPrices
     stock: ProductStock
     recent_movements: list[ProductMovement]  # 5 latest, newest first
+    notes_count: int  # « Observations »: > 0 = the window opens with the page
     # Fields the owner edited → their imported value (« Revenir à la valeur importée »).
     imported: dict[str, str | float | int | None]
 
@@ -214,7 +230,7 @@ class ProductStats(BaseModel):
     previous_to: str
     period: PeriodFigures
     previous: PeriodFigures
-    monthly: list[MonthFigures]  # 12 months, oldest first
+    monthly: list[MonthFigures]  # 12 months, oldest first (the last 12, or January → December of `months_year`)
     suppliers: list[SupplierShare]  # every supplier of the period, most units first (card: 3 + « Autres »)
     last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first (card: 5)
     history: list[YearHistory]  # « Historique (par année) »: every year with a sale or a purchase, newest first

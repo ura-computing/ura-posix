@@ -32,7 +32,8 @@ async function call<T>(
   return (status === 204 ? null : res.json()) as Promise<T>;
 }
 
-export const apiGet = <T = any>(page: Page, path: string, params: Params = {}) => call<T>(page, "GET", path, params);
+export const apiGet = <T = any>(page: Page, path: string, params: Params = {}, status = 200) =>
+  call<T>(page, "GET", path, params, undefined, status);
 export const apiPost = <T = any>(page: Page, path: string, body: unknown, params: Params = {}, status = 200) =>
   call<T>(page, "POST", path, params, body, status);
 export const apiPut = <T = any>(page: Page, path: string, body: unknown, status = 200) =>

@@ -87,6 +87,8 @@ export interface DataTableProps<R, K extends string = string> {
   /** A list with its details beside it (« Traçabilité »): click / Entrée picks a row, shown selected. */
   onRowClick?: (row: R, index: number) => void;
   isRowSelected?: (row: R, index: number) => boolean;
+  /** A row's own look (e.g. « Historique »: sales light green, purchases light blue). */
+  rowClassName?: (row: R, index: number) => string;
 }
 
 function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" }) {
@@ -110,6 +112,7 @@ export function DataTable<R, K extends string = string>({
   scrollOnPage = "page",
   onRowClick,
   isRowSelected,
+  rowClassName,
 }: DataTableProps<R, K>) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -230,6 +233,7 @@ export function DataTable<R, K extends string = string>({
                   className={cn(
                     "border-b border-border last:border-0 hover:bg-surface-subtle/50",
                     onRowClick && "cursor-pointer focus-visible:outline-2 focus-visible:outline-ring",
+                    rowClassName?.(row, i),
                     isRowSelected?.(row, i) && "bg-accent hover:bg-accent",
                   )}
                 >

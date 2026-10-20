@@ -15,6 +15,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type {
   AchatsFilters,
   CatalogFilters,
+  HistoryFilters,
   MargeMode,
   MovementsFilters,
   ProductsFilters,
@@ -54,6 +55,8 @@ const afterImport = {
     API.products.sheet,
     API.products.stats,
     API.products.movements,
+    API.products.history,
+    API.history.list,
     ...blExclusionReads(),
     ...supplierExclusionReads(),
   ],
@@ -72,6 +75,8 @@ const afterImport = {
     API.products.sheet,
     API.products.stats,
     API.products.movements,
+    API.products.history,
+    API.history.list,
   ],
   stock: (): Read[] => [
     API.imports.list,
@@ -82,8 +87,13 @@ const afterImport = {
     API.stats.analyseMarge,
     API.products.list,
     API.products.sheet,
+    API.products.history,
+    API.history.list,
   ],
 };
+
+/** An observation added / deleted: the window, the sheet's count, the list's icon. */
+const notesReads = (): Read[] => [API.products.notes, API.products.sheet, API.products.list];
 
 /** Reads an exclusion (product, BL, supplier) changes, besides its own list. */
 const afterExclusion = (): Read[] => [
@@ -256,17 +266,50 @@ export const API = {
     },
     stats: {
       url: (id: number) => `/products/${id}/stats`,
-      key: (id: number, from: string, to: string) => ["products", "stats", id, from, to] as const,
+      key: (id: number, from: string, to: string, monthsYear: number | null) =>
+        ["products", "stats", id, from, to, monthsYear] as const,
       all: ["products", "stats"],
     },
     /** « Scanner / Rechercher un code barre »: exact PID / barcode → the product's id (404 = none). */
     lookup: { url: "/products/lookup" },
     /** Owner's « Enregistrer » / « Revenir à la valeur importée ». */
-    save: { url: (id: number) => `/products/${id}`, refreshes: (): Read[] => [API.products.list, API.products.sheet] },
+    save: {
+      url: (id: number) => `/products/${id}`,
+      refreshes: (): Read[] => [API.products.list, API.products.sheet, API.products.history, API.history.list],
+    },
+    /** « Observations » of a product; add one, delete one (its author or the owner). */
+    notes: {
+      url: (id: number) => `/products/${id}/notes`,
+      key: (id: number) => ["products", "notes", id] as const,
+      all: ["products", "notes"],
+    },
+    addNote: {
+      url: (id: number) => `/products/${id}/notes`,
+      refreshes: (): Read[] => [notesReads(), API.products.history, API.history.list].flat(),
+    },
+    deleteNote: {
+      url: (id: number, noteId: number) => `/products/${id}/notes/${noteId}`,
+      refreshes: (): Read[] => [notesReads(), API.products.history, API.history.list].flat(),
+    },
+    /** Its « Historique » tab: its edits, observations, the imports that brought its lines. */
+    history: {
+      url: (id: number) => `/products/${id}/history`,
+      key: (id: number, page: number) => ["products", "history", id, page] as const,
+      all: ["products", "history"],
+    },
     movements: {
       url: (id: number) => `/products/${id}/movements`,
       key: (id: number, f: MovementsFilters) => ["products", "movements", id, f] as const,
       all: ["products", "movements"],
+    },
+  },
+
+  /** « Historique des modifications » (owner): every change of the pharmacy. */
+  history: {
+    list: {
+      url: "/history",
+      key: (f: HistoryFilters) => ["history", "list", f] as const,
+      all: ["history", "list"],
     },
   },
 

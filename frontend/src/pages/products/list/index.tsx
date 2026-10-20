@@ -1,9 +1,10 @@
 /** /produits — every product of the pharmacy: in its last stock import, sold or bought.
  *  « Vendus 12 mois », stock and marge follow the Stock page's rules (same numbers). A barcode
- *  reader works in the search field (code + Entrée = that product's sheet when the code is exactly
- *  one of its barcodes / its PID) and in « Scanner / Rechercher un code barre ». */
+ *  reader works anywhere on the page, no field to click (`useScanner`), in the search field (code +
+ *  Entrée = that product's sheet when the code is exactly one of its barcodes / its PID) and in
+ *  « Scanner / Rechercher un code barre ». */
 import { useState } from "react";
-import { Download, ScanBarcode } from "lucide-react";
+import { Download, ScanBarcode, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/_components/button";
@@ -19,6 +20,7 @@ import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 import { useBarcodeLookup } from "../_components/barcodeLookup";
 import { ProductPhoto } from "../_components/ProductPhoto";
 import { ScanDialog } from "../_components/ScanDialog";
+import { useScanner } from "../_components/useScanner";
 import { useProduitsPage } from "./hooks";
 
 const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
@@ -37,7 +39,15 @@ const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
           >
             {r.product}
           </span>
-          <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid}</span>
+            {r.notes > 0 && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-warning-subtle px-1.5 text-[11px] font-semibold text-warning-subtle-foreground">
+                <StickyNote className="size-3" aria-hidden />
+                {t("products.notesCount", { n: r.notes })}
+              </span>
+            )}
+          </span>
         </div>
       </Link>
     ),
@@ -119,6 +129,7 @@ export default function ProduitsPage() {
   } = useProduitsPage();
   const { lookup } = useBarcodeLookup();
   const [scanning, setScanning] = useState(false);
+  useScanner();
 
   const activeFilters: ActiveFilter[] = filters.search
     ? [
@@ -166,6 +177,10 @@ export default function ProduitsPage() {
         onResetAll={reset}
       />
 
+      <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <ScanBarcode className="size-4 text-primary" />
+        {t("products.scanAnywhere")}
+      </p>
       {salesFrom && salesTo && (
         <p className="text-xs text-muted-foreground">
           {t("products.salesWindow", { from: formatDate(salesFrom), to: formatDate(salesTo) })}
