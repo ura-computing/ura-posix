@@ -266,8 +266,7 @@ export const API = {
     },
     stats: {
       url: (id: number) => `/products/${id}/stats`,
-      key: (id: number, from: string, to: string, monthsYear: number | null) =>
-        ["products", "stats", id, from, to, monthsYear] as const,
+      key: (id: number, from: string, to: string) => ["products", "stats", id, from, to] as const,
       all: ["products", "stats"],
     },
     /** « Scanner / Rechercher un code barre »: exact PID / barcode → the product's id (404 = none). */

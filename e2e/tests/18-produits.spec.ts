@@ -6,23 +6,29 @@
  *  barcode the admin gives in the catalogue (setup), a dead address → the box icon.
  *  Product sheet (from the list): every case the oracle picked (photos, never bought, not in
  *  the stock file, stock only, negative stock) = oracle, on screen too: header (PID / catégorie /
- *  TVA, type + stock badges, code barre drawn), Général (5 prices, stock, informations générales,
- *  5 latest lines, performance = the Statistiques dates + %, same picker on both tabs); copy the barcode; header photo; « Codes » tab kept
- *  in the address, breadcrumb + « Retour à la liste des produits »; a product of no pharmacy line → 404
- *  inside the layout.
- *  Statistiques = oracle for every product (last 30 days), then the Ventes date picker (2 quick
- *  periods, typed dates, « Mois affichés » by year) + « Copier » on the best seller: KPIs and % vs the days before, 3 charts
- *  (12 months, tooltips), « Détail mensuel », « Historique » Tous / Ventes / Achats (colors), top suppliers + latest
- *  prices with « Voir tout »; no « Tendances ».
- *  « Traçabilité » (from « Voir tout »): all lines, page 2, sort by type, Achats, Ventes over the
- *  test window, search = oracle; list (type, date, heure, quantité) + every line's details (BL /
- *  ticket, prices, remise, TVA, total, import), 20 per page. « Voir tout le ticket / BL » = the whole
- *  ticket on Ventes / BL on Achats (exact number, period cleared, removable filter).
+ *  TVA, type + stock badges, tiles Emplacement / Code barre drawn / Observations), Général (5 prices,
+ *  stock tiles, informations générales without PID / purchase prices, 5 latest lines, performance =
+ *  the page dates + %); copy the barcode; header photo; « Codes » tab kept in the address, no
+ *  breadcrumb, « Retour à la liste des produits »; a product of no pharmacy line → 404 inside the layout.
+ *  One date picker for the page (toolbar under the tabs), the current year first.
+ *  Statistiques = oracle for every product (current year), then the Ventes date picker (2 quick
+ *  periods, typed dates) + « Copier » on the best seller: KPIs and % vs the period before (whole
+ *  months: the months before; the year so far: the same dates a year before), 3 charts (the
+ *  period's months, at least 12; a whole year = Jan → Dec; tooltips), « Détail mensuel »,
+ *  « Historique » Tous / Ventes / Achats (colors), top suppliers + latest prices with « Voir tout »;
+ *  no « Tendances ».
+ *  « Traçabilité » (from « Voir tout »): the page dates (current year), then the test window: page
+ *  1 + 2, sort by type, Achats, Ventes, search, « Tout réinitialiser » keeps the dates = oracle;
+ *  dates without a line → the message, no details; list (type, date + hour, quantité) + every
+ *  line's details (BL / ticket, prices, remise, TVA, total, import), 20 per page. « Voir tout le
+ *  ticket / BL » = the whole ticket on Ventes / BL on Achats (exact number, period cleared, removable
+ *  filter).
  *  No « Imprimer » button (owner, employee).
  *  « Codes »: PID / barcodes + « Copier », barcode drawn (no format / length blocks), « Scanner / Rechercher
  *  un code barre » (barcode, PID, unknown code, Échap / Annuler).
  *  Général: emplacement + date de péremption (file) with « Périmé » / < 30 j / < 90 j.
- *  « Observations »: add, the window at opening (click, scan), list badge, employee rights, delete.
+ *  « Observations »: add, the window at opening (click, scan), list badge, employee rights, delete;
+ *  « Fermer » when there is none to read.
  *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
  *  import keeps them; « Éditer » of a block = the same edit mode; « Revenir à la valeur importée »,
  *  « Annuler », min > max refused. Employee: « Modifier » and « Éditer » disabled + reason, PUT refused.
@@ -95,8 +101,8 @@ async function open(page: Page): Promise<Row> {
   return list;
 }
 
-/** List → type the PID → click the product: its id + the sheet and the statistics (30 jours) the
- *  page loads with it (« Statistiques » then opens without waiting). */
+/** List → type the PID → click the product: its id + the sheet and the statistics (current year)
+ *  the page loads with it (« Statistiques » then opens without waiting). */
 async function openSheet(page: Page, pid: string): Promise<{ id: number; sheet: Row; stats: Row }> {
   await open(page);
   const found = pageCall(page, "/products", { search: pid });
@@ -163,16 +169,18 @@ function daysFromToday(n: number): string {
 const fieldIn = (scope: Locator, label: string) =>
   scope.locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
 
-/** The big value of the KPI tile labelled `label` in `scope` (« Prix d'achat moyen » is also a
- *  row of « Informations générales »: kpiValue would find both). */
+/** The KPI tile labelled `label` in `scope` (« Observations » in the header is a button tile). */
+const tileBox = (scope: Page | Locator, label: string) =>
+  scope.locator(`xpath=.//*[contains(@class, 'rounded-2xl')][./div/span[normalize-space()="${label}"]]`);
+
+/** The big value of the KPI tile labelled `label` in `scope` (« Code barre » is also a row of
+ *  « Informations générales »: kpiValue would find both). */
 const tile = (scope: Page | Locator, label: string) =>
-  scope
-    .locator(`xpath=.//div[contains(@class, 'rounded-2xl')][./div/span[normalize-space()="${label}"]]`)
-    .locator("span.font-mono.font-bold")
-    .first();
+  tileBox(scope, label).locator("span.font-mono.font-bold").first();
 
 async function expectTile(scope: Page | Locator, label: string, want: number | null): Promise<void> {
-  const got = frNumber((await tile(scope, label).innerText()).replace(/unités/, ""));
+  // 1st line: an edited stock value also shows « modifié · Valeur importée … » under it.
+  const got = frNumber((await tile(scope, label).innerText()).split("\n")[0].replace(/unités/, ""));
   if (want == null) expect(got, label).toBeNull();
   else expect(Math.abs((got ?? NaN) - want), `${label}: écran ${got} ≠ ${want}`).toBeLessThanOrEqual(0.011);
 }
@@ -188,7 +196,7 @@ function tvaShort(tva: string): string {
 /** Header badge of the stock: in the file with more than 0, 0 or less, not in the file. */
 const stockState = (stock: number | null) => (stock == null ? "Hors stock" : stock > 0 ? "En stock" : "Rupture");
 
-/** % change shown by « Performance » (none when nothing the 30 days before). */
+/** % change shown by « Performance » (none when nothing the period before). */
 const change = (now: number, before: number) => (before ? ((now - before) / before) * 100 : null);
 
 test("produits: liste = oracle (pages 1 et 2, 50 par page, période « Vendus 12 mois »)", async ({ page }) => {
@@ -443,6 +451,8 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     await other.goto(`/produits/${tracedId}?tab=movements`);
     await expect(other.getByRole("tab", { name: "Traçabilité", exact: true })).toHaveAttribute("aria-selected", "true");
     const details = section(other, "Détails de la ligne");
+    // The test window (the current year may have no line yet early in January).
+    await setPeriod(other, testWindow().date_from, testWindow().date_to);
     await other.getByRole("button", { name: "Achats", exact: true }).click();
     await expect(details.getByRole("button", { name: "Voir tout le BL" })).toBeDisabled();
     await expect(details.getByText("Vous n'avez pas accès à cette page. Demandez au propriétaire.")).toBeVisible();
@@ -479,7 +489,7 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
       const { sheet } = await openSheet(page, pid);
       expectSame(sheet, e, `fiche ${pid}`);
 
-      // Header: PID | Catégorie | TVA (without their rate), type + stock badges, code barre.
+      // Header: PID · Catégorie · TVA (without their rate), type + stock badges; tiles: code barre.
       const header = page.locator("main header");
       await expect(header).toContainText(`PID : ${pid}`);
       await expect(header).toContainText(`Catégorie : ${withoutRate(e.category)}`);
@@ -497,7 +507,7 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
             .locator("rect")
             .first(),
         ).toBeAttached();
-      } else await expect(header.getByText("Non disponible", { exact: true })).toBeVisible();
+      } else await expect(tileBox(header, "Code barre").getByText("Non disponible", { exact: true })).toBeVisible();
 
       // 5 tiles: prices and marge.
       const { ppv, avg_pu, last_pu, last_pu_date, marge_pct } = e.prices;
@@ -508,20 +518,18 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
       await expectTile(page, "Marge brute", avg_pu == null ? null : ppv - avg_pu);
       await expectTile(page, "Marge %", marge_pct);
 
-      // Stock (Stock page rules).
-      if (e.stock.current_stock == null) await expect(field(page, "Stock actuel")).toHaveText("Hors stock");
-      else await expectNumber(page, "Stock actuel", e.stock.current_stock);
-      await expectNumber(page, "Stock minimum", e.stock.stock_min);
-      await expectNumber(page, "Stock maximum", e.stock.stock_max);
+      // « Stock » (Stock page rules): 3 tiles « Actuel », « Minimum », « Maximum ».
+      const stock = section(page, "Stock");
+      if (e.stock.current_stock == null) await expect(tile(stock, "Actuel")).toHaveText("Hors stock");
+      else await expectTile(stock, "Actuel", e.stock.current_stock);
+      await expectTile(stock, "Minimum", e.stock.stock_min);
+      await expectTile(stock, "Maximum", e.stock.stock_max);
       // Emplacement + date de péremption (stock file), with its hint (Périmé / < 30 j / < 90 j).
       await expect(field(page, "Emplacement")).toHaveText(e.stock.zone || "Non disponible");
       // ... and big in the header, on every tab.
-      if (e.stock.zone) {
-        await expect(
-          page.locator("main header").getByText(e.stock.zone, { exact: true }),
-          "emplacement en haut",
-        ).toBeVisible();
-      }
+      await expect(tileBox(header, "Emplacement"), "emplacement en haut").toContainText(
+        e.stock.zone || "Non disponible",
+      );
       if (!e.stock.expiry_date) await expect(field(page, "Date de péremption")).toHaveText("Non disponible");
       else {
         await expect(field(page, "Date de péremption")).toContainText(frDate(e.stock.expiry_date));
@@ -533,31 +541,26 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
         }
       }
 
-      // « Performance » = the Statistiques dates (last 30 days first) vs the days just before.
+      // « Performance » = the page dates (current year first, in the toolbar) vs the period before.
       await expect(page.getByText("Ventes 30 jours", { exact: true }), "pas de tuile en double").toHaveCount(0);
-      await expectDates(
-        page,
-        expected().products.stats[pid]["30d"].date_from,
-        expected().products.stats[pid]["30d"].date_to,
-      );
-      await expectPerformance(page, expected().products.stats[pid]["30d"]);
+      const year = expected().products.stats[pid].year;
+      await expectDates(page, year.date_from, year.date_to);
+      await expectPerformance(page, year);
 
-      // Informations générales: the values as imported (« Non disponible » when none).
+      // Informations générales: what the owner can change, as imported (« Non disponible » when none);
+      // Catégorie and TVA without their rate. PID and the purchase prices: header and tiles only.
       const infos: [string, string][] = [
         ["Produit", e.product],
-        ["PID", pid],
-        ["Catégorie", e.category],
-        ["TVA", e.tva],
+        ["Catégorie", withoutRate(e.category)],
+        ["TVA", tvaShort(e.tva)],
         ["Code barre", e.barcode1 ?? "Non disponible"],
         ["Laboratoire", e.laboratoire ?? "Non disponible"],
       ];
       for (const [label, want] of infos) await expect(field(page, label), label).toHaveText(want);
       await expectNumber(page, "PPV", ppv);
-      // Never bought with a price: « Non disponible » (the tile shows « — »).
-      if (avg_pu == null) await expect(field(page, "Prix d'achat moyen")).toHaveText("Non disponible");
-      else await expectNumber(page, "Prix d'achat moyen", avg_pu);
-      if (last_pu_date) await expect(field(page, "Dernier prix d'achat")).toContainText(`(${frDate(last_pu_date)})`);
-      else await expect(field(page, "Dernier prix d'achat")).toHaveText("Non disponible");
+      for (const label of ["PID", "Prix d'achat moyen", "Dernier prix d'achat"]) {
+        await expect(field(page, label), `${label} : pas dans la liste`).toHaveCount(0);
+      }
 
       // Traçabilité récente: the 5 latest lines.
       const moves: Row[] = e.recent_movements;
@@ -604,7 +607,7 @@ test("fiche produit: photo de l'en-tête (première photo, adresse morte, aucune
   await expect(header.getByRole("img", { name: "Pas de photo" })).toBeVisible();
 });
 
-test("fiche produit: onglet « Codes » (identifiants, copier, sans blocs format / longueur), gardé dans l'adresse, fil d'Ariane", async ({
+test("fiche produit: onglet « Codes » (identifiants, copier, sans blocs format / longueur), gardé dans l'adresse, « Retour »", async ({
   page,
 }) => {
   const { product, barcode1 } = expected().products.barcode_setup;
@@ -659,15 +662,14 @@ test("fiche produit: onglet « Codes » (identifiants, copier, sans blocs format
   await expect(page.getByRole("tab", { name: "Codes", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Général", exact: true }).click();
   await expect(page).not.toHaveURL(/tab=/);
-  // Breadcrumb « ⌂ › Produits › name », then the browser's back button.
-  const crumbs = page.locator("main nav");
-  await expect(crumbs.getByRole("link", { name: "Accueil", exact: true })).toHaveAttribute("href", "/");
-  await expect(crumbs.getByText(other.product, { exact: true })).toBeVisible();
-  await crumbs.getByRole("link", { name: "Produits", exact: true }).click();
+  // No breadcrumb (the top bar shows where we are): « Retour à la liste des produits », then the
+  // browser's back button.
+  await expect(page.locator("main").getByRole("link", { name: "Accueil", exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: other.product, exact: true })).toBeVisible();
-  // « Retour à la liste des produits » (big button, on every tab): the list.
+  // The big button is on every tab: the list.
   await page.getByRole("tab", { name: "Traçabilité", exact: true }).click();
   await page.getByRole("link", { name: "Retour à la liste des produits", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Produits", exact: true })).toBeVisible();
@@ -820,8 +822,8 @@ async function expectDates(page: Page, from: string, to: string) {
 /** A number as « Copier » puts it for Excel: French style, no thousands space. */
 const excel = (n: number | null, decimals: number) => (n == null ? "" : n.toFixed(decimals).replace(".", ","));
 
-/** « Performance » (Général) for one Statistiques period: its dates, units sold / bought, % vs the
- *  days just before (none when nothing then). */
+/** « Performance » (Général) for one period of the page: its dates, units sold / bought, % vs the
+ *  period before (none when nothing then). */
 async function expectPerformance(page: Page, s: Row): Promise<void> {
   const perf = section(page, "Performance");
   await expect(perf).toContainText(`(du ${frDate(s.date_from)} au ${frDate(s.date_to)})`);
@@ -845,7 +847,7 @@ async function expectPerformance(page: Page, s: Row): Promise<void> {
 /** Statistiques tab for one period = the oracle, on screen. */
 async function expectStats(page: Page, e: Row): Promise<void> {
   await expect(page.getByText(/^Du .+ au .+ · les % comparent/)).toHaveText(
-    `Du ${frDate(e.date_from)} au ${frDate(e.date_to)} · les % comparent aux jours d'avant, du ${frDate(e.previous_from)} au ${frDate(e.previous_to)}.`,
+    `Du ${frDate(e.date_from)} au ${frDate(e.date_to)} · les % comparent avec la période du ${frDate(e.previous_from)} au ${frDate(e.previous_to)}.`,
   );
   const { period: now, previous: before } = e;
   for (const [label, key] of [
@@ -859,17 +861,24 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     await expectChange(page, label, now[key], before[key]);
   }
 
-  // 3 charts over the last 12 months: 12 bars, or 2 solid curves of 2 colors; the last month's tooltip.
+  // 3 charts over the period's months (at least 12): a bar a month, or 2 solid curves of 2 colors; the
+  // last month's tooltip; a line says which months.
   const monthly: Row[] = e.monthly;
-  const last = monthly[11];
+  const last = monthly[monthly.length - 1];
+  await expect(
+    page.getByText(`Graphiques et « Détail mensuel » : ${monthName(monthly[0].month)} → ${monthName(last.month)}`),
+  ).toHaveText(
+    `Graphiques et « Détail mensuel » : ${monthName(monthly[0].month)} → ${monthName(last.month)} (${monthly.length} mois).`,
+  );
   for (const [title, keys] of [
     ["Ventes par mois", ["sold"]],
     ["Achats par mois", ["bought"]],
     ["Ventes vs Achats", ["sold", "bought"]],
   ] as const) {
     const chart = page.getByRole("img", { name: title, exact: true });
-    if (keys.length === 1) await expect(chart.locator("rect"), `${title} : 12 barres`).toHaveCount(12);
-    else {
+    if (keys.length === 1) {
+      await expect(chart.locator("rect"), `${title} : ${monthly.length} barres`).toHaveCount(monthly.length);
+    } else {
       await expect(chart.locator("path"), `${title} : 2 courbes`).toHaveCount(2);
       // framer-motion draws a line with one dash as long as the line (« 1 1 » on pathLength 1) =
       // a solid line once drawn; a dashed curve would have a pattern (« 5 4 »).
@@ -887,6 +896,9 @@ async function expectStats(page: Page, e: Row): Promise<void> {
       const colors = await chart.locator("path").evaluateAll((els) => els.map((el) => el.getAttribute("stroke")));
       expect(new Set(colors).size, "une couleur par courbe").toBe(2);
     }
+    // The date toolbar stays at the top (sticky): a quick period no longer scrolls the page up, so
+    // bring the chart to the middle of the screen before pointing at its last month.
+    await chart.evaluate((el) => el.scrollIntoView({ block: "center" }));
     const label = await chart.locator("text").last().boundingBox();
     const box = await chart.boundingBox();
     if (!label || !box) throw new Error(`pas de graphique ${title}`);
@@ -1023,16 +1035,17 @@ async function expectStats(page: Page, e: Row): Promise<void> {
   }
 }
 
-test("fiche produit: onglet « Statistiques » (30 jours) = oracle, chaque produit", async ({ page }) => {
+test("fiche produit: onglet « Statistiques » (année en cours) = oracle, chaque produit", async ({ page }) => {
+  test.setTimeout(3 * 60_000); // 8 products, the whole Statistiques tab each
   const all = expected().products.stats;
   for (const pid of Object.keys(all)) {
     await test.step(pid, async () => {
-      const e = all[pid]["30d"];
+      const e = all[pid].year;
       const { stats } = await openSheet(page, pid);
-      expectSame(stats, e, `statistiques ${pid} (30 jours, chargées avec la fiche)`);
+      expectSame(stats, e, `statistiques ${pid} (année en cours, chargées avec la fiche)`);
       await page.getByRole("tab", { name: "Statistiques", exact: true }).click();
       await expect(page).toHaveURL(/\?tab=stats$/);
-      // The Ventes date picker, on the last 30 days.
+      // The Ventes date picker, on the current year (1 January → today).
       await expectDates(page, e.date_from, e.date_to);
       await expectStats(page, e);
     });
@@ -1049,24 +1062,8 @@ test("fiche produit: Statistiques, le sélecteur de dates de Ventes (périodes r
   await expect(page.getByRole("button", { name: "30 jours", exact: true }), "plus de boutons 7 j / 30 j…").toHaveCount(
     0,
   );
-  await test.step("mois affichés : une année (ses 12 mois), puis les 12 derniers mois", async () => {
-    const years = expected().products.stats_years;
-    const months = page.getByRole("group", { name: "Mois affichés" });
-    for (const year of [Object.keys(years)[0], Object.keys(years).at(-1) as string]) {
-      const e = years[year];
-      const stats = pageCall(page, `/products/${id}/stats`, { months_year: year });
-      await months.getByRole("button", { name: year, exact: true }).click();
-      expectSame(await stats, e, `statistiques ${year} (mois)`);
-      expect(
-        (e.monthly as Row[]).map((m) => m.month),
-        `${year} : janvier → décembre`,
-      ).toEqual(Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`));
-      await expectStats(page, e);
-    }
-    const back = pageCall(page, `/products/${id}/stats`, { months_year: null });
-    await months.getByRole("button", { name: "12 derniers mois", exact: true }).click();
-    expectSame(await back, all["30d"], "12 derniers mois");
-  });
+  // No separate « Mois affichés »: the charts + « Détail mensuel » follow the dates at the top.
+  await expect(page.getByRole("group", { name: "Mois affichés" })).toHaveCount(0);
   for (const [preset, key] of [
     ["Mois antérieur", "previous-month"],
     ["Année antérieure", "previous-year"],
@@ -1078,6 +1075,14 @@ test("fiche produit: Statistiques, le sélecteur de dates de Ventes (périodes r
       await page.getByRole("button", { name: preset, exact: true }).click();
       expectSame(await stats, e, `statistiques ${preset}`);
       await expectDates(page, e.date_from, e.date_to);
+      if (key === "previous-year") {
+        // A whole year at the top = its 12 months, January → December, in the charts + « Détail mensuel ».
+        const year = e.date_from.slice(0, 4);
+        expect(
+          (e.monthly as Row[]).map((m) => m.month),
+          "année antérieure : janvier → décembre",
+        ).toEqual(Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`));
+      }
       await expectStats(page, e);
     });
   }
@@ -1200,14 +1205,16 @@ test("fiche produit: onglet « Traçabilité » = oracle (liste, détails de cha
     expect(got.pagination.total, `${what}: nombre de lignes`).toBe(want.total);
     expectSame(got.data, want.page, `${what}: lignes`);
   };
-  /** The list = the oracle's page (type, date, heure, quantité); the first line's details shown. */
+  /** The list = the oracle's page (type, date with the hour when known, quantité); the first line's
+   *  details shown. */
   const expectRows = async (want: Row[], what: string) => {
     await expect(page.locator("tbody tr"), `${what}: lignes dessinées`).toHaveCount(want.length);
     expect(await columnTexts(page, "Type"), `${what}: types`).toEqual(
       want.map((m) => (m.kind === "achat" ? "Achat" : "Vente")),
     );
-    expect(await columnTexts(page, "Date"), `${what}: dates`).toEqual(want.map((m) => frDate(m.date)));
-    expect(await columnTexts(page, "Heure"), `${what}: heures`).toEqual(want.map((m) => m.time ?? "—"));
+    expect(await columnTexts(page, "Date"), `${what}: dates`).toEqual(
+      want.map((m) => (m.time ? `${frDate(m.date)} ${m.time}` : frDate(m.date))),
+    );
     expect((await columnTexts(page, "Quantité")).map(frNumber), `${what}: quantités`).toEqual(
       want.map((m) => m.quantity),
     );
@@ -1219,56 +1226,91 @@ test("fiche produit: onglet « Traçabilité » = oracle (liste, détails de cha
       await expectDetail(page, want[0], tva, `${what}, 1re ligne`);
     }
   };
+  /** No line in the dates: the message says which ones and where to change them; no details. */
+  const expectNoLine = async (from: string, to: string, what: string) => {
+    await expect(
+      page.getByText(`Aucune ligne du ${frDate(from)} au ${frDate(to)} : changez les dates en haut.`, { exact: true }),
+      what,
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Détails de la ligne", exact: true }), what).toHaveCount(0);
+  };
 
-  // « Voir tout » under « Traçabilité récente » opens the tab: 20 lines a page.
-  let call = pageCall(page, path, { page: "1", kind: "all", order: "date", limit: "20" });
+  // « Voir tout » under « Traçabilité récente » opens the tab on the page dates (the current year
+  // first; none early in January), 20 lines a page.
+  let call = pageCall(page, path, { page: "1", kind: "all", order: "date", limit: "20", ...period(e.year) });
   await section(page, "Traçabilité récente").getByRole("button", { name: "Voir tout" }).click();
   await expect(page).toHaveURL(/\?tab=movements$/);
   await expect(page.getByRole("tab", { name: "Traçabilité", exact: true })).toHaveAttribute("aria-selected", "true");
-  check(await call, e.all, "tout");
-  await expectRows(e.all.page, "tout");
-  await expect(page.getByText(/20 \/ page/).first()).toBeVisible();
+  check(await call, e.year, "année en cours");
+  await expectDates(page, e.year.date_from, e.year.date_to);
+  if (e.year.total) await expectRows(e.year.page, "année en cours");
+  else await expectNoLine(e.year.date_from, e.year.date_to, "année en cours : aucune ligne");
+  await expect(page.locator("thead").getByText("Heure", { exact: true }), "l'heure est dans « Date »").toHaveCount(0);
 
-  // Every line of the page: click it → its details (purchases and sales).
-  const lines: Row[] = e.all.page;
+  // The test window: every line of page 1 → its details (purchases and sales), then page 2.
+  call = pageCall(page, path, { page: "1", kind: "all", ...period(w) });
+  await setPeriod(page, w.date_from, w.date_to);
+  check(await call, e.window, "période");
+  await expectRows(e.window.page, "période");
+  await expect(page.getByText(/20 \/ page/).first()).toBeVisible();
+  const lines: Row[] = e.window.page;
   for (const [i, m] of lines.entries()) {
     await page.locator("tbody tr").nth(i).click();
     await expect(page.locator("tbody tr").nth(i), `ligne ${i + 1} choisie`).toHaveAttribute("aria-selected", "true");
     await expectDetail(page, m, tva, `ligne ${i + 1}`);
   }
 
-  call = pageCall(page, path, { page: "2" });
+  call = pageCall(page, path, { page: "2", ...period(w) });
   await page.getByRole("button", { name: "Page suivante" }).click();
-  check(await call, e.all_page2, "page 2");
-  await expectRows(e.all_page2.page, "page 2");
+  check(await call, e.window_page2, "page 2");
+  await expectRows(e.window_page2.page, "page 2");
+  // Other dates go back to page 1 (the current year, then the test window again).
+  call = pageCall(page, path, { page: "1", ...period(e.year) });
+  await setPeriod(page, e.year.date_from, e.year.date_to);
+  check(await call, e.year, "autres dates : page 1");
+  call = pageCall(page, path, { page: "1", ...period(w) });
+  await setPeriod(page, w.date_from, w.date_to);
+  check(await call, e.window, "période : page 1");
 
-  // « Trier : Par type » = purchases first, then sales (like « Rastro »).
-  call = pageCall(page, path, { order: "kind", page: "1" });
-  await page.getByRole("group", { name: "Trier" }).getByRole("button", { name: "Par type", exact: true }).click();
+  // « Trier : Par type » = purchases first, then sales (like « Rastro »); in the same toolbar.
+  const sort = page.getByRole("region", { name: "Filtres" }).getByRole("group", { name: "Trier" });
+  call = pageCall(page, path, { order: "kind", page: "1", ...period(w) });
+  await sort.getByRole("button", { name: "Par type", exact: true }).click();
   check(await call, e.by_kind, "par type");
   await expectRows(e.by_kind.page, "par type");
-  call = pageCall(page, path, { order: "date", page: "1" });
-  await page.getByRole("group", { name: "Trier" }).getByRole("button", { name: "Par date", exact: true }).click();
+  call = pageCall(page, path, { order: "date", page: "1", ...period(w) });
+  await sort.getByRole("button", { name: "Par date", exact: true }).click();
   await call;
 
-  call = pageCall(page, path, { kind: "achat", page: "1" });
+  call = pageCall(page, path, { kind: "achat", page: "1", ...period(w) });
   await pickCategoryType(page, "Achats");
   check(await call, e.achats, "achats");
   await expectRows(e.achats.page, "achats");
 
-  await pickCategoryType(page, "Ventes");
   call = pageCall(page, path, { kind: "vente", ...period(w) });
-  await setPeriod(page, w.date_from, w.date_to);
+  await pickCategoryType(page, "Ventes");
   check(await call, e.ventes_window, "ventes sur la période");
   await expectRows(e.ventes_window.page, "ventes sur la période");
 
-  call = pageCall(page, path, { kind: "all", date_from: null, date_to: null });
-  await page.getByRole("button", { name: "Tout réinitialiser" }).click();
-  check(await call, e.all, "tout réinitialisé");
-  call = pageCall(page, path, { search: e.client });
+  await pickCategoryType(page, "Tous");
+  call = pageCall(page, path, { kind: "all", search: e.client, ...period(w) });
   await page.getByPlaceholder("Rechercher une référence, un client…").fill(e.client);
   check(await call, e.search, `recherche « ${e.client} »`);
   await expectRows(e.search.page, "recherche");
+
+  // « Tout réinitialiser »: the search goes, the page dates stay.
+  call = pageCall(page, path, { kind: "all", search: null, ...period(w) });
+  await page.getByRole("button", { name: "Tout réinitialiser" }).click();
+  check(await call, e.window, "tout réinitialisé");
+  await expectDates(page, w.date_from, w.date_to);
+
+  // Dates without any line (years before the files).
+  const y = Number(w.date_from.slice(0, 4)) - 5;
+  const [from, to] = [`${y}-01-01`, `${y}-01-31`];
+  call = pageCall(page, path, { date_from: from, date_to: to });
+  await setPeriod(page, from, to);
+  expect((await call).pagination.total, "aucune ligne").toBe(0);
+  await expectNoLine(from, to, "dates sans ligne");
 });
 
 test("fiche produit: « Voir tout le ticket / BL » = tout le ticket dans Ventes, tout le BL dans Achats (période retirée)", async ({
@@ -1307,7 +1349,9 @@ test("fiche produit: « Voir tout le ticket / BL » = tout le ticket dans Ventes
   // Its latest purchase → the whole BL on Achats; « Tout réinitialiser » removes it.
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`/produits/${id}\\?tab=movements$`));
-  moves = pageCall(page, `/products/${id}/movements`, { kind: "achat" });
+  // Back on the product the dates are the current year again: the test window, with its latest purchase.
+  await setPeriod(page, w.date_from, w.date_to);
+  moves = pageCall(page, `/products/${id}/movements`, { kind: "achat", ...period(w) });
   await pickCategoryType(page, "Achats");
   expect((await moves).data[0].document, "dernier achat").toBe(e.bl.ref);
   const achats = pageCall(page, "/achats", { ref: e.bl.ref, date_from: null, date_to: null });
@@ -1366,6 +1410,9 @@ test("fiche produit: « Observations » (ajout, fenêtre à l'ouverture, au scan
   // The owner adds one from the strip under the title.
   await strip.click();
   await expect(win.getByText("Aucune observation pour ce produit.")).toBeVisible();
+  // Nothing to read: « Fermer », not « J'ai lu » (the window's X is « Fermer » too).
+  await expect(win.getByRole("button", { name: "J'ai lu", exact: true })).toHaveCount(0);
+  await expect(win.getByRole("button", { name: "Fermer", exact: true })).toHaveCount(2);
   const ownerNote = "À vendre avec la crème E2E (même passage).";
   await win.getByLabel("Ajouter une observation", { exact: true }).fill(ownerNote);
   const added = pageSend(page, "POST", `/products/${id}/notes`, 201);
@@ -1452,7 +1499,8 @@ test("fiche produit: « Observations » (ajout, fenêtre à l'ouverture, au scan
   await ownerItem.getByRole("button", { name: "Oui, supprimer", exact: true }).click();
   await deleted;
   await expect(win.getByText("Aucune observation pour ce produit.")).toBeVisible();
-  await win.getByRole("button", { name: "J'ai lu", exact: true }).click();
+  await win.getByRole("button", { name: "Fermer", exact: true }).last().click();
+  await expect(win).toHaveCount(0);
   await expect(strip).toContainText("Aucune");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: e.product, exact: true })).toBeVisible();
@@ -1667,8 +1715,9 @@ test.describe("modifier", () => {
     expect(after.stock.current_stock, "valeur du propriétaire gardée").toBe(12);
     expect(after.imported.current_stock, "nouvelle valeur importée").toBe(999);
     await page.reload();
-    await expectNumber(page, "Stock actuel", 12);
-    await expect(field(page, "Stock actuel")).toContainText("Valeur importée : 999");
+    const stock = section(page, "Stock");
+    await expectTile(stock, "Actuel", 12);
+    await expect(tile(stock, "Actuel")).toContainText("Valeur importée : 999");
     await importStockLine(page, e, e.stock.current_stock); // back to the oracle's stock
   });
 

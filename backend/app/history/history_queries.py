@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import func, or_, select, union
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import AuditAction
@@ -99,21 +99,25 @@ def pharmacy_history(
 
 
 def product_history(db: Session, pharmacy_id: int, med_id: int, *, page: int, limit: int) -> dict:
-    """One product's tab: its edits + observations, and the imports that brought its lines."""
-    batches = union(
-        *(
-            select(model.import_batch_id).where(
-                model.pharmacy_id == pharmacy_id, model.medicament_id == med_id, model.import_batch_id.isnot(None)
-            )
-            for model in (Achat, Vente, PharmacyStock)
-        )
-    ).subquery()
-    batch_ids = [b for (b,) in db.execute(select(batches)).all()]
+    """One product's tab: its edits + observations, and the imports that brought its lines; an import
+    line says how many of them are this product's (`product_lines`: 247, not the file's 136 529)."""
+    lines: dict[int, int] = {}
+    for model in (Achat, Vente, PharmacyStock):
+        counts = db.execute(
+            select(model.import_batch_id, func.count())
+            .where(model.pharmacy_id == pharmacy_id, model.medicament_id == med_id, model.import_batch_id.isnot(None))
+            .group_by(model.import_batch_id)
+        ).all()
+        for batch_id, n in counts:
+            lines[batch_id] = lines.get(batch_id, 0) + n
     q = _base(pharmacy_id).where(
         or_(
             AuditLog.medicament_id == med_id,
-            AuditLog.action.in_(IMPORT_ACTIONS) & AuditLog.details["batch_id"].as_integer().in_(batch_ids),
+            AuditLog.action.in_(IMPORT_ACTIONS) & AuditLog.details["batch_id"].as_integer().in_(list(lines)),
         )
     )
     data, pagination = _rows(db, q, page, limit, export=False)
+    for row in data:
+        if row["action"] in IMPORT_ACTIONS:
+            row["product_lines"] = lines.get(row["details"].get("batch_id"))
     return {"data": data, "pagination": pagination}

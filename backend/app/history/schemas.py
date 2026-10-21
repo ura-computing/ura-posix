@@ -17,6 +17,7 @@ class AuditRow(BaseModel):
     details: dict  # the action's values: file, field before → after, note text…
     medicament_id: int | None  # the product it is about (link to its page)
     product: str | None  # its catalogue name
+    product_lines: int | None = None  # a product's tab, import line: that product's lines in the import
 
 
 class HistoryResponse(BaseModel):

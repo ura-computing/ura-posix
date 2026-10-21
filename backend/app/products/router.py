@@ -7,8 +7,8 @@ GET /v1/products/lookup?code=   « Scanner / Rechercher un code barre »: the pr
 GET /v1/products/{med_id}   One product's sheet (Général + Codes tabs). Not one of the
                     pharmacy's products → 404 `productNotFound` (never says it exists elsewhere).
 GET /v1/products/{med_id}/stats   Statistiques tab: date_from → date_to (default: the last
-                    30 days) vs the days just before, the last 12 months (or `months_year`: its
-                    January → December), suppliers (same 404).
+                    30 days) vs the period just before, the period's months (at least 12) for the
+                    charts, suppliers (same 404).
 GET /v1/products/{med_id}/movements   « Traçabilité » tab: purchase + sale lines with their details
                     (hour, lot expiry, import), period, type, search (document / supplier / client),
                     sort (date | kind), page (same 404).
@@ -70,9 +70,6 @@ DateQ = Annotated[str | None, Query(description="ISO date YYYY-MM-DD, inclusive"
 KindQ = Annotated[str, Query(description="all | achat | vente")]
 OrderQ = Annotated[str, Query(description="date (newest first) | kind (purchases, then sales)")]
 PeriodQ = Annotated[date | None, Query(description="ISO date YYYY-MM-DD, inclusive")]
-MonthsYearQ = Annotated[
-    int | None, Query(ge=2000, le=2100, description="charts + « Détail mensuel »: that year (default: last 12 months)")
-]
 
 
 @router.get("/products", response_model=ProductsListResponse)
@@ -128,12 +125,11 @@ def get_product_stats(
     db: DbDep,
     date_from: PeriodQ = None,
     date_to: PeriodQ = None,
-    months_year: MonthsYearQ = None,
 ) -> dict:
     date_to = date_to or pharmacy_today()
     date_from = date_from or date_to - timedelta(days=29)
     date_from, date_to = min(date_from, date_to), max(date_from, date_to)
-    stats = product_stats(db, pharmacy_id, med_id, date_from, date_to, months_year)
+    stats = product_stats(db, pharmacy_id, med_id, date_from, date_to)
     if stats is None:
         raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
     return stats

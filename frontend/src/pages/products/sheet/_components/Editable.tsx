@@ -8,9 +8,10 @@ import { useFormState, useWatch } from "react-hook-form";
 import { DayPicker } from "react-day-picker";
 import { fr } from "date-fns/locale";
 import { autoUpdate, flip, offset, shift, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/dayPicker";
+import { useMonths } from "@/i18n/dates";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
@@ -43,8 +44,12 @@ const isoOf = (d: Date) =>
 
 /** The calendar next to a date field: a day picked = the field's date (« JJ/MM/AAAA »). Year
  *  buttons above it: an expiry is often 1–3 years away. */
+// One header row « « ‹ Novembre 2026 › » »: year and month arrows around the month shown.
+const CALENDAR_CLASSES = { ...DAY_PICKER_CLASSES, month_caption: "hidden" };
+
 function CalendarButton({ field, label }: { field: FormField; label: string }) {
   const t = useT();
+  const months = useMonths();
   const { editor } = useSheetEdit();
   const { control, setValue } = editor.form;
   const typed = useWatch({ control, name: field });
@@ -67,8 +72,8 @@ function CalendarButton({ field, label }: { field: FormField; label: string }) {
     if (!open) setMonth(selected ?? new Date());
     setOpen(!open);
   };
-  const shiftYear = (n: number) => setMonth(new Date(month.getFullYear() + n, month.getMonth(), 1));
-  const yearButton =
+  const moveMonths = (n: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
+  const arrow =
     "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary";
   return (
     <>
@@ -91,32 +96,54 @@ function CalendarButton({ field, label }: { field: FormField; label: string }) {
           style={floatingStyles}
           className="z-50 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-base font-normal shadow-2xl"
         >
-          <div className="flex items-center justify-between gap-2 text-sm font-semibold text-foreground">
-            <button
-              type="button"
-              onClick={() => shiftYear(-1)}
-              aria-label={t("products.prevYear")}
-              className={yearButton}
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            {month.getFullYear()}
-            <button
-              type="button"
-              onClick={() => shiftYear(1)}
-              aria-label={t("products.nextYear")}
-              className={yearButton}
-            >
-              <ChevronRight className="size-4" />
-            </button>
+          <div className="flex items-center justify-between gap-1 text-sm font-bold text-foreground">
+            <span className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => moveMonths(-12)}
+                aria-label={t("products.prevYear")}
+                className={arrow}
+              >
+                <ChevronsLeft className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveMonths(-1)}
+                aria-label={t("products.prevMonth")}
+                className={arrow}
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+            </span>
+            <span>
+              {months[month.getMonth()]} {month.getFullYear()}
+            </span>
+            <span className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => moveMonths(1)}
+                aria-label={t("products.nextMonth")}
+                className={arrow}
+              >
+                <ChevronRight className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveMonths(12)}
+                aria-label={t("products.nextYear")}
+                className={arrow}
+              >
+                <ChevronsRight className="size-4" />
+              </button>
+            </span>
           </div>
-          {/* `relative`: the month arrows (absolute) stay inside the calendar, under the year row. */}
-          <div className="relative">
+          <div>
             <DayPicker
               mode="single"
               locale={fr}
               month={month}
               onMonthChange={setMonth}
+              hideNavigation
               selected={selected}
               onSelect={(d) => {
                 if (!d) return;
@@ -125,7 +152,7 @@ function CalendarButton({ field, label }: { field: FormField; label: string }) {
               }}
               weekStartsOn={1}
               showOutsideDays
-              classNames={DAY_PICKER_CLASSES}
+              classNames={CALENDAR_CLASSES}
               modifiersClassNames={DAY_PICKER_MODIFIERS}
             />
           </div>
@@ -186,7 +213,7 @@ export function Editable({
     <span className="flex flex-col items-start gap-1">
       <span>{children}</span>
       {edited && (
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs font-normal tracking-normal">
           <span className="rounded bg-warning-subtle px-1.5 py-px font-semibold text-warning-subtle-foreground">
             {t("products.edited")}
           </span>

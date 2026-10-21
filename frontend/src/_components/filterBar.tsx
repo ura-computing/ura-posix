@@ -783,6 +783,8 @@ export interface FilterBarProps<V extends string = string> {
   rightActions?: RightAction[];
   activeFilters?: ActiveFilter[];
   onResetAll?: () => void;
+  /** More controls of the page, after the others on row 1 (e.g. « Trier : Par date · Par type »). */
+  extra?: ReactNode;
 }
 
 export function FilterBar<V extends string = string>({
@@ -794,6 +796,7 @@ export function FilterBar<V extends string = string>({
   rightActions,
   activeFilters,
   onResetAll,
+  extra,
 }: FilterBarProps<V>) {
   const t = useT();
   const hasActive = (activeFilters?.length ?? 0) > 0;
@@ -839,6 +842,8 @@ export function FilterBar<V extends string = string>({
             onChange={singleSelect.onChange}
           />
         )}
+
+        {extra}
 
         {rightActions && rightActions.length > 0 && (
           <div className="ml-auto flex flex-wrap items-center gap-2">

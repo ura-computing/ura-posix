@@ -23,7 +23,7 @@ import {
   type ProductSheet,
   type ProductStats,
 } from "@/types";
-import { daysAgo, todayIso } from "@/utils/dateRange";
+import { currentYear } from "@/utils/dateRange";
 
 export const SHEET_TABS = ["general", "stats", "movements", "codes", "history"] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
@@ -68,31 +68,25 @@ export interface StatsRange {
   to: string | null;
 }
 
-/** The Statistiques dates (the Ventes date picker, on the tab row): the last 30 days first, today
- *  included; kept while switching tabs. Its own: the Ventes / Achats dates do not move. */
+/** The page dates (the Ventes date picker, in the toolbar under the tabs): « Performance »,
+ *  Statistiques and Traçabilité. The current year first (1 January → today); kept while switching tabs.
+ *  Its own: the Ventes / Achats dates do not move. */
 export function useStatsRange() {
-  const [range, setRangeState] = useState<StatsRange>(() => ({ from: daysAgo(29), to: todayIso() }));
-  // Charts + « Détail mensuel »: null = the last 12 months, else January → December of that year.
-  const [monthsYear, setMonthsYear] = useState<number | null>(null);
+  const [range, setRangeState] = useState<StatsRange>(() => currentYear());
   const setRange = (from: string | null, to: string | null) => setRangeState({ from, to });
   return {
     range,
     setRange,
-    monthsYear,
-    setMonthsYear,
   };
 }
 
 /** One product's statistics over a period, asked with the sheet (`enabled` once it is there):
  *  « Statistiques » opens at once, without a « Chargement… » first. Nothing asked while a custom
  *  date is missing. */
-export function useProductStats(id: number, { from, to }: StatsRange, monthsYear: number | null, enabled: boolean) {
+export function useProductStats(id: number, { from, to }: StatsRange, enabled: boolean) {
   const { data } = useQuery({
-    queryKey: API.products.stats.key(id, from ?? "", to ?? "", monthsYear),
-    queryFn: () =>
-      api.get<ProductStats>(API.products.stats.url(id), {
-        params: { date_from: from, date_to: to, months_year: monthsYear },
-      }),
+    queryKey: API.products.stats.key(id, from ?? "", to ?? ""),
+    queryFn: () => api.get<ProductStats>(API.products.stats.url(id), { params: { date_from: from, date_to: to } }),
     enabled: enabled && !!from && !!to,
     placeholderData: keepPreviousData,
   });
@@ -111,13 +105,13 @@ const DEFAULT_MOVES: Omit<MovementsFilters, "date_from" | "date_to"> = {
   sort_order: "desc",
 };
 
-/** « Traçabilité »: one product's purchase / sale lines, filtered (type, period shared with the
- *  other pages, search), sorted by date or by type, 20 per page. « Voir tout le ticket / BL »
- *  opens it in Ventes / Achats: every period, that number only. */
-export function useMovements(id: number) {
+/** « Traçabilité »: one product's purchase / sale lines, filtered (type, the page dates, search),
+ *  sorted by date or by type, 20 per page. « Voir tout le ticket / BL » opens it in Ventes / Achats:
+ *  every period, that number only. */
+export function useMovements(id: number, { from, to }: StatsRange) {
   const navigate = useNavigate();
   const { me } = useMe();
-  const { from, to, setRange } = useGlobalDateRange();
+  const { setRange } = useGlobalDateRange();
   const { filters: local, patch, setPage, setPageSize, reset: resetLocal } = useListFilters(DEFAULT_MOVES, "desc");
   const filters: MovementsFilters = useMemo(() => ({ ...local, date_from: from, date_to: to }), [local, from, to]);
 
@@ -137,14 +131,10 @@ export function useMovements(id: number) {
       }),
   });
 
-  // Every filter change goes back to page 1 (`patch`); the period is shared between pages.
+  // Every filter change goes back to page 1 (`patch`); the dates are the page's (Général, Statistiques).
   const setSearch = (search: string) => patch({ search });
   const setKind = (kind: MovementsFilters["kind"]) => patch({ kind });
   const setOrder = (order: MovementsFilters["order"]) => patch({ order });
-  const reset = () => {
-    resetLocal();
-    setRange(null, null);
-  };
   /** Ventes / Achats open for this user (an employee may not have them). */
   const canSeeDetail = (kind: ProductMovementLine["kind"]) =>
     me?.role === "admin" || !!me?.permissions.includes(kind === "achat" ? "achats" : "ventes");
@@ -159,10 +149,9 @@ export function useMovements(id: number) {
     setSearch,
     setKind,
     setOrder,
-    setDateRange: setRange,
     setPage,
     setPageSize,
-    reset,
+    reset: resetLocal,
     canSeeDetail,
     seeDetail,
     rows: data?.data ?? [],

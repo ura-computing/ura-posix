@@ -1,7 +1,7 @@
-/** Statistiques charts, hand-drawn SVG like Rapport (no chart library): `MonthsChart` = the last
- *  12 months across, as bars or as solid lines (one color per series). Hover = the month's value
- *  of every series. A month with more returns than sales is drawn at 0 (the tooltip shows the
- *  real number). */
+/** Statistiques charts, hand-drawn SVG like Rapport (no chart library): `MonthsChart` = the
+ *  period's months across (12 or more), as bars or as solid lines (one color per series). Hover =
+ *  the month's value of every series. A month with more returns than sales is drawn at 0 (the
+ *  tooltip shows the real number). */
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -93,7 +93,7 @@ function DrawnMonthsChart({ months, series, kind, label, W }: MonthsChartProps &
   const yAt = (v: number) => PAD_T + plotH - (Math.max(v, 0) / niceMax) * plotH;
   const baseY = PAD_T + plotH;
   const barW = Math.min(22, (band * 0.6) / series.length);
-  const labelStep = band < 26 ? 2 : 1;
+  const labelStep = Math.max(1, Math.ceil(26 / band)); // a label needs ~26 px
   const monthOf = (m: string) => Number(m.slice(5, 7)) - 1;
   // « Janv. » → « Janv »: 12 names fit under a third of the page.
   const short = (m: string) => monthsShort[monthOf(m)].replace(/\.$/, "");
@@ -209,7 +209,8 @@ function DrawnMonthsChart({ months, series, kind, label, W }: MonthsChartProps &
           </g>
         )}
 
-        {/* Narrow chart: every other month (always the last one and the one under the mouse). */}
+        {/* Narrow chart / many months: one month in `labelStep` (always the last one and the one
+            under the mouse). */}
         {months.map((m, i) => (
           <text
             key={m}

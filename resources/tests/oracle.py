@@ -482,32 +482,33 @@ class Oracle:
         }
 
     def stats_periods(self) -> dict[str, tuple[date, date]]:
-        """Statistiques dates (the Ventes picker): the last 30 days first (today included), two
+        """Product page dates (the Ventes picker): the current year first (1 January → today), two
         « Périodes rapides » (frontend utils/dateRange.ts), dates typed = the test window."""
         t = self.today
         first = month_start(t)
         return {
-            "30d": (t - timedelta(days=29), t),
+            "year": (date(t.year, 1, 1), t),
             "previous-month": (months_back(first, 1), first - timedelta(days=1)),
             "previous-year": (date(t.year - 1, 1, 1), date(t.year - 1, 12, 31)),
             "custom": (self.df, self.dt),
         }
 
-    def stats_years(self, p) -> dict:
-        """GET /products/{id}/stats?months_year=Y (last 30 days) for every year of the product's history."""
-        df, dt = self.stats_periods()["30d"]
-        years = sorted({v.day.year for v in self.ventes if v.p is p} | {a.day.year for a in self.achats if a.p is p},
-                       reverse=True)
-        return {str(y): self.product_stats(p, df, dt, y) for y in years}
-
-    def product_stats(self, p, df: date, dt: date, months_year: int | None = None) -> dict:
-        """GET /products/{id}/stats?date_from&date_to: the period vs the days just before (same
-        number); the last 12 months; every supplier of the period (most units first); each supplier's
-        latest priced purchase (newest first); units sold / bought per month of every year with a sale
-        or a purchase (newest first).
+    def product_stats(self, p, df: date, dt: date) -> dict:
+        """GET /products/{id}/stats?date_from&date_to: the period vs the one just before (whole months
+        → the same number of months; the year so far → the same dates a year before; else the same
+        number of days); the period's months, at least 12
+        (ending with it); every supplier of the period (most units first); each supplier's latest
+        priced purchase (newest first); units sold / bought per month of every year with a sale or a
+        purchase (newest first).
         CA = qty × PPV, marge = CA − units sold × average PU (every purchase)."""
-        days = (dt - df).days + 1
-        pf, pt = df - timedelta(days=days), df - timedelta(days=1)
+        if df.day == 1 and (dt + timedelta(days=1)).day == 1:
+            n = (dt.year - df.year) * 12 + dt.month - df.month + 1
+            pf, pt = months_back(df, n), df - timedelta(days=1)
+        elif (df.month, df.day) == (1, 1) and dt.year == df.year:
+            pf, pt = months_back(df, 12), months_back(dt, 12)
+        else:
+            days = (dt - df).days + 1
+            pf, pt = df - timedelta(days=days), df - timedelta(days=1)
         pu = self.pu_alltime.get(p.pid)
         sales = [v for v in self.ventes if v.p is p]
         buys = [a for a in self.achats if a.p is p]
@@ -520,9 +521,14 @@ class Oracle:
                     "marge": r2(c - sold * pu) if pu is not None else None,
                     "transactions": len({v.ref for v in lines})}
 
-        # Charts + « Détail mensuel »: the last 12 months, or January → December of `months_year`.
-        months = ([date(months_year, m, 1) for m in range(1, 13)] if months_year
-                  else [months_back(month_start(self.today), n) for n in range(11, -1, -1)])
+        # Charts + « Détail mensuel »: every month the period touches, at least 12 (a shorter period →
+        # the 12 months ending with it; backend product_queries._chart_months).
+        last = month_start(dt)
+        months = [month_start(df)]
+        while months[-1] < last:
+            months.append(next_month(months[-1]))
+        while len(months) < 12:
+            months.insert(0, months_back(months[0], 1))
         monthly = [{"month": m.isoformat()[:7], **{k: v for k, v in figures(m, next_month(m) - timedelta(days=1)).items()
                                                   if k != "transactions"}} for m in months]
 
@@ -613,20 +619,24 @@ class Oracle:
         return by_pid[pid]
 
     def movements_scenarios(self, p) -> dict:
-        """18-produits « Traçabilité » tab, best-selling product: no filter (pages 1 + 2), sorted by
-        type, Achats, Ventes over the test window, search = the client of its latest sale with a client.
-        « Voir détail » of its latest sale / purchase = every line of that ticket / BL (any product)."""
+        """18-produits « Traçabilité » tab, best-selling product: the page dates first (current year,
+        may be empty early in January), then over the test window: pages 1 + 2, sorted by type,
+        Achats, Ventes, search = the client of its latest sale with a client. « Voir détail » of its
+        latest sale / purchase = every line of that ticket / BL (any product)."""
         client = next(v.client for v in sorted(self.ventes, key=lambda v: (v.day, v.seq), reverse=True)
                       if v.p is p and v.client)
         sale = max((v for v in self.ventes if v.p is p), key=lambda v: (v.day, v.seq))
         buy = max((a for a in self.achats if a.p is p), key=lambda a: (a.day, a.seq))
         return {
             "pid": p.pid, "client": client,
-            "all": self.product_movements(p), "all_page2": self.product_movements(p, page=2),
-            "by_kind": self.product_movements(p, order="kind"),
-            "achats": self.product_movements(p, kind="achat"),
+            "year": {"date_from": date(self.today.year, 1, 1).isoformat(), "date_to": self.today.isoformat(),
+                     **self.product_movements(p, date(self.today.year, 1, 1), self.today)},
+            "window": self.product_movements(p, self.df, self.dt),
+            "window_page2": self.product_movements(p, self.df, self.dt, page=2),
+            "by_kind": self.product_movements(p, self.df, self.dt, order="kind"),
+            "achats": self.product_movements(p, self.df, self.dt, kind="achat"),
             "ventes_window": self.product_movements(p, self.df, self.dt, "vente"),
-            "search": self.product_movements(p, query=client),
+            "search": self.product_movements(p, self.df, self.dt, query=client),
             "ticket": {"ref": sale.ref, "products": sorted(v.p.name for v in self.ventes if v.ref == sale.ref)},
             "bl": {"ref": buy.ref, "products": sorted(a.p.name for a in self.achats if a.ref == buy.ref)},
         }
@@ -668,8 +678,6 @@ class Oracle:
             # Statistiques: every period button, for every product the test opens.
             "stats": {pid: {k: self.product_stats(by_pid[pid], *r) for k, r in self.stats_periods().items()}
                       for pid in self.sheet_pids(rows, infos)},
-            # « Détail mensuel » by year (the 1st product of the stats): each year of its history.
-            "stats_years": self.stats_years(by_pid[self.sheet_pids(rows, infos)[0]]),
             "movements": self.movements_scenarios(self.traced_product(rows, by_pid)),
             "search": {q: [r["pid"] for r in rows if all(product_match(by_pid[r["pid"]], t) for t in tokenize(q))]
                        for q in PRODUCT_QUERIES},

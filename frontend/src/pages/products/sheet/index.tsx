@@ -1,11 +1,13 @@
 /** /produits/:id — one product of the pharmacy: header (photo, PID / catégorie / TVA, badges,
  *  emplacement, code barre, « Observations », « Modifier »), then « Général », « Statistiques »,
- *  « Traçabilité », « Codes » and « Historique ». A product with observations opens their window first.
+ *  « Traçabilité », « Codes » and « Historique ». One date picker for the page, in the toolbar under
+ *  the tabs (Général, Statistiques, Traçabilité). A product with observations opens their window first.
  *  Not one of its products → the 404 inside the layout (never says whether it exists elsewhere). */
 import { useState } from "react";
 import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
+import { FilterBar } from "@/_components/filterBar";
 import { Page } from "@/_components/Page";
 import { TabBar, type TabItem } from "@/_components/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
@@ -19,8 +21,7 @@ import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { NotesDialog } from "./_components/NotesDialog";
-import { EditActions, SheetBreadcrumb, SheetFacts, SheetMeta } from "./_components/SheetHeader";
-import { StatsPeriodPicker } from "./_components/StatsPeriodPicker";
+import { BackToList, EditActions, SheetFacts, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
   useProductNotes,
@@ -35,8 +36,8 @@ function ProductSheetPage({ id }: { id: number }) {
   const t = useT();
   const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(id);
   const editor = useSheetEditor(sheet);
-  const { range, setRange, monthsYear, setMonthsYear } = useStatsRange();
-  const { stats } = useProductStats(id, range, monthsYear, !!sheet);
+  const { range, setRange } = useStatsRange();
+  const { stats } = useProductStats(id, range, !!sheet);
   useScanner(); // a scan anywhere on the page → that product
   // « Observations »: their window opens with the page when there are some — once (switching tabs
   // does not reopen it); « Observations » in the header opens it again.
@@ -68,8 +69,8 @@ function ProductSheetPage({ id }: { id: number }) {
   return (
     <SheetEditContext value={{ editor, sheet }}>
       <Page
-        above={<SheetBreadcrumb name={sheet.product} />}
-        media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-28 rounded-xl p-2" />}
+        above={<BackToList />}
+        media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
         subtitle={<SheetMeta sheet={sheet} />}
         actions={<EditActions editor={editor} onStart={startEditing} />}
@@ -82,15 +83,12 @@ function ProductSheetPage({ id }: { id: number }) {
           />
         }
       >
-        <TabBar
-          tabs={tabs}
-          activeId={tab}
-          onChange={setTab}
-          actions={
-            // The same dates for « Performance » (Général) and Statistiques.
-            (tab === "general" || tab === "stats") && <StatsPeriodPicker range={range} onRange={setRange} />
-          }
-        />
+        <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
+        {/* The page dates: « Performance » (Général), Statistiques; Traçabilité has them in its own
+            toolbar, with its search and filters. */}
+        {(tab === "general" || tab === "stats") && (
+          <FilterBar dateRange={{ from: range.from, to: range.to, onChange: setRange }} />
+        )}
         {editor.editing && (
           <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
             {t("products.editHint")}
@@ -99,10 +97,8 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "general" && (
           <GeneralTab sheet={sheet} stats={stats} range={range} onShowMovements={() => setTab("movements")} />
         )}
-        {tab === "stats" && (
-          <StatsTab stats={stats} range={range} monthsYear={monthsYear} onMonthsYear={setMonthsYear} />
-        )}
-        {tab === "movements" && <MovementsTab sheet={sheet} />}
+        {tab === "stats" && <StatsTab stats={stats} range={range} />}
+        {tab === "movements" && <MovementsTab sheet={sheet} range={range} onRange={setRange} />}
         {tab === "codes" && <CodesTab sheet={sheet} />}
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
@@ -122,7 +118,7 @@ function ProductSheetPage({ id }: { id: number }) {
 }
 
 /** A new product (« Scanner / Rechercher un code barre », browser back) starts fresh: not
- *  editing, Statistiques on the last 30 days. */
+ *  editing, the page dates on the current year. */
 export default function ProduitPage() {
   const { id } = useParams<{ id: string }>();
   return <ProductSheetPage key={id} id={Number(id)} />;

@@ -13,7 +13,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { LOGGED_OUT, OWNER, loadState, saveState, sessionFile } from "../lib/auth";
 import { type Row } from "../lib/checks";
 import { expect, test } from "../lib/fixtures";
-import { columnTexts, downloadXlsx, pageCall, setPeriod } from "../lib/ui";
+import { columnTexts, downloadXlsx, frNumber, pageCall, setPeriod } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
 
@@ -184,6 +184,20 @@ test.describe("propriétaire", () => {
       every.data.some((r: Row) => r.action === "import_done"),
       "les imports qui ont apporté ses lignes",
     ).toBe(true);
+    // An import line counts this product's lines in it, not the whole file's: over the purchase / sale
+    // imports, every line of the product (« Traçabilité » with no dates).
+    const imports = every.data.filter((r: Row) => r.action === "import_done" && r.details.type !== "stock");
+    const moves = await apiGet(page, `/products/${p.id}/movements`, { limit: "20" });
+    expect(
+      imports.reduce((n: number, r: Row) => n + r.product_lines, 0),
+      "lignes de ce produit (achats + ventes)",
+    ).toBe(moves.pagination.total);
+    const shown = tab.data.find((r: Row) => r.action === "import_done");
+    if (shown) {
+      const line = page.locator("tbody tr").filter({ hasText: shown.details.file }).first();
+      const n = /: ([\d\s\u202f]+) ligne\(s\) de ce produit/.exec(await line.innerText());
+      expect(frNumber(n?.[1] ?? null), `« ${shown.details.file} » à l'écran`).toBe(shown.product_lines);
+    }
     await expect(page.getByRole("tab", { name: "Historique", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText(/^PPV : .+ → .+ \(valeur importée\)$/).first()).toBeVisible();
     await expect(page.getByText(`Observation ajoutée : « ${NOTE} »`)).toBeVisible();

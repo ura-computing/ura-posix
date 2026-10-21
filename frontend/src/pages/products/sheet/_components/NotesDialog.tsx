@@ -1,6 +1,7 @@
 /** « Observations sur ce produit »: the notes the pharmacy left on it (« à vendre avec … »),
  *  newest first, who and when; « Ajouter une observation »; « Supprimer » (its author or the
- *  owner, asked twice); « J'ai lu » closes. Opens with the product page when it has notes.
+ *  owner, asked twice); « J'ai lu » closes (« Fermer » when there is none to read). Opens with the
+ *  product page when it has notes.
  *  Mounted only while open: the field starts empty each time. */
 import { useState } from "react";
 import { Check, StickyNote, Trash2, X } from "lucide-react";
@@ -127,10 +128,16 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
       </div>
 
       <div className="flex justify-end border-t border-border bg-surface-subtle px-5 py-3.5">
-        <AsyncButton variant="primary" onClick={onClose}>
-          <Check className="size-4" />
-          {t("products.notesRead")}
-        </AsyncButton>
+        {notes.length > 0 ? (
+          <AsyncButton variant="primary" onClick={onClose}>
+            <Check className="size-4" />
+            {t("products.notesRead")}
+          </AsyncButton>
+        ) : (
+          <AsyncButton variant="secondary" onClick={onClose}>
+            {t("common.close")}
+          </AsyncButton>
+        )}
       </div>
     </DialogContent>
   );

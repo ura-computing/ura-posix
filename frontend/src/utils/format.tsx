@@ -87,6 +87,12 @@ export function formatNumStr(n: number | null | undefined, decimals: 0 | 1 | 2 =
   return NUM_FR[decimals].format(n);
 }
 
+/** Money without the « MAD » suffix, for a tile that prints the unit smaller: « 30 902,90 ». */
+export function formatMoney(n: number | null | undefined): ReactNode {
+  if (n == null) return "—";
+  return tighten(NUM_FR[2].format(n));
+}
+
 export function formatQty(n: number | null | undefined): ReactNode {
   if (n == null) return "—";
   return tighten(QTY.format(n));

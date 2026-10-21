@@ -1,6 +1,7 @@
 /** « Historique des modifications »: one line as a sentence, in the page language.
  *  `historyText(t, row)` → « PPV : 46,80 MAD → 50,00 MAD »,
- *  « Import Achats « Sobrus - Achats 2026… » : 1 234 lignes importées, 0 ignorées ». */
+ *  « Import Achats « Sobrus - Achats 2026… » : 1 234 lignes importées, 0 ignorées »; on a product's
+ *  tab « Import Achats « … » : 247 lignes de ce produit ». */
 import type { AuditRow } from "@/types";
 import type { TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
@@ -47,6 +48,13 @@ export function historyText(t: TFn, row: AuditRow): string {
     case "import_cancelled":
     case "import_failed":
     case "import_deleted":
+      if (row.action === "import_done" && row.product_lines != null) {
+        return t("history.import_product", {
+          type: t(IMPORT_TYPE[String(d.type)] ?? "history.kindImport"),
+          file: String(d.file ?? "—"),
+          n: formatNumStr(row.product_lines),
+        });
+      }
       return t(`history.${row.action}`, {
         type: t(IMPORT_TYPE[String(d.type)] ?? "history.kindImport"),
         file: String(d.file ?? "—"),

@@ -2,7 +2,7 @@
  *  barcode 1 drawn, and « Scanner / Rechercher un code barre ». The owner changes the barcodes
  *  here too (« Modifier »); the PID never. */
 import { useState, type ReactNode } from "react";
-import { FileText, Info, ScanBarcode } from "lucide-react";
+import { Info, ScanBarcode } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import type { ProductSheet } from "@/types";
@@ -16,8 +16,8 @@ import { SheetCard } from "./SheetCard";
 
 function InfoNote({ children }: { children: ReactNode }) {
   return (
-    <p className="flex gap-3 rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
-      <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+    <p className="flex items-start gap-2.5 rounded-lg border border-info-border bg-info-subtle px-3 py-2.5 text-sm text-info-subtle-foreground">
+      <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
   );
@@ -47,7 +47,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   const drawn = sheet.barcode1 ?? sheet.barcode2;
   return (
     <div className="max-w-3xl">
-      <SheetCard title={t("products.identifiers")} icon={<FileText className="size-5" />}>
+      <SheetCard title={t("products.identifiers")}>
         <InfoNote>{t("products.pidInfo")}</InfoNote>
         <dl className="flex flex-col gap-3">
           <CodeRow

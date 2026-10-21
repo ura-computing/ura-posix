@@ -5,18 +5,18 @@ import { HistoryTable } from "@/_components/HistoryTable";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useProductHistory } from "../hooks";
+import { SheetCard } from "./SheetCard";
 
 export function HistoryTab({ id }: { id: number }) {
   const t = useT();
   const { rows, total, page, setPage, isLoading } = useProductHistory(id);
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">{t("history.tabHint")}</p>
+    <SheetCard title={t("history.title")} hint={t("history.tabHint")}>
       <HistoryTable
         rows={rows}
         isLoading={isLoading}
         pagination={{ page, pageSize: 20, total, onPage: setPage, onPageSize: () => {}, pageSizes: [20] }}
       />
-    </div>
+    </SheetCard>
   );
 }

@@ -1,10 +1,11 @@
-/** « Statistiques »: the period's figures vs the days just before (same number); 3 charts +
- *  « Détail mensuel » (copied for Excel) over the last 12 months or one year (« Mois affichés »);
+/** « Statistiques », all following the page dates: the period's figures vs the period just before
+ *  (whole months: as many months, else as many days); 3 charts + « Détail mensuel » (copied for
+ *  Excel) over the period's months (at least 12: a short period → the 12 months ending with it);
  *  « Historique (par année) » (sales light green, purchases light blue; « Tous · Ventes · Achats »);
  *  « Top fournisseurs » of the period and each supplier's latest purchase price (« Voir tout » = the
  *  whole list in a window). */
 import { useState } from "react";
-import { ArrowRight, BarChart3, CalendarRange, FileText, LineChart, Receipt, Truck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import { CategorySegment } from "@/_components/CategorySegment";
@@ -14,12 +15,12 @@ import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare, YearHist
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatDate, formatMAD, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";
+import { formatDate, formatMAD, formatMoney, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";
 
 import type { StatsRange } from "../hooks";
 import { CopyButton } from "./CopyButton";
 import { SeeAllDialog } from "./SeeAllDialog";
-import { SheetCard } from "./SheetCard";
+import { SheetCard, TileNumber } from "./SheetCard";
 import { ChartLegend, MonthsChart, type ChartSeries } from "./StatsCharts";
 
 const SALES = "var(--chart-1)";
@@ -32,7 +33,12 @@ const cell = (n: number | null, decimals: 0 | 2) => (n == null ? "" : formatNumS
 
 // No fixed widths: the columns fit the page (no sideways scroll on a laptop screen).
 const monthColumns = (t: TFn, monthName: (m: string) => string): ColumnDef<MonthFigures>[] => [
-  { key: "month", label: t("col.mois"), sortable: false, render: (r) => monthName(r.month) },
+  {
+    key: "month",
+    label: t("col.mois"),
+    sortable: false,
+    render: (r) => <span className="whitespace-nowrap">{monthName(r.month)}</span>,
+  },
   {
     key: "sold",
     label: t("products.colSoldUnits"),
@@ -188,18 +194,7 @@ function SeeAllButton({ n, onClick }: { n: number; onClick: () => void }) {
   );
 }
 
-export function StatsTab({
-  stats,
-  range,
-  monthsYear,
-  onMonthsYear,
-}: {
-  stats: ProductStats | null;
-  range: StatsRange;
-  /** Charts + « Détail mensuel »: null = the last 12 months, else that year's 12 months. */
-  monthsYear: number | null;
-  onMonthsYear: (year: number | null) => void;
-}) {
+export function StatsTab({ stats, range }: { stats: ProductStats | null; range: StatsRange }) {
   const t = useT();
   const months = useMonths();
   const monthsShort = useMonthsShort();
@@ -215,11 +210,8 @@ export function StatsTab({
     const c = a == null || b == null ? null : pctChange(a, b);
     return c == null ? null : { value: c };
   };
-  const units = (n: number) => (
-    <>
-      {formatQty(n)} {t("common.wUnites")}
-    </>
-  );
+  const units = (n: number) => <TileNumber value={formatQty(n)} unit={t("common.wUnites")} />;
+  const madTile = (n: number | null) => (n != null ? <TileNumber value={formatMoney(n)} unit="MAD" /> : "—");
   const monthName = (m: string) => `${months[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
   const sold: ChartSeries = { key: "sold", label: t("nav.ventes"), values: monthly.map((m) => m.sold), color: SALES };
   const bought: ChartSeries = {
@@ -278,16 +270,6 @@ export function StatsTab({
         ]
       : []),
   ];
-  // Charts + « Détail mensuel »: « 12 derniers mois » or a year of the history (all its months).
-  const LAST_12 = "last12";
-  const monthsOptions = [
-    { value: LAST_12, label: t("products.last12Months"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
-    ...stats.history.map((y) => ({
-      value: String(y.year),
-      label: String(y.year),
-      activeBg: "bg-primary text-primary-foreground shadow-sm",
-    })),
-  ];
   const historyOptions = [
     { value: "all" as const, label: t("products.kindAll"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
     { value: "sales" as const, label: t("nav.ventes"), activeBg: "bg-primary text-primary-foreground shadow-sm" },
@@ -296,21 +278,32 @@ export function StatsTab({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* One line: the period, what the % compare with, the months of the charts + « Détail mensuel »
+          (the period's months, at least 12). */}
       <p className="text-sm text-muted-foreground">
-        {t("products.periodHint", {
-          from: formatDate(stats.date_from),
-          to: formatDate(stats.date_to),
-          pfrom: formatDate(stats.previous_from),
-          pto: formatDate(stats.previous_to),
-        })}
+        <span>
+          {t("products.periodHint", {
+            from: formatDate(stats.date_from),
+            to: formatDate(stats.date_to),
+            pfrom: formatDate(stats.previous_from),
+            pto: formatDate(stats.previous_to),
+          })}
+        </span>{" "}
+        <span>
+          {t("products.monthsRange", {
+            from: monthName(monthly[0].month),
+            to: monthName(monthly[monthly.length - 1].month),
+            n: monthly.length,
+          })}
+        </span>
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <KpiTile label={t("products.qtySold")} value={units(now.sold)} delta={change(now.sold, before.sold)} />
         <KpiTile label={t("products.qtyBought")} value={units(now.bought)} delta={change(now.bought, before.bought)} />
-        <KpiTile label={t("products.ca")} value={formatMAD(now.ca)} delta={change(now.ca, before.ca)} />
+        <KpiTile label={t("products.ca")} value={madTile(now.ca)} delta={change(now.ca, before.ca)} />
         <KpiTile
           label={t("products.margeGeneree")}
-          value={now.marge != null ? formatMAD(now.marge) : "—"}
+          value={madTile(now.marge)}
           delta={change(now.marge, before.marge)}
         />
         <KpiTile
@@ -320,34 +313,20 @@ export function StatsTab({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3" role="group" aria-label={t("products.monthsShown")}>
-        <span className="text-sm font-medium text-muted-foreground">{t("products.monthsShown")}</span>
-        <CategorySegment
-          value={monthsYear == null ? LAST_12 : String(monthsYear)}
-          options={monthsOptions}
-          onChange={(v) => onMonthsYear(v === LAST_12 ? null : Number(v))}
-        />
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-3">
-        <SheetCard title={t("products.salesByMonth")} icon={<BarChart3 className="size-5" />}>
+        <SheetCard title={t("products.salesByMonth")}>
           <MonthsChart months={monthKeys} series={[sold]} kind="bars" label={t("products.salesByMonth")} />
         </SheetCard>
-        <SheetCard title={t("products.purchasesByMonth")} icon={<BarChart3 className="size-5" />}>
+        <SheetCard title={t("products.purchasesByMonth")}>
           <MonthsChart months={monthKeys} series={[bought]} kind="bars" label={t("products.purchasesByMonth")} />
         </SheetCard>
-        <SheetCard
-          title={t("products.salesVsPurchases")}
-          icon={<LineChart className="size-5" />}
-          actions={<ChartLegend series={[sold, bought]} />}
-        >
+        <SheetCard title={t("products.salesVsPurchases")} actions={<ChartLegend series={[sold, bought]} />}>
           <MonthsChart months={monthKeys} series={[sold, bought]} kind="lines" label={t("products.salesVsPurchases")} />
         </SheetCard>
       </div>
 
       <SheetCard
         title={t("products.yearHistory")}
-        icon={<CalendarRange className="size-5" />}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <CategorySegment value={historyFilter} options={historyOptions} onChange={setHistoryFilter} />
@@ -373,7 +352,6 @@ export function StatsTab({
       <div className="grid gap-4 xl:grid-cols-2">
         <SheetCard
           title={t("products.monthlyDetail")}
-          icon={<FileText className="size-5" />}
           actions={<CopyButton value={tsv} label={t("products.copyTable")} copiedText={t("products.tableCopied")} />}
         >
           <DataTable<MonthFigures> rows={monthly} columns={monthColumns(t, monthName)} rowKey={(r) => r.month} />
@@ -382,7 +360,6 @@ export function StatsTab({
         <div className="flex flex-col gap-4">
           <SheetCard
             title={t("products.topSuppliers")}
-            icon={<Truck className="size-5" />}
             actions={<SeeAllButton n={stats.suppliers.length} onClick={() => setSeeAll("suppliers")} />}
           >
             <DataTable<SupplierShare>
@@ -394,7 +371,6 @@ export function StatsTab({
           </SheetCard>
           <SheetCard
             title={t("products.lastPrices")}
-            icon={<Receipt className="size-5" />}
             actions={<SeeAllButton n={stats.last_prices.length} onClick={() => setSeeAll("prices")} />}
           >
             <DataTable<SupplierPrice>

@@ -12,6 +12,7 @@ always show the same numbers (`stock_queries`)."""
 
 from __future__ import annotations
 
+import calendar
 from datetime import date, timedelta
 
 from sqlalchemy import Float, String, and_, case, func, literal, or_, select, union, union_all
@@ -449,31 +450,45 @@ def save_product_edits(db: Session, pharmacy_id: int, med_id: int, user: User, c
 
 
 def _previous_period(date_from: date, date_to: date) -> tuple[date, date]:
-    """The same number of days, just before the period (7 → the 7 days before)."""
+    """Just before the period. Whole months → the same number of months (2025 → 2024, septembre →
+    août, so the % match « Historique (par année) »); the year so far → the same dates a year before
+    (01/01/2026 → 21/10/2026 vs 01/01/2025 → 21/10/2025, like Tableau de bord); else the same number
+    of days (7 → the 7 days before)."""
+    if date_from.day == 1 and (date_to + timedelta(days=1)).day == 1:
+        months = (date_to.year - date_from.year) * 12 + date_to.month - date_from.month + 1
+        first = date_from.year * 12 + date_from.month - 1 - months
+        return date(first // 12, first % 12 + 1, 1), date_from - timedelta(days=1)
+    if (date_from.month, date_from.day) == (1, 1) and date_to.year == date_from.year:
+        last_day = calendar.monthrange(date_to.year - 1, date_to.month)[1]
+        return date_from.replace(year=date_from.year - 1), date_to.replace(
+            year=date_to.year - 1, day=min(date_to.day, last_day)
+        )
     days = (date_to - date_from).days + 1
     return date_from - timedelta(days=days), date_from - timedelta(days=1)
 
 
-def _last_12_months(today: date) -> list[str]:
-    """This month and the 11 before, oldest first: ["2025-11", …, "2026-10"]."""
-    n = today.year * 12 + today.month - 1
-    return [f"{m // 12}-{m % 12 + 1:02d}" for m in range(n - 11, n + 1)]
+def _chart_months(date_from: date, date_to: date) -> list[str]:
+    """Charts + « Détail mensuel », oldest first: every month the period touches, at least 12 (a
+    shorter period → the 12 months that end with it). 30 days to 20/10/2026 → 2025-11 … 2026-10;
+    2025-01-01 → 2025-12-31 → 2025-01 … 2025-12; 2024-01-01 → 2026-10-20 → 34 months."""
+    first = date_from.year * 12 + date_from.month - 1
+    last = date_to.year * 12 + date_to.month - 1
+    first = min(first, last - 11)
+    return [f"{m // 12}-{m % 12 + 1:02d}" for m in range(first, last + 1)]
 
 
-def product_stats(
-    db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date, months_year: int | None = None
-) -> dict | None:
+def product_stats(db: Session, pharmacy_id: int, med_id: int, date_from: date, date_to: date) -> dict | None:
     """Statistiques tab; None = not one of the pharmacy's products. The period (and the one just
     before, same length) drives the KPIs and « Top fournisseurs »; the charts and « Détail mensuel »
-    are the last 12 months, or January → December of `months_year`; « Historique (par année) » =
-    every year with a sale or a purchase. CA = Rapport rule (qty × PPV); marge = CA − units sold ×
+    show the period's months, at least 12 (`_chart_months`); « Historique (par année) » = every
+    year with a sale or a purchase. CA = Rapport rule (qty × PPV); marge = CA − units sold ×
     average purchase price (every purchase, as on « Général ») = CA × marge %. One product = a few
     thousand lines at most: summed in Python."""
     if db.get(Medicament, med_id) is None or not _is_linked(db, pharmacy_id, med_id):
         return None
     today = pharmacy_today()
     prev_from, prev_to = _previous_period(date_from, date_to)
-    months = [f"{months_year}-{m:02d}" for m in range(1, 13)] if months_year else _last_12_months(today)
+    months = _chart_months(date_from, date_to)
     lo = min(prev_from.isoformat(), f"{months[0]}-01")
     hi = max(date_to.isoformat(), today.isoformat(), f"{months[-1]}-31")
     sales = db.execute(

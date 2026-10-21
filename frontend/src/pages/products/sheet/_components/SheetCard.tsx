@@ -1,19 +1,18 @@
-/** One block of the product sheet: icon + title (+ a small hint) + its content, and a label / value list. */
+/** One block of the product sheet, in the app's look (Tableau de bord, Stock): the title in small
+ *  grey capitals (+ a small hint), its buttons on the right, its content; and a label / value list. */
 import type { ReactNode } from "react";
 
 import { cn } from "@/utils/cn";
 
 export function SheetCard({
   title,
-  icon,
   hint,
   actions,
   children,
   className,
 }: {
   title: string;
-  icon?: ReactNode;
-  /** Small text after the title, e.g. « (30 derniers jours) ». */
+  /** Small text after the title, e.g. « du 22 sept. 2026 au 21 oct. 2026 ». */
   hint?: string;
   /** Right of the title (e.g. « Éditer », « Voir tout »). */
   actions?: ReactNode;
@@ -21,17 +20,26 @@ export function SheetCard({
   className?: string;
 }) {
   return (
-    <section className={cn("flex flex-col gap-3 rounded-xl border border-border bg-card p-4", className)}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {icon && <span className="text-primary">{icon}</span>}
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+    <section className={cn("flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm", className)}>
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
           {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
         </div>
         {actions}
       </div>
       {children}
     </section>
+  );
+}
+
+/** A tile number + its unit, smaller (like « / 10 » on Stock): « 2 359 unités », « 30 902,90 MAD ». */
+export function TileNumber({ value, unit }: { value: ReactNode; unit: string }) {
+  return (
+    <>
+      <span className="whitespace-nowrap">{value}</span>{" "}
+      <span className="font-mono text-base font-semibold text-muted-foreground">{unit}</span>
+    </>
   );
 }
 

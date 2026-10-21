@@ -1,10 +1,10 @@
 /** « Traçabilité »: every purchase (+) and sale (−) line of the product, like a pharmacy's
- *  « Rastro »: the list on the left (type, date, hour, quantity), the clicked line's details on
- *  the right (the first line until one is clicked). Type, period (shared with the other pages),
- *  search, sort by date or by type; 20 per page. « Voir tout le ticket / BL » opens it in
+ *  « Rastro »: the list on the left (type, date with the hour when known, quantity), the clicked
+ *  line's details on the right (the first line until one is clicked). One toolbar: the page dates,
+ *  search, type, sort by date or by type; 20 per page. « Voir tout le ticket / BL » opens it in
  *  Ventes / Achats. */
 import { useState } from "react";
-import { ExternalLink, ListTree } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import { CategorySegment } from "@/_components/CategorySegment";
@@ -15,7 +15,7 @@ import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatDateTime, formatMAD, formatPct, formatQty } from "@/utils/format";
 
-import { useMovements } from "../hooks";
+import { useMovements, type StatsRange } from "../hooks";
 import { tvaShort } from "../labels";
 import { KindBadge } from "./KindBadge";
 import { FieldList, SheetCard } from "./SheetCard";
@@ -37,8 +37,18 @@ function Quantity({ n }: { n: number | null }) {
 
 const columns = (t: TFn): ColumnDef<ProductMovementLine>[] => [
   { key: "kind", label: t("col.type"), sortable: false, render: (m) => <KindBadge kind={m.kind} /> },
-  { key: "date", label: t("col.date"), sortable: false, render: (m) => formatDate(m.date) },
-  { key: "time", label: t("products.colTime"), sortable: false, render: (m) => m.time ?? dash },
+  // The hour only when the file gives it (a purchase's « Créée le » that day): « 19/03/2026 17:12 ».
+  {
+    key: "date",
+    label: t("col.date"),
+    sortable: false,
+    render: (m) => (
+      <span className="whitespace-nowrap">
+        {formatDate(m.date)}
+        {m.time && <span className="text-muted-foreground"> {m.time}</span>}
+      </span>
+    ),
+  },
   {
     key: "quantity",
     label: t("products.colQty"),
@@ -118,7 +128,16 @@ function LineDetail({
   );
 }
 
-export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
+export function MovementsTab({
+  sheet,
+  range,
+  onRange,
+}: {
+  sheet: ProductSheet;
+  /** The page dates (Général, Statistiques): changed here too. */
+  range: StatsRange;
+  onRange: (from: string | null, to: string | null) => void;
+}) {
   const t = useT();
   const {
     canSeeDetail,
@@ -127,19 +146,19 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
     reset,
     rows,
     seeDetail,
-    setDateRange,
     setKind,
     setOrder,
     setPage,
     setPageSize,
     setSearch,
     total,
-  } = useMovements(sheet.id);
+  } = useMovements(sheet.id, range);
   // The clicked line, for this list only: another page / filter / sort → its first line.
   const listKey = JSON.stringify(filters);
   const [picked, setPicked] = useState<{ list: string; key: string } | null>(null);
   const clicked = picked?.list === listKey ? rows.find((m) => keyOf(m) === picked.key) : undefined;
   const selected = clicked ?? rows[0] ?? null;
+  const hasLines = isLoading || rows.length > 0;
 
   const kinds = [
     { value: "all" as const, label: t("products.kindAll"), activeBg: ACTIVE },
@@ -162,34 +181,39 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
           onClear: () => setSearch(""),
         }
       : null,
-    filters.date_from || filters.date_to
-      ? {
-          key: "dates",
-          label: (
-            <>
-              {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
-            </>
-          ),
-          onClear: () => setDateRange(null, null),
-        }
-      : null,
   ].filter(Boolean) as ActiveFilter[];
+  // Nothing in the dates (the current year first): say so, and where to change them.
+  const empty =
+    range.from && range.to && !filters.search
+      ? t("products.noLineInDates", { from: formatDate(range.from), to: formatDate(range.to) })
+      : t("products.noMovement");
 
   return (
     <div className="flex flex-col gap-4">
       <FilterBar
         search={{ value: filters.search, onChange: setSearch, placeholder: t("products.movementsSearchPh") }}
-        dateRange={{ from: filters.date_from, to: filters.date_to, onChange: setDateRange }}
+        dateRange={{
+          from: range.from,
+          to: range.to,
+          // Other dates: back to page 1 (page 3 of a shorter period would look empty).
+          onChange: (from, to) => {
+            onRange(from, to);
+            setPage(1);
+          },
+        }}
         segment={{ value: filters.kind, onChange: setKind, options: kinds }}
+        extra={
+          <div className="flex items-center gap-2" role="group" aria-label={t("products.sortLabel")}>
+            <span className="text-sm font-medium text-muted-foreground">{t("products.sortLabel")}</span>
+            <CategorySegment value={filters.order} options={orders} onChange={setOrder} />
+          </div>
+        }
         activeFilters={activeFilters}
         onResetAll={reset}
       />
-      <div className="flex items-center gap-3" role="group" aria-label={t("products.sortLabel")}>
-        <span className="text-sm font-medium text-muted-foreground">{t("products.sortLabel")}</span>
-        <CategorySegment value={filters.order} options={orders} onChange={setOrder} />
-      </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* No line: the list alone (its message says to change the dates), no « Détails de la ligne ». */}
+      <div className={cn("grid items-start gap-4", hasLines && "lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]")}>
         <DataTable<ProductMovementLine>
           rows={rows}
           columns={columns(t)}
@@ -202,18 +226,20 @@ export function MovementsTab({ sheet }: { sheet: ProductSheet }) {
             onPageSize: setPageSize,
             pageSizes: [20, 50, 100],
           }}
-          emptyTitle={t("products.noMovement")}
+          emptyTitle={empty}
           rowKey={keyOf}
           onRowClick={(m) => setPicked({ list: listKey, key: keyOf(m) })}
           isRowSelected={(m) => selected != null && keyOf(m) === keyOf(selected)}
         />
-        <SheetCard title={t("products.lineDetail")} icon={<ListTree className="size-5" />}>
-          {selected ? (
-            <LineDetail line={selected} tva={sheet.tva} canSeeDetail={canSeeDetail} seeDetail={seeDetail} />
-          ) : (
-            <p className="py-6 text-center text-sm text-muted-foreground">{t("products.pickLine")}</p>
-          )}
-        </SheetCard>
+        {hasLines && (
+          <SheetCard title={t("products.lineDetail")}>
+            {selected ? (
+              <LineDetail line={selected} tva={sheet.tva} canSeeDetail={canSeeDetail} seeDetail={seeDetail} />
+            ) : (
+              <p className="py-6 text-center text-sm text-muted-foreground">{t("products.pickLine")}</p>
+            )}
+          </SheetCard>
+        )}
       </div>
     </div>
   );

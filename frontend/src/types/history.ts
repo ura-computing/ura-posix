@@ -22,6 +22,8 @@ export interface AuditRow {
   /** The product it is about (link to its page). */
   medicament_id: number | null;
   product: string | null;
+  /** A product's tab, import line: that product's lines in the import (else null). */
+  product_lines: number | null;
 }
 
 export interface HistoryResponse {

@@ -221,8 +221,9 @@ class YearHistory(BaseModel):
 
 
 class ProductStats(BaseModel):
-    """Statistiques tab: the period vs the one just before (same number of days); the charts and
-    « Détail mensuel » = the last 12 months (this month and the 11 before)."""
+    """Statistiques tab: the period vs the one just before (whole months: as many months; else as many
+    days); the charts and « Détail mensuel » = the period's months, at least 12 (a short period → the
+    12 ending with it)."""
 
     date_from: str
     date_to: str
@@ -230,7 +231,7 @@ class ProductStats(BaseModel):
     previous_to: str
     period: PeriodFigures
     previous: PeriodFigures
-    monthly: list[MonthFigures]  # 12 months, oldest first (the last 12, or January → December of `months_year`)
+    monthly: list[MonthFigures]  # the period's months, at least 12 (ending with it), oldest first
     suppliers: list[SupplierShare]  # every supplier of the period, most units first (card: 3 + « Autres »)
     last_prices: list[SupplierPrice]  # each supplier's latest priced purchase, newest first (card: 5)
     history: list[YearHistory]  # « Historique (par année) »: every year with a sale or a purchase, newest first

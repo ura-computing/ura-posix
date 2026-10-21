@@ -172,7 +172,7 @@ export interface SupplierShare {
 export interface ProductStats {
   date_from: string;
   date_to: string;
-  /** The same number of days, just before. */
+  /** Just before: whole months → as many months (2025 → 2024), else as many days. */
   previous_from: string;
   previous_to: string;
   period: PeriodFigures;
