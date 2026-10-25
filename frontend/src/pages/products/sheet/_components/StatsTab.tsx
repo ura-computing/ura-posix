@@ -11,10 +11,9 @@ import { Button } from "@/_components/button";
 import { CategorySegment } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
-import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare, YearHistory } from "@/types";
+import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare } from "@/types";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { cn } from "@/utils/cn";
 import { formatDate, formatMAD, formatMoney, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";
 
 import type { StatsRange } from "../hooks";
@@ -22,6 +21,7 @@ import { CopyButton } from "./CopyButton";
 import { SeeAllDialog } from "./SeeAllDialog";
 import { SheetCard, TileNumber } from "./SheetCard";
 import { ChartLegend, MonthsChart, type ChartSeries } from "./StatsCharts";
+import { historyLines, kindLabel, LINE_TONE, yearColumns, type HistoryFilter, type HistoryLine } from "./yearHistory";
 
 const SALES = "var(--chart-1)";
 const PURCHASES = "var(--chart-2)";
@@ -62,69 +62,6 @@ const monthColumns = (t: TFn, monthName: (m: string) => string): ColumnDef<Month
     sortable: false,
     render: (r) => money(r.marge),
   },
-];
-
-// « Historique (par année) »: per year a Ventes line (light green) and an Achats line (light blue):
-// the units each month, the total, then the amount (CA of the sales, Σ line totals of the purchases).
-type HistoryFilter = "all" | "sales" | "purchases";
-interface HistoryLine {
-  year: number;
-  kind: "sales" | "purchases";
-  units: number[];
-  total: number;
-  amount: number;
-}
-/** The lines of the filter, newest year first; a kind without any unit that year is left out. */
-const historyLines = (history: YearHistory[], filter: HistoryFilter): HistoryLine[] =>
-  history
-    .flatMap((y): HistoryLine[] => [
-      { year: y.year, kind: "sales", units: y.sold, total: y.total, amount: y.ca },
-      { year: y.year, kind: "purchases", units: y.bought, total: y.bought_total, amount: y.spent },
-    ])
-    .filter((l) => (filter === "all" || l.kind === filter) && l.units.some((n) => n !== 0));
-const LINE_TONE: Record<HistoryLine["kind"], string> = {
-  sales: "bg-success-subtle hover:bg-success-subtle",
-  purchases: "bg-info-subtle hover:bg-info-subtle",
-};
-const unitsOrDash = (n: number) => (n === 0 ? dash : formatQty(n));
-const kindLabel = (t: TFn, kind: HistoryLine["kind"]) => t(kind === "sales" ? "nav.ventes" : "nav.achats");
-const yearColumns = (t: TFn, monthsShort: string[]): ColumnDef<HistoryLine>[] => [
-  {
-    key: "year",
-    label: t("col.annee"),
-    sortable: false,
-    render: (r) => <span className="font-semibold">{r.year}</span>,
-  },
-  {
-    key: "kind",
-    label: t("col.type"),
-    sortable: false,
-    render: (r) => (
-      <span
-        className={cn(
-          "font-semibold",
-          r.kind === "sales" ? "text-success-subtle-foreground" : "text-info-subtle-foreground",
-        )}
-      >
-        {kindLabel(t, r.kind)}
-      </span>
-    ),
-  },
-  ...monthsShort.map((label, m): ColumnDef<HistoryLine> => ({
-    key: `m${m + 1}`,
-    label: label.replace(/\.$/, ""),
-    align: "right",
-    sortable: false,
-    render: (r) => unitsOrDash(r.units[m]),
-  })),
-  {
-    key: "total",
-    label: t("col.total"),
-    align: "right",
-    sortable: false,
-    render: (r) => <span className="font-semibold">{unitsOrDash(r.total)}</span>,
-  },
-  { key: "amount", label: t("products.colSpentMad"), align: "right", sortable: false, render: (r) => money(r.amount) },
 ];
 
 const supplierColumns = (t: TFn): ColumnDef<SupplierShare>[] => [

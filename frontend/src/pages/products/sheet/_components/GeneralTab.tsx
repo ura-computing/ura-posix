@@ -1,14 +1,17 @@
-/** « Général »: prices + marge, stock (Stock page rules) + emplacement + date de péremption (with
- *  « Périmé » / « Moins de 30 / 90 jours », the Alertes thresholds), informations générales, the
- *  5 latest purchases / sales, « Performance » = ventes / achats over the page dates (toolbar under
- *  the tabs, the current year first) + % vs the period just before. */
+/** « Général »: prices + marge tiles; « Informations générales » like a pharmacy software form
+ *  (« Données générales » · « Prix » · « Stock » boxes: Stock page rules, emplacement, date de
+ *  péremption with « Périmé » / « Moins de 30 / 90 jours », the Alertes thresholds); the sales of
+ *  every year (« Historique des ventes (par année) »); the 5 latest purchases / sales;
+ *  « Performance » = ventes / achats over the page dates (toolbar under the tabs, the current year
+ *  first) + % vs the period just before. */
 import { useContext, type ReactNode } from "react";
-import { ArrowDownToLine, ArrowRight, ArrowUpToLine, Package, Pencil, ShoppingCart, Truck } from "lucide-react";
+import { ArrowRight, Pencil, ShoppingCart, Truck } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
 import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
+import { useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { todayIso } from "@/utils/dateRange";
@@ -19,7 +22,8 @@ import { tvaShort, withoutRate } from "../labels";
 import { Editable, type EditKind } from "./Editable";
 import { SheetEditContext } from "./editContext";
 import { KindBadge } from "./KindBadge";
-import { FieldList, SheetCard, TileNumber } from "./SheetCard";
+import { FieldList, SheetCard, TileNumber, type Field } from "./SheetCard";
+import { historyLines, LINE_TONE, yearColumns, type HistoryLine } from "./yearHistory";
 
 const dash = <span className="text-muted-foreground">—</span>;
 const mad = (n: number | null) => (n != null ? <span className="whitespace-nowrap">{formatMAD(n)}</span> : dash);
@@ -83,6 +87,17 @@ function ExpiryHint({ iso }: { iso: string }) {
   return <span className={cn("rounded-md border px-2 py-0.5 text-xs font-semibold", tone)}>{label}</span>;
 }
 
+/** One part of « Informations générales » (« Données générales », « Prix », « Stock »): its title,
+ *  then label / value rows. */
+function InfoGroup({ title, fields }: { title: string; fields: Field[] }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <FieldList fields={fields} />
+    </div>
+  );
+}
+
 export function GeneralTab({
   sheet,
   stats,
@@ -97,10 +112,11 @@ export function GeneralTab({
   onShowMovements: () => void;
 }) {
   const t = useT();
+  const monthsShort = useMonthsShort();
   const { prices, stock } = sheet;
   const units = (n: number) => <TileNumber value={formatQty(n)} unit={t("common.wUnites")} />;
   const missing = <span className="font-normal text-muted-foreground">{t("products.notAvailable")}</span>;
-  const editable = (field: FormField, label: string, value: ReactNode, kind: EditKind = "text") => ({
+  const editable = (field: FormField, label: string, value: ReactNode, kind: EditKind = "text"): Field => ({
     label,
     value: (
       <Editable field={field} kind={kind} label={label}>
@@ -108,19 +124,6 @@ export function GeneralTab({
       </Editable>
     ),
   });
-  // The 3 stock figures: the same tiles as the prices (short label under « Stock », one line), an
-  // input in edit mode (named in full: « Stock actuel »).
-  const stockTile = (field: FormField, short: string, label: string, icon: ReactNode, value: ReactNode) => (
-    <KpiTile
-      label={short}
-      icon={icon}
-      value={
-        <Editable field={field} kind="int" label={label}>
-          {value}
-        </Editable>
-      }
-    />
-  );
   const marge = prices.ppv != null && prices.avg_pu != null ? prices.ppv - prices.avg_pu : null;
   // « Performance »: the period vs the one just before (no % when nothing then).
   const now = stats?.period;
@@ -130,6 +133,8 @@ export function GeneralTab({
   const vsBefore = stats
     ? t("products.vsPeriod", { from: formatDate(stats.previous_from), to: formatDate(stats.previous_to) })
     : undefined;
+  // « Historique des ventes (par année) »: every year, not tied to the page dates.
+  const salesYears = stats ? historyLines(stats.history, "sales") : [];
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -147,132 +152,134 @@ export function GeneralTab({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="flex flex-col gap-4">
-          <SheetCard title={t("products.stock")} actions={<EditBlockButton />}>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {stockTile(
+      {/* 3 parts side by side, like a pharmacy software sheet. Catégorie and TVA without their rate
+          (« Médicament », « Exonéré »); edit mode keeps the text. PID: header and Codes tab. */}
+      <SheetCard title={t("products.infos")} actions={<EditBlockButton />}>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <InfoGroup
+            title={t("products.generalData")}
+            fields={[
+              editable("product", t("col.produit"), sheet.product),
+              editable("category", t("col.categorie"), sheet.category && withoutRate(sheet.category)),
+              editable("laboratoire", t("col.laboratoire"), sheet.laboratoire),
+              editable("tva", t("col.tva"), sheet.tva && tvaShort(sheet.tva)),
+              editable(
+                "barcode1",
+                t("products.barcode"),
+                sheet.barcode1 ? <span className="font-mono">{sheet.barcode1}</span> : null,
+              ),
+              editable("zone", t("products.location"), stock.zone),
+              editable(
+                "expiry_date",
+                t("products.expiryDate"),
+                stock.expiry_date ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    {formatDate(stock.expiry_date)}
+                    <ExpiryHint iso={stock.expiry_date} />
+                  </span>
+                ) : null,
+                "date",
+              ),
+            ]}
+          />
+          <InfoGroup
+            title={t("products.pricesBox")}
+            fields={[
+              editable("ppv", t("col.ppv"), prices.ppv != null ? mad(prices.ppv) : null, "price"),
+              { label: t("col.pph"), value: mad(prices.pph) },
+              { label: t("products.avgPu"), value: mad(prices.avg_pu) },
+              { label: t("products.lastPu"), value: mad(prices.last_pu) },
+            ]}
+          />
+          {/* Stock page rules; an input in edit mode (named in full: « Stock actuel »). */}
+          <InfoGroup
+            title={t("products.stock")}
+            fields={[
+              editable(
                 "current_stock",
-                t("products.tileCurrent"),
                 t("products.stockCurrent"),
-                <Package className="size-5" />,
                 stock.current_stock != null ? (
                   formatQty(stock.current_stock)
                 ) : (
-                  <span className="font-sans text-base font-medium text-muted-foreground">
-                    {t("products.outOfFile")}
-                  </span>
+                  <span className="font-normal text-muted-foreground">{t("products.outOfFile")}</span>
                 ),
-              )}
-              {stockTile(
-                "stock_min",
-                t("products.tileMin"),
-                t("products.stockMin"),
-                <ArrowDownToLine className="size-5" />,
-                formatQty(stock.stock_min),
-              )}
-              {stockTile(
-                "stock_max",
-                t("products.tileMax"),
-                t("products.stockMax"),
-                <ArrowUpToLine className="size-5" />,
-                formatQty(stock.stock_max),
-              )}
+                "int",
+              ),
+              editable("stock_min", t("products.stockMin"), formatQty(stock.stock_min), "int"),
+              editable("stock_max", t("products.stockMax"), formatQty(stock.stock_max), "int"),
+            ]}
+          />
+        </div>
+      </SheetCard>
+
+      {/* Ventes only (Statistiques has Tous · Ventes · Achats). */}
+      <SheetCard title={t("products.salesYearHistory")}>
+        {!range.from || !range.to ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
+        ) : !stats ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+        ) : (
+          <DataTable<HistoryLine>
+            rows={salesYears}
+            columns={yearColumns(t, monthsShort, false)}
+            emptyTitle={t("products.noSale")}
+            rowKey={(r) => `${r.year}-${r.kind}`}
+            rowClassName={(r) => LINE_TONE[r.kind]}
+          />
+        )}
+      </SheetCard>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SheetCard
+          title={t("products.recent")}
+          actions={
+            <Button variant="outline" size="sm" onClick={onShowMovements}>
+              {t("products.seeAll")}
+              <ArrowRight className="size-3.5" />
+            </Button>
+          }
+        >
+          <DataTable<ProductMovement>
+            rows={sheet.recent_movements}
+            columns={movementColumns(t)}
+            emptyTitle={t("products.noMovement")}
+            rowKey={(_, i) => i}
+          />
+        </SheetCard>
+
+        <SheetCard
+          title={t("products.performance")}
+          hint={
+            range.from && range.to
+              ? t("products.periodFromTo", { from: formatDate(range.from), to: formatDate(range.to) })
+              : undefined
+          }
+        >
+          {!range.from || !range.to ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
+          ) : !now ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <KpiTile
+                label={t("nav.ventes")}
+                value={units(now.sold)}
+                icon={<ShoppingCart className="size-5" />}
+                iconTone="success"
+                delta={salesChange == null ? null : { value: salesChange }}
+                sub={salesChange == null ? undefined : vsBefore}
+              />
+              <KpiTile
+                label={t("nav.achats")}
+                value={units(now.bought)}
+                icon={<Truck className="size-5" />}
+                iconTone="info"
+                delta={purchasesChange == null ? null : { value: purchasesChange }}
+                sub={purchasesChange == null ? undefined : vsBefore}
+              />
             </div>
-            <FieldList
-              fields={[
-                editable("zone", t("products.location"), stock.zone),
-                {
-                  label: t("products.expiryDate"),
-                  value: (
-                    <Editable field="expiry_date" kind="date" label={t("products.expiryDate")}>
-                      {stock.expiry_date ? (
-                        <span className="flex flex-wrap items-center gap-2">
-                          {formatDate(stock.expiry_date)}
-                          <ExpiryHint iso={stock.expiry_date} />
-                        </span>
-                      ) : (
-                        missing
-                      )}
-                    </Editable>
-                  ),
-                },
-              ]}
-            />
-          </SheetCard>
-
-          {/* Only what the owner can change: PID and the purchase prices are in the header / tiles.
-              Catégorie and TVA without their rate (« Médicament », « Exonéré »); edit mode keeps the text. */}
-          <SheetCard title={t("products.infos")} actions={<EditBlockButton />}>
-            <FieldList
-              fields={[
-                editable("product", t("col.produit"), sheet.product),
-                editable("category", t("col.categorie"), sheet.category && withoutRate(sheet.category)),
-                editable("tva", t("col.tva"), sheet.tva && tvaShort(sheet.tva)),
-                editable("ppv", t("col.ppv"), prices.ppv != null ? mad(prices.ppv) : null, "price"),
-                editable(
-                  "barcode1",
-                  t("products.barcode"),
-                  sheet.barcode1 ? <span className="font-mono">{sheet.barcode1}</span> : null,
-                ),
-                editable("laboratoire", t("col.laboratoire"), sheet.laboratoire),
-              ]}
-            />
-          </SheetCard>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <SheetCard
-            title={t("products.recent")}
-            actions={
-              <Button variant="outline" size="sm" onClick={onShowMovements}>
-                {t("products.seeAll")}
-                <ArrowRight className="size-3.5" />
-              </Button>
-            }
-          >
-            <DataTable<ProductMovement>
-              rows={sheet.recent_movements}
-              columns={movementColumns(t)}
-              emptyTitle={t("products.noMovement")}
-              rowKey={(_, i) => i}
-            />
-          </SheetCard>
-
-          <SheetCard
-            title={t("products.performance")}
-            hint={
-              range.from && range.to
-                ? t("products.periodFromTo", { from: formatDate(range.from), to: formatDate(range.to) })
-                : undefined
-            }
-          >
-            {!range.from || !range.to ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
-            ) : !now ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <KpiTile
-                  label={t("nav.ventes")}
-                  value={units(now.sold)}
-                  icon={<ShoppingCart className="size-5" />}
-                  iconTone="success"
-                  delta={salesChange == null ? null : { value: salesChange }}
-                  sub={salesChange == null ? undefined : vsBefore}
-                />
-                <KpiTile
-                  label={t("nav.achats")}
-                  value={units(now.bought)}
-                  icon={<Truck className="size-5" />}
-                  iconTone="info"
-                  delta={purchasesChange == null ? null : { value: purchasesChange }}
-                  sub={purchasesChange == null ? undefined : vsBefore}
-                />
-              </div>
-            )}
-          </SheetCard>
-        </div>
+          )}
+        </SheetCard>
       </div>
     </div>
   );
