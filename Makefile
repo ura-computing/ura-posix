@@ -1,8 +1,9 @@
 BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
+EXTENSION_DIR := ./extension
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
+.PHONY: help install dev extension-dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -19,13 +20,17 @@ help:
 	@echo "    make migrate   — apply Alembic migrations against the dev DB + reload product photos"
 	@echo "    make seed      — seed admin + owner + catalogue into the dev DB (idempotent)"
 	@echo ""
+	@echo "  Chrome extension (extension/: sends Sobrus exports to PharmaGest):"
+	@echo "    make extension-dev — install its deps if missing + build it in watch mode into extension/dist"
+	@echo "                         (chrome://extensions → Mode développeur → Charger l'extension non empaquetée → extension/dist)"
+	@echo ""
 	@echo "  Build:"
 	@echo "    make build          — build-backend + build-frontend"
 	@echo "    make build-backend  — backend Docker image (the one make demo runs)"
 	@echo "    make build-frontend — type check + Vite bundle into frontend/dist"
 	@echo ""
 	@echo "  Docker demo (one-command setup for clients):"
-	@echo "    make demo      — build + run the full stack (postgres + backend + frontend)"
+	@echo "    make demo      — build + run the full stack (postgres + backend + frontend) + build the Chrome extension"
 	@echo "                     → Frontend: http://localhost:4173"
 	@echo "                     → Login:    admin@gmail.com / admin@123"
 	@echo "    make down      — stop containers (DB volume survives)"
@@ -33,7 +38,7 @@ help:
 	@echo "    make clean     — DESTRUCTIVE: stop + wipe ALL DB volumes (dev, demo, old Postgres 16 backup)"
 	@echo ""
 	@echo "  Code style:"
-	@echo "    make format    — format the whole repo (Prettier: frontend + e2e, ruff: backend)"
+	@echo "    make format    — format the whole repo (Prettier: frontend + e2e + extension, ruff: backend)"
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
 	@echo "    make tests     — every test, headless (make tests 99 / 06 15: only those test files)"
@@ -100,6 +105,15 @@ migrate: db
 seed: db migrate
 	cd $(BACKEND_DIR) && uv run python scripts/seed.py
 
+# ── Chrome extension ────────────────────────────────────────────────────────
+# Vite dev server + crxjs: extension/dist rebuilds on every save (load it once in Chrome).
+# VITE_BACKEND_URL / VITE_FRONTEND_URL: extension/.env, created from .env.example if missing.
+
+extension-dev:
+	@if [ ! -f $(EXTENSION_DIR)/.env ]; then cp $(EXTENSION_DIR)/.env.example $(EXTENSION_DIR)/.env; fi
+	@if [ ! -d $(EXTENSION_DIR)/node_modules ]; then cd $(EXTENSION_DIR) && npm install; fi
+	cd $(EXTENSION_DIR) && npm run dev
+
 # ── Build ───────────────────────────────────────────────────────────────────
 
 build: build-backend build-frontend
@@ -128,11 +142,15 @@ demo:
 	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend
 	@echo "▸ Building containers + bootstrapping schema (smart)…"
 	@docker compose up -d --build --wait
+	@echo "▸ Building the Chrome extension for the demo (backend :8000, app :4173)…"
+	@if [ ! -d $(EXTENSION_DIR)/node_modules ]; then cd $(EXTENSION_DIR) && npm install; fi
+	@cd $(EXTENSION_DIR) && VITE_BACKEND_URL=http://localhost:8000 VITE_FRONTEND_URL=http://localhost:4173 npm run build
 	@echo ""
 	@echo "✓ Demo ready:"
 	@echo "    Frontend : http://localhost:4173"
 	@echo "    Backend  : http://localhost:8000"
 	@echo "    Login    : admin@gmail.com / admin@123  (or owner@gmail.com / owner@123)"
+	@echo "    Extension: chrome://extensions → Mode développeur → Charger l'extension non empaquetée → extension/dist"
 
 down:
 	docker compose down
@@ -145,11 +163,11 @@ clean:
 	@echo "✓ Volume removed. Next 'make demo' starts from an empty DB."
 
 # ── Code style ──────────────────────────────────────────────────────────────
-# One style everywhere: Prettier for frontend + e2e (.prettierrc.json, width 120),
+# One style everywhere: Prettier for frontend + e2e + extension (.prettierrc.json, width 120),
 # ruff for the backend (pyproject.toml, line-length 120). Rewrites only spacing,
 # wrapping and quotes, never what the code does.
 format:
-	cd $(FRONTEND_DIR) && npx prettier --write --log-level warn --ignore-path ../.prettierignore . ../e2e
+	cd $(FRONTEND_DIR) && npx prettier --write --log-level warn --ignore-path ../.prettierignore . ../e2e ../extension
 	cd $(BACKEND_DIR) && uv run ruff format .
 
 # ── End-to-end (Playwright) ─────────────────────────────────────────────────
