@@ -512,17 +512,19 @@ def _norm(name: str | None) -> str:
 
 def _supplier_aggregate(db, pharmacy_id: int, suppliers: list[str] | None = None):
     """Group this pharmacy's Achats by supplier → one row per supplier with
-    total / line & product counts / last date. NULL suppliers are ignored."""
+    total / line & product counts / last date. NULL suppliers are ignored. Names are
+    compared trimmed: Sobrus writes some with a space at the end (« … FRANCHISE »)."""
+    name = func.trim(Achat.supplier)
     q = db.query(
-        Achat.supplier.label("supplier"),
+        name.label("supplier"),
         func.coalesce(func.sum(Achat.total), 0.0).label("total"),
         func.count(Achat.id).label("nb_lines"),
         func.count(func.distinct(Achat.medicament_id)).label("nb_products"),
         func.max(Achat.delivery_date).label("last_date"),
     ).filter(Achat.pharmacy_id == pharmacy_id, Achat.supplier.isnot(None))
     if suppliers is not None:
-        q = q.filter(Achat.supplier.in_(suppliers))
-    return q.group_by(Achat.supplier)
+        q = q.filter(name.in_([s.strip() for s in suppliers]))
+    return q.group_by(name)
 
 
 def _excluded_norm_set(db, pharmacy_id: int) -> set[str]:
@@ -553,7 +555,7 @@ def list_supplier_exclusions(pharmacy_id: Annotated[int, member("special_product
     agg = {a.supplier: a for a in _supplier_aggregate(db, pharmacy_id, [r.supplier for r in rows]).all()}
     out = []
     for r in rows:
-        a = agg.get(r.supplier)
+        a = agg.get(r.supplier.strip())
         out.append(
             {
                 "supplier": r.supplier,

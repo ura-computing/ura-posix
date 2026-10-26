@@ -36,10 +36,11 @@ def _bl_excluded_sub(db: Session, pharmacy_id: int):
 
 
 def _supplier_excluded_sub(db: Session, pharmacy_id: int):
-    """Scalar subquery of the NORMALIZED (unaccent+lower) supplier names the pharmacy
-    excluded, so the match against the free-text Achat.supplier is accent/case-insensitive."""
+    """Scalar subquery of the NORMALIZED (unaccent+lower+trim) supplier names the pharmacy
+    excluded, so the match against the free-text Achat.supplier is accent/case-insensitive and
+    ignores spaces at both ends (Sobrus writes some names with a trailing space)."""
     return (
-        db.query(func.unaccent(func.lower(PharmacySupplierExclusion.supplier)))
+        db.query(func.unaccent(func.lower(func.trim(PharmacySupplierExclusion.supplier))))
         .filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
         .scalar_subquery()
     )
@@ -61,7 +62,7 @@ def excluded_medicaments_select(db: Session, pharmacy_id: int):
     from_excluded_supplier = select(Achat.medicament_id).where(
         Achat.pharmacy_id == pharmacy_id,
         Achat.medicament_id.isnot(None),
-        func.unaccent(func.lower(Achat.supplier)).in_(_supplier_excluded_sub(db, pharmacy_id)),
+        func.unaccent(func.lower(func.trim(Achat.supplier))).in_(_supplier_excluded_sub(db, pharmacy_id)),
     )
     combined = union(special, on_excluded_bl, from_excluded_supplier).subquery()
     return select(combined.c.medicament_id)
