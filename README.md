@@ -145,6 +145,7 @@ apcm-pharma/
 │   ├── khutna/, les-joyeux/   real Sobrus exports of 2 pharmacies (samples)
 │   └── tests/                 E2E data generator + oracle (§8)
 ├── e2e/                       Playwright suite (§8)
+├── extension/                 Chrome extension: Sobrus exports → PharmaGest (§6.5)
 ├── backend/                   FastAPI (§5)
 │   ├── main.py                the app: middlewares + routers (deployments run main:app)
 │   ├── app/                   all code, one folder per business area (§5.1)
@@ -188,9 +189,10 @@ flowchart LR
 | `make seed` | seed accounts + « Pharmacie Demo » + catalogue (idempotent) |
 | `make dev` | backend uvicorn **:8000** (hot reload, applies new migrations first) + Vite **:5173** |
 | `make backend` · `make frontend` | one of the two |
-| `make format` | Prettier (frontend + e2e) + ruff (backend), width 120 |
+| `make extension-dev` | Chrome extension in watch mode into `extension/dist` (creates `extension/.env`, installs its deps if missing) ([§6.5](#65-chrome-extension-extension)) |
+| `make format` | Prettier (frontend + e2e + extension) + ruff (backend), width 120 |
 | `make build` | backend Docker image + `tsc -b && vite build` |
-| `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**) · stop · logs |
+| `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**) + the extension built for it · stop · logs |
 | `make clean` | **destroys every DB volume** |
 | `make tests` · `make tests-ui` | E2E ([§8](#8-tests-the-playwright-e2e-suite)) |
 
@@ -491,6 +493,29 @@ Mixte / Pharmacie / Parapharmacie, selects, chips) + `DataTable`.
   comma, `formatDate`, `formatDateTime`, `formatNumStr`). Never `toFixed` / `toLocaleString` in a page.
 - Search boxes: `utils/text.ts` `matchesFields` (same grammar as the backend, [§7.7](#77-search-every-search-box)).
 - Excel: `.xlsx` via `utils/table.ts`, French headers.
+
+### 6.5 Chrome extension (`extension/`)
+Sends the Sobrus exports to PharmaGest without the import page. Manifest V3, Vite + crxjs, React + TanStack
+Query, the frontend's layout (`api/`, `hooks/`, `pages/popup/`, `i18n/` FR ⇄ ES, `types/`, `utils/`) plus
+`background/` (service worker) and `content/` (Sobrus pages).
+
+```mermaid
+flowchart LR
+  P["Popup<br/>« Importer tout l'historique »"] --> SW["Service worker<br/>queue, 1 file after the other"]
+  C["Sobrus export page<br/>« Télécharger en CSV » · year by year"] -- "the CSV (Sobrus session)" --> SW
+  SW -- "POST /v1/uploads/{type}-json<br/>2000 rows a chunk + PATCH status" --> BE["PharmaGest backend"]
+  SW -- "jobs in chrome.storage" --> C
+```
+
+| Rule | Example |
+|---|---|
+| A click on Sobrus « Télécharger en CSV » (`a[download][href*="/reports/exports/"]`) still downloads the file and sends it, named with its dates | « Sobrus - Export Sales.csv » → « Sobrus - Ventes 2025-01-01 - 2025-12-31.csv » |
+| « Importer tout l'historique (achats + ventes) »: `exportpurchases` then `exportsales`, each year newest first (this year: 1 January → today), until 5 years in a row without a line; each year waits for the previous import | 2026, 2025, … 2017 → done; lines already stored are skipped by the backend |
+| Each step shown on the page: spotlight on the date fields and the button, download in Mo, « paquet N / M » bar; « Arrêter » cancels the running import | the card bottom right, plus the popup list |
+| Same checks and batching as the import page | damaged bytes, empty file, its columns; chunks of 2000 rows, one `batch_id`, final `PATCH success` |
+| Login = the PharmaGest session open in Chrome (cookies); no password in the extension | not logged in → « Se connecter à PharmaGest » |
+| `VITE_BACKEND_URL` + `VITE_FRONTEND_URL` read at build time (`extension/.env`, `make demo` uses :8000 / :4173) | load `extension/dist`: `chrome://extensions` → Mode développeur → Charger l'extension non empaquetée |
+| Not covered by the Playwright suite | test it by hand on a Sobrus account |
 
 ---
 
