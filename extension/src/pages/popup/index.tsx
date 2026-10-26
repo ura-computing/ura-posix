@@ -1,9 +1,11 @@
-/** The extension's window: who is connected (else « Se connecter à PharmaGest »), the latest Sobrus
- *  files sent (live progress, « Annuler » while running), « Voir mes imports », the language. */
+/** The extension's window: who is connected (else « Se connecter à PharmaGest »), « Importer tout
+ *  l'historique », the files being sent (live progress, « Annuler »), the pharmacy's latest imports on
+ *  PharmaGest (the server's list), « Voir mes imports », the language. */
 import { Button } from "@/_components/button";
 import { useI18n } from "@/i18n/I18nProvider";
 import { errorText } from "@/i18n/translate";
-import type { ImportJob } from "@/types";
+import type { ImportJob, ServerImport } from "@/types";
+import { formatDate, formatQty } from "@/utils/format";
 import { isRunning, jobStatus } from "@/utils/jobs";
 import { openApp } from "@/utils/links";
 
@@ -16,6 +18,38 @@ const PHASE_TONE: Record<ImportJob["phase"], string> = {
   cancelled: "bg-muted text-muted-foreground",
   error: "bg-error-subtle text-error-subtle-foreground",
 };
+
+const SERVER_TONE: Record<string, string> = {
+  success: "bg-success-subtle text-success-subtle-foreground",
+  in_progress: "bg-info-subtle text-info-subtle-foreground",
+  interrupted: "bg-error-subtle text-error-subtle-foreground",
+  cancelled: "bg-muted text-muted-foreground",
+  error: "bg-error-subtle text-error-subtle-foreground",
+};
+
+/** One import as PharmaGest stores it (same as « Gestion des imports »). */
+function ImportRow({ row }: { row: ServerImport }) {
+  const { t } = useI18n();
+  const status =
+    row.status === "success"
+      ? t("phase.success", { inserted: formatQty(row.rows_inserted), skipped: formatQty(row.rows_skipped) })
+      : t(`server.${row.status}`);
+  return (
+    <li className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">{t(`kind.${row.file_type}`)}</span>
+        <span
+          className={`rounded-md px-2 py-0.5 text-xs font-semibold ${SERVER_TONE[row.status] ?? SERVER_TONE.cancelled}`}
+        >
+          {status}
+        </span>
+      </div>
+      <span className="break-all text-xs text-muted-foreground">
+        {row.filename ?? "—"} · {formatDate(row.imported_at.slice(0, 10))}
+      </span>
+    </li>
+  );
+}
 
 function JobRow({ job, onCancel, isCancelling }: { job: ImportJob; onCancel: () => void; isCancelling: boolean }) {
   const { t } = useI18n();
@@ -52,7 +86,8 @@ function JobRow({ job, onCancel, isCancelling }: { job: ImportJob; onCancel: () 
 
 export default function PopupPage() {
   const { t, lang, setLang } = useI18n();
-  const { me, isLoadingMe, meError, jobs, cancelImport, isCancelling, startFullExport, isStarting } = usePopupPage();
+  const { me, isLoadingMe, meError, sending, imports, cancelImport, isCancelling, startFullExport, isStarting } =
+    usePopupPage();
   return (
     <main className="flex flex-col gap-4 p-4">
       <header className="flex items-center justify-between gap-2">
@@ -100,14 +135,25 @@ export default function PopupPage() {
         )}
       </section>
 
+      {sending.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("jobs.sending")}</h2>
+          <ul className="flex flex-col gap-2">
+            {sending.map((job) => (
+              <JobRow key={job.id} job={job} onCancel={() => void cancelImport(job.id)} isCancelling={isCancelling} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("jobs.title")}</h2>
-        {jobs.length === 0 ? (
+        {imports.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("jobs.none")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {jobs.map((job) => (
-              <JobRow key={job.id} job={job} onCancel={() => void cancelImport(job.id)} isCancelling={isCancelling} />
+            {imports.map((row) => (
+              <ImportRow key={row.id} row={row} />
             ))}
           </ul>
         )}

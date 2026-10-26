@@ -14,10 +14,17 @@ export const fr = {
     login: "Se connecter à PharmaGest",
   },
   jobs: {
-    title: "Derniers imports",
+    title: "Derniers imports sur PharmaGest",
+    sending: "En cours d'envoi",
     none: "Aucun import pour l'instant. Sur Sobrus, cliquez sur « Télécharger » d'un export : il arrive ici tout seul.",
     seeAll: "Voir mes imports",
     cancel: "Annuler l'import",
+  },
+  server: {
+    in_progress: "En cours",
+    interrupted: "Interrompu",
+    cancelled: "Annulé",
+    error: "Échec",
   },
   kind: {
     achat: "Achats",

@@ -15,10 +15,17 @@ export const es: typeof fr = {
     login: "Conectarse a PharmaGest",
   },
   jobs: {
-    title: "Últimas importaciones",
+    title: "Últimas importaciones en PharmaGest",
+    sending: "Enviándose",
     none: "Ninguna importación por ahora. En Sobrus, haga clic en « Descargar » de una exportación: llega aquí sola.",
     seeAll: "Ver mis importaciones",
     cancel: "Cancelar la importación",
+  },
+  server: {
+    in_progress: "En curso",
+    interrupted: "Interrumpida",
+    cancelled: "Cancelada",
+    error: "Fallida",
   },
   kind: {
     achat: "Compras",

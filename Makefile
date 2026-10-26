@@ -140,11 +140,11 @@ build-frontend:
 demo:
 	@cp env/demo/docker.env .env
 	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend
-	@echo "▸ Building containers + bootstrapping schema (smart)…"
-	@docker compose up -d --build --wait
-	@echo "▸ Building the Chrome extension for the demo (backend :8000, app :4173)…"
+	@echo "▸ Building the Chrome extension (before Docker: built even if a pull fails) for the demo (backend :8000, app :4173)…"
 	@if [ ! -d $(EXTENSION_DIR)/node_modules ]; then cd $(EXTENSION_DIR) && npm install; fi
 	@cd $(EXTENSION_DIR) && VITE_BACKEND_URL=http://localhost:8000 VITE_FRONTEND_URL=http://localhost:4173 npm run build
+	@echo "▸ Building containers + bootstrapping schema (smart)…"
+	@docker compose up -d --build --wait
 	@echo ""
 	@echo "✓ Demo ready:"
 	@echo "    Frontend : http://localhost:4173"

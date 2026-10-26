@@ -44,6 +44,23 @@ export interface UploadChunkBody {
   batch_id?: number;
 }
 
+/** GET /v1/data/imports (backend app/ingestion/schemas.py ImportRow): the fields shown. */
+export interface ServerImport {
+  id: number;
+  file_type: DocType;
+  filename: string | null;
+  rows_inserted: number;
+  rows_skipped: number;
+  /** success | in_progress | interrupted | cancelled | error */
+  status: string;
+  imported_at: string;
+  deleted_at: string | null;
+}
+
+export interface ServerImportsResponse {
+  data: ServerImport[];
+}
+
 /** content script / popup → service worker. */
 export type ExtensionMessage =
   /** Answer: `{ id }` = its job. */

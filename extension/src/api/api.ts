@@ -19,14 +19,18 @@ export const API = {
     me: { url: "/auth/me", key: ["auth", "me"] },
   },
   uploads: {
-    achat: { url: "/uploads/achat-json", refreshes: (): Read[] => [API.jobs.list] },
-    vente: { url: "/uploads/vente-json", refreshes: (): Read[] => [API.jobs.list] },
-    stock: { url: "/uploads/stock-json", refreshes: (): Read[] => [API.jobs.list] },
+    achat: { url: "/uploads/achat-json", refreshes: (): Read[] => [API.jobs.list, API.imports.list] },
+    vente: { url: "/uploads/vente-json", refreshes: (): Read[] => [API.jobs.list, API.imports.list] },
+    stock: { url: "/uploads/stock-json", refreshes: (): Read[] => [API.jobs.list, API.imports.list] },
     setBatchStatus: { url: (id: number) => `/uploads/batches/${id}` },
+  },
+  /** The pharmacy's imports on PharmaGest (the app's « Gestion des imports »): the popup's list. */
+  imports: {
+    list: { url: "/data/imports", key: ["imports", "list"] },
   },
   jobs: {
     list: { key: ["jobs", "list"] },
-    cancel: { refreshes: (): Read[] => [API.jobs.list] },
+    cancel: { refreshes: (): Read[] => [API.jobs.list, API.imports.list] },
   },
   lang: {
     current: { key: ["lang"] },
