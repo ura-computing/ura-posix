@@ -4,6 +4,7 @@ exposes the FastAPI dependencies routers declare (no guard code in handler bodie
     pharmacy_id: Annotated[int, member("ventes")]   # owner / employee + feature(s)
     pharmacy_id: MemberDep                           # owner / employee, no feature
     pharmacy_id: OwnerDep                            # owner only
+    pharmacy_id: Annotated[int, owner("import")]     # owner + feature(s)
     user: AdminDep / DeveloperDep                    # role-only, gives the user
     APIRouter(dependencies=[admin_only])             # a whole admin router
 
@@ -162,6 +163,19 @@ def _owner(user: CurrentUserDep, db: DbDep) -> int:
     if user.role != "owner":
         raise ApiError(status.HTTP_403_FORBIDDEN, ErrorCode.OWNER_ONLY, "Réservé aux propriétaires.")
     return pharmacy_id
+
+
+def owner(*features: str) -> Any:
+    """`pharmacy_id: Annotated[int, owner("import")]` → an owner of a pharmacy holding every listed
+    feature; gives the pharmacy id."""
+
+    def dep(user: CurrentUserDep, db: DbDep) -> int:
+        pharmacy_id = _owner(user, db)
+        for feature in features:
+            require_feature(feature, user, db)
+        return pharmacy_id
+
+    return Depends(dep)
 
 
 def _admin(user: CurrentUserDep) -> User:

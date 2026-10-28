@@ -53,6 +53,7 @@ export const ROUTES = {
   PRODUITS: "/produits",
   PRODUIT: "/produits/:id",
   IMPORTS: "/imports",
+  SOBRUS: "/sobrus",
 
   // Gestion
   OWNER_EMPLOYEES: "/owner/employees",
@@ -92,3 +93,4 @@ export * from "./members";
 export * from "./storeWebsite";
 export * from "./products";
 export * from "./history";
+export * from "./sobrus";

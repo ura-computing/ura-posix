@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # E2E stack, built and run like production (see e2e/docker-compose.e2e.yml): regenerate
 # the test data, build the backend + frontend images, start them on a fresh Postgres 17,
-# then stream the backend log to e2e/.logs/backend.log (magic links are read there).
+# then stream the backend logs (with its Sobrus robot) to e2e/.logs/backend.log (magic links and
+# the « connexion Sobrus » emails are read there).
 # Started by Playwright (playwright.config.ts → webServer); when Playwright stops it,
 # the containers and their data are removed. Never touches the dev stack.
 set -eu

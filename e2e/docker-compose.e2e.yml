@@ -33,6 +33,10 @@ services:
       RATE_LIMIT: "0" # the suite logs in more than 5 times a minute
       PORT: "8001"
       PYTHONUNBUFFERED: "1"
+      # « Connexion Sobrus » against the fake Sobrus below, never the real one; the robot is a child
+      # process of the backend (app/sobrus/launcher.py), its key derived from JWT_SECRET (as in production).
+      SOBRUS_API_URL: &sobrus_url http://sobrus.e2e.test:9100
+      SOBRUS_ACCOUNT_API_URL: *sobrus_url
     volumes:
       - ../resources/tests/catalog/product-infos.json:/app/data/product-infos.e2e.json:ro
     ports:
@@ -40,12 +44,39 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      fake-sobrus:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/health || exit 1"]
       interval: 2s
       timeout: 5s
       retries: 90
       start_period: 10s
+
+  # Fake Sobrus (e2e/fake-sobrus/server.py): the 5 HTTP steps of the real login + its exports, serving
+  # the generated CSVs. Port 9100 on the host = the specs' `/__control` (« password changed »).
+  fake-sobrus:
+    image: python:3.12-slim
+    command: ["python", "/srv/server.py"]
+    environment:
+      FAKE_SOBRUS_EMAIL: pharmacie@sobrus.e2e
+      FAKE_SOBRUS_PASSWORD: SobrusE2e#2026
+      FAKE_SOBRUS_DATA: /data
+      FAKE_SOBRUS_BASE: http://sobrus.e2e.test:9100
+      PORT: "9100"
+    volumes:
+      - ./fake-sobrus/server.py:/srv/server.py:ro
+      - ../resources/tests:/data:ro
+    ports:
+      - "127.0.0.1:9100:9100"
+    networks:
+      default:
+        aliases: [sobrus.e2e.test]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9100/login')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
 
   frontend:
     build:

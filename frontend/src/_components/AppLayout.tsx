@@ -20,6 +20,7 @@ import {
   Tags,
   CircleUser,
   Settings,
+  RefreshCw,
   Menu,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +43,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { Skeleton } from "./Skeleton";
+import { SobrusBanner } from "./SobrusBanner";
 import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
@@ -113,6 +115,14 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "nav.equipe", to: ROUTES.OWNER_EMPLOYEES, icon: UsersRound, roles: [ROLES.OWNER], ready: true },
       { label: "nav.historique", to: ROUTES.HISTORY, icon: History, roles: [ROLES.OWNER], ready: true },
+      {
+        label: "nav.sobrus",
+        to: ROUTES.SOBRUS,
+        icon: RefreshCw,
+        roles: [ROLES.OWNER],
+        ready: true,
+        feature: "import",
+      },
       // HIDDEN 2026-07-03 — restore when the store-website feature ships.
       // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],
@@ -722,6 +732,8 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobile={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-auto p-7">
+          {/* « Connexion Sobrus » stopped working: owners with Import see it on every page. */}
+          {me.role === ROLES.OWNER && me.permissions.includes("import") && <SobrusBanner />}
           {/* Pages load on first visit (App.tsx lazy): sidebar + header stay meanwhile. */}
           <Suspense fallback={<PageLoading />}>
             <Outlet />

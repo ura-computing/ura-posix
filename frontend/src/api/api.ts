@@ -311,6 +311,28 @@ export const API = {
       all: ["history", "list"],
     },
   },
+  /** « Connexion Sobrus » (owner): the robot imports the Sobrus achats + ventes. A run that ends
+   *  refreshes what an achat + vente import refreshes (`afterImport`). */
+  sobrus: {
+    connection: { url: "/sobrus/connection", key: ["sobrus", "connection"] },
+    save: {
+      url: "/sobrus/connection",
+      refreshes: (): Read[] => [API.sobrus.connection, API.sobrus.runs, API.history.list],
+    },
+    disconnect: {
+      url: "/sobrus/connection",
+      refreshes: (): Read[] => [API.sobrus.connection, API.sobrus.runs, API.history.list],
+    },
+    runs: { url: "/sobrus/runs", key: ["sobrus", "runs"] },
+    startRun: { url: "/sobrus/runs", refreshes: (): Read[] => [API.sobrus.connection, API.sobrus.runs] },
+    cancelRun: {
+      url: (id: number) => `/sobrus/runs/${id}/cancel`,
+      refreshes: (): Read[] => [API.sobrus.connection, API.sobrus.runs],
+    },
+    runEnded: {
+      refreshes: (): Read[] => [API.sobrus.connection, API.sobrus.runs, ...afterImport.achat(), ...afterImport.vente()],
+    },
+  },
 
   uploads: {
     achat: { url: "/uploads/achat-json", refreshes: afterImport.achat },

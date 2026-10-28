@@ -21,6 +21,28 @@ class Settings(BaseSettings):
     # day of the imported files). Empty = the real date in Casablanca (dev, E2E, production).
     TODAY: str = ""
 
+    # « Connexion Sobrus » (app/sobrus/). SOBRUS_SECRET_KEY = Fernet key that encrypts the Sobrus
+    # passwords + sessions (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`);
+    # empty = a key derived from JWT_SECRET (app/sobrus/crypto.py). The URLs are the real Sobrus;
+    # the E2E stack points them to its fake Sobrus.
+    SOBRUS_SECRET_KEY: str = ""
+    SOBRUS_API_URL: str = "https://api.pharmav4.sobrus.com"
+    SOBRUS_ACCOUNT_API_URL: str = "https://api.account.sobrus.com"
+    SOBRUS_COUNTRY: str = "MA"
+
+    @field_validator("SOBRUS_SECRET_KEY")
+    @classmethod
+    def _sobrus_key_valid(cls, v: str) -> str:
+        """Fail at boot on a key Fernet can't use (a wrong key would make every saved password unreadable)."""
+        if v:
+            from cryptography.fernet import Fernet
+
+            try:
+                Fernet(v.encode())
+            except ValueError as e:
+                raise ValueError("SOBRUS_SECRET_KEY is not a Fernet key (32 url-safe base64 bytes)") from e
+        return v
+
     @field_validator("JWT_SECRET")
     @classmethod
     def _jwt_secret_strength(cls, v: str) -> str:

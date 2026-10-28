@@ -9,7 +9,11 @@ export type AuditAction =
   | "product_edited"
   | "product_reverted"
   | "note_added"
-  | "note_deleted";
+  | "note_deleted"
+  | "sobrus_connected"
+  | "sobrus_password_updated"
+  | "sobrus_disconnected"
+  | "sobrus_login_refused";
 
 export interface AuditRow {
   id: number;

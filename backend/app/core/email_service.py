@@ -118,3 +118,36 @@ def send_signup_decision(*, to: str, name: str, accepted: bool, login_url: str) 
         log.info("signup_decision.sent to=%s accepted=%s", to, accepted)
     except Exception:
         log.exception("signup_decision.send_failed to=%s", to)
+
+
+def send_sobrus_problem(*, to: str, name: str, needs_password: bool, app_url: str) -> None:
+    """« Connexion Sobrus » stopped working: the password was refused (changed on Sobrus), or Sobrus
+    asks a check / keeps failing. Sent once per problem. Same no-SMTP fallback and « never raise »
+    rule as the magic links."""
+    if not settings.MAIL_USERNAME:
+        print(f"\n>>> [SOBRUS_PROBLEM] EMAIL for {to}: {app_url}\n", flush=True)
+        return
+    subject = "PharmaGest : la connexion Sobrus ne fonctionne plus"
+    why = (
+        "Sobrus refuse le mot de passe enregistré : il a sans doute été changé."
+        if needs_password
+        else "Sobrus ne répond pas ou demande une vérification."
+    )
+    text = (
+        f"Bonjour {name},\n\n{why} Les imports automatiques de vos achats et ventes sont en pause.\n\n"
+        f"Pour les relancer, ouvrez « Connexion Sobrus » dans PharmaGest :\n{app_url}"
+    )
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+    msg["To"] = to
+    msg.set_content(text)
+    try:
+        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
+            if settings.MAIL_STARTTLS:
+                smtp.starttls(context=ssl.create_default_context())
+            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+            smtp.send_message(msg)
+        log.info("sobrus_problem.sent to=%s", to)
+    except Exception:
+        log.exception("sobrus_problem.send_failed to=%s", to)

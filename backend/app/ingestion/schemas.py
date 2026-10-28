@@ -15,7 +15,7 @@ from app.ledger.schemas import Pagination
 
 
 class JsonUploadBody(BaseModel):
-    rows: list[dict[str, str]]  # the extension serializes one row as {label: value, ...}
+    rows: list[dict[str, str]]  # the import page serializes one row as {label: value, ...}
     filename: str | None = None
     batch_id: int | None = None
 

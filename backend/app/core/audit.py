@@ -20,6 +20,10 @@ class AuditAction(StrEnum):
     PRODUCT_REVERTED = "product_reverted"  # {product, field, before, after = the imported value}
     NOTE_ADDED = "note_added"  # {product, text}
     NOTE_DELETED = "note_deleted"  # {product, text, author}
+    SOBRUS_CONNECTED = "sobrus_connected"  # {email}
+    SOBRUS_PASSWORD_UPDATED = "sobrus_password_updated"  # {email}
+    SOBRUS_DISCONNECTED = "sobrus_disconnected"  # {email}
+    SOBRUS_LOGIN_REFUSED = "sobrus_login_refused"  # {email, reason = error code}
 
 
 def user_label(user: User) -> str:

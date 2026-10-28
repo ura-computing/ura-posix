@@ -11,6 +11,7 @@ import type {
   MargeMode,
   MarginAlertsResponse,
   PharmacyListRow,
+  SobrusConnection,
   StatsFilters,
   StatsResponse,
   VentesFilters,
@@ -114,5 +115,21 @@ export function useAdminPharmaciesList() {
     isLoading,
     isError,
     reload: () => void refetch(),
+  };
+}
+
+/** « Connexion Sobrus » — its page and the banner shown on every page when it stops working
+ *  (owners with Import). While a run goes on, asked again every 2 s (its live progress). */
+export function useSobrusConnection(enabled = true) {
+  const { data, isLoading } = useQuery({
+    queryKey: API.sobrus.connection.key,
+    queryFn: () => api.get<SobrusConnection>(API.sobrus.connection.url),
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: (query) => (query.state.data?.active_run ? 2000 : false),
+  });
+  return {
+    connection: data ?? null,
+    isLoading,
   };
 }

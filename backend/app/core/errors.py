@@ -86,6 +86,16 @@ class ErrorCode(StrEnum):
     SUPPLIER_EMPTY = "supplierEmpty"
     SUPPLIER_NOT_FOUND = "supplierNotFound"
     PAYMENT_NOT_FOUND = "paymentNotFound"
+    # Connexion Sobrus (app/sobrus/)
+    SOBRUS_NOT_CONNECTED = "sobrusNotConnected"
+    SOBRUS_RUN_ACTIVE = "sobrusRunActive"
+    SOBRUS_RUN_NOT_FOUND = "sobrusRunNotFound"
+    SOBRUS_BAD_CREDENTIALS = "sobrusBadCredentials"
+    SOBRUS_NEEDS_ACTION = "sobrusNeedsAction"
+    SOBRUS_UNREACHABLE = "sobrusUnreachable"
+    SOBRUS_EXPORT_FAILED = "sobrusExportFailed"
+    SOBRUS_INTERRUPTED = "sobrusInterrupted"
+    CONSENT_REQUIRED = "consentRequired"
     # Store website (hidden feature)
     REQUEST_NOT_FOUND = "requestNotFound"
     REQUEST_ACTIVE_EXISTS = "requestActiveExists"

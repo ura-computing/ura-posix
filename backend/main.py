@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +21,19 @@ from app.ingestion import router as imports
 from app.ledger import router as transactions
 from app.history import router as history
 from app.products import router as products
+from app.sobrus import launcher, router as sobrus
 from app.store_website import router as store_website
 
 
-app = FastAPI(title="PharmaGest", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # « Connexion Sobrus »: nightly runs + waking the robot for queued ones (app/sobrus/launcher.py).
+    task = asyncio.create_task(launcher.ticker())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="PharmaGest", version="0.1.0", lifespan=lifespan)
 
 # Crash → JSON 500 `serverError` (« Le logiciel a rencontré un problème »). Added before
 # CORS = inside it, so the answer keeps the CORS headers and the browser can read it.
@@ -59,6 +71,7 @@ app.include_router(imports.router, prefix="/v1")
 app.include_router(transactions.router, prefix="/v1")
 app.include_router(products.router, prefix="/v1")
 app.include_router(history.router, prefix="/v1")
+app.include_router(sobrus.router, prefix="/v1")
 app.include_router(exclusions.router, prefix="/v1")
 app.include_router(accounting.router, prefix="/v1")
 app.include_router(store_website.router, prefix="/v1")

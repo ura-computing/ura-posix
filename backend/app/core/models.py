@@ -233,7 +233,7 @@ class ImportBatch(Base):
       - "in_progress" → first chunk inserted; later chunks haven't flipped it yet
       - "success"     → finished cleanly. Default for backward-compat with one-shot
                         CSV uploads that existed before the chunked extension flow.
-      - "cancelled"   → user cancelled mid-upload (page wizard or extension)
+      - "cancelled"   → user cancelled mid-upload (page wizard or Sobrus robot)
       - "error"       → unexpected failure; error_message carries the reason
     """
 
@@ -408,6 +408,93 @@ class AuditLog(Base):
     )
     details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+SOBRUS_CONNECTION_STATUSES = ("active", "needs_login", "invalid")
+SOBRUS_RUN_MODES = ("full", "new", "check", "range")
+SOBRUS_RUN_STATUSES = ("queued", "running", "success", "error", "cancelled")
+
+
+class SobrusConnection(Base):
+    """« Connexion Sobrus »: the owner's Sobrus login, so the worker (`app/sobrus/worker.py`) imports
+    the pharmacy's achats + ventes by itself. Password and Sobrus session cookies are encrypted
+    (`SOBRUS_SECRET_KEY`, `app/sobrus/crypto.py`) and never sent back. `invalid` = Sobrus refused the
+    password (never retried until the owner types a new one); `needs_login` = Sobrus asks a check."""
+
+    __tablename__ = "sobrus_connections"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in SOBRUS_CONNECTION_STATUSES) + ")",
+            name="ck_sobrus_connections_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False, unique=True
+    )
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    password_enc: Mapped[str] = mapped_column(String, nullable=False)
+    session_enc: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    consent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The owner was emailed about the current problem (once per problem); failed nights in a row.
+    problem_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_nights: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class SobrusRun(Base):
+    """One run of the Sobrus robot: `full` = every year back to the pharmacy's start, `new` = the last
+    days (every night), `check` = login test only, `range` = the owner's dates (`date_from` →
+    `date_to`, year by year). The page follows it live: `phase` + the counters,
+    and `events` = each step done (« Connexion à Sobrus », « Ventes 2026 : 12 345 lignes »…). One
+    queued / running run per pharmacy (partial unique index)."""
+
+    __tablename__ = "sobrus_runs"
+    __table_args__ = (
+        CheckConstraint("mode IN (" + ", ".join(f"'{m}'" for m in SOBRUS_RUN_MODES) + ")", name="ck_sobrus_runs_mode"),
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in SOBRUS_RUN_STATUSES) + ")", name="ck_sobrus_runs_status"
+        ),
+        Index(
+            "uq_sobrus_runs_active",
+            "pharmacy_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+        Index("ix_sobrus_runs_pharmacy_created", "pharmacy_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    mode: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="queued")
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    date_from: Mapped[date | None] = mapped_column(Date, nullable=True)  # mode `range` only
+    date_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Now: login | download | import (+ kind / year), with its counters.
+    phase: Mapped[str | None] = mapped_column(String, nullable=True)
+    kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bytes_received: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunk_current: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    chunk_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    lines_added: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # [{at, code, kind?, year?, n?}]
+    error_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Written at every step while running: silent 10 min = its robot stopped (app/sobrus/worker.py).
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PharmacyMedicamentStatus(Base):

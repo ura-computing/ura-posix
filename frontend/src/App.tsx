@@ -25,6 +25,7 @@ const PAGES = {
   MePage: () => import("@/pages/auth/me"),
   SetPasswordPage: () => import("@/pages/auth/set-password"),
   ImportsPage: () => import("@/pages/imports/history"),
+  SobrusPage: () => import("@/pages/imports/sobrus"),
   RapportPage: () => import("@/pages/rapport"),
   AchatsPage: () => import("@/pages/operations/achats"),
   AlertesPage: () => import("@/pages/analytics/alertes"),
@@ -61,6 +62,7 @@ const SetPasswordPage = lazy(PAGES.SetPasswordPage);
 // hidden feature. Restore alongside the block below.
 // import StorePreviewPage from "@/pages/store/preview";
 const ImportsPage = lazy(PAGES.ImportsPage);
+const SobrusPage = lazy(PAGES.SobrusPage);
 const RapportPage = lazy(PAGES.RapportPage);
 const AchatsPage = lazy(PAGES.AchatsPage);
 const AlertesPage = lazy(PAGES.AlertesPage);
@@ -114,6 +116,9 @@ export default function App() {
           <Route element={<RequireFeature feature="import" />}>
             <Route path={ROUTES.IMPORTS} element={<ImportsPage />} />
             <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
+            <Route element={<RequireRole role={ROLES.OWNER} />}>
+              <Route path={ROUTES.SOBRUS} element={<SobrusPage />} />
+            </Route>
           </Route>
           <Route element={<RequireFeature feature="achats" />}>
             <Route path={ROUTES.ACHATS} element={<AchatsPage />} />

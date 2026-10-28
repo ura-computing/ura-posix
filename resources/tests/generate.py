@@ -165,6 +165,8 @@ def make_products(rng: random.Random, n: int, today: date) -> list[Product]:
             r = rng.random()
             stock = rng.randint(-5, -1) if r < 0.01 else 0 if r < 0.05 else rng.randint(1, 80)
             expiry = random_expiry(rng, today)
+            if stock == 0:  # Sobrus' stock file leaves out the products at 0 (same random draws)
+                stock = expiry = None
         products.append(Product(
             pid=str(900000 + i),
             name=f"E2E PRODUIT {i:05d}",

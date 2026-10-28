@@ -38,6 +38,7 @@ const IMPORT_TYPE: Record<string, string> = { achat: "nav.achats", vente: "nav.v
 export function historyKind(t: TFn, row: AuditRow): string {
   if (row.action.startsWith("import_")) return t("history.kindImport");
   if (row.action.startsWith("note_")) return t("history.kindNote");
+  if (row.action.startsWith("sobrus_")) return t("history.kindSobrus");
   return t("history.kindProduct");
 }
 
@@ -74,5 +75,10 @@ export function historyText(t: TFn, row: AuditRow): string {
     case "note_added":
     case "note_deleted":
       return t(`history.${row.action}`, { text: String(d.text ?? ""), author: String(d.author ?? "—") });
+    case "sobrus_connected":
+    case "sobrus_password_updated":
+    case "sobrus_disconnected":
+    case "sobrus_login_refused":
+      return t(`history.${row.action}`, { email: String(d.email ?? "—") });
   }
 }

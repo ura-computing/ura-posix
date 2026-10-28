@@ -43,3 +43,11 @@ export async function lastSignupEmail(email: string, decision: "ACCEPTED" | "REF
     `sign-up ${decision} email for ${email}`,
   );
 }
+
+/** Last « La connexion Sobrus ne fonctionne plus » email to `email` (printed by the Sobrus worker). */
+export async function lastSobrusProblemEmail(email: string): Promise<string> {
+  return lastPrinted(
+    new RegExp(`>>> \\[SOBRUS_PROBLEM\\] EMAIL for ${escaped(email)}: (\\S+)`, "g"),
+    `Sobrus problem email for ${email}`,
+  );
+}

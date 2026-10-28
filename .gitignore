@@ -50,3 +50,6 @@ resources/tests/catalog/product-infos.json
 
 # Production database dumps — never commit
 *.dump
+
+# The removed Chrome extension: a local copy may still hold a Sobrus session (never commit it)
+extension/
