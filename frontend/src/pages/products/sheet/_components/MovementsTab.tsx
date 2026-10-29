@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { CategorySegment } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
@@ -114,7 +114,7 @@ function LineDetail({
       <FieldList fields={fields} />
       <div className="flex flex-col items-start gap-1">
         <Button
-          variant="outline"
+          variant="secondary"
           onClick={() => seeDetail(line)}
           disabled={!line.document || !allowed}
           title={t(line.kind === "achat" ? "products.seeBl" : "products.seeTicket", { ref: line.document ?? "" })}

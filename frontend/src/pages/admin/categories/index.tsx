@@ -4,9 +4,9 @@
  *  shared DataTable primitive so empty/loading/sort states stay consistent
  *  with the rest of the app. */
 import { useState } from "react";
-import { Loader2, Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { FormField, FormInput } from "@/_components/FormField";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { DataTable } from "@/_components/DataTable";
@@ -24,9 +24,11 @@ import {
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { SUFFIX_COLORS } from "@/types";
 import { Page } from "@/_components/Page";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { Card } from "@/_components/atoms/Card";
 
 /** Create / edit dialog for a CategorySuffix. Mirrors the handoff design via
- *  our shared primitives (Dialog, AsyncButton, SuffixBadge). The category is
+ *  our shared primitives (Dialog, Button, SuffixBadge). The category is
  *  saved as typed (spaces tidied); the backend matches it ignoring accents,
  *  case and the « (x%) » part (`csv_parse.suffix_key`). */
 
@@ -154,12 +156,12 @@ function CategorySuffixBody({ open, onClose, item, isSaving, onSubmit }: Categor
           </FormField>
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-            <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton type="submit" variant="primary" isLoading={isSaving} loadingText={t("categories.saving")}>
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isSaving} loadingText={t("categories.saving")}>
               {t("common.save")}
-            </AsyncButton>
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -209,22 +211,24 @@ export default function AdminCategoriesPage() {
       width: 110,
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
             onClick={() => setEditing(row)}
             aria-label={t("common.edit")}
-            className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
           >
             <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:bg-error-subtle hover:text-error"
             onClick={() => setRemoveTarget(row)}
             aria-label={t("common.delete")}
-            className="inline-flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-error-subtle hover:text-error"
           >
             <Trash2 className="size-3.5" />
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -235,24 +239,24 @@ export default function AdminCategoriesPage() {
       title={t("categories.title")}
       subtitle={t("categories.subtitle")}
       actions={
-        <AsyncButton variant="primary" onClick={() => setCreateOpen(true)}>
+        <Button variant="primary" onClick={() => setCreateOpen(true)}>
           <Plus className="size-4" />
           {t("categories.newMapping")}
-        </AsyncButton>
+        </Button>
       }
     >
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("categories.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={reload}>
+          <Button variant="secondary" onClick={reload}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
-          </AsyncButton>
+          </Button>
         </div>
       ) : isLoading ? (
-        <div className="flex items-center justify-center rounded-2xl border border-border bg-card py-16">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
+        <Card as="div" padding="none" className="flex items-center justify-center py-16">
+          <Spinner size="lg" className="text-muted-foreground" />
+        </Card>
       ) : (
         <DataTable
           rows={items}

@@ -29,6 +29,9 @@ import { formatDate, formatNumStr, formatQty } from "@/utils/format";
 import type { UploadJob, UploadPhase, UploadProgress } from "@/hooks/UploadContext";
 import type { ReactNode } from "react";
 import { Page } from "@/_components/Page";
+import { Button } from "@/_components/atoms/Button";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { Card } from "@/_components/atoms/Card";
 
 interface DropZoneProps {
   docType: DocType;
@@ -146,7 +149,7 @@ function PickedFiles({ files, onImport }: { files: PickedFile[]; onImport: () =>
   const total = good.reduce((n, f) => n + f.rows.length, 0);
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <Card as="div" padding="none">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
           <h3 className="text-base font-semibold text-foreground">{t("uploadFile.manyTitle", { n: files.length })}</h3>
           <span className="text-sm text-muted-foreground">{t("uploadFile.manyTotal", { n: formatNumStr(total) })}</span>
@@ -179,17 +182,12 @@ function PickedFiles({ files, onImport }: { files: PickedFile[]; onImport: () =>
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
       <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onImport}
-          disabled={good.length === 0}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
-        >
+        <Button onClick={onImport} disabled={good.length === 0}>
           <UploadCloud className="size-4" />
           {t("uploadFile.manyImport", { n: good.length })}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -211,7 +209,7 @@ function BatchFiles({
   const done = jobs.filter((j) => j.phase !== "queued" && j.phase !== "uploading").length;
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <Card as="div" padding="none">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
           <h3 className="text-base font-semibold text-foreground">{t("uploadFile.batchTitle", { n: jobs.length })}</h3>
           <span className="text-sm text-muted-foreground">
@@ -225,9 +223,7 @@ function BatchFiles({
               <li key={j.id} className="flex flex-col gap-2 px-5 py-3">
                 <div className="flex items-center gap-3">
                   {j.phase === "queued" && <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
-                  {j.phase === "uploading" && (
-                    <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
-                  )}
+                  {j.phase === "uploading" && <Spinner className="text-primary" />}
                   {j.phase === "success" && <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />}
                   {j.phase === "error" && <AlertCircle className="size-4 shrink-0 text-error" aria-hidden />}
                   {j.phase === "cancelled" && <Ban className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
@@ -275,26 +271,18 @@ function BatchFiles({
             );
           })}
         </ul>
-      </div>
+      </Card>
       <div className="flex justify-end">
         {running ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-subtle"
-          >
+          <Button variant="outline" onClick={onCancel}>
             <X className="size-4" />
             {t("uploadFile.cancelAll")}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            onClick={onNewImport}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-          >
+          <Button onClick={onNewImport}>
             <UploadCloud className="size-4" />
             {t("uploadFile.newImport")}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -350,14 +338,10 @@ function Queued({ docType, filename, onCancel }: { docType: DocType; filename: s
           <Clock className="size-4" style={{ color: `var(--color-doc-${docType})` }} />
           {t("uploadFile.queuedTitle")}
         </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-destructive/30 bg-card px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/5"
-        >
+        <Button variant="danger-outline" size="sm" onClick={onCancel}>
           <X className="size-3.5" />
           {t("uploadFile.removeFromQueue")}
-        </button>
+        </Button>
       </div>
       <p className="text-xs text-muted-foreground">{t("uploadFile.queuedHint")}</p>
       {filename && <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>}
@@ -404,14 +388,10 @@ function Uploading({
           {pct} % {t("uploadFile.completed")} — {formatQty(progress.inserted)} {t("uploadFile.inserted")},{" "}
           {formatQty(progress.skipped)} {t("uploadFile.ignored")}
         </span>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-destructive/30 bg-card px-2.5 py-1 text-xs font-semibold text-destructive hover:bg-destructive/5"
-        >
+        <Button variant="danger-outline" size="sm" onClick={onCancel}>
           <Ban className="size-3.5" />
           {t("uploadFile.cancelImport")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -500,14 +480,10 @@ function Success({
         </div>
       )}
       <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
-      <button
-        type="button"
-        onClick={onReset}
-        className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-subtle"
-      >
+      <Button variant="outline" className="mt-2" onClick={onReset}>
         <RotateCcw className="size-4" />
         {t("uploadFile.newImport")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -532,14 +508,10 @@ function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: (
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onReset}
-        className="inline-flex cursor-pointer items-center gap-2 self-start rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-subtle"
-      >
+      <Button variant="outline" size="sm" className="self-start" onClick={onReset}>
         <RotateCcw className="size-3.5" />
         {t("uploadFile.restart")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -990,15 +962,10 @@ export default function UploadFilePage() {
             </div>
           )}
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => docType && handlePickType(docType)}
-              disabled={!docType}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
+            <Button onClick={() => docType && handlePickType(docType)} disabled={!docType}>
               {t("uploadFile.continue")}
               <ChevronRight className="size-4" />
-            </button>
+            </Button>
           </div>
         </section>
       )}
@@ -1006,14 +973,10 @@ export default function UploadFilePage() {
       {/* ─── STEP 2 — File ─── */}
       {step === 2 && docType && (
         <section className="flex flex-col gap-4">
-          <button
-            type="button"
-            onClick={handleBackToType}
-            className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" size="sm" className="self-start text-muted-foreground" onClick={handleBackToType}>
             <ArrowLeft className="size-3.5" />
             {t("uploadFile.changeType")}
-          </button>
+          </Button>
           <DropZone
             docType={docType}
             example={examples[docType]}
@@ -1036,10 +999,11 @@ export default function UploadFilePage() {
       {step === 3 && docType && (
         <section className="flex flex-col gap-4">
           {batchJobs.length === 0 && (file || picked.length > 0 || phase !== "idle") && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start text-muted-foreground"
               onClick={file || picked.length > 0 ? changeFile : reset}
-              className="inline-flex cursor-pointer items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="size-3.5" />
               {picked.length > 0
@@ -1047,7 +1011,7 @@ export default function UploadFilePage() {
                 : file
                   ? t("uploadFile.chooseAnother")
                   : t("uploadFile.newImport")}
-            </button>
+            </Button>
           )}
 
           {batchJobs.length > 0 ? (
@@ -1064,14 +1028,10 @@ export default function UploadFilePage() {
                 fileDates={fileDates}
               />
               <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={startImport}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-                >
+                <Button onClick={startImport}>
                   <UploadCloud className="size-4" />
                   {t("uploadFile.importToDb")}
-                </button>
+                </Button>
               </div>
             </>
           ) : phase !== "idle" ? (
@@ -1121,14 +1081,10 @@ function ImportDoneFallback({ docType, onNewImport }: { docType: DocType; onNewI
       </div>
       <h3 className="text-base font-semibold text-foreground">{t("uploadFile.done")}</h3>
       <p className="max-w-sm text-sm text-muted-foreground">{t("uploadFile.doneDesc")}</p>
-      <button
-        type="button"
-        onClick={onNewImport}
-        className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
-      >
+      <Button className="mt-1" onClick={onNewImport}>
         <UploadCloud className="size-4" />
         {t("uploadFile.newImport")}
-      </button>
+      </Button>
     </div>
   );
 }

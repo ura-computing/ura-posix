@@ -4,8 +4,9 @@
 import { useState, type FormEvent } from "react";
 import { ScanBarcode, Search, X } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/dialog";
+import { Input } from "@/_components/atoms/Input";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useBarcodeLookup } from "./barcodeLookup";
@@ -36,13 +37,13 @@ function ScanForm({ onClose }: { onClose: () => void }) {
           {t("products.scan")}
         </h3>
         <p className="text-sm text-muted-foreground">{t("products.scanHint")}</p>
-        <input
+        <Input
           autoFocus
           aria-label={t("products.scanInput")}
           placeholder={t("products.scanInput")}
           value={code}
-          onChange={(e) => setCode(e.target.value)}
-          className="h-12 w-full rounded-md border border-input bg-surface-subtle px-3 font-mono text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          onValueChange={setCode}
+          className="font-mono"
         />
         {notFound && (
           <p role="alert" className="text-sm font-medium text-error">
@@ -50,14 +51,14 @@ function ScanForm({ onClose }: { onClose: () => void }) {
           </p>
         )}
         <div className="flex justify-end gap-2">
-          <AsyncButton variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             <X className="size-4" />
             {t("common.cancel")}
-          </AsyncButton>
-          <AsyncButton type="submit" variant="primary" disabled={!code.trim()} isLoading={isSearching}>
+          </Button>
+          <Button type="submit" variant="primary" disabled={!code.trim()} isLoading={isSearching}>
             <Search className="size-4" />
             {t("products.scanSearch")}
-          </AsyncButton>
+          </Button>
         </div>
       </form>
     </DialogContent>

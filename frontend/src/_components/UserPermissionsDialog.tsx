@@ -14,14 +14,15 @@
  *  read time by the 3-layer intersection in permissions.py.
  */
 import { useState } from "react";
-import { Info, Check, Loader2, X } from "lucide-react";
+import { Info, Check, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { AsyncButton } from "./AsyncButton";
+import { Badge } from "@/_components/atoms/Badge";
+import { Button } from "@/_components/atoms/Button";
+import { Spinner } from "@/_components/atoms/Spinner";
 import { Switch } from "./Switch";
 import { Tooltip } from "./Tooltip";
 import { Dialog, DialogContent } from "./dialog";
-import { cn } from "@/utils/cn";
 import type { MemberOut } from "@/types";
 
 import { FEATURES, ROLE_LABEL, type FeatureKey } from "./memberConstants";
@@ -51,8 +52,6 @@ export interface UserPermissionsDialogProps {
   isSaving?: boolean;
   onSave: (next: Record<FeatureKey, boolean>) => void;
 }
-
-const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 
 /** Mounted only while open (one mount per user): the toggles start from the
  *  server values on every open, no reset effect needed. */
@@ -123,7 +122,7 @@ function PermissionsBody({
             <div className="flex min-w-0 flex-col gap-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-[17px] font-semibold text-foreground">{user.full_name ?? user.email}</h3>
-                <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>{t(ROLE_LABEL[user.role])}</span>
+                <Badge>{t(ROLE_LABEL[user.role])}</Badge>
               </div>
               <span className="text-[12.5px] text-muted-foreground">{user.email}</span>
             </div>
@@ -177,15 +176,9 @@ function PermissionsBody({
                     {ceilings.map((layer) => {
                       const allowed = layer.values[f.key];
                       return (
-                        <span
-                          key={layer.label}
-                          className={cn(
-                            PILL_BASE,
-                            allowed ? "bg-info-subtle text-info" : "bg-muted text-muted-foreground",
-                          )}
-                        >
+                        <Badge key={layer.label} tone={allowed ? "info" : "neutral"}>
                           {layer.label} : {allowed ? t("adminPharm.enabledF") : t("adminPharm.disabledF")}
-                        </span>
+                        </Badge>
                       );
                     })}
                     <div className="ml-auto">
@@ -206,18 +199,18 @@ function PermissionsBody({
 
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-          <AsyncButton variant="ghost" onClick={enableAllPossible} className="!h-9 !px-3 text-xs">
+          <Button variant="ghost" onClick={enableAllPossible} className="!h-9 !px-3 text-xs">
             <Check className="size-3.5" />
             {t("adminPharm.enableAllPossible")}
-          </AsyncButton>
+          </Button>
           <div className="flex items-center gap-2.5">
-            <AsyncButton variant="secondary" onClick={onClose} disabled={isSaving}>
+            <Button variant="secondary" onClick={onClose} disabled={isSaving}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton variant="primary" onClick={() => onSave(pending)} disabled={isSaving || !isDirty}>
-              {isSaving && <Loader2 className="size-3.5 animate-spin" />}
+            </Button>
+            <Button variant="primary" onClick={() => onSave(pending)} disabled={isSaving || !isDirty}>
+              {isSaving && <Spinner size="sm" />}
               {t("common.save")}
-            </AsyncButton>
+            </Button>
           </div>
         </div>
       </DialogContent>

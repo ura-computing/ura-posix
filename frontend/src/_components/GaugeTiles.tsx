@@ -7,6 +7,7 @@ import { cn } from "@/utils/cn";
 
 import { NeedleGauge } from "./NeedleGauge";
 import { Skeleton } from "./Skeleton";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 export interface GaugeSide {
   title: string;
@@ -40,7 +41,9 @@ export function GaugeTiles({ left, right, goodness, caption, summary, isLoading 
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3">
         {summary.map(({ label, value }) => (
           <div key={label} className="flex flex-col items-center text-center">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+            <SectionTitle as="span" size="sm">
+              {label}
+            </SectionTitle>
             <span className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">{value}</span>
           </div>
         ))}

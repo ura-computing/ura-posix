@@ -103,6 +103,7 @@ export const fr = {
     pagePrev: "Page précédente",
     pageNext: "Page suivante",
     removeFilter: "Supprimer le filtre",
+    clearSearch: "Effacer la recherche",
     noOption: "Aucune option",
     filters: "Filtres",
     pharmacy: "Pharmacie",

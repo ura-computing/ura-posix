@@ -8,11 +8,11 @@
  *  `detail.owners_union_permissions` in the GET response. */
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Pencil, Trash2, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Pencil, Trash2, Check } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
 import { MembersSection } from "@/_components/MembersSection";
@@ -35,6 +35,7 @@ import {
 } from "../hooks";
 import { Switch } from "@/_components/Switch";
 import { Page } from "@/_components/Page";
+import { Spinner } from "@/_components/atoms/Spinner";
 
 /** Section A of the pharmacy detail page — pharmacy-level feature toggles.
  *
@@ -118,13 +119,13 @@ function FeatureToggleGrid({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
-          <AsyncButton variant="ghost" onClick={onEnableAll} className="!h-8 !px-2 text-xs">
+          <Button variant="ghost" onClick={onEnableAll} className="!h-8 !px-2 text-xs">
             <Check className="size-3.5" />
             {t("adminPharm.enableAll")}
-          </AsyncButton>
-          <AsyncButton variant="ghost" onClick={onDisableAll} className="!h-8 !px-2 text-xs">
+          </Button>
+          <Button variant="ghost" onClick={onDisableAll} className="!h-8 !px-2 text-xs">
             {t("adminPharm.disableAll")}
-          </AsyncButton>
+          </Button>
         </div>
       </div>
 
@@ -135,13 +136,13 @@ function FeatureToggleGrid({
             {dirtyCount} {t(dirtyCount > 1 ? "adminPharm.unsavedChangesPlural" : "adminPharm.unsavedChangesSingular")}
           </span>
           <div className="flex items-center gap-2">
-            <AsyncButton variant="ghost" onClick={onCancel} disabled={isSaving}>
+            <Button variant="ghost" onClick={onCancel} disabled={isSaving}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton variant="primary" onClick={onSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="size-3.5 animate-spin" />}
+            </Button>
+            <Button variant="primary" onClick={onSave} disabled={isSaving}>
+              {isSaving && <Spinner size="sm" />}
               {t("common.save")}
-            </AsyncButton>
+            </Button>
           </div>
         </div>
       )}
@@ -254,14 +255,14 @@ export default function AdminPharmacyDetail() {
       }
       actions={
         <>
-          <AsyncButton variant="secondary" onClick={() => setEditOpen(true)}>
+          <Button variant="secondary" onClick={() => setEditOpen(true)}>
             <Pencil className="size-4" />
             {t("common.edit")}
-          </AsyncButton>
-          <AsyncButton variant="destructive" onClick={() => setDeleteOpen(true)}>
+          </Button>
+          <Button variant="danger" onClick={() => setDeleteOpen(true)}>
             <Trash2 className="size-4" />
             {t("common.delete")}
-          </AsyncButton>
+          </Button>
         </>
       }
     >

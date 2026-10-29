@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { Input } from "./input";
 import { Label } from "./label";
@@ -125,7 +125,7 @@ export function CategoryModal({ open, onOpenChange, category, isSaving, onSubmit
           </Field>
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
             <Button type="submit" disabled={isSaving}>

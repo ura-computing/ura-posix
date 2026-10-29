@@ -5,9 +5,9 @@
  *  3,4 Mo, import paquet 12 / 69…, « Arrêter »), the last runs. Password refused / Sobrus asks a
  *  check → a red card with « Mettre à jour le mot de passe ». The password is never shown again. */
 import { useState } from "react";
-import { CheckCircle2, CircleAlert, Loader2, Unplug } from "lucide-react";
+import { CheckCircle2, CircleAlert, Unplug } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { CategorySegment } from "@/_components/CategorySegment";
 import { Checkbox } from "@/_components/Checkbox";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
@@ -15,6 +15,9 @@ import { DateRangePopover } from "@/_components/filterBar";
 import { FormField, FormInput } from "@/_components/FormField";
 import { Page } from "@/_components/Page";
 import { Skeleton } from "@/_components/Skeleton";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { Card } from "@/_components/atoms/Card";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { useT } from "@/i18n/I18nProvider";
 import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
 import { cn } from "@/utils/cn";
@@ -71,7 +74,7 @@ function ConnectForm({
         </label>
       )}
       <Button type="submit" size="lg" disabled={!ready || isSaving} className="self-start">
-        {isSaving && <Loader2 className="size-4 animate-spin" />}
+        {isSaving && <Spinner />}
         {update ? t("sobrus.updatePassword") : t("sobrus.connect")}
       </Button>
     </form>
@@ -87,13 +90,13 @@ function RunProgress({ run, isCancelling, onCancel }: { run: SobrusRun; isCancel
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-foreground">{modeName(t, run)}</h2>
         {run.mode !== "check" && (
-          <Button variant="outline" onClick={onCancel} disabled={isCancelling || run.cancel_requested}>
+          <Button variant="secondary" onClick={onCancel} disabled={isCancelling || run.cancel_requested}>
             {t("sobrus.stop")}
           </Button>
         )}
       </div>
       <div className="flex items-center gap-3 text-base font-medium text-foreground">
-        <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden />
+        <Spinner size="lg" className="text-primary" />
         <span>{currentStep(t, run)}</span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-muted">
@@ -124,7 +127,7 @@ function RunsList({ runs }: { runs: SobrusRun[] }) {
   if (runs.length === 0) return null;
   return (
     <section className={CARD}>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("sobrus.lastRuns")}</h2>
+      <SectionTitle>{t("sobrus.lastRuns")}</SectionTitle>
       <ul className="flex flex-col divide-y divide-border">
         {runs.map((run) => (
           <li key={run.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5 text-sm">
@@ -258,7 +261,7 @@ export default function SobrusPage() {
         ) : (
           <>
             {connection.status !== "active" && !activeRun && (
-              <section className="flex flex-col gap-4 rounded-2xl border border-error/30 bg-card p-5 shadow-sm">
+              <Card className="flex flex-col gap-4 border-error/30">
                 <div className="flex items-start gap-3 text-error-subtle-foreground">
                   <CircleAlert className="mt-0.5 size-5 shrink-0 text-error" aria-hidden />
                   <span className="text-base font-semibold">
@@ -272,7 +275,7 @@ export default function SobrusPage() {
                   isSaving={isSaving}
                   onSave={saveConnection}
                 />
-              </section>
+              </Card>
             )}
             <Connected
               connection={connection}

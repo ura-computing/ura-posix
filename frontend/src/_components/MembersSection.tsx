@@ -6,14 +6,12 @@ import { SlidersHorizontal, UserPlus, Users } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import type { MemberOut } from "@/types";
-import { cn } from "@/utils/cn";
 
-import { AsyncButton } from "./AsyncButton";
+import { Badge } from "@/_components/atoms/Badge";
+import { Button } from "@/_components/atoms/Button";
 import { FeaturePills } from "./FeaturePills";
 import { MemberKebab } from "./MemberKebab";
 import { ROLE_LABEL, STATUS_LABEL } from "./memberConstants";
-
-const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 
 export interface MembersSectionProps {
   title: string;
@@ -57,10 +55,10 @@ export function MembersSection({
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        <AsyncButton variant="primary" onClick={onAdd}>
+        <Button variant="primary" onClick={onAdd}>
           <UserPlus className="size-4" />
           {addLabel}
-        </AsyncButton>
+        </Button>
       </div>
 
       {rows.length === 0 ? (
@@ -96,24 +94,10 @@ export function MembersSection({
                   </div>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span
-                    className={cn(
-                      PILL_BASE,
-                      m.role === "owner" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {t(ROLE_LABEL[m.role])}
-                  </span>
+                  <Badge tone={m.role === "owner" ? "primary" : "neutral"}>{t(ROLE_LABEL[m.role])}</Badge>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span
-                    className={cn(
-                      PILL_BASE,
-                      m.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {t(STATUS_LABEL[m.status])}
-                  </span>
+                  <Badge tone={m.status === "active" ? "success" : "neutral"}>{t(STATUS_LABEL[m.status])}</Badge>
                 </td>
                 <td className="px-3 py-2.5">
                   <FeaturePills features={m.granted_permissions} maxShown={3} />

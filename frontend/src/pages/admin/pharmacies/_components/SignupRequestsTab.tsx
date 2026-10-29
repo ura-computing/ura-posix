@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { useT } from "@/i18n/I18nProvider";
@@ -107,14 +107,10 @@ export function SignupRequestsTab() {
                 <Check className="size-3.5" />
                 {t("signupReq.accept")}
               </Button>
-              <button
-                type="button"
-                onClick={() => setToRefuse(r)}
-                className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-destructive/30 px-3 text-xs font-medium text-destructive hover:bg-destructive/5"
-              >
+              <Button variant="danger-outline" size="sm" onClick={() => setToRefuse(r)}>
                 <X className="size-3.5" />
                 {t("signupReq.refuse")}
-              </button>
+              </Button>
             </div>
             {reasons.length > 0 && (
               <span className="max-w-[260px] text-right text-[11px] text-muted-foreground">

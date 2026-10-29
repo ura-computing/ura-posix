@@ -20,9 +20,9 @@ import {
   X,
 } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/dayPicker";
+import { Input } from "@/_components/atoms/Input";
 import { useMonths } from "@/i18n/dates";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -32,9 +32,6 @@ import { isoToTyped, typedToIso, type EditSection, type FormField } from "../hoo
 import { SheetEditContext } from "./editContext";
 
 export type EditKind = "text" | "price" | "int" | "date";
-
-const INPUT =
-  "w-full rounded-md border bg-surface-subtle px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
 
 function useSheetEdit() {
   const ctx = useContext(SheetEditContext);
@@ -183,17 +180,12 @@ function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; l
   return (
     <span className="flex w-full flex-col items-start gap-1">
       <span className="flex w-full max-w-[260px] items-center gap-2">
-        <input
+        <Input
           aria-label={label}
-          aria-invalid={error ? true : undefined}
+          invalid={!!error}
           inputMode={kind === "price" ? "decimal" : kind === "int" ? "numeric" : undefined}
           placeholder={kind === "date" ? t("products.datePlaceholder") : undefined}
-          className={cn(
-            INPUT,
-            "h-9",
-            kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono",
-            error ? "border-error" : "border-input",
-          )}
+          className={kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono"}
           {...register(field)}
         />
         {kind === "date" && <CalendarButton field={field} label={label} />}
@@ -211,11 +203,11 @@ export function SectionEditActions({ section }: { section: EditSection }) {
   if (editor.section === section) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <AsyncButton variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
+        <Button variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
           <X className="size-4" />
           {t("common.cancel")}
-        </AsyncButton>
-        <AsyncButton
+        </Button>
+        <Button
           variant="primary"
           onClick={() => void editor.save()}
           isLoading={editor.isSaving}
@@ -223,14 +215,14 @@ export function SectionEditActions({ section }: { section: EditSection }) {
         >
           <Save className="size-4" />
           {t("common.save")}
-        </AsyncButton>
+        </Button>
       </div>
     );
   }
   return (
     <div className="flex flex-col items-end gap-1">
       <Button
-        variant="outline"
+        variant="secondary"
         onClick={() => editor.start(section)}
         disabled={!editor.canEdit || editor.section !== null}
       >
@@ -287,14 +279,14 @@ export function Editable({
             {t("products.importedValue", { value: importedText(kind, sheet.imported[field]) })}
           </span>
           {editor.canEdit && (
-            <button
-              type="button"
+            <Button
+              variant="link"
+              className="font-semibold"
               onClick={() => void editor.revert(field)}
               disabled={editor.isSaving}
-              className="cursor-pointer font-semibold text-primary hover:text-primary-hover hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("products.revert")}
-            </button>
+            </Button>
           )}
         </span>
       )}

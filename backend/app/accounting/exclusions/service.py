@@ -16,7 +16,7 @@ APPLICATION RULE (user decision 2026-08-01): applied ONLY in Comptabilité
 add `vente_filter()` / `achat_filter()` only when `include_non_declared` is False.
 """
 
-from sqlalchemy import and_, exists, func, select, union
+from sqlalchemy import and_, func, select, union
 from sqlalchemy.orm import Session
 
 from app.core.models import (
@@ -78,13 +78,20 @@ def vente_filter(db: Session, pharmacy_id: int):
 
 def achat_filter(db: Session, pharmacy_id: int):
     """WHERE clause keeping the Achat rows whose product is not excluded and that are not an
-    excluded BL line (this product on this BL). No BL line excluded (most pharmacies): no line test."""
+    excluded BL line (this product on this BL). The excluded lines are few: their achat ids are read
+    once and left out by id (cheaper than a test per achat row)."""
     kept = Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id))
-    if db.query(PharmacyBlLineExclusion.id).filter(PharmacyBlLineExclusion.pharmacy_id == pharmacy_id).first() is None:
-        return kept
-    excluded_line = exists().where(
-        PharmacyBlLineExclusion.pharmacy_id == pharmacy_id,
-        PharmacyBlLineExclusion.delivery_ref == Achat.delivery_ref,
-        PharmacyBlLineExclusion.medicament_id == Achat.medicament_id,
-    )
-    return and_(kept, ~excluded_line)
+    line_ids = [
+        r[0]
+        for r in db.query(Achat.id)
+        .join(
+            PharmacyBlLineExclusion,
+            and_(
+                PharmacyBlLineExclusion.pharmacy_id == pharmacy_id,
+                PharmacyBlLineExclusion.delivery_ref == Achat.delivery_ref,
+                PharmacyBlLineExclusion.medicament_id == Achat.medicament_id,
+            ),
+        )
+        .filter(Achat.pharmacy_id == pharmacy_id)
+    ]
+    return and_(kept, Achat.id.notin_(line_ids)) if line_ids else kept

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { Checkbox } from "@/_components/Checkbox";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { TabBar } from "@/_components/TabBar";
@@ -12,6 +12,8 @@ import type { DataImport, DocType, ImportBatchStatus } from "@/types";
 import { useDeleteImport, useDeleteImports, useImports } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { Page } from "@/_components/Page";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { Card } from "@/_components/atoms/Card";
 
 const buildTabs = (t: TFn): TabItem[] => [{ id: "imports", label: t("imports.tab") }];
 
@@ -81,7 +83,7 @@ function ImportsTab() {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> {t("imports.loading")}
+        <Spinner /> {t("imports.loading")}
       </div>
     );
   }
@@ -102,12 +104,12 @@ function ImportsTab() {
       {/* Always there (users look for it), usable once a line is ticked. */}
       <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
         {selectedRows.length === 0 && <span className="text-sm text-muted-foreground">{t("imports.selectHint")}</span>}
-        <Button variant="destructive" disabled={selectedRows.length === 0} onClick={() => setConfirmMany(true)}>
+        <Button variant="danger" disabled={selectedRows.length === 0} onClick={() => setConfirmMany(true)}>
           <Trash2 className="size-4" />
           {t("imports.deleteSelection", { n: selectedRows.length })}
         </Button>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+      <Card as="div" padding="none">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-surface-subtle text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -212,14 +214,10 @@ function ImportsTab() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {!isDeleted && (
-                      <button
-                        type="button"
-                        onClick={() => setPendingRow(row)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/5"
-                      >
+                      <Button variant="danger-outline" size="sm" onClick={() => setPendingRow(row)}>
                         <Trash2 className="size-3.5" />
                         {t("imports.deleteBtn")}
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -227,7 +225,7 @@ function ImportsTab() {
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       <ConfirmDialog
         open={pendingRow !== null}

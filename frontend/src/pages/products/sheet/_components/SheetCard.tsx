@@ -2,6 +2,8 @@
  *  grey capitals (+ a small hint), its buttons on the right, its content; and a label / value list. */
 import type { ReactNode } from "react";
 
+import { Card } from "@/_components/atoms/Card";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { cn } from "@/utils/cn";
 
 export function SheetCard({
@@ -20,16 +22,13 @@ export function SheetCard({
   className?: string;
 }) {
   return (
-    <section className={cn("flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm", className)}>
+    <Card className={cn("flex flex-col gap-3", className)}>
       <div className="flex min-h-8 flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h2>
-          {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
-        </div>
+        <SectionTitle hint={hint}>{title}</SectionTitle>
         {actions}
       </div>
       {children}
-    </section>
+    </Card>
   );
 }
 

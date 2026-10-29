@@ -4,7 +4,7 @@
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { useT } from "@/i18n/I18nProvider";
 
 export function CopyButton({
@@ -30,7 +30,7 @@ export function CopyButton({
   };
   return (
     <Button
-      variant={iconOnly ? "ghost" : "outline"}
+      variant={iconOnly ? "ghost" : "secondary"}
       size={iconOnly ? "icon" : "sm"}
       onClick={() => void copy()}
       disabled={!value}

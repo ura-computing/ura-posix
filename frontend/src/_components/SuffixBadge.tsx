@@ -1,4 +1,6 @@
+import { Badge } from "@/_components/atoms/Badge";
 import type { SuffixColor } from "@/types";
+import { cn } from "@/utils/cn";
 
 const TINT: Record<SuffixColor, { bg: string; fg: string; border: string }> = {
   teal: {
@@ -52,10 +54,6 @@ export function SuffixBadge({ text, color }: { text: string | null; color: Suffi
   if (!text) return null;
   const t = color ? TINT[color] : NEUTRAL;
   return (
-    <span
-      className={`ml-1 inline-flex items-center rounded-md border px-1.5 py-px font-mono text-[10px] font-semibold ${t.bg} ${t.fg} ${t.border}`}
-    >
-      {text}
-    </span>
+    <Badge className={cn("ml-1 px-1.5 py-px font-mono text-[10px] font-semibold", t.bg, t.fg, t.border)}>{text}</Badge>
   );
 }

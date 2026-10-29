@@ -4,7 +4,7 @@
 import { useState, type ReactNode } from "react";
 import { Info, ScanBarcode } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import type { ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 

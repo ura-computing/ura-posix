@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
 import { TextField } from "@/_components/TextField";
 import { ROUTES } from "@/types";
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
           />
 
           <div className="flex flex-col gap-4">
-            <AsyncButton
+            <Button
               type="submit"
               variant="primary"
               className="w-full"
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
               loadingText={t("auth.sending")}
             >
               {t("auth.sendLink")}
-            </AsyncButton>
+            </Button>
             <div className="flex justify-center">
               <BackToLogin />
             </div>

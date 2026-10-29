@@ -1,12 +1,13 @@
 /** Create + edit pharmacy basic info (Screen 4). No special states — just a
  *  form. Field set: name (required), code, city, address, phone, email. */
 import { useState } from "react";
-import { Building2, Info, Loader2, X } from "lucide-react";
+import { Building2, Info, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { FormField, FormInput } from "@/_components/FormField";
 import { Dialog, DialogContent } from "@/_components/dialog";
+import { Spinner } from "@/_components/atoms/Spinner";
 import type { PharmacyIn } from "@/types";
 
 const EMPTY: PharmacyIn = {
@@ -127,13 +128,13 @@ function PharmacyFormBody({ open, onClose, initialValues, pharmacyName, isSaving
           )}
 
           <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-            <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton type="submit" variant="primary" disabled={isSaving}>
-              {isSaving && <Loader2 className="size-3.5 animate-spin" />}
+            </Button>
+            <Button type="submit" variant="primary" disabled={isSaving}>
+              {isSaving && <Spinner size="sm" />}
               {isCreate ? t("adminPharm.createPharmacy") : t("common.save")}
-            </AsyncButton>
+            </Button>
           </div>
         </form>
       </DialogContent>

@@ -33,12 +33,15 @@ import { cn } from "@/utils/cn";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { formatMAD, formatPct } from "@/utils/format";
 import { Dialog, DialogContent } from "@/_components/dialog";
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { FormField } from "@/_components/FormField";
 import { PAYMENT_METHODS } from "@/types";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
 import { TypeBadge } from "@/_components/TypeBadge";
 import { Page } from "@/_components/Page";
+import { Input } from "@/_components/atoms/Input";
+import { Checkbox } from "@/_components/Checkbox";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 /** Month-picker matching the app's design system (same trigger shell as
  *  SingleSelectPopover, same panel positioning). Returns a "YYYY-MM" string.
@@ -367,7 +370,7 @@ function PaymentEditBody({ open, onClose, method, month, entry }: PaymentEditDia
 
         <div className="flex items-center justify-between border-t border-border px-5 py-3">
           {entry ? (
-            <AsyncButton
+            <Button
               variant="ghost"
               onClick={handleDelete}
               isLoading={isDeleting}
@@ -375,13 +378,13 @@ function PaymentEditBody({ open, onClose, method, month, entry }: PaymentEditDia
             >
               <Trash2 className="size-4" />
               Supprimer
-            </AsyncButton>
+            </Button>
           ) : (
             <span />
           )}
-          <AsyncButton variant="primary" onClick={handleSave} isLoading={isSaving}>
+          <Button variant="primary" onClick={handleSave} isLoading={isSaving}>
             Enregistrer
-          </AsyncButton>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -398,14 +401,14 @@ function NumberInput({
   integer?: boolean;
 }) {
   return (
-    <input
+    <Input
       type="number"
       inputMode={integer ? "numeric" : "decimal"}
       step={integer ? "1" : "0.01"}
       min="0"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm font-mono tabular-nums focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
+      onValueChange={onChange}
+      className="font-mono tabular-nums"
     />
   );
 }
@@ -482,9 +485,7 @@ function MethodCard({
         <div className={`flex size-9 items-center justify-center rounded-xl ${tint.bg} ${tint.fg}`}>
           {METHOD_ICON[method]}
         </div>
-        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {t(METHOD_KEY[method])}
-        </span>
+        <SectionTitle as="span">{t(METHOD_KEY[method])}</SectionTitle>
       </div>
 
       {entry ? (
@@ -698,11 +699,9 @@ export default function ComptabilitePage() {
 
       {/* Non-declared toggle — secondary control, lives outside the FilterBar */}
       <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={filters.include_non_declared}
-          onChange={(e) => setFilters({ ...filters, include_non_declared: e.target.checked })}
-          className="cursor-pointer accent-primary"
+          onChange={(on) => setFilters({ ...filters, include_non_declared: on })}
         />
         {t("comptabilite.includeSpecial")}
       </label>
@@ -721,9 +720,7 @@ export default function ComptabilitePage() {
       {/* Payment method cards (4) for the active month */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("comptabilite.paymentMethods")}
-          </h2>
+          <SectionTitle>{t("comptabilite.paymentMethods")}</SectionTitle>
           <MonthPopover label="" value={activeMonth} onChange={setActiveMonth} align="end" />
         </div>
         <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
@@ -731,9 +728,7 @@ export default function ComptabilitePage() {
 
       {/* Ventes ledger */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("comptabilite.salesJournal")}
-        </h2>
+        <SectionTitle>{t("comptabilite.salesJournal")}</SectionTitle>
         <VentesLedger
           rows={ventes}
           isLoading={ventesLoading}

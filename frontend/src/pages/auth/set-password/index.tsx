@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Link, useSearchParams } from "react-router-dom";
 import { TriangleAlert } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
 import { PasswordField } from "@/_components/PasswordField";
 import { ROUTES } from "@/types";
@@ -117,7 +117,7 @@ export default function SetPasswordPage() {
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}
           />
-          <AsyncButton
+          <Button
             type="submit"
             variant="primary"
             className="w-full"
@@ -125,7 +125,7 @@ export default function SetPasswordPage() {
             loadingText={isSetup ? t("auth.activating") : t("auth.resetting")}
           >
             {isSetup ? t("auth.activateAccount") : t("auth.resetButton")}
-          </AsyncButton>
+          </Button>
         </form>
       </div>
     </AuthLayout>

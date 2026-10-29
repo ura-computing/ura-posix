@@ -4,10 +4,12 @@
  *  « Annuler » in the message) and « 2. … exclus » (its list: « Réintégrer », « Ajouter une note »).
  *  Nothing is deleted. */
 import { useState } from "react";
-import { Building2, FileText, ListChecks, Package, Search } from "lucide-react";
+import { Building2, FileText, ListChecks, Package } from "lucide-react";
 
 import { Page } from "@/_components/Page";
 import { TabBar } from "@/_components/TabBar";
+import { Card } from "@/_components/atoms/Card";
+import { SearchInput } from "@/_components/atoms/Input";
 import { useT } from "@/i18n/I18nProvider";
 
 import { ExcludedList } from "./_components/ExcludedList";
@@ -24,31 +26,23 @@ function KindTab({ kind }: { kind: ExclusionKind }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <Card className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-foreground">{t(`ps.find.${kind}`)}</h2>
           <p className="text-sm text-muted-foreground">{t(`ps.hint.${kind}`)}</p>
         </div>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <input
-            type="search"
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t(`ps.placeholder.${kind}`)}
-            aria-label={t(`ps.find.${kind}`)}
-            className="h-12 w-full rounded-xl border border-input bg-surface-subtle pl-12 pr-4 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          />
-        </div>
+        <SearchInput
+          autoFocus
+          value={q}
+          onValueChange={setQ}
+          placeholder={t(`ps.placeholder.${kind}`)}
+          aria-label={t(`ps.find.${kind}`)}
+        />
         {ready && kind === "product" && <ProductResults {...common} products={foundProducts} />}
         {ready && kind === "bl" && <BlResults {...common} bls={foundBls} />}
         {ready && kind === "line" && <LineResults {...common} products={foundProducts} onReintegrate={reintegrate} />}
         {ready && kind === "supplier" && <SupplierResults {...common} suppliers={foundSuppliers} />}
-      </section>
+      </Card>
 
       <ExcludedList
         kind={kind}

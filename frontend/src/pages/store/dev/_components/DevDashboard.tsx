@@ -2,7 +2,7 @@ import { ArrowRight, Briefcase, Clock, Download, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { KpiTile } from "@/_components/KpiTile";
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { REQUEST_STATE_LABEL, URGENCY_LABEL, type DevKpis, type DevRequest, type Urgency } from "@/types/storeWebsite";
 
 import { formatRelative } from "../../store-website/_format";
@@ -81,7 +81,7 @@ export function DevDashboard({
       <Section title="Mes demandes en cours" empty="Vous n'avez aucune demande en cours.">
         {mine.map((r) => (
           <ActionableRow key={r.id} r={r} onOpen={onOpen}>
-            <Button size="sm" variant="outline" onClick={() => onOpenEditor(r.id)}>
+            <Button size="sm" variant="secondary" onClick={() => onOpenEditor(r.id)}>
               Ouvrir l'éditeur
               <ArrowRight className="size-3.5" />
             </Button>

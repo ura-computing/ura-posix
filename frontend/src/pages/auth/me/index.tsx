@@ -10,15 +10,17 @@ import { cn } from "@/utils/cn";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { PasswordField } from "@/_components/PasswordField";
 import { useChangePassword, useUpdateProfile, useKillSession, useRevokeOtherSessions, useSessions } from "./hooks";
-import { Lock, Loader2, Monitor } from "lucide-react";
+import { Lock, Monitor } from "lucide-react";
 import { TextField } from "@/_components/TextField";
 import type { Me, Session } from "@/types";
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
 import { useLogout } from "@/hooks/useLogout";
 import { Page } from "@/_components/Page";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 const COUNTRIES: { code: CountryCode; label: string }[] = [
   { code: "MA", label: "Maroc" },
@@ -133,7 +135,7 @@ function PasswordTab() {
 
   return (
     <form className="flex max-w-[480px] flex-col gap-5" onSubmit={handlePasswordSubmit} noValidate>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("me.changePassword")}</h2>
+      <SectionTitle>{t("me.changePassword")}</SectionTitle>
 
       <PasswordField
         label={t("me.currentPassword")}
@@ -158,9 +160,9 @@ function PasswordTab() {
       />
 
       <div className="flex justify-end">
-        <AsyncButton type="submit" variant="primary" isLoading={isPending} loadingText={t("me.changing")}>
+        <Button type="submit" variant="primary" isLoading={isPending} loadingText={t("me.changing")}>
           {t("me.change")}
-        </AsyncButton>
+        </Button>
       </div>
     </form>
   );
@@ -191,7 +193,7 @@ function ProfileTab({ me }: { me: Me }) {
 
   return (
     <form className="flex max-w-[480px] flex-col gap-5" onSubmit={handleProfileSubmit} noValidate>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("me.profil")}</h2>
+      <SectionTitle>{t("me.profil")}</SectionTitle>
 
       <TextField
         label={t("me.email")}
@@ -218,9 +220,9 @@ function ProfileTab({ me }: { me: Me }) {
       />
 
       <div className="flex justify-end">
-        <AsyncButton type="submit" variant="primary" isLoading={isPending} loadingText={t("me.saving")}>
+        <Button type="submit" variant="primary" isLoading={isPending} loadingText={t("me.saving")}>
           {t("me.save")}
-        </AsyncButton>
+        </Button>
       </div>
     </form>
   );
@@ -248,13 +250,13 @@ function SessionsTab({ me }: { me: Me }) {
   return (
     <div className="flex max-w-[640px] flex-col gap-5">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t("me.mySessions")}</h2>
+        <SectionTitle>{t("me.mySessions")}</SectionTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t("me.sessionsDesc")}</p>
       </div>
 
       {isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> {t("me.loading")}
+          <Spinner /> {t("me.loading")}
         </div>
       )}
 
@@ -284,14 +286,14 @@ function SessionsTab({ me }: { me: Me }) {
 
       {otherCount > 0 && (
         <div className="mt-2 flex justify-end">
-          <AsyncButton
-            variant="destructive"
+          <Button
+            variant="danger"
             isLoading={isRevoking}
             loadingText={t("me.revokeLoading")}
             onClick={() => setConfirmRevokeOpen(true)}
           >
             {t("me.logoutAll", { n: otherCount })}
-          </AsyncButton>
+          </Button>
         </div>
       )}
 
@@ -344,14 +346,14 @@ function SessionRow({
           </span>
         </div>
       </div>
-      <AsyncButton
-        variant={s.is_current ? "secondary" : "destructive"}
+      <Button
+        variant={s.is_current ? "secondary" : "danger"}
         isLoading={isWorking}
         loadingText="…"
         onClick={() => (s.is_current ? onLogoutCurrent() : onKillOther(s.id))}
       >
         {s.is_current ? t("me.logoutSelf") : t("me.logout")}
-      </AsyncButton>
+      </Button>
     </li>
   );
 }

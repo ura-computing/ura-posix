@@ -71,6 +71,8 @@ import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Page } from "@/_components/Page";
+import { Card } from "@/_components/atoms/Card";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 /** Section 2f — dual-bar trend chart. Ventes (info-blue) + Achats (muted) per
  *  month. Pure CSS bars — no chart lib dep. Reused styling vocabulary
@@ -81,7 +83,7 @@ function AdminMonthlyTrendChart({ data, subtitle }: { data: MonthlyTrendPoint[];
   const max = Math.max(1, ...data.flatMap((d) => [d.ventes, d.achats]));
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <Card as="div" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-semibold text-foreground">{t("rapportAdmin.evolutionMensuelle")}</span>
@@ -110,7 +112,7 @@ function AdminMonthlyTrendChart({ data, subtitle }: { data: MonthlyTrendPoint[];
           ))
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -490,7 +492,11 @@ function AdminPharmacyBody({
       {/* 2d — Marge */}
       <section className="flex flex-col gap-3.5">
         <h2 className="text-base font-bold tracking-tight text-foreground">{t("rapportAdmin.marge")}</h2>
-        <div className="grid grid-cols-1 divide-y divide-border rounded-2xl border border-border bg-card shadow-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <Card
+          as="div"
+          padding="none"
+          className="grid grid-cols-1 divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0"
+        >
           <MargeCell
             label={t("col.margePct")}
             value={formatPct(stats.marge.marge_pct)}
@@ -507,7 +513,7 @@ function AdminPharmacyBody({
             sub={t("rapportAdmin.apresCharges")}
             emphasis
           />
-        </div>
+        </Card>
       </section>
 
       {/* Alertes marges — same cards as the owner's Rapport, without links */}
@@ -533,7 +539,7 @@ function AdminPharmacyBody({
       <AdminMonthlyTrendChart data={stats.monthly_trend} subtitle={subtitleDates} />
 
       {/* 2g — Top catégories */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <Card as="div" className="flex flex-col gap-4">
         <span className="text-sm font-semibold text-foreground">{t("rapportAdmin.topCategories")}</span>
         {stats.top_categories.length === 0 ? (
           <span className="text-xs text-muted-foreground">{t("rapportAdmin.aucuneDonneeCategorie")}</span>
@@ -562,7 +568,7 @@ function AdminPharmacyBody({
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -644,9 +650,7 @@ function AnalyseMargePreview({
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {t("preview.sectionTitle")}
-      </h2>
+      <SectionTitle>{t("preview.sectionTitle")}</SectionTitle>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile label={t("kpi.ca")} value={formatMAD(ca)} icon={<Coins className="size-5" />} tint={tint} />
@@ -1814,9 +1818,7 @@ function AdminView() {
     <Page title={t("dashboard.title")} subtitle={t("dashboard.subtitleAdmin")}>
       {/* Vue système — always shown */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("rapportAdmin.vueSysteme")}
-        </h2>
+        <SectionTitle size="sm">{t("rapportAdmin.vueSysteme")}</SectionTitle>
         {ls || !systemStats ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
@@ -1830,9 +1832,7 @@ function AdminView() {
 
       {/* Per-pharmacy drill-down */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("rapportAdmin.parPharmacie")}
-        </h2>
+        <SectionTitle size="sm">{t("rapportAdmin.parPharmacie")}</SectionTitle>
         {/* Admin pharmacy picker — uses the shared SingleSelectPopover so the
             trigger + panel match every other dropdown in the app (Catégorie,
             Type, Statut, page-size, etc.). */}
@@ -1966,9 +1966,7 @@ function RapportSections({ stats, filters, alerts, stock, category }: SectionsPr
       {/* Section 5 — Alertes marges (feature: alertes) */}
       {has("alertes") && alerts && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("rapportAdmin.alertesMarges")}
-          </h2>
+          <SectionTitle size="sm">{t("rapportAdmin.alertesMarges")}</SectionTitle>
           <MarginAlertCards data={alerts} tint={category} />
         </section>
       )}
@@ -1976,9 +1974,7 @@ function RapportSections({ stats, filters, alerts, stock, category }: SectionsPr
       {/* Section 6 — Déclaration TVA (feature: accounting) */}
       {has("accounting") && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("rapportAdmin.declarationTva")}
-          </h2>
+          <SectionTitle size="sm">{t("rapportAdmin.declarationTva")}</SectionTitle>
           <TvaTiles tva={stats.tva} tint={category} />
         </section>
       )}
@@ -1989,7 +1985,7 @@ function RapportSections({ stats, filters, alerts, stock, category }: SectionsPr
       {/* Section 8 — Stock summary (feature: stock) */}
       {has("stock") && stock && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("col.stock")}</h2>
+          <SectionTitle size="sm">{t("col.stock")}</SectionTitle>
           <StockSummaryTiles stock={stock} tint={category} />
         </section>
       )}

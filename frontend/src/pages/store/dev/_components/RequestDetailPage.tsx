@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, ExternalLink, Phone, Store } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { REQUEST_STATE_LABEL, URGENCY_LABEL, type RequestBrief, type RequestState } from "@/types/storeWebsite";
 
 import { formatMAD } from "../../store-website/_format";
@@ -145,17 +145,17 @@ function ActionColumn(props: RequestDetailPageProps) {
               </Button>
             )}
             {s === "prise_en_charge" && (
-              <Button variant="outline" className="w-full" onClick={() => props.onMarkInProgress(brief.id)}>
+              <Button variant="secondary" className="w-full" onClick={() => props.onMarkInProgress(brief.id)}>
                 Marquer en cours
               </Button>
             )}
             {s === "en_cours" && (
-              <Button variant="outline" className="w-full" onClick={() => props.onMarkDelivered(brief.id)}>
+              <Button variant="secondary" className="w-full" onClick={() => props.onMarkDelivered(brief.id)}>
                 Marquer comme livrée
               </Button>
             )}
             {s === "livree" && (
-              <Button variant="outline" className="w-full" onClick={() => props.onClose(brief.id)}>
+              <Button variant="secondary" className="w-full" onClick={() => props.onClose(brief.id)}>
                 Clôturer
               </Button>
             )}

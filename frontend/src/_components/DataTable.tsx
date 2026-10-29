@@ -9,7 +9,7 @@
 import { useRef, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { AsyncButton } from "./AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { Skeleton } from "./Skeleton";
 import { SingleSelectPopover } from "./SingleSelectPopover";
 import { useT } from "@/i18n/I18nProvider";
@@ -295,7 +295,7 @@ function PaginationFooter({
         {formatQty(total)} {t("common.results")}
       </span>
       <div className="flex items-center gap-2">
-        <AsyncButton
+        <Button
           variant="ghost"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
@@ -304,11 +304,11 @@ function PaginationFooter({
         >
           <ChevronLeft className="size-4" />
           <span className="ml-1">{t("common.previous")}</span>
-        </AsyncButton>
+        </Button>
         <span className="text-muted-foreground">
           {t("common.page")} {page} / {pageCount}
         </span>
-        <AsyncButton
+        <Button
           variant="ghost"
           disabled={page >= pageCount}
           onClick={() => onPage(page + 1)}
@@ -317,7 +317,7 @@ function PaginationFooter({
         >
           <span className="mr-1">{t("common.next")}</span>
           <ChevronRight className="size-4" />
-        </AsyncButton>
+        </Button>
         <SingleSelectPopover
           label=""
           options={pageSizeOptions}

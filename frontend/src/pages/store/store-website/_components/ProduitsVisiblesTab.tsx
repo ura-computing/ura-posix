@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Search, Eye, EyeOff } from "lucide-react";
 
 import { SingleSelectPopover, type SingleSelectOption } from "@/_components/SingleSelectPopover";
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { Switch } from "./switch";
 import { soldeLockFor, type RequestState, type StoreCategory, type VisibleProduct } from "@/types/storeWebsite";
 import { cn } from "@/utils/cn";
@@ -81,11 +81,11 @@ export function ProduitsVisiblesTab(props: ProduitsVisiblesTabProps) {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => props.onBulkVisibility(true)}>
+            <Button variant="secondary" size="sm" onClick={() => props.onBulkVisibility(true)}>
               <Eye className="size-3.5" />
               Tout afficher
             </Button>
-            <Button variant="outline" size="sm" onClick={() => props.onBulkVisibility(false)}>
+            <Button variant="secondary" size="sm" onClick={() => props.onBulkVisibility(false)}>
               <EyeOff className="size-3.5" />
               Tout cacher
             </Button>

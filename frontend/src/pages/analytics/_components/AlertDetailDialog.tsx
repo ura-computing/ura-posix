@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
 import { Dialog, DialogContent } from "@/_components/dialog";
+import { Button } from "@/_components/atoms/Button";
 import { cn } from "@/utils/cn";
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import { downloadXlsx, exportFilename } from "@/utils/table";
@@ -371,21 +372,12 @@ function AlertDetailBody({
 
         {/* footer */}
         <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={sorted.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold text-secondary-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-          >
+          <Button variant="outline" onClick={handleExport} disabled={sorted.length === 0}>
             <Download className="size-4" /> {t("common.export")}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md bg-secondary px-4 py-2 text-[13px] font-semibold text-secondary-foreground hover:bg-muted cursor-pointer"
-          >
+          </Button>
+          <Button variant="secondary" onClick={onClose}>
             {t("common.close")}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

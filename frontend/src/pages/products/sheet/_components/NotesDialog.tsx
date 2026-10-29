@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Check, StickyNote, Trash2, X } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import type { ProductNote } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
@@ -46,19 +46,19 @@ function NoteItem({
         {note.can_delete &&
           (confirming ? (
             <span className="flex items-center gap-2">
-              <AsyncButton variant="secondary" onClick={() => setConfirming(false)} disabled={isDeleting}>
+              <Button variant="secondary" onClick={() => setConfirming(false)} disabled={isDeleting}>
                 {t("common.cancel")}
-              </AsyncButton>
-              <AsyncButton variant="destructive" onClick={() => onDelete(note.id)} isLoading={isDeleting}>
+              </Button>
+              <Button variant="danger" onClick={() => onDelete(note.id)} isLoading={isDeleting}>
                 <Trash2 className="size-4" />
                 {t("products.noteDeleteConfirm")}
-              </AsyncButton>
+              </Button>
             </span>
           ) : (
-            <AsyncButton variant="ghost" onClick={() => setConfirming(true)}>
+            <Button variant="ghost" onClick={() => setConfirming(true)}>
               <Trash2 className="size-4" />
               {t("products.noteDelete")}
-            </AsyncButton>
+            </Button>
           ))}
       </div>
     </li>
@@ -121,22 +121,22 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{t("products.noteChars", { n: text.length })}</span>
-          <AsyncButton variant="secondary" onClick={save} disabled={!text.trim()} isLoading={isAdding}>
+          <Button variant="secondary" onClick={save} disabled={!text.trim()} isLoading={isAdding}>
             {t("products.noteSave")}
-          </AsyncButton>
+          </Button>
         </div>
       </div>
 
       <div className="flex justify-end border-t border-border bg-surface-subtle px-5 py-3.5">
         {notes.length > 0 ? (
-          <AsyncButton variant="primary" onClick={onClose}>
+          <Button variant="primary" onClick={onClose}>
             <Check className="size-4" />
             {t("products.notesRead")}
-          </AsyncButton>
+          </Button>
         ) : (
-          <AsyncButton variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t("common.close")}
-          </AsyncButton>
+          </Button>
         )}
       </div>
     </DialogContent>

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Pencil, Undo2 } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
+import { Input } from "@/_components/atoms/Input";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD } from "@/utils/format";
@@ -34,10 +35,10 @@ function NoteCell({
       if (text.trim() !== (row.notes ?? "")) void onSave(row.target, text.trim());
     };
     return (
-      <input
+      <Input
         autoFocus
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onValueChange={setText}
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
@@ -49,18 +50,18 @@ function NoteCell({
         aria-label={t("ps.note")}
         placeholder={t("ps.notePlaceholder")}
         maxLength={500}
-        className="w-full rounded-md border border-input bg-surface-subtle px-2 py-1.5 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       />
     );
   }
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       onClick={() => {
         setText(row.notes ?? "");
         setEditing(true);
       }}
-      className="inline-flex max-w-full cursor-pointer items-center gap-1.5 text-left text-sm hover:text-primary"
+      className="max-w-full justify-start px-1.5 text-sm font-normal"
     >
       {row.notes ? (
         <span className="truncate text-foreground" title={row.notes}>
@@ -72,7 +73,7 @@ function NoteCell({
           {t("ps.addNote")}
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -146,14 +147,9 @@ export function ExcludedList({
       sortable: false,
       align: "right",
       render: (r) => (
-        <AsyncButton
-          variant="secondary"
-          type="button"
-          disabled={isReintegrating}
-          onClick={() => onReintegrate(r.target)}
-        >
+        <Button variant="secondary" type="button" disabled={isReintegrating} onClick={() => onReintegrate(r.target)}>
           <Undo2 className="size-4" /> {t("ps.reintegrer")}
-        </AsyncButton>
+        </Button>
       ),
     },
   ];

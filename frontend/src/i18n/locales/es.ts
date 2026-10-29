@@ -101,6 +101,7 @@ export const es: Dict = {
     pagePrev: "Página anterior",
     pageNext: "Página siguiente",
     removeFilter: "Eliminar el filtro",
+    clearSearch: "Borrar la búsqueda",
     noOption: "Ninguna opción",
     filters: "Filtros",
     pharmacy: "Farmacia",

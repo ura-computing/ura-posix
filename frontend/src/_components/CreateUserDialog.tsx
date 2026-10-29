@@ -14,10 +14,11 @@
  *  resets so admin + owner get one consistent credentials flow.
  */
 import { useState } from "react";
-import { CheckCircle2, Copy, KeyRound, Loader2, Mail, UserPlus, X } from "lucide-react";
+import { CheckCircle2, Copy, KeyRound, Mail, UserPlus, X } from "lucide-react";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { AsyncButton } from "./AsyncButton";
+import { Button } from "@/_components/atoms/Button";
+import { Spinner } from "@/_components/atoms/Spinner";
 import { FormField, FormInput } from "./FormField";
 import { PasswordField } from "./PasswordField";
 import { SingleSelectPopover } from "./SingleSelectPopover";
@@ -189,13 +190,13 @@ export function CreateUserDialog({
             </FormField>
 
             <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-              <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
+              <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
                 {t("common.cancel")}
-              </AsyncButton>
-              <AsyncButton type="submit" variant="primary" disabled={isSaving}>
-                {isSaving && <Loader2 className="size-3.5 animate-spin" />}
+              </Button>
+              <Button type="submit" variant="primary" disabled={isSaving}>
+                {isSaving && <Spinner size="sm" />}
                 {t("adminPharm.createAccount")}
-              </AsyncButton>
+              </Button>
             </div>
           </form>
         )}
@@ -278,13 +279,13 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
               autoFocus
             />
             <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-              <AsyncButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
+              <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
                 {t("common.cancel")}
-              </AsyncButton>
-              <AsyncButton type="submit" variant="primary" disabled={saving}>
-                {saving && <Loader2 className="size-3.5 animate-spin" />}
+              </Button>
+              <Button type="submit" variant="primary" disabled={saving}>
+                {saving && <Spinner size="sm" />}
                 {t("common.save")}
-              </AsyncButton>
+              </Button>
             </div>
           </form>
         )}
@@ -376,10 +377,10 @@ function CredentialsReveal({
           <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
             {tempPassword}
           </code>
-          <AsyncButton variant="secondary" onClick={copyPassword}>
+          <Button variant="secondary" onClick={copyPassword}>
             {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
             {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
-          </AsyncButton>
+          </Button>
         </div>
       </FormField>
 
@@ -395,9 +396,9 @@ function CredentialsReveal({
           <Mail className="size-4" />
           {t("adminPharm.sendByGmail")}
         </a>
-        <AsyncButton variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           {t("common.close")}
-        </AsyncButton>
+        </Button>
       </div>
     </div>
   );

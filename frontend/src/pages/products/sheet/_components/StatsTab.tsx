@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { CategorySegment } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
@@ -124,7 +124,7 @@ const LAST_PRICES_SHOWN = 5;
 function SeeAllButton({ n, onClick }: { n: number; onClick: () => void }) {
   const t = useT();
   return (
-    <Button variant="outline" size="sm" onClick={onClick} disabled={n === 0}>
+    <Button variant="secondary" size="sm" onClick={onClick} disabled={n === 0}>
       {t("products.seeAllN", { n })}
       <ArrowRight className="size-3.5" />
     </Button>

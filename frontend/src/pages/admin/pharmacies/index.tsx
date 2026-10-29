@@ -11,7 +11,7 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { useMemo, useState } from "react";
 import { ArrowRight, Plus, RefreshCw, UserPlus, Building2 } from "lucide-react";
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { useAdminPharmaciesList } from "@/hooks/sharedQueries";
 import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
@@ -112,17 +112,17 @@ function PharmaciesTab() {
       align: "right",
       sortable: false,
       render: (p) => (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={(e) => {
             e.stopPropagation();
             nav(`/admin/pharmacies/${p.id}`);
           }}
-          className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
         >
           {t("adminPharm.open")}
           <ArrowRight className="size-3.5" />
-        </button>
+        </Button>
       ),
     },
   ];
@@ -156,10 +156,10 @@ function PharmaciesTab() {
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("adminPharm.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={reload}>
+          <Button variant="secondary" onClick={reload}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
-          </AsyncButton>
+          </Button>
         </div>
       ) : (
         <DataTable
@@ -372,14 +372,10 @@ function UsersTab() {
         ) : (
           <div className="flex items-center justify-end gap-1.5">
             {!hasActivePharmacy(u) && (
-              <button
-                type="button"
-                onClick={() => setAssignTarget(u)}
-                className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground hover:bg-surface-subtle"
-              >
+              <Button variant="outline" size="sm" onClick={() => setAssignTarget(u)}>
                 <Building2 className="size-3.5" />
                 {t("adminUsers.assign")}
-              </button>
+              </Button>
             )}
             <MemberKebab
               member={toMember(u)}
@@ -418,10 +414,10 @@ function UsersTab() {
       {usersError ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
           <span className="text-sm font-medium">{t("adminUsers.loadError")}</span>
-          <AsyncButton variant="secondary" onClick={reloadUsers}>
+          <Button variant="secondary" onClick={reloadUsers}>
             <RefreshCw className="size-3.5" />
             {t("common.retry")}
-          </AsyncButton>
+          </Button>
         </div>
       ) : (
         <DataTable
@@ -518,12 +514,12 @@ function AssignPharmacyDialog({
             onChange={setPharmacyId}
           />
           <div className="flex justify-end gap-2 border-t border-border pt-3">
-            <AsyncButton variant="secondary" onClick={onClose} disabled={isAssigning}>
+            <Button variant="secondary" onClick={onClose} disabled={isAssigning}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton variant="primary" onClick={() => void submit()} isLoading={isAssigning} disabled={!pharmacyId}>
+            </Button>
+            <Button variant="primary" onClick={() => void submit()} isLoading={isAssigning} disabled={!pharmacyId}>
               {t("adminUsers.assignBtn")}
-            </AsyncButton>
+            </Button>
           </div>
         </div>
       </DialogContent>

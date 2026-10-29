@@ -1,3 +1,4 @@
+import { Badge } from "@/_components/atoms/Badge";
 import { useT } from "@/i18n/I18nProvider";
 import type { ProductType } from "@/types";
 
@@ -8,16 +9,8 @@ export function TypeBadge({ type, size = "sm" }: { type: ProductType | null; siz
   if (!type) return <span className="text-muted-foreground">—</span>;
   const isPharma = type === "pharmacie";
   return (
-    <span
-      className={`inline-flex items-center rounded-md border font-medium ${
-        size === "md" ? "px-2.5 py-1 text-sm" : "px-1.5 py-0.5 text-[11px]"
-      } ${
-        isPharma
-          ? "bg-pharmacie-bg text-pharmacie-fg border-pharmacie-border"
-          : "bg-parapharmacie-bg text-parapharmacie-fg border-parapharmacie-border"
-      }`}
-    >
+    <Badge tone={isPharma ? "pharmacie" : "parapharmacie"} size={size}>
       {isPharma ? t("category.pharmacie") : t("category.parapharmacie")}
-    </span>
+    </Badge>
   );
 }

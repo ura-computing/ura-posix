@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { TriangleAlert, Info } from "lucide-react";
 
-import { AsyncButton } from "./AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { cn } from "@/utils/cn";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -92,17 +92,17 @@ export function ConfirmDialog({
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <AsyncButton variant="ghost" onClick={onClose} disabled={isLoading}>
+              <Button variant="ghost" onClick={onClose} disabled={isLoading}>
                 {cancelLabel ?? t("common.cancel")}
-              </AsyncButton>
-              <AsyncButton
-                variant={destructive ? "destructive" : "primary"}
+              </Button>
+              <Button
+                variant={destructive ? "danger" : "primary"}
                 onClick={onConfirm}
                 isLoading={isLoading}
                 loadingText={loadingLabel ?? t("shared.processing")}
               >
                 {confirmLabel ?? t("common.confirm")}
-              </AsyncButton>
+              </Button>
             </div>
           </motion.div>
         </div>

@@ -10,7 +10,7 @@ import { formatMAD, formatNumStr, formatPct } from "@/utils/format";
 import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types";
 
 import { useCatalogPage } from "./hooks";
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { TextField } from "@/_components/TextField";
 import { TypeBadge } from "@/_components/TypeBadge";
@@ -105,10 +105,10 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
           )}
 
           <footer className="mt-1 flex justify-end gap-2 border-t border-border pt-3">
-            <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
+            <Button variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
               {lastResult ? t("common.close") : t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton
+            </Button>
+            <Button
               type="button"
               variant="primary"
               disabled={!file}
@@ -117,7 +117,7 @@ function ImportCsvDialog({ open, onClose, onSubmit, isLoading, lastResult }: Imp
               onClick={() => file && onSubmit(file)}
             >
               {t("common.import")}
-            </AsyncButton>
+            </Button>
           </footer>
         </div>
       </DialogContent>
@@ -335,17 +335,17 @@ function MedicamentFormBody({ open, onClose, initial, onSubmit, isLoading }: Med
           )}
 
           <footer className="mt-2 flex justify-end gap-2 border-t border-border pt-3">
-            <AsyncButton variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
+            <Button variant="ghost" type="button" onClick={onClose} disabled={isLoading}>
               {t("common.cancel")}
-            </AsyncButton>
-            <AsyncButton
+            </Button>
+            <Button
               type="submit"
               variant="primary"
               isLoading={isLoading}
               loadingText={initial ? t("catalogue.editing") : t("catalogue.adding")}
             >
               {initial ? t("common.save") : t("common.add")}
-            </AsyncButton>
+            </Button>
           </footer>
         </form>
 
@@ -508,22 +508,24 @@ export default function CataloguePage() {
       sortable: false,
       render: (m) => (
         <div className="flex justify-end gap-1">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
             aria-label={t("common.edit")}
             onClick={() => setEditing(m)}
-            className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-surface-subtle hover:text-foreground"
           >
             <Pencil className="size-3.5" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:bg-error-subtle hover:text-error"
             aria-label={t("common.delete")}
             onClick={() => setRemoving(m)}
-            className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-error-subtle hover:text-error"
           >
             <Trash2 className="size-3.5" />
-          </button>
+          </Button>
         </div>
       ),
     },

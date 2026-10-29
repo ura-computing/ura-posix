@@ -38,6 +38,7 @@ import type {
 } from "@/types";
 import type { DialogDescriptor } from "../hooks";
 import { Page } from "@/_components/Page";
+import { Button } from "@/_components/atoms/Button";
 
 // src/pages/alertes/_components/GlobalSummaryStrip.tsx
 
@@ -572,13 +573,9 @@ export default function AlertesPage() {
             <AlertCircle className="size-4" />
             {t("alertes.loadError")}
           </span>
-          <button
-            type="button"
-            onClick={refetchAll}
-            className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
-          >
+          <Button variant="danger-outline" size="sm" onClick={refetchAll}>
             {t("common.retry")}
-          </button>
+          </Button>
         </div>
       ) : isLoading ? (
         <AlertesSkeleton />

@@ -31,6 +31,8 @@ import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
 import { StockStatusPill } from "@/_components/StockStatusPill";
 import type { StockSortKey } from "./hooks";
 import { Page } from "@/_components/Page";
+import { Button } from "@/_components/atoms/Button";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 // src/pages/stock/_components/AbcdAnalysisCard.tsx
 
@@ -172,7 +174,9 @@ function AlertCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         {metrics.map((m) => (
           <div key={m.label} className="flex flex-col gap-0.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{m.label}</span>
+            <SectionTitle as="span" size="sm">
+              {m.label}
+            </SectionTitle>
             <span className="font-mono text-lg font-bold tabular-nums text-foreground">{m.value}</span>
           </div>
         ))}
@@ -478,13 +482,9 @@ function StockTable({
           onChange={onStatusChange}
           align="end"
         />
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-error/40 hover:bg-error-subtle hover:text-error"
-        >
+        <Button variant="outline" size="sm" onClick={onClose}>
           <X className="size-3" /> {t("common.close")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -621,13 +621,9 @@ export default function StockPage() {
             <AlertCircle className="size-4" />
             {t("stock.loadError")}
           </span>
-          <button
-            type="button"
-            onClick={reload}
-            className="rounded-md border border-error/40 bg-card px-3 py-1.5 text-[13px] font-semibold text-error"
-          >
+          <Button variant="danger-outline" size="sm" onClick={reload}>
             {t("common.retry")}
-          </button>
+          </Button>
         </div>
       )}
 

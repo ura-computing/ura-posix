@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Download, ScanBarcode, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { useCategoryTypeOptions } from "@/_components/CategorySegment";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/filterBar";

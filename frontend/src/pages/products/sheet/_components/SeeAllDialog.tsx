@@ -2,7 +2,7 @@
  *  title and « Fermer » stay). Mounted only while open. */
 import { X } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { Dialog, DialogContent } from "@/_components/dialog";
 import { useT } from "@/i18n/I18nProvider";
@@ -29,10 +29,10 @@ export function SeeAllDialog<R>({
           <DataTable<R> rows={rows} columns={columns} rowKey={(_, i) => i} />
         </div>
         <div className="flex justify-end border-t border-border bg-surface-subtle px-5 py-3.5">
-          <AsyncButton variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             <X className="size-4" />
             {t("common.close")}
-          </AsyncButton>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

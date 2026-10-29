@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Upload, X } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { Input } from "./input";
 import { Label } from "./label";
 import { Textarea } from "./textarea";
@@ -163,7 +163,7 @@ export function NewRequestForm({ initialValues, isSubmitting, submitError, onSub
               </div>
             ))}
             {v.brand.palette.length < 3 && (
-              <Button type="button" variant="outline" size="sm" onClick={addColor}>
+              <Button type="button" variant="secondary" size="sm" onClick={addColor}>
                 + Couleur
               </Button>
             )}
@@ -237,7 +237,7 @@ export function NewRequestForm({ initialValues, isSubmitting, submitError, onSub
       )}
 
       <div className="flex items-center justify-end gap-2.5">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="secondary" onClick={onCancel}>
           Annuler
         </Button>
         <Button type="submit" disabled={!canSubmit}>

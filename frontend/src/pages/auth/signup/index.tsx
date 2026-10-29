@@ -8,7 +8,7 @@ import { z } from "zod";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Building2, Check, Store, UserRound, type LucideIcon } from "lucide-react";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
 import { PasswordField } from "@/_components/PasswordField";
 import { TextField } from "@/_components/TextField";
@@ -324,14 +324,14 @@ export default function SignupPage() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             {index > 0 ? (
-              <AsyncButton type="button" variant="ghost" onClick={() => setStep(STEPS[index - 1])}>
+              <Button type="button" variant="ghost" onClick={() => setStep(STEPS[index - 1])}>
                 {t("common.back")}
-              </AsyncButton>
+              </Button>
             ) : (
               <span />
             )}
             {/* Always there; on the first screen it waits for a choice. */}
-            <AsyncButton
+            <Button
               type="submit"
               variant="primary"
               className="min-w-32"
@@ -340,7 +340,7 @@ export default function SignupPage() {
               loadingText={t("signup.sending")}
             >
               {isLast ? t("signup.send") : t("common.next")}
-            </AsyncButton>
+            </Button>
           </div>
           {!kind && <p className="text-right text-xs text-muted-foreground">{t("signup.chooseFirst")}</p>}
         </div>

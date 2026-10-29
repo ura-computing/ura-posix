@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link } from "react-router-dom";
 
-import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
 import { PasswordField } from "@/_components/PasswordField";
 import { TextField } from "@/_components/TextField";
@@ -66,7 +66,7 @@ export default function LoginPage() {
           />
 
           <div className="flex flex-col gap-4">
-            <AsyncButton
+            <Button
               type="submit"
               variant="primary"
               className="w-full"
@@ -74,7 +74,7 @@ export default function LoginPage() {
               loadingText={t("misc.loggingIn")}
             >
               {t("misc.login")}
-            </AsyncButton>
+            </Button>
 
             <Link
               to={ROUTES.FORGOT_PASSWORD}

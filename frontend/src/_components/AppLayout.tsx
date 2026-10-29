@@ -29,7 +29,6 @@ import {
   CheckCircle2,
   Clock,
   FileSpreadsheet,
-  Loader2,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -49,6 +48,8 @@ import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
 import { formatQty } from "@/utils/format";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 interface NavItem {
   label: string;
@@ -589,7 +590,7 @@ function JobCard({
       >
         <div className="flex size-9 items-center justify-center rounded-xl" style={{ background: tintBg, color: tint }}>
           {job.phase === "uploading" ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Spinner />
           ) : job.phase === "success" ? (
             <CheckCircle2 className="size-4" />
           ) : job.phase === "queued" ? (
@@ -600,9 +601,9 @@ function JobCard({
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <SectionTitle as="span" size="sm">
               {t(TYPE_LABEL[job.docType])}
-            </span>
+            </SectionTitle>
             {job.phase === "uploading" && (
               <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                 {t("upload.lot", { current: job.progress.current, total: job.progress.total })}

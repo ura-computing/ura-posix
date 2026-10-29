@@ -1,8 +1,10 @@
-import { Plus, Search, UserCog } from "lucide-react";
+import { Plus, UserCog } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { KebabMenu } from "@/_components/KebabMenu";
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
+import { Card } from "@/_components/atoms/Card";
+import { SearchInput } from "@/_components/atoms/Input";
 import { type DeveloperAccount, type DeveloperStatus } from "@/types/storeWebsite";
 
 import { formatRelative } from "@/pages/store/store-website/_format";
@@ -51,20 +53,12 @@ export function DevelopersPage(props: DevelopersPageProps) {
         </Button>
       </header>
 
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-subtle px-3 py-2">
-        <Search className="size-4 text-muted-foreground" />
-        <input
-          value={search}
-          onChange={(e) => props.onSearch(e.target.value)}
-          placeholder={t("developers.searchPlaceholder")}
-          className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-        />
-      </div>
+      <SearchInput value={search} onValueChange={props.onSearch} placeholder={t("developers.searchPlaceholder")} />
 
       {isError ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-error-border bg-error-subtle px-4 py-3 text-sm font-medium text-error-subtle-foreground">
           {t("developers.loadError")}
-          <Button variant="outline" size="sm" onClick={props.onRetry}>
+          <Button variant="secondary" size="sm" onClick={props.onRetry}>
             {t("common.retry")}
           </Button>
         </div>
@@ -73,7 +67,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
       ) : developers.length === 0 ? (
         <EmptyState onInvite={props.onInvite} />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <Card as="div" padding="none">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-subtle text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -150,7 +144,7 @@ export function DevelopersPage(props: DevelopersPageProps) {
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -190,7 +184,7 @@ function EmptyState({ onInvite }: { onInvite: () => void }) {
 
 function TableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+    <Card as="div" padding="none">
       <div className="h-11 border-b border-border bg-surface-subtle" />
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 border-b border-border px-4 py-3.5 last:border-0">
@@ -199,6 +193,6 @@ function TableSkeleton() {
           <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         </div>
       ))}
-    </div>
+    </Card>
   );
 }

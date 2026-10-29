@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { ArrowRight, ShoppingCart, Truck } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
 import { KpiTile } from "@/_components/KpiTile";
 import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
@@ -220,7 +220,7 @@ export function GeneralTab({
         <SheetCard
           title={t("products.recent")}
           actions={
-            <Button variant="outline" size="sm" onClick={onShowMovements}>
+            <Button variant="secondary" size="sm" onClick={onShowMovements}>
               {t("products.seeAll")}
               <ArrowRight className="size-3.5" />
             </Button>

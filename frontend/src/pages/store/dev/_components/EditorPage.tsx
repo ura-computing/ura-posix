@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload } from "lucide-react";
 
 import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import {
   EDITOR_SECTION_LABEL,
   FONT_PAIRINGS,
@@ -117,7 +117,7 @@ function TopBar(props: EditorPageProps) {
         </Button>
 
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={handleReset}
           disabled={props.isResetting}
@@ -127,13 +127,13 @@ function TopBar(props: EditorPageProps) {
           <span className="hidden sm:inline">{props.isResetting ? "Réinitialisation…" : "Réinitialiser"}</span>
         </Button>
 
-        <Button variant="outline" size="sm" onClick={props.onOpenPreview} title="Ouvrir l'aperçu">
+        <Button variant="secondary" size="sm" onClick={props.onOpenPreview} title="Ouvrir l'aperçu">
           <ExternalLink className="size-4" />
           <span className="hidden sm:inline">Aperçu</span>
         </Button>
 
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           onClick={props.onExport}
           disabled={props.exporting}

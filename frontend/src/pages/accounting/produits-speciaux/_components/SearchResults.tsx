@@ -7,11 +7,13 @@
  *   - Fournisseurs: « Exclure » (every product bought from it)
  *  Already excluded: « déjà exclu », no button (« Réintégrer » is in the list below). */
 import { useState, type ReactNode } from "react";
-import { Building2, ChevronDown, ChevronUp, FileText, Loader2, Package } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, FileText, Package } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Badge } from "@/_components/atoms/Badge";
+import { Button } from "@/_components/atoms/Button";
 import { Checkbox } from "@/_components/Checkbox";
 import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
+import { Spinner } from "@/_components/atoms/Spinner";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import type { BlSummary, MedicamentSuggestion, SupplierSummary } from "@/types";
 import { formatDate, formatMAD, formatNumStr, formatQty } from "@/utils/format";
@@ -21,11 +23,7 @@ import { useBlDetail, useProductBlLines, type ExclusionTarget } from "../hooks";
 /** « déjà exclu » next to a found BL / supplier. */
 function AlreadyExcluded() {
   const t = useT();
-  return (
-    <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-      {t("ps.dejaExclu")}
-    </span>
-  );
+  return <Badge>{t("ps.dejaExclu")}</Badge>;
 }
 
 /** « Fournisseur » filter over the suppliers found (shown when there are 2 or more). */
@@ -73,7 +71,7 @@ function Found({
   const t = useT();
   if (count === 0) {
     return isSearching ? (
-      <Loader2 className="mx-auto size-5 animate-spin text-muted-foreground" />
+      <Spinner size="lg" className="mx-auto text-muted-foreground" />
     ) : (
       <p className="py-2 text-center text-sm text-muted-foreground">{t("ps.nothingFound", { q })}</p>
     );
@@ -122,7 +120,7 @@ function Row({
 /** « Voir ses BL » / « Contenu »: opens one line's details. */
 function OpenButton({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
   return (
-    <Button variant="outline" onClick={onClick} aria-expanded={open}>
+    <Button variant="secondary" onClick={onClick} aria-expanded={open}>
       {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
       {label}
     </Button>
@@ -181,7 +179,7 @@ export function ProductResults({
 function BlContent({ deliveryRef }: { deliveryRef: string }) {
   const t = useT();
   const { blLines, isLoadingLines, linesError } = useBlDetail(deliveryRef);
-  if (isLoadingLines) return <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" />;
+  if (isLoadingLines) return <Spinner className="mx-auto text-muted-foreground" />;
   if (linesError) return <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>;
   return (
     <div className="ml-8 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface-subtle/50">
@@ -302,7 +300,7 @@ function ProductBls({
         <SupplierFilter suppliers={suppliers} value={supplier} onChange={setSupplier} />
       </div>
       {isLoadingProductLines ? (
-        <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" />
+        <Spinner className="mx-auto text-muted-foreground" />
       ) : productLinesError ? (
         <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>
       ) : shown.length === 0 ? (

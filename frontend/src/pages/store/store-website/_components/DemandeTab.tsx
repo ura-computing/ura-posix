@@ -1,6 +1,6 @@
 import { Check, Pencil, X, Store, Phone, CheckCircle2 } from "lucide-react";
 
-import { Button } from "@/_components/button";
+import { Button } from "@/_components/atoms/Button";
 import {
   REQUEST_STATE_ORDER,
   REQUEST_STATE_LABEL,
@@ -116,7 +116,7 @@ function PastRequestsRail({ items, onReuse }: { items: PastRequest[]; onReuse: (
               <span className="font-mono text-xs tabular-nums text-muted-foreground">
                 {formatRelative(p.createdAt)}
               </span>
-              <Button variant="outline" size="sm" className="mt-1 justify-center" onClick={() => onReuse(p.id)}>
+              <Button variant="secondary" size="sm" className="mt-1 justify-center" onClick={() => onReuse(p.id)}>
                 Faire une nouvelle demande basée sur celle-ci
               </Button>
             </div>
@@ -151,7 +151,7 @@ function ActiveRequestCard({
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => onEdit(request.id)}>
+            <Button variant="secondary" size="sm" onClick={() => onEdit(request.id)}>
               <Pencil className="size-3.5" />
               Modifier
             </Button>

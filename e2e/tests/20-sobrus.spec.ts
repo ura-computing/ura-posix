@@ -16,11 +16,11 @@
  *    `GET /sobrus/connection` 403 */
 import type { Browser, Page } from "@playwright/test";
 
-import { apiGet, apiPost, apiPut } from "../lib/api";
+import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { sessionFile } from "../lib/auth";
 import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
-import { expect, test } from "../lib/fixtures";
+import { expect, recordPage, test } from "../lib/fixtures";
 import { lastSobrusProblemEmail } from "../lib/mail";
 import { setPeriod } from "../lib/ui";
 
@@ -33,6 +33,7 @@ const CONSENT = "J'autorise PharmaGest à se connecter à mon compte Sobrus pour
 const BANNER_PASSWORD = "La connexion Sobrus ne fonctionne plus : votre mot de passe Sobrus a changé.";
 
 let owner: Page;
+let flushOwner: () => Promise<void>;
 let pharmacyId: number;
 
 async function control(page: Page, body: Record<string, unknown>): Promise<void> {
@@ -72,6 +73,14 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
 
   const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   owner = await ctx.newPage();
+  // Its calls count in the coverage + speed gates, under the test running when they happen.
+  flushOwner = recordPage(owner, () => {
+    try {
+      return test.info().title;
+    } catch {
+      return "20-sobrus";
+    }
+  });
   await owner.goto("/login");
   await owner.locator('input[type="email"]').fill(OWNER.email);
   await owner.locator('input[autocomplete="current-password"]').fill(OWNER.password);
@@ -81,6 +90,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
 });
 
 test.afterAll(async () => {
+  await flushOwner?.();
   await owner?.context().close();
 });
 
@@ -352,15 +362,31 @@ test("accès « Connexion Sobrus » retiré par l'administrateur → absent du m
   await expect(menu, "rendu par l'administrateur").toBeVisible();
 });
 
-test.describe("employé", () => {
-  test.use({ storageState: sessionFile("employee") });
-
-  test("pas d'entrée de menu, 404 dans l'interface, API refusée", async ({ page }) => {
+test("employé : pas d'entrée de menu, 404 dans l'interface, API refusée", async ({ browser }) => {
+  // His own employee (the session saved by 12 is gone: 12 deletes its employee).
+  const employee = { email: "employe.sobrus@pharmagest.ma", password: "EmployeSobrus#2026" };
+  const { member } = await apiPost(owner, "/owner/employees", {
+    full_name: "Employé Sobrus",
+    ...employee,
+    role: "employee",
+    pharmacy_id: pharmacyId,
+  });
+  const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  try {
+    const page = await ctx.newPage();
+    await page.goto("/login");
+    await page.locator('input[type="email"]').fill(employee.email);
+    await page.locator('input[autocomplete="current-password"]').fill(employee.password);
+    await page.locator('button[type="submit"]').click();
+    await expect(page).not.toHaveURL(/\/login/);
     await page.goto("/rapport");
     await expect(page.locator("aside").getByRole("link", { name: "Connexion Sobrus", exact: true })).toHaveCount(0);
     await page.goto("/sobrus");
     await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
     const refused = await apiGet(page, "/sobrus/connection", {}, 403);
     expect(refused.code).toBe("ownerOnly");
-  });
+  } finally {
+    await ctx.close();
+    await apiDelete(owner, `/owner/employees/${member.id}`, 204);
+  }
 });

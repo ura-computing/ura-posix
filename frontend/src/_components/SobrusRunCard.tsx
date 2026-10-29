@@ -2,7 +2,7 @@
  *  (`AppLayout` `JobCard`): the « Connexion Sobrus » robot as it goes (« Ventes 2025 », the step, the
  *  bar, the lines added, « Arrêter »), then how it ended (« Terminé : 45 012 ligne(s) ajoutée(s) »
  *  for 6 s, or why it stopped until ✕). A click on the card → /sobrus. */
-import { Ban, CheckCircle2, CircleAlert, Loader2, RefreshCw, X } from "lucide-react";
+import { Ban, CheckCircle2, CircleAlert, RefreshCw, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useSobrusRunWatcher } from "@/hooks/useSobrusRunWatcher";
@@ -11,6 +11,8 @@ import { ROUTES } from "@/types";
 import { cn } from "@/utils/cn";
 import { formatNumStr } from "@/utils/format";
 import { currentStep, fileName, modeName, runResult } from "@/utils/sobrus";
+import { Spinner } from "@/_components/atoms/Spinner";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 export function SobrusRunCard() {
   const t = useT();
@@ -25,7 +27,7 @@ export function SobrusRunCard() {
   const pct = importing ? Math.round((run.chunk_current / run.chunk_total) * 100) : 0;
   const what = running ? fileName(t, run) : "";
   const icon = running ? (
-    <Loader2 className="size-4 animate-spin" />
+    <Spinner />
   ) : run.status === "success" ? (
     <CheckCircle2 className="size-4" />
   ) : (
@@ -43,9 +45,9 @@ export function SobrusRunCard() {
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-2">
             <RefreshCw className="size-3 text-muted-foreground" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <SectionTitle as="span" size="sm">
               {t("sobrus.cornerTitle")}
-            </span>
+            </SectionTitle>
             {what && <span className="truncate text-xs font-semibold text-foreground">{what}</span>}
           </div>
           <span className="truncate text-sm font-medium text-foreground" title={modeName(t, run)}>

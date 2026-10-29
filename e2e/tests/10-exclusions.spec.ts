@@ -325,10 +325,10 @@ test("réintégrer : « Réintégrer » sur la ligne de chaque onglet → compta
   const reintegrate = async (tab: Tab, text: string, path: string, want: Row, what: string, list: string) => {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const posted = pageSend(page, "POST", path);
-    const after = pageCall(page, list);
     await excludedRow(page, text).getByRole("button", { name: "Réintégrer", exact: true }).click();
     expectSame(await posted, want, what);
-    expect(await after, `${what} : liste`).toEqual([]);
+    // The tab's own reading of the list may land after the click: ask the API.
+    await expect.poll(() => apiGet<Row[]>(page, list), { message: `${what} : liste` }).toEqual([]);
     await expect(page.getByText("Rien n'est exclu ici", { exact: true }), `${what} : plus rien`).toBeVisible();
   };
   await reintegrate(
