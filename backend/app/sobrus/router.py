@@ -1,5 +1,5 @@
-"""« Connexion Sobrus » (owner + feature `import`): PharmaGest imports the pharmacy's Sobrus achats +
-ventes by itself (`worker.py` + `sync.py`).
+"""« Connexion Sobrus » (owner + feature `sobrus`, given or taken by the admin like every access):
+PharmaGest imports the pharmacy's Sobrus achats + ventes + stock by itself (`worker.py` + `sync.py`).
 
 GET    /v1/sobrus/connection          the connection (never the password) + the run in progress
 PUT    /v1/sobrus/connection          {email, password, consent} first time; {password} = new password.
@@ -34,7 +34,7 @@ from app.sobrus.schemas import SobrusConnectionIn, SobrusConnectionOut, SobrusRu
 
 router = APIRouter(tags=["sobrus"])
 
-OwnerImport = Annotated[int, owner("import")]
+OwnerSobrus = Annotated[int, owner("sobrus")]
 ACTIVE = ("queued", "running")
 
 
@@ -86,13 +86,13 @@ def _queue(
 
 
 @router.get("/sobrus/connection", response_model=SobrusConnectionOut)
-def get_connection(pharmacy_id: OwnerImport, db: DbDep) -> SobrusConnectionOut:
+def get_connection(pharmacy_id: OwnerSobrus, db: DbDep) -> SobrusConnectionOut:
     return _connection_out(db, pharmacy_id)
 
 
 @router.put("/sobrus/connection", response_model=SobrusConnectionOut)
 def save_connection(
-    body: SobrusConnectionIn, pharmacy_id: OwnerImport, user: CurrentUserDep, db: DbDep
+    body: SobrusConnectionIn, pharmacy_id: OwnerSobrus, user: CurrentUserDep, db: DbDep
 ) -> SobrusConnectionOut:
     conn = _connection(db, pharmacy_id)
     if conn is None:
@@ -130,7 +130,7 @@ def save_connection(
 
 
 @router.delete("/sobrus/connection", status_code=204)
-def delete_connection(pharmacy_id: OwnerImport, user: CurrentUserDep, db: DbDep) -> None:
+def delete_connection(pharmacy_id: OwnerSobrus, user: CurrentUserDep, db: DbDep) -> None:
     conn = _connection(db, pharmacy_id)
     if conn is None:
         raise ApiError(404, ErrorCode.SOBRUS_NOT_CONNECTED, "Aucune connexion Sobrus.")
@@ -147,7 +147,7 @@ def delete_connection(pharmacy_id: OwnerImport, user: CurrentUserDep, db: DbDep)
 
 
 @router.post("/sobrus/runs", response_model=SobrusRunOut, status_code=201)
-def start_run(body: SobrusRunIn, pharmacy_id: OwnerImport, user: CurrentUserDep, db: DbDep) -> SobrusRun:
+def start_run(body: SobrusRunIn, pharmacy_id: OwnerSobrus, user: CurrentUserDep, db: DbDep) -> SobrusRun:
     conn = _connection(db, pharmacy_id)
     if conn is None:
         raise ApiError(409, ErrorCode.SOBRUS_NOT_CONNECTED, "Aucune connexion Sobrus.")
@@ -157,7 +157,7 @@ def start_run(body: SobrusRunIn, pharmacy_id: OwnerImport, user: CurrentUserDep,
 
 
 @router.get("/sobrus/runs", response_model=list[SobrusRunOut])
-def list_runs(pharmacy_id: OwnerImport, db: DbDep, limit: Annotated[int, Query(ge=1, le=50)] = 10) -> list[SobrusRun]:
+def list_runs(pharmacy_id: OwnerSobrus, db: DbDep, limit: Annotated[int, Query(ge=1, le=50)] = 10) -> list[SobrusRun]:
     return (
         db.query(SobrusRun)
         .filter(SobrusRun.pharmacy_id == pharmacy_id)
@@ -168,7 +168,7 @@ def list_runs(pharmacy_id: OwnerImport, db: DbDep, limit: Annotated[int, Query(g
 
 
 @router.post("/sobrus/runs/{run_id}/cancel", response_model=SobrusRunOut)
-def cancel_run(run_id: Annotated[int, Path(ge=1)], pharmacy_id: OwnerImport, db: DbDep) -> SobrusRun:
+def cancel_run(run_id: Annotated[int, Path(ge=1)], pharmacy_id: OwnerSobrus, db: DbDep) -> SobrusRun:
     run = db.get(SobrusRun, run_id)
     if run is None or run.pharmacy_id != pharmacy_id or run.status not in ACTIVE:
         raise ApiError(404, ErrorCode.SOBRUS_RUN_NOT_FOUND, "Import Sobrus introuvable.")

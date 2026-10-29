@@ -10,6 +10,8 @@ import {
   PackageX,
   PackageOpen,
   FileWarning,
+  ShieldCheck,
+  TrendingUp,
 } from "lucide-react";
 
 import { useCategoryTypeOptions } from "@/_components/CategorySegment";
@@ -115,21 +117,42 @@ interface MarginAlertsSectionProps {
 
 function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) {
   const t = useT();
-  // NB: backend also returns `high` + `very_high` — intentionally NOT shown here
-  // (they live on the Rapport margin tiles).
+  // The 4 brackets of the Rapport margin tiles: too low (loss, < 10 %) and too high (60 % +: often a price mistake).
   const cards: {
     tone: IconTone;
+    Icon: typeof TrendingDown;
     title: string;
     bracket?: MarginAlertsResponse["negative"];
     dlgSubtitle: string;
   }[] = [
     {
       tone: "error",
+      Icon: TrendingDown,
       title: t("ventes.margeNegative"),
       bracket: data?.negative,
       dlgSubtitle: t("alertes.margeNegativeSub"),
     },
-    { tone: "warning", title: t("alertes.margeFaible"), bracket: data?.low, dlgSubtitle: t("alertes.margeFaibleSub") },
+    {
+      tone: "warning",
+      Icon: TrendingDown,
+      title: t("alertes.margeFaible"),
+      bracket: data?.low,
+      dlgSubtitle: t("alertes.margeFaibleSub"),
+    },
+    {
+      tone: "info",
+      Icon: TrendingUp,
+      title: t("rapportAdmin.marge60a90"),
+      bracket: data?.high,
+      dlgSubtitle: t("alertes.margeHauteSub"),
+    },
+    {
+      tone: "success",
+      Icon: ShieldCheck,
+      title: t("rapportAdmin.margeSup90"),
+      bracket: data?.very_high,
+      dlgSubtitle: t("alertes.margeTresHauteSub"),
+    },
   ];
 
   return (
@@ -142,7 +165,7 @@ function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => {
           const count = c.bracket?.count ?? 0;
           return (
@@ -151,7 +174,7 @@ function MarginAlertsSection({ data, onOpen }: MarginAlertsSectionProps) {
               label={c.title}
               value={formatMAD(c.bracket?.total_ca ?? 0)}
               sub={t("alertes.caConcerne")}
-              icon={<TrendingDown className="size-5" />}
+              icon={<c.Icon className="size-5" />}
               iconTone={c.tone}
               badge={{
                 label: (

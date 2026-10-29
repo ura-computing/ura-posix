@@ -1,189 +1,232 @@
-/** /produits-speciaux page state: filters + CRUD + autocomplete for the
- *  exclude dialog. Owner-managed; no admin involved. */
+/** /produits-speciaux: one tab per kind (a product, a BL, a product on some of its BLs, a supplier),
+ *  each with its search, ONE click to exclude (« Annuler » in the message), and its list of what is
+ *  excluded (« Réintégrer », « Ajouter une note »). Owner-managed, reversible: nothing is deleted.
+ *  Each write refreshes the reads it changes (`API.*.exclude.refreshes`). */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
-
+import { useT } from "@/i18n/I18nProvider";
 import type {
   BlDetail,
   BlExclusion,
-  BlExclusionResult,
-  BlReintegrateResult,
+  BlLineExclusion,
+  BlLineExclusionResult,
   BlSummary,
   MedicamentSuggestion,
+  ProductBlLines,
   SpecialProduct,
-  SpecialProductBulkResult,
-  SpecialProductReintegrateResult,
   SupplierExclusion,
-  SupplierExclusionResult,
-  SupplierReintegrateResult,
   SupplierSummary,
 } from "@/types";
-import { useT } from "@/i18n/I18nProvider";
-import { matchesFields } from "@/utils/text";
+import { formatDate, formatNumStr } from "@/utils/format";
 
-export function useProduitsSpeciaux() {
+export type ExclusionKind = "product" | "bl" | "supplier" | "line";
+
+/** What one click excludes / reintegrates. A line = one product on one BL (its exclusion ids once
+ *  excluded: « Réintégrer » and « Annuler » use them). */
+export type ExclusionTarget =
+  | { kind: "product"; medicamentId: number; name: string }
+  | { kind: "bl"; ref: string; name: string }
+  | { kind: "supplier"; supplier: string; name: string }
+  | { kind: "line"; medicamentId: number; ref: string; ids: number[]; name: string };
+
+/** One excluded thing, whatever its kind, in the « Déjà exclus » list. */
+export interface ExcludedRow {
+  key: string;
+  target: ExclusionTarget;
+  name: string;
+  /** « PID · Catégorie », « Fournisseur · date · 12 lignes »… */
+  detail: string;
+  total: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+/** Each kind's writes (their `refreshes` = the reads that change). */
+const WRITES = {
+  product: API.specialProducts,
+  bl: API.blExclusions,
+  supplier: API.supplierExclusions,
+  line: API.blLineExclusions,
+} as const;
+
+async function excludeOne(x: ExclusionTarget): Promise<ExclusionTarget> {
+  if (x.kind === "product") await api.post(API.specialProducts.exclude.url, { medicament_ids: [x.medicamentId] });
+  else if (x.kind === "bl") await api.post(API.blExclusions.exclude.url, { delivery_ref: x.ref });
+  else if (x.kind === "supplier") await api.post(API.supplierExclusions.exclude.url, { supplier: x.supplier });
+  else {
+    const r = await api.post<BlLineExclusionResult>(API.blLineExclusions.exclude.url, {
+      medicament_id: x.medicamentId,
+      delivery_refs: [x.ref],
+    });
+    return { ...x, ids: r.ids };
+  }
+  return x;
+}
+
+async function reintegrateOne(x: ExclusionTarget): Promise<ExclusionTarget> {
+  if (x.kind === "product") await api.post(API.specialProducts.reintegrate.url, { medicament_ids: [x.medicamentId] });
+  else if (x.kind === "bl") await api.post(API.blExclusions.reintegrate.url, { delivery_refs: [x.ref] });
+  else if (x.kind === "supplier") await api.post(API.supplierExclusions.reintegrate.url, { suppliers: [x.supplier] });
+  else await api.post(API.blLineExclusions.reintegrate.url, { ids: x.ids });
+  return x;
+}
+
+function saveNoteOf(x: ExclusionTarget, notes: string) {
+  if (x.kind === "product") return api.put(API.specialProducts.note.url, { medicament_id: x.medicamentId, notes });
+  if (x.kind === "bl") return api.put(API.blExclusions.note.url, { delivery_ref: x.ref, notes });
+  if (x.kind === "supplier") return api.put(API.supplierExclusions.note.url, { supplier: x.supplier, notes });
+  return api.put(API.blLineExclusions.note.url, { id: x.ids[0], notes });
+}
+
+/** Everything excluded + the 3 actions (exclude, reintegrate, note), each with its message. */
+export function useExclusions() {
   const t = useT();
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [suggestQ, setSuggestQ] = useState("");
+  const qc = useQueryClient();
 
-  const { data: list, isLoading } = useQuery({
+  const products = useQuery({
     queryKey: API.specialProducts.list.key,
     queryFn: () => api.get<SpecialProduct[]>(API.specialProducts.list.url),
   });
-
-  const { data: suggestions, isFetching: suggestionsLoading } = useQuery({
-    queryKey: API.specialProducts.suggestions.key(suggestQ),
-    queryFn: () =>
-      api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, {
-        params: { q: suggestQ },
-      }),
-    enabled: suggestQ.trim().length >= 2,
-    staleTime: 60_000,
-  });
-
-  const { mutate: exclude, isPending: excluding } = useMutation({
-    mutationFn: (ids: number[]) =>
-      api.post<SpecialProductBulkResult>(API.specialProducts.exclude.url, {
-        medicament_ids: ids,
-      }),
-    onSuccess: (r) => {
-      const n = r.inserted + r.already_special;
-      const s = r.already_special;
-      const tail =
-        s > 0
-          ? t(s === 1 ? "ps.alreadySpecialOne" : "ps.alreadySpecialMany", {
-              n: s,
-            })
-          : "";
-      toast.success(t(n === 1 ? "ps.prodExcludedOne" : "ps.prodExcludedMany", { n }) + tail);
-      setSuggestQ("");
-      void refresh(queryClient, API.specialProducts.exclude);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
-    mutationFn: (ids: number[]) =>
-      api.post<SpecialProductReintegrateResult>(API.specialProducts.reintegrate.url, { medicament_ids: ids }),
-    onSuccess: (r) => {
-      const n = r.reintegrated;
-      toast.success(
-        t(n === 1 ? "ps.prodReintegratedOne" : "ps.prodReintegratedMany", {
-          n,
-        }),
-      );
-      void refresh(queryClient, API.specialProducts.reintegrate);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  // Local filter on the displayed table: same search as every other page (accents,
-  // several words, `*`).
-  const filteredProducts = useMemo(
-    () => (list ?? []).filter((p) => matchesFields([p.product, p.pid, p.category], search)),
-    [list, search],
-  );
-
-  return {
-    specialProducts: list ?? [],
-    filteredProducts,
-    productsLoading: isLoading,
-    productSearch: search,
-    setProductSearch: setSearch,
-    suggestions: suggestions ?? [],
-    suggestionsLoading,
-    suggestQ,
-    setSuggestQ,
-    excludeProducts: exclude,
-    reintegrateProducts: reintegrate,
-    isExcludingProducts: excluding,
-    isReintegratingProducts: reintegrating,
-  };
-}
-
-/** BL-exclusion state for the "Bons de livraison" tab of Produits Spéciaux.
- *  Owner-managed, reversible. Excluding a BL removes its Achats from every
- *  purchase aggregate (dashboard / analyse / stock) via the backend
- *  achat_bl_filter — so it refreshes the same reads produit-exclusion does. */
-
-export function useBlExclusions() {
-  const t = useT();
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState(""); // filters the excluded-BL table
-  const [searchQ, setSearchQ] = useState(""); // exclude-dialog search box
-
-  const { data: list, isLoading } = useQuery({
+  const bls = useQuery({
     queryKey: API.blExclusions.list.key,
     queryFn: () => api.get<BlExclusion[]>(API.blExclusions.list.url),
   });
-
-  const { data: results, isFetching: resultsLoading } = useQuery({
-    queryKey: API.blExclusions.search.key(searchQ),
-    queryFn: () =>
-      api.get<BlSummary[]>(API.blExclusions.search.url, {
-        params: { q: searchQ },
-      }),
-    enabled: searchQ.trim().length >= 2,
-    staleTime: 30_000,
+  const suppliers = useQuery({
+    queryKey: API.supplierExclusions.list.key,
+    queryFn: () => api.get<SupplierExclusion[]>(API.supplierExclusions.list.url),
+  });
+  const lines = useQuery({
+    queryKey: API.blLineExclusions.list.key,
+    queryFn: () => api.get<BlLineExclusion[]>(API.blLineExclusions.list.url),
   });
 
-  const { mutate: exclude, isPending: excluding } = useMutation({
-    mutationFn: (v: { ref: string; notes?: string }) =>
-      api.post<BlExclusionResult>(API.blExclusions.exclude.url, {
-        delivery_ref: v.ref,
-        notes: v.notes || null,
-      }),
-    onSuccess: (r) => {
-      toast.success(
-        r.already_excluded ? t("ps.blAlreadyExcluded") : t("ps.blExcluded", { ref: r.item?.delivery_ref ?? "" }),
-      );
-      setSearchQ("");
-      void refresh(queryClient, API.blExclusions.exclude);
+  const rows = useMemo<ExcludedRow[]>(() => {
+    const out: ExcludedRow[] = [
+      ...(products.data ?? []).map((p) => ({
+        key: `product:${p.medicament_id}`,
+        target: { kind: "product" as const, medicamentId: p.medicament_id, name: p.product },
+        name: p.product,
+        detail: [p.pid, p.category].filter(Boolean).join(" · "),
+        total: null,
+        notes: p.notes,
+        created_at: p.created_at,
+      })),
+      ...(bls.data ?? []).map((b) => ({
+        key: `bl:${b.delivery_ref}`,
+        target: { kind: "bl" as const, ref: b.delivery_ref, name: b.delivery_ref },
+        name: b.delivery_ref,
+        detail: [b.supplier, formatDate(b.delivery_date)].filter(Boolean).join(" · "),
+        total: b.total,
+        notes: b.notes,
+        created_at: b.created_at,
+      })),
+      ...(suppliers.data ?? []).map((s) => ({
+        key: `supplier:${s.supplier}`,
+        target: { kind: "supplier" as const, supplier: s.supplier, name: s.supplier },
+        name: s.supplier,
+        detail: t("ps.supplierDetail", { lines: formatNumStr(s.nb_lines), products: formatNumStr(s.nb_products) }),
+        total: s.total,
+        notes: s.notes,
+        created_at: s.created_at,
+      })),
+      ...(lines.data ?? []).map((x) => ({
+        key: `line:${x.id}`,
+        target: {
+          kind: "line" as const,
+          medicamentId: x.medicament_id,
+          ref: x.delivery_ref,
+          ids: [x.id],
+          name: x.product,
+        },
+        name: x.product,
+        detail: [`BL ${x.delivery_ref}`, x.supplier, formatDate(x.delivery_date)].filter(Boolean).join(" · "),
+        total: x.total,
+        notes: x.notes,
+        created_at: x.created_at,
+      })),
+    ];
+    return out.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }, [products.data, bls.data, suppliers.data, lines.data, t]);
+
+  const { mutate: exclude, isPending: isExcluding } = useMutation({
+    mutationFn: excludeOne,
+    onSuccess: (x) => {
+      void refresh(qc, WRITES[x.kind].exclude);
+      toast.success(t("ps.excludedToast", { name: x.name }), {
+        action: { label: t("common.cancel"), onClick: () => reintegrate(x) },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
-    mutationFn: (refs: string[]) =>
-      api.post<BlReintegrateResult>(API.blExclusions.reintegrate.url, {
-        delivery_refs: refs,
-      }),
-    onSuccess: (r) => {
-      const n = r.reintegrated;
-      toast.success(t(n === 1 ? "ps.blReintegratedOne" : "ps.blReintegratedMany", { n }));
-      void refresh(queryClient, API.blExclusions.reintegrate);
+  const { mutate: reintegrate, isPending: isReintegrating } = useMutation({
+    mutationFn: reintegrateOne,
+    onSuccess: (x) => {
+      void refresh(qc, WRITES[x.kind].reintegrate);
+      toast.success(t("ps.reintegratedToast", { name: x.name }), {
+        action: { label: t("common.cancel"), onClick: () => exclude(x) },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const filtered = useMemo(
-    () => (list ?? []).filter((b) => matchesFields([b.delivery_ref, b.supplier, b.notes], search)),
-    [list, search],
-  );
+  const { mutateAsync: saveNote } = useMutation({
+    mutationFn: ({ target, notes }: { target: ExclusionTarget; notes: string }) => saveNoteOf(target, notes),
+    onSuccess: (_, { target }) => {
+      void refresh(qc, WRITES[target.kind].note);
+      toast.success(t("ps.noteSaved"));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return {
-    blExclusions: list ?? [],
-    filteredBls: filtered,
-    blsLoading: isLoading,
-    blSearch: search,
-    setBlSearch: setSearch,
-    blSearchQ: searchQ,
-    setBlSearchQ: setSearchQ,
-    blResults: results ?? [],
-    blResultsLoading: resultsLoading,
-    excludeBl: (ref: string, notes?: string) => exclude({ ref, notes }),
-    reintegrateBls: reintegrate,
-    isExcludingBl: excluding,
-    isReintegratingBls: reintegrating,
+    excludedRows: rows,
+    excludedLoading: products.isLoading || bls.isLoading || suppliers.isLoading || lines.isLoading,
+    exclude,
+    isExcluding,
+    reintegrate,
+    isReintegrating,
+    saveNote: (target: ExclusionTarget, notes: string) => saveNote({ target, notes }),
   };
 }
 
-/** Product lines of one BL (step 2 of « Exclure un BL »). */
+/** One tab's search (2+ letters), for its kind only: products (« Produits », « Produit sur un BL »),
+ *  BLs (by reference or by a product they hold) or suppliers. */
+export function useExclusionSearch(kind: ExclusionKind) {
+  const [q, setQ] = useState("");
+  const ready = q.trim().length >= 2;
+  const products = useQuery({
+    queryKey: API.specialProducts.suggestions.key(q),
+    queryFn: () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q } }),
+    enabled: ready && (kind === "product" || kind === "line"),
+    staleTime: 30_000,
+  });
+  const bls = useQuery({
+    queryKey: API.blExclusions.search.key(q),
+    queryFn: () => api.get<BlSummary[]>(API.blExclusions.search.url, { params: { q } }),
+    enabled: ready && kind === "bl",
+    staleTime: 30_000,
+  });
+  const suppliers = useQuery({
+    queryKey: API.supplierExclusions.search.key(q),
+    queryFn: () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q } }),
+    enabled: ready && kind === "supplier",
+    staleTime: 30_000,
+  });
+  return {
+    q,
+    setQ,
+    ready,
+    foundProducts: products.data ?? [],
+    foundBls: bls.data ?? [],
+    foundSuppliers: suppliers.data ?? [],
+    isSearching: products.isFetching || bls.isFetching || suppliers.isFetching,
+  };
+}
+
+/** The product lines of one BL (« Voir le contenu »). */
 export function useBlDetail(deliveryRef: string) {
   const { data, isLoading, isError } = useQuery({
     queryKey: API.blExclusions.detail.key(deliveryRef),
@@ -196,78 +239,15 @@ export function useBlDetail(deliveryRef: string) {
   };
 }
 
-/** Supplier-exclusion state for the "Fournisseurs" tab of Produits Spéciaux.
- *  Owner-managed, reversible. Excluding a supplier removes its Achats from every
- *  purchase aggregate (dashboard / analyse / stock) via the backend
- *  achat_supplier_filter — so it refreshes the same reads BL-exclusion does. */
-
-export function useSupplierExclusions() {
-  const t = useT();
-  const queryClient = useQueryClient();
-  const [search, setSearch] = useState(""); // filters the excluded-supplier table
-  const [searchQ, setSearchQ] = useState(""); // exclude-dialog search box
-
-  const { data: list, isLoading } = useQuery({
-    queryKey: API.supplierExclusions.list.key,
-    queryFn: () => api.get<SupplierExclusion[]>(API.supplierExclusions.list.url),
+/** Every BL one product was bought on (« Voir ses BL »). */
+export function useProductBlLines(medicamentId: number) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: API.blLineExclusions.lines.key(medicamentId),
+    queryFn: () => api.get<ProductBlLines>(API.blLineExclusions.lines.url, { params: { medicament_id: medicamentId } }),
   });
-
-  const { data: results, isFetching: resultsLoading } = useQuery({
-    queryKey: API.supplierExclusions.search.key(searchQ),
-    queryFn: () =>
-      api.get<SupplierSummary[]>(API.supplierExclusions.search.url, {
-        params: { q: searchQ },
-      }),
-    enabled: searchQ.trim().length >= 2,
-    staleTime: 30_000,
-  });
-
-  const { mutate: exclude, isPending: excluding } = useMutation({
-    mutationFn: (v: { supplier: string; notes?: string }) =>
-      api.post<SupplierExclusionResult>(API.supplierExclusions.exclude.url, {
-        supplier: v.supplier,
-        notes: v.notes || null,
-      }),
-    onSuccess: (r) => {
-      toast.success(
-        r.already_excluded ? t("ps.supAlreadyExcluded") : t("ps.supExcluded", { name: r.item?.supplier ?? "" }),
-      );
-      setSearchQ("");
-      void refresh(queryClient, API.supplierExclusions.exclude);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const { mutate: reintegrate, isPending: reintegrating } = useMutation({
-    mutationFn: (suppliers: string[]) =>
-      api.post<SupplierReintegrateResult>(API.supplierExclusions.reintegrate.url, { suppliers }),
-    onSuccess: (r) => {
-      const verb = r.reintegrated === 1 ? t("ps.supReintegratedOne") : t("ps.supReintegratedMany");
-      toast.success(`${r.reintegrated} ${verb}`);
-      void refresh(queryClient, API.supplierExclusions.reintegrate);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const filtered = useMemo(() => {
-    const all = list ?? [];
-    if (!search.trim()) return all;
-    return all.filter((s) => matchesFields([s.supplier, s.notes ?? ""], search));
-  }, [list, search]);
-
   return {
-    supplierExclusions: list ?? [],
-    filteredSuppliers: filtered,
-    suppliersLoading: isLoading,
-    supplierSearch: search,
-    setSupplierSearch: setSearch,
-    supplierSearchQ: searchQ,
-    setSupplierSearchQ: setSearchQ,
-    supplierResults: results ?? [],
-    supplierResultsLoading: resultsLoading,
-    excludeSupplier: (supplier: string, notes?: string) => exclude({ supplier, notes }),
-    reintegrateSuppliers: reintegrate,
-    isExcludingSupplier: excluding,
-    isReintegratingSuppliers: reintegrating,
+    productLines: data?.lines ?? [],
+    isLoadingProductLines: isLoading,
+    productLinesError: isError,
   };
 }

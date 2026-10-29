@@ -1,22 +1,34 @@
-/** One editable value of the product sheet (owner's « Modifier »).
+/** One editable value of the product sheet (owner's « Modifier » on its block).
  *  - View: the value; when the owner changed it, « modifié », the imported value and (owner)
  *    « Revenir à la valeur importée ».
- *  - Edit mode: its input (text, price, whole number, date « JJ/MM/AAAA » typed or picked in the
- *    calendar next to it). */
+ *  - Its block edited: its input (text, price, whole number, date « JJ/MM/AAAA » typed or picked in
+ *    the calendar next to it).
+ *  `SectionEditActions` = the block's « Modifier », then « Annuler » + « Enregistrer », right there. */
 import { useContext, useState, type ReactNode } from "react";
 import { useFormState, useWatch } from "react-hook-form";
 import { DayPicker } from "react-day-picker";
 import { fr } from "date-fns/locale";
 import { autoUpdate, flip, offset, shift, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Pencil,
+  Save,
+  X,
+} from "lucide-react";
 
+import { AsyncButton } from "@/_components/AsyncButton";
+import { Button } from "@/_components/button";
 import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/dayPicker";
 import { useMonths } from "@/i18n/dates";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
 
-import { isoToTyped, typedToIso, type FormField } from "../hooks";
+import { isoToTyped, typedToIso, type EditSection, type FormField } from "../hooks";
 import { SheetEditContext } from "./editContext";
 
 export type EditKind = "text" | "price" | "int" | "date";
@@ -191,22 +203,76 @@ function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; l
   );
 }
 
+/** Owner: « Modifier » (one block at a time), then « Annuler » + « Enregistrer ». Employee:
+ *  « Modifier » shown, disabled, with the reason under it. */
+export function SectionEditActions({ section }: { section: EditSection }) {
+  const t = useT();
+  const { editor } = useSheetEdit();
+  if (editor.section === section) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <AsyncButton variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
+          <X className="size-4" />
+          {t("common.cancel")}
+        </AsyncButton>
+        <AsyncButton
+          variant="primary"
+          onClick={() => void editor.save()}
+          isLoading={editor.isSaving}
+          loadingText={t("products.saving")}
+        >
+          <Save className="size-4" />
+          {t("common.save")}
+        </AsyncButton>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        variant="outline"
+        onClick={() => editor.start(section)}
+        disabled={!editor.canEdit || editor.section !== null}
+      >
+        <Pencil className="size-4" />
+        {t("common.edit")}
+      </Button>
+      {!editor.canEdit && <span className="text-xs text-muted-foreground">{t("products.ownerOnly")}</span>}
+    </div>
+  );
+}
+
+/** While its block is edited: what the owner's values change. */
+export function EditHint({ section }: { section: EditSection }) {
+  const t = useT();
+  const { editor } = useSheetEdit();
+  if (editor.section !== section) return null;
+  return (
+    <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
+      {t("products.editHint")}
+    </p>
+  );
+}
+
 export function Editable({
   field,
   kind = "text",
   label,
+  section,
   children,
 }: {
   field: FormField;
   kind?: EditKind;
   /** Names the input in edit mode (screen readers, tests). */
   label: string;
+  /** Its block: an input while that block is edited. */
+  section: EditSection;
   /** The value as shown in view mode. */
   children: ReactNode;
 }) {
   const t = useT();
   const { editor, sheet } = useSheetEdit();
-  if (editor.editing) return <EditInput field={field} kind={kind} label={label} />;
+  if (editor.section === section) return <EditInput field={field} kind={kind} label={label} />;
 
   const edited = field in sheet.imported;
   return (

@@ -44,6 +44,7 @@ import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { Skeleton } from "./Skeleton";
 import { SobrusBanner } from "./SobrusBanner";
+import { SobrusRunCard } from "./SobrusRunCard";
 import { Tooltip } from "./Tooltip";
 import { useLogout } from "@/hooks/useLogout";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
@@ -121,7 +122,7 @@ const NAV_GROUPS: NavGroup[] = [
         icon: RefreshCw,
         roles: [ROLES.OWNER],
         ready: true,
-        feature: "import",
+        feature: "sobrus",
       },
       // HIDDEN 2026-07-03 — restore when the store-website feature ships.
       // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
@@ -494,8 +495,8 @@ function Sidebar({ role, permissions, pending, collapsed, onToggleCollapse, mobi
 }
 
 /**
- * Fixed bottom-right widget — renders one card per non-dismissed job on EVERY
- * route, including /upload-file. With concurrency=1 we typically see: 1
+ * Bottom-right widget (in the corner stack of `AppLayout`, under the Sobrus card) — renders one
+ * card per non-dismissed job on EVERY route, including /upload-file. With concurrency=1 we typically see: 1
  * running + N queued + recent successes fading out. Auto-dismiss for
  * "success" is owned by UploadContext (per-job timer); cancelled/error stay
  * until the user closes them.
@@ -536,7 +537,7 @@ function UploadProgressWidget() {
   const visible = [...jobs].sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_VISIBLE);
 
   return (
-    <div role="status" aria-live="polite" className="fixed bottom-4 right-4 z-50 flex w-[320px] flex-col gap-2">
+    <div role="status" aria-live="polite" className="flex flex-col gap-2">
       {visible.map((job) => (
         <JobCard
           key={job.id}
@@ -709,6 +710,8 @@ export function AppLayout() {
 
   if (isLoading) return null;
   if (isError || !me) return <Navigate to={ROUTES.LOGIN} replace />;
+  // « Connexion Sobrus » (an access the admin gives): owners with it see its problems (banner) and runs (corner card).
+  const sobrusOwner = me.role === ROLES.OWNER && me.permissions.includes("sobrus");
 
   const toggleCollapse = () => {
     setCollapsed((c) => {
@@ -732,15 +735,19 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onOpenMobile={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-auto p-7">
-          {/* « Connexion Sobrus » stopped working: owners with Import see it on every page. */}
-          {me.role === ROLES.OWNER && me.permissions.includes("import") && <SobrusBanner />}
+          {/* « Connexion Sobrus » stopped working: owners with that access see it on every page. */}
+          {sobrusOwner && <SobrusBanner />}
           {/* Pages load on first visit (App.tsx lazy): sidebar + header stay meanwhile. */}
           <Suspense fallback={<PageLoading />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
-      <UploadProgressWidget />
+      {/* Bottom-right, on every page: the Sobrus robot's run, then the files being imported. */}
+      <div className="fixed bottom-4 right-4 z-50 flex w-[320px] flex-col gap-2">
+        {sobrusOwner && <SobrusRunCard />}
+        <UploadProgressWidget />
+      </div>
     </div>
   );
 }

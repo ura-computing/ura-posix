@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { API, refresh } from "@/api/api";
@@ -7,7 +6,7 @@ import { useSobrusConnection } from "@/hooks/sharedQueries";
 import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
 
 /** « Connexion Sobrus »: the connection (+ the run in progress, polled every 2 s), the last runs,
- *  and the owner's actions. When a run ends, every page fed by achats / ventes is refreshed. */
+ *  and the owner's actions. A run's end refreshes the other pages: `hooks/useSobrusRunWatcher.ts`. */
 export function useSobrusPage() {
   const qc = useQueryClient();
   const { connection, isLoading } = useSobrusConnection();
@@ -19,13 +18,6 @@ export function useSobrusPage() {
     enabled: !!connection?.connected,
     refetchInterval: activeRun ? 2000 : false,
   });
-
-  // A run just ended (it was there, it is gone): the new lines everywhere, and its final line in the list.
-  const runningId = useRef<number | null>(null);
-  useEffect(() => {
-    if (runningId.current != null && activeRun == null) void refresh(qc, API.sobrus.runEnded);
-    runningId.current = activeRun?.id ?? null;
-  }, [activeRun, qc]);
 
   const { mutateAsync: saveConnection, isPending: isSaving } = useMutation({
     mutationFn: (body: SobrusConnectionBody) => api.put<SobrusConnection>(API.sobrus.save.url, body),

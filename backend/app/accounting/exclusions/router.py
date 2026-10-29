@@ -1,4 +1,4 @@
-"""Owner exclusions: special products, BLs, suppliers. They only change Comptabilité
+"""Owner exclusions: special products, BLs, a product on some BLs, suppliers. They only change Comptabilité
 (`exclusions.py` at the backend root); nothing is deleted, réintégrer restores it."""
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from app.core.models import (
     Achat,
     Medicament,
     PharmacyBlExclusion,
+    PharmacyBlLineExclusion,
     PharmacyMedicamentStatus,
     PharmacySupplierExclusion,
     Vente,
@@ -25,18 +26,28 @@ from app.accounting.exclusions.schemas import (
     BlExclusionCreate,
     BlExclusionOut,
     BlExclusionResult,
+    BlLineExclusionCreate,
+    BlLineExclusionOut,
+    BlLineExclusionResult,
+    BlLineNote,
+    BlLineReintegrate,
+    BlLineReintegrateResult,
+    BlNote,
     BlReintegrate,
     BlReintegrateResult,
     BlSummary,
     MedicamentSuggestion,
+    ProductBlLines,
     SpecialProductBulkResult,
     SpecialProductCreate,
+    SpecialProductNote,
     SpecialProductOut,
     SpecialProductReintegrate,
     SpecialProductReintegrateResult,
     SupplierExclusionCreate,
     SupplierExclusionOut,
     SupplierExclusionResult,
+    SupplierNote,
     SupplierReintegrate,
     SupplierReintegrateResult,
     SupplierSummary,
@@ -65,6 +76,7 @@ def _to_out(status_row, med: Medicament) -> dict:
         "product": med.product,
         "pid": med.pid,
         "category": med.category,
+        "notes": status_row.notes,
         "created_at": status_row.created_at.isoformat() if status_row.created_at else "",
     }
 
@@ -495,6 +507,166 @@ def reintegrate_bls(body: BlReintegrate, pharmacy_id: Annotated[int, member("spe
     }
 
 
+# ═══ BL line exclusions ══════════════════════════════════════════════════════
+# « Exclure un produit d'un BL »: pick a product → every BL it was bought on → tick some. In
+# Comptabilité only, those achat lines drop (`service.achat_filter`); the product's other BLs and
+# its ventes stay. The whole-BL exclusions above keep their rule.
+#
+# Feature gate: special_products (same page).
+
+
+def _line_aggregate(db, pharmacy_id: int, medicament_id: int | None = None):
+    """This pharmacy's achats grouped by (BL, product): supplier / date / quantity / total / lines."""
+    q = db.query(
+        Achat.delivery_ref.label("ref"),
+        Achat.medicament_id.label("med"),
+        func.max(Achat.supplier).label("supplier"),
+        func.max(Achat.delivery_date).label("delivery_date"),
+        func.coalesce(func.sum(Achat.quantity), 0.0).label("quantity"),
+        func.coalesce(func.sum(Achat.total), 0.0).label("total"),
+        func.count(Achat.id).label("nb_lines"),
+    ).filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None), Achat.medicament_id.isnot(None))
+    if medicament_id is not None:
+        q = q.filter(Achat.medicament_id == medicament_id)
+    return q.group_by(Achat.delivery_ref, Achat.medicament_id)
+
+
+@router.get("/bl-line-exclusions/", response_model=list[BlLineExclusionOut])
+def list_bl_line_exclusions(pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> list[dict]:
+    """Every product-on-a-BL currently excluded, newest first, with its BL's facts and its quantity."""
+    rows = (
+        db.query(PharmacyBlLineExclusion, Medicament)
+        .join(Medicament, PharmacyBlLineExclusion.medicament_id == Medicament.id)
+        .filter(PharmacyBlLineExclusion.pharmacy_id == pharmacy_id)
+        .order_by(PharmacyBlLineExclusion.created_at.desc(), PharmacyBlLineExclusion.id.desc())
+        .all()
+    )
+    if not rows:
+        return []
+    refs = {x.delivery_ref for x, _ in rows}
+    agg = {(a.ref, a.med): a for a in _line_aggregate(db, pharmacy_id).filter(Achat.delivery_ref.in_(refs)).all()}
+    out = []
+    for x, med in rows:
+        a = agg.get((x.delivery_ref, x.medicament_id))
+        out.append(
+            {
+                "id": x.id,
+                "delivery_ref": x.delivery_ref,
+                "supplier": a.supplier if a else None,
+                "delivery_date": a.delivery_date if a else None,
+                "medicament_id": med.id,
+                "pid": med.pid,
+                "product": med.product,
+                "quantity": float(a.quantity) if a else 0.0,
+                "total": round(float(a.total), 2) if a else 0.0,
+                "notes": x.notes,
+                "created_at": x.created_at.isoformat() if x.created_at else "",
+            }
+        )
+    return out
+
+
+@router.get("/bl-line-exclusions/lines", response_model=ProductBlLines)
+def product_bl_lines(
+    pharmacy_id: Annotated[int, member("special_products")],
+    db: DbDep,
+    medicament_id: Annotated[int, Query(ge=1)],
+) -> dict:
+    """Every BL this product was bought on (newest first), the ones already left out flagged."""
+    med = db.get(Medicament, medicament_id)
+    if med is None:
+        raise ApiError(404, ErrorCode.MEDICAMENT_NOT_FOUND, "Produit introuvable.")
+    rows = (
+        _line_aggregate(db, pharmacy_id, medicament_id)
+        .order_by(func.max(Achat.delivery_date).desc(), Achat.delivery_ref)
+        .all()
+    )
+    excluded = {
+        ref: x_id
+        for ref, x_id in db.query(PharmacyBlLineExclusion.delivery_ref, PharmacyBlLineExclusion.id).filter(
+            PharmacyBlLineExclusion.pharmacy_id == pharmacy_id, PharmacyBlLineExclusion.medicament_id == medicament_id
+        )
+    }
+    return {
+        "medicament_id": med.id,
+        "pid": med.pid,
+        "product": med.product,
+        "lines": [
+            {
+                "delivery_ref": r.ref,
+                "supplier": r.supplier,
+                "delivery_date": r.delivery_date,
+                "quantity": float(r.quantity),
+                "total": round(float(r.total), 2),
+                "nb_lines": int(r.nb_lines),
+                "already_excluded": r.ref in excluded,
+                "exclusion_id": excluded.get(r.ref),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.post("/bl-line-exclusions/", response_model=BlLineExclusionResult, status_code=201)
+def exclude_bl_lines(
+    body: BlLineExclusionCreate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep
+) -> dict:
+    """Leave this product out of Comptabilité on these BLs only (+ optional note). Idempotent per
+    BL; 404 when the product was not bought on one of them."""
+    refs = list(dict.fromkeys(r.strip() for r in body.delivery_refs if r.strip()))
+    if not refs:
+        raise ApiError(422, ErrorCode.BL_REF_EMPTY, "Référence de livraison vide.")
+    held = {
+        a.ref for a in _line_aggregate(db, pharmacy_id, body.medicament_id).filter(Achat.delivery_ref.in_(refs)).all()
+    }
+    missing = [r for r in refs if r not in held]
+    if missing:
+        raise ApiError(404, ErrorCode.BL_NOT_FOUND, f"Bon de livraison introuvable : {missing[0]}", ref=missing[0])
+    existing = {
+        r[0]
+        for r in db.query(PharmacyBlLineExclusion.delivery_ref).filter(
+            PharmacyBlLineExclusion.pharmacy_id == pharmacy_id,
+            PharmacyBlLineExclusion.medicament_id == body.medicament_id,
+            PharmacyBlLineExclusion.delivery_ref.in_(refs),
+        )
+    }
+    rows = [
+        PharmacyBlLineExclusion(
+            pharmacy_id=pharmacy_id, delivery_ref=ref, medicament_id=body.medicament_id, notes=body.notes
+        )
+        for ref in refs
+        if ref not in existing
+    ]
+    db.add_all(rows)
+    db.commit()
+    ids = [
+        r[0]
+        for r in db.query(PharmacyBlLineExclusion.id).filter(
+            PharmacyBlLineExclusion.pharmacy_id == pharmacy_id,
+            PharmacyBlLineExclusion.medicament_id == body.medicament_id,
+            PharmacyBlLineExclusion.delivery_ref.in_(refs),
+        )
+    ]
+    return {"excluded": len(rows), "already_excluded": len(existing), "ids": sorted(ids)}
+
+
+@router.post("/bl-line-exclusions/reintegrate", response_model=BlLineReintegrateResult)
+def reintegrate_bl_lines(
+    body: BlLineReintegrate, pharmacy_id: Annotated[int, member("special_products")], db: DbDep
+) -> dict:
+    """Back into Comptabilité. Idempotent: ids not excluded (any more) count as not_excluded."""
+    ids = list(dict.fromkeys(body.ids))
+    rows = (
+        db.query(PharmacyBlLineExclusion)
+        .filter(PharmacyBlLineExclusion.pharmacy_id == pharmacy_id, PharmacyBlLineExclusion.id.in_(ids))
+        .all()
+    )
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"reintegrated": len(rows), "not_excluded": len(ids) - len(rows)}
+
+
 # ═══ Supplier exclusions ═════════════════════════════════════════════════════
 # Supplier (fournisseur) exclusions — achats-side sibling of BL exclusions.
 #
@@ -681,3 +853,77 @@ def reintegrate_suppliers(
         "not_excluded": len([s for s in suppliers if s not in found]),
         "suppliers": suppliers,
     }
+
+
+# ═══ Notes ═══════════════════════════════════════════════════════════════════
+# « Ajouter une note » on an excluded line (after the exclusion: excluding is one click). Empty
+# text = no note. 404 when the line is not excluded (any more).
+
+
+def _note(text: str | None) -> str | None:
+    return (text or "").strip() or None
+
+
+@router.put("/special-products/note", status_code=204)
+def note_special_product(
+    body: SpecialProductNote, pharmacy_id: Annotated[int, member("special_products")], db: DbDep
+) -> None:
+    row = (
+        db.query(PharmacyMedicamentStatus)
+        .filter(
+            PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
+            PharmacyMedicamentStatus.medicament_id == body.medicament_id,
+            PharmacyMedicamentStatus.declared == False,  # noqa: E712
+        )
+        .first()
+    )
+    if row is None:
+        raise ApiError(404, ErrorCode.MEDICAMENT_NOT_FOUND, "Produit exclu introuvable.")
+    row.notes = _note(body.notes)
+    db.commit()
+
+
+@router.put("/bl-exclusions/note", status_code=204)
+def note_bl(body: BlNote, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> None:
+    ref = body.delivery_ref.strip()
+    row = (
+        db.query(PharmacyBlExclusion)
+        .filter(PharmacyBlExclusion.pharmacy_id == pharmacy_id, PharmacyBlExclusion.delivery_ref == ref)
+        .first()
+    )
+    if row is None:
+        raise ApiError(404, ErrorCode.BL_NOT_FOUND, f"Bon de livraison introuvable : {ref}", ref=ref)
+    row.notes = _note(body.notes)
+    db.commit()
+
+
+@router.put("/supplier-exclusions/note", status_code=204)
+def note_supplier(body: SupplierNote, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> None:
+    norm = _norm(body.supplier)
+    row = next(
+        (
+            r
+            for r in db.query(PharmacySupplierExclusion).filter(PharmacySupplierExclusion.pharmacy_id == pharmacy_id)
+            if _norm(r.supplier) == norm
+        ),
+        None,
+    )
+    if row is None:
+        raise ApiError(
+            404, ErrorCode.SUPPLIER_NOT_FOUND, f"Fournisseur introuvable : {body.supplier}", supplier=body.supplier
+        )
+    row.notes = _note(body.notes)
+    db.commit()
+
+
+@router.put("/bl-line-exclusions/note", status_code=204)
+def note_bl_line(body: BlLineNote, pharmacy_id: Annotated[int, member("special_products")], db: DbDep) -> None:
+    row = (
+        db.query(PharmacyBlLineExclusion)
+        .filter(PharmacyBlLineExclusion.pharmacy_id == pharmacy_id, PharmacyBlLineExclusion.id == body.id)
+        .first()
+    )
+    if row is None:
+        raise ApiError(404, ErrorCode.BL_NOT_FOUND, "Ligne de BL exclue introuvable.")
+    row.notes = _note(body.notes)
+    db.commit()

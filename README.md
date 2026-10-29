@@ -291,6 +291,7 @@ erDiagram
   medicaments ||--o{ pharmacy_product_edits : "product"
   pharmacies ||--o{ pharmacy_medicament_status : "produits spéciaux"
   pharmacies ||--o{ pharmacy_bl_exclusions : "excluded BLs"
+  pharmacies ||--o{ pharmacy_bl_line_exclusions : "a product on some BLs"
   pharmacies ||--o{ pharmacy_supplier_exclusions : "excluded suppliers"
   pharmacies ||--o{ payment_entries : "Comptabilité"
 ```
@@ -522,7 +523,15 @@ flowchart LR
   BL["excluded BL<br/>every product on it"] --> SET
   SU["excluded supplier<br/>every product bought from it"] --> SET
   SET -- "Comptabilité only<br/>include_non_declared=false" --> OUT["drop from ventes AND achats"]
+  LI["a product on some BLs<br/>(ticked one by one)"] -- "Comptabilité only" --> ACH["drop only those achat lines<br/>its other BLs + its ventes stay"]
 ```
+
+- The page: one tab per kind (Produits · Bons de livraison · Produit sur un BL · Fournisseurs), each
+  « 1. Cherchez … » (its search, one click « Exclure », « Annuler » in the message) and « 2. … exclus »
+  (« Réintégrer », « Ajouter une note »: the note comes after, on the line). No pop-up window.
+- « Produit sur un BL »: search the product → « Voir ses BL » (« Fournisseur » filter) → tick one =
+  excluded at once (untick = back). Example: X bought on BL-1 (Sophadims) and BL-2 (GPM), BL-1 ticked
+  → only X's BL-1 purchase leaves Comptabilité. A whole BL keeps its rule (every product on it).
 
 - Every other page includes everything. Comptabilité sends `include_non_declared=false`, the Rapport
   `true`. API defaults when the param is missing: `/stats` → exclusions on, `/ventes`, `/achats` → off.
@@ -546,7 +555,7 @@ pie showData
 ### 7.5 Stock (`stock_queries.py`)
 | Rule | Value |
 |---|---|
-| MIN / MAX | round(sales_12m / 300 × 14) / round(sales_12m / 300 × 15) |
+| MIN / MAX | round(sales_12m / 300 × 14) / round(sales_12m / 300 × 15); class C (6–47 sold): 0 / 1 |
 | Coverage days = stock × 365 / sales_12m | ≤ 45 sous-stock · ≤ 60 idéal · ≤ 99 à surveiller · else sur-stock; `negatif` if stock < 0; `inconnu` without 12-month sales |
 | ABCD by units sold in 12 months | ≥ 300 A · ≥ 250 A- · ≥ 200 B+ · ≥ 48 B · ≥ 6 C · 1–5 C- (C-N if sold only in the last 4 months) · 0 D |
 | Default window | Jan–Jun → previous calendar year; Jul–Dec → Jul (Y-1) → Jun (Y) |

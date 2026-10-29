@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models import Achat, Medicament, PharmacyStock, Vente
 from app.analytics.query_parts import Filters, avg_pu_subquery, ca_sum, category_filter, pharma_expr
+from app.analytics.stock_queries import is_class_c
 from app.core.utils import today as pharmacy_today
 
 
@@ -597,9 +598,9 @@ def compute_stock_summary(db: Session, pharmacy_id: int) -> dict:
         units_12m = float(r.units_12m or 0)
         if units_12m <= 0:
             continue  # can't classify products with no recent sales; skip
-        # Match apcm-pharma: stock_min = (ventes_12m / 300) × 14, stock_max = × 15
-        stock_min = (units_12m / 300) * 14
-        stock_max = (units_12m / 300) * 15
+        # Match apcm-pharma: stock_min = (ventes_12m / 300) × 14, stock_max = × 15; class C: 0 / 1
+        stock_min = 0 if is_class_c(units_12m) else (units_12m / 300) * 14
+        stock_max = 1 if is_class_c(units_12m) else (units_12m / 300) * 15
         if stock < stock_min:
             sous_stock += 1
         elif stock > stock_max:

@@ -124,6 +124,8 @@ async function checkScreen(
       ["Ventes sans achat correspondant", v.total_ca],
       ["Marge négative", m.negative.total_ca],
       ["Marge faible (<10%)", m.low.total_ca],
+      ["Marge 60 % à 89,9 %", m.high.total_ca],
+      ["Marge supérieure à 90 %", m.very_high.total_ca],
     ];
     for (const [label, want] of tiles) {
       await expect
@@ -168,6 +170,8 @@ async function checkScreen(
     await checkList(page, "Ventes sans achat correspondant", v.products);
     await checkList(page, "Marge négative", m.negative.products);
     await checkList(page, "Marge faible (<10%)", m.low.products);
+    await checkList(page, "Marge 60 % à 89,9 %", m.high.products);
+    await checkList(page, "Marge supérieure à 90 %", m.very_high.products);
     await checkList(page, "Expirés", p.expired.products);
     await checkList(page, "Très proche (<30j)", p.very_close.products);
     await checkList(page, "Proche (<90j)", p.close.products);

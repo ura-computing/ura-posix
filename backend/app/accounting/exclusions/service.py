@@ -1,25 +1,28 @@
 """Comptabilité exclusions — the ONE place that decides what drops out.
 
-Three kinds, all owner-managed and reversible (Produits spéciaux page):
+Four kinds, all owner-managed and reversible (Produits spéciaux page):
 - **Special product** — `pharmacy_medicament_status.declared = False`.
 - **BL** — an excluded `Achat.delivery_ref`.
 - **Supplier** — an excluded `Achat.supplier` name (accent/case-insensitive).
+- **BL line** — one product on one BL (`pharmacy_bl_line_exclusions`).
 
-They become ONE medicament set (`excluded_medicaments_select`): every product on an
+The first three become ONE medicament set (`excluded_medicaments_select`): every product on an
 excluded BL and every product of an excluded supplier drops from BOTH ventes and
-achats, exactly like a special product.
+achats, exactly like a special product. A BL line removes only those achat lines
+(`achat_filter`): the product's other BLs and its ventes stay.
 
 APPLICATION RULE (user decision 2026-08-01): applied ONLY in Comptabilité
 (`include_non_declared=False`). Every other page includes everything, so callers
 add `vente_filter()` / `achat_filter()` only when `include_non_declared` is False.
 """
 
-from sqlalchemy import func, select, union
+from sqlalchemy import and_, exists, func, select, union
 from sqlalchemy.orm import Session
 
 from app.core.models import (
     Achat,
     PharmacyBlExclusion,
+    PharmacyBlLineExclusion,
     PharmacyMedicamentStatus,
     PharmacySupplierExclusion,
     Vente,
@@ -74,5 +77,14 @@ def vente_filter(db: Session, pharmacy_id: int):
 
 
 def achat_filter(db: Session, pharmacy_id: int):
-    """WHERE clause keeping the Achat rows whose product is not excluded."""
-    return Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id))
+    """WHERE clause keeping the Achat rows whose product is not excluded and that are not an
+    excluded BL line (this product on this BL). No BL line excluded (most pharmacies): no line test."""
+    kept = Achat.medicament_id.notin_(excluded_medicaments_select(db, pharmacy_id))
+    if db.query(PharmacyBlLineExclusion.id).filter(PharmacyBlLineExclusion.pharmacy_id == pharmacy_id).first() is None:
+        return kept
+    excluded_line = exists().where(
+        PharmacyBlLineExclusion.pharmacy_id == pharmacy_id,
+        PharmacyBlLineExclusion.delivery_ref == Achat.delivery_ref,
+        PharmacyBlLineExclusion.medicament_id == Achat.medicament_id,
+    )
+    return and_(kept, ~excluded_line)

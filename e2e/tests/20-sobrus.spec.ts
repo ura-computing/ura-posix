@@ -5,16 +5,18 @@
  *  - form: consent required; a wrong password → the check run refuses it, red card, banner on every
  *    page, one email; « Mettre à jour le mot de passe » → « Connexion vérifiée », banner gone
  *  - « Tout l'historique » → « Importer »: the steps shown live (connexion, import Ventes 2026 paquet
- *    x / y), every year done + 5 empty years per kind, then today's stock; its /stats + stock summary =
- *    the oracle (same data as 02-import)
+ *    x / y), on another page the corner card (step, « Arrêter », then « Terminé »), every year done +
+ *    5 empty years per kind, then today's stock; its /stats + stock summary = the oracle (02-import)
  *  - the nightly run (mode `new`, API: no button) → 0 line (already there); « Choisir les dates »
  *    01/03/2014 → 01/08/2025 = one export per year, newest first (2025-01-01 → 2025-08-01 …
  *    2014-03-01 → 2014-12-31); « Arrêter » a run (slow fake exports)
  *  - password changed on Sobrus → next run refused → banner + email → new password → banner gone
- *  - Spanish; « Déconnecter »; an employee: no menu entry, 404, `GET /sobrus/connection` 403 */
+ *  - Spanish; « Déconnecter »; the admin takes the « Connexion Sobrus » access away → no menu entry,
+ *    404, API 403 `featureDisabled`, then gives it back; an employee: no menu entry, 404,
+ *    `GET /sobrus/connection` 403 */
 import type { Browser, Page } from "@playwright/test";
 
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, apiPut } from "../lib/api";
 import { sessionFile } from "../lib/auth";
 import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
@@ -31,6 +33,7 @@ const CONSENT = "J'autorise PharmaGest à se connecter à mon compte Sobrus pour
 const BANNER_PASSWORD = "La connexion Sobrus ne fonctionne plus : votre mot de passe Sobrus a changé.";
 
 let owner: Page;
+let pharmacyId: number;
 
 async function control(page: Page, body: Record<string, unknown>): Promise<void> {
   const res = await page.request.post(`${FAKE}/__control`, { data: body });
@@ -59,6 +62,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
   const admin = await browser.newContext({ storageState: sessionFile("admin") });
   const adminPage = await admin.newPage();
   const pharmacy = await apiPost(adminPage, "/admin/pharmacies", { name: "Pharmacie Sobrus E2E", city: "Rabat" });
+  pharmacyId = pharmacy.id;
   await apiPost(adminPage, `/admin/pharmacies/${pharmacy.id}/users`, {
     ...OWNER,
     role: "owner",
@@ -132,6 +136,7 @@ test("importer tout l'historique : chaque étape à l'écran, puis les chiffres 
   const page = owner;
   await openSobrus(page);
   await control(page, { delay: 3 }); // each export waits 3 s: every step stays on screen long enough
+  const corner = page.getByRole("region", { name: "Import Sobrus" });
   try {
     await startImport(page, "Tout l'historique");
     const progress = page.locator("section", {
@@ -142,7 +147,8 @@ test("importer tout l'historique : chaque étape à l'écran, puis les chiffres 
     await expect(progress.getByText(/^Téléchargement Achats \d{4} depuis Sobrus… [\d,]+ Mo$/)).toBeVisible({
       timeout: 60_000,
     });
-    await expect(progress.getByText("Connecté à Sobrus", { exact: true })).toBeVisible();
+    // Logged in again, or the session of the check run still open.
+    await expect(progress.getByText(/^(Connecté à Sobrus|Session Sobrus encore ouverte)$/).first()).toBeVisible();
     await expect(
       progress.getByText(/^Achats \d{4} : [\d\s\u00a0\u202f]+ ligne\(s\) ajoutée\(s\)$/).first(),
     ).toBeVisible({
@@ -151,20 +157,30 @@ test("importer tout l'historique : chaque étape à l'écran, puis les chiffres 
     await expect(progress.getByText(/^Téléchargement Ventes \d{4} depuis Sobrus… [\d,]+ Mo$/)).toBeVisible({
       timeout: 120_000,
     });
+    // Any other page: the corner card follows the run, « Arrêter » there too; none on its own page.
+    await expect(corner, "pas de carte sur sa page").toHaveCount(0);
+    await page.locator("aside").getByRole("link", { name: "Tableau de bord", exact: true }).click();
+    await expect(corner.getByText(/^(Téléchargement|Import) Ventes \d{4}/)).toBeVisible({ timeout: 60_000 });
+    await expect(corner.getByRole("button", { name: "Arrêter", exact: true })).toBeEnabled();
   } finally {
     await control(page, { delay: 0 });
   }
+  // Its end, still on the Tableau de bord: « Terminé » in the corner, gone by itself a moment later.
+  await expect(corner.getByText(/^Terminé : [\d\s\u00a0\u202f]+ ligne\(s\) ajoutée\(s\)$/)).toBeVisible({
+    timeout: 10 * 60_000,
+  });
   await runEnded(page);
+  await expect(corner, "partie seule").toHaveCount(0, { timeout: 15_000 });
+  await openSobrus(page);
   await expect(page.getByText(/^Terminé : [\d\s\u00a0\u202f]+ ligne\(s\) ajoutée\(s\)$/).first()).toBeVisible();
   const stockWant = expected().import.stock;
-  await expect(
-    page.getByText(`Stock du jour : ${stockWant.inserted} produit(s) mis à jour`, { exact: true }),
-  ).toBeVisible();
 
   // The robot's run: every year with lines, then 5 empty years, for achats then ventes.
   const [run] = await apiGet(page, "/sobrus/runs");
   expect(run.mode).toBe("full");
   expect(run.status).toBe("success");
+  const stockDone = run.events.find((e: { code: string }) => e.code === "stock_done");
+  expect(stockDone?.n, "« Stock du jour » : produits mis à jour").toBe(stockWant.inserted);
   for (const kind of ["achat", "vente"]) {
     const done = run.events.filter((e: { code: string; kind?: string }) => e.code === "year_done" && e.kind === kind);
     const empty = run.events.filter((e: { code: string; kind?: string }) => e.code === "year_empty" && e.kind === kind);
@@ -251,6 +267,8 @@ test("arrêter un import en cours", async () => {
   await control(page, { delay: 3 }); // each export waits 3 s: time to click
   try {
     await startImport(page, "Tout l'historique");
+    // Once the robot runs (a queued run is cancelled at once, without « Arrêt en cours… »).
+    await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toBeVisible({ timeout: 60_000 });
     const stop = page.getByRole("button", { name: "Arrêter", exact: true });
     await expect(stop).toBeEnabled();
     await stop.click();
@@ -307,6 +325,31 @@ test("en espagnol", async () => {
   await expect(page.getByRole("button", { name: "Conectar mi cuenta Sobrus", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Francés", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Connexion Sobrus" })).toBeVisible();
+});
+
+test("accès « Connexion Sobrus » retiré par l'administrateur → absent du menu, 404 dans le cadre, API refusée", async ({
+  browser,
+}) => {
+  const page = owner;
+  const ctx = await browser.newContext({ storageState: sessionFile("admin") });
+  const admin = await ctx.newPage();
+  const features = `/admin/pharmacies/${pharmacyId}/features`;
+  const menu = page.locator("aside").getByRole("link", { name: "Connexion Sobrus", exact: true });
+  await apiPut(admin, features, { features: { sobrus: false } });
+  try {
+    await page.goto("/rapport");
+    await expect(page.getByRole("heading", { level: 1, name: "Tableau de bord" })).toBeVisible();
+    await expect(menu, "plus dans le menu").toHaveCount(0);
+    await page.goto("/sobrus");
+    await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
+    const refused = await apiGet(page, "/sobrus/connection", {}, 403);
+    expect(refused.code, "API refusée").toBe("featureDisabled");
+  } finally {
+    await apiPut(admin, features, { features: { sobrus: true } });
+    await ctx.close();
+  }
+  await page.goto("/rapport");
+  await expect(menu, "rendu par l'administrateur").toBeVisible();
 });
 
 test.describe("employé", () => {

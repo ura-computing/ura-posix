@@ -1,5 +1,5 @@
 /** /produits/:id — one product of the pharmacy: header (photo, PID / catégorie / TVA, badges,
- *  emplacement, code barre, « Observations », « Modifier »), then « Général », « Statistiques »,
+ *  emplacement, code barre, « Observations »), then « Général », « Statistiques »,
  *  « Traçabilité », « Codes » and « Historique ». One date picker for the page, in the toolbar under
  *  the tabs (Général, Statistiques, Traçabilité). A product with observations opens their window first.
  *  Not one of its products → the 404 inside the layout (never says whether it exists elsewhere). */
@@ -21,7 +21,7 @@ import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { NotesDialog } from "./_components/NotesDialog";
-import { BackToList, EditActions, SheetFacts, SheetMeta } from "./_components/SheetHeader";
+import { BackToList, SheetFacts, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
   useProductNotes,
@@ -60,11 +60,6 @@ function ProductSheetPage({ id }: { id: number }) {
     { id: "codes", label: t("products.tabCodes"), icon: <ScanLine className={icon} /> },
     { id: "history", label: t("products.tabHistory"), icon: <History className={icon} /> },
   ];
-  // The editable values are on Général and Codes: editing starts on Général from the other tabs.
-  const startEditing = () => {
-    editor.start();
-    if (tab === "stats" || tab === "movements") setTab("general");
-  };
   const photo = sheet.info?.images[0] ?? null;
   return (
     <SheetEditContext value={{ editor, sheet }}>
@@ -73,7 +68,6 @@ function ProductSheetPage({ id }: { id: number }) {
         media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
         subtitle={<SheetMeta sheet={sheet} />}
-        actions={<EditActions editor={editor} onStart={startEditing} />}
         below={
           <SheetFacts
             zone={sheet.stock.zone}
@@ -88,11 +82,6 @@ function ProductSheetPage({ id }: { id: number }) {
             toolbar, with its search and filters. */}
         {(tab === "general" || tab === "stats") && (
           <FilterBar dateRange={{ from: range.from, to: range.to, onChange: setRange }} />
-        )}
-        {editor.editing && (
-          <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
-            {t("products.editHint")}
-          </p>
         )}
         {tab === "general" && (
           <GeneralTab sheet={sheet} stats={stats} range={range} onShowMovements={() => setTab("movements")} />

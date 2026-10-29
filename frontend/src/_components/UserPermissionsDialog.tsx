@@ -86,15 +86,18 @@ function PermissionsBody({
   /** A feature is locked when ANY ceiling layer disallows it. */
   const isLocked = (key: FeatureKey) => ceilings.some((layer) => !layer.values[key]);
 
+  // An employee's dialog leaves out the owners-only accesses (« Connexion Sobrus »).
+  const shown = FEATURES.filter((f) => !f.ownerOnly || user.role === "owner");
+
   const enableAllPossible = () => {
     const next: Record<FeatureKey, boolean> = { ...pending };
-    for (const f of FEATURES) {
+    for (const f of shown) {
       if (!isLocked(f.key)) next[f.key] = true;
     }
     setPending(next);
   };
 
-  const isDirty = FEATURES.some((f) => pending[f.key] !== serverPermissions[f.key]);
+  const isDirty = shown.some((f) => pending[f.key] !== serverPermissions[f.key]);
 
   /** Tooltip text on a locked toggle — names the FIRST blocking layer. */
   const lockReason = (key: FeatureKey): string => {
@@ -144,7 +147,7 @@ function PermissionsBody({
         {/* Permission grid */}
         <div className="flex-1 overflow-auto p-5">
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => {
+            {shown.map((f) => {
               const locked = isLocked(f.key);
               const userOn = !locked && pending[f.key];
               const Icon = f.icon;

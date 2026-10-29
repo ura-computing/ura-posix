@@ -122,7 +122,13 @@ const achatsReads = (): Read[] => [
   API.achats.supplierSummary,
   API.achats.suggestions,
 ];
-const blExclusionReads = (): Read[] => [API.blExclusions.list, API.blExclusions.search, API.blExclusions.detail];
+const blExclusionReads = (): Read[] => [
+  API.blExclusions.list,
+  API.blExclusions.search,
+  API.blExclusions.detail,
+  API.blLineExclusions.list,
+  API.blLineExclusions.lines,
+];
 const supplierExclusionReads = (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search];
 
 export const API = {
@@ -378,6 +384,7 @@ export const API = {
       url: "/special-products/reintegrate",
       refreshes: (): Read[] => [API.specialProducts.list, API.specialProducts.suggestions, ...afterExclusion()],
     },
+    note: { url: "/special-products/note", refreshes: (): Read[] => [API.specialProducts.list] },
   },
   blExclusions: {
     list: { url: "/bl-exclusions/", key: ["bl-exclusions", "list"] },
@@ -399,6 +406,25 @@ export const API = {
       url: "/bl-exclusions/reintegrate",
       refreshes: (): Read[] => [API.blExclusions.list, API.blExclusions.search, ...afterExclusion()],
     },
+    note: { url: "/bl-exclusions/note", refreshes: (): Read[] => [API.blExclusions.list] },
+  },
+  // « Exclure un produit d'un BL »: only those achat lines leave Comptabilité.
+  blLineExclusions: {
+    list: { url: "/bl-line-exclusions/", key: ["bl-line-exclusions", "list"] },
+    lines: {
+      url: "/bl-line-exclusions/lines",
+      key: (medicamentId: number) => ["bl-line-exclusions", "lines", medicamentId] as const,
+      all: ["bl-line-exclusions", "lines"],
+    },
+    exclude: {
+      url: "/bl-line-exclusions/",
+      refreshes: (): Read[] => [API.blLineExclusions.list, API.blLineExclusions.lines, ...afterExclusion()],
+    },
+    reintegrate: {
+      url: "/bl-line-exclusions/reintegrate",
+      refreshes: (): Read[] => [API.blLineExclusions.list, API.blLineExclusions.lines, ...afterExclusion()],
+    },
+    note: { url: "/bl-line-exclusions/note", refreshes: (): Read[] => [API.blLineExclusions.list] },
   },
   supplierExclusions: {
     list: {
@@ -418,6 +444,7 @@ export const API = {
       url: "/supplier-exclusions/reintegrate",
       refreshes: (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search, ...afterExclusion()],
     },
+    note: { url: "/supplier-exclusions/note", refreshes: (): Read[] => [API.supplierExclusions.list] },
   },
   categorySuffixes: {
     list: { url: "/category-suffixes", key: ["category-suffixes", "list"] },

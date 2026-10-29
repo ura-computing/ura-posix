@@ -1,4 +1,4 @@
-/** On every page, for owners with Import: « Connexion Sobrus » stopped working (password changed on
+/** On every page, for owners with the « Connexion Sobrus » access: « Connexion Sobrus » stopped working (password changed on
  *  Sobrus, or Sobrus asks a check) — the nightly imports are paused until it is fixed. One button
  *  to the page that fixes it. Hidden on that page (it shows the form itself). */
 import { CircleAlert } from "lucide-react";

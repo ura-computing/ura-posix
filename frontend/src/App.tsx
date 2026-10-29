@@ -116,6 +116,8 @@ export default function App() {
           <Route element={<RequireFeature feature="import" />}>
             <Route path={ROUTES.IMPORTS} element={<ImportsPage />} />
             <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
+          </Route>
+          <Route element={<RequireFeature feature="sobrus" />}>
             <Route element={<RequireRole role={ROLES.OWNER} />}>
               <Route path={ROUTES.SOBRUS} element={<SobrusPage />} />
             </Route>

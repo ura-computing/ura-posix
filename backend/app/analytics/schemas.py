@@ -157,8 +157,8 @@ class StockRow(BaseModel):
     product: str
     category: str  # A | A- | B+ | B | C | C- | C-N | D
     units_sold_12m: int
-    stock_min: int  # round(ventes_12m / 300 × 14)
-    stock_max: int  # round(ventes_12m / 300 × 15)
+    stock_min: int  # round(ventes_12m / 300 × 14); class C (6-47): 0
+    stock_max: int  # round(ventes_12m / 300 × 15); class C (6-47): 1
     current_stock: int | None
     ppv: float | None
     avg_pu: float | None

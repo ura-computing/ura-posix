@@ -4,8 +4,8 @@
  *  every year (« Historique des ventes (par année) »); the 5 latest purchases / sales;
  *  « Performance » = ventes / achats over the page dates (toolbar under the tabs, the current year
  *  first) + % vs the period just before. */
-import { useContext, type ReactNode } from "react";
-import { ArrowRight, Pencil, ShoppingCart, Truck } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, ShoppingCart, Truck } from "lucide-react";
 
 import { Button } from "@/_components/button";
 import { DataTable, type ColumnDef } from "@/_components/DataTable";
@@ -19,8 +19,7 @@ import { formatDate, formatMAD, formatMoney, formatQty, pctChange } from "@/util
 
 import type { FormField, StatsRange } from "../hooks";
 import { tvaShort, withoutRate } from "../labels";
-import { Editable, type EditKind } from "./Editable";
-import { SheetEditContext } from "./editContext";
+import { EditHint, Editable, SectionEditActions, type EditKind } from "./Editable";
 import { KindBadge } from "./KindBadge";
 import { FieldList, SheetCard, TileNumber, type Field } from "./SheetCard";
 import { historyLines, LINE_TONE, yearColumns, type HistoryLine } from "./yearHistory";
@@ -59,19 +58,6 @@ const movementColumns = (t: TFn): ColumnDef<ProductMovement>[] => [
 ];
 
 /** « Éditer » of a block: the same edit mode as « Modifier » (owner only, shown disabled otherwise). */
-function EditBlockButton() {
-  const t = useT();
-  const ctx = useContext(SheetEditContext);
-  if (!ctx) return null;
-  const { editor } = ctx;
-  return (
-    <Button variant="outline" size="sm" onClick={editor.start} disabled={!editor.canEdit || editor.editing}>
-      <Pencil className="size-3.5" />
-      {t("products.editBlock")}
-    </Button>
-  );
-}
-
 /** Next to the expiry date: « Périmé » (past), « Moins de 30 jours » (red), « Moins de 90 jours »
  *  (orange); nothing further away. */
 function ExpiryHint({ iso }: { iso: string }) {
@@ -119,7 +105,7 @@ export function GeneralTab({
   const editable = (field: FormField, label: string, value: ReactNode, kind: EditKind = "text"): Field => ({
     label,
     value: (
-      <Editable field={field} kind={kind} label={label}>
+      <Editable field={field} kind={kind} label={label} section="infos">
         {value ?? missing}
       </Editable>
     ),
@@ -154,7 +140,8 @@ export function GeneralTab({
 
       {/* 3 parts side by side, like a pharmacy software sheet. Catégorie and TVA without their rate
           (« Médicament », « Exonéré »); edit mode keeps the text. PID: header and Codes tab. */}
-      <SheetCard title={t("products.infos")} actions={<EditBlockButton />}>
+      <SheetCard title={t("products.infos")} actions={<SectionEditActions section="infos" />}>
+        <EditHint section="infos" />
         <div className="grid gap-6 lg:grid-cols-3">
           <InfoGroup
             title={t("products.generalData")}

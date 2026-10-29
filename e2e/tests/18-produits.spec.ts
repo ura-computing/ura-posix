@@ -29,9 +29,10 @@
  *  Général: emplacement + date de péremption (file) with « Périmé » / < 30 j / < 90 j.
  *  « Observations »: add, the window at opening (click, scan), list badge, employee rights, delete;
  *  « Fermer » when there is none to read.
- *  « Modifier » (owner): edit + Enregistrer → « modifié », list and sheet show his values; a stock
- *  import keeps them; « Éditer » of a block = the same edit mode; « Revenir à la valeur importée »,
- *  « Annuler », min > max refused. Employee: « Modifier » and « Éditer » disabled + reason, PUT refused.
+ *  « Modifier » (owner) on each block (« Informations générales », « Identifiants du produit »): its
+ *  values only, « Annuler » / « Enregistrer » next to it → « modifié », list and sheet show his values;
+ *  a stock import keeps them; « Revenir à la valeur importée », « Annuler », min > max refused.
+ *  Employee: the block's « Modifier » disabled + reason, PUT refused.
  *  An employee sees the list + a sheet; feature OFF → no menu entry, 404 inside the layout. */
 import type { Locator, Page } from "@playwright/test";
 
@@ -428,15 +429,12 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     await other.locator("tbody").getByText(first.product, { exact: true }).click();
     expectSame(await sheet, expected().products.sheets[first.pid], "fiche (employé)");
     await expect(
-      other.getByRole("button", { name: "Modifier", exact: true }),
+      section(other, "Informations générales").getByRole("button", { name: "Modifier", exact: true }),
       "employé : lecture seule",
     ).toBeDisabled();
     await expect(other.getByRole("button", { name: "Imprimer", exact: true }), "employé : pas d'imprimer").toHaveCount(
       0,
     );
-    const blocks = other.getByRole("button", { name: "Éditer", exact: true });
-    await expect(blocks, "« Éditer » de Informations générales").toHaveCount(1);
-    for (const button of await blocks.all()) await expect(button).toBeDisabled();
     await expect(other.getByText("Seul le propriétaire peut modifier ce produit.")).toBeVisible();
     const refused = await apiPut(other, `/products/${got.data[0].id}`, { ppv: 1 }, 403);
     expect(refused.code, "PUT par un employé").toBe("ownerOnly");
@@ -590,15 +588,18 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
         );
       }
 
-      // Traçabilité récente: the 5 latest lines.
+      // Traçabilité récente: the 5 latest lines (its own table: the sales by year come first).
       const moves: Row[] = e.recent_movements;
       if (moves.length === 0) await expect(page.getByText("Aucun achat ni vente pour ce produit.")).toBeVisible();
       else {
-        expect(await columnTexts(page, "Type"), "types").toEqual(
+        const recent = section(page, "Traçabilité récente").locator("table");
+        expect(await columnTexts(page, "Type", recent), "types").toEqual(
           moves.map((m) => (m.kind === "achat" ? "Achat" : "Vente")),
         );
-        expect(await columnTexts(page, "Référence"), "références").toEqual(moves.map((m) => m.document ?? "—"));
-        expect((await columnTexts(page, "Quantité")).map(frNumber), "quantités").toEqual(moves.map((m) => m.quantity));
+        expect(await columnTexts(page, "Référence", recent), "références").toEqual(moves.map((m) => m.document ?? "—"));
+        expect((await columnTexts(page, "Quantité", recent)).map(frNumber), "quantités").toEqual(
+          moves.map((m) => m.quantity),
+        );
       }
     });
   }
@@ -784,7 +785,7 @@ test("fiche produit: en espagnol (onglets, blocs, boutons), choix gardé, retour
   for (const label of ["Ventas", "Compras"]) {
     await expect(section(page, "Rendimiento").getByText(label, { exact: true }), label).toBeVisible();
   }
-  await expect(page.getByRole("button", { name: "Editar", exact: true }), "Editar + 1 « Editar »").toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Editar", exact: true }), "« Editar » del bloque").toHaveCount(1);
   await expect(page.getByRole("link", { name: "Volver a la lista de productos", exact: true })).toBeVisible();
   await page.reload(); // the language is remembered
   await expect(page.getByRole("tab", { name: "Estadísticas", exact: true })).toBeVisible();
@@ -1661,22 +1662,32 @@ test.describe("modifier", () => {
     const plan = editPlan(e);
     const { id } = await openSheet(page, pid);
 
-    await page.getByRole("button", { name: "Modifier", exact: true }).click();
-    await expect(page.getByText("Ces valeurs comptent seulement pour votre pharmacie")).toBeVisible();
-    // The type (Pharmacie / Parapharmacie) stays the catalogue's: no switch for it.
-    await expect(page.getByRole("button", { name: "Parapharmacie", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Pharmacie", exact: true })).toHaveCount(0);
-    for (const tab of ["Général", "Codes"] as const) {
-      await page.getByRole("tab", { name: tab, exact: true }).click(); // still editing on each tab
-      for (const f of plan.filter((x) => x.tab === tab)) await page.getByLabel(f.label, { exact: true }).fill(f.typed);
-    }
-    const put = page.waitForResponse((r) => r.url().endsWith(`/v1/products/${id}`) && r.request().method() === "PUT");
-    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
-    const res = await put;
-    expect(res.status(), "PUT /products/{id}").toBe(200);
-    expect(res.request().postDataJSON(), "seuls les champs changés").toEqual(
-      Object.fromEntries(plan.map((f) => [f.field, f.sent])),
-    );
+    // One block at a time: its « Modifier », its values, its « Enregistrer » → only its changed values sent.
+    const saveBlock = async (tab: "Général" | "Codes", title: string) => {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
+      const block = section(page, title);
+      await block.getByRole("button", { name: "Modifier", exact: true }).click();
+      await expect(block.getByText("Ces valeurs comptent seulement pour votre pharmacie")).toBeVisible();
+      // The type (Pharmacie / Parapharmacie) stays the catalogue's: no switch for it.
+      await expect(page.getByRole("button", { name: "Parapharmacie", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Pharmacie", exact: true })).toHaveCount(0);
+      const fields = plan.filter((x) => x.tab === tab);
+      for (const f of fields) await page.getByLabel(f.label, { exact: true }).fill(f.typed);
+      const put = page.waitForResponse((r) => r.url().endsWith(`/v1/products/${id}`) && r.request().method() === "PUT");
+      await block.getByRole("button", { name: "Enregistrer", exact: true }).click();
+      const res = await put;
+      expect(res.status(), `PUT /products/{id} (${title})`).toBe(200);
+      expect(res.request().postDataJSON(), `${title} : seuls ses champs changés`).toEqual(
+        Object.fromEntries(fields.map((f) => [f.field, f.sent])),
+      );
+      await expect(
+        block.getByRole("button", { name: "Modifier", exact: true }),
+        "fin de la modification",
+      ).toBeVisible();
+      return res;
+    };
+    await saveBlock("Général", "Informations générales");
+    const res = await saveBlock("Codes", "Identifiants du produit");
     const ppv = plan.find((f) => f.field === "ppv")?.sent as number;
     expectSame(
       await res.json(),
@@ -1697,8 +1708,7 @@ test.describe("modifier", () => {
       },
       "fiche après Enregistrer",
     );
-    await expect(page.getByText("Fiche enregistrée")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Modifier", exact: true }), "fin de la modification").toBeVisible();
+    await expect(page.getByText("Fiche enregistrée").first()).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: `${e.product} (pharmacie)`, exact: true })).toBeVisible();
     await expect(page.getByText("modifié", { exact: true }), "« modifié » sur « Codes »").toHaveCount(2);
     await page.getByRole("tab", { name: "Général", exact: true }).click();
@@ -1766,14 +1776,18 @@ test.describe("modifier", () => {
       if (r.method() === "PUT") puts += 1;
     });
 
-    // « Éditer » of each block = the same edit mode (« Annuler » / « Enregistrer » in the header).
-    for (const block of ["Stock", "Informations générales"]) {
-      await section(page, block).getByRole("button", { name: "Éditer", exact: true }).click();
-      await expect(page.getByLabel("Stock actuel", { exact: true }), `${block} : saisie`).toBeEditable();
-      await expect(page.getByLabel("PPV", { exact: true }), `${block} : saisie`).toBeEditable();
-      await expect(section(page, block).getByRole("button", { name: "Éditer", exact: true })).toBeDisabled();
-      await page.getByRole("button", { name: "Annuler", exact: true }).click();
-    }
+    // « Modifier » of a block opens its values only; the other block waits (one at a time).
+    const infos = section(page, "Informations générales");
+    await infos.getByRole("button", { name: "Modifier", exact: true }).click();
+    await expect(page.getByLabel("Stock actuel", { exact: true }), "Informations : saisie").toBeEditable();
+    await expect(page.getByLabel("PPV", { exact: true }), "Informations : saisie").toBeEditable();
+    await page.getByRole("tab", { name: "Codes", exact: true }).click();
+    const codes = section(page, "Identifiants du produit");
+    await expect(codes.getByRole("button", { name: "Modifier", exact: true }), "un bloc à la fois").toBeDisabled();
+    await expect(page.getByLabel("Code barre 1", { exact: true }), "Codes : pas en saisie").toHaveCount(0);
+    await page.getByRole("tab", { name: "Général", exact: true }).click();
+    await infos.getByRole("button", { name: "Annuler", exact: true }).click();
+    await expect(infos.getByRole("button", { name: "Modifier", exact: true })).toBeEnabled();
 
     // « Annuler »: nothing sent, nothing changed.
     await page.getByRole("button", { name: "Modifier", exact: true }).click();

@@ -2,7 +2,8 @@
 
 Ported verbatim from apcm-pharma's `routers/stats/stock.py` +
 `routers/stats/peremptions.py`. Formulas are LOCKED (PG-001/002/008 + the
-client-confirmed `_stock_min_for` / `_stock_max_for` of 2026-06-15).
+client-confirmed `_stock_min_for` / `_stock_max_for` of 2026-06-15; class C fixed at
+min 0 / max 1 on 2026-10-29).
 
 ABCD class thresholds (lines per units_sold_12m):
     A  ≥300, A- 250-299, B+ 200-249, B 48-199, C 6-47, C-/C-N 1-5, D 0
@@ -70,17 +71,25 @@ def _stock_status_from_coverage(current_stock: int | None, units_sold_12m: int) 
     return "sur-stock"
 
 
+def is_class_c(units_sold_12m: float) -> bool:
+    """Class C of `_classify_abcd` (6-47 units in 12 months): the lowest sellers kept in stock,
+    min 0 / max 1 whatever the formula gives (client 2026-10-29)."""
+    return 6 <= units_sold_12m < 48
+
+
 def _stock_min_for(units_sold_12m: int) -> int:
-    """round(ventes_12m / 300 × 14). Client formula 2026-06-15."""
-    if not units_sold_12m or units_sold_12m <= 0:
+    """round(ventes_12m / 300 × 14). Client formula 2026-06-15; class C: 0."""
+    if not units_sold_12m or units_sold_12m <= 0 or is_class_c(units_sold_12m):
         return 0
     return round(units_sold_12m / 300 * 14)
 
 
 def _stock_max_for(units_sold_12m: int) -> int:
-    """round(ventes_12m / 300 × 15). One extra day above the min."""
+    """round(ventes_12m / 300 × 15). One extra day above the min; class C: 1."""
     if not units_sold_12m or units_sold_12m <= 0:
         return 0
+    if is_class_c(units_sold_12m):
+        return 1
     return round(units_sold_12m / 300 * 15)
 
 

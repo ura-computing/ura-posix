@@ -17,6 +17,7 @@ class SpecialProductOut(BaseModel):
     product: str
     pid: str
     category: str | None = None
+    notes: str | None = None
     created_at: str
 
 
@@ -124,6 +125,68 @@ class BlReintegrateResult(BaseModel):
     delivery_refs: list[str]
 
 
+# ═══ BL line exclusions ══════════════════════════════════════════════════════
+# « Exclure un produit d'un BL »: the same product bought on several BLs, only some of them left
+# out of Comptabilité (those achat lines only; its other BLs and its ventes stay).
+
+
+class ProductBlLine(BaseModel):
+    """One BL holding the product (its lines of that product added up)."""
+
+    delivery_ref: str
+    supplier: str | None
+    delivery_date: str | None
+    quantity: float
+    total: float
+    nb_lines: int
+    already_excluded: bool
+    exclusion_id: int | None = None  # set when already excluded (« Réintégrer » = untick)
+
+
+class ProductBlLines(BaseModel):
+    medicament_id: int
+    pid: str
+    product: str
+    lines: list[ProductBlLine]  # newest BL first
+
+
+class BlLineExclusionOut(BaseModel):
+    """An excluded product-on-a-BL, for the list table."""
+
+    id: int
+    delivery_ref: str
+    supplier: str | None
+    delivery_date: str | None
+    medicament_id: int
+    pid: str
+    product: str
+    quantity: float
+    total: float
+    notes: str | None
+    created_at: str
+
+
+class BlLineExclusionCreate(BaseModel):
+    medicament_id: int
+    delivery_refs: list[str]
+    notes: str | None = None
+
+
+class BlLineExclusionResult(BaseModel):
+    excluded: int  # newly excluded BLs
+    already_excluded: int
+    ids: list[int]  # every exclusion of these BLs (« Annuler » = reintegrate them)
+
+
+class BlLineReintegrate(BaseModel):
+    ids: list[int]
+
+
+class BlLineReintegrateResult(BaseModel):
+    reintegrated: int
+    not_excluded: int
+
+
 # ═══ Supplier exclusions ═════════════════════════════════════════════════════
 # Schemas for supplier (fournisseur) exclusions.
 #
@@ -173,3 +236,27 @@ class SupplierReintegrateResult(BaseModel):
     reintegrated: int
     not_excluded: int
     suppliers: list[str]
+
+
+# ═══ Notes ═══════════════════════════════════════════════════════════════════
+# « Ajouter une note » on an excluded line, after the exclusion (empty text = no note).
+
+
+class NoteIn(BaseModel):
+    notes: str | None = Field(None, max_length=500)
+
+
+class SpecialProductNote(NoteIn):
+    medicament_id: int
+
+
+class BlNote(NoteIn):
+    delivery_ref: str
+
+
+class SupplierNote(NoteIn):
+    supplier: str
+
+
+class BlLineNote(NoteIn):
+    id: int

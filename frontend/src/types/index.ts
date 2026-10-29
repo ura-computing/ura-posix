@@ -29,6 +29,7 @@ export const FEATURES = [
   "alertes",
   "special_products",
   "produits",
+  "sobrus",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 

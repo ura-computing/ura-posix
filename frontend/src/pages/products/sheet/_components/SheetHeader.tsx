@@ -1,17 +1,15 @@
 /** Top of the product sheet, on every tab, in 3 bands: « Retour à la liste des produits »; the name +
- *  one line « PID · Catégorie · TVA » + type and stock badges, « Modifier » (owner) / « Annuler » +
- *  « Enregistrer »; 3 tiles « Emplacement », « Code barre », « Observations » (Tableau de bord tiles). */
-import { ArrowLeft, Barcode, ChevronRight, MapPin, Pencil, Save, StickyNote, X } from "lucide-react";
+ *  one line « PID · Catégorie · TVA » + type and stock badges; 3 tiles « Emplacement », « Code barre »,
+ *  « Observations » (Tableau de bord tiles). « Modifier » is on each editable block (`Editable.tsx`). */
+import { ArrowLeft, Barcode, ChevronRight, MapPin, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { AsyncButton } from "@/_components/AsyncButton";
 import { KpiTile } from "@/_components/KpiTile";
 import { TypeBadge } from "@/_components/TypeBadge";
 import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 
-import type { SheetEditor } from "../hooks";
 import { tvaShort, withoutRate } from "../labels";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
@@ -129,40 +127,6 @@ export function SheetFacts({
           </span>
         </span>
       </KpiTile>
-    </div>
-  );
-}
-
-/** Owner: « Modifier », then « Annuler » + « Enregistrer ». Employee: « Modifier » shown,
- *  disabled, with the reason under it. */
-export function EditActions({ editor, onStart }: { editor: SheetEditor; onStart: () => void }) {
-  const t = useT();
-  if (editor.editing) {
-    return (
-      <>
-        <AsyncButton variant="secondary" onClick={editor.cancel} disabled={editor.isSaving}>
-          <X className="size-4" />
-          {t("common.cancel")}
-        </AsyncButton>
-        <AsyncButton
-          variant="primary"
-          onClick={() => void editor.save()}
-          isLoading={editor.isSaving}
-          loadingText={t("products.saving")}
-        >
-          <Save className="size-4" />
-          {t("common.save")}
-        </AsyncButton>
-      </>
-    );
-  }
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <AsyncButton variant="primary" onClick={onStart} disabled={!editor.canEdit}>
-        <Pencil className="size-4" />
-        {t("common.edit")}
-      </AsyncButton>
-      {!editor.canEdit && <span className="text-xs text-muted-foreground">{t("products.ownerOnly")}</span>}
     </div>
   );
 }

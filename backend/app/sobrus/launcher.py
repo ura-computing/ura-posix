@@ -22,7 +22,7 @@ from pathlib import Path
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import SessionLocal
-from app.core.models import SobrusConnection, SobrusRun
+from app.core.models import PharmacyFeature, SobrusConnection, SobrusRun
 from app.core.utils import PHARMACY_TZ
 
 log = logging.getLogger("uvicorn.error")
@@ -45,13 +45,22 @@ def wake() -> None:
 
 
 def schedule_nightly() -> None:
-    """Tonight's « new » run per active connection, once a day after NIGHTLY_HOUR (Casablanca)."""
+    """Tonight's « new » run per active connection, once a day after NIGHTLY_HOUR (Casablanca); not
+    for a pharmacy whose « Connexion Sobrus » access the admin took away."""
     now = datetime.now(PHARMACY_TZ)
     if now.hour < NIGHTLY_HOUR:
         return
     since = datetime.combine(now.date(), time(NIGHTLY_HOUR), PHARMACY_TZ)
     with SessionLocal() as db:
-        for conn in db.query(SobrusConnection).filter(SobrusConnection.status == "active").all():
+        allowed = (
+            db.query(PharmacyFeature.pharmacy_id)
+            .filter(PharmacyFeature.feature == "sobrus", PharmacyFeature.enabled.is_(True))
+            .scalar_subquery()
+        )
+        active = db.query(SobrusConnection).filter(
+            SobrusConnection.status == "active", SobrusConnection.pharmacy_id.in_(allowed)
+        )
+        for conn in active.all():
             done = (
                 db.query(SobrusRun.id)
                 .filter(SobrusRun.pharmacy_id == conn.pharmacy_id, SobrusRun.created_at >= since)

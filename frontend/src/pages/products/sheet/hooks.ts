@@ -304,11 +304,15 @@ function editSchema(t: TFn) {
 
 /** The owner's « Modifier »: a form over what the sheet shows; « Enregistrer » sends the changed
  *  fields only; « Revenir à la valeur importée » clears one edit. Employees: read only. */
+/** The sheet's editable blocks: « Informations générales » (Général) and « Identifiants » (Codes). */
+export type EditSection = "infos" | "codes";
+
 export function useSheetEditor(sheet: ProductSheet | null) {
   const t = useT();
   const qc = useQueryClient();
   const { me } = useMe();
-  const [editing, setEditing] = useState(false);
+  // The block being edited (one at a time), its « Modifier » / « Enregistrer » next to it.
+  const [section, setSection] = useState<EditSection | null>(null);
   const form = useForm<EditValues>();
   const { mutateAsync, isPending } = useMutation({
     mutationFn: ({ id, body }: { id: number; body: ProductEditIn }) =>
@@ -319,12 +323,12 @@ export function useSheetEditor(sheet: ProductSheet | null) {
     },
   });
 
-  const start = () => {
+  const start = (block: EditSection) => {
     if (!sheet) return;
     form.reset(toForm(sheet));
-    setEditing(true);
+    setSection(block);
   };
-  const cancel = () => setEditing(false);
+  const cancel = () => setSection(null);
 
   const save = async () => {
     if (!sheet) return;
@@ -344,7 +348,7 @@ export function useSheetEditor(sheet: ProductSheet | null) {
       await mutateAsync({ id: sheet.id, body });
       toast.success(t("products.saved"));
     }
-    setEditing(false);
+    setSection(null);
   };
 
   const revert = async (field: FormField) => {
@@ -353,7 +357,7 @@ export function useSheetEditor(sheet: ProductSheet | null) {
 
   return {
     canEdit: me?.role === "owner",
-    editing,
+    section,
     start,
     cancel,
     save,

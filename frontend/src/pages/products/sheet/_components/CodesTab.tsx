@@ -11,7 +11,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { ScanDialog } from "../../_components/ScanDialog";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
-import { Editable } from "./Editable";
+import { EditHint, Editable, SectionEditActions } from "./Editable";
 import { SheetCard } from "./SheetCard";
 
 function InfoNote({ children }: { children: ReactNode }) {
@@ -47,7 +47,8 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   const drawn = sheet.barcode1 ?? sheet.barcode2;
   return (
     <div className="max-w-3xl">
-      <SheetCard title={t("products.identifiers")}>
+      <SheetCard title={t("products.identifiers")} actions={<SectionEditActions section="codes" />}>
+        <EditHint section="codes" />
         <InfoNote>{t("products.pidInfo")}</InfoNote>
         <dl className="flex flex-col gap-3">
           <CodeRow
@@ -60,7 +61,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
               key={field}
               label={t("products.barcodeN", { n })}
               value={
-                <Editable field={field} label={t("products.barcodeN", { n })}>
+                <Editable field={field} label={t("products.barcodeN", { n })} section="codes">
                   {code ?? missing}
                 </Editable>
               }

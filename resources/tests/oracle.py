@@ -123,6 +123,13 @@ def abcd_class(units: int, units_4m: int, units_before: int) -> str:
     return "D"
 
 
+def stock_min_max(units: float) -> tuple[float, float]:
+    """(ventes_12m / 300) × 14 / × 15, unrounded; class C (6-47 units): 0 / 1 (client 2026-10-29)."""
+    if 6 <= units < 48:
+        return 0, 1
+    return units / 300 * 14, units / 300 * 15
+
+
 def coverage_status(stock: int | None, units_12m: int) -> str:
     if stock is None: return "inconnu"
     if stock < 0: return "negatif"
@@ -364,9 +371,10 @@ class Oracle:
             u = units.get(p.pid, 0.0)
             if u <= 0:
                 continue
-            if p.stock < u / 300 * 14:
+            lo, hi = stock_min_max(u)
+            if p.stock < lo:
                 sous += 1
-            elif p.stock > u / 300 * 15:
+            elif p.stock > hi:
                 sur += 1
             else:
                 band += 1
@@ -402,8 +410,8 @@ class Oracle:
             pu = self.pu_alltime.get(p.pid)                    # no date filter in compute_stock_abcd
             products.append({
                 "product": p.name, "category": cls, "units_sold_12m": units,
-                "stock_min": round(units / 300 * 14) if units > 0 else 0,
-                "stock_max": round(units / 300 * 15) if units > 0 else 0,
+                "stock_min": round(stock_min_max(units)[0]) if units > 0 else 0,
+                "stock_max": round(stock_min_max(units)[1]) if units > 0 else 0,
                 "current_stock": p.stock, "ppv": r2(p.ppv),
                 "avg_pu": r4(pu) if pu is not None else None,
                 "status": coverage_status(p.stock, units),
@@ -464,8 +472,8 @@ class Oracle:
             },
             "stock": {
                 "current_stock": stock, "units_sold_12m": units,
-                "stock_min": round(units / 300 * 14) if units > 0 else 0,
-                "stock_max": round(units / 300 * 15) if units > 0 else 0,
+                "stock_min": round(stock_min_max(units)[0]) if units > 0 else 0,
+                "stock_max": round(stock_min_max(units)[1]) if units > 0 else 0,
                 "sales_from": start.isoformat(), "sales_to": end.isoformat(),
                 "coverage_days": round(stock * 365 / units) if stock is not None and stock >= 0 and units > 0 else None,
                 "status": coverage_status(stock, units),
@@ -1160,11 +1168,12 @@ class Oracle:
         return q if hits == [p] else None
 
     def exclusion_scenario(self) -> dict:
-        """1 special product + 1 BL (found by one of its products) + 1 supplier.
-        Comptabilité (include_non_declared=false) drops them med-level
+        """1 special product + 1 BL (found by one of its products) + 1 supplier + 1 product on one
+        of its BLs. Comptabilité (include_non_declared=false) drops the first three med-level
         (exclusions.excluded_medicaments_select): the product, EVERY product on the
-        BL and EVERY product of the supplier leave ventes AND achats. Its /stats
-        is the plain oracle run on what is left."""
+        BL and EVERY product of the supplier leave ventes AND achats. The BL line drops only that
+        product's achat lines on that BL (exclusions.achat_filter). Its /stats is the plain oracle
+        run on what is left."""
         by_ref: dict[str, list] = defaultdict(list)
         for a in self.achats:
             by_ref[a.ref].append(a)
@@ -1200,8 +1209,34 @@ class Oracle:
 
         suppliers = sorted({a.supplier for a in self.achats})
         excluded = {special.pid} | bl_pids | from_supplier
+
+        # BL line: a product (none of the above) bought on several BLs from 2+ suppliers, findable
+        # alone by name; its newest BL of the window leaves, its other BLs and its ventes stay.
+        def lines_of(p) -> list[dict]:
+            refs: dict[str, list] = defaultdict(list)
+            for a in self.achats:
+                if a.p.pid == p.pid:
+                    refs[a.ref].append(a)
+            return [{"delivery_ref": r, "supplier": max(a.supplier for a in ls),
+                     "delivery_date": max(a.day for a in ls).isoformat(),
+                     "quantity": sum(a.qty for a in ls), "total": r2(sum(a.total for a in ls)),
+                     "nb_lines": len(ls), "already_excluded": False}
+                    for r, ls in sorted(refs.items(), key=lambda kv: max(a.day for a in kv[1]), reverse=True)]
+
+        line_holder = next(
+            p for p in self.products
+            if p.pid not in excluded and p.pid in bought and self.unique_query(p)
+            and len({a.ref for a in self.achats if a.p.pid == p.pid}) >= 3
+            and len({a.supplier for a in self.achats if a.p.pid == p.pid}) >= 2
+            and any(a.p.pid == p.pid for a in self.aw))
+        line_ref = max((a for a in self.aw if a.p.pid == line_holder.pid), key=lambda a: (a.day, a.ref)).ref
+        line_rows = lines_of(line_holder)
+        line = next(r for r in line_rows if r["delivery_ref"] == line_ref)
+
         compta = Oracle(self.products, [v for v in self.ventes if v.p.pid not in excluded],
-                        [a for a in self.achats if a.p.pid not in excluded], self.today, self.df, self.dt)
+                        [a for a in self.achats if a.p.pid not in excluded
+                         and not (a.ref == line_ref and a.p.pid == line_holder.pid)],
+                        self.today, self.df, self.dt)
         return {
             "special": {
                 "query": self.unique_query(special), "pid": special.pid, "product": special.name,
@@ -1222,6 +1257,12 @@ class Oracle:
                            if all(token_match(s, t, unaccent=True) for t in tokenize(SUPPLIER_QUERY))],
                 "search_grossiste": sorted((supplier(s) for s in suppliers if is_grossiste(s)),
                                            key=lambda r: r["total"], reverse=True),
+            },
+            "bl_line": {
+                "pid": line_holder.pid, "product": line_holder.name, "query": self.unique_query(line_holder),
+                "lines": line_rows, "ref": line_ref, "supplier": line["supplier"],
+                "excluded": {k: line[k] for k in ("delivery_ref", "supplier", "delivery_date", "quantity", "total")}
+                | {"pid": line_holder.pid, "product": line_holder.name},
             },
             "excluded_pids": sorted(excluded),
             "stats": {ct: compta.stats(ct) for ct in CATEGORY_TYPES},

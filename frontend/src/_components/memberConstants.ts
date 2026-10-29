@@ -1,4 +1,4 @@
-/** Single source of truth for the 10 permission features rendered on the admin
+/** Single source of truth for the 11 permission features rendered on the admin
  *  permission pages. Same keys as backend's ALLOWED_FEATURES (see models.py). */
 import {
   LayoutDashboard,
@@ -11,6 +11,7 @@ import {
   Bell,
   Star,
   Package,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,13 +25,16 @@ export type FeatureKey =
   | "accounting"
   | "alertes"
   | "special_products"
-  | "produits";
+  | "produits"
+  | "sobrus";
 
 export interface FeatureDef {
   key: FeatureKey;
   label: string;
   description: string;
   icon: LucideIcon;
+  /** Owners only (« Connexion Sobrus »): not offered on an employee's accesses. */
+  ownerOnly?: boolean;
 }
 
 // label/description hold i18n KEYS (adminFeat.*) — translate at render with t().
@@ -45,6 +49,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "alertes", label: "adminFeat.alertes", description: "adminFeat.alertesD", icon: Bell },
   { key: "special_products", label: "adminFeat.special", description: "adminFeat.specialD", icon: Star },
   { key: "produits", label: "adminFeat.produits", description: "adminFeat.produitsD", icon: Package },
+  { key: "sobrus", label: "adminFeat.sobrus", description: "adminFeat.sobrusD", icon: RefreshCw, ownerOnly: true },
 ];
 
 export const FEATURE_KEYS: readonly FeatureKey[] = FEATURES.map((f) => f.key);

@@ -7,6 +7,7 @@ export interface SpecialProduct {
   product: string;
   pid: string;
   category: string | null;
+  notes: string | null;
   created_at: string;
 }
 
@@ -79,6 +80,53 @@ export interface BlReintegrateResult {
   reintegrated: number;
   not_excluded: number;
   delivery_refs: string[];
+}
+
+// ── BL lines: one product left out on some BLs only (« Exclure un produit d'un BL ») ──
+export interface ProductBlLine {
+  delivery_ref: string;
+  supplier: string | null;
+  delivery_date: string | null;
+  quantity: number;
+  total: number;
+  nb_lines: number;
+  already_excluded: boolean;
+  /** Set when already excluded (untick = reintegrate it). */
+  exclusion_id: number | null;
+}
+
+export interface ProductBlLines {
+  medicament_id: number;
+  pid: string;
+  product: string;
+  /** Newest BL first. */
+  lines: ProductBlLine[];
+}
+
+export interface BlLineExclusion {
+  id: number;
+  delivery_ref: string;
+  supplier: string | null;
+  delivery_date: string | null;
+  medicament_id: number;
+  pid: string;
+  product: string;
+  quantity: number;
+  total: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BlLineExclusionResult {
+  excluded: number;
+  already_excluded: number;
+  /** Every exclusion of these BLs (« Annuler » reintegrates them). */
+  ids: number[];
+}
+
+export interface BlLineReintegrateResult {
+  reintegrated: number;
+  not_excluded: number;
 }
 
 // ── Supplier (fournisseur) exclusions — owner-managed, achats-side ──────────

@@ -42,6 +42,7 @@ ALLOWED_FEATURES = (
     "alertes",
     "special_products",
     "produits",
+    "sobrus",  # « Connexion Sobrus » (owners only, app/sobrus/)
 )
 # Same rule as migrations 0009 / 0016, so a fresh DB (create_all) rejects unknown features too.
 _FEATURES_SQL = "(" + ", ".join(f"'{f}'" for f in ALLOWED_FEATURES) + ")"
@@ -510,6 +511,7 @@ class PharmacyMedicamentStatus(Base):
     pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False)
     medicament_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_MEDICAMENTS_ID), nullable=False)
     declared: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)  # the owner's reason (« Ajouter une note »)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -544,6 +546,24 @@ class PharmacyBlExclusion(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
     delivery_ref: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PharmacyBlLineExclusion(Base):
+    """One product's lines on one BL the pharmacy excluded (« Exclure un produit d'un BL »: the same
+    product bought on several BLs, only some of them left out). In Comptabilité only, those achat
+    lines drop; the product's other BLs and all its ventes stay (exclusions.py)."""
+
+    __tablename__ = "pharmacy_bl_line_exclusions"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "delivery_ref", "medicament_id", name="uq_pharmacy_bl_line"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
+    delivery_ref: Mapped[str] = mapped_column(String, nullable=False)
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False
+    )
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

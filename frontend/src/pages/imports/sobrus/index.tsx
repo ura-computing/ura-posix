@@ -15,58 +15,18 @@ import { DateRangePopover } from "@/_components/filterBar";
 import { FormField, FormInput } from "@/_components/FormField";
 import { Page } from "@/_components/Page";
 import { Skeleton } from "@/_components/Skeleton";
-import { useT, type TFn } from "@/i18n/I18nProvider";
-import type { SobrusConnection, SobrusConnectionBody, SobrusEvent, SobrusRun, SobrusRunBody } from "@/types";
+import { useT } from "@/i18n/I18nProvider";
+import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
 import { cn } from "@/utils/cn";
 import { todayIso } from "@/utils/dateRange";
-import { formatDate, formatDateTime, formatNumStr } from "@/utils/format";
+import { formatDateTime, formatNumStr } from "@/utils/format";
+import { currentStep, eventText, modeName, runResult } from "@/utils/sobrus";
 
 import { useSobrusPage } from "./hooks";
 
 const CARD = "flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm";
 
 const CHOICE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
-
-const kindName = (t: TFn, kind: string | null | undefined) =>
-  kind === "achat" ? t("nav.achats") : kind === "vente" ? t("nav.ventes") : kind === "stock" ? t("nav.stock") : "";
-/** « Ventes 2026 », « Stock ». */
-const fileName = (t: TFn, run: SobrusRun) => [kindName(t, run.kind), run.year].filter(Boolean).join(" ");
-const modeName = (t: TFn, run: SobrusRun) =>
-  t(`sobrus.mode.${run.mode}`, { start: formatDate(run.date_from), end: formatDate(run.date_to) });
-const errorText = (t: TFn, code: string | null | undefined) => {
-  const key = `errors.${code}`;
-  const text = t(key);
-  return text === key ? t("errors.serverError") : text;
-};
-
-/** One step done by the robot, as a sentence. */
-function eventText(t: TFn, e: SobrusEvent): string {
-  const vars = {
-    kind: kindName(t, e.kind),
-    year: e.year ?? "",
-    n: formatNumStr(e.n ?? 0),
-    start: formatDate(e.start),
-    end: formatDate(e.end),
-    error: errorText(t, e.error),
-  };
-  const key = `sobrus.event.${e.code}`;
-  const text = t(key, vars);
-  return text === key ? e.code : text;
-}
-
-/** What the robot does right now. */
-function currentStep(t: TFn, run: SobrusRun): string {
-  if (run.status === "queued") return t("sobrus.stepQueued");
-  if (run.cancel_requested) return t("sobrus.stepStopping");
-  if (run.phase === "login") return t("sobrus.stepLogin");
-  if (run.phase === "download") {
-    return t("sobrus.stepDownload", { what: fileName(t, run), size: formatNumStr(run.bytes_received / 1_048_576, 1) });
-  }
-  if (run.phase === "import") {
-    return t("sobrus.stepImport", { what: fileName(t, run), current: run.chunk_current, total: run.chunk_total });
-  }
-  return t("sobrus.stepWorking");
-}
 
 function ConnectForm({
   email: knownEmail,
@@ -157,17 +117,6 @@ function RunProgress({ run, isCancelling, onCancel }: { run: SobrusRun; isCancel
       )}
     </section>
   );
-}
-
-function runResult(t: TFn, run: SobrusRun): string {
-  if (run.status === "success") {
-    return run.mode === "check"
-      ? t("sobrus.resultChecked")
-      : t("sobrus.resultDone", { n: formatNumStr(run.lines_added) });
-  }
-  if (run.status === "error") return errorText(t, run.error_code);
-  if (run.status === "cancelled") return t("sobrus.resultCancelled", { n: formatNumStr(run.lines_added) });
-  return t("sobrus.resultRunning");
 }
 
 function RunsList({ runs }: { runs: SobrusRun[] }) {
@@ -262,7 +211,6 @@ function Connected({
           <DateRangePopover
             from={from}
             to={to}
-            showPresets={false}
             onChange={(start, end) => {
               setFrom(start);
               setTo(end);

@@ -30,6 +30,7 @@ export const ALL_FEATURES = [
   "alertes",
   "special_products",
   "produits",
+  "sobrus",
 ];
 
 /** admin / owner: saved by the setup project. employee / account: 12 and 13. */
