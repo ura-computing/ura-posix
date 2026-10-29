@@ -2,5 +2,6 @@ node_modules/
 report/
 test-results/
 .results/
+.demo/
 .state/
 .logs/

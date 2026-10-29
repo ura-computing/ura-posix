@@ -8,7 +8,7 @@ DELETE /v1/sobrus/connection          password + session erased, the running run
 POST   /v1/sobrus/runs                {mode: full | new | check | range, date_from?, date_to?}: one queued /
                                       running run per pharmacy
 GET    /v1/sobrus/runs                the last runs, newest first (the page polls while one runs)
-POST   /v1/sobrus/runs/{id}/cancel    « Arrêter »: queued → cancelled; running → stops before its next chunk
+POST   /v1/sobrus/runs/{id}/cancel    « Arrêter »: the run ends now (cancelled); a busy robot stops at its next check
 
 A queued run wakes the robot at once (`launcher.wake`: a process in this container, gone after).
 """
@@ -136,11 +136,7 @@ def delete_connection(pharmacy_id: OwnerSobrus, user: CurrentUserDep, db: DbDep)
         raise ApiError(404, ErrorCode.SOBRUS_NOT_CONNECTED, "Aucune connexion Sobrus.")
     run = _active_run(db, pharmacy_id)
     if run is not None:
-        if run.status == "queued":
-            run.status = "cancelled"
-            run.ended_at = datetime.now(timezone.utc)
-        else:
-            run.cancel_requested = True
+        _stop(run)
     log_action(db, user, pharmacy_id, AuditAction.SOBRUS_DISCONNECTED, {"email": conn.email})
     db.delete(conn)
     db.commit()
@@ -167,16 +163,21 @@ def list_runs(pharmacy_id: OwnerSobrus, db: DbDep, limit: Annotated[int, Query(g
     )
 
 
+def _stop(run: SobrusRun) -> None:
+    """« Arrêter » / « Déconnecter »: the run ends now for the owner (no « en cours », no more polling,
+    a new run can start). A robot still busy — a Sobrus download can last minutes — sees
+    `cancel_requested` at its next check and removes what it imported of that file."""
+    run.cancel_requested = True
+    run.status = "cancelled"
+    run.ended_at = datetime.now(timezone.utc)
+
+
 @router.post("/sobrus/runs/{run_id}/cancel", response_model=SobrusRunOut)
 def cancel_run(run_id: Annotated[int, Path(ge=1)], pharmacy_id: OwnerSobrus, db: DbDep) -> SobrusRun:
     run = db.get(SobrusRun, run_id)
     if run is None or run.pharmacy_id != pharmacy_id or run.status not in ACTIVE:
         raise ApiError(404, ErrorCode.SOBRUS_RUN_NOT_FOUND, "Import Sobrus introuvable.")
-    if run.status == "queued":
-        run.status = "cancelled"
-        run.ended_at = datetime.now(timezone.utc)
-    else:
-        run.cancel_requested = True
+    _stop(run)
     db.commit()
     db.refresh(run)
     return run

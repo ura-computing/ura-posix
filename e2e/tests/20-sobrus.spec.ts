@@ -277,12 +277,13 @@ test("arrêter un import en cours", async () => {
   await control(page, { delay: 3 }); // each export waits 3 s: time to click
   try {
     await startImport(page, "Tout l'historique");
-    // Once the robot runs (a queued run is cancelled at once, without « Arrêt en cours… »).
+    // While the robot downloads (slow fake export): « Arrêter » ends the run at once — no waiting
+    // for the download, the progress goes away (no more polling).
     await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toBeVisible({ timeout: 60_000 });
     const stop = page.getByRole("button", { name: "Arrêter", exact: true });
     await expect(stop).toBeEnabled();
     await stop.click();
-    await expect(page.getByText("Arrêt en cours…", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toHaveCount(0, { timeout: 5_000 });
     await runEnded(page);
   } finally {
     await control(page, { delay: 0 });
