@@ -152,7 +152,7 @@ export function useAdminPharmacyAnalyseMarge(pharmacyId: number | null, mode: Ma
 // Category-tint helper for the Rapport page. Threads `filters.category_type`
 // into a class + var accent that non-KpiTile wrappers (CategoriesDonut,
 // TrendChart, SanteFinanciere, TopCategoriesList, AnalyseMarge gauge/cta)
-// can pick up so the whole page adopts the current CategorySegment value.
+// can pick up so the whole page adopts the current Segmented value.
 //
 // KpiTile has its own `tint` prop wired to the same tokens; this helper is
 // specifically for non-KpiTile blocks that render their own `border/bg` shell.

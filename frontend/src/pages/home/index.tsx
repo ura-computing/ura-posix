@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { ShoppingCart, TrendingUp, Boxes, PieChart, Layers, LineChart, ShieldCheck } from "lucide-react";
 
-import { PharmagestIcon } from "@/_components/PharmagestIcon";
-import { ThemeToggle } from "@/_components/ThemeToggle";
+import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
+import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
 import { useMe } from "@/hooks/useMe";
 import { ROLES, ROUTES, type Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";

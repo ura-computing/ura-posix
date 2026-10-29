@@ -7,15 +7,14 @@ import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/_components/atoms/Button";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { useT } from "@/i18n/I18nProvider";
 import type { SignupRequestRow } from "@/types";
 import { formatDateTime } from "@/utils/format";
 
 import { useAcceptSignup, useRefuseSignup, useSignupRequests } from "../hooks";
-
-const PILL = "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium";
+import { Badge } from "@/_components/atoms/Badge";
 
 export function SignupRequestsTab() {
   const t = useT();
@@ -58,7 +57,7 @@ export function SignupRequestsTab() {
       sortable: false,
       render: (r) => (
         <div className="flex flex-col gap-1">
-          <span className={`${PILL} w-fit bg-muted text-muted-foreground`}>{t(`roles.${r.role}`)}</span>
+          <Badge className="w-fit">{t(`roles.${r.role}`)}</Badge>
           {r.pharmacy_code ? (
             <span className="text-sm text-foreground">
               {t("signupReq.join", { code: r.pharmacy_code })}
@@ -86,9 +85,9 @@ export function SignupRequestsTab() {
         ) : (
           <div className="flex flex-wrap gap-1">
             {reasons.map((reason) => (
-              <span key={reason} className={`${PILL} bg-warning-subtle text-warning`}>
+              <Badge key={reason} tone="warning">
                 {reason}
-              </span>
+              </Badge>
             ))}
           </div>
         );

@@ -1,13 +1,16 @@
-import { Plus, UserCog } from "lucide-react";
+import { Plus, RefreshCw, UserCog } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import { KebabMenu } from "@/_components/KebabMenu";
+import { KebabItem, KebabMenu } from "@/_components/molecules/KebabMenu";
 import { Button } from "@/_components/atoms/Button";
 import { Card } from "@/_components/atoms/Card";
 import { SearchInput } from "@/_components/atoms/Input";
 import { type DeveloperAccount, type DeveloperStatus } from "@/types/storeWebsite";
 
 import { formatRelative } from "@/pages/store/store-website/_format";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { Callout } from "@/_components/molecules/Callout";
+import { Badge } from "@/_components/atoms/Badge";
 
 /** i18n key per developer status — the source enum values ("actif" | …) stay
  *  as logic; only the displayed label is translated. */
@@ -56,16 +59,21 @@ export function DevelopersPage(props: DevelopersPageProps) {
       <SearchInput value={search} onValueChange={props.onSearch} placeholder={t("developers.searchPlaceholder")} />
 
       {isError ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-error-border bg-error-subtle px-4 py-3 text-sm font-medium text-error-subtle-foreground">
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={props.onRetry}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
           {t("developers.loadError")}
-          <Button variant="secondary" size="sm" onClick={props.onRetry}>
-            {t("common.retry")}
-          </Button>
-        </div>
+        </Callout>
       ) : isLoading ? (
         <TableSkeleton />
       ) : developers.length === 0 ? (
-        <EmptyState onInvite={props.onInvite} />
+        <NoDeveloper onInvite={props.onInvite} />
       ) : (
         <Card as="div" padding="none">
           <table className="w-full text-sm">
@@ -103,38 +111,17 @@ export function DevelopersPage(props: DevelopersPageProps) {
                     <KebabMenu>
                       {(close) => (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              props.onResetPassword(d.id);
-                              close();
-                            }}
-                            className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
-                          >
+                          <KebabItem onSelect={() => props.onResetPassword(d.id)} close={close}>
                             {t("developers.resetPassword")}
-                          </button>
+                          </KebabItem>
                           {d.status === "desactive" ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                props.onToggleActive(d.id, true);
-                                close();
-                              }}
-                              className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-foreground hover:bg-surface-subtle"
-                            >
+                            <KebabItem onSelect={() => props.onToggleActive(d.id, true)} close={close}>
                               {t("developers.activateAccount")}
-                            </button>
+                            </KebabItem>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                props.onToggleActive(d.id, false);
-                                close();
-                              }}
-                              className="block w-full cursor-pointer px-3 py-2 text-left text-sm text-error-subtle-foreground hover:bg-error-subtle"
-                            >
+                            <KebabItem danger onSelect={() => props.onToggleActive(d.id, false)} close={close}>
                               {t("developers.deactivateAccount")}
-                            </button>
+                            </KebabItem>
                           )}
                         </>
                       )}
@@ -152,33 +139,27 @@ export function DevelopersPage(props: DevelopersPageProps) {
 
 function StatusBadge({ status }: { status: DeveloperStatus }) {
   const t = useT();
-  const tone =
-    status === "actif"
-      ? "bg-success-subtle text-success-subtle-foreground"
-      : status === "en_attente"
-        ? "bg-warning-subtle text-warning-subtle-foreground"
-        : "bg-surface-subtle text-muted-foreground";
+  const tone = status === "actif" ? "success" : status === "en_attente" ? "warning" : "neutral";
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone}`}>
-      <span className="size-1.5 rounded-full bg-current" />
+    <Badge tone={tone} dot>
       {t(STATUS_KEY[status])}
-    </span>
+    </Badge>
   );
 }
 
-function EmptyState({ onInvite }: { onInvite: () => void }) {
+function NoDeveloper({ onInvite }: { onInvite: () => void }) {
   const t = useT();
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border p-10 text-center">
-      <span className="flex size-12 items-center justify-center rounded-xl bg-surface-subtle text-primary">
-        <UserCog className="size-5" />
-      </span>
-      <p className="text-sm text-muted-foreground">{t("developers.empty")}</p>
-      <Button onClick={onInvite}>
-        <Plus className="size-4" />
-        {t("developers.invite")}
-      </Button>
-    </div>
+    <EmptyState
+      icon={<UserCog className="size-6" />}
+      title={t("developers.empty")}
+      action={
+        <Button onClick={onInvite}>
+          <Plus className="size-4" />
+          {t("developers.invite")}
+        </Button>
+      }
+    />
   );
 }
 

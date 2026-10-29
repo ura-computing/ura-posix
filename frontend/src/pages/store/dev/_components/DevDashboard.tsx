@@ -1,7 +1,7 @@
 import { ArrowRight, Briefcase, Clock, Download, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { KpiTile } from "@/_components/KpiTile";
+import { KpiTile } from "@/_components/organisms/KpiTile";
 import { Button } from "@/_components/atoms/Button";
 import { REQUEST_STATE_LABEL, URGENCY_LABEL, type DevKpis, type DevRequest, type Urgency } from "@/types/storeWebsite";
 

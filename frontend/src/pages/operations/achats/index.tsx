@@ -1,18 +1,18 @@
 import { useEffect } from "react";
 import { Download, Upload } from "lucide-react";
 
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { ROUTES } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatMAD, formatQty, formatPct } from "@/utils/format";
 
 import { useAchatsPage } from "./hooks";
-import { SuffixBadge } from "@/_components/SuffixBadge";
-import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
+import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
+import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import type { AchatRow, AchatsSupplierSummary } from "@/types";
-import { GaugeTiles } from "@/_components/GaugeTiles";
-import { TypeBadge } from "@/_components/TypeBadge";
-import { Page } from "@/_components/Page";
+import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
+import { TypeBadge } from "@/_components/molecules/TypeBadge";
+import { Page } from "@/_components/templates/Page";
 
 interface AchatsTableProps {
   rows: AchatRow[];

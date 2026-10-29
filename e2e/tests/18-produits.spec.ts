@@ -1042,7 +1042,7 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     await seeAll(top, all.length).click();
     const win = page.getByRole("dialog").filter({ hasText: "Tous les fournisseurs de la période" });
     await expectSuppliers(win.locator("table"), all, "voir tout : fournisseurs");
-    await win.getByRole("button", { name: "Fermer", exact: true }).click();
+    await win.getByRole("button", { name: "Fermer", exact: true }).last().click();
     await expect(win).toHaveCount(0);
   }
 
@@ -1067,7 +1067,7 @@ async function expectStats(page: Page, e: Row): Promise<void> {
     expect(await columnTexts(page, "Date", win.locator("table")), "voir tout : dates").toEqual(
       prices.map((r) => frDate(r.date)),
     );
-    await win.getByRole("button", { name: "Fermer", exact: true }).click();
+    await win.getByRole("button", { name: "Fermer", exact: true }).last().click();
     await expect(win).toHaveCount(0);
   }
 }

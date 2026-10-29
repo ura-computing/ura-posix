@@ -1,19 +1,21 @@
 import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 
+import { Badge, type BadgeTone } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
-import { Checkbox } from "@/_components/Checkbox";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { TabBar } from "@/_components/TabBar";
-import type { TabItem } from "@/_components/TabBar";
+import { Checkbox } from "@/_components/atoms/Checkbox";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { TabBar } from "@/_components/molecules/TabBar";
+import type { TabItem } from "@/_components/molecules/TabBar";
 import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
 import type { DataImport, DocType, ImportBatchStatus } from "@/types";
 
 import { useDeleteImport, useDeleteImports, useImports } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { Page } from "@/_components/Page";
-import { Spinner } from "@/_components/atoms/Spinner";
+import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
+import { SkeletonRows } from "@/_components/molecules/Skeletons";
+import { EmptyState } from "@/_components/molecules/EmptyState";
 
 const buildTabs = (t: TFn): TabItem[] => [{ id: "imports", label: t("imports.tab") }];
 
@@ -23,17 +25,16 @@ const TYPE_LABEL: Record<DocType, string> = {
   stock: "imports.typeStock",
 };
 
-const STATUS_TINT: Record<ImportBatchStatus, { bg: string; fg: string; label: string }> = {
-  in_progress: { bg: "bg-info-subtle", fg: "text-info", label: "imports.statusInProgress" },
-  success: { bg: "bg-success-subtle", fg: "text-success", label: "imports.statusSuccess" },
-  // Indigo (cancelled) / violet (deleted) = nothing to do; orange = act (import the file again).
-  cancelled: {
-    bg: "bg-[color-mix(in_srgb,var(--chart-7)_14%,transparent)]",
-    fg: "text-[var(--chart-7)]",
-    label: "imports.statusCancelled",
-  },
-  error: { bg: "bg-error-subtle", fg: "text-error", label: "imports.statusError" },
-  interrupted: { bg: "bg-warning-subtle", fg: "text-warning", label: "imports.statusInterrupted" },
+// Indigo (cancelled) / violet (deleted) = nothing to do; orange = act (import the file again).
+const CANCELLED = "border-transparent bg-[color-mix(in_srgb,var(--chart-7)_14%,transparent)] text-[var(--chart-7)]";
+const DELETED = "border-transparent bg-[color-mix(in_srgb,var(--chart-4)_14%,transparent)] text-[var(--chart-4)]";
+
+const STATUS_TINT: Record<ImportBatchStatus, { tone: BadgeTone; className?: string; label: string }> = {
+  in_progress: { tone: "info", label: "imports.statusInProgress" },
+  success: { tone: "success", label: "imports.statusSuccess" },
+  cancelled: { tone: "neutral", className: CANCELLED, label: "imports.statusCancelled" },
+  error: { tone: "error", label: "imports.statusError" },
+  interrupted: { tone: "warning", label: "imports.statusInterrupted" },
 };
 
 function relativeDate(iso: string, t: TFn): string {
@@ -82,17 +83,13 @@ function ImportsTab() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Spinner /> {t("imports.loading")}
-      </div>
+      <Card padding="none">
+        <SkeletonRows rows={6} />
+      </Card>
     );
   }
   if (sorted.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-        {t("imports.empty")}
-      </div>
-    );
+    return <EmptyState title={t("imports.empty")} />;
   }
 
   const confirmCopy = pendingRow
@@ -194,19 +191,17 @@ function ImportsTab() {
                   </td>
                   <td className="px-4 py-3">
                     {isDeleted ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-[color-mix(in_srgb,var(--chart-4)_14%,transparent)] px-2 py-0.5 text-xs font-medium text-[var(--chart-4)]">
+                      <Badge className={DELETED}>
                         <Trash2 className="size-3" />
                         {t("imports.deletedBy", {
                           who: row.deleted_by_full_name ?? row.deleted_by_email ?? "—",
                           when: relativeDate(row.deleted_at!, t),
                         })}
-                      </span>
+                      </Badge>
                     ) : (
-                      <span
-                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${status.bg} ${status.fg}`}
-                      >
+                      <Badge tone={status.tone} className={status.className}>
                         {t(status.label)}
-                      </span>
+                      </Badge>
                     )}
                     {!isDeleted && row.status === "interrupted" && (
                       <p className="mt-1 text-xs text-muted-foreground">{t("imports.interruptedHint")}</p>

@@ -1,4 +1,5 @@
 /** Form pieces shared by every dialog form (user, pharmacy, catégorie, paiement). */
+import { Input, type InputProps } from "@/_components/atoms/Input";
 
 /** Label (+ red * when required) above its input, optional hint below.
  *  `group`: children are buttons (role cards, picker, copy) — render a
@@ -30,22 +31,11 @@ export function FormField({
   );
 }
 
-/** Text input bound to a string: `onChange` gets the value, not the event. */
+/** Text input bound to a string: `onChange` gets the value, not the event (the `Input` atom). */
 export function FormInput({
   value,
   onChange,
-  className,
   ...rest
-}: { value: string; onChange: (v: string) => void; className?: string } & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange" | "className"
->) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-9 w-full rounded-md border border-input bg-surface-subtle px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 ${className ?? ""}`}
-    />
-  );
+}: { value: string; onChange: (v: string) => void } & Omit<InputProps, "value" | "onChange" | "onValueChange">) {
+  return <Input {...rest} value={value} onValueChange={onChange} />;
 }

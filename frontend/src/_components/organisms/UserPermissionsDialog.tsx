@@ -14,18 +14,19 @@
  *  read time by the 3-layer intersection in permissions.py.
  */
 import { useState } from "react";
-import { Info, Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
-import { Spinner } from "@/_components/atoms/Spinner";
-import { Switch } from "./Switch";
-import { Tooltip } from "./Tooltip";
-import { Dialog, DialogContent } from "./dialog";
+import { Callout } from "@/_components/molecules/Callout";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { Switch } from "@/_components/atoms/Switch";
+import { Tooltip } from "@/_components/atoms/Tooltip";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import type { MemberOut } from "@/types";
 
-import { FEATURES, ROLE_LABEL, type FeatureKey } from "./memberConstants";
+import { FEATURES, ROLE_LABEL, type FeatureKey } from "@/_components/organisms/memberConstants";
 
 /** One layer that gates the user's effective access for each feature.
  *  The label appears on per-row pills; the values dict says which features
@@ -113,38 +114,23 @@ function PermissionsBody({
       }}
     >
       <DialogContent className="flex max-h-[calc(100vh-140px)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-full bg-muted text-[15px] font-bold text-foreground">
+        <DialogHeader
+          media={
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-[15px] font-bold text-foreground">
               {initials}
             </span>
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-[17px] font-semibold text-foreground">{user.full_name ?? user.email}</h3>
-                <Badge>{t(ROLE_LABEL[user.role])}</Badge>
-              </div>
-              <span className="text-[12.5px] text-muted-foreground">{user.email}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("common.close")}
-            className="cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+          }
+          title={user.full_name ?? user.email}
+          subtitle={user.email}
+          onClose={onClose}
+        >
+          <Badge className="mt-1 w-fit">{t(ROLE_LABEL[user.role])}</Badge>
+        </DialogHeader>
 
-        {/* Context strip (caller-owned copy) */}
-        <div className="mx-5 mt-3.5 flex items-start gap-2.5 rounded-lg border border-info-border bg-info-subtle px-3 py-2.5 text-info-subtle-foreground">
-          <Info className="mt-0.5 size-4 shrink-0" />
-          <span className="text-[12.5px] leading-snug">{contextStrip}</span>
-        </div>
+        <DialogBody>
+          {/* Context strip (caller-owned copy) */}
+          <Callout tone="info">{contextStrip}</Callout>
 
-        {/* Permission grid */}
-        <div className="flex-1 overflow-auto p-5">
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((f) => {
               const locked = isLocked(f.key);
@@ -195,11 +181,10 @@ function PermissionsBody({
               );
             })}
           </div>
-        </div>
+        </DialogBody>
 
-        {/* Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
-          <Button variant="ghost" onClick={enableAllPossible} className="!h-9 !px-3 text-xs">
+        <DialogFooter className="justify-between">
+          <Button variant="ghost" onClick={enableAllPossible}>
             <Check className="size-3.5" />
             {t("adminPharm.enableAllPossible")}
           </Button>
@@ -207,12 +192,17 @@ function PermissionsBody({
             <Button variant="secondary" onClick={onClose} disabled={isSaving}>
               {t("common.cancel")}
             </Button>
-            <Button variant="primary" onClick={() => onSave(pending)} disabled={isSaving || !isDirty}>
-              {isSaving && <Spinner size="sm" />}
+            <Button
+              variant="primary"
+              onClick={() => onSave(pending)}
+              disabled={!isDirty}
+              isLoading={isSaving}
+              loadingText={t("common.saving")}
+            >
               {t("common.save")}
             </Button>
           </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

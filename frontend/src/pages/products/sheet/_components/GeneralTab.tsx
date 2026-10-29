@@ -8,8 +8,9 @@ import type { ReactNode } from "react";
 import { ArrowRight, ShoppingCart, Truck } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { KpiTile } from "@/_components/KpiTile";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { KpiTile } from "@/_components/organisms/KpiTile";
+import { SkeletonRows, SkeletonTile } from "@/_components/molecules/Skeletons";
 import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
 import { useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
@@ -204,7 +205,7 @@ export function GeneralTab({
         {!range.from || !range.to ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
         ) : !stats ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+          <SkeletonRows rows={3} columns={6} />
         ) : (
           <DataTable<HistoryLine>
             rows={salesYears}
@@ -245,7 +246,10 @@ export function GeneralTab({
           {!range.from || !range.to ? (
             <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
           ) : !now ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SkeletonTile />
+              <SkeletonTile />
+            </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <KpiTile

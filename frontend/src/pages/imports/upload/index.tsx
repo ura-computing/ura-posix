@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Ban,
   Clock,
-  Info,
   Loader2,
   RotateCcw,
   Check,
@@ -28,10 +27,13 @@ import { cn } from "@/utils/cn";
 import { formatDate, formatNumStr, formatQty } from "@/utils/format";
 import type { UploadJob, UploadPhase, UploadProgress } from "@/hooks/UploadContext";
 import type { ReactNode } from "react";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { Card } from "@/_components/atoms/Card";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { Callout } from "@/_components/molecules/Callout";
+import { ChoiceCard } from "@/_components/molecules/ChoiceCard";
 
 interface DropZoneProps {
   docType: DocType;
@@ -125,17 +127,9 @@ function DropZone({ docType, example, multiple, onAccept, errorMsg, onClearError
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-3 rounded-md border border-error-border bg-error-subtle px-3 py-2 text-sm text-error-subtle-foreground">
-          <span className="flex-1">{errorMsg}</span>
-          <button
-            type="button"
-            onClick={onClearError}
-            aria-label={t("common.close")}
-            className="cursor-pointer text-error-subtle-foreground/70 hover:text-error-subtle-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+        <Callout tone="error" onDismiss={onClearError}>
+          {errorMsg}
+        </Callout>
       )}
     </div>
   );
@@ -465,19 +459,23 @@ function Success({
         </ul>
       )}
       {newMeds && newMeds.count > 0 && (
-        <div className="mt-1 flex w-full max-w-md flex-col gap-1.5 rounded-md border border-info-border bg-info-subtle px-4 py-3 text-left">
-          <div className="flex items-center gap-2 text-sm font-semibold text-info">
-            <Info className="size-4" aria-hidden />
-            {formatQty(newMeds.count)}{" "}
-            {newMeds.count > 1 ? t("uploadFile.newProductPlural") : t("uploadFile.newProductSingular")}
-          </div>
-          <p className="text-xs text-info-subtle-foreground">
+        <Callout
+          tone="info"
+          className="mt-1 w-full max-w-md text-left"
+          title={
+            <>
+              {formatQty(newMeds.count)}{" "}
+              {newMeds.count > 1 ? t("uploadFile.newProductPlural") : t("uploadFile.newProductSingular")}
+            </>
+          }
+        >
+          <p>
             {newMeds.sample.slice(0, 3).join(" · ")}
             {newMeds.count > 3 &&
               ` · +${newMeds.count - 3} ${newMeds.count - 3 > 1 ? t("uploadFile.others") : t("uploadFile.other")}`}
           </p>
-          <p className="text-xs text-info-subtle-foreground">{t("uploadFile.newProductsNote")}</p>
-        </div>
+          <p className="font-normal">{t("uploadFile.newProductsNote")}</p>
+        </Callout>
       )}
       <p className="font-mono text-[11px] text-muted-foreground">{filename}</p>
       <Button variant="outline" className="mt-2" onClick={onReset}>
@@ -492,48 +490,33 @@ function Cancelled({ progress, onReset }: { progress: UploadProgress; onReset: (
   const t = useT();
   const had = progress.inserted > 0;
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-subtle p-5">
-      <div className="flex items-start gap-3">
-        <Ban className="size-5 text-warning" aria-hidden />
-        <div className="flex-1">
-          <h3 className="text-sm font-semibold text-warning">{t("uploadFile.cancelledTitle")}</h3>
-          <p className="mt-0.5 text-xs text-warning-subtle-foreground">
-            {had ? (
-              <>
-                {formatQty(progress.inserted)} {t("uploadFile.cancelledHad")}
-              </>
-            ) : (
-              t("uploadFile.cancelledNone")
-            )}
-          </p>
-        </div>
-      </div>
-      <Button variant="outline" size="sm" className="self-start" onClick={onReset}>
-        <RotateCcw className="size-3.5" />
-        {t("uploadFile.restart")}
-      </Button>
-    </div>
+    <Callout
+      tone="warning"
+      title={<h3>{t("uploadFile.cancelledTitle")}</h3>}
+      action={
+        <Button variant="outline" onClick={onReset}>
+          <RotateCcw className="size-3.5" />
+          {t("uploadFile.restart")}
+        </Button>
+      }
+    >
+      {had ? (
+        <>
+          {formatQty(progress.inserted)} {t("uploadFile.cancelledHad")}
+        </>
+      ) : (
+        t("uploadFile.cancelledNone")
+      )}
+    </Callout>
   );
 }
 
 function Errored({ error, onDismiss }: { error: string | null; onDismiss: () => void }) {
   const t = useT();
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-error-border bg-error-subtle p-5">
-      <AlertCircle className="size-5 text-error" aria-hidden />
-      <div className="flex-1">
-        <h3 className="text-sm font-semibold text-error">{t("uploadFile.errorTitle")}</h3>
-        <p className="mt-0.5 text-xs text-error-subtle-foreground">{error ?? t("uploadFile.unknownError")}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={t("common.close")}
-        className="cursor-pointer text-error-subtle-foreground/70 hover:text-error-subtle-foreground"
-      >
-        <X className="size-4" />
-      </button>
-    </div>
+    <Callout tone="error" title={<h3>{t("uploadFile.errorTitle")}</h3>} onDismiss={onDismiss}>
+      {error ?? t("uploadFile.unknownError")}
+    </Callout>
   );
 }
 
@@ -712,15 +695,15 @@ interface TypeCardProps {
  */
 
 function TypeCard({ type, title, description, icon, columns, totalCols, selected, onSelect }: TypeCardProps) {
+  const t = useT();
   const ringColor = `var(--color-doc-${type})`;
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
+    <ChoiceCard
+      selected={selected}
+      onSelect={onSelect}
       className={cn(
-        "group flex cursor-pointer flex-col gap-3 rounded-2xl border-2 p-5 text-left transition-all",
-        selected ? "shadow-md" : "border-border bg-card hover:-translate-y-0.5 hover:shadow-md",
+        "group gap-3 p-5 transition-all",
+        selected ? "shadow-md" : "hover:-translate-y-0.5 hover:shadow-md",
       )}
       style={selected ? { borderColor: ringColor, background: `var(--color-doc-${type}-bg)` } : undefined}
     >
@@ -755,11 +738,11 @@ function TypeCard({ type, title, description, icon, columns, totalCols, selected
         ))}
         {totalCols > 5 && (
           <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            +{totalCols - 5} autres
+            +{totalCols - 5} {t("uploadFile.others")}
           </span>
         )}
       </div>
-    </button>
+    </ChoiceCard>
   );
 }
 
@@ -937,11 +920,9 @@ export default function UploadFilePage() {
       {step === 1 && (
         <section className="flex flex-col gap-4">
           {allowedTypes.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              {t("uploadFile.noTypeAvailable")}
-            </div>
+            <EmptyState title={t("uploadFile.noTypeAvailable")} />
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div role="radiogroup" aria-label={t("uploadFile.step1")} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {allowedTypes.map((dt) => {
                 const meta = typeMeta[dt];
                 const Icon = meta.icon;

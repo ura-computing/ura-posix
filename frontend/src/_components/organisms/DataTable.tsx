@@ -4,17 +4,19 @@
  * pagination state through; everything else (shell, header, body row, sort
  * UI, empty / loading states, pagination footer) lives here.
  *
- * Pattern matches the KpiTile / FilterBar / CategorySegment shared primitives.
+ * Pattern matches the KpiTile / FilterBar / Segmented shared primitives.
  */
 import { useRef, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { Skeleton } from "./Skeleton";
-import { SingleSelectPopover } from "./SingleSelectPopover";
+import { Skeleton } from "@/_components/atoms/Skeleton";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { SortButton } from "@/_components/molecules/SortButton";
 
 // Pagination footer sits below the (possibly long) table; without this, changing
 // page leaves the viewport scrolled down at the footer with no visual cue that
@@ -91,11 +93,6 @@ export interface DataTableProps<R, K extends string = string> {
   rowClassName?: (row: R, index: number) => string;
 }
 
-function SortIcon({ active, order }: { active: boolean; order: "asc" | "desc" }) {
-  if (!active) return <ArrowUpDown className="size-3 text-muted-foreground/60" />;
-  return order === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />;
-}
-
 export function DataTable<R, K extends string = string>({
   rows,
   columns,
@@ -162,10 +159,7 @@ export function DataTable<R, K extends string = string>({
     return (
       <div className={cn("flex flex-col gap-3", className)}>
         {topBanner}
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-card py-16 text-center">
-          <p className="text-sm font-medium text-foreground">{emptyLabel}</p>
-          {emptyHint && <p className="text-xs text-muted-foreground">{emptyHint}</p>}
-        </div>
+        <EmptyState title={emptyLabel} hint={emptyHint} className="py-16" />
       </div>
     );
   }
@@ -194,17 +188,14 @@ export function DataTable<R, K extends string = string>({
                       className={headerCls}
                     >
                       {sortable ? (
-                        <button
-                          type="button"
-                          onClick={() => onSort?.(col.key)}
-                          className={cn(
-                            "inline-flex cursor-pointer items-center gap-1 hover:text-foreground",
-                            col.align === "right" && "flex-row-reverse",
-                          )}
+                        <SortButton
+                          active={sortBy === col.key}
+                          order={sortOrder}
+                          alignRight={col.align === "right"}
+                          onSort={() => onSort?.(col.key)}
                         >
                           {col.label}
-                          <SortIcon active={sortBy === col.key} order={sortOrder} />
-                        </button>
+                        </SortButton>
                       ) : (
                         <span>{col.label}</span>
                       )}
@@ -318,7 +309,7 @@ function PaginationFooter({
           <span className="mr-1">{t("common.next")}</span>
           <ChevronRight className="size-4" />
         </Button>
-        <SingleSelectPopover
+        <SingleSelect
           label=""
           options={pageSizeOptions}
           value={String(pageSize)}

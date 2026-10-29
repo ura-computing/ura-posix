@@ -4,10 +4,13 @@
  *  product page when it has notes.
  *  Mounted only while open: the field starts empty each time. */
 import { useState } from "react";
-import { Check, StickyNote, Trash2, X } from "lucide-react";
+import { Check, StickyNote, Trash2 } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Textarea } from "@/_components/atoms/Input";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { SkeletonText } from "@/_components/molecules/Skeletons";
 import type { ProductNote } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDateTime } from "@/utils/format";
@@ -74,27 +77,16 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
   };
   return (
     <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-xl flex-col">
-      <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning-subtle text-warning-subtle-foreground">
-          <StickyNote className="size-5" />
-        </span>
-        <div className="flex min-w-0 flex-col">
-          <h3 className="text-[17px] font-semibold text-foreground">{t("products.notesTitle", { n: notes.length })}</h3>
-          <span className="truncate text-sm text-muted-foreground">{product}</span>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={t("common.close")}
-          className="ml-auto cursor-pointer text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
+      <DialogHeader
+        icon={<StickyNote className="size-4" />}
+        title={t("products.notesTitle", { n: notes.length })}
+        subtitle={<span className="block truncate">{product}</span>}
+        onClose={onClose}
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <DialogBody>
         {isLoading ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+          <SkeletonText lines={4} />
         ) : notes.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t("products.notesEmpty")}</p>
         ) : (
@@ -104,20 +96,20 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
             ))}
           </ul>
         )}
-      </div>
+      </DialogBody>
 
       <div className="flex flex-col gap-2 border-t border-border px-5 py-4">
         <label htmlFor="new-note" className="text-sm font-semibold text-foreground">
           {t("products.noteAdd")}
         </label>
-        <textarea
+        <Textarea
           id="new-note"
           rows={3}
           maxLength={MAX}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={t("products.notePlaceholder")}
-          className="w-full resize-y rounded-md border border-input bg-surface-subtle px-3 py-2 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="resize-y"
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{t("products.noteChars", { n: text.length })}</span>
@@ -127,7 +119,7 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
         </div>
       </div>
 
-      <div className="flex justify-end border-t border-border bg-surface-subtle px-5 py-3.5">
+      <DialogFooter>
         {notes.length > 0 ? (
           <Button variant="primary" onClick={onClose}>
             <Check className="size-4" />
@@ -138,7 +130,7 @@ function NotesContent({ product, notes, isLoading, onAdd, isAdding, onDelete, is
             {t("common.close")}
           </Button>
         )}
-      </div>
+      </DialogFooter>
     </DialogContent>
   );
 }

@@ -6,7 +6,7 @@
  *  The tab lives in the URL (?tab=utilisateurs / ?tab=demandes) so a reload keeps it. */
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 
-import { TabBar } from "@/_components/TabBar";
+import { TabBar } from "@/_components/molecules/TabBar";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useMemo, useState } from "react";
@@ -15,8 +15,8 @@ import { Button } from "@/_components/atoms/Button";
 import { useAdminPharmaciesList } from "@/hooks/sharedQueries";
 import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { FilterBar } from "@/_components/filterBar";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { FilterBar } from "@/_components/organisms/FilterBar";
 import type {
   CreateUserIn,
   CreateUserOut,
@@ -26,8 +26,8 @@ import type {
   MemberRole,
   MemberStatus,
 } from "@/types";
-import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
-import { FeaturePills } from "@/_components/FeaturePills";
+import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
+import { FeaturePills } from "@/_components/molecules/FeaturePills";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
 import { SignupRequestsTab } from "./_components/SignupRequestsTab";
 import {
@@ -41,12 +41,14 @@ import {
   useSignupRequests,
 } from "./hooks";
 import { toast } from "sonner";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
-import { MemberKebab } from "@/_components/MemberKebab";
-import { Dialog, DialogContent } from "@/_components/dialog";
-import { cn } from "@/utils/cn";
-import { Page } from "@/_components/Page";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { MemberKebab } from "@/_components/organisms/MemberKebab";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { Page } from "@/_components/templates/Page";
+import { Callout } from "@/_components/molecules/Callout";
+import { Badge } from "@/_components/atoms/Badge";
 
 /** « Pharmacies » tab of /admin/pharmacies — the pharmacies list (was the
  *  whole page before the « Utilisateurs » tab). The TanStack hooks return
@@ -154,13 +156,17 @@ function PharmaciesTab() {
       />
 
       {isError ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
-          <span className="text-sm font-medium">{t("adminPharm.loadError")}</span>
-          <Button variant="secondary" onClick={reload}>
-            <RefreshCw className="size-3.5" />
-            {t("common.retry")}
-          </Button>
-        </div>
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={reload}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {t("adminPharm.loadError")}
+        </Callout>
       ) : (
         <DataTable
           rows={filtered}
@@ -226,7 +232,6 @@ function AvatarStack({ initials, count }: { initials: string[]; count: number })
 
 type Scope = "all" | "with" | "without";
 
-const PILL = "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold";
 const KNOWN_ROLES = ["admin", "owner", "employee", "developer"];
 const SCOPE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 
@@ -300,22 +305,13 @@ function UsersTab() {
       key: "role",
       label: t("adminUsers.colRole"),
       sortable: false,
-      render: (u) => <span className={cn(PILL, "bg-muted text-muted-foreground")}>{roleLabel(u.role)}</span>,
+      render: (u) => <Badge>{roleLabel(u.role)}</Badge>,
     },
     {
       key: "status",
       label: t("adminUsers.colStatus"),
       sortable: false,
-      render: (u) => (
-        <span
-          className={cn(
-            PILL,
-            u.status === "active" ? "bg-success-subtle text-success" : "bg-muted text-muted-foreground",
-          )}
-        >
-          {statusLabel(u.status)}
-        </span>
-      ),
+      render: (u) => <Badge tone={u.status === "active" ? "success" : "neutral"}>{statusLabel(u.status)}</Badge>,
     },
     {
       key: "pharmacy",
@@ -330,14 +326,10 @@ function UsersTab() {
             >
               {[u.pharmacy.code, u.pharmacy.name].filter(Boolean).join(" · ")}
             </Link>
-            {u.pharmacy.archived_at && (
-              <span className={cn(PILL, "bg-warning-subtle text-warning")}>{t("adminUsers.archived")}</span>
-            )}
+            {u.pharmacy.archived_at && <Badge tone="warning">{t("adminUsers.archived")}</Badge>}
           </div>
         ) : (
-          <span className={cn(PILL, isMember(u) ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground")}>
-            {t("adminUsers.noPharmacy")}
-          </span>
+          <Badge tone={isMember(u) ? "warning" : "neutral"}>{t("adminUsers.noPharmacy")}</Badge>
         ),
     },
     {
@@ -412,13 +404,17 @@ function UsersTab() {
       )}
 
       {usersError ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3 text-error-subtle-foreground">
-          <span className="text-sm font-medium">{t("adminUsers.loadError")}</span>
-          <Button variant="secondary" onClick={reloadUsers}>
-            <RefreshCw className="size-3.5" />
-            {t("common.retry")}
-          </Button>
-        </div>
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={reloadUsers}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {t("adminUsers.loadError")}
+        </Callout>
       ) : (
         <DataTable
           rows={filtered}
@@ -500,28 +496,27 @@ function AssignPharmacyDialog({
       }}
     >
       <DialogContent className="max-w-md">
-        <div className="flex flex-col gap-4 p-5">
-          <header className="flex flex-col gap-1">
-            <h3 className="text-[17px] font-semibold text-foreground">
-              {t("adminUsers.assignTitle", { name: user?.full_name ?? user?.email ?? "" })}
-            </h3>
-            <p className="text-xs text-muted-foreground">{t("adminUsers.assignDesc")}</p>
-          </header>
-          <SingleSelectPopover
+        <DialogHeader
+          title={t("adminUsers.assignTitle", { name: user?.full_name ?? user?.email ?? "" })}
+          subtitle={t("adminUsers.assignDesc")}
+          onClose={onClose}
+        />
+        <DialogBody>
+          <SingleSelect
             label={t("adminUsers.colPharmacy")}
             options={pharmacies}
             value={pharmacyId}
             onChange={setPharmacyId}
           />
-          <div className="flex justify-end gap-2 border-t border-border pt-3">
-            <Button variant="secondary" onClick={onClose} disabled={isAssigning}>
-              {t("common.cancel")}
-            </Button>
-            <Button variant="primary" onClick={() => void submit()} isLoading={isAssigning} disabled={!pharmacyId}>
-              {t("adminUsers.assignBtn")}
-            </Button>
-          </div>
-        </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose} disabled={isAssigning}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" onClick={() => void submit()} isLoading={isAssigning} disabled={!pharmacyId}>
+            {t("adminUsers.assignBtn")}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

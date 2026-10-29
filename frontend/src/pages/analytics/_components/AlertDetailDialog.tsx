@@ -1,240 +1,24 @@
 // src/pages/alertes/_components/AlertDetailDialog.tsx
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
-import { ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Download } from "lucide-react";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { SortButton } from "@/_components/molecules/SortButton";
+import type { AlertColumn } from "./alertColumns";
 import { cn } from "@/utils/cn";
-import { formatMAD, formatPct, formatQty } from "@/utils/format";
+import { formatQty } from "@/utils/format";
 import { downloadXlsx, exportFilename } from "@/utils/table";
-import { ABCD_COLORS } from "@/pages/analytics/constants";
-import type { StockRow } from "@/types";
 import { translateFr, useT } from "@/i18n/I18nProvider";
-
-export interface AlertColumn<T = any> {
-  key: string;
-  label: string;
-  align?: "left" | "right";
-  cell: (row: T) => ReactNode; // formatted JSX for the cell
-  raw: (row: T) => string | number; // RAW value for Excel export (Excel formats/sums)
-  sortValue?: (row: T) => number | string; // defaults to raw()
-}
-
-function hexA(hex: string, a: number) {
-  const h = hex.replace("#", "");
-  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
-}
-
-/* ---- column sets (one per alert kind) ---- */
-
-type MarginRow = { product: string; marge_pct: number; ca: number };
-export const MARGIN_COLUMNS: AlertColumn<MarginRow>[] = [
-  {
-    key: "product",
-    label: "col.produit",
-    align: "left",
-    raw: (r) => r.product,
-    cell: (r) => (
-      <span className="text-sm font-medium" title={r.product}>
-        {r.product}
-      </span>
-    ),
-  },
-  {
-    key: "marge_pct",
-    label: "alertes.marge",
-    align: "right",
-    raw: (r) => r.marge_pct,
-    cell: (r) => <span className={cn("font-mono", r.marge_pct < 0 && "text-error")}>{formatPct(r.marge_pct)}</span>,
-  },
-  {
-    key: "ca",
-    label: "col.ca",
-    align: "right",
-    raw: (r) => r.ca,
-    cell: (r) => <span className="font-mono">{formatMAD(r.ca)}</span>,
-  },
-];
-
-type VsaRow = {
-  product: string;
-  category: string | null;
-  ppv: number | null;
-  units_sold: number;
-  ca: number;
-  last_vente_date: string | null;
-};
-export const VENTES_SANS_ACHAT_COLUMNS: AlertColumn<VsaRow>[] = [
-  {
-    key: "product",
-    label: "col.produit",
-    align: "left",
-    raw: (r) => r.product,
-    cell: (r) => (
-      <span className="text-sm font-medium" title={r.product}>
-        {r.product}
-      </span>
-    ),
-  },
-  {
-    key: "category",
-    label: "col.categorie",
-    align: "left",
-    raw: (r) => r.category ?? "",
-    cell: (r) => <span className="text-sm text-muted-foreground">{r.category ?? "—"}</span>,
-  },
-  {
-    key: "units_sold",
-    label: "alertes.qteVendue",
-    align: "right",
-    raw: (r) => r.units_sold,
-    cell: (r) => <span className="font-mono">{formatQty(r.units_sold)}</span>,
-  },
-  {
-    key: "ca",
-    label: "col.ca",
-    align: "right",
-    raw: (r) => r.ca,
-    cell: (r) => <span className="font-mono">{formatMAD(r.ca)}</span>,
-  },
-  {
-    key: "ppv",
-    label: "col.ppv",
-    align: "right",
-    raw: (r) => r.ppv ?? 0,
-    cell: (r) =>
-      r.ppv == null ? (
-        <span className="text-muted-foreground">—</span>
-      ) : (
-        <span className="font-mono">{formatMAD(r.ppv)}</span>
-      ),
-  },
-  {
-    key: "last_vente_date",
-    label: "alertes.derniereVente",
-    align: "left",
-    raw: (r) => r.last_vente_date ?? "",
-    sortValue: (r) => (r.last_vente_date ? Date.parse(r.last_vente_date) : -Infinity),
-    cell: (r) => <span className="font-mono">{r.last_vente_date ?? "—"}</span>,
-  },
-];
-
-type PeremRow = { product: string; expiry_date: string | null; quantity: number; ppv: number };
-export const PEREMPTION_COLUMNS: AlertColumn<PeremRow>[] = [
-  {
-    key: "product",
-    label: "col.produit",
-    align: "left",
-    raw: (r) => r.product,
-    cell: (r) => (
-      <span className="text-sm font-medium" title={r.product}>
-        {r.product}
-      </span>
-    ),
-  },
-  {
-    key: "expiry_date",
-    label: "alertes.dateExpiration",
-    align: "left",
-    raw: (r) => r.expiry_date ?? "",
-    sortValue: (r) => (r.expiry_date ? Date.parse(r.expiry_date) : Infinity),
-    cell: (r) =>
-      r.expiry_date ? (
-        <span className={cn("font-mono", new Date(r.expiry_date) < new Date() && "text-error")}>{r.expiry_date}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      ),
-  },
-  {
-    key: "quantity",
-    label: "alertes.quantite",
-    align: "right",
-    raw: (r) => r.quantity,
-    cell: (r) => <span className="font-mono">{formatQty(r.quantity)}</span>,
-  },
-  {
-    key: "ppv",
-    label: "col.ppv",
-    align: "right",
-    raw: (r) => r.ppv,
-    cell: (r) => <span className="font-mono">{formatMAD(r.ppv)}</span>,
-  },
-];
-
-export const STOCK_COLUMNS: AlertColumn<StockRow>[] = [
-  {
-    key: "product",
-    label: "col.produit",
-    align: "left",
-    raw: (r) => r.product,
-    cell: (r) => (
-      <span className="text-sm font-medium" title={r.product}>
-        {r.product}
-      </span>
-    ),
-  },
-  {
-    key: "category",
-    label: "stock.classe",
-    align: "left",
-    raw: (r) => r.category,
-    cell: (r) => (
-      <span
-        className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold"
-        style={{ background: hexA(ABCD_COLORS[r.category], 0.16), color: ABCD_COLORS[r.category] }}
-      >
-        {r.category}
-      </span>
-    ),
-  },
-  {
-    key: "current_stock",
-    label: "stock.stockActuel",
-    align: "right",
-    raw: (r) => r.current_stock ?? 0,
-    sortValue: (r) => r.current_stock ?? -Infinity,
-    cell: (r) =>
-      r.current_stock == null ? (
-        <span className="text-muted-foreground">—</span>
-      ) : (
-        <span className={cn("font-mono", r.current_stock < 0 && "rounded bg-error/10 px-1.5 text-error")}>
-          {formatQty(r.current_stock)}
-        </span>
-      ),
-  },
-  {
-    key: "stock_min",
-    label: "stock.stockMin",
-    align: "right",
-    raw: (r) => r.stock_min,
-    cell: (r) => <span className="font-mono text-muted-foreground">{formatQty(r.stock_min)}</span>,
-  },
-  {
-    key: "stock_max",
-    label: "stock.stockMax",
-    align: "right",
-    raw: (r) => r.stock_max,
-    cell: (r) => <span className="font-mono text-muted-foreground">{formatQty(r.stock_max)}</span>,
-  },
-  {
-    key: "ppv",
-    label: "col.ppv",
-    align: "right",
-    raw: (r) => r.ppv ?? 0,
-    cell: (r) =>
-      r.ppv == null ? (
-        <span className="text-muted-foreground">—</span>
-      ) : (
-        <span className="font-mono">{formatMAD(r.ppv)}</span>
-      ),
-  },
-];
 
 export interface AlertDetailDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- one window for 4 row types
   products: any[];
   columns: AlertColumn[];
   defaultSortKey: string;
@@ -294,23 +78,15 @@ function AlertDetailBody({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[88vh] w-full max-w-[1400px] flex-col gap-0 p-0">
-        {/* header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-              <span className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-xs font-bold tabular-nums text-muted-foreground">
-                {formatQty(products.length)} {t("common.wProduits")}
-              </span>
-            </div>
-            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-          </div>
-        </div>
+        <DialogHeader title={title} subtitle={subtitle} onClose={onClose}>
+          <Badge className="mt-1 w-fit tabular-nums">
+            {formatQty(products.length)} {t("common.wProduits")}
+          </Badge>
+        </DialogHeader>
 
-        {/* body */}
-        <div className="flex-1 overflow-auto px-5 py-4">
+        <DialogBody>
           {products.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">{t("alertes.emptyCat")}</div>
+            <EmptyState title={t("alertes.emptyCat")} />
           ) : (
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="overflow-x-auto">
@@ -318,8 +94,6 @@ function AlertDetailBody({
                   <thead>
                     <tr>
                       {columns.map((c) => {
-                        const active = sortKey === c.key;
-                        const Icon = !active ? ArrowUpDown : sortOrder === "asc" ? ArrowUp : ArrowDown;
                         return (
                           <th
                             key={c.key}
@@ -329,17 +103,14 @@ function AlertDetailBody({
                             )}
                           >
                             {/* A button (not onClick on <th>): sortable with the keyboard, like DataTable. */}
-                            <button
-                              type="button"
-                              onClick={() => toggleSort(c.key)}
-                              className={cn(
-                                "inline-flex cursor-pointer items-center gap-1.5 uppercase",
-                                c.align === "right" && "flex-row-reverse",
-                              )}
+                            <SortButton
+                              active={sortKey === c.key}
+                              order={sortOrder}
+                              alignRight={c.align === "right"}
+                              onSort={() => toggleSort(c.key)}
                             >
                               {t(c.label)}
-                              <Icon className={cn("size-3", active ? "text-primary" : "opacity-50")} />
-                            </button>
+                            </SortButton>
                           </th>
                         );
                       })}
@@ -368,17 +139,16 @@ function AlertDetailBody({
               </div>
             </div>
           )}
-        </div>
+        </DialogBody>
 
-        {/* footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
+        <DialogFooter>
           <Button variant="outline" onClick={handleExport} disabled={sorted.length === 0}>
             <Download className="size-4" /> {t("common.export")}
           </Button>
           <Button variant="secondary" onClick={onClose}>
             {t("common.close")}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Search, Eye, EyeOff } from "lucide-react";
 
-import { SingleSelectPopover, type SingleSelectOption } from "@/_components/SingleSelectPopover";
+import { SingleSelect, type SingleSelectOption } from "@/_components/molecules/SingleSelect";
 import { Button } from "@/_components/atoms/Button";
 import { Switch } from "./switch";
 import { soldeLockFor, type RequestState, type StoreCategory, type VisibleProduct } from "@/types/storeWebsite";
@@ -272,7 +272,7 @@ function ProductRow(props: RowProps) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <SingleSelectPopover
+        <SingleSelect
           label=""
           options={categoryOptions}
           value={product.storeCategoryId ?? ""}
@@ -307,7 +307,7 @@ function ProductCard(props: RowProps) {
         <Switch checked={product.visible} onCheckedChange={(v) => onToggleVisible(product.id, v)} />
       </div>
       <div className="flex items-center justify-between gap-3 text-sm">
-        <SingleSelectPopover
+        <SingleSelect
           label=""
           options={categoryOptions}
           value={product.storeCategoryId ?? ""}

@@ -5,8 +5,8 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
-import { PasswordField } from "@/_components/PasswordField";
-import { TextField } from "@/_components/TextField";
+import { PasswordField } from "@/_components/molecules/PasswordField";
+import { TextField } from "@/_components/molecules/TextField";
 import { ROUTES } from "@/types";
 import { cn } from "@/utils/cn";
 import { useT, type TFn } from "@/i18n/I18nProvider";

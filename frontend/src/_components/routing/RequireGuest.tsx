@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 
-import { PharmagestIcon } from "./PharmagestIcon";
+import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { useMe } from "@/hooks/useMe";
 import { ROUTES } from "@/types";
 

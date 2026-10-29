@@ -9,22 +9,24 @@
 import { useRef, useState } from "react";
 import { Download, Upload, BarChart3, Boxes, Coins, Percent, ShoppingCart, Sparkles, TrendingUp } from "lucide-react";
 
-import { useCategoryTypeOptions } from "@/_components/CategorySegment";
+import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { FilterBar, type ActiveFilter, type RightAction } from "@/_components/filterBar";
+import { FilterBar, type ActiveFilter, type RightAction } from "@/_components/organisms/FilterBar";
 import { MARGE_MODES } from "@/types";
 import type { AnalyseFilters, MargeMode, AnalyseMargeKpis, AnalyseMargeRow, ListeItem } from "@/types";
 
 import { useAnalysePage } from "./hooks";
-import { KpiTile } from "@/_components/KpiTile";
-import { TabBar } from "@/_components/TabBar";
-import { NeedleGauge } from "@/_components/NeedleGauge";
-import { Skeleton } from "@/_components/Skeleton";
+import { KpiTile } from "@/_components/organisms/KpiTile";
+import { TabBar } from "@/_components/molecules/TabBar";
+import { NeedleGauge } from "@/_components/atoms/NeedleGauge";
+import { Skeleton } from "@/_components/atoms/Skeleton";
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
-import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
+import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import { useMonthsShort } from "@/i18n/dates";
 import { MARGE_COLS } from "./constants";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
+import { Callout } from "@/_components/molecules/Callout";
+import { Badge } from "@/_components/atoms/Badge";
 
 /** 8 KPI tiles for /analyse (old-app parity):
  *  Row 1 — CA, Marge moyenne %, Marge moyenne DH, Optimisation.
@@ -188,13 +190,9 @@ function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrder, onSo
       c.key === "match_status"
         ? (r: AnalyseMargeRow) =>
             r.match_status === "found" ? (
-              <span className="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success">
-                {t("analyse.trouve")}
-              </span>
+              <Badge tone="success">{t("analyse.trouve")}</Badge>
             ) : (
-              <span className="rounded-full bg-error-subtle px-2 py-0.5 text-xs font-semibold text-error">
-                {t("analyse.introuvable")}
-              </span>
+              <Badge tone="error">{t("analyse.introuvable")}</Badge>
             )
         : c.render,
   }));
@@ -216,13 +214,13 @@ function AnalyseTable({ mode, rows, loading, pagination, sortBy, sortOrder, onSo
 
 /** CSV parser for /analyses → Liste mode. Detects the delimiter (`;` or `,`),
  *  reads the header, and maps the Produit / PID / Code-barre columns to
- *  ListeItem. Strips a UTF-8 BOM (real ﻿ or mojibake "ï»¿") that Sobrus glues
+ *  ListeItem. Strips a UTF-8 BOM (real  or mojibake "ï»¿") that Sobrus glues
  *  to the first header — otherwise the PID column is never detected. */
 
 function detectColumn(headers: string[], aliases: string[]): number {
   const norm = (s: string) =>
     s
-      .replace(/﻿|ï»¿/g, "")
+      .replace(/|ï»¿/g, "")
       .toLowerCase()
       .replace(/[\s_-]/g, "");
   const normalizedHeaders = headers.map(norm);
@@ -235,7 +233,7 @@ function detectColumn(headers: string[], aliases: string[]): number {
 
 function parseCsv(text: string): ListeItem[] {
   // Drop a leading real BOM so it can't leak into the first data cell either.
-  text = text.replace(/^﻿/, "");
+  text = text.replace(/^/, "");
   // Detect delimiter from the first line (`;` wins over `,`).
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
   const delim = (firstLine.match(/;/g)?.length ?? 0) >= (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
@@ -452,10 +450,10 @@ export default function AnalysePage() {
       )}
 
       {error && (
-        <div className="rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-sm text-error">
+        <Callout tone="error">
           {/* Surface the API detail when available — a bare "réessayez" hid real causes (e.g. 422). */}
           {t("analyse.loadError")} {error instanceof Error && error.message ? error.message : t("analyse.retryLater")}
-        </div>
+        </Callout>
       )}
     </Page>
   );

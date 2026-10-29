@@ -10,7 +10,7 @@ paths:
 | What | Where |
 |---|---|
 | A page | `pages/<feature>/<route>/index.tsx` + its `hooks.ts` (+ `_components/` used by that page only) |
-| Shared UI | `src/_components/` (`DataTable`, `KpiTile`, `ConfirmDialog`, `FormField`, `GaugeTiles`, `MembersSection`, …) |
+| Shared UI | `src/_components/atoms/` (one control) → `molecules/` (2+ atoms) → `organisms/` (app blocks) → `templates/` (`Page`, `AppLayout`), `routing/` (`Require*`). README §6.3 lists them |
 | Every backend call | `api/api.ts`: read `API.<group>.<action> = { url, key }`, write `{ url, refreshes }`; after a write `refresh(qc, API.x.write)` |
 | A read used by 2+ pages | `hooks/sharedQueries.ts`, one hook per query |
 | List filters + sort + page | `hooks/useListFilters.ts`; the date range is shared (`useGlobalDateRange`, `setRange(from, to)` both at once) |
@@ -41,7 +41,11 @@ paths:
 - Never a generic "AI-generated" look: no colored side stripes, tinted cards, gradients, emoji. Calm, same look as the site: `styles/tokens.css` colors + existing components.
 - `window.alert / confirm / prompt` → `ConfirmDialog` or a toast.
 - Several buttons in one `<label>` → `role="group"` + `aria-label`.
-- Fixed menus flip up near the window bottom (`_components/KebabMenu.tsx`).
+- Fixed menus flip up near the window bottom (`_components/molecules/KebabMenu.tsx`).
+- Pages: no raw `<button>` / `<input>` / `<select>` / `<textarea>` (ESLint guard; a file input aside) → the atoms. A piece drawn in 2+ places → a molecule.
+- One control height 36 px (`Button`, `Input`, selects); `size="lg"` (44 px) only for a page's main action.
+- Dialogs: `Dialog` + `DialogHeader` / `DialogBody` / `DialogFooter` (`molecules/DialogShell.tsx`). Messages: `Callout`. Empty: `EmptyState`.
+- Loading: a skeleton with the shape of what comes (`molecules/Skeletons.tsx`), never blank / « Chargement… » / a lone spinner (spinner only inside a button: `isLoading`).
 - Every visible text from `fr.ts` + `es.ts`; numbers French style in both languages.
 
 ## Format

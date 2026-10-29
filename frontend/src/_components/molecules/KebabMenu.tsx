@@ -6,18 +6,19 @@
  *  by that wrapper — this primitive portals the menu to `document.body`
  *  with viewport-fixed coords, mirroring the `ConfirmDialog` pattern.
  *
- *  Children = the menu items. Caller controls their styling.
+ *  Children = the menu items: `KebabItem` (one look; `danger` for « Supprimer », « Désactiver »).
  *  Click-outside closes; Escape closes; re-clicking the trigger toggles.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
+import { cn } from "@/utils/cn";
 
 /** Room (px) the menu needs below its trigger; with less, it opens upward. */
 const MENU_SPACE = 180;
 
-export function KebabMenu({ label, children }: { label?: string; children: (close: () => void) => React.ReactNode }) {
+export function KebabMenu({ label, children }: { label?: string; children: (close: () => void) => ReactNode }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
@@ -74,5 +75,38 @@ export function KebabMenu({ label, children }: { label?: string; children: (clos
           document.body,
         )}
     </>
+  );
+}
+
+/** One line of a `KebabMenu`: `onSelect` runs, then the menu closes (pass the menu's `close`). */
+export function KebabItem({
+  icon,
+  danger,
+  onSelect,
+  close,
+  children,
+}: {
+  icon?: ReactNode;
+  danger?: boolean;
+  onSelect: () => void;
+  close: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        onSelect();
+        close();
+      }}
+      className={cn(
+        "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-2 text-left text-sm",
+        danger ? "text-destructive hover:bg-destructive/5" : "text-foreground hover:bg-surface-subtle",
+      )}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }

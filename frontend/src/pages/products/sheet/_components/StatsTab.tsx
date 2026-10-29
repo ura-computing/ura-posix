@@ -8,9 +8,10 @@ import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { CategorySegment } from "@/_components/CategorySegment";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { KpiTile } from "@/_components/KpiTile";
+import { Segmented } from "@/_components/molecules/Segmented";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { KpiTile } from "@/_components/organisms/KpiTile";
+import { SkeletonCard, SkeletonTile } from "@/_components/molecules/Skeletons";
 import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare } from "@/types";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
@@ -140,7 +141,18 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
   if (!range.from || !range.to) {
     return <p className="py-10 text-center text-base text-muted-foreground">{t("products.pickDates")}</p>;
   }
-  if (!stats) return <p className="py-10 text-center text-sm text-muted-foreground">{t("common.loading")}</p>;
+  if (!stats) {
+    return (
+      <div className="flex flex-col gap-5" aria-busy>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <SkeletonTile key={i} />
+          ))}
+        </div>
+        <SkeletonCard lines={8} />
+      </div>
+    );
+  }
 
   const { period: now, previous: before, monthly } = stats;
   const change = (a: number | null, b: number | null) => {
@@ -266,7 +278,7 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
         title={t("products.yearHistory")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <CategorySegment value={historyFilter} options={historyOptions} onChange={setHistoryFilter} />
+            <Segmented value={historyFilter} options={historyOptions} onChange={setHistoryFilter} />
             <CopyButton value={historyTsv} label={t("products.copyHistory")} copiedText={t("products.tableCopied")} />
           </div>
         }

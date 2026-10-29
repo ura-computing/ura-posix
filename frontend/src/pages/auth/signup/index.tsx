@@ -10,13 +10,14 @@ import { ArrowLeft, Building2, Check, Store, UserRound, type LucideIcon } from "
 
 import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
-import { PasswordField } from "@/_components/PasswordField";
-import { TextField } from "@/_components/TextField";
+import { PasswordField } from "@/_components/molecules/PasswordField";
+import { TextField } from "@/_components/molecules/TextField";
 import { ROUTES, type SignupIn } from "@/types";
 import { cn } from "@/utils/cn";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 
 import { useSignup } from "./hooks";
+import { ChoiceCard } from "@/_components/molecules/ChoiceCard";
 
 type Kind = "new" | "joinOwner" | "employee";
 type Step = "who" | "pharmacy" | "name" | "email" | "password";
@@ -103,17 +104,7 @@ function KindCard({
   onSelect: () => void;
 }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onSelect}
-      className={cn(
-        "flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3.5 text-left transition-colors",
-        "focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2",
-        selected ? "border-primary bg-accent" : "border-border bg-card hover:border-primary/60",
-      )}
-    >
+    <ChoiceCard selected={selected} onSelect={onSelect} className="flex-row items-start gap-3 p-3.5">
       <span
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-md",
@@ -126,7 +117,7 @@ function KindCard({
         <span className="text-sm font-semibold text-foreground">{label}</span>
         <span className="text-xs text-muted-foreground">{hint}</span>
       </span>
-    </button>
+    </ChoiceCard>
   );
 }
 

@@ -1,176 +1,26 @@
-import {
-  Download,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  BarChart3,
-  Receipt,
-  Wallet,
-  Trash2,
-  X,
-  ArrowRightLeft,
-  Banknote,
-  CreditCard,
-  Plus,
-} from "lucide-react";
+import { Download, BarChart3, Receipt, Wallet, Trash2, ArrowRightLeft, Banknote, CreditCard, Plus } from "lucide-react";
 
-import { useCategoryTypeOptions } from "@/_components/CategorySegment";
-import {
-  FilterBar,
-  type ActiveFilter,
-  POPOVER_ALIGN,
-  POPOVER_OPTION,
-  POPOVER_PANEL,
-  POPOVER_POSITION,
-  POPOVER_TRIGGER,
-} from "@/_components/filterBar";
+import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import type { StatsFilters, StatsResponse, PaymentEntry, PaymentMethod, VenteRow } from "@/types";
 
 import { useComptabilitePage, useDeletePayment, useSavePayment } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/utils/cn";
-import { useMonths, useMonthsShort } from "@/i18n/dates";
+import { useState } from "react";
 import { formatMAD, formatPct } from "@/utils/format";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { MonthPicker } from "@/_components/molecules/MonthPicker";
+import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { Button } from "@/_components/atoms/Button";
-import { FormField } from "@/_components/FormField";
+import { FormField } from "@/_components/molecules/FormField";
 import { PAYMENT_METHODS } from "@/types";
-import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
-import { TypeBadge } from "@/_components/TypeBadge";
-import { Page } from "@/_components/Page";
+import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
+import { TypeBadge } from "@/_components/molecules/TypeBadge";
+import { Page } from "@/_components/templates/Page";
 import { Input } from "@/_components/atoms/Input";
-import { Checkbox } from "@/_components/Checkbox";
+import { Checkbox } from "@/_components/atoms/Checkbox";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
-
-/** Month-picker matching the app's design system (same trigger shell as
- *  SingleSelectPopover, same panel positioning). Returns a "YYYY-MM" string.
- *
- *  Used on /comptabilité — both the activeMonth selector on the page and
- *  the month field inside PaymentEditDialog go through this. Native
- *  <input type="month"> was the previous implementation; it doesn't match
- *  the rest of the popovers in the app, so we replaced it.
- *
- *  Behaviour: trigger shows "Mois MMMM YYYY". Click → panel with a year
- *  stepper (◀ YYYY ▶) and a 3×4 month grid. Pick a month → onChange(YYYY-MM),
- *  panel closes. ESC / outside-click close without committing.
- */
-
-/** Decompose a "YYYY-MM" string into [year, monthIdx] (monthIdx is 0-based). */
-function parseYearMonth(s: string): [number, number] {
-  const [y, m] = s.split("-").map(Number);
-  return [y || new Date().getFullYear(), (m || 1) - 1];
-}
-
-function formatYearMonth(year: number, monthIdx: number): string {
-  return `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
-}
-
-interface MonthPopoverProps {
-  /** Current value as "YYYY-MM". */
-  value: string;
-  onChange: (next: string) => void;
-  /** Label shown before the value in the trigger ("Mois" by default). Pass ""
-   *  to show only the value (e.g. inside a header). */
-  label?: string;
-  /** Where the panel opens — matches SingleSelectPopover's API. */
-  placement?: "top" | "bottom";
-  align?: "start" | "end";
-}
-
-function MonthPopover({ value, onChange, label = "", placement = "bottom", align = "start" }: MonthPopoverProps) {
-  const t = useT();
-  const MONTHS_FR = useMonths();
-  const MONTHS_FR_SHORT = useMonthsShort();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const [valueY, valueM] = parseYearMonth(value);
-  // The year currently displayed in the panel — independent from `valueY` so
-  // the user can browse other years before committing.
-  const [displayYear, setDisplayYear] = useState(valueY);
-
-  // Outside-click close
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
-
-  const pick = (monthIdx: number) => {
-    onChange(formatYearMonth(displayYear, monthIdx));
-    setOpen(false);
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          if (!open) setDisplayYear(valueY); // the panel always opens on the selected year
-          setOpen(!open);
-        }}
-        className={POPOVER_TRIGGER}
-      >
-        <span>
-          {label}
-          <span className={cn("font-semibold text-foreground", label && "ml-1")}>
-            {label ? `: ${MONTHS_FR[valueM]} ${valueY}` : `${MONTHS_FR[valueM]} ${valueY}`}
-          </span>
-        </span>
-        <ChevronDown className="size-3.5 text-muted-foreground" />
-      </button>
-
-      {open && (
-        <div className={cn(POPOVER_PANEL, POPOVER_POSITION[placement], POPOVER_ALIGN[align], "w-64 p-2")}>
-          {/* Year stepper */}
-          <div className="mb-1 flex items-center justify-between px-1">
-            <button
-              type="button"
-              onClick={() => setDisplayYear(displayYear - 1)}
-              aria-label={t("shared.prevYear")}
-              className="rounded p-1 hover:bg-surface-subtle"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="text-sm font-semibold text-foreground">{displayYear}</span>
-            <button
-              type="button"
-              onClick={() => setDisplayYear(displayYear + 1)}
-              aria-label={t("shared.nextYear")}
-              className="rounded p-1 hover:bg-surface-subtle"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-
-          {/* 3 × 4 month grid */}
-          <div className="grid grid-cols-3 gap-1">
-            {MONTHS_FR_SHORT.map((name, idx) => {
-              const active = displayYear === valueY && idx === valueM;
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => pick(idx)}
-                  className={cn(
-                    POPOVER_OPTION,
-                    "justify-center px-2 py-2 text-xs",
-                    active && "bg-surface-subtle font-semibold text-foreground",
-                  )}
-                >
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /**
  * 3 KPI cards for /comptabilité — each card groups several related metrics:
@@ -273,8 +123,7 @@ function Row({
  *  - If `entry` is set  → edit mode (Save calls POST upsert too — backend
  *    upserts on (pharmacy_id, month, method)). Also surfaces Delete.
  *
- * Month picker uses the native <input type="month"> for simplicity — gives a
- * YYYY-MM string directly which is what the backend wants.
+ * Month: `MonthPicker` — gives the YYYY-MM string the backend wants.
  */
 
 const METHOD_KEY: Record<PaymentMethod, string> = {
@@ -335,23 +184,11 @@ function PaymentEditBody({ open, onClose, method, month, entry }: PaymentEditDia
       }}
     >
       <DialogContent className="max-w-md">
-        <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-semibold text-foreground">
-            {t(METHOD_KEY[method])} — {monthV}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t("common.close")}
-            className="cursor-pointer text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+        <DialogHeader title={`${t(METHOD_KEY[method])} — ${monthV}`} onClose={onClose} />
 
-        <div className="flex flex-col gap-4 px-5 py-4">
+        <DialogBody>
           <FormField label={t("comptabilite.moisLabel")}>
-            <MonthPopover label="" value={monthV} onChange={setMonthV} />
+            <MonthPicker label="" value={monthV} onChange={setMonthV} />
           </FormField>
 
           <div className="grid grid-cols-2 gap-3">
@@ -366,26 +203,21 @@ function PaymentEditBody({ open, onClose, method, month, entry }: PaymentEditDia
           <FormField label={t("comptabilite.nbTransactions")}>
             <NumberInput value={cnt} onChange={setCnt} integer />
           </FormField>
-        </div>
+        </DialogBody>
 
-        <div className="flex items-center justify-between border-t border-border px-5 py-3">
+        <DialogFooter className="justify-between">
           {entry ? (
-            <Button
-              variant="ghost"
-              onClick={handleDelete}
-              isLoading={isDeleting}
-              className="!text-destructive hover:!bg-destructive/5"
-            >
+            <Button variant="danger-outline" onClick={handleDelete} isLoading={isDeleting}>
               <Trash2 className="size-4" />
-              Supprimer
+              {t("common.delete")}
             </Button>
           ) : (
             <span />
           )}
           <Button variant="primary" onClick={handleSave} isLoading={isSaving}>
-            Enregistrer
+            {t("common.save")}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -476,10 +308,10 @@ function MethodCard({
   const total = entry ? entry.pharmacie_amount + entry.parapharmacie_amount : 0;
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`group flex cursor-pointer flex-col gap-3 rounded-xl border ${tint.border} bg-card p-5 text-left shadow-sm transition-shadow hover:shadow-md`}
+      className={`group h-auto flex-col items-stretch justify-start gap-3 whitespace-normal rounded-xl border ${tint.border} bg-card p-5 text-left font-normal shadow-sm transition-shadow hover:bg-card hover:shadow-md`}
     >
       <div className="flex items-center justify-between">
         <div className={`flex size-9 items-center justify-center rounded-xl ${tint.bg} ${tint.fg}`}>
@@ -509,7 +341,7 @@ function MethodCard({
           <span>{t("common.add")}</span>
         </div>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -710,7 +542,7 @@ export default function ComptabilitePage() {
       {statsLoading || !stats ? (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-44 animate-pulse rounded-xl border border-border bg-card" />
+            <SkeletonTile key={i} className="min-h-44" />
           ))}
         </div>
       ) : (
@@ -721,7 +553,7 @@ export default function ComptabilitePage() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <SectionTitle>{t("comptabilite.paymentMethods")}</SectionTitle>
-          <MonthPopover label="" value={activeMonth} onChange={setActiveMonth} align="end" />
+          <MonthPicker label="" value={activeMonth} onChange={setActiveMonth} align="end" />
         </div>
         <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
       </section>

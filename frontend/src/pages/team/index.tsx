@@ -13,11 +13,11 @@ import { useState } from "react";
 
 import { useT } from "@/i18n/I18nProvider";
 
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
-import { MembersSection } from "@/_components/MembersSection";
-import { UserPermissionsDialog } from "@/_components/UserPermissionsDialog";
-import { FEATURES, toFeatureRecord, type FeatureKey } from "@/_components/memberConstants";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
+import { MembersSection } from "@/_components/organisms/MembersSection";
+import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDialog";
+import { FEATURES, toFeatureRecord, type FeatureKey } from "@/_components/organisms/memberConstants";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/utils/cn";
 import type { CreateUserIn, CreateUserOut, MemberOut } from "@/types";
@@ -30,7 +30,8 @@ import {
   useSetEmployeePermissions,
   useSetEmployeeStatus,
 } from "./hooks";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
+import { PageSkeleton } from "@/_components/molecules/Skeletons";
 
 export default function OwnerEmployeesPage() {
   const t = useT();
@@ -49,11 +50,7 @@ export default function OwnerEmployeesPage() {
   const { deleteEmployee } = useDeleteEmployee();
 
   if (isLoading || !team) {
-    return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-4 py-10 text-center text-sm text-muted-foreground">
-        {t("common.loading")}
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   const { employees, pharmacy_features, my_permissions } = team;

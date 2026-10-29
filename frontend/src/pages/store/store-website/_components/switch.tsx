@@ -1,6 +1,6 @@
 /** Shim mapping shadcn's <Switch checked onCheckedChange> API to the
  *  existing apcm `<Switch checked onChange>` primitive. */
-import { Switch as SharedSwitch } from "@/_components/Switch";
+import { Switch as SharedSwitch } from "@/_components/atoms/Switch";
 
 export interface SwitchProps {
   checked: boolean;

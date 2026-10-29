@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 
-import { AppLayout } from "@/_components/AppLayout";
-import { RequireFeature } from "@/_components/RequireFeature";
-import { RequireGuest } from "@/_components/RequireGuest";
-import { RequireRole } from "@/_components/RequireRole";
+import { AppLayout } from "@/_components/templates/AppLayout";
+import { RequireFeature } from "@/_components/routing/RequireFeature";
+import { RequireGuest } from "@/_components/routing/RequireGuest";
+import { RequireRole } from "@/_components/routing/RequireRole";
 import HomePage from "@/pages/home";
 import LoginPage from "@/pages/auth/login";
 import NotFoundPage from "@/pages/auth/not-found";

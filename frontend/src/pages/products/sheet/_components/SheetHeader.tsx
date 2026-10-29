@@ -4,8 +4,8 @@
 import { ArrowLeft, Barcode, ChevronRight, MapPin, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { KpiTile } from "@/_components/KpiTile";
-import { TypeBadge } from "@/_components/TypeBadge";
+import { KpiTile } from "@/_components/organisms/KpiTile";
+import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";

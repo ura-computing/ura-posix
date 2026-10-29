@@ -14,16 +14,19 @@
  *  resets so admin + owner get one consistent credentials flow.
  */
 import { useState } from "react";
-import { CheckCircle2, Copy, KeyRound, Mail, UserPlus, X } from "lucide-react";
+import { CheckCircle2, Copy, KeyRound, Mail, UserPlus } from "lucide-react";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { Button } from "@/_components/atoms/Button";
-import { Spinner } from "@/_components/atoms/Spinner";
-import { FormField, FormInput } from "./FormField";
-import { PasswordField } from "./PasswordField";
-import { SingleSelectPopover } from "./SingleSelectPopover";
-import { Dialog, DialogContent } from "./dialog";
-import { ROLE_LABEL } from "./memberConstants";
+import { buttonClass } from "@/_components/atoms/buttonClass";
+import { Callout } from "@/_components/molecules/Callout";
+import { ChoiceCard } from "@/_components/molecules/ChoiceCard";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { FormField, FormInput } from "@/_components/molecules/FormField";
+import { PasswordField } from "@/_components/molecules/PasswordField";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { ROLE_LABEL } from "@/_components/organisms/memberConstants";
 import type { CreateUserIn, CreateUserOut, MemberOut, MemberRole } from "@/types";
 
 export interface PharmacyOption {
@@ -106,7 +109,7 @@ export function CreateUserDialog({
       }}
     >
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
-        <DialogHead
+        <DialogHeader
           icon={revealed ? <CheckCircle2 className="size-4" /> : <UserPlus className="size-4" />}
           title={revealed ? t("adminPharm.accountCreated") : t("adminPharm.newUser")}
           subtitle={revealed ? t("adminPharm.revealSubtitle") : t("adminPharm.createSubtitle")}
@@ -115,89 +118,94 @@ export function CreateUserDialog({
 
         {/* ─── State A · Form ──────────────────────────────────────────── */}
         {!revealed && (
-          <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-            <FormField label={t("adminPharm.fullName")} required>
-              <FormInput
-                value={values.full_name ?? ""}
-                onChange={(v) => set("full_name", v)}
-                placeholder="Karim Bennani"
-                required
-              />
-            </FormField>
-
-            <FormField label={t("adminPharm.email")} required>
-              <FormInput
-                type="email"
-                value={values.email}
-                onChange={(v) => set("email", v)}
-                placeholder="karim.bennani@pharmacentre.ma"
-                required
-              />
-            </FormField>
-
-            <PasswordField
-              label={t("adminPharm.password")}
-              hint={t("adminPharm.passwordMinHint")}
-              value={values.password}
-              onChange={(e) => set("password", e.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-              required
-            />
-
-            {/* Rôle radio — hidden when roleLocked is set (owner-side caller
-                forces "employee"; admin-side caller shows the choice). */}
-            {!roleLocked && (
-              <FormField label={t("adminPharm.role")} required group>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {(["owner", "employee"] as const).map((role) => {
-                    const selected = values.role === role;
-                    return (
-                      <button
-                        key={role}
-                        type="button"
-                        data-selected={selected}
-                        onClick={() => set("role", role)}
-                        className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-card p-3 text-left transition-colors data-[selected=true]:border-primary data-[selected=true]:bg-primary/5"
-                      >
-                        <span
-                          data-selected={selected}
-                          className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-border data-[selected=true]:border-primary"
-                        >
-                          {selected && <span className="size-2 rounded-full bg-primary" />}
-                        </span>
-                        <span className="flex flex-col gap-0.5">
-                          <span className="text-[13px] font-semibold text-foreground">{t(ROLE_LABEL[role])}</span>
-                          <span className="text-[11.5px] leading-snug text-muted-foreground">{t(ROLE_DESC[role])}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+          <form className="flex flex-col" onSubmit={handleSubmit}>
+            <DialogBody>
+              <FormField label={t("adminPharm.fullName")} required>
+                <FormInput
+                  value={values.full_name ?? ""}
+                  onChange={(v) => set("full_name", v)}
+                  placeholder="Karim Bennani"
+                  required
+                />
               </FormField>
-            )}
 
-            <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
-              <SingleSelectPopover
-                label=""
-                options={pharmacies.map((p) => ({
-                  value: String(p.id),
-                  label: [p.name, p.city].filter(Boolean).join(" · "),
-                }))}
-                value={String(values.pharmacy_id)}
-                onChange={(v) => set("pharmacy_id", Number(v))}
+              <FormField label={t("adminPharm.email")} required>
+                <FormInput
+                  type="email"
+                  value={values.email}
+                  onChange={(v) => set("email", v)}
+                  placeholder="karim.bennani@pharmacentre.ma"
+                  required
+                />
+              </FormField>
+
+              <PasswordField
+                label={t("adminPharm.password")}
+                hint={t("adminPharm.passwordMinHint")}
+                value={values.password}
+                onChange={(e) => set("password", e.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
               />
-            </FormField>
 
-            <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+              {/* Rôle radio — hidden when roleLocked is set (owner-side caller
+                forces "employee"; admin-side caller shows the choice). */}
+              {!roleLocked && (
+                <FormField label={t("adminPharm.role")} required group>
+                  <div
+                    role="radiogroup"
+                    aria-label={t("adminPharm.role")}
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+                  >
+                    {(["owner", "employee"] as const).map((role) => {
+                      const selected = values.role === role;
+                      return (
+                        <ChoiceCard
+                          key={role}
+                          selected={selected}
+                          onSelect={() => set("role", role)}
+                          className="flex-row items-start gap-2.5 p-3"
+                        >
+                          <span
+                            data-selected={selected}
+                            className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2 border-border data-[selected=true]:border-primary"
+                          >
+                            {selected && <span className="size-2 rounded-full bg-primary" />}
+                          </span>
+                          <span className="flex flex-col gap-0.5">
+                            <span className="text-[13px] font-semibold text-foreground">{t(ROLE_LABEL[role])}</span>
+                            <span className="text-[11.5px] leading-snug text-muted-foreground">
+                              {t(ROLE_DESC[role])}
+                            </span>
+                          </span>
+                        </ChoiceCard>
+                      );
+                    })}
+                  </div>
+                </FormField>
+              )}
+
+              <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
+                <SingleSelect
+                  label=""
+                  options={pharmacies.map((p) => ({
+                    value: String(p.id),
+                    label: [p.name, p.city].filter(Boolean).join(" · "),
+                  }))}
+                  value={String(values.pharmacy_id)}
+                  onChange={(v) => set("pharmacy_id", Number(v))}
+                />
+              </FormField>
+            </DialogBody>
+            <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" disabled={isSaving}>
-                {isSaving && <Spinner size="sm" />}
+              <Button type="submit" variant="primary" isLoading={isSaving} loadingText={t("common.saving")}>
                 {t("adminPharm.createAccount")}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         )}
 
@@ -260,33 +268,34 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
       }}
     >
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
-        <DialogHead
+        <DialogHeader
           icon={done ? <CheckCircle2 className="size-4" /> : <KeyRound className="size-4" />}
           title={done ? t("adminPharm.passwordReset") : t("members.resetPassword")}
           subtitle={t("adminPharm.resetSubtitle")}
           onClose={onClose}
         />
         {member && !done && (
-          <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-            <PasswordField
-              label={t("adminPharm.newPassword")}
-              hint={t("adminPharm.passwordMinHint")}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              minLength={8}
-              required
-              autoFocus
-            />
-            <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+          <form className="flex flex-col" onSubmit={handleSubmit}>
+            <DialogBody>
+              <PasswordField
+                label={t("adminPharm.newPassword")}
+                hint={t("adminPharm.passwordMinHint")}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                minLength={8}
+                required
+                autoFocus
+              />
+            </DialogBody>
+            <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" disabled={saving}>
-                {saving && <Spinner size="sm" />}
+              <Button type="submit" variant="primary" isLoading={saving} loadingText={t("common.saving")}>
                 {t("common.save")}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         )}
         {member && done && (
@@ -300,41 +309,6 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function DialogHead({
-  icon,
-  title,
-  subtitle,
-  onClose,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  onClose: () => void;
-}) {
-  const t = useT();
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-[10px] bg-primary/15 text-primary">
-          {icon}
-        </span>
-        <div className="flex flex-col gap-0.5">
-          <h3 className="text-[17px] font-semibold text-foreground">{title}</h3>
-          <span className="text-xs text-muted-foreground">{subtitle}</span>
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t("common.close")}
-        className="cursor-pointer text-muted-foreground hover:text-foreground"
-      >
-        <X className="size-4" />
-      </button>
-    </div>
   );
 }
 
@@ -364,34 +338,33 @@ function CredentialsReveal({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-5">
-      <div className="flex flex-col gap-1 rounded-lg border border-success-border bg-success-subtle px-4 py-3 text-success-subtle-foreground">
-        <span className="text-sm font-semibold">{banner}</span>
-        <span className="text-xs">
+    <>
+      <DialogBody>
+        <Callout tone="success" title={banner}>
           {member.email} · {t(ROLE_LABEL[member.role])}
-        </span>
-      </div>
+        </Callout>
 
-      <FormField label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")} group>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
-            {tempPassword}
-          </code>
-          <Button variant="secondary" onClick={copyPassword}>
-            {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
-            {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
-          </Button>
-        </div>
-      </FormField>
+        <FormField label={t("adminPharm.tempPassword")} hint={t("adminPharm.tempPasswordHint")} group>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground">
+              {tempPassword}
+            </code>
+            <Button variant="secondary" onClick={copyPassword}>
+              {copied ? <CheckCircle2 className="size-4 text-success" /> : <Copy className="size-4" />}
+              {copied ? t("adminPharm.copied") : t("adminPharm.copy")}
+            </Button>
+          </div>
+        </FormField>
+      </DialogBody>
 
-      <div className="-mx-5 -mb-5 mt-1 flex items-center justify-between gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+      <DialogFooter className="justify-between">
         {/* Gmail web compose, not mailto: — mailto goes to the OS default mail
             app (e.g. Thunderbird/Firefox on Ubuntu); client uses Gmail only. */}
         <a
           href={buildGmailUrl(member, tempPassword, kind, t)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
+          className={buttonClass("primary")}
         >
           <Mail className="size-4" />
           {t("adminPharm.sendByGmail")}
@@ -399,8 +372,8 @@ function CredentialsReveal({
         <Button variant="secondary" onClick={onClose}>
           {t("common.close")}
         </Button>
-      </div>
-    </div>
+      </DialogFooter>
+    </>
   );
 }
 

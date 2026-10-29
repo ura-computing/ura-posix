@@ -16,10 +16,11 @@ import { useMe } from "@/hooks/useMe";
 import NotFoundPage from "@/pages/auth/not-found";
 import { ROUTES, STATUSES } from "@/types";
 import type { Role } from "@/types";
+import { PageSkeleton } from "@/_components/molecules/Skeletons";
 
 export function RequireRole({ role }: { role: Role | Role[] }) {
   const { me, isLoading } = useMe();
-  if (isLoading) return null; // AppLayout already renders the shell; brief blank is fine
+  if (isLoading) return <PageSkeleton />;
   const allowed = Array.isArray(role) ? role : [role];
   if (!me) return <Navigate to={ROUTES.LOGIN} replace />;
   const pending = me.status === STATUSES.PENDING;

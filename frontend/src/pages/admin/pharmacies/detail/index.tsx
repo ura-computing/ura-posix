@@ -13,11 +13,11 @@ import { ArrowLeft, ChevronRight, Pencil, Trash2, Check } from "lucide-react";
 import { useT } from "@/i18n/I18nProvider";
 
 import { Button } from "@/_components/atoms/Button";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { CreateUserDialog, ResetPasswordDialog } from "@/_components/CreateUserDialog";
-import { MembersSection } from "@/_components/MembersSection";
-import { UserPermissionsDialog } from "@/_components/UserPermissionsDialog";
-import { allFeatures, toFeatureRecord, type FeatureKey, FEATURES } from "@/_components/memberConstants";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
+import { MembersSection } from "@/_components/organisms/MembersSection";
+import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDialog";
+import { allFeatures, toFeatureRecord, type FeatureKey, FEATURES } from "@/_components/organisms/memberConstants";
 import { ROUTES, type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types";
 import { cn } from "@/utils/cn";
 
@@ -33,9 +33,10 @@ import {
   useSetUserStatus,
   useUpdatePharmacy,
 } from "../hooks";
-import { Switch } from "@/_components/Switch";
-import { Page } from "@/_components/Page";
+import { Switch } from "@/_components/atoms/Switch";
+import { Page } from "@/_components/templates/Page";
 import { Spinner } from "@/_components/atoms/Spinner";
+import { PageSkeleton } from "@/_components/molecules/Skeletons";
 
 /** Section A of the pharmacy detail page — pharmacy-level feature toggles.
  *
@@ -217,11 +218,7 @@ export default function AdminPharmacyDetail() {
   };
 
   if (isLoading || !detail) {
-    return (
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-4 py-10 text-center text-sm text-muted-foreground">
-        {t("common.loading")}
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   return (

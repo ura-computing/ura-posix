@@ -7,9 +7,9 @@ import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { CategorySegment } from "@/_components/CategorySegment";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
+import { Segmented } from "@/_components/molecules/Segmented";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import type { ProductMovementLine, ProductSheet } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -205,7 +205,7 @@ export function MovementsTab({
         extra={
           <div className="flex items-center gap-2" role="group" aria-label={t("products.sortLabel")}>
             <span className="text-sm font-medium text-muted-foreground">{t("products.sortLabel")}</span>
-            <CategorySegment value={filters.order} options={orders} onChange={setOrder} />
+            <Segmented value={filters.order} options={orders} onChange={setOrder} />
           </div>
         }
         activeFilters={activeFilters}

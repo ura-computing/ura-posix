@@ -7,13 +7,15 @@
  *   - Fournisseurs: « Exclure » (every product bought from it)
  *  Already excluded: « déjà exclu », no button (« Réintégrer » is in the list below). */
 import { useState, type ReactNode } from "react";
-import { Building2, ChevronDown, ChevronUp, FileText, Package } from "lucide-react";
+import { Building2, ChevronRight, FileText, Package } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
-import { Checkbox } from "@/_components/Checkbox";
-import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
-import { Spinner } from "@/_components/atoms/Spinner";
+import { cn } from "@/utils/cn";
+import { Checkbox } from "@/_components/atoms/Checkbox";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { SkeletonRows, SkeletonText } from "@/_components/molecules/Skeletons";
+import { Card } from "@/_components/atoms/Card";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import type { BlSummary, MedicamentSuggestion, SupplierSummary } from "@/types";
 import { formatDate, formatMAD, formatNumStr, formatQty } from "@/utils/format";
@@ -39,7 +41,7 @@ function SupplierFilter({
   const t = useT();
   if (suppliers.length < 2) return null;
   return (
-    <SingleSelectPopover
+    <SingleSelect
       label={t("ps.fournisseur")}
       options={[{ value: "", label: t("ps.tousFournisseurs") }, ...suppliers.map((s) => ({ value: s, label: s }))]}
       value={suppliers.includes(value) ? value : ""}
@@ -71,7 +73,9 @@ function Found({
   const t = useT();
   if (count === 0) {
     return isSearching ? (
-      <Spinner size="lg" className="mx-auto text-muted-foreground" />
+      <Card as="div" padding="none">
+        <SkeletonRows rows={3} columns={3} />
+      </Card>
     ) : (
       <p className="py-2 text-center text-sm text-muted-foreground">{t("ps.nothingFound", { q })}</p>
     );
@@ -92,25 +96,52 @@ function Row({
   facts,
   amount,
   actions,
+  expand,
   children,
 }: {
   icon: ReactNode;
   title: ReactNode;
   facts: ReactNode;
   amount?: ReactNode;
-  actions: ReactNode;
+  actions?: ReactNode;
+  /** The line opens (its BL, its content): a › before the name, ⌄ once open; the whole name is the target. */
+  expand?: { open: boolean; label: string; onToggle: () => void };
   children?: ReactNode;
 }) {
+  const head = (
+    <>
+      {expand && (
+        <ChevronRight
+          className={cn("size-5 shrink-0 text-primary transition-transform", expand.open && "rotate-90")}
+          aria-hidden
+        />
+      )}
+      <span className="text-muted-foreground">{icon}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 items-center gap-2 text-base font-semibold text-foreground">{title}</div>
+        <div className="truncate text-sm font-normal text-muted-foreground">{facts}</div>
+      </div>
+    </>
+  );
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-muted-foreground">{icon}</span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <div className="flex min-w-0 items-center gap-2 text-base font-semibold text-foreground">{title}</div>
-          <div className="truncate text-sm text-muted-foreground">{facts}</div>
-        </div>
+        {expand ? (
+          <Button
+            variant="ghost"
+            onClick={expand.onToggle}
+            aria-expanded={expand.open}
+            aria-label={expand.label}
+            title={expand.label}
+            className="-mx-2 h-auto min-w-0 flex-1 justify-start gap-3 whitespace-normal px-2 py-1.5 text-left"
+          >
+            {head}
+          </Button>
+        ) : (
+          head
+        )}
         {amount && <span className="font-mono text-sm font-semibold tabular-nums text-foreground">{amount}</span>}
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
       {children}
     </li>
@@ -118,15 +149,6 @@ function Row({
 }
 
 /** « Voir ses BL » / « Contenu »: opens one line's details. */
-function OpenButton({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
-  return (
-    <Button variant="secondary" onClick={onClick} aria-expanded={open}>
-      {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-      {label}
-    </Button>
-  );
-}
-
 function ExcludeButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   const t = useT();
   return (
@@ -179,7 +201,7 @@ export function ProductResults({
 function BlContent({ deliveryRef }: { deliveryRef: string }) {
   const t = useT();
   const { blLines, isLoadingLines, linesError } = useBlDetail(deliveryRef);
-  if (isLoadingLines) return <Spinner className="mx-auto text-muted-foreground" />;
+  if (isLoadingLines) return <SkeletonText lines={3} className="ml-8" />;
   if (linesError) return <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>;
   return (
     <div className="ml-8 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface-subtle/50">
@@ -254,13 +276,13 @@ export function BlResults({ bls, q, isSearching, isExcluding, onExclude }: Commo
             </>
           }
           amount={formatMAD(b.total)}
+          expand={{
+            open: opened === b.delivery_ref,
+            label: t("ps.seeContent"),
+            onToggle: () => setOpened(opened === b.delivery_ref ? null : b.delivery_ref),
+          }}
           actions={
             <>
-              <OpenButton
-                open={opened === b.delivery_ref}
-                label={t("ps.seeContent")}
-                onClick={() => setOpened(opened === b.delivery_ref ? null : b.delivery_ref)}
-              />
               {!b.already_excluded && (
                 <ExcludeButton
                   disabled={isExcluding}
@@ -300,7 +322,7 @@ function ProductBls({
         <SupplierFilter suppliers={suppliers} value={supplier} onChange={setSupplier} />
       </div>
       {isLoadingProductLines ? (
-        <Spinner className="mx-auto text-muted-foreground" />
+        <SkeletonText lines={3} />
       ) : productLinesError ? (
         <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>
       ) : shown.length === 0 ? (
@@ -360,13 +382,11 @@ export function LineResults({
           icon={<Package className="size-5" />}
           title={<span className="truncate">{p.product}</span>}
           facts={productFacts(t, p)}
-          actions={
-            <OpenButton
-              open={opened === p.id}
-              label={t("ps.seeBls")}
-              onClick={() => setOpened(opened === p.id ? null : p.id)}
-            />
-          }
+          expand={{
+            open: opened === p.id,
+            label: t("ps.seeBls"),
+            onToggle: () => setOpened(opened === p.id ? null : p.id),
+          }}
         >
           {opened === p.id && <ProductBls product={p} onExclude={onExclude} onReintegrate={onReintegrate} />}
         </Row>

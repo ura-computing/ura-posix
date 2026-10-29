@@ -2,7 +2,7 @@
  *  barcode 1 drawn, and « Scanner / Rechercher un code barre ». The owner changes the barcodes
  *  here too (« Modifier »); the PID never. */
 import { useState, type ReactNode } from "react";
-import { Info, ScanBarcode } from "lucide-react";
+import { ScanBarcode } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import type { ProductSheet } from "@/types";
@@ -13,14 +13,10 @@ import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
 import { EditHint, Editable, SectionEditActions } from "./Editable";
 import { SheetCard } from "./SheetCard";
+import { Callout } from "@/_components/molecules/Callout";
 
 function InfoNote({ children }: { children: ReactNode }) {
-  return (
-    <p className="flex items-start gap-2.5 rounded-lg border border-info-border bg-info-subtle px-3 py-2.5 text-sm text-info-subtle-foreground">
-      <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
+  return <Callout tone="info">{children}</Callout>;
 }
 
 /** One identifier: label, then its value in a box + « Copier » (an input in edit mode). */

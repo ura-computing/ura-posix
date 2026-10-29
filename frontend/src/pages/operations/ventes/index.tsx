@@ -1,18 +1,19 @@
 import { useEffect } from "react";
 import { Download, Upload } from "lucide-react";
 
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { ROUTES, SURVEILLANCE_TABS } from "@/types";
 import { formatMAD, formatQty, formatPct } from "@/utils/format";
 
 import { useVentesPage } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { GaugeTiles } from "@/_components/GaugeTiles";
+import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
 import type { VentesDiscountSummary, SurveillanceTab, VentesSurveillanceCounts, VenteRow } from "@/types";
-import { SuffixBadge } from "@/_components/SuffixBadge";
-import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
-import { TypeBadge } from "@/_components/TypeBadge";
-import { Page } from "@/_components/Page";
+import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
+import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
+import { TypeBadge } from "@/_components/molecules/TypeBadge";
+import { Page } from "@/_components/templates/Page";
+import { ToggleChip } from "@/_components/molecules/ToggleChip";
 
 /** Remise gauge. Per the manager's framing on this pharmacy, granting a
  *  remise is treated as the *desirable* outcome — so "Avec remise" sits on
@@ -89,16 +90,7 @@ function SurveillanceTabs({
         const isActive = active === tab.key;
         const n = counts?.[tab.field] ?? 0;
         return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => onSelect(isActive ? null : tab.key)}
-            className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors ${
-              isActive
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-foreground hover:bg-surface-subtle"
-            }`}
-          >
+          <ToggleChip key={tab.key} pressed={isActive} onToggle={() => onSelect(isActive ? null : tab.key)}>
             <span
               className={`size-2 rounded-full ${tab.dot} ${isActive ? "ring-2 ring-primary-foreground/40" : ""}`}
               aria-hidden
@@ -111,7 +103,7 @@ function SurveillanceTabs({
             >
               {formatQty(n)}
             </span>
-          </button>
+          </ToggleChip>
         );
       })}
     </div>
@@ -314,7 +306,7 @@ export default function VentesPage() {
     tvaRates,
   } = useVentesPage();
 
-  // Wire search → suggestions debounce trigger. Keeps SearchAutocomplete decoupled from the API layer.
+  // Wire search → suggestions debounce trigger. Keeps SearchField decoupled from the API layer.
   useEffect(() => {
     setSuggestQ(filters.search);
   }, [filters.search, setSuggestQ]);

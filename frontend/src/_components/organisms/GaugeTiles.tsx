@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/utils/cn";
 
-import { NeedleGauge } from "./NeedleGauge";
-import { Skeleton } from "./Skeleton";
+import { NeedleGauge } from "@/_components/atoms/NeedleGauge";
+import { Skeleton } from "@/_components/atoms/Skeleton";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
 export interface GaugeSide {

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { CheckCircle2, Download, ExternalLink, Eye, EyeOff, Loader2, RotateCcw, Save, Upload } from "lucide-react";
 
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { Button } from "@/_components/atoms/Button";
 import {
   EDITOR_SECTION_LABEL,

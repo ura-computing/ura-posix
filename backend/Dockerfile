@@ -9,7 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /usr/local/bin/uv
 
 WORKDIR /app
+# UV_NO_SYNC: `uv run` (entrypoint.sh) uses the venv built below as is — no download at start
+# (else it syncs the dev group, ruff, on every start and fails without internet).
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
+    UV_NO_SYNC=1 \
     PATH=/app/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

@@ -19,7 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { KebabMenu } from "@/_components/KebabMenu";
+import { KebabMenu } from "@/_components/molecules/KebabMenu";
 import { Button } from "@/_components/atoms/Button";
 import { MAX_STORE_CATEGORIES, STORE_CATEGORY_WARN_AT, type StoreCategory } from "@/types/storeWebsite";
 

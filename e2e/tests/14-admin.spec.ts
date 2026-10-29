@@ -94,7 +94,7 @@ async function rowAction(page: Page, email: string, action: string): Promise<voi
     .getByRole("row", { name: new RegExp(email) })
     .getByRole("button", { name: "Plus d'actions" })
     .click();
-  await page.getByRole("menu").getByRole("button", { name: action, exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: action, exact: true }).click();
 }
 
 test("rapport admin : vue système + Pharmacie E2E × Mixte / Pharmacie / Parapharmacie", async ({ page }) => {
@@ -333,7 +333,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     await dialog.getByLabel("Nom complet").fill(M.name);
     await dialog.getByLabel("Email").fill(M.email);
     await dialog.getByLabel("Mot de passe", { exact: true }).fill(M.password);
-    await dialog.getByRole("button", { name: /^Propriétaire/ }).click();
+    await dialog.getByRole("radio", { name: /^Propriétaire/ }).click();
     const made = pageSend(page, "POST", `/admin/pharmacies/${c.id}/users`);
     await dialog.getByRole("button", { name: "Créer le compte" }).click();
     const { member } = await made;

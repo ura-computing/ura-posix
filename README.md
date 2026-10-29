@@ -160,7 +160,7 @@ apcm-pharma/
     └── src/
         ├── main.tsx · App.tsx  providers · routes + guards
         ├── api/                client.ts, api.ts (every call), errors.ts (error codes)
-        ├── _components/        shared UI (AppLayout, DataTable, filterBar, KpiTile, Page, …)
+        ├── _components/        shared UI: atoms/ molecules/ organisms/ templates/ routing/
         ├── hooks/              app-wide hooks (useMe, sharedQueries, useListFilters, UploadContext, …)
         ├── pages/              one folder per area, then one per route (§6.3)
         ├── i18n/               I18nProvider (useT) + locales/fr.ts, es.ts
@@ -481,10 +481,21 @@ so the E2E gate requires **0** of them (`npx eslint src` in `frontend/`). Rules:
 |---|---|
 | 1 page | that page's `index.tsx` / `hooks.ts` / `_components/` |
 | several routes of 1 area | `pages/area/_components/` or `pages/area/hooks.ts` |
-| several areas | `src/_components/` (`Page`, `DataTable`, `filterBar`, `KpiTile`, `GaugeTiles`, `FormField`, `MembersSection`, `ConfirmDialog`, `TabBar`, `Checkbox`, `StockStatusPill`, …) |
+| several areas | `src/_components/<layer>/` (table below) |
 
-Every page uses `Page` (same title block and width). Lists use `filterBar` (search, period,
-Mixte / Pharmacie / Parapharmacie, selects, chips) + `DataTable`.
+| Layer (`src/_components/`) | Holds |
+|---|---|
+| `atoms/` | one control, no data: `Button` / `ButtonLink`, `Input` / `SearchInput` / `Textarea` / `Select`, `Badge`, `Card`, `Spinner`, `SectionTitle`, `Checkbox`, `Switch`, `Tooltip`, `Skeleton`, `Dialog` |
+| `molecules/` | 2+ atoms, still generic: `DialogShell` (header / body / footer), `ConfirmDialog`, `FormField`, `EmptyState`, `Callout`, `Skeletons`, `SingleSelect`, `MultiSelect`, `DateRangePicker`, `MonthPicker`, `DatePickerButton`, `SearchField`, `Segmented`, `ToggleChip`, `ChoiceCard`, `FilterChip`, `SortButton`, `KebabMenu`, `TabBar`, `PhoneField` |
+| `organisms/` | app blocks, may read hooks: `FilterBar`, `DataTable`, `KpiTile`, `GaugeTiles`, `MembersSection`, `CreateUserDialog`, `UserPermissionsDialog`, `HistoryTable`, `SobrusRunCard`, `SobrusBanner` |
+| `templates/` · `routing/` | `Page`, `AppLayout` (`Sidebar`, `Header`, `CornerStack`, `nav.ts`) · `RequireFeature`, `RequireRole`, `RequireGuest` |
+
+Every page uses `Page` (same title block and width). Lists use `FilterBar` (search, period,
+Mixte / Pharmacie / Parapharmacie, selects, chips) + `DataTable`. One control height: 36 px
+(`Button`, `Input`, selects); 44 px (`size="lg"`) only for a page's main action. Pages never draw a raw
+`<button>` / `<input>` / `<select>` / `<textarea>` (ESLint `no-restricted-syntax`, file inputs aside).
+Loading = skeletons with the shape of what comes (`molecules/Skeletons.tsx`, `PageSkeleton`), never a
+blank area, « Chargement… » or a lone spinner (spinner = inside a button only).
 
 ### 6.4 Text, numbers, exports
 - Text: `t("section.key", {var})` from `fr.ts`; `es.ts` must have the same keys (TypeScript checks).
@@ -735,7 +746,7 @@ flowchart LR
 5. E2E: call it from the UI and check every field against the oracle (the coverage gate fails otherwise).
 
 **Add a page**: route in `App.tsx` (+ `RequireFeature` / `RequireRole`), nav entry in
-`_components/AppLayout.tsx`, `Page` + page folder ([§6.3](#63-where-things-go)), texts in `fr.ts` **and**
+`_components/templates/AppLayout.tsx`, `Page` + page folder ([§6.3](#63-where-things-go)), texts in `fr.ts` **and**
 `es.ts`, a spec.
 
 **Add a DB column**: model + Alembic migration (idempotent); functions used by indexes schema-qualified

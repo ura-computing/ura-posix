@@ -1,6 +1,6 @@
 // src/pages/stock/index.tsx
 import {
-  AlertCircle,
+  RefreshCw,
   Download,
   Package,
   Upload,
@@ -12,27 +12,29 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import { AlertDetailDialog, PEREMPTION_COLUMNS } from "@/pages/analytics/_components/AlertDetailDialog";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { AlertDetailDialog } from "@/pages/analytics/_components/AlertDetailDialog";
+import { PEREMPTION_COLUMNS } from "@/pages/analytics/_components/alertColumns";
 import { ROUTES } from "@/types";
 
 import { useStockPage } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { KpiTile, type IconTone } from "@/_components/KpiTile";
-import { NeedleGauge } from "@/_components/NeedleGauge";
+import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";
+import { NeedleGauge } from "@/_components/atoms/NeedleGauge";
 import { cn } from "@/utils/cn";
 import { formatQty, formatPct, formatMAD, formatNumStr } from "@/utils/format";
 import type { AbcdClass, StockRow, PeremptionBracket, PeremptionsResponse } from "@/types";
 import { ABCD_COLORS, ABCD_ORDER, abcdFontSize, STATUS_OPTIONS } from "../constants";
 import { useMemo, type ReactNode } from "react";
 import type { DialogDescriptor } from "@/pages/analytics/hooks";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
-import { StockStatusPill } from "@/_components/StockStatusPill";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { StockStatusPill } from "@/_components/molecules/StockStatusPill";
 import type { StockSortKey } from "./hooks";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
+import { Callout } from "@/_components/molecules/Callout";
 
 // src/pages/stock/_components/AbcdAnalysisCard.tsx
 
@@ -66,13 +68,13 @@ function AbcdAnalysisCard({
             const pct = totalReferences > 0 ? (count / totalReferences) * 100 : 0;
             const active = activeClass === k;
             return (
-              <button
+              <Button
                 key={k}
-                type="button"
+                variant="ghost"
                 onClick={() => onSelectClass(k)}
                 aria-pressed={active}
                 aria-label={t("stock.classAria", { k, n: count })}
-                className="group flex flex-col items-center gap-1.5"
+                className="group h-auto flex-col gap-1.5 p-0 hover:bg-transparent"
               >
                 <span
                   className={cn(
@@ -92,7 +94,7 @@ function AbcdAnalysisCard({
                 <span className="-mt-0.5 whitespace-nowrap font-mono text-xs text-muted-foreground">
                   {formatPct(pct)}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -470,7 +472,7 @@ function StockTable({
       </span>
       {/* Status filter lives on top of the table (a selector), not in the page FilterBar. */}
       <div className="ml-auto flex items-center gap-2">
-        <SingleSelectPopover
+        <SingleSelect
           label={t("col.statut")}
           options={STATUS_OPTIONS.map((o) => ({
             value: o.value,
@@ -616,15 +618,17 @@ export default function StockPage() {
 
       {/* ERROR */}
       {isError && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
-          <span className="flex items-center gap-2 text-sm font-medium">
-            <AlertCircle className="size-4" />
-            {t("stock.loadError")}
-          </span>
-          <Button variant="danger-outline" size="sm" onClick={reload}>
-            {t("common.retry")}
-          </Button>
-        </div>
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={reload}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {t("stock.loadError")}
+        </Callout>
       )}
 
       {/* LOADING */}

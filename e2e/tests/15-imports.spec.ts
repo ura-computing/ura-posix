@@ -43,7 +43,7 @@ test("nom de fichier invalide : le message s'affiche puis se ferme", async ({ pa
   const error = page.getByText(/^Nom de fichier invalide\. Format attendu : « .+ »$/);
   await expect(error).toBeVisible();
   await expect(page.getByRole("button", { name: "Importer dans la base" }), "pas d'aperçu").toHaveCount(0);
-  await error.locator("..").getByRole("button", { name: "Fermer" }).click();
+  await page.getByRole("alert").filter({ has: error }).getByRole("button", { name: "Fermer" }).click();
   await expect(error).toBeHidden();
 });
 

@@ -5,7 +5,8 @@ import { useState, type FormEvent } from "react";
 import { ScanBarcode, Search, X } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
 import { Input } from "@/_components/atoms/Input";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -31,26 +32,29 @@ function ScanForm({ onClose }: { onClose: () => void }) {
 
   return (
     <DialogContent className="max-w-md">
-      <form className="flex flex-col gap-4 p-5" onSubmit={(e) => void submit(e)}>
-        <h3 className="flex items-center gap-2 text-[17px] font-semibold text-foreground">
-          <ScanBarcode className="size-5 text-primary" />
-          {t("products.scan")}
-        </h3>
-        <p className="text-sm text-muted-foreground">{t("products.scanHint")}</p>
-        <Input
-          autoFocus
-          aria-label={t("products.scanInput")}
-          placeholder={t("products.scanInput")}
-          value={code}
-          onValueChange={setCode}
-          className="font-mono"
+      <form className="flex flex-col" onSubmit={(e) => void submit(e)}>
+        <DialogHeader
+          icon={<ScanBarcode className="size-4" />}
+          title={t("products.scan")}
+          subtitle={t("products.scanHint")}
+          onClose={onClose}
         />
-        {notFound && (
-          <p role="alert" className="text-sm font-medium text-error">
-            {t("products.scanNotFound", { code: notFound })}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
+        <DialogBody>
+          <Input
+            autoFocus
+            aria-label={t("products.scanInput")}
+            placeholder={t("products.scanInput")}
+            value={code}
+            onValueChange={setCode}
+            className="font-mono"
+          />
+          {notFound && (
+            <p role="alert" className="text-sm font-medium text-error">
+              {t("products.scanNotFound", { code: notFound })}
+            </p>
+          )}
+        </DialogBody>
+        <DialogFooter>
           <Button variant="secondary" onClick={onClose}>
             <X className="size-4" />
             {t("common.cancel")}
@@ -59,7 +63,7 @@ function ScanForm({ onClose }: { onClose: () => void }) {
             <Search className="size-4" />
             {t("products.scanSearch")}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </DialogContent>
   );

@@ -8,11 +8,11 @@ import { Download, ScanBarcode, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/_components/atoms/Button";
-import { useCategoryTypeOptions } from "@/_components/CategorySegment";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import { Page } from "@/_components/Page";
-import { TypeBadge } from "@/_components/TypeBadge";
+import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { Page } from "@/_components/templates/Page";
+import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { ROUTES, type ProductRow } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
@@ -22,6 +22,7 @@ import { ProductPhoto } from "../_components/ProductPhoto";
 import { ScanDialog } from "../_components/ScanDialog";
 import { useScanner } from "../_components/useScanner";
 import { useProduitsPage } from "./hooks";
+import { Badge } from "@/_components/atoms/Badge";
 
 const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
   {
@@ -42,10 +43,10 @@ const buildColumns = (t: TFn): ColumnDef<ProductRow>[] => [
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid}</span>
             {r.notes > 0 && (
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-warning-subtle px-1.5 text-[11px] font-semibold text-warning-subtle-foreground">
+              <Badge tone="warning">
                 <StickyNote className="size-3" aria-hidden />
                 {t("products.notesCount", { n: r.notes })}
-              </span>
+              </Badge>
             )}
           </span>
         </div>

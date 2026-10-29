@@ -3,9 +3,9 @@
  *  file, observation), dates, type, person; Excel = every matching line. */
 import { Download } from "lucide-react";
 
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import { HistoryTable } from "@/_components/HistoryTable";
-import { Page } from "@/_components/Page";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { HistoryTable } from "@/_components/organisms/HistoryTable";
+import { Page } from "@/_components/templates/Page";
 import type { HistoryKind } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDate } from "@/utils/format";

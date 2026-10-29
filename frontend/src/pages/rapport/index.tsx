@@ -25,10 +25,10 @@ import {
   FileText,
 } from "lucide-react";
 
-import { useCategoryTypeOptions } from "@/_components/CategorySegment";
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
-import { SingleSelectPopover } from "@/_components/SingleSelectPopover";
-import { TabBar } from "@/_components/TabBar";
+import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { TabBar } from "@/_components/molecules/TabBar";
 import { useMe } from "@/hooks/useMe";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { ROLES, ROUTES, type MarginAlertsResponse, type TvaSummary } from "@/types";
@@ -60,19 +60,22 @@ import {
 import { useAdminPharmaciesList, useMarginAlerts, useStats } from "@/hooks/sharedQueries";
 
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import { DataTable } from "@/_components/DataTable";
-import type { ColumnDef } from "@/_components/DataTable";
-import { KpiTile, type IconTone } from "@/_components/KpiTile";
-import { NeedleGauge } from "@/_components/NeedleGauge";
+import { DataTable } from "@/_components/organisms/DataTable";
+import type { ColumnDef } from "@/_components/organisms/DataTable";
+import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";
+import { NeedleGauge } from "@/_components/atoms/NeedleGauge";
 import { formatDate, formatQty, formatMAD, formatPct, formatNumStr, pctChange } from "@/utils/format";
 import { Link } from "react-router-dom";
 import { clamp, niceScale, smoothPath } from "@/utils/chart";
 import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { Callout } from "@/_components/molecules/Callout";
+import { SkeletonCard, SkeletonTile } from "@/_components/molecules/Skeletons";
 
 /** Section 2f — dual-bar trend chart. Ventes (info-blue) + Achats (muted) per
  *  month. Pure CSS bars — no chart lib dep. Reused styling vocabulary
@@ -1084,20 +1087,26 @@ function MarginAlertCards({
   );
 }
 
+/** The page's shape while its numbers load: the 4 main tiles (CA large, Achats wide, Marge,
+ *  Transactions), the 4 advanced tiles, the CA split, then santé financière + the trend. */
 function RapportSkeleton() {
   return (
-    <div className="flex flex-col gap-6" aria-busy>
-      <div className="h-12 animate-pulse rounded-xl bg-muted" />
+    <div className="flex flex-col gap-5" aria-busy>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="h-44 animate-pulse rounded-2xl bg-muted sm:col-span-2 sm:row-span-2" />
-        <div className="h-44 animate-pulse rounded-2xl bg-muted" />
-        <div className="h-44 animate-pulse rounded-2xl bg-muted" />
-        <div className="h-44 animate-pulse rounded-2xl bg-muted" />
+        <SkeletonTile className="min-h-[312px] sm:col-span-2 sm:row-span-2" />
+        <SkeletonTile className="min-h-[150px] lg:col-span-2" />
+        <SkeletonTile className="min-h-[150px]" />
+        <SkeletonTile className="min-h-[150px]" />
       </div>
-      <div className="h-60 animate-pulse rounded-2xl bg-muted" />
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr]">
-        <div className="h-72 animate-pulse rounded-2xl bg-muted" />
-        <div className="h-72 animate-pulse rounded-2xl bg-muted" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <SkeletonTile key={i} className="min-h-[150px]" />
+        ))}
+      </div>
+      <SkeletonCard lines={5} className="min-h-72" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
+        <SkeletonCard lines={4} className="min-h-72" />
+        <SkeletonCard lines={4} className="min-h-72" />
       </div>
     </div>
   );
@@ -1758,11 +1767,7 @@ function OwnerView() {
 
       {loading && <RapportSkeleton />}
 
-      {e1 && (
-        <div className="rounded-md border border-error-border bg-error-subtle px-4 py-3 text-sm text-error-subtle-foreground">
-          {t("dashboard.loadError")}
-        </div>
-      )}
+      {e1 && <Callout tone="error">{t("dashboard.loadError")}</Callout>}
 
       {stats && !loading && (
         <RapportSections
@@ -1822,7 +1827,7 @@ function AdminView() {
         {ls || !systemStats ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-32 animate-pulse rounded-2xl bg-muted" />
+              <SkeletonTile key={i} className="min-h-32" />
             ))}
           </div>
         ) : (
@@ -1833,11 +1838,11 @@ function AdminView() {
       {/* Per-pharmacy drill-down */}
       <section className="flex flex-col gap-3">
         <SectionTitle size="sm">{t("rapportAdmin.parPharmacie")}</SectionTitle>
-        {/* Admin pharmacy picker — uses the shared SingleSelectPopover so the
+        {/* Admin pharmacy picker — uses the shared SingleSelect so the
             trigger + panel match every other dropdown in the app (Catégorie,
             Type, Statut, page-size, etc.). */}
         <div className="flex flex-wrap items-center gap-3">
-          <SingleSelectPopover
+          <SingleSelect
             label={t("category.pharmacie")}
             value={pharmacyId != null ? String(pharmacyId) : ""}
             onChange={(v) => setPharmacyId(v ? Number(v) : null)}
@@ -1889,19 +1894,16 @@ function AdminView() {
         />
 
         {pharmacyId === null && (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card px-6 py-16 text-center">
-            <Building2 className="size-12 text-muted-foreground" aria-hidden />
-            <p className="max-w-md text-sm text-muted-foreground">{t("rapportAdmin.selectPharmacyHint")}</p>
-          </div>
+          <EmptyState
+            icon={<Building2 className="size-12" aria-hidden />}
+            title={t("rapportAdmin.selectPharmacyHint")}
+            className="py-16"
+          />
         )}
 
         {loading && <RapportSkeleton />}
 
-        {e1 && (
-          <div className="rounded-md border border-error-border bg-error-subtle px-4 py-3 text-sm text-error-subtle-foreground">
-            {t("rapportAdmin.pharmacyLoadError")}
-          </div>
-        )}
+        {e1 && <Callout tone="error">{t("rapportAdmin.pharmacyLoadError")}</Callout>}
 
         {stats &&
           pharmacyId !== null &&

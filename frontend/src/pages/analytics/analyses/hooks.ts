@@ -3,7 +3,7 @@
  *  in memory from the API response). Resets to page 1 on mode/filter/search change. */
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { DataTablePagination } from "@/_components/DataTable";
+import type { DataTablePagination } from "@/_components/organisms/DataTable";
 import { MARGE_MODE_LABELS } from "@/types";
 import type {
   AnalyseFilters,

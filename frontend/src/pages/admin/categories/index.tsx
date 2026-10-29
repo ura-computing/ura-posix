@@ -7,12 +7,12 @@ import { useState } from "react";
 import { Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { FormField, FormInput } from "@/_components/FormField";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { DataTable } from "@/_components/DataTable";
-import { SuffixBadge } from "@/_components/SuffixBadge";
+import { FormField, FormInput } from "@/_components/molecules/FormField";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { DataTable } from "@/_components/organisms/DataTable";
+import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { useT } from "@/i18n/I18nProvider";
-import type { ColumnDef } from "@/_components/DataTable";
+import type { ColumnDef } from "@/_components/organisms/DataTable";
 import type { CategorySuffixOut, CategorySuffixIn, SuffixColor } from "@/types";
 
 import {
@@ -21,11 +21,13 @@ import {
   useDeleteCategorySuffix,
   useUpdateCategorySuffix,
 } from "./hooks";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
+import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
 import { SUFFIX_COLORS } from "@/types";
-import { Page } from "@/_components/Page";
-import { Spinner } from "@/_components/atoms/Spinner";
+import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
+import { SkeletonRows } from "@/_components/molecules/Skeletons";
+import { Callout } from "@/_components/molecules/Callout";
 
 /** Create / edit dialog for a CategorySuffix. Mirrors the handoff design via
  *  our shared primitives (Dialog, Button, SuffixBadge). The category is
@@ -86,11 +88,7 @@ function CategorySuffixBody({ open, onClose, item, isSaving, onSubmit }: Categor
       }}
     >
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
-        <div className="border-b border-border px-5 py-4">
-          <h3 className="text-[17px] font-semibold text-foreground">
-            {item ? t("categories.editMapping") : t("categories.newMapping")}
-          </h3>
-        </div>
+        <DialogHeader title={item ? t("categories.editMapping") : t("categories.newMapping")} onClose={onClose} />
 
         {/* Live preview */}
         <div className="flex items-center gap-3 border-b border-border bg-surface-subtle px-5 py-3.5">
@@ -101,68 +99,73 @@ function CategorySuffixBody({ open, onClose, item, isSaving, onSubmit }: Categor
           <span className="ml-auto font-mono text-xs text-muted-foreground">{previewCategory}</span>
         </div>
 
-        <form className="flex flex-col gap-4 p-5" onSubmit={handleSubmit}>
-          <FormField label={t("col.categorie")} required>
-            <FormInput
-              value={values.category}
-              onChange={(v) => set("category", v)}
-              placeholder={t("categories.categoryPlaceholderEx")}
-              required
-              autoFocus
-            />
-          </FormField>
+        <form className="flex flex-col" onSubmit={handleSubmit}>
+          <DialogBody>
+            <FormField label={t("col.categorie")} required>
+              <FormInput
+                value={values.category}
+                onChange={(v) => set("category", v)}
+                placeholder={t("categories.categoryPlaceholderEx")}
+                required
+                autoFocus
+              />
+            </FormField>
 
-          <FormField label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
-            <FormInput
-              value={values.suffix}
-              onChange={(v) => set("suffix", v)}
-              placeholder="-1"
-              maxLength={6}
-              required
-              className="max-w-[140px] font-mono"
-            />
-          </FormField>
+            <FormField label={t("categories.suffix")} required hint={t("categories.suffixHint")}>
+              <FormInput
+                value={values.suffix}
+                onChange={(v) => set("suffix", v)}
+                placeholder="-1"
+                maxLength={6}
+                required
+                className="max-w-[140px] font-mono"
+              />
+            </FormField>
 
-          <FormField label={t("categories.color")}>
-            <div className="flex flex-wrap items-center gap-2">
-              {SUFFIX_COLORS.map((c) => {
-                const selected = values.color === c;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={c}
-                    onClick={() => set("color", c)}
-                    className="flex size-7 cursor-pointer items-center justify-center rounded-md border-2 transition-transform hover:scale-110"
-                    style={{
-                      background: SWATCH_SOLID[c],
-                      borderColor: selected ? "var(--foreground)" : "transparent",
-                    }}
-                  >
-                    {selected && <Check className="size-3.5 text-white" />}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                aria-label={t("categories.colorNone")}
-                onClick={() => set("color", null)}
-                className="flex size-7 cursor-pointer items-center justify-center rounded-md border-2 bg-surface-subtle transition-transform hover:scale-110"
-                style={{ borderColor: values.color === null ? "var(--foreground)" : "transparent" }}
-              >
-                <Minus className="size-3.5 text-muted-foreground" />
-              </button>
-            </div>
-          </FormField>
-
-          <div className="-mx-5 -mb-5 mt-1 flex items-center justify-end gap-2.5 border-t border-border bg-surface-subtle px-5 py-3.5">
+            <FormField label={t("categories.color")}>
+              <div className="flex flex-wrap items-center gap-2">
+                {SUFFIX_COLORS.map((c) => {
+                  const selected = values.color === c;
+                  return (
+                    <Button
+                      key={c}
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={c}
+                      aria-pressed={selected}
+                      onClick={() => set("color", c)}
+                      className="border-2 transition-transform hover:scale-110"
+                      style={{
+                        background: SWATCH_SOLID[c],
+                        borderColor: selected ? "var(--foreground)" : "transparent",
+                      }}
+                    >
+                      {selected && <Check className="size-3.5 text-white" />}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("categories.colorNone")}
+                  aria-pressed={values.color === null}
+                  onClick={() => set("color", null)}
+                  className="border-2 bg-surface-subtle transition-transform hover:scale-110"
+                  style={{ borderColor: values.color === null ? "var(--foreground)" : "transparent" }}
+                >
+                  <Minus className="size-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </FormField>
+          </DialogBody>
+          <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               {t("common.cancel")}
             </Button>
             <Button type="submit" variant="primary" isLoading={isSaving} loadingText={t("categories.saving")}>
               {t("common.save")}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -246,16 +249,20 @@ export default function AdminCategoriesPage() {
       }
     >
       {isError ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-error-border bg-error-subtle px-4 py-3.5 text-error-subtle-foreground">
-          <span className="text-sm font-medium">{t("categories.loadError")}</span>
-          <Button variant="secondary" onClick={reload}>
-            <RefreshCw className="size-3.5" />
-            {t("common.retry")}
-          </Button>
-        </div>
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={reload}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {t("categories.loadError")}
+        </Callout>
       ) : isLoading ? (
-        <Card as="div" padding="none" className="flex items-center justify-center py-16">
-          <Spinner size="lg" className="text-muted-foreground" />
+        <Card as="div" padding="none">
+          <SkeletonRows rows={5} columns={4} />
         </Card>
       ) : (
         <DataTable

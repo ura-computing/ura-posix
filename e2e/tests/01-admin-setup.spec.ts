@@ -31,7 +31,7 @@ test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
   await dialog.getByLabel("Nom complet").fill(OWNER.name);
   await dialog.getByLabel("Email").fill(OWNER.email);
   await dialog.getByLabel("Mot de passe", { exact: true }).fill(OWNER.password);
-  await dialog.getByRole("button", { name: /^Propriétaire/ }).click();
+  await dialog.getByRole("radio", { name: /^Propriétaire/ }).click();
   await dialog.getByRole("button", { name: "Créer le compte" }).click();
 
   await expect(dialog.getByText("Compte créé", { exact: true })).toBeVisible();

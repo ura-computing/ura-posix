@@ -4,28 +4,14 @@
  *  - Its block edited: its input (text, price, whole number, date « JJ/MM/AAAA » typed or picked in
  *    the calendar next to it).
  *  `SectionEditActions` = the block's « Modifier », then « Annuler » + « Enregistrer », right there. */
-import { useContext, useState, type ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { useFormState, useWatch } from "react-hook-form";
-import { DayPicker } from "react-day-picker";
-import { fr } from "date-fns/locale";
-import { autoUpdate, flip, offset, shift, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
-import {
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Pencil,
-  Save,
-  X,
-} from "lucide-react";
+import { Pencil, Save, X } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/dayPicker";
 import { Input } from "@/_components/atoms/Input";
-import { useMonths } from "@/i18n/dates";
+import { DatePickerButton } from "@/_components/molecules/DatePickerButton";
 import { useT } from "@/i18n/I18nProvider";
-import { cn } from "@/utils/cn";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
 
 import { isoToTyped, typedToIso, type EditSection, type FormField } from "../hooks";
@@ -51,123 +37,19 @@ function importedText(kind: EditKind, v: string | number | null | undefined): st
 const isoOf = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-/** The calendar next to a date field: a day picked = the field's date (« JJ/MM/AAAA »). Year
- *  buttons above it: an expiry is often 1–3 years away. */
-// One header row « « ‹ Novembre 2026 › » »: year and month arrows around the month shown.
-const CALENDAR_CLASSES = { ...DAY_PICKER_CLASSES, month_caption: "hidden" };
-
+/** The calendar next to a date field: a day picked = the field's date (« JJ/MM/AAAA »). */
 function CalendarButton({ field, label }: { field: FormField; label: string }) {
   const t = useT();
-  const months = useMonths();
   const { editor } = useSheetEdit();
   const { control, setValue } = editor.form;
   const typed = useWatch({ control, name: field });
   const iso = typedToIso(typed ?? "");
-  const selected = iso ? new Date(`${iso}T00:00:00`) : undefined;
-  const [open, setOpen] = useState(false);
-  const [month, setMonth] = useState<Date>(selected ?? new Date());
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [panelEl, setPanelEl] = useState<HTMLElement | null>(null);
-  const { floatingStyles, context } = useFloating({
-    elements: { reference: anchorEl, floating: panelEl },
-    open,
-    onOpenChange: setOpen,
-    placement: "bottom-start",
-    middleware: [offset(8), flip({ padding: 16 }), shift({ padding: 16 })],
-    whileElementsMounted: autoUpdate,
-  });
-  const { getReferenceProps, getFloatingProps } = useInteractions([useDismiss(context)]);
-  const toggle = () => {
-    if (!open) setMonth(selected ?? new Date());
-    setOpen(!open);
-  };
-  const moveMonths = (n: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
-  const arrow =
-    "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary";
   return (
-    <>
-      <button
-        ref={setAnchorEl}
-        type="button"
-        aria-label={t("products.pickDate", { label })}
-        {...getReferenceProps({ onClick: toggle })}
-        className={cn(
-          "inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary",
-          open && "border-primary text-primary",
-        )}
-      >
-        <CalendarIcon className="size-4" />
-      </button>
-      {open && (
-        <div
-          ref={setPanelEl}
-          {...getFloatingProps()}
-          style={floatingStyles}
-          className="z-50 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-base font-normal shadow-2xl"
-        >
-          <div className="flex items-center justify-between gap-1 text-sm font-bold text-foreground">
-            <span className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => moveMonths(-12)}
-                aria-label={t("products.prevYear")}
-                className={arrow}
-              >
-                <ChevronsLeft className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => moveMonths(-1)}
-                aria-label={t("products.prevMonth")}
-                className={arrow}
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-            </span>
-            <span>
-              {months[month.getMonth()]} {month.getFullYear()}
-            </span>
-            <span className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => moveMonths(1)}
-                aria-label={t("products.nextMonth")}
-                className={arrow}
-              >
-                <ChevronRight className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => moveMonths(12)}
-                aria-label={t("products.nextYear")}
-                className={arrow}
-              >
-                <ChevronsRight className="size-4" />
-              </button>
-            </span>
-          </div>
-          <div>
-            <DayPicker
-              mode="single"
-              locale={fr}
-              month={month}
-              onMonthChange={setMonth}
-              hideNavigation
-              selected={selected}
-              onSelect={(d) => {
-                if (!d) return;
-                setValue(field, isoToTyped(isoOf(d)), { shouldDirty: true });
-                setOpen(false);
-              }}
-              weekStartsOn={1}
-              showOutsideDays
-              classNames={CALENDAR_CLASSES}
-              modifiersClassNames={DAY_PICKER_MODIFIERS}
-            />
-          </div>
-        </div>
-      )}
-    </>
+    <DatePickerButton
+      selected={iso ? new Date(`${iso}T00:00:00`) : undefined}
+      onPick={(d) => setValue(field, isoToTyped(isoOf(d)), { shouldDirty: true })}
+      label={t("products.pickDate", { label })}
+    />
   );
 }
 

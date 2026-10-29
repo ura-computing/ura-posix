@@ -1,4 +1,4 @@
-/** Date-range presets used in the DateRangePopover (and anywhere else a
+/** Date-range presets used in the DateRangePicker (and anywhere else a
  *  "quick period" shortcut is offered). Ported from apcm-pharma's
  *  `utils/dateRange.ts`. All returns are ISO YYYY-MM-DD strings.
  */

@@ -8,13 +8,13 @@ import { useState } from "react";
 import { CheckCircle2, CircleAlert, Unplug } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { CategorySegment } from "@/_components/CategorySegment";
-import { Checkbox } from "@/_components/Checkbox";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
-import { DateRangePopover } from "@/_components/filterBar";
-import { FormField, FormInput } from "@/_components/FormField";
-import { Page } from "@/_components/Page";
-import { Skeleton } from "@/_components/Skeleton";
+import { Segmented } from "@/_components/molecules/Segmented";
+import { Checkbox } from "@/_components/atoms/Checkbox";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { DateRangePicker } from "@/_components/molecules/DateRangePicker";
+import { FormField, FormInput } from "@/_components/molecules/FormField";
+import { Page } from "@/_components/templates/Page";
+import { Skeleton } from "@/_components/atoms/Skeleton";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
@@ -199,7 +199,7 @@ function Connected({
       </div>
       <div className="flex flex-col gap-3 border-t border-border pt-4">
         <h2 className="text-base font-semibold text-foreground">{t("sobrus.importTitle")}</h2>
-        <CategorySegment
+        <Segmented
           value={choice}
           onChange={setChoice}
           options={[
@@ -211,7 +211,7 @@ function Connected({
           {choice === "full" ? t("sobrus.allHint") : t("sobrus.periodHint")}
         </p>
         {choice === "range" && (
-          <DateRangePopover
+          <DateRangePicker
             from={from}
             to={to}
             onChange={(start, end) => {

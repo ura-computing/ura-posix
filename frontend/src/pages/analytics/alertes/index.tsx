@@ -1,6 +1,6 @@
 // src/pages/alertes/index.tsx
 import {
-  AlertCircle,
+  RefreshCw,
   CheckCircle2,
   AlertTriangle,
   TrendingDown,
@@ -14,21 +14,21 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { useCategoryTypeOptions } from "@/_components/CategorySegment";
-import { FilterBar, type ActiveFilter } from "@/_components/filterBar";
+import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 
+import { AlertDetailDialog } from "../_components/AlertDetailDialog";
 import {
-  AlertDetailDialog,
   MARGIN_COLUMNS,
   PEREMPTION_COLUMNS,
   STOCK_COLUMNS,
   VENTES_SANS_ACHAT_COLUMNS,
-} from "../_components/AlertDetailDialog";
+} from "../_components/alertColumns";
 import { useAlertesPage, type CategoryType } from "../hooks";
 import { useT } from "@/i18n/I18nProvider";
 import type { ReactNode } from "react";
 import { formatQty, formatMAD } from "@/utils/format";
-import { KpiTile, type IconTone } from "@/_components/KpiTile";
+import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";
 import type {
   MarginAlertsResponse,
   PeremptionsResponse,
@@ -37,8 +37,11 @@ import type {
   VentesSansAchatResponse,
 } from "@/types";
 import type { DialogDescriptor } from "../hooks";
-import { Page } from "@/_components/Page";
+import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
+import { Callout } from "@/_components/molecules/Callout";
+import { SkeletonTile } from "@/_components/molecules/Skeletons";
+import { Skeleton } from "@/_components/atoms/Skeleton";
 
 // src/pages/alertes/_components/GlobalSummaryStrip.tsx
 
@@ -568,15 +571,17 @@ export default function AlertesPage() {
       />
 
       {isError ? (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-error/40 bg-error-subtle px-4 py-3 text-error">
-          <span className="flex items-center gap-2 text-sm font-medium">
-            <AlertCircle className="size-4" />
-            {t("alertes.loadError")}
-          </span>
-          <Button variant="danger-outline" size="sm" onClick={refetchAll}>
-            {t("common.retry")}
-          </Button>
-        </div>
+        <Callout
+          tone="error"
+          action={
+            <Button variant="secondary" onClick={refetchAll}>
+              <RefreshCw className="size-3.5" />
+              {t("common.retry")}
+            </Button>
+          }
+        >
+          {t("alertes.loadError")}
+        </Callout>
       ) : isLoading ? (
         <AlertesSkeleton />
       ) : isEmpty ? (
@@ -630,31 +635,39 @@ export default function AlertesPage() {
   );
 }
 
-/* ---- loading skeleton: 6 chips + 2/4/3 cards ---- */
+/* ---- loading skeleton: the page's shape — 6 chips, then each section (title + its cards) in order:
+ *  ventes sans achat (1 wide), marges (4), péremptions (4), stock (3) ---- */
+function SectionSkeleton({ cards, className }: { cards: number; className: string }) {
+  return (
+    <section className="flex flex-col gap-3" aria-busy>
+      <div className="flex items-center gap-2.5">
+        <Skeleton className="size-5 rounded-md" />
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-72" />
+        </div>
+      </div>
+      <div className={className}>
+        {Array.from({ length: cards }, (_, i) => (
+          <SkeletonTile key={i} className="min-h-[132px]" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function AlertesSkeleton() {
-  const Card = () => <div className="h-32 animate-pulse rounded-xl border border-border bg-card" />;
   return (
     <>
       <div className="flex flex-wrap gap-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-[54px] w-44 animate-pulse rounded-md border border-border bg-card" />
+        {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-[50px] w-44 rounded-md" />
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Card key={i} />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} />
-        ))}
-      </div>
+      <SectionSkeleton cards={1} className="grid grid-cols-1" />
+      <SectionSkeleton cards={4} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" />
+      <SectionSkeleton cards={4} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" />
+      <SectionSkeleton cards={3} className="grid grid-cols-1 gap-3 sm:grid-cols-3" />
     </>
   );
 }

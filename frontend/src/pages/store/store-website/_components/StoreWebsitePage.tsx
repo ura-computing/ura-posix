@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { TabBar, type TabItem } from "@/_components/TabBar";
+import { TabBar, type TabItem } from "@/_components/molecules/TabBar";
 
 import { CategoriesTab, type CategoriesTabProps } from "./CategoriesTab";
 import { DemandeTab, type DemandeTabProps } from "./DemandeTab";

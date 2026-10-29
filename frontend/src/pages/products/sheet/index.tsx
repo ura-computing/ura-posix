@@ -7,9 +7,9 @@ import { useState } from "react";
 import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { FilterBar } from "@/_components/filterBar";
-import { Page } from "@/_components/Page";
-import { TabBar, type TabItem } from "@/_components/TabBar";
+import { FilterBar } from "@/_components/organisms/FilterBar";
+import { Page } from "@/_components/templates/Page";
+import { TabBar, type TabItem } from "@/_components/molecules/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
 import { useT } from "@/i18n/I18nProvider";
 
@@ -17,6 +17,7 @@ import { ProductPhoto } from "../_components/ProductPhoto";
 import { useScanner } from "../_components/useScanner";
 import { CodesTab } from "./_components/CodesTab";
 import { SheetEditContext } from "./_components/editContext";
+import { SheetSkeleton } from "./_components/SheetSkeleton";
 import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
@@ -49,7 +50,7 @@ function ProductSheetPage({ id }: { id: number }) {
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
-    return <div className="py-10 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
+    return <SheetSkeleton />;
   }
 
   const icon = "size-4";

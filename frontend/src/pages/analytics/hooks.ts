@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 // Already shipped at @/hooks/stats:
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useMarginAlerts, type MarginAlertsFilters } from "@/hooks/sharedQueries";
-import type { AlertColumn } from "./_components/AlertDetailDialog";
+import type { AlertColumn } from "./_components/alertColumns";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";

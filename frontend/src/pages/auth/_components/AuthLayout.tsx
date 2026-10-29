@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { ThemeToggle } from "@/_components/ThemeToggle";
-import { PharmagestIcon } from "@/_components/PharmagestIcon";
+import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
+import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { useT } from "@/i18n/I18nProvider";
 
 function BrandPanel() {

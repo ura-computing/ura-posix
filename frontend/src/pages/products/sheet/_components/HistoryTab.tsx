@@ -1,7 +1,7 @@
 /** « Historique »: who changed this product and when — its edits (before → after), its
  *  observations, the imports that brought its lines. Newest first, 20 a page; nothing is ever
  *  removed (proof). The owner's « Historique » page shows the whole pharmacy. */
-import { HistoryTable } from "@/_components/HistoryTable";
+import { HistoryTable } from "@/_components/organisms/HistoryTable";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useProductHistory } from "../hooks";

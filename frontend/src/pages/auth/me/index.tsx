@@ -1,104 +1,28 @@
-import { useState, forwardRef, useId } from "react";
+import { useState } from "react";
 
-import { TabBar } from "@/_components/TabBar";
-import type { TabItem } from "@/_components/TabBar";
+import { TabBar } from "@/_components/molecules/TabBar";
+import type { TabItem } from "@/_components/molecules/TabBar";
 import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 
-import { AsYouType, getCountryCallingCode, type CountryCode, isValidPhoneNumber } from "libphonenumber-js";
-import { cn } from "@/utils/cn";
+import { isValidPhoneNumber } from "libphonenumber-js";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/_components/atoms/Button";
-import { PasswordField } from "@/_components/PasswordField";
+import { PasswordField } from "@/_components/molecules/PasswordField";
 import { useChangePassword, useUpdateProfile, useKillSession, useRevokeOtherSessions, useSessions } from "./hooks";
 import { Lock, Monitor } from "lucide-react";
-import { TextField } from "@/_components/TextField";
+import { TextField } from "@/_components/molecules/TextField";
 import type { Me, Session } from "@/types";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { useLogout } from "@/hooks/useLogout";
-import { Page } from "@/_components/Page";
-import { Spinner } from "@/_components/atoms/Spinner";
+import { Page } from "@/_components/templates/Page";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
-
-const COUNTRIES: { code: CountryCode; label: string }[] = [
-  { code: "MA", label: "Maroc" },
-  { code: "FR", label: "France" },
-  { code: "ES", label: "Espagne" },
-  { code: "US", label: "États-Unis" },
-];
-
-interface PhoneFieldProps {
-  label: string;
-  value: string; // stored as E.164, e.g. "+212600000000"
-  onChange: (value: string) => void;
-  country?: CountryCode;
-  error?: string;
-  hint?: string;
-}
-
-const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
-  ({ label, value, onChange, country: countryProp, error, hint }, ref) => {
-    const t = useT();
-    const id = useId();
-    const [country, setCountry] = useState<CountryCode>(countryProp ?? "MA");
-
-    const dial = `+${getCountryCallingCode(country)}`;
-    const national = value.startsWith(dial) ? value.slice(dial.length) : value.replace(/^\+/, "");
-    const display = new AsYouType(country).input(national);
-
-    const emit = (rawNational: string, c: CountryCode) =>
-      onChange(`+${getCountryCallingCode(c)}${rawNational.replace(/\D/g, "")}`);
-
-    return (
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={id} className="text-sm font-medium text-foreground">
-          {label}
-        </label>
-        <div
-          className={cn(
-            "flex items-stretch overflow-hidden rounded-md border bg-surface-subtle",
-            error ? "border-error" : "border-input",
-            "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
-          )}
-        >
-          <select
-            aria-label={t("shared.countryCode")}
-            value={country}
-            onChange={(e) => {
-              const c = e.target.value as CountryCode;
-              setCountry(c);
-              emit(national, c);
-            }}
-            className="cursor-pointer border-r border-border bg-transparent py-2 pl-3 pr-2 font-mono text-sm text-foreground outline-none"
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                +{getCountryCallingCode(c.code)}
-              </option>
-            ))}
-          </select>
-          <input
-            id={id}
-            ref={ref}
-            type="tel"
-            inputMode="tel"
-            value={display}
-            onChange={(e) => emit(e.target.value, country)}
-            className="w-full bg-transparent px-3 py-2 text-sm text-foreground outline-none"
-          />
-        </div>
-        {error ? (
-          <span className="text-xs text-error-subtle-foreground">{error}</span>
-        ) : hint ? (
-          <span className="text-xs text-muted-foreground">{hint}</span>
-        ) : null}
-      </div>
-    );
-  },
-);
-PhoneField.displayName = "PhoneField";
+import { SkeletonRows } from "@/_components/molecules/Skeletons";
+import { EmptyState } from "@/_components/molecules/EmptyState";
+import { Callout } from "@/_components/molecules/Callout";
+import { PhoneField } from "@/_components/molecules/PhoneField";
 
 const makePasswordSchema = (t: (k: string) => string) =>
   z
@@ -254,23 +178,11 @@ function SessionsTab({ me }: { me: Me }) {
         <p className="mt-1 text-sm text-muted-foreground">{t("me.sessionsDesc")}</p>
       </div>
 
-      {isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner /> {t("me.loading")}
-        </div>
-      )}
+      {isLoading && <SkeletonRows rows={3} columns={4} />}
 
-      {isError && (
-        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {t("me.sessionsError")}
-        </p>
-      )}
+      {isError && <Callout tone="error">{t("me.sessionsError")}</Callout>}
 
-      {!isLoading && !isError && sessions.length === 0 && (
-        <p className="rounded-md border border-dashed border-border bg-surface-subtle px-4 py-6 text-sm text-muted-foreground">
-          {t("me.noSession")}
-        </p>
-      )}
+      {!isLoading && !isError && sessions.length === 0 && <EmptyState title={t("me.noSession")} className="py-6" />}
 
       <ul className="flex flex-col gap-2">
         {sessions.map((s) => (

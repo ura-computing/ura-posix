@@ -1,7 +1,7 @@
 /** « Historique (par année) » lines + columns, shared by Statistiques (Tous · Ventes · Achats) and
  *  Général (Ventes only): per year a Ventes line (light green) and an Achats line (light blue), the
  *  units each month, the total, then the amount (CA of the sales, Σ line totals of the purchases). */
-import type { ColumnDef } from "@/_components/DataTable";
+import type { ColumnDef } from "@/_components/organisms/DataTable";
 import type { YearHistory } from "@/types";
 import type { TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";

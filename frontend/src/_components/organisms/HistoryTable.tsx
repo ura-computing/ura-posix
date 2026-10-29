@@ -3,7 +3,7 @@
  *  then what (a sentence). Used by the owner's page and a product's « Historique » tab. */
 import { Link } from "react-router-dom";
 
-import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/DataTable";
+import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import { ROUTES, type AuditRow } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";

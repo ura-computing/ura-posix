@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/_components/atoms/Button";
-import { Dialog, DialogContent } from "@/_components/dialog";
+import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { Input } from "./input";
 import { Label } from "./label";
 import { STORE_CATEGORY_COLORS, type StoreCategory } from "@/types/storeWebsite";

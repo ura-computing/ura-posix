@@ -13,7 +13,7 @@ import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
 import { I18nProvider, translate, useT } from "@/i18n/I18nProvider";
 
 import "@/styles/globals.css";
-import { ConfirmDialog } from "@/_components/ConfirmDialog";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 
 /** Global modal that surfaces when the API client receives a 401 mid-session.
  *

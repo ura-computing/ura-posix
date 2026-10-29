@@ -1,6 +1,6 @@
 /** Single-pick dropdown — the ONE shared primitive for every "pick one option"
- *  selector in the app. Same trigger/panel/option className as MultiSelectPopover
- *  (both pull from POPOVER_TRIGGER / POPOVER_PANEL / POPOVER_OPTION in filterBar.tsx).
+ *  selector in the app. Same trigger/panel/option className as MultiSelect
+ *  (both pull from POPOVER_TRIGGER / POPOVER_PANEL / POPOVER_OPTION in molecules/popover.ts).
  *
  *  Reused by:
  *    - Stock status filter         (label="Statut", placement="bottom", align="start")
@@ -19,14 +19,20 @@ import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/utils/cn";
 
-import { POPOVER_ALIGN, POPOVER_OPTION, POPOVER_PANEL, POPOVER_POSITION, POPOVER_TRIGGER } from "./filterBar";
+import {
+  POPOVER_ALIGN,
+  POPOVER_OPTION,
+  POPOVER_PANEL,
+  POPOVER_POSITION,
+  POPOVER_TRIGGER,
+} from "@/_components/molecules/popover";
 
 export interface SingleSelectOption {
   value: string;
   label: string;
 }
 
-export interface SingleSelectPopoverProps {
+export interface SingleSelectProps {
   label: string;
   options: SingleSelectOption[];
   value: string;
@@ -43,7 +49,7 @@ export interface SingleSelectPopoverProps {
   align?: "start" | "end";
 }
 
-export function SingleSelectPopover({
+export function SingleSelect({
   label,
   options,
   value,
@@ -51,7 +57,7 @@ export function SingleSelectPopover({
   emptyValue = "",
   placement = "bottom",
   align = "start",
-}: SingleSelectPopoverProps) {
+}: SingleSelectProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

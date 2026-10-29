@@ -6,8 +6,8 @@
 import { useState } from "react";
 import { Building2, FileText, ListChecks, Package } from "lucide-react";
 
-import { Page } from "@/_components/Page";
-import { TabBar } from "@/_components/TabBar";
+import { Page } from "@/_components/templates/Page";
+import { TabBar } from "@/_components/molecules/TabBar";
 import { Card } from "@/_components/atoms/Card";
 import { SearchInput } from "@/_components/atoms/Input";
 import { useT } from "@/i18n/I18nProvider";

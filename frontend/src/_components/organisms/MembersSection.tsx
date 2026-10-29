@@ -9,9 +9,9 @@ import type { MemberOut } from "@/types";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
-import { FeaturePills } from "./FeaturePills";
-import { MemberKebab } from "./MemberKebab";
-import { ROLE_LABEL, STATUS_LABEL } from "./memberConstants";
+import { FeaturePills } from "@/_components/molecules/FeaturePills";
+import { MemberKebab } from "@/_components/organisms/MemberKebab";
+import { ROLE_LABEL, STATUS_LABEL } from "@/_components/organisms/memberConstants";
 
 export interface MembersSectionProps {
   title: string;

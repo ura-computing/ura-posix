@@ -5,7 +5,7 @@
 import { useT } from "@/i18n/I18nProvider";
 import { Badge } from "@/_components/atoms/Badge";
 
-import { FEATURE_KEYS, FEATURE_LABELS, type FeatureKey } from "./memberConstants";
+import { FEATURE_KEYS, FEATURE_LABELS, type FeatureKey } from "@/_components/organisms/memberConstants";
 
 export function FeaturePills({ features, maxShown = 4 }: { features: string[]; maxShown?: number }) {
   const t = useT();

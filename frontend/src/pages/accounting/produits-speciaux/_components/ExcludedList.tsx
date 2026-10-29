@@ -5,7 +5,7 @@ import { Pencil, Undo2 } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import { Input } from "@/_components/atoms/Input";
-import { DataTable, type ColumnDef } from "@/_components/DataTable";
+import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD } from "@/utils/format";
 

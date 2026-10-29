@@ -46,7 +46,7 @@ const row = (page: Page, email = EMP.email) => page.getByRole("row", { name: new
 /** Row kebab → one menu entry. */
 async function rowAction(page: Page, email: string, action: string): Promise<void> {
   await row(page, email).getByRole("button", { name: "Plus d'actions" }).click();
-  await page.getByRole("menu").getByRole("button", { name: action, exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: action, exact: true }).click();
 }
 
 test.describe("propriétaire", () => {
@@ -58,7 +58,7 @@ test.describe("propriétaire", () => {
 
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("button", { name: /^Propriétaire/ }), "rôle imposé : employé").toHaveCount(0);
+    await expect(dialog.getByRole("radio", { name: /^Propriétaire/ }), "rôle imposé : employé").toHaveCount(0);
     await dialog.getByLabel("Nom complet").fill(EMP.name);
     await dialog.getByLabel("Email").fill(EMP.email);
     await dialog.getByLabel("Mot de passe", { exact: true }).fill(EMP.password);

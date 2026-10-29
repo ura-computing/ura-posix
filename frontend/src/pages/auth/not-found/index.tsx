@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { PharmagestIcon } from "@/_components/PharmagestIcon";
+import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { ROUTES } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 

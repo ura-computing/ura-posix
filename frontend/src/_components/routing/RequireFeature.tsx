@@ -15,10 +15,11 @@ import { useMe } from "@/hooks/useMe";
 import NotFoundPage from "@/pages/auth/not-found";
 import { ROLES, ROUTES, STATUSES } from "@/types";
 import type { Feature } from "@/types";
+import { PageSkeleton } from "@/_components/molecules/Skeletons";
 
 export function RequireFeature({ feature }: { feature: Feature }) {
   const { me, isLoading } = useMe();
-  if (isLoading) return null;
+  if (isLoading) return <PageSkeleton />;
   if (!me) return <Navigate to={ROUTES.LOGIN} replace />;
   if (me.role === ROLES.ADMIN) return <Outlet />;
   if (!me.permissions.includes(feature)) {
