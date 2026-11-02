@@ -1,0 +1,7 @@
+# E2E with DigitalOcean's limits (env/do/limits.yml): the database on disk instead of in memory, else its data
+# would count in the 1 GB of RAM. Anonymous volume: removed with the stack (`down -v`), fresh every run.
+services:
+  db:
+    tmpfs: !reset []
+    volumes:
+      - /var/lib/postgresql/data

@@ -40,6 +40,10 @@ while :; do
   [[ "$E2E_ROWS" =~ ^[0-9]+$ ]] && [ "$E2E_ROWS" -ge 1000 ] && break
   echo "✗ a whole number ≥ 1000, please"
 done
+# DigitalOcean's limits (env/do/limits.yml): backend 512 MB, Postgres 1 GB / 22 connections + the DO gate.
+if [ "$(ask "DigitalOcean limits (backend 512 MB, Postgres 1 GB, 22 connections)? (y/n)" y)" = y ]; then
+  export E2E_DO=1
+fi
 args=()
 
 if [ ${#SPECS[@]} -gt 0 ]; then         # files given on the command line

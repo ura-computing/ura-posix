@@ -140,6 +140,7 @@ apcm-pharma/
 ├── docker-compose.yml         demo stack: db (Postgres 17) + backend + frontend
 ├── .prettierrc.json           Prettier width 120 (make format)
 ├── env/demo/docker.env        demo env, copied to .env by make db / make demo
+├── env/do/limits.yml          DigitalOcean's limits for the E2E + demo stacks (512 MB backend, Postgres 1 GB / 22 connections)
 ├── resources/
 │   ├── catalog.csv            real Sobrus catalogue sample, used by seed
 │   ├── khutna/, les-joyeux/   real Sobrus exports of 2 pharmacies (samples)
@@ -190,7 +191,7 @@ flowchart LR
 | `make backend` · `make frontend` | one of the two |
 | `make format` | Prettier (frontend + e2e) + ruff (backend), width 120 |
 | `make build` | backend Docker image + `tsc -b && vite build` |
-| `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**) · stop · logs |
+| `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**; asks « DigitalOcean limits? », Enter = yes, [§9](#9-deployment-digitalocean)) · stop · logs |
 | `make clean` | **destroys every DB volume** |
 | `make tests` · `make tests-ui` | E2E ([§8](#8-tests-the-playwright-e2e-suite)) |
 
@@ -657,7 +658,7 @@ flowchart LR
 ### 8.1 Run
 | Command | What |
 |---|---|
-| `make tests` | every test, headless. Asks: vente rows (default 100 000, min 1 000), only last failures?, record a new speed baseline? |
+| `make tests` | every test, headless. Asks: vente rows (default 100 000, min 1 000), DigitalOcean limits? (default yes, [§9](#9-deployment-digitalocean)), only last failures?, record a new speed baseline? |
 | `make tests 99` · `make tests 06 15` | only those files (number or part of the name); setup 01-02 always first |
 | `make tests-ui` (or `make tests-ui ventes`) | a real maximized browser plays them, slowed down |
 
@@ -687,7 +688,7 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 17-inscription | sign-up (5 screens), login before « Accepter » (empty menu, 404 + hint), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
 | 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos; product sheet of 8 products = oracle on screen (header, badges, barcode copy, Général, Statistiques on the current year); best seller: the date picker (quick periods, typed dates), 3 charts + tooltips, « Détail mensuel » + « Copier », Historique Tous / Ventes / Achats (colors), months following the dates (a whole year = Jan → Dec), suppliers + prices « Voir tout », no Tendances; Traçabilité (current year, test window, filters, sort, 20 / page, every line's details, no line message), « Voir tout le ticket / BL »; emplacement + péremption hints; Codes (copy), scanner (barcode, PID, unknown, Échap), reader anywhere on the page (Entrée, no Entrée, slow typing ignored), list search; Observations (window at opening / scan, list badge, employee rights, delete); expiry date in a calendar; owner edits (every field, « Éditer », wrong values, an import keeps them, « Revenir », lookup by his barcode), type not editable, employee read only + « Voir tout le ticket / BL » by permission, feature OFF, 404, Spanish |
 | 19-historique | « Historique des modifications »: owner page = API (newest first, 02 imports), filters type / person / text / dates, product link, Excel; product tab (its lines per import); employee: no menu, 404, `GET /history` 403 |
-| 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** |
+| 99-gates | **coverage** (every `/openapi.json` route called, store allowlisted) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** · **DigitalOcean limits** (with them: backend never killed and < 512 MB, ≤ 22 connections, none refused, database < 10 GB; speed vs `e2e/perf-baseline.do.json`) |
 
 ### 8.4 When a test fails
 - `e2e/test-results/<test>/error-context.md`: the error + a page snapshot (read this first); trace and
@@ -728,7 +729,21 @@ flowchart LR
   `FRONTEND_URL` = the deployed frontend origin, SMTP. Never `RATE_LIMIT=0`.
 - Migrations run at each deploy (no manual SQL). A failed migration fails the deploy; DigitalOcean keeps
   the previous version running. Replay a new migration locally on Postgres 17 first.
-- The exact DO app spec (domains, sizes) is **not in the repo**: ask the owner.
+- The exact DO app spec (domains) is **not in the repo**: ask the owner.
+
+**Rehearse production on the laptop.** `make tests` and `make demo` ask « DigitalOcean limits? » (Enter = yes):
+the stacks then run with `env/do/limits.yml`, so a request that needs too much memory or too many connections fails
+here too.
+
+| Part | DigitalOcean | Local with the limits |
+|---|---|---|
+| Backend app | 512 MB RAM, 1 shared vCPU | 512 MB, no swap (over it: killed, not restarted) · CPU not limited (this machine's Docker has no CPU controller) |
+| Managed Postgres | 1 GB RAM, 1 vCPU, 10 GB, 22 connections for the app | 1 GB, `max_connections=22`, `shared_buffers=256MB` (DO's real value: its console) · E2E: data on disk, size checked |
+| Frontend | static site | `serve` container, same files |
+
+E2E with the limits: every 5 s one line in `e2e/.logs/resources.log` (RAM of backend + db, connections, database
+size, backend state, Postgres errors); the `99-gates` DigitalOcean gate fails on a killed backend, ≥ 512 MB, more than
+22 connections or a refused one, and prints the peaks (« backend max 431 MB / 512 »).
 - Next production steps (static site, `pg_stat_statements`, caches, workers): `PLAN.md` §3.
 
 ---

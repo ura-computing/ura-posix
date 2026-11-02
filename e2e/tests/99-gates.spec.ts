@@ -13,6 +13,9 @@
  *     (fr.ts / es.ts already fail the build when a frontend code has no text).
  *  4. REACT COMPILER — 0 `react-hooks` lint errors: the compiler skips (no auto
  *     memo) every component with one. Hidden store pages (moved as-is) excluded.
+ *  5. DIGITALOCEAN LIMITS (E2E_DO=1, `make tests` asks) — from e2e/.logs/resources.log (written every 5 s by
+ *     scripts/start-stack.sh): backend never killed (out of memory) or stopped, under 512 MB; Postgres never
+ *     refused a connection, at most 22, database under 10 GB. Speed gate: its own e2e/perf-baseline.do.json.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -22,7 +25,10 @@ import { expect, test, type CallRecord } from "../lib/fixtures";
 import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR } from "../lib/paths";
 
 const ALLOWLIST = [/^\/v1\/store-website\//];
-const BASELINE_FILE = resolve(E2E_DIR, "perf-baseline.json");
+const DO_LIMITS = process.env.E2E_DO === "1";
+// Under DigitalOcean's limits the timings differ: their own baseline.
+const BASELINE_FILE = resolve(E2E_DIR, DO_LIMITS ? "perf-baseline.do.json" : "perf-baseline.json");
+const RESOURCES_FILE = resolve(E2E_DIR, ".logs/resources.log");
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
 function readCalls(): CallRecord[] {
@@ -162,6 +168,57 @@ test("gate: no route got slower than the baseline", async ({ request }) => {
     });
   }
   expect(slower, `slower than baseline:\n  ${slower.join("\n  ")}\n`).toEqual([]);
+});
+
+const UNIT_MB: Record<string, number> = { B: 1 / 2 ** 20, KiB: 1 / 1024, MiB: 1, GiB: 1024 };
+/** « 40.11MiB » (docker stats) → 40.11. */
+function megabytes(text: string): number {
+  const m = /^([\d.]+)\s*(B|KiB|MiB|GiB)$/.exec(text.trim());
+  return m ? Number(m[1]) * UNIT_MB[m[2]] : NaN;
+}
+
+interface ResourceSample {
+  t: string;
+  stats: { Name: string; MemUsage: string }[];
+  backend: string;
+  oom: boolean;
+  connections?: number;
+  db_bytes?: number;
+  db_error?: string;
+}
+
+test("gate: the app stays inside DigitalOcean's limits (512 MB backend, 22 connections, 10 GB)", () => {
+  test.skip(!DO_LIMITS, "run without DigitalOcean's limits");
+  const samples: ResourceSample[] = existsSync(RESOURCES_FILE)
+    ? readFileSync(RESOURCES_FILE, "utf-8")
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+    : [];
+  expect(samples.length, "e2e/.logs/resources.log (scripts/start-stack.sh)").toBeGreaterThan(0);
+  // docker stats « MemUsage »: « 40.11MiB / 512MiB »; containers apcm-e2e-backend-1, apcm-e2e-db-1.
+  const used = (s: ResourceSample, name: string) =>
+    megabytes(s.stats.find((x) => x.Name.includes(name))?.MemUsage.split("/")[0] ?? "0B");
+  const peak = (name: string) => Math.max(0, ...samples.map((s) => used(s, name)));
+  const backendMb = peak("-backend-");
+  const dbMb = peak("-db-");
+  const connections = Math.max(0, ...samples.map((s) => s.connections ?? 0));
+  const dbGb = Math.max(0, ...samples.map((s) => s.db_bytes ?? 0)) / 2 ** 30;
+  for (const description of [
+    `backend max ${Math.round(backendMb)} MB / 512`,
+    `Postgres max ${Math.round(dbMb)} MB / 1024`,
+    `connections max ${connections} / 22`,
+    `database ${dbGb.toFixed(2)} GB / 10`,
+  ]) {
+    test.info().annotations.push({ type: "DigitalOcean", description });
+  }
+  const killed = samples.find((s) => s.oom || s.backend !== "running");
+  expect(killed && `${killed.t}: backend ${killed.backend}${killed.oom ? " (out of memory, 512 MB)" : ""}`).toBeFalsy();
+  const refused = samples.filter((s) => s.db_error).map((s) => `${s.t}: ${s.db_error}`);
+  expect(refused, "Postgres refused connections (22 max)").toEqual([]);
+  expect(backendMb, "backend RAM (MB)").toBeLessThan(512);
+  expect(connections, "Postgres connections").toBeLessThanOrEqual(22);
+  expect(dbGb, "database size (GB)").toBeLessThan(10);
 });
 
 test("gate: same error codes in backend and frontend", () => {

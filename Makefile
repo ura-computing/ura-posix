@@ -128,7 +128,10 @@ demo:
 	@cp env/demo/docker.env .env
 	@cp resources/catalog.csv backend/catalog.csv     # docker build context is ./backend
 	@echo "▸ Building containers + bootstrapping schema (smart)…"
-	@docker compose up -d --build --wait
+	@# DigitalOcean's limits (env/do/limits.yml: backend 512 MB, Postgres 1 GB / 22 connections). Enter = yes.
+	@answer=y; if [ -t 0 ]; then printf "DigitalOcean limits (backend 512 MB, Postgres 1 GB, 22 connections)? (y/n) [y]: "; read -r answer; fi; \
+	if [ "$${answer:-y}" = y ]; then docker compose -f docker-compose.yml -f env/do/limits.yml up -d --build --wait; \
+	else docker compose up -d --build --wait; fi
 	@echo ""
 	@echo "✓ Demo ready:"
 	@echo "    Frontend : http://localhost:4173"
