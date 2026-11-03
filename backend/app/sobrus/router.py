@@ -10,7 +10,7 @@ POST   /v1/sobrus/runs                {mode: full | new | check | range, date_fr
 GET    /v1/sobrus/runs                the last runs, newest first (the page polls while one runs)
 POST   /v1/sobrus/runs/{id}/cancel    « Arrêter »: the run ends now (cancelled); a busy robot stops at its next check
 
-A queued run wakes the robot at once (`launcher.wake`: a process in this container, gone after).
+A queued run wakes the robot at once (`launcher.wake`: Postgres NOTIFY to `worker.py`, its own process).
 """
 
 from __future__ import annotations
@@ -75,13 +75,13 @@ def _queue(
         created_by=user_id,
     )
     db.add(run)
+    wake(db)  # delivered by the commit below
     try:
         db.commit()
     except IntegrityError as e:  # the partial unique index: one queued / running run per pharmacy
         db.rollback()
         raise ApiError(409, ErrorCode.SOBRUS_RUN_ACTIVE, "Un import Sobrus est déjà en cours.") from e
     db.refresh(run)
-    wake()
     return run
 
 

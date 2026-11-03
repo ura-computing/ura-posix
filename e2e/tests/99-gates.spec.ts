@@ -14,7 +14,8 @@
  *  4. REACT COMPILER — 0 `react-hooks` lint errors: the compiler skips (no auto
  *     memo) every component with one. Hidden store pages (moved as-is) excluded.
  *  5. DIGITALOCEAN LIMITS (E2E_DO=1, `make tests` asks) — from e2e/.logs/resources.log (written every 5 s by
- *     scripts/start-stack.sh): backend never killed (out of memory) or stopped, under 512 MB; Postgres never
+ *     scripts/start-stack.sh): backend and worker (Sobrus robot) never killed (out of memory) or stopped, each
+ *     under 512 MB, no robot inside the backend; Postgres never
  *     refused a connection, at most 22, database under 10 GB. Speed gate: its own e2e/perf-baseline.do.json.
  */
 import { spawnSync } from "node:child_process";
@@ -180,14 +181,18 @@ function megabytes(text: string): number {
 interface ResourceSample {
   t: string;
   stats: { Name: string; MemUsage: string }[];
+  /** The backend's processes: uvicorn (master + workers), the Sobrus robot. */
+  procs?: { kb: number; cmd: string }[];
   backend: string;
   oom: boolean;
+  worker: string;
+  worker_oom: boolean;
   connections?: number;
   db_bytes?: number;
   db_error?: string;
 }
 
-test("gate: the app stays inside DigitalOcean's limits (512 MB backend, 22 connections, 10 GB)", () => {
+test("gate: the app stays inside DigitalOcean's limits (512 MB backend + worker, 22 connections, 10 GB)", () => {
   test.skip(!DO_LIMITS, "run without DigitalOcean's limits");
   const samples: ResourceSample[] = existsSync(RESOURCES_FILE)
     ? readFileSync(RESOURCES_FILE, "utf-8")
@@ -196,27 +201,47 @@ test("gate: the app stays inside DigitalOcean's limits (512 MB backend, 22 conne
         .map((l) => JSON.parse(l))
     : [];
   expect(samples.length, "e2e/.logs/resources.log (scripts/start-stack.sh)").toBeGreaterThan(0);
-  // docker stats « MemUsage »: « 40.11MiB / 512MiB »; containers apcm-e2e-backend-1, apcm-e2e-db-1.
+  // docker stats « MemUsage »: « 40.11MiB / 512MiB »; containers apcm-e2e-backend-1, -worker-1, -db-1.
   const used = (s: ResourceSample, name: string) =>
     megabytes(s.stats.find((x) => x.Name.includes(name))?.MemUsage.split("/")[0] ?? "0B");
   const peak = (name: string) => Math.max(0, ...samples.map((s) => used(s, name)));
   const backendMb = peak("-backend-");
+  const workerMb = peak("-worker-");
   const dbMb = peak("-db-");
   const connections = Math.max(0, ...samples.map((s) => s.connections ?? 0));
   const dbGb = Math.max(0, ...samples.map((s) => s.db_bytes ?? 0)) / 2 ** 30;
+  // Who holds the memory at the backend's peak (uvicorn: master + workers).
+  const top = samples.reduce((a, b) => (used(b, "-backend-") > used(a, "-backend-") ? b : a), samples[0]);
+  const holders = [...(top.procs ?? [])]
+    .sort((a, b) => b.kb - a.kb)
+    .slice(0, 4)
+    .map((p) => `${Math.round(p.kb / 1024)} MB ${p.cmd.slice(0, 60).trim()}`);
   for (const description of [
-    `backend max ${Math.round(backendMb)} MB / 512`,
+    `backend max ${Math.round(backendMb)} MB / 512 at ${top.t}: ${holders.join(" · ") || "?"}`,
+    `worker (Sobrus robot) max ${Math.round(workerMb)} MB / 512`,
     `Postgres max ${Math.round(dbMb)} MB / 1024`,
     `connections max ${connections} / 22`,
     `database ${dbGb.toFixed(2)} GB / 10`,
   ]) {
     test.info().annotations.push({ type: "DigitalOcean", description });
   }
+  // oom = one of its processes was killed for lack of memory (the backend container may still run: uvicorn
+  // starts a new worker, but that worker's requests are gone).
   const killed = samples.find((s) => s.oom || s.backend !== "running");
-  expect(killed && `${killed.t}: backend ${killed.backend}${killed.oom ? " (out of memory, 512 MB)" : ""}`).toBeFalsy();
+  const why = killed?.oom ? "a backend process killed for lack of memory (512 MB)" : `backend ${killed?.backend}`;
+  expect(killed && `${killed.t}: ${why}`).toBeFalsy();
+  const robotKilled = samples.find((s) => s.worker_oom || s.worker !== "running");
+  const robotWhy = robotKilled?.worker_oom
+    ? "the Sobrus robot killed for lack of memory (512 MB)"
+    : `worker ${robotKilled?.worker}`;
+  expect(robotKilled && `${robotKilled.t}: ${robotWhy}`).toBeFalsy();
+  // The robot runs only in its own container (DigitalOcean « Worker »), never inside the API.
+  const inside = samples.find((s) => s.procs?.some((p) => p.cmd.includes("app.sobrus.worker")));
+  expect(inside && `${inside.t}: Sobrus robot inside the backend container`).toBeFalsy();
   const refused = samples.filter((s) => s.db_error).map((s) => `${s.t}: ${s.db_error}`);
   expect(refused, "Postgres refused connections (22 max)").toEqual([]);
   expect(backendMb, "backend RAM (MB)").toBeLessThan(512);
+  expect(workerMb, "worker RAM (MB)").toBeLessThan(512);
   expect(connections, "Postgres connections").toBeLessThanOrEqual(22);
   expect(dbGb, "database size (GB)").toBeLessThan(10);
 });

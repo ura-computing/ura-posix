@@ -1,6 +1,7 @@
 # DigitalOcean's limits for the local stacks (E2E: e2e/scripts/start-stack.sh, demo: make demo), so what breaks
 # in production breaks here too:
 #   backend  App Platform 512 MB RAM (no swap: over 512 MB the process is killed)
+#   worker   App Platform « Worker » 512 MB (the Sobrus robot)
 #   db       Managed Postgres 1 GB RAM, 22 connections for the app (25 − 3 reserved)
 # No CPU limit (DO: 1 shared vCPU each): this machine's Docker has no CPU controller, `cpus` stops the stack.
 # Used as a compose override: docker compose -f <stack>.yml -f env/do/limits.yml …
@@ -9,6 +10,11 @@ services:
     mem_limit: 512m
     memswap_limit: 512m
     restart: "no" # a killed backend stays dead: the next tests fail clearly instead of hiding it
+
+  worker:
+    mem_limit: 512m
+    memswap_limit: 512m
+    restart: "no"
 
   db:
     mem_limit: 1g

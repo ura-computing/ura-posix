@@ -468,7 +468,9 @@ def compute_margin_alerts(
         if key is None:
             continue
         ca = float(r.ca or 0)
-        margin_dh = round(float(r.qty or 0) * (ppv - pu), 2)
+        # Not rounded per product: Σ then one round (below). Rounding each product first lets the last bits
+        # of the average PU (a Postgres float sum, its order changes between plans) flip a cent here and there.
+        margin_dh = float(r.qty or 0) * (ppv - pu)
         b = out[key]
         b["count"] += 1
         b["total_ca"] += ca

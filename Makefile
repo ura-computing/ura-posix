@@ -2,7 +2,7 @@ BACKEND_DIR  := ./backend
 FRONTEND_DIR := ./frontend
 DEV_DB       := apcm
 
-.PHONY: help install dev backend frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
+.PHONY: help install dev backend worker frontend migrate seed db build build-backend build-frontend demo down clean logs format test tests tests-ui
 
 help:
 	@echo "PharmaGest commands:"
@@ -12,9 +12,9 @@ help:
 	@echo "                    and create gitignored backend/.env + frontend/.env if missing"
 	@echo ""
 	@echo "  Local dev (dockerized DB + host backend/frontend):"
-	@echo "    make dev       — run backend + frontend together (Ctrl+C kills both)"
-	@echo "    make backend   — only the backend (starts the DB, applies new migrations; uvicorn :8000, hot reload;"
-	@echo "                     starts the « Connexion Sobrus » robot when an import is asked)"
+	@echo "    make dev       — run backend + Sobrus robot + frontend together (Ctrl+C kills all)"
+	@echo "    make backend   — only the backend (starts the DB, applies new migrations; uvicorn :8000, hot reload)"
+	@echo "    make worker    — only the « Connexion Sobrus » robot (waits for the backend's migrations)"
 	@echo "    make frontend  — only the frontend (Vite dev :5173)"
 	@echo "    make db        — start the Postgres 17 container + create the dev DB if missing"
 	@echo "    make migrate   — apply Alembic migrations against the dev DB + reload product photos"
@@ -68,6 +68,7 @@ install:
 dev: db
 	@trap 'kill 0' EXIT INT; \
 	  $(MAKE) backend & \
+	  $(MAKE) worker & \
 	  $(MAKE) frontend & \
 	  wait
 
@@ -88,6 +89,11 @@ db:
 
 backend: db migrate
 	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
+
+# The Sobrus robot, its own process (like the DigitalOcean « Worker »): no migrate here, it waits for the
+# backend's (make dev starts both).
+worker: db
+	cd $(BACKEND_DIR) && uv run python -m app.sobrus.worker
 
 frontend:
 	cd $(FRONTEND_DIR) && npm run dev

@@ -17,7 +17,8 @@ import csv
 import io
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from itertools import chain
 from datetime import date, datetime
 from functools import lru_cache
 from typing import Any
@@ -130,11 +131,25 @@ def fix_mojibake(s: str | None) -> str | None:
 # ─── Scalar parsers (tolerant of Sobrus formatting quirks) ───────────────────
 
 
+ENCODINGS = ("utf-8-sig", "utf-8", "latin-1")  # BOM-aware UTF-8, then plain UTF-8, then Latin-1
+
+
 def _decode(content: bytes) -> str:
     """Try BOM-aware UTF-8, then plain UTF-8, then Latin-1 fallback."""
-    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+    for enc in ENCODINGS:
         try:
             return content.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("Impossible de décoder le fichier — encodage inconnu")
+
+
+def _encoding(content: bytes) -> str:
+    """The encoding `_decode` picks, without keeping the decoded text."""
+    for enc in ENCODINGS:
+        try:
+            content.decode(enc)
+            return enc
         except UnicodeDecodeError:
             continue
     raise ValueError("Impossible de décoder le fichier — encodage inconnu")
@@ -239,18 +254,24 @@ def parse_csv(content: bytes, delimiter: str | None = None) -> list[dict[str, st
     `delimiter=` to lock the choice; otherwise the header line is sniffed
     via `_detect_delimiter`. Mojibake fix is applied to every header AND
     every cell value (via `clean_header` / `clean_value`)."""
-    text = _decode(content)
+    return list(iter_csv(content, delimiter))
+
+
+def iter_csv(content: bytes, delimiter: str | None = None) -> Iterator[dict[str, str]]:
+    """`parse_csv` one row at a time, decoding while it reads: the Sobrus robot imports a year of
+    sales (Les Joyeux 2025: 19 MB, 132 086 lines) without every line in memory (400 MB, more than
+    DigitalOcean's 512 MB with the API next to it)."""
+    text = io.TextIOWrapper(io.BytesIO(content), encoding=_encoding(content), newline="")
+    first = text.readline()
     if delimiter is None:
-        delimiter = _detect_delimiter(text.split("\n", 1)[0])
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    rows = list(reader)
-    if not rows:
-        return []
-    headers = [clean_header(h) for h in rows[0]]
-    out: list[dict[str, str]] = []
-    for row in rows[1:]:
-        out.append({headers[i]: clean_value(row[i]) for i in range(min(len(headers), len(row)))})
-    return out
+        delimiter = _detect_delimiter(first.split("\n", 1)[0])
+    reader = csv.reader(chain([first], text), delimiter=delimiter)
+    header = next(reader, None)
+    if header is None:
+        return
+    headers = [clean_header(h) for h in header]
+    for row in reader:
+        yield {headers[i]: clean_value(row[i]) for i in range(min(len(headers), len(row)))}
 
 
 def parse_catalog_csv(content: bytes) -> tuple[list[dict], list[dict]]:

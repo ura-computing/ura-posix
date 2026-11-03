@@ -22,11 +22,11 @@ import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
 import { expect, recordPage, test } from "../lib/fixtures";
 import { lastSobrusProblemEmail } from "../lib/mail";
-import { setPeriod } from "../lib/ui";
+import { pageSend, setPeriod } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
 
-const FAKE = "http://127.0.0.1:9100"; // the fake Sobrus, published by e2e/docker-compose.e2e.yml
+const FAKE = "http://127.0.0.1:19100"; // the fake Sobrus, published by e2e/docker-compose.e2e.yml
 const SOBRUS = { email: "pharmacie@sobrus.e2e", password: "SobrusE2e#2026" };
 const OWNER = { full_name: "Owner Sobrus E2E", email: "owner.sobrus@pharmagest.ma", password: "OwnerSobrus#2026" };
 const CONSENT = "J'autorise PharmaGest à se connecter à mon compte Sobrus pour importer mes achats et mes ventes.";
@@ -41,17 +41,26 @@ async function control(page: Page, body: Record<string, unknown>): Promise<void>
   expect(res.status(), "fake Sobrus control").toBe(200);
 }
 
-/** The run in progress is over (the robot ended it). */
+/** The run in progress is over (the robot ended it). Call it once the run exists (after the answer of
+ *  the click that queued it: `clickQueuing`), else it can see the previous run already over. */
 async function runEnded(page: Page, timeout = 10 * 60_000): Promise<void> {
   await expect
     .poll(async () => (await apiGet(page, "/sobrus/connection")).active_run, { timeout, intervals: [1000] })
     .toBeNull();
 }
 
+/** Click a button that queues a run (« Importer »: POST /sobrus/runs; « Mettre à jour le mot de passe »:
+ *  PUT /sobrus/connection queues the check run) and wait for its answer: the run exists. */
+async function clickQueuing(page: Page, name: string, method: "POST" | "PUT", path: string, status: number) {
+  const sent = pageSend(page, method, path, status);
+  await page.getByRole("button", { name, exact: true }).click();
+  await sent;
+}
+
 /** « Importer depuis Sobrus »: the choice, then the one « Importer » button. */
 async function startImport(page: Page, choice: "Tout l'historique" | "Choisir les dates"): Promise<void> {
   await page.getByRole("button", { name: choice, exact: true }).click();
-  await page.getByRole("button", { name: "Importer", exact: true }).click();
+  await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
 }
 
 async function openSobrus(page: Page): Promise<void> {
@@ -132,7 +141,7 @@ test("mettre à jour le mot de passe → connexion vérifiée, bandeau parti", a
   test.setTimeout(120_000);
   const page = owner;
   await page.getByLabel("Nouveau mot de passe Sobrus").fill(SOBRUS.password);
-  await page.getByRole("button", { name: "Mettre à jour le mot de passe", exact: true }).click();
+  await clickQueuing(page, "Mettre à jour le mot de passe", "PUT", "/sobrus/connection", 200);
   await runEnded(page);
   await expect(page.getByText("Connexion vérifiée", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(`Connecté à Sobrus : ${SOBRUS.email}`, { exact: true })).toBeVisible();
@@ -241,7 +250,8 @@ test("importer une période : coupée en années (Sobrus exporte 1 an au plus), 
   await expect(start, "début après la fin").toBeDisabled();
   await setPeriod(page, "2014-03-01", "2025-08-01");
   await expect(page.getByText("La date de début doit être avant la date de fin.", { exact: true })).toHaveCount(0);
-  await start.click();
+  await expect(start).toBeEnabled();
+  await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
   await runEnded(page);
   await expect(page.getByText("Import du 01 mars 2014 au 01 août 2025", { exact: false }).first()).toBeVisible();
 
@@ -311,7 +321,7 @@ test("mot de passe changé sur Sobrus → refusé, bandeau + email, nouveau mot 
 
     await page.getByRole("alert").getByRole("link", { name: "Mettre à jour le mot de passe", exact: true }).click();
     await page.getByLabel("Nouveau mot de passe Sobrus").fill(NEW);
-    await page.getByRole("button", { name: "Mettre à jour le mot de passe", exact: true }).click();
+    await clickQueuing(page, "Mettre à jour le mot de passe", "PUT", "/sobrus/connection", 200);
     await runEnded(page);
     expect((await apiGet(page, "/sobrus/connection")).status).toBe("active");
   } finally {

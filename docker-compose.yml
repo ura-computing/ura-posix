@@ -30,7 +30,7 @@ services:
 
   backend:
     build: ./backend
-    environment:
+    environment: &backend_env
       # Driver explicitly named — config.py uses psycopg2.
       DATABASE_URL:          postgresql+psycopg2://${POSTGRES_USER:-apcm}:${POSTGRES_PASSWORD:-apcm}@db:5432/${POSTGRES_DB:-apcm_demo}
       JWT_SECRET:            ${JWT_SECRET:-demo-jwt-secret-not-for-prod-32chars-min!!}
@@ -48,6 +48,16 @@ services:
       timeout:      5s
       retries:      5
       start_period: 30s
+    restart: unless-stopped
+
+  # The Sobrus robot, its own container (DigitalOcean « Worker » component): same image and settings.
+  worker:
+    build: ./backend
+    command: ["./entrypoint.sh", "worker"]
+    environment: *backend_env
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:

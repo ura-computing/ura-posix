@@ -1,7 +1,11 @@
 #!/usr/bin/env sh
 # Boot sequence for the backend container. Idempotent: safe to re-run on every
 # `docker compose up` regardless of whether the DB is fresh or already populated.
+#   entrypoint.sh          the API: migrations, photos, seed, uvicorn
+#   entrypoint.sh worker   the Sobrus robot (DigitalOcean « Worker » component): waits for the API's
+#                          migrations, never migrates (app/sobrus/worker.py)
 set -eu
+ROLE="${1:-api}"
 
 # 1. Wait for Postgres to be reachable (the db service health-check covers
 #    the container, but the network can lag a moment after `service_healthy`).
@@ -23,6 +27,11 @@ for attempt in range(60):
         time.sleep(1)
 print("✓ Postgres reachable")
 PY
+
+if [ "$ROLE" = worker ]; then
+  echo "▸ Starting the Sobrus robot"
+  exec uv run python -m app.sobrus.worker
+fi
 
 # 2. Schema bootstrap (extensions + migrations or stamp). Shared with
 #    `make migrate` — single source of truth in scripts/bootstrap.py.

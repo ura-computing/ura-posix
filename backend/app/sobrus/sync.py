@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from datetime import date, datetime, timedelta, timezone
+from itertools import batched
 
 from cryptography.fernet import InvalidToken
 from sqlalchemy.orm import Session
@@ -33,7 +35,7 @@ from app.core.database import SessionLocal
 from app.core.email_service import send_sobrus_problem
 from app.core.models import ImportBatch, SobrusConnection, SobrusRun, User
 from app.core.utils import PHARMACY_TZ, today
-from app.ingestion.csv_parse import parse_csv, parse_int
+from app.ingestion.csv_parse import iter_csv, parse_int
 from app.ingestion.service import (
     ACHAT_CFG,
     COL_BARCODE1,
@@ -182,13 +184,20 @@ class Robot:
         if _cancel_requested(self.db, self.run):  # before a download that can take a while
             raise Cancelled()
         content = self._download(kind, year, start, end)
-        rows = _stock_rows(content) if kind == "stock" else parse_csv(content)
-        if not rows:
+
+        # Read 2 000 lines at a time, twice: a year of sales all at once = 400 MB, more than DigitalOcean's
+        # 512 MB with the API next to it. The 1st pass counts them (« paquet x / y ») and refuses a broken file.
+        def lines() -> Iterator[dict[str, str]]:
+            return iter(_stock_rows(content)) if kind == "stock" else iter_csv(content)
+
+        total = 0
+        for r in lines():
+            total += 1
+            if any("\x00" in v for v in r.values()):
+                raise SobrusError("fileCorrupted")
+        if not total:
             return None
-        if any("\x00" in v for r in rows for v in r.values()):
-            raise SobrusError("fileCorrupted")
-        chunks = [rows[i : i + CHUNK_SIZE] for i in range(0, len(rows), CHUNK_SIZE)]
-        _set(self.db, self.run, phase="import", chunk_total=len(chunks), chunk_current=0)
+        _set(self.db, self.run, phase="import", chunk_total=-(-total // CHUNK_SIZE), chunk_current=0)
         filename = (
             f"Sobrus - Stock {today():%Y%m%d}.csv"  # the wizard's name (frontend/src/utils/csv.ts)
             if kind == "stock"
@@ -197,7 +206,8 @@ class Robot:
         batch_id: int | None = None
         added = 0
         try:
-            for i, part in enumerate(chunks):
+            for i, chunk in enumerate(batched(lines(), CHUNK_SIZE)):
+                part = list(chunk)
                 if _cancel_requested(self.db, self.run):
                     raise Cancelled()
                 args = {

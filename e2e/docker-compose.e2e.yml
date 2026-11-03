@@ -1,5 +1,6 @@
 # E2E stack = the production images on Postgres 17, like DigitalOcean:
 #   backend  → backend/Dockerfile → entrypoint.sh (migrations, seed, uvicorn main:app, 2 workers)
+#   worker   → the same image, entrypoint.sh worker (the Sobrus robot, DigitalOcean « Worker » component)
 #   frontend → frontend/Dockerfile → production build served by `serve`
 # Isolated from dev: own project (apcm-e2e), own ports, database in memory (fresh every run).
 # Started and removed by e2e/scripts/start-stack.sh (Playwright webServer).
@@ -22,7 +23,7 @@ services:
 
   backend:
     build: ../backend
-    environment:
+    environment: &backend_env
       DATABASE_URL: postgresql+psycopg2://apcm:apcm@db:5432/apcm_e2e
       JWT_SECRET: e2e-jwt-secret-only-for-the-test-stack-0123456789
       FRONTEND_URL: http://localhost:5174
@@ -33,8 +34,8 @@ services:
       RATE_LIMIT: "0" # the suite logs in more than 5 times a minute
       PORT: "8001"
       PYTHONUNBUFFERED: "1"
-      # « Connexion Sobrus » against the fake Sobrus below, never the real one; the robot is a child
-      # process of the backend (app/sobrus/launcher.py), its key derived from JWT_SECRET (as in production).
+      # « Connexion Sobrus » against the fake Sobrus below, never the real one; the robot = the `worker`
+      # service below (app/sobrus/worker.py), its key derived from JWT_SECRET (as in production).
       SOBRUS_API_URL: &sobrus_url http://sobrus.e2e.test:9100
       SOBRUS_ACCOUNT_API_URL: *sobrus_url
     volumes:
@@ -53,8 +54,19 @@ services:
       retries: 90
       start_period: 10s
 
+  # The Sobrus robot, its own container (as on DigitalOcean): same image and settings as the API, started
+  # once the API is up (migrations done); its emails go to the log like the API's (e2e/lib/mail.ts).
+  worker:
+    build: ../backend
+    command: ["./entrypoint.sh", "worker"]
+    environment: *backend_env
+    depends_on:
+      backend:
+        condition: service_healthy
+
   # Fake Sobrus (e2e/fake-sobrus/server.py): the 5 HTTP steps of the real login + its exports, serving
-  # the generated CSVs. Port 9100 on the host = the specs' `/__control` (« password changed »).
+  # the generated CSVs. Port 19100 on the host (9100 is often taken there: Prometheus node_exporter) = the specs'
+  # `/__control` (« password changed »).
   fake-sobrus:
     image: python:3.12-slim
     command: ["python", "/srv/server.py"]
@@ -68,7 +80,7 @@ services:
       - ./fake-sobrus/server.py:/srv/server.py:ro
       - ../resources/tests:/data:ro
     ports:
-      - "127.0.0.1:9100:9100"
+      - "127.0.0.1:19100:9100"
     networks:
       default:
         aliases: [sobrus.e2e.test]

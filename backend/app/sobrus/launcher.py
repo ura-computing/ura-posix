@@ -1,97 +1,18 @@
-"""Starts the Sobrus robot (`worker.py`) only when there is work, as a child process of the backend:
-no extra server component, nothing running between imports (no RAM, no polling).
-
-  wake()    a run was just queued: starts the robot, unless this process already has one alive
-  ticker()  every TICK_S in each backend process (FastAPI lifespan, main.py): queues tonight's « new »
-            runs (from NIGHTLY_HOUR in Casablanca, once a day), closes the runs of a stopped robot,
-            and wakes the robot when runs wait (left by a restart, or queued as it was exiting)
-
-Two backend processes (uvicorn --workers 2) may start two robots: harmless, each run is taken by one."""
+"""Wakes the Sobrus robot (`worker.py`, its own process, never inside the API) when the API queues a
+run: Postgres `NOTIFY sobrus_runs`, sent with the run's INSERT (same transaction: no wake for a run that
+was not saved). The robot LISTENs; it also looks every 30 s (tonight's runs, a stopped robot's)."""
 
 from __future__ import annotations
 
-import asyncio
-import logging
-import os
-import subprocess
-import sys
-import threading
-from datetime import datetime, time
 from pathlib import Path
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
-from app.core.models import PharmacyFeature, SobrusConnection, SobrusRun
-from app.core.utils import PHARMACY_TZ
-
-log = logging.getLogger("uvicorn.error")
-
-TICK_S = float(os.environ.get("SOBRUS_TICK", "30"))
-NIGHTLY_HOUR = 2
+CHANNEL = "sobrus_runs"
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
-_robot: subprocess.Popen | None = None
-_lock = threading.Lock()
 
-
-def wake() -> None:
-    global _robot
-    with _lock:
-        if _robot is not None and _robot.poll() is None:  # poll() also reaps a robot that ended
-            return
-        _robot = subprocess.Popen([sys.executable, "-m", "app.sobrus.worker"], cwd=BACKEND_DIR)
-        log.info("Sobrus robot started (pid %s)", _robot.pid)
-
-
-def schedule_nightly() -> None:
-    """Tonight's « new » run per active connection, once a day after NIGHTLY_HOUR (Casablanca); not
-    for a pharmacy whose « Connexion Sobrus » access the admin took away."""
-    now = datetime.now(PHARMACY_TZ)
-    if now.hour < NIGHTLY_HOUR:
-        return
-    since = datetime.combine(now.date(), time(NIGHTLY_HOUR), PHARMACY_TZ)
-    with SessionLocal() as db:
-        allowed = (
-            db.query(PharmacyFeature.pharmacy_id)
-            .filter(PharmacyFeature.feature == "sobrus", PharmacyFeature.enabled.is_(True))
-            .scalar_subquery()
-        )
-        active = db.query(SobrusConnection).filter(
-            SobrusConnection.status == "active", SobrusConnection.pharmacy_id.in_(allowed)
-        )
-        for conn in active.all():
-            done = (
-                db.query(SobrusRun.id)
-                .filter(SobrusRun.pharmacy_id == conn.pharmacy_id, SobrusRun.created_at >= since)
-                .first()
-            )
-            if done:
-                continue
-            db.add(SobrusRun(pharmacy_id=conn.pharmacy_id, mode="new", status="queued", events=[]))
-            try:
-                db.commit()
-            except IntegrityError:  # a run of this pharmacy is already queued / running
-                db.rollback()
-
-
-def tick() -> None:
-    from app.sobrus.worker import recover  # the robot's module, without starting it
-
-    schedule_nightly()
-    recover()
-    with SessionLocal() as db:
-        waiting = db.query(SobrusRun.id).filter(SobrusRun.status == "queued").first()
-    if waiting:
-        wake()
-    elif _robot is not None:
-        _robot.poll()  # reaps a robot that ended (no zombie process left)
-
-
-async def ticker() -> None:
-    while True:
-        try:
-            await asyncio.to_thread(tick)
-        except Exception:
-            log.exception("Sobrus ticker")
-        await asyncio.sleep(TICK_S)
+def wake(db: Session) -> None:
+    """Before `db.commit()`: Postgres delivers the NOTIFY at the commit."""
+    db.execute(text(f"NOTIFY {CHANNEL}"))

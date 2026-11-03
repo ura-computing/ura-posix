@@ -187,8 +187,8 @@ flowchart LR
 | `make db` | starts Postgres 17 (volume `pg17_data`) and creates the dev DB `apcm` |
 | `make migrate` | `scripts/bootstrap.py`: extensions, `immutable_unaccent()`, migrations; then `scripts/load_product_infos.py` (product photos) |
 | `make seed` | seed accounts + « Pharmacie Demo » + catalogue (idempotent) |
-| `make dev` | backend uvicorn **:8000** (hot reload, applies new migrations first) + Vite **:5173** |
-| `make backend` · `make frontend` | one of the two |
+| `make dev` | backend uvicorn **:8000** (hot reload, applies new migrations first) + Sobrus robot + Vite **:5173** |
+| `make backend` · `make worker` · `make frontend` | one of the three |
 | `make format` | Prettier (frontend + e2e) + ruff (backend), width 120 |
 | `make build` | backend Docker image + `tsc -b && vite build` |
 | `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**; asks « DigitalOcean limits? », Enter = yes, [§9](#9-deployment-digitalocean)) · stop · logs |
@@ -708,13 +708,23 @@ flowchart LR
   U["Browser"]
   subgraph DO["DigitalOcean"]
     FE["Frontend app<br/>frontend/Dockerfile<br/>VITE_BACKEND_URL at build"]
-    BE["Backend app<br/>backend/Dockerfile → entrypoint.sh"]
-    PG[("Managed Postgres 17")]
+    BE["Backend app (Web Service, 512 MB)<br/>backend/Dockerfile → entrypoint.sh"]
+    WK["Worker (Worker, 512 MB)<br/>same image → entrypoint.sh worker<br/>Sobrus robot"]
+    PG[("Managed Postgres 17<br/>+ the jobs queue (sobrus_runs)")]
   end
   U -- "loads the app" --> FE
   U -- "/v1 calls + cookies" --> BE
-  BE --> PG
+  BE -- "queues a run + NOTIFY" --> PG
+  PG -- "LISTEN · claim (SKIP LOCKED)" --> WK
 ```
+
+| Component | DO type | Run command | Size |
+|---|---|---|---|
+| backend | Web Service | image default (`entrypoint.sh`) | 512 MB |
+| worker | **Worker** | `./entrypoint.sh worker` | 512 MB, same env vars as the backend |
+
+Heavy jobs never run in the web box: a big client's import has the worker's memory, not the website's.
+The worker never migrates: it waits until the database is at its code's revision (`app/sobrus/worker.py`).
 
 The backend container boots like this (same in the demo and the E2E stack):
 
@@ -737,6 +747,7 @@ here too.
 
 | Part | DigitalOcean | Local with the limits |
 |---|---|---|
+| Worker (Sobrus robot) | 512 MB RAM | 512 MB, no swap |
 | Backend app | 512 MB RAM, 1 shared vCPU | 512 MB, no swap (over it: killed, not restarted) · CPU not limited (this machine's Docker has no CPU controller) |
 | Managed Postgres | 1 GB RAM, 1 vCPU, 10 GB, 22 connections for the app | 1 GB, `max_connections=22`, `shared_buffers=256MB` (DO's real value: its console) · E2E: data on disk, size checked |
 | Frontend | static site | `serve` container, same files |

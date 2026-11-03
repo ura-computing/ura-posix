@@ -334,7 +334,7 @@ class Oracle:
             b = out[key]
             b["count"] += 1
             b["total_ca"] += total
-            b["total_margin_dh"] += r2(qty * (p.ppv - pu))
+            b["total_margin_dh"] += qty * (p.ppv - pu)  # Σ then one round (backend compute_margin_alerts)
             b["products"].append({"product": p.name, "marge_pct": pct, "ca": r2(total)})
         for b in out.values():
             b["total_ca"], b["total_margin_dh"] = r2(b["total_ca"]), r2(b["total_margin_dh"])
