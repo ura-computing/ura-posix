@@ -22,17 +22,35 @@ const CURSOR = () => {
     const c = document.createElement("div");
     c.innerHTML =
       '<svg width="26" height="26" viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>';
-    Object.assign(c.style, { position: "fixed", left: "-50px", top: "-50px", zIndex: 2147483647, pointerEvents: "none" });
+    Object.assign(c.style, {
+      position: "fixed",
+      left: "-50px",
+      top: "-50px",
+      zIndex: 2147483647,
+      pointerEvents: "none",
+    });
     document.body.appendChild(c);
-    addEventListener("mousemove", (e) => Object.assign(c.style, { left: `${e.clientX - 4}px`, top: `${e.clientY - 2}px` }), true);
+    addEventListener(
+      "mousemove",
+      (e) => Object.assign(c.style, { left: `${e.clientX - 4}px`, top: `${e.clientY - 2}px` }),
+      true,
+    );
     addEventListener(
       "mousedown",
       (e) => {
         const r = document.createElement("div");
         Object.assign(r.style, {
-          position: "fixed", left: `${e.clientX - 18}px`, top: `${e.clientY - 18}px`, width: "36px", height: "36px",
-          borderRadius: "50%", background: "rgba(20,184,166,.35)", border: "2px solid rgba(20,184,166,.9)",
-          zIndex: 2147483646, pointerEvents: "none", transition: "transform .45s ease-out, opacity .45s ease-out",
+          position: "fixed",
+          left: `${e.clientX - 18}px`,
+          top: `${e.clientY - 18}px`,
+          width: "36px",
+          height: "36px",
+          borderRadius: "50%",
+          background: "rgba(20,184,166,.35)",
+          border: "2px solid rgba(20,184,166,.9)",
+          zIndex: 2147483646,
+          pointerEvents: "none",
+          transition: "transform .45s ease-out, opacity .45s ease-out",
         });
         document.body.appendChild(r);
         requestAnimationFrame(() => Object.assign(r.style, { transform: "scale(1.8)", opacity: "0" }));
@@ -46,7 +64,11 @@ const CURSOR = () => {
 };
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: SIZE, recordVideo: { dir: resolve(ROOT, "e2e/.demo"), size: SIZE }, locale: "fr-FR" });
+const context = await browser.newContext({
+  viewport: SIZE,
+  recordVideo: { dir: resolve(ROOT, "e2e/.demo"), size: SIZE },
+  locale: "fr-FR",
+});
 await context.addInitScript(CURSOR);
 const page = await context.newPage();
 page.setDefaultTimeout(8000);
@@ -74,7 +96,9 @@ async function type(loc, text, after = 900) {
 async function scroll(px, ms = 1600) {
   const main = page.locator("main").first();
   const b = (await main.count()) ? await main.boundingBox() : null;
-  await page.mouse.move(b ? b.x + b.width / 2 : SIZE.width / 2, b ? b.y + b.height / 2 : SIZE.height / 2, { steps: 10 });
+  await page.mouse.move(b ? b.x + b.width / 2 : SIZE.width / 2, b ? b.y + b.height / 2 : SIZE.height / 2, {
+    steps: 10,
+  });
   const n = Math.max(1, Math.round(ms / 40));
   for (let i = 0; i < n; i++) {
     await page.mouse.wheel(0, px / n);
@@ -100,10 +124,16 @@ await scene("connexion", async () => {
   await type(page.locator('input[autocomplete="current-password"]'), owner.password, 400);
   await click(page.locator('button[type="submit"]'), 2000);
   // The home page, then « Aller à mon espace ».
-  for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 120), await wait(60);
+  for (let i = 0; i < 12; i++) (await page.mouse.wheel(0, 120), await wait(60));
   await wait(800);
-  for (let i = 0; i < 12; i++) await page.mouse.wheel(0, -120), await wait(40);
-  await click(page.getByRole("link", { name: "Aller à mon espace" }).or(page.getByRole("button", { name: "Aller à mon espace" })).first(), 2500);
+  for (let i = 0; i < 12; i++) (await page.mouse.wheel(0, -120), await wait(40));
+  await click(
+    page
+      .getByRole("link", { name: "Aller à mon espace" })
+      .or(page.getByRole("button", { name: "Aller à mon espace" }))
+      .first(),
+    2500,
+  );
 });
 
 await scene("tableau de bord", async () => {
@@ -189,7 +219,13 @@ await scene("produits spéciaux", async () => {
 
 await scene("équipe", async () => {
   await nav("Gérer mon équipe");
-  await click(page.locator("main").getByRole("button", { name: /Ajouter|Nouvel|Créer|Inviter/ }).first(), 1200);
+  await click(
+    page
+      .locator("main")
+      .getByRole("button", { name: /Ajouter|Nouvel|Créer|Inviter/ })
+      .first(),
+    1200,
+  );
   await type(page.getByRole("dialog").locator("input").first(), "Salma Bennani", 900);
   await page.keyboard.press("Escape");
   await wait(800);
@@ -213,7 +249,7 @@ await scene("imports", async () => {
   await page.goto(`${BASE}/upload-file`);
   await wait(1200);
   // Hover the 3 file types, pick « Ventes » → the file step.
-  for (const name of [/^Achats/, /^Stock/]) await moveTo(page.getByRole("radio", { name }).first()), await wait(500);
+  for (const name of [/^Achats/, /^Stock/]) (await moveTo(page.getByRole("radio", { name }).first()), await wait(500));
   await click(page.getByRole("radio", { name: /^Ventes/ }).first(), 1800);
 });
 

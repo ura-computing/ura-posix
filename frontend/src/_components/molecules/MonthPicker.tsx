@@ -115,7 +115,7 @@ export function MonthPicker({ value, onChange, label = "", placement = "bottom",
           </div>
 
           {/* 3 × 4 month grid */}
-          <div className="grid grid-cols-3 gap-1">
+          <div data-list="months" className="grid grid-cols-3 gap-1">
             {MONTHS_FR_SHORT.map((name, idx) => {
               const active = displayYear === valueY && idx === valueM;
               return (

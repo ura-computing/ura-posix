@@ -10,6 +10,8 @@
  *  - the nightly run (mode `new`, API: no button) → 0 line (already there); « Choisir les dates »
  *    01/03/2014 → 01/08/2025 = one export per year, newest first (2025-01-01 → 2025-08-01 …
  *    2014-03-01 → 2014-12-31); « Arrêter » a run (slow fake exports)
+ *  - Sobrus asks a check (« Confirmez votre numéro ») → red card; once done, « Réessayer » → active again
+ *  - Sobrus answers 429 (too many logins) → the robot waits and logs in again; longer → stops, no red card
  *  - password changed on Sobrus → next run refused → banner + email → new password → banner gone
  *  - Spanish; « Déconnecter »; the admin takes the « Connexion Sobrus » access away → no menu entry,
  *    404, API 403 `featureDisabled`, then gives it back; an employee: no menu entry, 404,
@@ -112,6 +114,14 @@ test("connexion : accord obligatoire, mot de passe refusé → carte rouge, band
   ).toBeVisible();
   await page.getByLabel("Email Sobrus").fill(SOBRUS.email);
   await page.getByLabel("Mot de passe Sobrus").fill("pas-le-bon");
+  // The eye shows what was typed, then hides it again.
+  const typed = page.getByLabel("Mot de passe Sobrus"); // the label also holds « * » and the hint
+  await expect(typed).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+  await expect(typed).toHaveAttribute("type", "text");
+  await expect(typed).toHaveValue("pas-le-bon");
+  await page.getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+  await expect(typed).toHaveAttribute("type", "password");
   const connect = page.getByRole("button", { name: "Connecter mon compte Sobrus", exact: true });
   await expect(connect, "sans l'accord").toBeDisabled();
   await page.getByRole("checkbox", { name: CONSENT }).click();
@@ -140,6 +150,9 @@ test("connexion : accord obligatoire, mot de passe refusé → carte rouge, band
 test("mettre à jour le mot de passe → connexion vérifiée, bandeau parti", async () => {
   test.setTimeout(120_000);
   const page = owner;
+  // Refused: the email can be wrong too, so it stays editable (the saved one shown).
+  await expect(page.getByLabel("Email Sobrus")).toHaveValue(SOBRUS.email);
+  await expect(page.getByLabel("Email Sobrus")).toBeEditable();
   await page.getByLabel("Nouveau mot de passe Sobrus").fill(SOBRUS.password);
   await clickQueuing(page, "Mettre à jour le mot de passe", "PUT", "/sobrus/connection", 200);
   await runEnded(page);
@@ -234,6 +247,8 @@ test("import de la nuit (nouveautés, sans bouton) : rien de nouveau → 0 ligne
   await runEnded(page);
   const [run] = await apiGet(page, "/sobrus/runs");
   expect(run.mode).toBe("new");
+  // `limit`: the newest runs only (the page asks the default 10).
+  expect(await apiGet(page, "/sobrus/runs", { limit: 1 }), "limit 1").toEqual([run]);
   expect(run.status).toBe("success");
   expect(run.lines_added, "déjà importées").toBe(0);
   await page.reload();
@@ -292,6 +307,9 @@ test("arrêter un import en cours", async () => {
     await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toBeVisible({ timeout: 60_000 });
     const stop = page.getByRole("button", { name: "Arrêter", exact: true });
     await expect(stop).toBeEnabled();
+    // One run at a time per pharmacy: another one is refused while this one runs.
+    const second = await apiPost(page, "/sobrus/runs", { mode: "new" }, {}, 409);
+    expect(second.code, "un import déjà en cours").toBe("sobrusRunActive");
     await stop.click();
     await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toHaveCount(0, { timeout: 5_000 });
     await runEnded(page);
@@ -301,6 +319,88 @@ test("arrêter un import en cours", async () => {
   const [run] = await apiGet(page, "/sobrus/runs");
   expect(run.status, "arrêté").toBe("cancelled");
   await expect(page.getByText(/^Arrêté \([\d\s\u00a0\u202f]+ ligne\(s\) ajoutée\(s\) avant\)$/).first()).toBeVisible();
+});
+
+test("Sobrus demande une vérification → carte rouge, « Réessayer » une fois faite → reparti", async () => {
+  test.setTimeout(5 * 60_000);
+  const page = owner;
+  await control(page, { verify: true }); // « Confirmez votre numéro de téléphone » on sobrus.com
+  try {
+    await startImport(page, "Tout l'historique");
+    await runEnded(page);
+    expect((await apiGet(page, "/sobrus/connection")).status).toBe("needs_login");
+    await page.reload();
+    await expect(
+      page.getByText(
+        "Sobrus demande une vérification. Connectez-vous une fois sur sobrus.com, puis cliquez sur « Réessayer ».",
+        {
+          exact: true,
+        },
+      ),
+    ).toBeVisible();
+  } finally {
+    await control(page, { verify: false }); // the owner did it on sobrus.com
+  }
+  // « Réessayer »: the robot logs in again with the saved password, nothing to type.
+  await clickQueuing(page, "Réessayer", "POST", "/sobrus/runs", 201);
+  await runEnded(page);
+  expect((await apiGet(page, "/sobrus/connection")).status).toBe("active");
+  await expect(page.getByRole("button", { name: "Réessayer", exact: true })).toHaveCount(0);
+});
+
+test("Sobrus limite les connexions (429) → le robot attend et réessaie ; trop longtemps → pas de carte rouge", async () => {
+  test.setTimeout(5 * 60_000);
+  const page = owner;
+  // Once: the robot waits, logs in again, the run goes on (a check run: the nightly path, no button for it).
+  await control(page, { busy: 1 });
+  await apiPost(page, "/sobrus/runs", { mode: "check" }, {}, 201);
+  await runEnded(page);
+  let [run] = await apiGet(page, "/sobrus/runs");
+  expect(run.status, "réessayé tout seul").toBe("success");
+  expect(run.events.map((e: { code: string }) => e.code)).toContain("login_busy");
+  // Longer than the robot waits: the run stops, the connection stays OK (no red card, no « Réessayer »).
+  await control(page, { busy: 99 });
+  try {
+    await apiPost(page, "/sobrus/runs", { mode: "check" }, {}, 201);
+    await runEnded(page);
+    [run] = await apiGet(page, "/sobrus/runs");
+    expect(run.error_code).toBe("sobrusBusy");
+    expect((await apiGet(page, "/sobrus/connection")).status, "pas de carte rouge").toBe("active");
+    await page.reload();
+    await expect(
+      page.getByText("Sobrus limite les connexions pour le moment.", { exact: false }).first(),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Réessayer", exact: true })).toHaveCount(0);
+  } finally {
+    await control(page, { busy: 0 });
+  }
+});
+
+test("Sobrus en panne ou qui refuse le fichier → arrêté avec la raison, pas de carte rouge", async () => {
+  test.setTimeout(5 * 60_000);
+  const page = owner;
+  const lastRun = async () => (await apiGet(page, "/sobrus/runs"))[0];
+  await control(page, { fail: "login" }); // Sobrus answers 503 at login
+  try {
+    await apiPost(page, "/sobrus/runs", { mode: "check" }, {}, 201);
+    await runEnded(page);
+    expect((await lastRun()).error_code).toBe("sobrusUnreachable");
+  } finally {
+    await control(page, { fail: null });
+  }
+  await control(page, { fail: "export" }); // logged in, but the export answers 500
+  try {
+    await apiPost(page, "/sobrus/runs", { mode: "new" }, {}, 201);
+    await runEnded(page);
+    expect((await lastRun()).error_code).toBe("sobrusExportFailed");
+  } finally {
+    await control(page, { fail: null });
+  }
+  // Temporary: the connection stays OK (retried the next night), the page says why.
+  expect((await apiGet(page, "/sobrus/connection")).status).toBe("active");
+  await page.reload();
+  await expect(page.getByText("Sobrus n'a pas pu fournir le fichier.", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Réessayer", exact: true })).toHaveCount(0);
 });
 
 test("mot de passe changé sur Sobrus → refusé, bandeau + email, nouveau mot de passe → reparti", async () => {

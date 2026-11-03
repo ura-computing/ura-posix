@@ -66,6 +66,7 @@ export const ErrorCode = {
   SOBRUS_RUN_NOT_FOUND: "sobrusRunNotFound",
   SOBRUS_BAD_CREDENTIALS: "sobrusBadCredentials",
   SOBRUS_NEEDS_ACTION: "sobrusNeedsAction",
+  SOBRUS_BUSY: "sobrusBusy",
   SOBRUS_UNREACHABLE: "sobrusUnreachable",
   SOBRUS_EXPORT_FAILED: "sobrusExportFailed",
   SOBRUS_INTERRUPTED: "sobrusInterrupted",

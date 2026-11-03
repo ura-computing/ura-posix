@@ -38,6 +38,7 @@ export function Segmented<V extends string>({ value, options, onChange, classNam
           <button
             key={opt.value}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(opt.value)}
             className={cn(
               // h-full fills the parent's h-9; rounded-sm sits visually nested inside rounded-md

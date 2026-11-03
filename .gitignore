@@ -9,6 +9,8 @@
 .env.local
 .env.*.local
 !.env.example
+# The real Sobrus account of the E2E live check (e2e/tests.env.example = the empty model)
+e2e/tests.env
 
 # Python
 __pycache__/

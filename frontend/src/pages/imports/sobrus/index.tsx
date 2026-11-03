@@ -13,6 +13,7 @@ import { Checkbox } from "@/_components/atoms/Checkbox";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { DateRangePicker } from "@/_components/molecules/DateRangePicker";
 import { FormField, FormInput } from "@/_components/molecules/FormField";
+import { PasswordInput } from "@/_components/molecules/PasswordField";
 import { Page } from "@/_components/templates/Page";
 import { Skeleton } from "@/_components/atoms/Skeleton";
 import { Spinner } from "@/_components/atoms/Spinner";
@@ -58,14 +59,14 @@ function ConnectForm({
       }}
     >
       <FormField label={t("sobrus.email")} required>
-        <FormInput value={email} onChange={setEmail} type="email" autoComplete="off" disabled={update} />
+        <FormInput value={email} onChange={setEmail} type="email" autoComplete="off" />
       </FormField>
       <FormField
         label={update ? t("sobrus.newPassword") : t("sobrus.password")}
         required
         hint={t("sobrus.passwordHint")}
       >
-        <FormInput value={password} onChange={setPassword} type="password" autoComplete="new-password" />
+        <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
       </FormField>
       {!update && (
         <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
@@ -268,6 +269,18 @@ export default function SobrusPage() {
                     {connection.status === "invalid" ? t("sobrus.problemPassword") : t("sobrus.problemCheck")}
                   </span>
                 </div>
+                {/* Sobrus asked a check (« Confirmez votre numéro »…): once done on sobrus.com, the same
+                    password works again — « Réessayer » logs in again, no typing. */}
+                {connection.status === "needs_login" && (
+                  <Button
+                    size="lg"
+                    className="self-start"
+                    onClick={() => void startRun({ mode: "check" })}
+                    isLoading={isStarting}
+                  >
+                    {t("common.retry")}
+                  </Button>
+                )}
                 <ConnectForm
                   key={`update-${connection.last_error_code}`}
                   email={connection.email ?? ""}

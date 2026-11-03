@@ -23,7 +23,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { expect, test, type CallRecord } from "../lib/fixtures";
-import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR } from "../lib/paths";
+import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR, UI_FILE } from "../lib/paths";
 
 const ALLOWLIST = [/^\/v1\/store-website\//];
 const DO_LIMITS = process.env.E2E_DO === "1";
@@ -44,16 +44,41 @@ interface Route {
   key: string;
   method: string;
   re: RegExp;
+  /** Its query params and request-body fields (/openapi.json). */
+  query: string[];
+  body: string[];
 }
+
+/** What a run may leave out, each with its reason (e2e/coverage-allowlist.json): patterns per gate. */
+const COVERAGE_ALLOW: Record<"params" | "body" | "codes" | "ui", { pattern: string; why: string }[]> = JSON.parse(
+  readFileSync(resolve(E2E_DIR, "coverage-allowlist.json"), "utf-8"),
+);
+const allowed = (gate: keyof typeof COVERAGE_ALLOW, key: string) =>
+  COVERAGE_ALLOW[gate].some((a) => new RegExp(a.pattern).test(key));
 
 async function openApiRoutes(request: import("@playwright/test").APIRequestContext): Promise<Route[]> {
   const spec = await (await request.get(`${API}/openapi.json`)).json();
+  const ref = (s: { $ref?: string } | undefined) =>
+    s?.$ref ? spec.components.schemas[s.$ref.split("/").at(-1) as string] : s;
   const routes: Route[] = [];
   for (const [path, ops] of Object.entries<Record<string, unknown>>(spec.paths)) {
     if (!path.startsWith("/v1/") || ALLOWLIST.some((re) => re.test(path))) continue;
     const re = new RegExp("^" + path.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\\?\{[^/]+?\\?\}/g, "[^/]+") + "$");
     for (const method of Object.keys(ops).filter((m) => METHODS.includes(m))) {
-      routes.push({ key: `${method.toUpperCase()} ${path}`, method: method.toUpperCase(), re });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const op = ops[method] as any;
+      const query = (op.parameters ?? [])
+        .filter((p: { in: string }) => p.in === "query")
+        .map((p: { name: string }) => p.name);
+      const content = op.requestBody?.content ?? {};
+      const schema = ref((content["application/json"] ?? content["multipart/form-data"])?.schema);
+      routes.push({
+        key: `${method.toUpperCase()} ${path}`,
+        method: method.toUpperCase(),
+        re,
+        query,
+        body: Object.keys(schema?.properties ?? {}),
+      });
     }
   }
   return routes;
@@ -244,6 +269,75 @@ test("gate: the app stays inside DigitalOcean's limits (512 MB backend + worker,
   expect(workerMb, "worker RAM (MB)").toBeLessThan(512);
   expect(connections, "Postgres connections").toBeLessThanOrEqual(22);
   expect(dbGb, "database size (GB)").toBeLessThan(10);
+});
+
+test("gate: every query param and request field of every route is sent by the suite", async ({ request }) => {
+  test.skip(process.env.E2E_PARTIAL === "1", "partial run (failed tests only): not every param is sent");
+  const routes = await openApiRoutes(request);
+  const sent = new Map<string, Set<string>>();
+  for (const c of readCalls()) {
+    const r = c.source === "flow" ? undefined : routeOf(c, routes);
+    if (!r) continue;
+    const s = sent.get(r.key) ?? new Set<string>();
+    for (const q of c.query ?? []) s.add(`?${q}`);
+    for (const b of c.body ?? []) s.add(`.${b}`);
+    sent.set(r.key, s);
+  }
+  const missing: string[] = [];
+  for (const r of routes) {
+    const s = sent.get(r.key) ?? new Set<string>();
+    for (const q of r.query)
+      if (!s.has(`?${q}`) && !allowed("params", `${r.key} ?${q}`)) missing.push(`${r.key} ?${q}`);
+    for (const b of r.body) if (!s.has(`.${b}`) && !allowed("body", `${r.key} .${b}`)) missing.push(`${r.key} .${b}`);
+  }
+  const total = routes.reduce((n, r) => n + r.query.length + r.body.length, 0);
+  test.info().annotations.push({ type: "params", description: `${total - missing.length}/${total} params + fields` });
+  writeFileSync(resolve(RESULTS_DIR, "params-missing.txt"), missing.join("\n") + "\n");
+  expect(missing, `params / fields never sent (${missing.length}):\n  ${missing.join("\n  ")}\n`).toEqual([]);
+});
+
+test("gate: every error code the backend can send is triggered by the suite", () => {
+  test.skip(process.env.E2E_PARTIAL === "1", "partial run (failed tests only): not every error is triggered");
+  const codes = [
+    ...readFileSync(resolve(REPO_DIR, "backend/app/core/errors.py"), "utf-8").matchAll(/^ {4}[A-Z_]+\s*=\s*"(\w+)"$/gm),
+  ].map((m) => m[1]);
+  const seen = new Set(
+    readCalls()
+      .flatMap((c) => [c.code, ...(c.codes ?? [])])
+      .filter(Boolean),
+  );
+  const missing = codes.filter((c) => !seen.has(c) && !allowed("codes", c)).sort();
+  test
+    .info()
+    .annotations.push({ type: "codes", description: `${codes.length - missing.length}/${codes.length} codes` });
+  writeFileSync(resolve(RESULTS_DIR, "codes-missing.txt"), missing.join("\n") + "\n");
+  expect(missing, `error codes never triggered (${missing.length}):\n  ${missing.join("\n  ")}\n`).toEqual([]);
+});
+
+test("gate: every button, link, tab, menu, checkbox and field shown is used by the suite", () => {
+  test.skip(process.env.E2E_PARTIAL === "1", "partial run (failed tests only): not every page is opened");
+  const records: { kind: string; key: string; test: string }[] = existsSync(UI_FILE)
+    ? readFileSync(UI_FILE, "utf-8")
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+    : [];
+  const seen = new Map<string, string>(); // key → first test that showed it
+  const used = new Set<string>();
+  for (const r of records) {
+    if (r.kind === "seen" && !seen.has(r.key)) seen.set(r.key, r.test);
+    if (r.kind === "used") used.add(r.key);
+  }
+  const missing = [...seen.keys()].filter((k) => !used.has(k) && !allowed("ui", k)).sort();
+  test.info().annotations.push({
+    type: "ui",
+    description: `${seen.size - missing.length}/${seen.size} elements used (page | role | name)`,
+  });
+  writeFileSync(
+    resolve(RESULTS_DIR, "ui-missing.txt"),
+    missing.map((k) => `${k}    ← seen in « ${seen.get(k)} »`).join("\n") + "\n",
+  );
+  expect(missing, `shown but never used (${missing.length}):\n  ${missing.join("\n  ")}\n`).toEqual([]);
 });
 
 test("gate: same error codes in backend and frontend", () => {

@@ -186,6 +186,15 @@ export function DataTable<R, K extends string = string>({
                       key={col.key}
                       style={col.width ? { width: col.width, minWidth: col.width } : undefined}
                       className={headerCls}
+                      aria-sort={
+                        sortable
+                          ? sortBy === col.key
+                            ? sortOrder === "asc"
+                              ? "ascending"
+                              : "descending"
+                            : "none"
+                          : undefined
+                      }
                     >
                       {sortable ? (
                         <SortButton
@@ -271,7 +280,10 @@ function PaginationFooter({
 }: DataTablePagination) {
   const t = useT();
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pageSizeOptions = pageSizes.map((n) => ({ value: String(n), label: `${n} ${t("common.perPage")}` }));
+  // The size in use is always a choice (Ventes, Achats, Historique show 20, not one of 10 / 25 / 50): else the
+  // selector shows nothing but its arrow.
+  const sizes = pageSizes.includes(pageSize) ? pageSizes : [...pageSizes, pageSize].sort((a, b) => a - b);
+  const pageSizeOptions = sizes.map((n) => ({ value: String(n), label: `${n} ${t("common.perPage")}` }));
   return (
     // Mirrors the FilterBar at the top of the page: sticky-pinned to <main>,
     // own card shell, same z-20 layer. Lives OUTSIDE the table card so its

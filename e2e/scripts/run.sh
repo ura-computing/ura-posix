@@ -18,6 +18,22 @@ spec_file() {                           # "06" / "ventes" → tests/06-ventes.sp
   echo "$match"
 }
 
+# The real Sobrus account (21-sobrus-live): e2e/tests.env (gitignored). Missing → asked once here and saved;
+# no terminal (git pre-push) → no run at all.
+if [ ! -f tests.env ] || ! grep -Eq '^EMAIL=.+' tests.env || ! grep -Eq '^PASSWORD=.+' tests.env; then
+  if [ ! -t 0 ]; then
+    echo "✗ e2e/tests.env missing (EMAIL, PASSWORD of a Sobrus account): run make tests once in a terminal" >&2
+    exit 1
+  fi
+  echo "▸ A real Sobrus account for the live check (saved in e2e/tests.env, never committed)"
+  sobrus_email="" sobrus_password=""
+  while [ -z "$sobrus_email" ]; do read -r -p "Sobrus email: " sobrus_email; done
+  while [ -z "$sobrus_password" ]; do read -r -s -p "Sobrus password (hidden): " sobrus_password; echo; done
+  (umask 077 && printf 'EMAIL=%s\nPASSWORD=%s\n' "$sobrus_email" "$sobrus_password" > tests.env)
+  unset sobrus_email sobrus_password
+  echo "✓ e2e/tests.env saved"
+fi
+
 ask() {                                 # ask "question" default → answer
   local answer=""
   if [ -t 0 ]; then read -r -p "$1 [$2]: " answer || true; fi

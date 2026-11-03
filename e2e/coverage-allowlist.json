@@ -1,0 +1,54 @@
+{
+  "params": [
+    {
+      "pattern": "^\\w+ /v1/store-website",
+      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+    }
+  ],
+  "body": [
+    {
+      "pattern": "^\\w+ /v1/store-website",
+      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+    }
+  ],
+  "codes": [
+    {
+      "pattern": "^serverError$",
+      "why": "only a crash sends it (CatchServerErrors)"
+    },
+    {
+      "pattern": "^(customizationMissing|featuredIdsInvalid|logoFormat|logoTooLarge|notAssignedDeveloper|previewNotFound|requestActiveExists|requestClaimed|requestLocked|requestNotFound|transitionNotAllowed|developerOnly)$",
+      "why": "« Ma boutique en ligne » (store) + its developers: hidden, not built yet — skipped everywhere"
+    },
+    {
+      "pattern": "^tooManyAttempts$",
+      "why": "the E2E stack runs with RATE_LIMIT=0 (the suite logs in more than 5 times a minute)"
+    },
+    {
+      "pattern": "^pharmacyCodeFailed$",
+      "why": "only when every code of a city is taken (9 999 pharmacies)"
+    },
+    {
+      "pattern": "^forbidden$",
+      "why": "only a developer account reaches it (the hidden store)"
+    },
+    {
+      "pattern": "^fileTooLarge$",
+      "why": "a 100 MB upload: too heavy for the test stack under the 512 MB DigitalOcean limit"
+    },
+    {
+      "pattern": "^sobrusInterrupted$",
+      "why": "a robot stopped mid-run (deploy) for 10 minutes; the recovery runs in worker.recover"
+    }
+  ],
+  "ui": [
+    {
+      "pattern": "^/(store-website|preview)",
+      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+    },
+    {
+      "pattern": "\\|link\\|/(store-website|preview)",
+      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+    }
+  ]
+}

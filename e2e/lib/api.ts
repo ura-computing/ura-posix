@@ -2,7 +2,7 @@
  *  numbers with the oracle. Every call is recorded like the UI ones. */
 import type { Page } from "@playwright/test";
 
-import { expect, recordCall } from "./fixtures";
+import { answerCodes, bodyKeys, CODES_IN_ANSWER, expect, recordCall } from "./fixtures";
 import { API } from "./paths";
 
 type Params = Record<string, string | number | boolean | null | undefined>;
@@ -27,8 +27,27 @@ async function call<T>(
   const t0 = performance.now();
   const res = await page.request.fetch(u.toString(), { method, data: body });
   const ms = Math.round(performance.now() - t0);
-  recordCall({ method, path: u.pathname, status: res.status(), ms, source: "api", test: path });
-  expect(res.status(), `${method} ${u.pathname}${u.search} → ${await res.text()}`).toBe(status);
+  const text = await res.text();
+  let code: string | undefined;
+  let codes: string[] | undefined;
+  try {
+    const json = JSON.parse(text);
+    if (res.status() >= 400) code = json.code;
+    else if (CODES_IN_ANSWER.some((p) => u.pathname.startsWith(p))) codes = answerCodes(json);
+  } catch {}
+  recordCall({
+    method,
+    path: u.pathname,
+    status: res.status(),
+    ms,
+    source: "api",
+    test: path,
+    query: [...u.searchParams.keys()],
+    body: body === undefined ? undefined : bodyKeys(null, body),
+    code,
+    codes,
+  });
+  expect(res.status(), `${method} ${u.pathname}${u.search} → ${text}`).toBe(status);
   return (status === 204 ? null : res.json()) as Promise<T>;
 }
 

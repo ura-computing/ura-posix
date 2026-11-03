@@ -13,7 +13,12 @@ one (backend/app/sobrus/sobrus_client.py), never the real Sobrus.
   GET  /reports/exports/stock        → today's stock as JSON, like the real one (no dates): the rows of
                                        resources/tests/stock/*.csv + the categories / taxes / zones tables
   POST /__control                    test only: {password} = « the owner changed his Sobrus password »
-                                     (every session ends); {delay} = seconds each export waits (« Arrêter »)
+                                     (every session ends); {delay} = seconds each export waits (« Arrêter »);
+                                     {verify} = Sobrus asks a check (« Confirmez votre numéro »): /authorize
+                                     shows a page instead of the code (no SBSID2), every session ends;
+                                     {busy: n} = the next n logins answer 429 (too many logins), every session ends;
+                                     {fail: "login" | "export" | null} = Sobrus down at login (503, every session
+                                     ends) or refusing the export (500)
 Standard library only. Env: FAKE_SOBRUS_EMAIL, FAKE_SOBRUS_PASSWORD, FAKE_SOBRUS_DATA, FAKE_SOBRUS_BASE, PORT."""
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 EMAIL = os.environ.get("FAKE_SOBRUS_EMAIL", "pharmacie@sobrus.e2e")
-STATE = {"password": os.environ.get("FAKE_SOBRUS_PASSWORD", "SobrusE2e#2026"), "delay": 0.0}
+STATE = {"password": os.environ.get("FAKE_SOBRUS_PASSWORD", "SobrusE2e#2026"), "delay": 0.0, "verify": False, "busy": 0, "fail": None}
 DATA = Path(os.environ.get("FAKE_SOBRUS_DATA", "/data"))
 BASE = os.environ.get("FAKE_SOBRUS_BASE", "http://sobrus.e2e.test:9100").rstrip("/")
 PORT = int(os.environ.get("PORT", "9100"))
@@ -169,6 +174,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._redirect(f"{BASE}/authorize?{urlencode(params)}", cookies={"oidc_state": state})
         if url.path == "/authorize":
             if cookies.get("account_session") in ACCOUNT_SESSIONS and q.get("prompt") != "login":
+                if STATE["verify"]:
+                    return self._redirect(f"{BASE}/app/confirm-phone")
                 code = secrets.token_hex(8)
                 CODES.add(code)
                 return self._redirect(f"{BASE}/auth/token?{urlencode({'code': code, 'state': q.get('state', '')})}")
@@ -192,6 +199,8 @@ class Handler(BaseHTTPRequestHandler):
             kind = url.path.rsplit("/", 1)[-1]
             if cookies.get("SBSID2") not in APP_SESSIONS:
                 return self._json(401, {"errors": ["unauthenticated"]})
+            if STATE["fail"] == "export":
+                return self._json(500, {"errors": ["export failed"]})
             if kind not in FILES:
                 return self._json(404, {"errors": ["unknown export"]})
             start = end = None
@@ -210,8 +219,13 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         body = self._body()
         if url.path == "/auth/identifier":
+            if STATE["fail"] == "login":
+                return self._json(503, {"errors": ["unavailable"]})
             return self._json(200, {"isRegistered": body.get("login") == EMAIL})
         if url.path == "/auth/sessions":
+            if STATE["busy"] > 0:  # « too many logins »
+                STATE["busy"] -= 1
+                return self._json(429, {"errorMessage": "Too many requests"})
             if body.get("email") == EMAIL and body.get("password") == STATE["password"]:
                 token = secrets.token_hex(16)
                 ACCOUNT_SESSIONS.add(token)
@@ -220,6 +234,16 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/__control":
             if "delay" in body:
                 STATE["delay"] = float(body["delay"])
+            if "verify" in body:
+                STATE["verify"] = bool(body["verify"])
+                APP_SESSIONS.clear()
+            if "busy" in body:
+                STATE["busy"] = int(body["busy"])
+                APP_SESSIONS.clear()
+            if "fail" in body:
+                STATE["fail"] = body["fail"]
+                if body["fail"] == "login":
+                    APP_SESSIONS.clear()
             if "password" in body:
                 STATE["password"] = body["password"]
                 ACCOUNT_SESSIONS.clear()

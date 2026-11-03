@@ -337,7 +337,7 @@ export const fr = {
     problemPassword:
       "Sobrus refuse le mot de passe enregistré : il a sans doute été changé. Tapez le nouveau pour relancer les imports.",
     problemCheck:
-      "Sobrus demande une vérification. Connectez-vous une fois sur sobrus.com, puis retapez votre mot de passe ici.",
+      "Sobrus demande une vérification. Connectez-vous une fois sur sobrus.com, puis cliquez sur « Réessayer ».",
     bannerPassword:
       "La connexion Sobrus ne fonctionne plus : votre mot de passe Sobrus a changé. Les imports automatiques sont en pause.",
     bannerCheck:
@@ -364,6 +364,7 @@ export const fr = {
       login_start: "Connexion à Sobrus",
       session_reused: "Session Sobrus encore ouverte",
       login_ok: "Connecté à Sobrus",
+      login_busy: "Sobrus limite les connexions : nouvel essai dans {{n}} s",
       year_done: "{{kind}} {{year}} : {{n}} ligne(s) ajoutée(s)",
       year_empty: "{{kind}} {{year}} : aucune ligne sur Sobrus",
       period_done: "{{kind}} du {{start}} au {{end}} : {{n}} ligne(s) ajoutée(s)",
@@ -1606,6 +1607,8 @@ export const fr = {
     sobrusNeedsAction:
       "Sobrus demande une vérification : connectez-vous une fois sur sobrus.com, puis cliquez sur « Réessayer ».",
     sobrusUnreachable: "Sobrus ne répond pas pour le moment. L'import réessaiera la nuit prochaine.",
+    sobrusBusy:
+      "Sobrus limite les connexions pour le moment. L'import réessaiera la nuit prochaine, ou cliquez sur « Importer » dans quelques minutes.",
     sobrusExportFailed: "Sobrus n'a pas pu fournir le fichier. L'import réessaiera la nuit prochaine.",
     sobrusInterrupted:
       "L'import s'est arrêté (serveur redémarré). Relancez-le : les lignes déjà importées ne sont pas ajoutées deux fois.",

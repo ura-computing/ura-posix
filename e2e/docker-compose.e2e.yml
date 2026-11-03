@@ -38,6 +38,7 @@ services:
       # service below (app/sobrus/worker.py), its key derived from JWT_SECRET (as in production).
       SOBRUS_API_URL: &sobrus_url http://sobrus.e2e.test:9100
       SOBRUS_ACCOUNT_API_URL: *sobrus_url
+      SOBRUS_BUSY_WAITS: "1,1" # Sobrus 429: the robot waits 1 s then 1 s (production: 60 s then 300 s)
     volumes:
       - ../resources/tests/catalog/product-infos.json:/app/data/product-infos.e2e.json:ro
     ports:

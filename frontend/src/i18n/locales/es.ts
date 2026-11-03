@@ -329,8 +329,7 @@ export const es: Dict = {
     cornerTitle: "Importación Sobrus",
     problemPassword:
       "Sobrus rechaza la contraseña guardada: seguramente se cambió. Escriba la nueva para reanudar las importaciones.",
-    problemCheck:
-      "Sobrus pide una verificación. Conéctese una vez en sobrus.com y vuelva a escribir su contraseña aquí.",
+    problemCheck: "Sobrus pide una verificación. Conéctese una vez en sobrus.com y haga clic en « Reintentar ».",
     bannerPassword:
       "La conexión Sobrus ya no funciona: su contraseña Sobrus cambió. Las importaciones automáticas están en pausa.",
     bannerCheck:
@@ -357,6 +356,7 @@ export const es: Dict = {
       login_start: "Conexión a Sobrus",
       session_reused: "Sesión Sobrus todavía abierta",
       login_ok: "Conectado a Sobrus",
+      login_busy: "Sobrus limita las conexiones: nuevo intento en {{n}} s",
       year_done: "{{kind}} {{year}}: {{n}} línea(s) añadida(s)",
       year_empty: "{{kind}} {{year}}: ninguna línea en Sobrus",
       period_done: "{{kind}} del {{start}} al {{end}}: {{n}} línea(s) añadida(s)",
@@ -1593,6 +1593,8 @@ export const es: Dict = {
     sobrusBadCredentials: "Sobrus rechaza este email o esta contraseña. Escriba su contraseña Sobrus actual.",
     sobrusNeedsAction: "Sobrus pide una verificación: conéctese una vez en sobrus.com y haga clic en « Reintentar ».",
     sobrusUnreachable: "Sobrus no responde por el momento. La importación se reintentará la próxima noche.",
+    sobrusBusy:
+      "Sobrus limita las conexiones por el momento. La importación se reintentará la próxima noche, o haga clic en « Importar » en unos minutos.",
     sobrusExportFailed: "Sobrus no pudo proporcionar el archivo. La importación se reintentará la próxima noche.",
     sobrusInterrupted:
       "La importación se detuvo (servidor reiniciado). Vuelva a lanzarla: las líneas ya importadas no se añaden dos veces.",

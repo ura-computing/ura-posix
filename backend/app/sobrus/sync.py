@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta, timezone
 from itertools import batched
@@ -70,6 +72,8 @@ FILE_LABEL = {"achat": "Achats", "vente": "Ventes"}
 # Problems the owner must fix (email + banner); the others are retried the next night.
 NEEDS_OWNER = {"sobrusBadCredentials": "invalid", "sobrusNeedsAction": "needs_login"}
 FAILED_NIGHTS_TO_EMAIL = 3
+# Sobrus answers 429 (too many logins): wait, then log in again, at most this many times (seconds; E2E: short).
+BUSY_WAITS = tuple(float(x) for x in os.environ.get("SOBRUS_BUSY_WAITS", "60,300").split(",") if x.strip())
 
 
 def _stock_rows(content: bytes) -> list[dict[str, str]]:
@@ -156,9 +160,26 @@ class Robot:
             password = decrypt(self.conn.password_enc)
         except InvalidToken as e:  # saved with another key (JWT_SECRET changed): the owner types it again
             raise SobrusError("sobrusBadCredentials") from e
-        self.client.login(self.conn.email, password)
+        for wait in (*BUSY_WAITS, None):
+            try:
+                self.client.login(self.conn.email, password)
+                break
+            except SobrusError as e:
+                if e.code != "sobrusBusy" or wait is None:
+                    raise
+                _event(self.db, self.run, "login_busy", n=int(wait))
+                self._wait(wait)
         self._save_session()
         _event(self.db, self.run, "login_ok")
+
+    def _wait(self, seconds: float) -> None:
+        """Before logging in again: the heartbeat goes on (not « stopped »), « Arrêter » works."""
+        end = time.monotonic() + seconds
+        while (left := end - time.monotonic()) > 0:
+            time.sleep(min(5.0, left))
+            if _cancel_requested(self.db, self.run):
+                raise Cancelled()
+            _set(self.db, self.run, phase="login")
 
     def _download(self, kind: str, year: int | None, start: str | None, end: str | None) -> bytes:
         _set(
@@ -176,6 +197,7 @@ class Robot:
             try:
                 return self.client.export(kind, start, end, shown)
             except SessionExpired as e:
+                log.warning("Sobrus export %s refused again after a new login: Sobrus asks something", kind)
                 raise SobrusError("sobrusNeedsAction") from e
 
     def import_file(self, kind: str, year: int | None, start: str | None, end: str | None) -> int | None:

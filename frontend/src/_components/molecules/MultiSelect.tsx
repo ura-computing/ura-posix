@@ -46,7 +46,7 @@ export function MultiSelect({ label, options, selected, onChange }: MultiSelectP
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className={cn(POPOVER_PANEL, POPOVER_POSITION.bottom, POPOVER_ALIGN.start)}>
+        <div data-list={label} className={cn(POPOVER_PANEL, POPOVER_POSITION.bottom, POPOVER_ALIGN.start)}>
           {options.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>
           )}
