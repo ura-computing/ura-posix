@@ -11,6 +11,8 @@ import logging
 import os
 import select
 import time as clock
+
+import psycopg2
 from datetime import datetime, time, timedelta, timezone
 
 from alembic.config import Config
@@ -109,8 +111,11 @@ def wait_for_schema() -> None:
 
 
 def _listen():
-    """A Postgres connection of its own, LISTENing to `sobrus_runs` (outside the pool's transactions)."""
-    raw = engine.raw_connection().driver_connection
+    """A Postgres connection of its own, outside the pool (a pooled one is taken back and closed under us), LISTENing
+    to `sobrus_runs`. TCP keepalives: a connection the database drops (DigitalOcean idle limit, maintenance) fails at
+    once instead of hanging."""
+    url = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)
+    raw = psycopg2.connect(url, keepalives=1, keepalives_idle=60, keepalives_interval=10, keepalives_count=3)
     raw.autocommit = True
     raw.cursor().execute(f"LISTEN {CHANNEL}")
     return raw
@@ -133,8 +138,18 @@ def main() -> None:
             if select.select([listen], [], [], TICK_S)[0]:
                 listen.poll()
                 listen.notifies.clear()
+        # The LISTEN connection itself dropped (idle limit, maintenance): a new one, no traceback. (The pool's errors
+        # come wrapped by SQLAlchemy, other classes: below.)
+        except (psycopg2.InterfaceError, psycopg2.OperationalError):
+            log.info("Sobrus robot: LISTEN connection closed, opening a new one")
+            if listen is not None and not listen.closed:
+                listen.close()
+            listen = None
+            clock.sleep(1)
         except Exception:  # the database restarted (DigitalOcean maintenance…): again in TICK_S
             log.exception("Sobrus robot")
+            if listen is not None:
+                listen.close()
             listen = None
             clock.sleep(TICK_S)
 
