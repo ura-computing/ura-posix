@@ -10,6 +10,7 @@ import { useState } from "react";
 import { formatMAD, formatPct } from "@/utils/format";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { MonthPicker } from "@/_components/molecules/MonthPicker";
 import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { Button } from "@/_components/atoms/Button";
@@ -407,19 +408,23 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
 interface VentesLedgerProps {
   rows: VenteRow[];
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   sortBy: string | null;
   sortOrder: "asc" | "desc";
   onSort: (key: string) => void;
   pagination: DataTablePagination;
 }
 
-function VentesLedger({ rows, isLoading, sortBy, sortOrder, onSort, pagination }: VentesLedgerProps) {
+function VentesLedger({ rows, isLoading, isError, onRetry, sortBy, sortOrder, onSort, pagination }: VentesLedgerProps) {
   const t = useT();
   return (
     <DataTable
       rows={rows}
       columns={buildColumns(t)}
       isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
       sortBy={sortBy}
       sortOrder={sortOrder}
       onSort={onSort}
@@ -443,6 +448,11 @@ export default function ComptabilitePage() {
     handleExport,
     openMethod,
     payments,
+    paymentsError,
+    paymentsLoading,
+    reloadPayments,
+    reloadStats,
+    reloadVentes,
     setActiveMonth,
     setFilters,
     setOpenMethod,
@@ -450,8 +460,10 @@ export default function ComptabilitePage() {
     setVentesPageSize,
     setVentesSort,
     stats,
+    statsError,
     statsLoading,
     ventes,
+    ventesError,
     ventesLoading,
     ventesPage,
     ventesPageSize,
@@ -539,7 +551,9 @@ export default function ComptabilitePage() {
       </label>
 
       {/* KPI cards (3) */}
-      {statsLoading || !stats ? (
+      {statsError && !stats ? (
+        <LoadError onRetry={reloadStats} />
+      ) : statsLoading || !stats ? (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <SkeletonTile key={i} className="min-h-44" />
@@ -555,7 +569,17 @@ export default function ComptabilitePage() {
           <SectionTitle>{t("comptabilite.paymentMethods")}</SectionTitle>
           <MonthPicker label="" value={activeMonth} onChange={setActiveMonth} align="end" />
         </div>
-        <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
+        {paymentsError ? (
+          <LoadError onRetry={reloadPayments} />
+        ) : paymentsLoading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {PAYMENT_METHODS.map((method) => (
+              <SkeletonTile key={method} />
+            ))}
+          </div>
+        ) : (
+          <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
+        )}
       </section>
 
       {/* Ventes ledger */}
@@ -564,6 +588,8 @@ export default function ComptabilitePage() {
         <VentesLedger
           rows={ventes}
           isLoading={ventesLoading}
+          isError={ventesError}
+          onRetry={reloadVentes}
           sortBy={ventesSortBy}
           sortOrder={ventesSortOrder}
           onSort={setVentesSort}

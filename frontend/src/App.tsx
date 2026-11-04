@@ -110,9 +110,6 @@ export default function App() {
           <Route element={<RequireFeature feature="rapports" />}>
             <Route path={ROUTES.RAPPORT} element={<RapportPage />} />
           </Route>
-          <Route element={<RequireFeature feature="alertes" />}>
-            <Route path={ROUTES.ALERTES} element={<AlertesPage />} />
-          </Route>
           <Route element={<RequireFeature feature="import" />}>
             <Route path={ROUTES.IMPORTS} element={<ImportsPage />} />
             <Route path={ROUTES.UPLOAD_FILE} element={<UploadFilePage />} />
@@ -122,27 +119,33 @@ export default function App() {
               <Route path={ROUTES.SOBRUS} element={<SobrusPage />} />
             </Route>
           </Route>
-          <Route element={<RequireFeature feature="achats" />}>
-            <Route path={ROUTES.ACHATS} element={<AchatsPage />} />
-          </Route>
-          <Route element={<RequireFeature feature="ventes" />}>
-            <Route path={ROUTES.VENTES} element={<VentesPage />} />
-          </Route>
-          <Route element={<RequireFeature feature="stock" />}>
-            <Route path={ROUTES.STOCK} element={<StockPage />} />
-          </Route>
-          <Route element={<RequireFeature feature="produits" />}>
-            <Route path={ROUTES.PRODUITS} element={<ProduitsPage />} />
-            <Route path={ROUTES.PRODUIT} element={<ProduitPage />} />
-          </Route>
-          <Route element={<RequireFeature feature="analyse" />}>
-            <Route path={ROUTES.ANALYSES} element={<AnalysePage />} />
-          </Route>
-          <Route element={<RequireFeature feature="accounting" />}>
-            <Route path={ROUTES.COMPTABILITE} element={<ComptabilitePage />} />
-          </Route>
-          <Route element={<RequireFeature feature="special_products" />}>
-            <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
+          {/* The pharmacy data pages: an owner or an employee (the admin reads them in « Tableau de bord » per pharmacy) → else the 404 inside the layout. */}
+          <Route element={<RequireRole role={[ROLES.OWNER, ROLES.EMPLOYEE]} />}>
+            <Route element={<RequireFeature feature="alertes" />}>
+              <Route path={ROUTES.ALERTES} element={<AlertesPage />} />
+            </Route>
+            <Route element={<RequireFeature feature="achats" />}>
+              <Route path={ROUTES.ACHATS} element={<AchatsPage />} />
+            </Route>
+            <Route element={<RequireFeature feature="ventes" />}>
+              <Route path={ROUTES.VENTES} element={<VentesPage />} />
+            </Route>
+            <Route element={<RequireFeature feature="stock" />}>
+              <Route path={ROUTES.STOCK} element={<StockPage />} />
+            </Route>
+            <Route element={<RequireFeature feature="produits" />}>
+              <Route path={ROUTES.PRODUITS} element={<ProduitsPage />} />
+              <Route path={ROUTES.PRODUIT} element={<ProduitPage />} />
+            </Route>
+            <Route element={<RequireFeature feature="analyse" />}>
+              <Route path={ROUTES.ANALYSES} element={<AnalysePage />} />
+            </Route>
+            <Route element={<RequireFeature feature="accounting" />}>
+              <Route path={ROUTES.COMPTABILITE} element={<ComptabilitePage />} />
+            </Route>
+            <Route element={<RequireFeature feature="special_products" />}>
+              <Route path={ROUTES.PRODUITS_SPECIAUX} element={<ProduitsSpeciauxPage />} />
+            </Route>
           </Route>
 
           <Route element={<RequireRole role={ROLES.ADMIN} />}>

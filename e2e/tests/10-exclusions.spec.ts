@@ -234,7 +234,8 @@ test("exclure un produit sur certains BL : « Ses BL », filtre fournisseur, coc
 
   // « Fournisseur »: only that supplier's BLs; tick the one to leave out = excluded at once.
   await row.getByRole("button", { name: /^Fournisseur/ }).click();
-  await row.getByRole("button", { name: x.supplier, exact: true }).click();
+  // Its options open on top of the page (never cut by the row).
+  await page.locator('[data-list="Fournisseur"]').getByRole("button", { name: x.supplier, exact: true }).click();
   const ofSupplier = x.lines.filter((l: Row) => l.supplier === x.supplier).length;
   await expect(row.getByRole("checkbox"), `BL de ${x.supplier}`).toHaveCount(ofSupplier);
   const posted = pageSend(page, "POST", "/bl-line-exclusions/", 201);

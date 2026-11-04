@@ -1,6 +1,5 @@
 // src/pages/alertes/index.tsx
 import {
-  RefreshCw,
   CheckCircle2,
   AlertTriangle,
   TrendingDown,
@@ -38,8 +37,7 @@ import type {
 } from "@/types";
 import type { DialogDescriptor } from "../hooks";
 import { Page } from "@/_components/templates/Page";
-import { Button } from "@/_components/atoms/Button";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { Skeleton } from "@/_components/atoms/Skeleton";
 
@@ -571,17 +569,7 @@ export default function AlertesPage() {
       />
 
       {isError ? (
-        <Callout
-          tone="error"
-          action={
-            <Button variant="secondary" onClick={refetchAll}>
-              <RefreshCw className="size-3.5" />
-              {t("common.retry")}
-            </Button>
-          }
-        >
-          {t("alertes.loadError")}
-        </Callout>
+        <LoadError message={t("alertes.loadError")} onRetry={refetchAll} />
       ) : isLoading ? (
         <AlertesSkeleton />
       ) : isEmpty ? (

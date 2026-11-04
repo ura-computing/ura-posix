@@ -65,6 +65,7 @@ export function useAchatsPage() {
     data: list,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: API.achats.list.key(filters),
     queryFn: () => api.get<AchatsListResponse>(API.achats.list.url, { params: filters }),
@@ -182,6 +183,7 @@ export function useAchatsPage() {
     list,
     isLoading,
     isError,
+    reload: () => void refetch(),
     supplierSummary,
     supplierLoading,
     categories: categories ?? [],

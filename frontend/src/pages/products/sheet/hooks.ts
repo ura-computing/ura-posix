@@ -166,7 +166,7 @@ export function useMovements(id: number, { from, to }: StatsRange) {
  *  lines, newest first, 20 a page. */
 export function useProductHistory(id: number) {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.products.history.key(id, page),
     queryFn: () => api.get<ProductHistoryResponse>(API.products.history.url(id), { params: { page, limit: 20 } }),
     placeholderData: keepPreviousData,
@@ -177,6 +177,8 @@ export function useProductHistory(id: number) {
     page,
     setPage,
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }
 

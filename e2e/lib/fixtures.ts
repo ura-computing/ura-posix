@@ -2,7 +2,7 @@
  *  - API: every /v1 call the page makes → .results/calls.jsonl (status, duration, query + body KEYS, error code)
  *  - UI: every interactive element the page shows and every one used (clicked, typed, changed) → .results/ui.jsonl
  *  Import `test` / `expect` from here, never from @playwright/test directly. */
-import { test as base, expect, type BrowserContext, type Page, type Request } from "@playwright/test";
+import { test as base, expect, type BrowserContext, type Page, type Request, type Route } from "@playwright/test";
 import { appendFileSync, mkdirSync } from "node:fs";
 
 import { API, CALLS_FILE, RESULTS_DIR, UI_FILE } from "./paths";
@@ -51,6 +51,31 @@ export function bodyKeys(raw: string | null, json: unknown): string[] | undefine
   return undefined;
 }
 
+/** Requests a test answered itself (`fakeApi`): not recorded, the gates judge the real API only. */
+const faked = new WeakSet<Request>();
+
+/** The page's `GET /v1<path>` answered by the test, until the returned function is called: `error` = the backend's
+ *  crash answer (500 `serverError`), `down` = no connection, `slow` = the real answer `ms` later. */
+export async function fakeApi(
+  page: Page,
+  path: string,
+  how: "error" | "down" | "slow",
+  ms = 3_000,
+): Promise<() => Promise<void>> {
+  const match = (u: URL) => u.pathname === `/v1${path}`;
+  const handler = async (route: Route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    faked.add(route.request());
+    if (how === "down") return route.abort("connectionrefused");
+    if (how === "error")
+      return route.fulfill({ status: 500, json: { detail: "Erreur serveur.", code: "serverError" } });
+    await new Promise((r) => setTimeout(r, ms));
+    return route.continue();
+  };
+  await page.route(match, handler);
+  return () => page.unroute(match, handler);
+}
+
 /** Records every /v1 call `page` makes (`title()` = the test it belongs to), and its UI (seen / used
  *  elements). The fixture page is recorded by itself; a page a spec opens in its own context (another
  *  user) calls this once, before its first page load. Resolves the returned function once every call seen
@@ -58,7 +83,7 @@ export function bodyKeys(raw: string | null, json: unknown): string[] | undefine
 export function recordPage(page: Page, title: () => string): () => Promise<void> {
   const pending: Promise<void>[] = [];
   const onRequest = (req: Request) => {
-    if (!req.url().startsWith(`${API}/v1/`)) return;
+    if (!req.url().startsWith(`${API}/v1/`) || faked.has(req)) return;
     pending.push(
       (async () => {
         // Also on "requestfailed": Chromium reports a 204 No Content fetch as
@@ -104,8 +129,9 @@ export interface UiRecord {
   test: string;
 }
 
-/** Runs in every page. An element's key: the route (ids → :id) + its role + its name (aria-label, label, first line of
- *  its text; numbers and counts dropped: « Catégorie (2) » → « Catégorie »; an icon-only button → its icon).
+/** Runs in every page. An element's key: the route of the page on screen (ids → :id; the 404: `not-found`) + its
+ *  role + its name (aria-label, label, first line of its text; numbers and counts dropped: « Catégorie (2) » →
+ *  « Catégorie »; an icon-only button → its icon).
  *  A select's trigger keeps its label only (« Fournisseur: Société X » → « Fournisseur »).
  *  Shared, not per page: the sidebar, top bar and corner cards (`layout`). Data-driven elements share one key: inside a table row →
  *  its column; inside a `[data-list]` (search suggestions, multi-select options, corner cards…) → that list; calendar
@@ -135,6 +161,19 @@ const UI_SCRIPT = () => {
   ].join(",");
   const ID = /\/\d+(?=\/|$)/g;
   const route = () => location.pathname.replace(ID, "/:id") || "/";
+  // The page ON SCREEN. A link changes the address at once, the new page shows once loaded (lazy): until the title
+  // (h1) changes, the page before is still the one shown. A page drawn at any address (the 404, `data-page`): one key.
+  const title = () => document.querySelector("main h1")?.textContent ?? "";
+  let shown = { route: route(), title: title() };
+  /** Called on every DOM change (before the address can change again): the title of the page on screen. */
+  const follow = () => {
+    const now = { route: route(), title: title() };
+    if (now.route === shown.route || now.title !== shown.title) shown = now;
+  };
+  const pageOf = (el: Element): string => {
+    follow();
+    return (el.closest("[data-page]") as HTMLElement | null)?.dataset.page ?? shown.route;
+  };
   const clean = (s: string | null | undefined) =>
     (s ?? "")
       .split("\n")
@@ -180,7 +219,7 @@ const UI_SCRIPT = () => {
   const key = (el: Element): string => {
     const r = role(el);
     const shared = el.closest("aside") || el.closest("[aria-live]") || (el.closest("header") && !el.closest("main"));
-    const at = shared ? "layout" : route();
+    const at = shared ? "layout" : pageOf(el);
     const list = el.closest("[data-list]") as HTMLElement | null;
     if (list) return `${at}|list:${list.dataset.list}|${r}`;
     if (el.closest("[role=grid], .rdp, .rdp-root")) return `${at}|calendar|${r}`;
@@ -234,6 +273,7 @@ const UI_SCRIPT = () => {
   for (const type of ["click", "input", "change"]) document.addEventListener(type, used, true);
   let timer: number | undefined;
   const later = () => {
+    follow();
     clearTimeout(timer);
     timer = window.setTimeout(scan, 200);
   };

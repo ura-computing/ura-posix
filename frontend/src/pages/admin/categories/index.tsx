@@ -4,7 +4,7 @@
  *  shared DataTable primitive so empty/loading/sort states stay consistent
  *  with the rest of the app. */
 import { useState } from "react";
-import { Pencil, Plus, RefreshCw, Trash2, Check, Minus } from "lucide-react";
+import { Pencil, Plus, Trash2, Check, Minus } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import { FormField, FormInput } from "@/_components/molecules/FormField";
@@ -27,7 +27,7 @@ import { SUFFIX_COLORS } from "@/types";
 import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
 import { SkeletonRows } from "@/_components/molecules/Skeletons";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 
 /** Create / edit dialog for a CategorySuffix. Mirrors the handoff design via
  *  our shared primitives (Dialog, Button, SuffixBadge). The category is
@@ -249,17 +249,7 @@ export default function AdminCategoriesPage() {
       }
     >
       {isError ? (
-        <Callout
-          tone="error"
-          action={
-            <Button variant="secondary" onClick={reload}>
-              <RefreshCw className="size-3.5" />
-              {t("common.retry")}
-            </Button>
-          }
-        >
-          {t("categories.loadError")}
-        </Callout>
+        <LoadError message={t("categories.loadError")} onRetry={reload} />
       ) : isLoading ? (
         <Card as="div" padding="none">
           <SkeletonRows rows={5} columns={4} />

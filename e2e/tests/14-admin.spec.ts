@@ -530,7 +530,8 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
       .click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Pharmacie", exact: true }).click();
-    await dialog.getByRole("button", { name: /· Pharmacie Demo$/ }).click();
+    // Its options open on top of the page (over the dialog, never cut by it).
+    await page.locator('[data-list="Pharmacie"]').getByRole("button", { name: /· Pharmacie Demo$/ }).click();
     const assigned = pageSend(page, "PATCH", `/admin/users/${member.id}/pharmacy`);
     await dialog.getByRole("button", { name: "Assigner", exact: true }).click();
     expectSame(

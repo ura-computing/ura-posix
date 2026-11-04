@@ -35,6 +35,7 @@ export function useCatalogPage() {
     data: list,
     isLoading,
     isError,
+    refetch,
   } = useQuery({
     queryKey: API.admin.catalog.list.key(filters),
     queryFn: () =>
@@ -113,6 +114,7 @@ export function useCatalogPage() {
     list,
     isLoading,
     isError,
+    reload: () => void refetch(),
     categories: categories ?? [],
     create,
     update,

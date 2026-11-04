@@ -22,7 +22,7 @@ export type MarginAlertsFilters = Omit<StatsFilters, "include_non_declared">;
 
 /** /stats — Rapport, Comptabilité. */
 export function useStats(filters: StatsFilters) {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: API.stats.main.key(
       filters.date_from,
       filters.date_to,
@@ -37,6 +37,7 @@ export function useStats(filters: StatsFilters) {
     isLoading,
     isError,
     error,
+    reload: () => void refetch(),
   };
 }
 
@@ -62,7 +63,7 @@ export function useMarginAlerts(filters: MarginAlertsFilters) {
 /** /stats/analyse-marge per mode — Analyses, Rapport « Optimisation » tile (mode
  *  produit, same slot). Liste mode is a POST (`useAnalyseListe`), not cached. */
 export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: API.stats.analyseMarge.key(
       mode,
       filters.date_from,
@@ -87,12 +88,13 @@ export function useAnalyseMarge(filters: AnalyseFilters, mode: MargeMode) {
     analyse: data,
     isLoading,
     error: isError ? error : null,
+    reload: () => void refetch(),
   };
 }
 
 /** One page of the ventes ledger — Ventes, Comptabilité. */
 export function useVentesList(filters: VentesFilters) {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.ventes.list.key(filters),
     queryFn: () => api.get<VentesListResponse>(API.ventes.list.url, { params: filters }),
   });
@@ -100,6 +102,7 @@ export function useVentesList(filters: VentesFilters) {
     ventesList: data,
     isLoading,
     isError,
+    reload: () => void refetch(),
   };
 }
 
@@ -121,7 +124,7 @@ export function useAdminPharmaciesList() {
 /** « Connexion Sobrus » — its page and the banner shown on every page when it stops working
  *  (owners with Import). While a run goes on, asked again every 2 s (its live progress). */
 export function useSobrusConnection(enabled = true) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.sobrus.connection.key,
     queryFn: () => api.get<SobrusConnection>(API.sobrus.connection.url),
     enabled,
@@ -131,5 +134,7 @@ export function useSobrusConnection(enabled = true) {
   return {
     connection: data ?? null,
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }

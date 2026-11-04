@@ -9,12 +9,14 @@ import { SheetCard } from "./SheetCard";
 
 export function HistoryTab({ id }: { id: number }) {
   const t = useT();
-  const { rows, total, page, setPage, isLoading } = useProductHistory(id);
+  const { rows, total, page, setPage, isLoading, isError, reload } = useProductHistory(id);
   return (
     <SheetCard title={t("history.title")} hint={t("history.tabHint")}>
       <HistoryTable
         rows={rows}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         pagination={{ page, pageSize: 20, total, onPage: setPage, onPageSize: () => {}, pageSizes: [20] }}
       />
     </SheetCard>

@@ -8,14 +8,16 @@
  *
  *  Ports 8001 / 5174 keep the dev servers (8000 / 5173) untouched.
  *    make tests      headless, every test (pre-push)
- *    make tests-ui  a real browser plays one test file (or all), slowed down
+ *    make tests-ui  every test in a real browser, slowed down, inside ONE window (Xephyr) that stays put
  */
 import { defineConfig } from "@playwright/test";
 
 import { WEB } from "./lib/paths";
 
-/** Set by `make tests-ui`: maximized window, page fills it. Headless keeps a fixed size. */
+/** Set by `make tests-ui`: a real browser filling the tests window (E2E_SCREEN « 1824x970 »), slowed down.
+ *  Headless keeps a fixed size. */
 const HEADED = process.env.E2E_HEADED === "1";
+const SCREEN = (process.env.E2E_SCREEN ?? "1920x1080").replace("x", ",");
 
 export default defineConfig({
   testDir: "./tests",
@@ -28,12 +30,12 @@ export default defineConfig({
   use: {
     baseURL: WEB,
     viewport: HEADED ? null : { width: 1920, height: 1080 },
-    actionTimeout: 15_000, // a missing button fails in 15 s, not after the 20-min test timeout
-    navigationTimeout: 30_000,
     launchOptions: {
       slowMo: Number(process.env.E2E_SLOWMO ?? 0), // make tests-ui: slow enough to follow
-      args: HEADED ? ["--start-maximized"] : [],
+      args: HEADED ? ["--window-position=0,0", `--window-size=${SCREEN}`] : [],
     },
+    actionTimeout: 15_000, // a missing button fails in 15 s, not after the 20-min test timeout
+    navigationTimeout: 30_000,
     locale: "fr-FR",
     timezoneId: "Africa/Casablanca",
     trace: "on",
@@ -41,7 +43,7 @@ export default defineConfig({
     screenshot: "on",
   },
   // `setup` (admin creates the pharmacy + owner, owner imports the files) always
-  // runs first — also when you run a single page spec (make tests-ui ARGS=…).
+  // runs first — also when you run a single page spec (make tests 06).
   projects: [
     { name: "setup", testMatch: /0[12]-.*\.spec\.ts/ },
     { name: "pages", testMatch: /(0[3-9]|[1-9]\d)-.*\.spec\.ts/, dependencies: ["setup"] },

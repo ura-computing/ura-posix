@@ -98,7 +98,7 @@ export function FilterBar<V extends string = string>({
   return (
     <section
       aria-label={t("shared.filters")}
-      className="sticky top-0 z-20 flex flex-col gap-2.5 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur"
+      className="sticky top-0 z-30 flex flex-col gap-2.5 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur"
     >
       {/* Row 1 — controls + right cluster */}
       <div className="flex flex-wrap items-center gap-2.5">

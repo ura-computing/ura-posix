@@ -34,7 +34,7 @@ export function useHistoryPage() {
     date_to: filters.date_to,
     search: filters.search,
   };
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.history.list.key(filters),
     queryFn: () =>
       api.get<HistoryResponse>(API.history.list.url, {
@@ -82,5 +82,7 @@ export function useHistoryPage() {
     people: data?.people ?? [],
     total: data?.pagination.total ?? 0,
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }

@@ -262,7 +262,8 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
     });
     await expect(monthButton).toHaveText(monthLabel(month));
     await monthButton.click();
-    await dialog.getByRole("button", { name: short, exact: true }).click();
+    // The months open on top of the page (over the dialog, never cut by it).
+    await page.locator('[data-list="months"]').getByRole("button", { name: short, exact: true }).click();
     await dialog.getByLabel("Pharmacie (MAD)", { exact: true }).fill("500");
     await dialog.getByLabel("Parapharmacie (MAD)", { exact: true }).fill("250.5");
     await dialog.getByLabel("Nombre de transactions", { exact: true }).fill("3");

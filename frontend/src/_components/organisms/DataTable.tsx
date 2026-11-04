@@ -16,6 +16,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 import { EmptyState } from "@/_components/molecules/EmptyState";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { SortButton } from "@/_components/molecules/SortButton";
 
 // Pagination footer sits below the (possibly long) table; without this, changing
@@ -79,6 +80,9 @@ export interface DataTableProps<R, K extends string = string> {
   pagination?: DataTablePagination;
   emptyTitle?: string; // default "Aucun résultat"
   emptyHint?: string;
+  /** The rows could not load: « Impossible de charger … » + « Réessayer » (`onRetry`), never « Aucun … ». */
+  isError?: boolean;
+  onRetry?: () => void;
   topBanner?: ReactNode; // Stock's filter banner; renders above the table shell
   /** Optional unique row key extractor. Defaults to index. */
   rowKey?: (row: R, index: number) => string | number;
@@ -103,6 +107,8 @@ export function DataTable<R, K extends string = string>({
   pagination,
   emptyTitle,
   emptyHint,
+  isError,
+  onRetry,
   topBanner,
   rowKey,
   className,
@@ -152,6 +158,14 @@ export function DataTable<R, K extends string = string>({
             </table>
           </div>
         </div>
+      </div>
+    );
+  }
+  if (isError && onRetry && rows.length === 0) {
+    return (
+      <div className={cn("flex flex-col gap-3", className)}>
+        {topBanner}
+        <LoadError onRetry={onRetry} />
       </div>
     );
   }

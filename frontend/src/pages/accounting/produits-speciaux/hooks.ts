@@ -184,6 +184,10 @@ export function useExclusions() {
   return {
     excludedRows: rows,
     excludedLoading: products.isLoading || bls.isLoading || suppliers.isLoading || lines.isLoading,
+    excludedError: products.isError || bls.isError || suppliers.isError || lines.isError,
+    reloadExcluded: () => {
+      for (const list of [products, bls, suppliers, lines]) if (list.isError) void list.refetch();
+    },
     exclude,
     isExcluding,
     reintegrate,

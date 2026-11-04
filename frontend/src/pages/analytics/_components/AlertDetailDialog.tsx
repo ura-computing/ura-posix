@@ -101,6 +101,7 @@ function AlertDetailBody({
                               "sticky top-0 z-[1] select-none whitespace-nowrap border-b border-border bg-surface-subtle p-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground",
                               c.align === "right" ? "text-right" : "text-left",
                             )}
+                            aria-sort={sortKey === c.key ? (sortOrder === "asc" ? "ascending" : "descending") : "none"}
                           >
                             {/* A button (not onClick on <th>): sortable with the keyboard, like DataTable. */}
                             <SortButton

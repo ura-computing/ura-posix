@@ -13,19 +13,13 @@
  *  Trigger shows "Label : <selected>" when a value is set. When label="" the
  *  trigger shows the selected value alone (no leading colon).
  */
-import { useEffect, useRef, useState } from "react";
+import { FloatingPortal } from "@floating-ui/react";
 import { useT } from "@/i18n/I18nProvider";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/utils/cn";
 
-import {
-  POPOVER_ALIGN,
-  POPOVER_OPTION,
-  POPOVER_PANEL,
-  POPOVER_POSITION,
-  POPOVER_TRIGGER,
-} from "@/_components/molecules/popover";
+import { POPOVER_OPTION, POPOVER_PANEL, POPOVER_TRIGGER, usePopover } from "@/_components/molecules/popover";
 
 export interface SingleSelectOption {
   value: string;
@@ -59,16 +53,10 @@ export function SingleSelect({
   align = "start",
 }: SingleSelectProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+  const { open, setOpen, triggerRef, panelRef, panelStyle, getReferenceProps, getFloatingProps } = usePopover(
+    placement,
+    align,
+  );
 
   const selectedLabel = options.find((o) => o.value === value)?.label;
   const isFiltering = value !== emptyValue && Boolean(selectedLabel);
@@ -79,8 +67,13 @@ export function SingleSelect({
   };
 
   return (
-    <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen(!open)} className={POPOVER_TRIGGER}>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        {...getReferenceProps({ onClick: () => setOpen(!open) })}
+        className={POPOVER_TRIGGER}
+      >
         <span>
           {label}
           {isFiltering && (
@@ -92,34 +85,36 @@ export function SingleSelect({
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </button>
       {open && (
-        <div className={cn(POPOVER_PANEL, POPOVER_POSITION[placement], POPOVER_ALIGN[align])}>
-          {options.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>
-          )}
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => pick(opt.value)}
-                className={cn(POPOVER_OPTION, active && "bg-surface-subtle font-semibold text-foreground")}
-              >
-                <span
-                  className={cn(
-                    "flex size-3.5 shrink-0 items-center justify-center rounded-full border",
-                    active ? "border-primary" : "border-input",
-                  )}
-                  aria-hidden
+        <FloatingPortal>
+          <div data-list={label} ref={panelRef} {...getFloatingProps()} style={panelStyle} className={POPOVER_PANEL}>
+            {options.length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">{t("shared.noOption")}</div>
+            )}
+            {options.map((opt) => {
+              const active = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => pick(opt.value)}
+                  className={cn(POPOVER_OPTION, active && "bg-surface-subtle font-semibold text-foreground")}
                 >
-                  {active && <span className="size-1.5 rounded-full bg-primary" />}
-                </span>
-                <span className="flex-1 truncate">{opt.label}</span>
-              </button>
-            );
-          })}
-        </div>
+                  <span
+                    className={cn(
+                      "flex size-3.5 shrink-0 items-center justify-center rounded-full border",
+                      active ? "border-primary" : "border-input",
+                    )}
+                    aria-hidden
+                  >
+                    {active && <span className="size-1.5 rounded-full bg-primary" />}
+                  </span>
+                  <span className="flex-1 truncate">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FloatingPortal>
       )}
-    </div>
+    </>
   );
 }

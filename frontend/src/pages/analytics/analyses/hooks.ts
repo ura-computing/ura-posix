@@ -64,7 +64,12 @@ export function useAnalysePage() {
   // In année mode the search box filters ventes by PRODUCT server-side (so each
   // month reflects that product's quantities); other modes filter rows client-side.
   const margeFilters = mode === "annee" ? { ...filters, product: search.trim() || null } : filters;
-  const { analyse, isLoading: margeLoading, error: margeError } = useAnalyseMarge(margeFilters, mode);
+  const {
+    analyse,
+    isLoading: margeLoading,
+    error: margeError,
+    reload: reloadMarge,
+  } = useAnalyseMarge(margeFilters, mode);
   const { runListe, liste, isListeLoading, listeError } = useAnalyseListe();
 
   // When mode === liste, the active result lives on the mutation; otherwise on the query.
@@ -125,6 +130,12 @@ export function useAnalysePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, filters.date_from, filters.date_to, filters.category_type]);
+
+  // « Réessayer » after a failed load: the query again, or the list sent again.
+  const reload = () => {
+    if (mode !== "liste") reloadMarge();
+    else if (listeItems) runListe({ items: listeItems, ...filters });
+  };
 
   // Sort the FULL filtered set using the column's `raw` accessor (same values
   // the Excel export uses). Nulls sort last in both directions; strings use
@@ -228,6 +239,7 @@ export function useAnalysePage() {
     toggleSort,
     isLoading,
     error: margeError ?? listeError,
+    reload,
     kpis,
     rows: pageRows,
     pagination,

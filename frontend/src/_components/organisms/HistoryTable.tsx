@@ -80,11 +80,16 @@ const columns = (t: TFn, withProduct: boolean): ColumnDef<AuditRow>[] => [
 export function HistoryTable({
   rows,
   isLoading,
+  isError,
+  onRetry,
   pagination,
   withProduct = false,
 }: {
   rows: AuditRow[];
   isLoading: boolean;
+  /** Not loaded: « Réessayer » in place of « Aucune modification ». */
+  isError?: boolean;
+  onRetry?: () => void;
   pagination: DataTablePagination;
   /** The owner's page: a « Produit » column (a product's tab does not need it). */
   withProduct?: boolean;
@@ -95,6 +100,8 @@ export function HistoryTable({
       rows={rows}
       columns={columns(t, withProduct)}
       isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
       pagination={pagination}
       emptyTitle={t("history.empty")}
       rowKey={(r) => r.id}

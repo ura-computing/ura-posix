@@ -16,7 +16,7 @@ import type {
 } from "@/types";
 
 export function useOwnerEmployees() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.employees.list.key,
     queryFn: () => api.get<OwnerEmployeesResponse>(API.employees.list.url),
     staleTime: 30_000,
@@ -24,6 +24,8 @@ export function useOwnerEmployees() {
   return {
     team: data,
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }
 

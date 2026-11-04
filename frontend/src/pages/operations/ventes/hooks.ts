@@ -87,7 +87,7 @@ export function useVentesPage() {
     return rest;
   }, [filters]);
 
-  const { ventesList: list, isLoading, isError } = useVentesList(filters);
+  const { ventesList: list, isLoading, isError, reload } = useVentesList(filters);
   const { data: counts } = useQuery({
     queryKey: API.ventes.surveillance.key(key),
     queryFn: () =>
@@ -204,6 +204,7 @@ export function useVentesPage() {
     list,
     isLoading,
     isError,
+    reload,
     counts,
     discountSummary,
     discountLoading,

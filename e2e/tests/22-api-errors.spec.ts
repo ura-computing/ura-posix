@@ -189,7 +189,13 @@ test("catalogue (admin) : doublon, nom vide, produit inconnu, suffixes, fichiers
     expect(codeOf(await apiPut(admin, `/category-suffixes/${NONE}`, { category: "x", suffix: "y" }, 404))).toBe(
       "suffixNotFound",
     );
-    const suffix = await apiPost(admin, "/category-suffixes", { category: "E2E Catégorie Erreur", suffix: "ER" }, {}, 201);
+    const suffix = await apiPost(
+      admin,
+      "/category-suffixes",
+      { category: "E2E Catégorie Erreur", suffix: "ER" },
+      {},
+      201,
+    );
     try {
       expect(
         codeOf(await apiPost(admin, "/category-suffixes", { category: "E2E Catégorie Erreur", suffix: "E2" }, {}, 409)),
@@ -215,6 +221,19 @@ test("imports : lot inconnu, statut inconnu, lot d'une autre pharmacie, lot déj
   browser,
 }) => {
   const admin = await pageAs(browser, "admin");
+  const stranger = await pageAs(browser, null);
+  // The owner of another pharmacy (made here): an E2E pharmacy batch is not his.
+  const account = {
+    full_name: "E2E Autre Pharmacie",
+    email: "e2e.autre@pharmagest.ma",
+    password: "AutrePharmacie#2026",
+  };
+  const pharmacy = await apiPost(admin, "/admin/pharmacies", { name: "E2E Autre Pharmacie", city: "Rabat" });
+  const { member } = await apiPost(admin, `/admin/pharmacies/${pharmacy.id}/users`, {
+    ...account,
+    role: "owner",
+    pharmacy_id: pharmacy.id,
+  });
   try {
     expect(codeOf(await apiPatch(page, `/uploads/batches/${NONE}`, { status: "nimporte" }, 400))).toBe(
       "invalidBatchStatus",
@@ -226,16 +245,18 @@ test("imports : lot inconnu, statut inconnu, lot d'une autre pharmacie, lot déj
     expect(codeOf(await apiPost(page, "/uploads/stock-json", { rows: [], batch_id: NONE }, {}, 400))).toBe("emptyBody");
 
     const mine: Row[] = (await apiGet(page, "/data/imports", { limit: 200 })).data;
-    const all: Row[] = (await apiGet(admin, "/data/imports", { limit: 200 })).data;
-    const other = all.find((b) => !mine.some((m) => m.id === b.id));
-    expect(other, "un import d'une autre pharmacie (20-sobrus)").toBeTruthy();
-    expect(codeOf(await apiPatch(page, `/uploads/batches/${other!.id}`, { status: "error" }, 403))).toBe(
+    await apiPost(stranger, "/auth/login", { email: account.email, password: account.password });
+    expect(codeOf(await apiPatch(stranger, `/uploads/batches/${mine[0].id}`, { status: "error" }, 403))).toBe(
       "batchForbidden",
     );
-    const deleted = mine.find((b) => b.deleted_at);
-    expect(deleted, "un import supprimé (15-imports)").toBeTruthy();
-    expect(codeOf(await apiDelete(page, `/data/imports/${deleted!.id}`, 409))).toBe("batchAlreadyDeleted");
+    // His own import (one line without PID: an empty import, nothing written), deleted twice.
+    const { batch_id } = await apiPost(stranger, "/uploads/stock-json", { rows: [{ PID: "" }], filename: "vide.csv" });
+    await apiDelete(stranger, `/data/imports/${batch_id}`);
+    expect(codeOf(await apiDelete(stranger, `/data/imports/${batch_id}`, 409))).toBe("batchAlreadyDeleted");
   } finally {
+    await apiDelete(admin, `/admin/users/${member.id}`, 204);
+    await apiDelete(admin, `/admin/pharmacies/${pharmacy.id}`, 204);
+    await stranger.context().close();
     await admin.context().close();
   }
 });
@@ -250,7 +271,7 @@ test("propriétaire : routes admin, mode liste, export trop gros, ids inconnus",
       "plus de 50 000 lignes",
     ).toBe("exportTooLarge");
   }
-  expect(codeOf(await apiDelete(page, `/payments/${NONE}`, 404))).toBe("paymentNotFound");
+  expect(codeOf(await apiDelete(page, `/accounting/payments/${NONE}`, 404))).toBe("paymentNotFound");
   expect(codeOf(await apiDelete(page, `/owner/employees/${NONE}`, 404))).toBe("employeeNotFound");
   expect(codeOf(await apiDelete(page, `/sessions/${NONE}`, 404))).toBe("sessionNotFound");
   const med: Row = (await apiGet(page, "/products", { limit: 1 })).data[0];

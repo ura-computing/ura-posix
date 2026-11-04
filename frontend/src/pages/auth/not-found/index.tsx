@@ -11,6 +11,7 @@ export default function NotFoundPage({ embedded = false, pending = false }: { em
   const t = useT();
   return (
     <div
+      data-page="not-found" // one page at any address (the E2E UI gate)
       className={
         embedded ? "flex h-full flex-col text-foreground" : "flex min-h-screen flex-col bg-background text-foreground"
       }

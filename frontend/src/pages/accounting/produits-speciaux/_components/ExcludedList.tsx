@@ -81,6 +81,8 @@ export function ExcludedList({
   kind,
   rows,
   isLoading,
+  isError,
+  onRetry,
   isReintegrating,
   onReintegrate,
   onSaveNote,
@@ -88,6 +90,9 @@ export function ExcludedList({
   kind: ExclusionKind;
   rows: ExcludedRow[];
   isLoading: boolean;
+  /** The lists could not load: no count, « Réessayer » in place of the table. */
+  isError: boolean;
+  onRetry: () => void;
   isReintegrating: boolean;
   onReintegrate: (target: ExclusionTarget) => void;
   onSaveNote: (target: ExclusionTarget, notes: string) => Promise<unknown>;
@@ -157,12 +162,15 @@ export function ExcludedList({
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-base font-semibold text-foreground">
-        {t(TITLE[kind])} ({shown.length})
+        {t(TITLE[kind])}
+        {!isLoading && !isError && ` (${shown.length})`}
       </h2>
       <DataTable<ExcludedRow>
         rows={shown}
         columns={columns}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={onRetry}
         emptyTitle={t("ps.emptyExcluded")}
         emptyHint={t("ps.emptyExcludedHint")}
         rowKey={(r) => r.key}

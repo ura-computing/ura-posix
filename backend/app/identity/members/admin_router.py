@@ -531,7 +531,7 @@ def accept_signup(signup_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: Db
                 409,
                 ErrorCode.PHARMACY_CODE_UNKNOWN,
                 f"Aucune pharmacie avec le code {req.pharmacy_code}.",
-                code=req.pharmacy_code,
+                pharmacy_code=req.pharmacy_code,
             )
     else:
         pharm = add_pharmacy(

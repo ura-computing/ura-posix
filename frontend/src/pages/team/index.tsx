@@ -31,7 +31,8 @@ import {
   useSetEmployeeStatus,
 } from "./hooks";
 import { Page } from "@/_components/templates/Page";
-import { PageSkeleton } from "@/_components/molecules/Skeletons";
+import { LoadError } from "@/_components/molecules/LoadError";
+import { SkeletonCard } from "@/_components/molecules/Skeletons";
 
 export default function OwnerEmployeesPage() {
   const t = useT();
@@ -42,15 +43,27 @@ export default function OwnerEmployeesPage() {
   const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
   const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
 
-  const { team, isLoading } = useOwnerEmployees();
+  const { team, isError, reload } = useOwnerEmployees();
   const { createEmployee } = useCreateEmployee();
   const { setEmployeePermissions, isSavingPermissions } = useSetEmployeePermissions();
   const { setEmployeeStatus } = useSetEmployeeStatus();
   const { resetEmployeePassword } = useResetEmployeePassword();
   const { deleteEmployee } = useDeleteEmployee();
 
-  if (isLoading || !team) {
-    return <PageSkeleton />;
+  // Not loaded yet / not loaded: the title stays, the 2 blocks wait (or « Réessayer »).
+  if (!team) {
+    return (
+      <Page title={t("employees.title")} subtitle={t("employees.subtitle")}>
+        {isError ? (
+          <LoadError onRetry={reload} />
+        ) : (
+          <>
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={4} />
+          </>
+        )}
+      </Page>
+    );
   }
 
   const { employees, pharmacy_features, my_permissions } = team;

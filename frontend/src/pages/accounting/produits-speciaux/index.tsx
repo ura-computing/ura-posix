@@ -20,8 +20,17 @@ import { useExclusionSearch, useExclusions, type ExclusionKind } from "./hooks";
 function KindTab({ kind }: { kind: ExclusionKind }) {
   const t = useT();
   const { q, setQ, ready, foundProducts, foundBls, foundSuppliers, isSearching } = useExclusionSearch(kind);
-  const { excludedRows, excludedLoading, exclude, isExcluding, reintegrate, isReintegrating, saveNote } =
-    useExclusions();
+  const {
+    excludedRows,
+    excludedLoading,
+    excludedError,
+    reloadExcluded,
+    exclude,
+    isExcluding,
+    reintegrate,
+    isReintegrating,
+    saveNote,
+  } = useExclusions();
   const common = { q: q.trim(), isSearching, isExcluding, onExclude: exclude };
 
   return (
@@ -48,6 +57,8 @@ function KindTab({ kind }: { kind: ExclusionKind }) {
         kind={kind}
         rows={excludedRows}
         isLoading={excludedLoading}
+        isError={excludedError}
+        onRetry={reloadExcluded}
         isReintegrating={isReintegrating}
         onReintegrate={reintegrate}
         onSaveNote={saveNote}

@@ -366,12 +366,14 @@ export default function CataloguePage() {
     filters,
     importCsv,
     isCreating,
+    isError,
     isImporting,
     isLoading,
     isRemoving,
     isUpdating,
     lastImport,
     list,
+    reload,
     remove,
     reset,
     setCategories,
@@ -569,6 +571,8 @@ export default function CataloguePage() {
         rows={list?.data ?? []}
         columns={COLUMNS}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         sortBy={filters.sort_by}
         sortOrder={filters.sort_order}
         onSort={setSort}

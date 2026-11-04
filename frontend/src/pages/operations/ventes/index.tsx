@@ -113,6 +113,8 @@ function SurveillanceTabs({
 interface VentesTableProps {
   rows: VenteRow[];
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   sortBy: string | null;
   sortOrder: "asc" | "desc";
   onSort: (key: string) => void;
@@ -261,13 +263,15 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
   },
 ];
 
-function VentesTable({ rows, isLoading, sortBy, sortOrder, onSort, pagination }: VentesTableProps) {
+function VentesTable({ rows, isLoading, isError, onRetry, sortBy, sortOrder, onSort, pagination }: VentesTableProps) {
   const t = useT();
   return (
     <DataTable<VenteRow>
       rows={rows}
       columns={buildColumns(t)}
       isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
       sortBy={sortBy ?? undefined}
       sortOrder={sortOrder}
       onSort={onSort}
@@ -289,8 +293,10 @@ export default function VentesPage() {
     clearRef,
     filters,
     handleExport,
+    isError,
     isLoading,
     list,
+    reload,
     reset,
     setCategories,
     setDateRange,
@@ -430,6 +436,8 @@ export default function VentesPage() {
       <VentesTable
         rows={list?.data ?? []}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         sortBy={filters.sort_by}
         sortOrder={filters.sort_order}
         onSort={setSort}

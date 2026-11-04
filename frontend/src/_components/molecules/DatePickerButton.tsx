@@ -4,7 +4,16 @@
 import { useState, type ReactNode } from "react";
 import { DayPicker } from "react-day-picker";
 import { fr } from "date-fns/locale";
-import { autoUpdate, flip, offset, shift, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
+import {
+  autoUpdate,
+  flip,
+  FloatingPortal,
+  offset,
+  shift,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from "@floating-ui/react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
@@ -36,6 +45,7 @@ export function DatePickerButton({
     open,
     onOpenChange: setOpen,
     placement: "bottom-start",
+    strategy: "fixed", // drawn on top of the page (portal below): no parent cuts it
     middleware: [offset(8), flip({ padding: 16 }), shift({ padding: 16 })],
     whileElementsMounted: autoUpdate,
   });
@@ -63,45 +73,47 @@ export function DatePickerButton({
         <CalendarIcon className="size-4" />
       </Button>
       {open && (
-        <div
-          ref={setPanelEl}
-          {...getFloatingProps()}
-          style={floatingStyles}
-          className="z-50 flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-base font-normal shadow-2xl"
-        >
-          <div className="flex items-center justify-between gap-1 text-sm font-bold text-foreground">
-            <span className="flex gap-1">
-              {arrow(-12, t("products.prevYear"), <ChevronsLeft className="size-4" />)}
-              {arrow(-1, t("products.prevMonth"), <ChevronLeft className="size-4" />)}
-            </span>
-            <span>
-              {months[month.getMonth()]} {month.getFullYear()}
-            </span>
-            <span className="flex gap-1">
-              {arrow(1, t("products.nextMonth"), <ChevronRight className="size-4" />)}
-              {arrow(12, t("products.nextYear"), <ChevronsRight className="size-4" />)}
-            </span>
+        <FloatingPortal>
+          <div
+            ref={setPanelEl}
+            {...getFloatingProps()}
+            style={floatingStyles}
+            className="z-[60] flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-base font-normal shadow-2xl"
+          >
+            <div className="flex items-center justify-between gap-1 text-sm font-bold text-foreground">
+              <span className="flex gap-1">
+                {arrow(-12, t("products.prevYear"), <ChevronsLeft className="size-4" />)}
+                {arrow(-1, t("products.prevMonth"), <ChevronLeft className="size-4" />)}
+              </span>
+              <span>
+                {months[month.getMonth()]} {month.getFullYear()}
+              </span>
+              <span className="flex gap-1">
+                {arrow(1, t("products.nextMonth"), <ChevronRight className="size-4" />)}
+                {arrow(12, t("products.nextYear"), <ChevronsRight className="size-4" />)}
+              </span>
+            </div>
+            <div>
+              <DayPicker
+                mode="single"
+                locale={fr}
+                month={month}
+                onMonthChange={setMonth}
+                hideNavigation
+                selected={selected}
+                onSelect={(d) => {
+                  if (!d) return;
+                  onPick(d);
+                  setOpen(false);
+                }}
+                weekStartsOn={1}
+                showOutsideDays
+                classNames={CALENDAR_CLASSES}
+                modifiersClassNames={DAY_PICKER_MODIFIERS}
+              />
+            </div>
           </div>
-          <div>
-            <DayPicker
-              mode="single"
-              locale={fr}
-              month={month}
-              onMonthChange={setMonth}
-              hideNavigation
-              selected={selected}
-              onSelect={(d) => {
-                if (!d) return;
-                onPick(d);
-                setOpen(false);
-              }}
-              weekStartsOn={1}
-              showOutsideDays
-              classNames={CALENDAR_CLASSES}
-              modifiersClassNames={DAY_PICKER_MODIFIERS}
-            />
-          </div>
-        </div>
+        </FloatingPortal>
       )}
     </>
   );

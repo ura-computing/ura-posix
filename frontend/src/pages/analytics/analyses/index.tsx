@@ -25,7 +25,7 @@ import { DataTable, type ColumnDef, type DataTablePagination } from "@/_componen
 import { useMonthsShort } from "@/i18n/dates";
 import { MARGE_COLS } from "./constants";
 import { Page } from "@/_components/templates/Page";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { Badge } from "@/_components/atoms/Badge";
 
 /** 8 KPI tiles for /analyse (old-app parity):
@@ -306,6 +306,7 @@ export default function AnalysePage() {
     listeSubmitted,
     mode,
     pagination,
+    reload,
     rows,
     search,
     setFilters,
@@ -434,10 +435,19 @@ export default function AnalysePage() {
 
       <TabBar<MargeMode> tabs={MODE_TABS} activeId={mode} onChange={setMode} />
 
-      <AnalyseKpis kpis={kpis} isLoading={isLoading} />
+      {/* Not loaded: the reason (the API detail when there is one: a bare « réessayez » hid real causes, e.g. 422)
+          + « Réessayer », in place of figures and rows it does not have. */}
+      {error ? (
+        <LoadError
+          message={`${t("analyse.loadError")} ${error instanceof Error && error.message ? error.message : t("analyse.retryLater")}`}
+          onRetry={reload}
+        />
+      ) : (
+        <AnalyseKpis kpis={kpis} isLoading={isLoading} />
+      )}
 
       {/* Table: shows for all 8 modes (Liste shows it once items are submitted). */}
-      {(mode !== "liste" || listeSubmitted) && (
+      {!error && (mode !== "liste" || listeSubmitted) && (
         <AnalyseTable
           mode={mode}
           rows={rows}
@@ -447,13 +457,6 @@ export default function AnalysePage() {
           sortOrder={sortOrder}
           onSort={toggleSort}
         />
-      )}
-
-      {error && (
-        <Callout tone="error">
-          {/* Surface the API detail when available — a bare "réessayez" hid real causes (e.g. 422). */}
-          {t("analyse.loadError")} {error instanceof Error && error.message ? error.message : t("analyse.retryLater")}
-        </Callout>
       )}
     </Page>
   );

@@ -49,7 +49,7 @@ export function useStockSummary() {
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 export function useAdminStats() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.admin.stats.key,
     queryFn: () => api.get<AdminStatsResponse>(API.admin.stats.url),
     staleTime: 60_000,
@@ -58,11 +58,12 @@ export function useAdminStats() {
     systemStats: data,
     isLoading,
     isError,
+    reload: () => void refetch(),
   };
 }
 
 export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsFilters) {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.admin.pharmacyStats.key(
       pharmacyId ?? 0,
       filters.date_from,
@@ -78,6 +79,7 @@ export function useAdminPharmacyStats(pharmacyId: number | null, filters: StatsF
     stats: data,
     isLoading,
     isError,
+    reload: () => void refetch(),
   };
 }
 

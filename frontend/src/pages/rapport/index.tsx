@@ -74,7 +74,7 @@ import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { EmptyState } from "@/_components/molecules/EmptyState";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { SkeletonCard, SkeletonTile } from "@/_components/molecules/Skeletons";
 
 /** Section 2f — dual-bar trend chart. Ventes (info-blue) + Achats (muted) per
@@ -1739,7 +1739,7 @@ function OwnerView() {
     setRange(date_from, date_to);
   };
 
-  const { stats, isLoading: l1, isError: e1 } = useStats(filters);
+  const { stats, isLoading: l1, isError: e1, reload } = useStats(filters);
   const { marginAlerts: alerts, isLoading: l2 } = useMarginAlerts(filters);
   const { stock, isLoading: l3 } = useStockSummary();
 
@@ -1767,7 +1767,7 @@ function OwnerView() {
 
       {loading && <RapportSkeleton />}
 
-      {e1 && <Callout tone="error">{t("dashboard.loadError")}</Callout>}
+      {e1 && <LoadError message={t("dashboard.loadError")} onRetry={reload} />}
 
       {stats && !loading && (
         <RapportSections
@@ -1800,9 +1800,9 @@ function AdminView() {
   };
   const [marginMode, setMarginMode] = useState<MargeMode>("produit");
 
-  const { systemStats, isLoading: ls } = useAdminStats();
+  const { systemStats, isLoading: ls, isError: es, reload: reloadSystem } = useAdminStats();
   const { pharmacies = [] } = useAdminPharmaciesList();
-  const { stats, isLoading: l1, isError: e1 } = useAdminPharmacyStats(pharmacyId, filters);
+  const { stats, isLoading: l1, isError: e1, reload } = useAdminPharmacyStats(pharmacyId, filters);
   const { alerts } = useAdminPharmacyMarginAlerts(pharmacyId, {
     date_from: dateFrom,
     date_to: dateTo,
@@ -1824,7 +1824,9 @@ function AdminView() {
       {/* Vue système — always shown */}
       <section className="flex flex-col gap-3">
         <SectionTitle size="sm">{t("rapportAdmin.vueSysteme")}</SectionTitle>
-        {ls || !systemStats ? (
+        {es && !systemStats ? (
+          <LoadError onRetry={reloadSystem} />
+        ) : ls || !systemStats ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((i) => (
               <SkeletonTile key={i} className="min-h-32" />
@@ -1903,7 +1905,7 @@ function AdminView() {
 
         {loading && <RapportSkeleton />}
 
-        {e1 && <Callout tone="error">{t("rapportAdmin.pharmacyLoadError")}</Callout>}
+        {e1 && <LoadError message={t("rapportAdmin.pharmacyLoadError")} onRetry={reload} />}
 
         {stats &&
           pharmacyId !== null &&

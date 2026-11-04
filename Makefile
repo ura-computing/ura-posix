@@ -38,7 +38,7 @@ help:
 	@echo ""
 	@echo "  End-to-end tests (Playwright — asks its options, Enter = default):"
 	@echo "    make tests     — every test, headless (make tests 99 / 06 15: only those test files)"
-	@echo "    make tests-ui  — one test file (or all) in a real browser, slowed down"
+	@echo "    make tests-ui  — every test in a real browser, slowed down, inside one window that stays put"
 
 # ── Setup (fresh clone) ─────────────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ format:
 # Two commands. The script asks for its inputs (Enter = default); with no
 # terminal (git pre-push) it uses the defaults. First run installs Playwright.
 #   make tests      headless, every test        make tests 99 / make tests 06 15: only those files
-#   make tests-ui   real browser, slowed down; asks which test file (or: make tests-ui 06)
+#   make tests-ui   real browser, slowed down, inside one Xephyr window (or: make tests-ui 06)
 
 # `make tests 99`, `make tests 06 15`, `make tests-ui ventes`: only those test files (number
 # or part of the name; the setup tests 01-02 always run first). `make test` = `make tests`.

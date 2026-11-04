@@ -63,10 +63,15 @@ export function useComptabilitePage() {
   const [ventesSortOrder, setVentesSortOrder] = useState<"asc" | "desc">("desc");
 
   // KPIs (same /stats read as Rapport)
-  const { stats, isLoading: statsLoading } = useStats(filters);
+  const { stats, isLoading: statsLoading, isError: statsError, reload: reloadStats } = useStats(filters);
 
   // Payment entries for the active month (drives the 4 cards)
-  const { payments, isLoading: paymentsLoading } = usePayments(activeMonth);
+  const {
+    payments,
+    isLoading: paymentsLoading,
+    isError: paymentsError,
+    reload: reloadPayments,
+  } = usePayments(activeMonth);
 
   // Ventes ledger — independent query so changing the page's filters refetches
   // just the ledger (TanStack cache keyed via API.ventes.list.key).
@@ -87,7 +92,12 @@ export function useComptabilitePage() {
     [filters, ventesPage, ventesPageSize, ventesSortBy, ventesSortOrder],
   );
 
-  const { ventesList: ventesData, isLoading: ventesLoading } = useVentesList(ventesFilters);
+  const {
+    ventesList: ventesData,
+    isLoading: ventesLoading,
+    isError: ventesError,
+    reload: reloadVentes,
+  } = useVentesList(ventesFilters);
 
   /** Toggle order on same key; reset to "desc" on different key.
    *  Same UX as the /ventes page's setSort. */
@@ -142,14 +152,20 @@ export function useComptabilitePage() {
 
     stats,
     statsLoading,
+    statsError,
+    reloadStats,
     payments,
     paymentsLoading,
+    paymentsError,
+    reloadPayments,
 
     // Ventes ledger — full pagination/sort surface so the DataTable footer +
     // sortable headers behave the same as /achats and /ventes.
     ventes: ventesData?.data ?? [],
     ventesTotal: ventesData?.pagination.total ?? 0,
     ventesLoading,
+    ventesError,
+    reloadVentes,
     ventesPage,
     setVentesPage,
     ventesPageSize,
@@ -168,7 +184,7 @@ export function useComptabilitePage() {
 
 /** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
 export function usePayments(month?: string) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.payments.list.key(month),
     queryFn: () => api.get<PaymentEntry[]>(API.payments.list.url, { params: { month } }),
     staleTime: 30_000,
@@ -176,6 +192,8 @@ export function usePayments(month?: string) {
   return {
     payments: data ?? [],
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }
 

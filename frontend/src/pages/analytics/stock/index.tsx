@@ -1,15 +1,5 @@
 // src/pages/stock/index.tsx
-import {
-  RefreshCw,
-  Download,
-  Package,
-  Upload,
-  AlertTriangle,
-  TrendingDown,
-  PackageOpen,
-  CalendarX,
-  X,
-} from "lucide-react";
+import { Download, Package, Upload, AlertTriangle, TrendingDown, PackageOpen, CalendarX, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
@@ -34,7 +24,7 @@ import type { StockSortKey } from "./hooks";
 import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 
 // src/pages/stock/_components/AbcdAnalysisCard.tsx
 
@@ -617,19 +607,7 @@ export default function StockPage() {
       />
 
       {/* ERROR */}
-      {isError && (
-        <Callout
-          tone="error"
-          action={
-            <Button variant="secondary" onClick={reload}>
-              <RefreshCw className="size-3.5" />
-              {t("common.retry")}
-            </Button>
-          }
-        >
-          {t("stock.loadError")}
-        </Callout>
-      )}
+      {isError && <LoadError message={t("stock.loadError")} onRetry={reload} />}
 
       {/* LOADING */}
       {isLoading && <StockSkeleton />}

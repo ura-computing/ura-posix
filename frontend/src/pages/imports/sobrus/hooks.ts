@@ -9,10 +9,15 @@ import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody }
  *  and the owner's actions. A run's end refreshes the other pages: `hooks/useSobrusRunWatcher.ts`. */
 export function useSobrusPage() {
   const qc = useQueryClient();
-  const { connection, isLoading } = useSobrusConnection();
+  const { connection, isLoading, isError, reload } = useSobrusConnection();
   const activeRun = connection?.active_run ?? null;
 
-  const { data: runs = [] } = useQuery({
+  const {
+    data: runs = [],
+    isLoading: runsLoading,
+    isError: runsError,
+    refetch: refetchRuns,
+  } = useQuery({
     queryKey: API.sobrus.runs.key,
     queryFn: () => api.get<SobrusRun[]>(API.sobrus.runs.url),
     enabled: !!connection?.connected,
@@ -39,8 +44,13 @@ export function useSobrusPage() {
   return {
     connection,
     isLoading,
+    isError,
+    reload,
     activeRun,
     runs,
+    runsLoading,
+    runsError,
+    reloadRuns: () => void refetchRuns(),
     saveConnection,
     isSaving,
     disconnect,

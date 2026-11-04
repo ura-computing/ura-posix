@@ -10,7 +10,7 @@ import { TabBar } from "@/_components/molecules/TabBar";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Plus, RefreshCw, UserPlus, Building2 } from "lucide-react";
+import { ArrowRight, Plus, UserPlus, Building2 } from "lucide-react";
 import { Button } from "@/_components/atoms/Button";
 import { useAdminPharmaciesList } from "@/hooks/sharedQueries";
 import { formatDateTime } from "@/utils/format";
@@ -47,7 +47,7 @@ import { MemberKebab } from "@/_components/organisms/MemberKebab";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
 import { Page } from "@/_components/templates/Page";
-import { Callout } from "@/_components/molecules/Callout";
+import { LoadError } from "@/_components/molecules/LoadError";
 import { Badge } from "@/_components/atoms/Badge";
 
 /** « Pharmacies » tab of /admin/pharmacies — the pharmacies list (was the
@@ -156,17 +156,7 @@ function PharmaciesTab() {
       />
 
       {isError ? (
-        <Callout
-          tone="error"
-          action={
-            <Button variant="secondary" onClick={reload}>
-              <RefreshCw className="size-3.5" />
-              {t("common.retry")}
-            </Button>
-          }
-        >
-          {t("adminPharm.loadError")}
-        </Callout>
+        <LoadError message={t("adminPharm.loadError")} onRetry={reload} />
       ) : (
         <DataTable
           rows={filtered}
@@ -404,17 +394,7 @@ function UsersTab() {
       )}
 
       {usersError ? (
-        <Callout
-          tone="error"
-          action={
-            <Button variant="secondary" onClick={reloadUsers}>
-              <RefreshCw className="size-3.5" />
-              {t("common.retry")}
-            </Button>
-          }
-        >
-          {t("adminUsers.loadError")}
-        </Callout>
+        <LoadError message={t("adminUsers.loadError")} onRetry={reloadUsers} />
       ) : (
         <DataTable
           rows={filtered}

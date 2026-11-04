@@ -12,6 +12,8 @@ import { Segmented } from "@/_components/molecules/Segmented";
 import { Checkbox } from "@/_components/atoms/Checkbox";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { DateRangePicker } from "@/_components/molecules/DateRangePicker";
+import { LoadError } from "@/_components/molecules/LoadError";
+import { SkeletonCard } from "@/_components/molecules/Skeletons";
 import { FormField, FormInput } from "@/_components/molecules/FormField";
 import { PasswordInput } from "@/_components/molecules/PasswordField";
 import { Page } from "@/_components/templates/Page";
@@ -123,8 +125,20 @@ function RunProgress({ run, isCancelling, onCancel }: { run: SobrusRun; isCancel
   );
 }
 
-function RunsList({ runs }: { runs: SobrusRun[] }) {
+function RunsList({
+  runs,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  runs: SobrusRun[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
   const t = useT();
+  if (isLoading) return <SkeletonCard lines={3} />;
+  if (isError) return <LoadError onRetry={onRetry} />;
   if (runs.length === 0) return null;
   return (
     <section className={CARD}>
@@ -236,8 +250,13 @@ export default function SobrusPage() {
   const {
     connection,
     isLoading,
+    isError,
+    reload,
     activeRun,
     runs,
+    runsLoading,
+    runsError,
+    reloadRuns,
     saveConnection,
     isSaving,
     disconnect,
@@ -252,7 +271,9 @@ export default function SobrusPage() {
   return (
     <Page title={t("sobrus.title")} subtitle={t("sobrus.subtitle")} narrow>
       <div className="flex flex-col gap-5">
-        {isLoading || !connection ? (
+        {isError && !connection ? (
+          <LoadError onRetry={reload} />
+        ) : isLoading || !connection ? (
           <Skeleton className="h-48 w-full" />
         ) : !connection.connected ? (
           <section className={CARD}>
@@ -300,7 +321,7 @@ export default function SobrusPage() {
             {activeRun && (
               <RunProgress run={activeRun} isCancelling={isCancelling} onCancel={() => void cancelRun(activeRun.id)} />
             )}
-            <RunsList runs={runs} />
+            <RunsList runs={runs} isLoading={runsLoading} isError={runsError} onRetry={reloadRuns} />
           </>
         )}
       </div>

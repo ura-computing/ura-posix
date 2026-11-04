@@ -21,11 +21,10 @@ mkdir -p "$(dirname "$LOG")"
 : > "$RESOURCES"
 cd "$ROOT"
 
-echo "▸ Generating test data (${E2E_ROWS:-100000} vente rows)…"
-python3 resources/tests/generate.py --rows "${E2E_ROWS:-100000}"
-
 SAMPLER=""
+GENERATOR=""
 stop() {
+  [ -n "$GENERATOR" ] && kill "$GENERATOR" 2> /dev/null || true
   [ -n "$SAMPLER" ] && kill "$SAMPLER" 2> /dev/null || true
   $COMPOSE down -v --remove-orphans > /dev/null 2>&1 || true
 }
@@ -61,9 +60,21 @@ stop # leftovers of a run that was killed
 trap 'stop; exit 0' INT TERM
 trap stop EXIT
 
-echo "▸ Building + starting the production images (backend, frontend) on Postgres 17…"
+# The test data is generated while the images build (both take a while; the containers read the data at start).
+echo "▸ Generating test data (${E2E_ROWS:-100000} vente rows) while the images build…"
+python3 resources/tests/generate.py --rows "${E2E_ROWS:-100000}" &
+GENERATOR=$!
+echo "▸ Building the production images (backend, frontend)…"
+$COMPOSE build
+if ! wait "$GENERATOR"; then
+  echo "✗ test data not generated (resources/tests/generate.py)"
+  exit 1
+fi
+GENERATOR=""
+
+echo "▸ Starting them on Postgres 17…"
 # Not up (e.g. « backend is unhealthy »): print why before the containers are removed.
-if ! $COMPOSE up --build --wait; then
+if ! $COMPOSE up --wait; then
   echo "▸ Backend log (the stack did not start):"
   $COMPOSE logs --no-color --no-log-prefix backend 2>&1 | tail -n 80
   exit 1

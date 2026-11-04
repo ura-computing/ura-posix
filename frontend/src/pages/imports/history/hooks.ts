@@ -7,7 +7,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { type DataImport, type DataImportsResponse, type DocType } from "@/types";
 
 export function useImports() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: API.imports.list.key,
     queryFn: () =>
       api.get<DataImportsResponse>(API.imports.list.url, {
@@ -22,7 +22,9 @@ export function useImports() {
     imports: data?.data ?? [],
     pagination: data?.pagination,
     isLoading,
+    isError,
     error,
+    reload: () => void refetch(),
   };
 }
 

@@ -22,7 +22,7 @@ export function useProduitsPage() {
   const t = useT();
   const { filters, patch, setSort, setPage, setPageSize, reset } = useListFilters(DEFAULT_FILTERS, "desc");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.products.list.key(filters),
     queryFn: () => api.get<ProductsListResponse>(API.products.list.url, { params: filters }),
   });
@@ -81,5 +81,7 @@ export function useProduitsPage() {
     salesFrom: data?.sales_from ?? null,
     salesTo: data?.sales_to ?? null,
     isLoading,
+    isError,
+    reload: () => void refetch(),
   };
 }

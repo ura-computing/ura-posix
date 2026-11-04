@@ -116,7 +116,9 @@ export default function ProduitsPage() {
   const {
     filters,
     handleExport,
+    isError,
     isLoading,
+    reload,
     reset,
     rows,
     salesFrom,
@@ -192,6 +194,8 @@ export default function ProduitsPage() {
         rows={rows}
         columns={buildColumns(t)}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         sortBy={filters.sort_by ?? undefined}
         sortOrder={filters.sort_order}
         onSort={setSort}

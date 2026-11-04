@@ -20,8 +20,10 @@ export default function HistoryPage() {
   const {
     filters,
     handleExport,
+    isError,
     isLoading,
     people,
+    reload,
     reset,
     rows,
     setDateRange,
@@ -79,6 +81,8 @@ export default function HistoryPage() {
       <HistoryTable
         rows={rows}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         withProduct
         pagination={{ page: filters.page, pageSize: filters.limit, total, onPage: setPage, onPageSize: setPageSize }}
       />

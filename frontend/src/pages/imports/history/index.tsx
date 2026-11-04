@@ -16,6 +16,7 @@ import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
 import { SkeletonRows } from "@/_components/molecules/Skeletons";
 import { EmptyState } from "@/_components/molecules/EmptyState";
+import { LoadError } from "@/_components/molecules/LoadError";
 
 const buildTabs = (t: TFn): TabItem[] => [{ id: "imports", label: t("imports.tab") }];
 
@@ -59,7 +60,7 @@ export default function ImportsPage() {
 
 function ImportsTab() {
   const t = useT();
-  const { imports, isLoading } = useImports();
+  const { imports, isLoading, isError, reload } = useImports();
   const { deleteImport, isDeleting } = useDeleteImport();
   const { deleteImports, isDeletingMany } = useDeleteImports();
   const [pendingRow, setPendingRow] = useState<DataImport | null>(null);
@@ -88,6 +89,7 @@ function ImportsTab() {
       </Card>
     );
   }
+  if (isError && sorted.length === 0) return <LoadError onRetry={reload} />;
   if (sorted.length === 0) {
     return <EmptyState title={t("imports.empty")} />;
   }

@@ -2,7 +2,17 @@ import { useCallback, useRef, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { DayPicker, type DateRange as DPRange } from "react-day-picker";
 import { fr } from "date-fns/locale";
-import { autoUpdate, flip, offset, shift, size, useDismiss, useFloating, useInteractions } from "@floating-ui/react";
+import {
+  autoUpdate,
+  flip,
+  FloatingPortal,
+  offset,
+  shift,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from "@floating-ui/react";
 
 import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/molecules/dayPicker";
 import { useT } from "@/i18n/I18nProvider";
@@ -101,6 +111,7 @@ export function DateRangePicker({ from, to, onChange, showPresets = true, classN
     open,
     onOpenChange: setOpen,
     placement: "bottom-start",
+    strategy: "fixed", // drawn on top of the page (portal below): no parent cuts it
     middleware: [
       offset(8),
       flip({ padding: 16 }),
@@ -339,46 +350,48 @@ export function DateRangePicker({ from, to, onChange, showPresets = true, classN
       {/* Popover — Floating UI positions it under the date-field wrapper. flip()
           + shift() + size() handle every viewport edge case automatically. */}
       {open && (
-        <div
-          ref={setPanelEl}
-          {...getFloatingProps()}
-          style={floatingStyles}
-          className="z-50 flex flex-col overflow-auto rounded-xl border border-border bg-card shadow-2xl"
-        >
-          {showPresets && (
-            <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">
-              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                {t("shared.quickPeriods")}
+        <FloatingPortal>
+          <div
+            ref={setPanelEl}
+            {...getFloatingProps()}
+            style={floatingStyles}
+            className="z-[60] flex flex-col overflow-auto rounded-xl border border-border bg-card shadow-2xl"
+          >
+            {showPresets && (
+              <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("shared.quickPeriods")}
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {DATE_PRESETS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => applyPreset(p.get())}
+                      className="cursor-pointer rounded-md px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    >
+                      {t(p.label)}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1">
-                {DATE_PRESETS.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => applyPreset(p.get())}
-                    className="cursor-pointer rounded-md px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                  >
-                    {t(p.label)}
-                  </button>
-                ))}
-              </div>
+            )}
+            <div className="p-3">
+              <DayPicker
+                mode="range"
+                numberOfMonths={2}
+                locale={fr}
+                selected={{ from: fromDate, to: toDate }}
+                onSelect={handleRangeSelect}
+                weekStartsOn={1}
+                showOutsideDays
+                defaultMonth={fromDate ?? new Date()}
+                classNames={DAY_PICKER_CLASSES}
+                modifiersClassNames={DAY_PICKER_MODIFIERS}
+              />
             </div>
-          )}
-          <div className="p-3">
-            <DayPicker
-              mode="range"
-              numberOfMonths={2}
-              locale={fr}
-              selected={{ from: fromDate, to: toDate }}
-              onSelect={handleRangeSelect}
-              weekStartsOn={1}
-              showOutsideDays
-              defaultMonth={fromDate ?? new Date()}
-              classNames={DAY_PICKER_CLASSES}
-              modifiersClassNames={DAY_PICKER_MODIFIERS}
-            />
           </div>
-        </div>
+        </FloatingPortal>
       )}
     </div>
   );

@@ -17,6 +17,8 @@ import { Page } from "@/_components/templates/Page";
 interface AchatsTableProps {
   rows: AchatRow[];
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   sortBy: string | null;
   sortOrder: "asc" | "desc";
   onSort: (key: string) => void;
@@ -140,13 +142,15 @@ const buildColumns = (t: TFn): ColumnDef<AchatRow>[] => [
   },
 ];
 
-function AchatsTable({ rows, isLoading, sortBy, sortOrder, onSort, pagination }: AchatsTableProps) {
+function AchatsTable({ rows, isLoading, isError, onRetry, sortBy, sortOrder, onSort, pagination }: AchatsTableProps) {
   const t = useT();
   return (
     <DataTable<AchatRow>
       rows={rows}
       columns={buildColumns(t)}
       isLoading={isLoading}
+      isError={isError}
+      onRetry={onRetry}
       sortBy={sortBy ?? undefined}
       sortOrder={sortOrder}
       onSort={onSort}
@@ -204,8 +208,10 @@ export default function AchatsPage() {
     clearRef,
     filters,
     handleExport,
+    isError,
     isLoading,
     list,
+    reload,
     reset,
     setCategories,
     setDateRange,
@@ -342,6 +348,8 @@ export default function AchatsPage() {
       <AchatsTable
         rows={list?.data ?? []}
         isLoading={isLoading}
+        isError={isError}
+        onRetry={reload}
         sortBy={filters.sort_by}
         sortOrder={filters.sort_order}
         onSort={setSort}

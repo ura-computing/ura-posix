@@ -68,12 +68,38 @@ if [ ${#SPECS[@]} -gt 0 ]; then         # files given on the command line
 fi
 
 if [ "$MODE" = ui ]; then
-  if [ ${#SPECS[@]} -eq 0 ]; then
-    spec="$(ask "Test file (e.g. 06 or ventes; all = every test)" all)"
-    [ "$spec" != all ] && args+=("$(spec_file "$spec")")
-  fi
+  # Every test in a real browser, slowed down (250 ms per action), one after the other — inside ONE window (Xephyr:
+  # a screen in a window). It stays on the workspace where you put it: nothing pops up elsewhere, nothing takes the
+  # focus. Closed at the end. No Xephyr / no X11 desktop: the browser opens on the desktop itself.
   export E2E_HEADED=1 E2E_SLOWMO=250
   args+=(--headed)
+  if command -v   > /dev/null && command -v xdotool > /dev/null && [ -n "${DISPLAY:-}" ]; then
+    read -r width height < <(xdotool getdisplaygeometry)
+    export E2E_SCREEN="$((width * 95 / 100))x$((height - 110))" # room for the desktop's bars + the window title
+    screen=99
+    while [ -e "/tmp/.X11-unix/X$screen" ]; do screen=$((screen + 1)); done
+    Xephyr ":$screen" -screen "$E2E_SCREEN" -title "PharmaGest — tests" -ac -br -noreset -no-host-grab > /dev/null 2>&1 &
+    xephyr=$!
+    # That window has none of the desktop's settings: the app's font (« system-ui ») would fall back to DejaVu (an old
+    # look) → the desktop's own font (gsettings); the browser in French (on Linux: LANGUAGE), so it offers no translation.
+    fonts="$(mktemp -d)"
+    trap 'kill "$xephyr" 2> /dev/null || true; rm -rf "$fonts"' EXIT
+    desktop_font="$(gsettings get org.gnome.desktop.interface font-name 2> /dev/null | tr -d "'" | sed 's/ [0-9.]*$//')" ||
+      desktop_font="" # not GNOME: the system's fonts
+    {
+      echo '<?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd"><fontconfig>'
+      echo '<include ignore_missing="yes">/etc/fonts/fonts.conf</include>'
+      if [ -n "$desktop_font" ]; then
+        for family in sans-serif Sans system-ui; do
+          echo "<alias binding=\"strong\"><family>$family</family><prefer><family>$desktop_font</family></prefer></alias>"
+        done
+      fi
+      echo '</fontconfig>'
+    } > "$fonts/fonts.conf"
+    export FONTCONFIG_FILE="$fonts/fonts.conf" LANGUAGE=fr
+    for _ in $(seq 50); do [ -e "/tmp/.X11-unix/X$screen" ] && break; sleep 0.1; done
+    export DISPLAY=":$screen"
+  fi
 elif [ ${#SPECS[@]} -eq 0 ]; then
   if [ "$(ask "Only the tests that failed last time? (y/n)" n)" = y ]; then
     args+=(--last-failed)               # + the setup tests (01, 02) they depend on
@@ -83,4 +109,4 @@ elif [ ${#SPECS[@]} -eq 0 ]; then
   fi
 fi
 
-exec npx playwright test ${args[@]+"${args[@]}"}
+npx playwright test ${args[@]+"${args[@]}"}
