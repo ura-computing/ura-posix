@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import select
+import signal
 import time as clock
 
 import psycopg2
@@ -122,6 +123,25 @@ def _listen():
     return raw
 
 
+def requeue(run_id: int) -> None:
+    """This robot is stopping in the middle of a run (`make worker` restarts it when the code changes, a deploy stops
+    it): the run goes back in the queue, so the next robot takes it at once (a product import resumes at its last
+    page) instead of « running » for STALE_AFTER."""
+    with SessionLocal() as db:
+        run = db.get(SobrusRun, run_id)
+        if run is None or run.status != "running":
+            return
+        run.status, run.phase, run.started_at, run.heartbeat_at = "queued", None, None, None
+        run.events = [*run.events, {"at": datetime.now(timezone.utc).isoformat(), "code": "requeued"}]
+        db.commit()
+    log.info("Sobrus run %s back in the queue: this robot is stopping", run_id)
+
+
+def _stop_on_sigterm(*_) -> None:
+    """`docker stop`, a deploy: like Ctrl+C (the run in progress goes back in the queue)."""
+    raise SystemExit(0)
+
+
 def describe(run_id: int) -> str:
     """« products · Pharmacie Demo (pharmacy 1), by user 3 »."""
     with SessionLocal() as db:
@@ -158,7 +178,11 @@ def main() -> None:
             while (run_id := claim()) is not None:
                 log.info("Sobrus run %s started: %s", run_id, describe(run_id))
                 began = clock.monotonic()
-                execute(run_id)
+                try:
+                    execute(run_id)
+                except (KeyboardInterrupt, SystemExit):  # stopped (code changed in dev, deploy): the next robot goes on
+                    requeue(run_id)
+                    raise
                 log.info("Sobrus run %s ended in %s: %s", run_id, _duration(clock.monotonic() - began), result(run_id))
             # Sleep until the API queues a run, at most TICK_S (tonight's runs, a stopped robot's).
             if select.select([listen], [], [], TICK_S)[0]:
@@ -188,4 +212,8 @@ if __name__ == "__main__":
     # httpx logs every URL at INFO: the Sobrus login URLs carry its one-time `code` / `state`.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("alembic").setLevel(logging.WARNING)  # « Context impl … » at every schema check
-    main()
+    signal.signal(signal.SIGTERM, _stop_on_sigterm)
+    try:
+        main()
+    except KeyboardInterrupt:  # Ctrl+C, or `make worker` reloading after a code change
+        log.info("Sobrus robot stopped")

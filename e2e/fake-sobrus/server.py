@@ -12,13 +12,20 @@ one (backend/app/sobrus/sobrus_client.py), never the real Sobrus.
                                        the lines whose date is inside (same date rules as csv_parse)
   GET  /reports/exports/stock        → today's stock as JSON, like the real one (no dates): the rows of
                                        resources/tests/stock/*.csv + the categories / taxes / zones tables
+  GET  /paymentmethods               the payment ways [{id, name, label, status}]
+  GET  /reports/cashdeskclosing      ?start_date&end_date&by_day=1: one closing per day (Sunday: none), from the day
+                                     alone (`closing_day`, same formula as e2e/lib/sobrus.ts), every block keyed by day
+  GET  /products?page                the stock file's products then 3 new ones (SOB-E2E-1…3), 21 a page, [] after;
+                                     laboratoire / DCI / galenic form set (the catalogue's empty fields get them)
   POST /__control                    test only: {password} = « the owner changed his Sobrus password »
                                      (every session ends); {delay} = seconds each export waits (« Arrêter »);
                                      {verify} = Sobrus asks a check (« Confirmez votre numéro »): /authorize
                                      shows a page instead of the code (no SBSID2), every session ends;
                                      {busy: n} = the next n logins answer 429 (too many logins), every session ends;
                                      {fail: "login" | "export" | null} = Sobrus down at login (503, every session
-                                     ends) or refusing the export (500)
+                                     ends) or refusing the export (500); {forbid: "closing" | "products" | null}
+                                     = that read answers 403 (an account without access); {products_delay} = seconds
+                                     each product page waits (« Arrêter », the popup)
 Standard library only. Env: FAKE_SOBRUS_EMAIL, FAKE_SOBRUS_PASSWORD, FAKE_SOBRUS_DATA, FAKE_SOBRUS_BASE, PORT."""
 
 from __future__ import annotations
@@ -36,7 +43,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
 
 EMAIL = os.environ.get("FAKE_SOBRUS_EMAIL", "pharmacie@sobrus.e2e")
-STATE = {"password": os.environ.get("FAKE_SOBRUS_PASSWORD", "SobrusE2e#2026"), "delay": 0.0, "verify": False, "busy": 0, "fail": None}
+STATE = {
+    "password": os.environ.get("FAKE_SOBRUS_PASSWORD", "SobrusE2e#2026"),
+    "delay": 0.0,
+    "verify": False,
+    "busy": 0,
+    "fail": None,
+    "forbid": None,
+    "products_delay": 0.0,
+}
 DATA = Path(os.environ.get("FAKE_SOBRUS_DATA", "/data"))
 BASE = os.environ.get("FAKE_SOBRUS_BASE", "http://sobrus.e2e.test:9100").rstrip("/")
 PORT = int(os.environ.get("PORT", "9100"))
@@ -124,6 +139,105 @@ def export(kind: str, start: date, end: date) -> bytes:
     return ("\n".join([header, *lines]) + "\n").encode("utf-8")
 
 
+PAYMENT_METHODS = [
+    {"id": "41", "name": "cash", "label": "Espèce", "status": "active"},
+    {"id": "43", "name": "debit_card", "label": "Carte bancaire", "status": "active"},
+    {"id": "46", "name": "credit", "label": "Avoir", "status": "active"},
+]
+
+
+def closing_day(d: date) -> dict | None:
+    """One day's closing, from the date alone (e2e/lib/sobrus.ts computes the same): None on Sunday."""
+    if d.weekday() == 6:
+        return None
+    invoices = d.day + 10
+    total = round(invoices * 100.5, 2)
+    credit = round(total * 0.2, 2)
+    paid = round(total - credit, 2)
+    returns = 12.0 if d.day % 5 == 0 else 0.0
+    return {
+        "stats": {
+            "invoice_date": d.isoformat(),
+            "invoices_count": str(invoices),
+            "total": str(total),
+            "total_pretax": str(total),
+            "paid": str(paid),
+            "unpaid": str(credit),
+            "total_discount": "0",
+            "total_cash_sales": str(paid),
+            "total_cash_sales_discount": "0",
+            "total_credit_sales": str(credit),
+            "total_credit_sales_discount": "0",
+            "total_unpaid_credit_sales": str(credit),
+            "gross_total": total,
+            "total_sales_returns": str(returns),
+            "net": round(total - returns, 2),
+        },
+        "methods": {
+            "41": {"payments_on_cash_sales": round(paid * 0.6, 2), "settlements": None, "advances": None, "expenses": None, "other": 0},
+            "43": {"payments_on_cash_sales": round(paid - round(paid * 0.6, 2), 2), "settlements": None, "advances": None, "expenses": None, "other": 0},
+        },
+        "customer": (f"9{d.day:02d}", f"CLIENT CREDIT {d.day:02d}", credit),
+    }
+
+
+def closing_report(start: date, end: date) -> dict:
+    blocks: dict[str, dict] = {k: {} for k in ("sales_stats", "income_by_method", "credit_sales_stats_by_customer")}
+    customers: dict[str, dict] = {}
+    d = start
+    while d <= end:
+        day = closing_day(d)
+        if day:
+            key = d.isoformat()
+            blocks["sales_stats"][key] = day["stats"]
+            blocks["income_by_method"][key] = day["methods"]
+            cid, name, credit = day["customer"]
+            blocks["credit_sales_stats_by_customer"][key] = {cid: str(credit)}
+            customers[cid] = {"ID": cid, "name": name, "balance": str(round(credit * 2, 2))}
+        d = date.fromordinal(d.toordinal() + 1)
+    return {"data": {**blocks, "customers_info": customers, "totals_dates": list(blocks["sales_stats"])}}
+
+
+def product_list() -> list[dict]:
+    """The stock file's products, then 3 products the catalogue does not have yet."""
+    path = sorted((DATA / "stock").glob("*.csv"))[-1]
+    rows = list(csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines(), delimiter=";"))
+    ref = lambda label: {"ID": "1" if label else None, "label": label or None}  # noqa: E731
+    items = [
+        {
+            "ID": r["PID"],
+            "name": r["Produit"],
+            "barcode": r["Code barre 1"] or None,
+            "sale_price": r["PPV"],
+            "purchase_price": r["PPH"],
+            "sale_tax_id": ref(r["TVA"]),
+            "product_category_id": ref(r["Catégorie"]),
+            "laboratory_supplier_id": ref("LABORATOIRE SOBRUS E2E"),
+            "product_dci_id": ref(f"DCI {r['PID']}"),
+            "product_galenic_form_id": ref("Comprimé"),
+            "deactivation_reason": ref(None),
+        }
+        for r in rows
+    ]
+    for i in (1, 2, 3):
+        items.append(
+            {
+                "ID": f"SOB-E2E-{i}",
+                "name": f"PRODUIT SOBRUS E2E {i}",
+                "barcode": f"61190000990{i}",
+                "sale_price": "25.00",
+                "purchase_price": "18.00",
+                "sale_tax_id": ref("TVA (20.00%)"),
+                "product_category_id": ref("Parapharmacie (25.000%)"),
+                "laboratory_supplier_id": ref("LABORATOIRE SOBRUS E2E"),
+                "product_dci_id": ref(None),
+                "product_galenic_form_id": ref("Crème"),
+                "deactivation_reason": ref(None),
+            }
+        )
+    return items
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # quiet: the E2E log is the backend's
         pass
@@ -195,6 +309,24 @@ class Handler(BaseHTTPRequestHandler):
             if cookies.get("SBSID2") in APP_SESSIONS:
                 return self._json(200, {"user": {"user_id": 1}})
             return self._json(401, {"errors": ["unauthenticated"]})
+        if url.path in ("/paymentmethods", "/reports/cashdeskclosing", "/products"):
+            if cookies.get("SBSID2") not in APP_SESSIONS:
+                return self._json(401, {"errors": ["unauthenticated"]})
+            if url.path == "/paymentmethods":
+                return self._json(200, PAYMENT_METHODS)
+            if url.path == "/reports/cashdeskclosing":
+                if STATE["forbid"] == "closing":
+                    return self._json(403, {"errors": ["Accès interdit"]})
+                try:
+                    start, end = date.fromisoformat(q["start_date"]), date.fromisoformat(q["end_date"])
+                except (KeyError, ValueError):
+                    return self._json(400, {"errors": ["dates"]})
+                return self._json(200, closing_report(start, end))
+            if STATE["forbid"] == "products":
+                return self._json(403, {"errors": ["Accès interdit"]})
+            time.sleep(STATE["products_delay"])
+            page = max(1, int(q.get("page") or 1))
+            return self._json(200, {"data": product_list()[(page - 1) * 21 : page * 21]})
         if url.path.startswith("/reports/exports/"):
             kind = url.path.rsplit("/", 1)[-1]
             if cookies.get("SBSID2") not in APP_SESSIONS:
@@ -244,6 +376,10 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["fail"] = body["fail"]
                 if body["fail"] == "login":
                     APP_SESSIONS.clear()
+            if "forbid" in body:
+                STATE["forbid"] = body["forbid"]
+            if "products_delay" in body:
+                STATE["products_delay"] = float(body["products_delay"])
             if "password" in body:
                 STATE["password"] = body["password"]
                 ACCOUNT_SESSIONS.clear()

@@ -252,6 +252,7 @@ def _story(code: str, data: dict) -> str:
         "products_try": "reading the Sobrus product list with this account",
         "products_resume": f"resuming where the last import stopped: page {n}",
         "products_done": f"products: {n} added to the catalogue, {_n(data.get('filled'))} filled",
+        "requeued": "robot restarted: the run goes on",
         "run_success": "done",
         "run_cancelled": "stopped (« Arrêter »)",
         "run_error": f"stopped: {data.get('error')}",

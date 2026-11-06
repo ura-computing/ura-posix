@@ -57,7 +57,8 @@ test.describe("propriétaire", () => {
   test("inviter un employé : mot de passe tapé, toutes les permissions", async ({ page }) => {
     const all = [...ALL_FEATURES].sort();
     const on = [...PHARMACY_FEATURES].sort(); // premium off for the pharmacy
-    expectSame(await open(page), { employees: [], pharmacy_features: on, my_permissions: on }, "équipe au départ");
+    // The owner holds every permission; the pharmacy's switches leave the premium ones off.
+    expectSame(await open(page), { employees: [], pharmacy_features: on, my_permissions: all }, "équipe au départ");
 
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");

@@ -312,6 +312,7 @@ export const es: Dict = {
   },
   closing: {
     title: "Cierre de caja (Sobrus)",
+    export: "Exportar el cierre",
     fetchedAt: "recuperado el {{date}}",
     invoices: "Facturas",
     total: "Total",
@@ -425,6 +426,7 @@ export const es: Dict = {
       products_try: "Lectura de los productos con esta cuenta",
       products_resume: "Reanudación donde se detuvo la última importación: página {{n}}",
       products_done: "Productos: {{n}} añadido(s) al catálogo, {{filled}} completado(s)",
+      requeued: "Robot reiniciado: la importación continúa",
       run_success: "Terminado",
       run_error: "Detenido: {{error}}",
       run_cancelled: "Detenido a petición suya",

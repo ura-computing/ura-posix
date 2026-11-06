@@ -319,6 +319,7 @@ export const fr = {
   },
   closing: {
     title: "Clôture de caisse (Sobrus)",
+    export: "Exporter la clôture",
     fetchedAt: "récupérée le {{date}}",
     invoices: "Factures",
     total: "Total",
@@ -433,6 +434,7 @@ export const fr = {
       products_try: "Lecture des produits avec ce compte",
       products_resume: "Reprise là où le dernier import s'est arrêté : page {{n}}",
       products_done: "Produits : {{n}} ajouté(s) au catalogue, {{filled}} complété(s)",
+      requeued: "Robot redémarré : l'import reprend",
       run_success: "Terminé",
       run_error: "Arrêté : {{error}}",
       run_cancelled: "Arrêté à votre demande",

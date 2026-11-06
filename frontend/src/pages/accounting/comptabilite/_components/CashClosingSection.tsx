@@ -165,7 +165,7 @@ export function CashClosingSection({ month }: { month: string }) {
         </SectionTitle>
         <Button variant="outline" onClick={exportClosings} disabled={days.length === 0}>
           <Download className="size-4" />
-          {t("common.export")}
+          {t("closing.export")}
         </Button>
       </div>
       {closings && !closings.connected ? (

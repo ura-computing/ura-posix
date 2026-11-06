@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost } from "../lib/api";
-import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, PREMIUM_FEATURES, loadState, sessionFile } from "../lib/auth";
 import { expected } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
 import { REPO_DIR } from "../lib/paths";
@@ -789,11 +789,14 @@ test.describe("administrateur", () => {
         const cancel = page.locator("main").getByRole("button", { name: "Annuler", exact: true });
         await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
         await expect(switches.and(page.locator("[aria-checked=true]"))).toHaveCount(0);
-        await cancel.click(); // nothing saved: all back on
-        await expect(switches.and(page.locator("[aria-checked=false]"))).toHaveCount(0);
+        const off = switches.and(page.locator("[aria-checked=false]"));
+        await cancel.click(); // nothing saved: back as saved (every feature on, premium off)
+        await expect(off).toHaveCount(PREMIUM_FEATURES.length);
         await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
         await page.getByRole("button", { name: "Tout activer", exact: true }).click();
-        await expect(switches.and(page.locator("[aria-checked=false]"))).toHaveCount(0);
+        await expect(off).toHaveCount(0);
+        await cancel.click(); // premium switched on only on screen: back as saved
+        await expect(off).toHaveCount(PREMIUM_FEATURES.length);
         await expect(cancel, "comme enregistré : rien à annuler").toHaveCount(0);
       });
       await test.step("permissions du propriétaire : « Tout activer (où possible) », « Annuler »", async () => {
