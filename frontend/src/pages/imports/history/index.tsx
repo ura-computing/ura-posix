@@ -10,6 +10,10 @@ import type { TabItem } from "@/_components/molecules/TabBar";
 import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
 import type { DataImport, DocType, ImportBatchStatus } from "@/types";
 
+import { useMe } from "@/hooks/useMe";
+import { ROLES } from "@/types";
+
+import { SobrusProductsTab } from "./_components/SobrusProductsTab";
 import { useDeleteImport, useDeleteImports, useImports } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { Page } from "@/_components/templates/Page";
@@ -18,7 +22,11 @@ import { SkeletonRows } from "@/_components/molecules/Skeletons";
 import { EmptyState } from "@/_components/molecules/EmptyState";
 import { LoadError } from "@/_components/molecules/LoadError";
 
-const buildTabs = (t: TFn): TabItem[] => [{ id: "imports", label: t("imports.tab") }];
+/** The admin also sees his catalogue imports from Sobrus (one owner's Sobrus account each). */
+const buildTabs = (t: TFn, admin: boolean): TabItem[] => [
+  { id: "imports", label: t("imports.tab") },
+  ...(admin ? [{ id: "sobrus", label: t("imports.tabSobrus") }] : []),
+];
 
 const TYPE_LABEL: Record<DocType, string> = {
   achat: "imports.typeAchat",
@@ -48,12 +56,17 @@ function relativeDate(iso: string, t: TFn): string {
 
 export default function ImportsPage() {
   const t = useT();
+  const { me } = useMe();
+  const admin = me?.role === ROLES.ADMIN;
   const [active, setActive] = useState("imports");
 
   return (
     <Page title={t("imports.title")} subtitle={t("imports.subtitle")}>
-      <TabBar tabs={buildTabs(t)} activeId={active} onChange={setActive} />
-      <div>{active === "imports" && <ImportsTab />}</div>
+      <TabBar tabs={buildTabs(t, admin)} activeId={active} onChange={setActive} />
+      <div>
+        {active === "imports" && <ImportsTab />}
+        {active === "sobrus" && admin && <SobrusProductsTab />}
+      </div>
     </Page>
   );
 }

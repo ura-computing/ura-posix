@@ -85,3 +85,12 @@ export interface CatalogImportResponse {
   skipped: number;
   errors: RowError[];
 }
+
+/** GET /admin/catalog/stats: tiles on top of the Catalogue. */
+export interface CatalogStats {
+  total: number;
+  pharmacie: number;
+  parapharmacie: number;
+  /** Type not set yet (the sidebar badge). */
+  unclassified: number;
+}

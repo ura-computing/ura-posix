@@ -58,6 +58,13 @@ class MedicamentUpdate(BaseModel):
     product_type: str | None = None
 
 
+class CatalogStats(BaseModel):
+    total: int
+    pharmacie: int
+    parapharmacie: int
+    unclassified: int  # product_type not set yet (the sidebar badge)
+
+
 class CatalogListResponse(BaseModel):
     data: list[MedicamentRow]
     pagination: Pagination

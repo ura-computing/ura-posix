@@ -359,6 +359,8 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
         "pid": med.pid,
         "product": v["product"],
         "laboratoire": v["laboratoire"],
+        "dci": med.dci,  # from Sobrus' product list (admin « Produits Sobrus »)
+        "galenic_form": med.galenic_form,
         "category": v["category"],
         "category_type": extra["category_type"],
         "tva": v["tva"],

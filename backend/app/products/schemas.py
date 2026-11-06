@@ -144,6 +144,8 @@ class ProductSheet(BaseModel):
     pid: str
     product: str
     laboratoire: str | None
+    dci: str | None  # Sobrus' product list (admin « Produits Sobrus »); None = « À renseigner »
+    galenic_form: str | None
     category: str | None
     category_type: Literal["pharmacie", "parapharmacie"]
     tva: str | None

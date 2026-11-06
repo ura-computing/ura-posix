@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.errors import ApiError, CatchServerErrors, api_error_handler, validation_error_handler
 from app.core.rate_limit import limiter, rate_limit_handler
 from app.accounting.exclusions import router as exclusions
+from app.accounting.closings import router as closings
 from app.accounting.payments import router as accounting
 from app.analytics import router as stats
 from app.catalog import router as catalog
@@ -63,4 +64,5 @@ app.include_router(history.router, prefix="/v1")
 app.include_router(sobrus.router, prefix="/v1")
 app.include_router(exclusions.router, prefix="/v1")
 app.include_router(accounting.router, prefix="/v1")
+app.include_router(closings.router, prefix="/v1")
 app.include_router(store_website.router, prefix="/v1")

@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost } from "../lib/api";
-import { ALL_FEATURES, loadState, saveState, sessionFile } from "../lib/auth";
+import { ALL_FEATURES, PHARMACY_FEATURES, loadState, saveState, sessionFile } from "../lib/auth";
 import {
   CATEGORY_TYPES,
   checkAnalyse,
@@ -286,7 +286,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     {
       name: P.name,
       city: P.city,
-      enabled_features: sorted(ALL_FEATURES),
+      enabled_features: sorted(PHARMACY_FEATURES),
       members: [],
       archived_at: null,
     },
@@ -316,7 +316,7 @@ test("pharmacies : créer, modifier, fonctionnalités, membre (permissions, stat
     );
   });
 
-  const features = ALL_FEATURES.filter((f) => f !== "stock" && f !== "analyse");
+  const features = PHARMACY_FEATURES.filter((f) => f !== "stock" && f !== "analyse");
   await test.step("fonctionnalités : Stock + Analyse coupées", async () => {
     // The page's only switches: one per feature, in ALL_FEATURES order.
     for (const f of ["stock", "analyse"]) await page.getByRole("switch").nth(ALL_FEATURES.indexOf(f)).click();
@@ -531,7 +531,10 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Pharmacie", exact: true }).click();
     // Its options open on top of the page (over the dialog, never cut by it).
-    await page.locator('[data-list="Pharmacie"]').getByRole("button", { name: /· Pharmacie Demo$/ }).click();
+    await page
+      .locator('[data-list="Pharmacie"]')
+      .getByRole("button", { name: /· Pharmacie Demo$/ })
+      .click();
     const assigned = pageSend(page, "PATCH", `/admin/users/${member.id}/pharmacy`);
     await dialog.getByRole("button", { name: "Assigner", exact: true }).click();
     expectSame(

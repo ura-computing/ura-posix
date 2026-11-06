@@ -12,7 +12,7 @@ import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
-import { ALL_FEATURES, LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, PHARMACY_FEATURES, loadState, sessionFile } from "../lib/auth";
 import { expect, fakeApi, test } from "../lib/fixtures";
 import { STATE_DIR } from "../lib/paths";
 import { OPENERS, PAGES, pagesOf, splitGet, type AppPage, type Opener } from "../lib/pages";
@@ -132,7 +132,7 @@ test.describe("owner", () => {
     const admin = await ctx.newPage();
     const features = `/admin/pharmacies/${loadState().pharmacyId}/features`;
     try {
-      for (const feature of ALL_FEATURES) {
+      for (const feature of PHARMACY_FEATURES) {
         await test.step(feature, async () => {
           const pages = PAGES.filter((p) => p.feature === feature && "owner" in p.open);
           await apiPut(admin, features, { features: { [feature]: false } });

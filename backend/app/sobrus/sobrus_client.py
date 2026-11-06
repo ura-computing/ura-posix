@@ -6,7 +6,8 @@
   4 GET  the same /authorize (without `prompt`) → {API}/auth/token?code&state → cookie SBSID2 (≈ 4 days)
 
 Exports: GET {API}/reports/exports/{purchases|sales}?start_date&end_date with SBSID2 (the CSV the
-« Télécharger en CSV » button gives). Every refusal is logged with its step + HTTP status (the robot's log), never a
+« Télécharger en CSV » button gives). JSON reads (`get_json`): the cash desk closing report, the payment ways, the
+product list. Every refusal is logged with its step + HTTP status (the robot's log), never a
 password, a cookie value or a query string (one-time codes)."""
 
 from __future__ import annotations
@@ -146,6 +147,25 @@ class SobrusClient:
                 return bytes(content)
         except httpx.HTTPError as e:
             raise SobrusError("sobrusUnreachable") from e
+
+    def get_json(self, path: str, params: dict) -> dict | list:
+        """A JSON read of Sobrus' API (`/reports/cashdeskclosing`, `/paymentmethods`, `/products`), like its pages do.
+        401 / 403 / a redirect → SessionExpired (the caller logs in again once; refused again = no access)."""
+        r = self._request("GET", f"{settings.SOBRUS_API_URL}{path}", params=params, follow_redirects=False)
+        if r.status_code in (401, 403) or r.is_redirect:
+            log.info("Sobrus %s: HTTP %s", path, r.status_code)
+            raise SessionExpired()
+        if r.status_code == 429:
+            log.warning("Sobrus %s: HTTP 429 (too many requests)", path)
+            raise SobrusError("sobrusBusy")
+        if r.status_code != 200:
+            log.warning("Sobrus %s: HTTP %s", path, r.status_code)
+            raise SobrusError("sobrusExportFailed")
+        try:
+            return r.json()
+        except ValueError as e:
+            log.warning("Sobrus %s: not JSON", path)
+            raise SobrusError("sobrusExportFailed") from e
 
 
 def _json(r: httpx.Response) -> dict:

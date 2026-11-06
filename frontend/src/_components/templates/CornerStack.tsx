@@ -1,11 +1,12 @@
-/** Bottom-right, on every page: the Sobrus robot's run (owners with « Connexion Sobrus »), then the files being imported. */
+/** Bottom-right, on every page: the Sobrus robot's run (owners with « Connexion Sobrus »), the admin's Catalogue
+ *  « Importer les produits depuis Sobrus », then the files being imported. */
 import { useNavigate } from "react-router-dom";
 
 import { ROUTES } from "@/types";
 import { Ban, CheckCircle2, Clock, FileSpreadsheet, X } from "lucide-react";
 import type { DocType } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
-import { SobrusRunCard } from "@/_components/organisms/SobrusRunCard";
+import { AdminSobrusImportCard, SobrusRunCard } from "@/_components/organisms/SobrusRunCard";
 import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
 import { formatQty } from "@/utils/format";
 import { Spinner } from "@/_components/atoms/Spinner";
@@ -203,10 +204,11 @@ function JobCard({
   );
 }
 
-export function CornerStack({ sobrusOwner }: { sobrusOwner: boolean }) {
+export function CornerStack({ sobrusOwner, admin }: { sobrusOwner: boolean; admin: boolean }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex w-[320px] flex-col gap-2">
+    <div className="fixed bottom-4 right-4 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-2">
       {sobrusOwner && <SobrusRunCard />}
+      {admin && <AdminSobrusImportCard />}
       <UploadProgressWidget />
     </div>
   );

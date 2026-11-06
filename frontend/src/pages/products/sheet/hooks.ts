@@ -323,8 +323,9 @@ function editSchema(t: TFn) {
 
 /** The owner's « Modifier »: a form over what the sheet shows; « Enregistrer » sends the changed
  *  fields only; « Revenir à la valeur importée » clears one edit. Employees: read only. */
-/** The sheet's editable blocks: « Informations générales » (Général) and « Identifiants » (Codes). */
-export type EditSection = "infos" | "codes";
+/** The sheet's editable blocks, each with its own « Modifier »: « Identité », « Prix et marge », « Stock et
+ *  réappro » (Général) and « Identifiants » (Codes). */
+export type EditSection = "identity" | "prices" | "stock" | "codes";
 
 export function useSheetEditor(sheet: ProductSheet | null) {
   const t = useT();
@@ -374,13 +375,6 @@ export function useSheetEditor(sheet: ProductSheet | null) {
     if (sheet) await mutateAsync({ id: sheet.id, body: { [field]: null } });
   };
 
-  /** « Appliquer » a suggestion: those values saved at once (stock minimum / maximum). */
-  const apply = async (changes: ProductEditIn) => {
-    if (!sheet) return;
-    await mutateAsync({ id: sheet.id, body: changes });
-    toast.success(t("products.applied"));
-  };
-
   return {
     canEdit: me?.role === "owner",
     section,
@@ -388,7 +382,6 @@ export function useSheetEditor(sheet: ProductSheet | null) {
     cancel,
     save,
     revert,
-    apply,
     isSaving: isPending,
     form,
   };

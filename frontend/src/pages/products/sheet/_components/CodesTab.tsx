@@ -44,7 +44,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   return (
     <div className="max-w-3xl">
       <SheetCard title={t("products.identifiers")} actions={<SectionEditActions section="codes" />}>
-        <EditHint section="codes" />
+        <EditHint sections={["codes"]} />
         <InfoNote>{t("products.pidInfo")}</InfoNote>
         <dl className="flex flex-col gap-3">
           <CodeRow

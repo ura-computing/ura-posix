@@ -52,7 +52,7 @@ export function AppLayout() {
           </Suspense>
         </main>
       </div>
-      <CornerStack sobrusOwner={sobrusOwner} />
+      <CornerStack sobrusOwner={sobrusOwner} admin={me.role === ROLES.ADMIN} />
     </div>
   );
 }

@@ -117,10 +117,10 @@ export function SectionEditActions({ section }: { section: EditSection }) {
 }
 
 /** While its block is edited: what the owner's values change. */
-export function EditHint({ section }: { section: EditSection }) {
+export function EditHint({ sections }: { sections: EditSection[] }) {
   const t = useT();
   const { editor } = useSheetEdit();
-  if (editor.section !== section) return null;
+  if (!editor.section || !sections.includes(editor.section)) return null;
   return (
     <p className="rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-foreground">
       {t("products.editHint")}

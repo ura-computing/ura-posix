@@ -96,6 +96,7 @@ class ErrorCode(StrEnum):
     SOBRUS_UNREACHABLE = "sobrusUnreachable"
     SOBRUS_EXPORT_FAILED = "sobrusExportFailed"
     SOBRUS_INTERRUPTED = "sobrusInterrupted"
+    SOBRUS_NO_ACCESS = "sobrusNoAccess"
     CONSENT_REQUIRED = "consentRequired"
     # Store website (hidden feature)
     REQUEST_NOT_FOUND = "requestNotFound"

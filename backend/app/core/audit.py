@@ -24,6 +24,7 @@ class AuditAction(StrEnum):
     SOBRUS_PASSWORD_UPDATED = "sobrus_password_updated"  # {email}
     SOBRUS_DISCONNECTED = "sobrus_disconnected"  # {email}
     SOBRUS_LOGIN_REFUSED = "sobrus_login_refused"  # {email, reason = error code}
+    SOBRUS_PRODUCTS_FETCHED = "sobrus_products_fetched"  # {added, filled} (by the admin, « Produits Sobrus »)
 
 
 def user_label(user: User) -> str:

@@ -8,7 +8,7 @@
 import type { Page } from "@playwright/test";
 
 import { apiGet, apiPost } from "../lib/api";
-import { ALL_FEATURES, LOGGED_OUT, loadState, login, saveState, sessionFile } from "../lib/auth";
+import { ALL_FEATURES, LOGGED_OUT, PHARMACY_FEATURES, loadState, login, saveState, sessionFile } from "../lib/auth";
 import { type Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expect, test } from "../lib/fixtures";
@@ -24,6 +24,8 @@ const EMP = {
 const NEW_PASSWORD = "EmployeE2e#2";
 const REMOVED = ["stock", "analyse"];
 const GRANTED = ALL_FEATURES.filter((f) => !REMOVED.includes(f)).sort();
+/** What the employee can open: granted ∩ the pharmacy's switches (premium off). */
+const EFFECTIVE = GRANTED.filter((f) => PHARMACY_FEATURES.includes(f));
 
 const employeeId = (): number => loadState().employeeId;
 
@@ -54,7 +56,8 @@ test.describe("propriétaire", () => {
 
   test("inviter un employé : mot de passe tapé, toutes les permissions", async ({ page }) => {
     const all = [...ALL_FEATURES].sort();
-    expectSame(await open(page), { employees: [], pharmacy_features: all, my_permissions: all }, "équipe au départ");
+    const on = [...PHARMACY_FEATURES].sort(); // premium off for the pharmacy
+    expectSame(await open(page), { employees: [], pharmacy_features: on, my_permissions: on }, "équipe au départ");
 
     await page.getByRole("button", { name: "Inviter un employé" }).click();
     const dialog = page.getByRole("dialog");
@@ -185,7 +188,7 @@ test.describe("employé", () => {
     await login(page, { ...EMP, password: NEW_PASSWORD }, "employee");
     const me = await apiGet(page, "/auth/me");
     expectSame(me.user, { email: EMP.email, name: EMP.name, role: "employee", status: "active" }, "/auth/me");
-    expect([...me.permissions].sort(), "permissions effectives").toEqual(GRANTED);
+    expect([...me.permissions].sort(), "permissions effectives").toEqual(EFFECTIVE);
     const refused = await apiPost(page, "/owner/employees", {}, {}, 403);
     expect(refused.code, "un employé ne gère pas l'équipe (POST /owner/employees)").toBe("ownerOnly");
     await expect(page.getByRole("link", { name: "Stock", exact: true }), "menu sans Stock").toHaveCount(0);

@@ -9,6 +9,8 @@ import { cn } from "@/utils/cn";
 import { formatMAD, formatNumStr, formatPct } from "@/utils/format";
 import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types";
 
+import { CatalogStatsTiles } from "./_components/CatalogStatsTiles";
+import { SobrusImportCard } from "./_components/SobrusImportCard";
 import { useCatalogPage } from "./hooks";
 import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
@@ -528,6 +530,8 @@ export default function CataloguePage() {
 
   return (
     <Page title={t("catalogue.title")} subtitle={t("catalogue.subtitle")}>
+      <CatalogStatsTiles onFilterType={setType} />
+
       <FilterBar
         search={{
           value: filters.search,
@@ -566,6 +570,8 @@ export default function CataloguePage() {
         activeFilters={activeFilters}
         onResetAll={reset}
       />
+
+      <SobrusImportCard />
 
       <DataTable<Medicament>
         rows={list?.data ?? []}

@@ -11,6 +11,7 @@ import type {
   MargeMode,
   MarginAlertsResponse,
   PharmacyListRow,
+  AdminSobrusImport,
   SobrusConnection,
   StatsFilters,
   StatsResponse,
@@ -135,6 +136,26 @@ export function useSobrusConnection(enabled = true) {
     connection: data ?? null,
     isLoading,
     isError,
+    reload: () => void refetch(),
+  };
+}
+
+const importActive = (s: AdminSobrusImport | undefined) =>
+  !!s?.runs.some(({ run }) => run.status === "queued" || run.status === "running");
+
+/** Admin Catalogue « Importer les produits depuis Sobrus »: the last click's tries (the Catalogue card, the corner
+ *  card on every admin page). Polled every 2 s while one runs. */
+export function useAdminSobrusImport(enabled = true) {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: API.admin.sobrusProducts.key,
+    queryFn: () => api.get<AdminSobrusImport>(API.admin.sobrusProducts.url),
+    enabled,
+    refetchInterval: (query) => (importActive(query.state.data) ? 2000 : false),
+  });
+  return {
+    sobrusImport: data ?? null,
+    isLoading,
+    isRunning: importActive(data),
     reload: () => void refetch(),
   };
 }

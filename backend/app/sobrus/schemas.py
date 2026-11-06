@@ -10,12 +10,12 @@ from app.core.utils import today
 
 class SobrusRunOut(BaseModel):
     id: int
-    mode: Literal["full", "new", "check", "range"]
+    mode: Literal["full", "new", "check", "range", "products"]  # products: the admin's « Produits Sobrus »
     status: Literal["queued", "running", "success", "error", "cancelled"]
     cancel_requested: bool
     date_from: date | None  # mode `range` only
     date_to: date | None
-    phase: str | None  # login | download | import
+    phase: str | None  # login | download | import | closing | products
     kind: str | None  # achat | vente
     year: int | None
     bytes_received: int
@@ -74,3 +74,20 @@ class SobrusRunIn(BaseModel):
         if self.date_from > self.date_to:
             raise ValueError("date_from après date_to")
         return self
+
+
+class AdminProductsRun(BaseModel):
+    pharmacy_name: str
+    run: SobrusRunOut
+
+
+class AdminSobrusImportOut(BaseModel):
+    """Catalogue « Importer les produits depuis Sobrus »: connected pharmacies (active connection) and the last
+    click's tries, oldest first (refused accounts, then the one that worked or still runs)."""
+
+    connected: int
+    runs: list[AdminProductsRun]
+
+
+class AdminSobrusImportStarted(BaseModel):
+    pharmacy_name: str  # whose owner's Sobrus account is read first

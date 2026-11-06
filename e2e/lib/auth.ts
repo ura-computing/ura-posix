@@ -31,7 +31,13 @@ export const ALL_FEATURES = [
   "special_products",
   "produits",
   "sobrus",
+  "labels",
+  "orders",
 ];
+/** Premium (« Étiquette », « Commander »): OFF for a new pharmacy; the admin switches them on. Users always get them. */
+export const PREMIUM_FEATURES = ["labels", "orders"];
+/** A new pharmacy's switches ON (and so an account's effective access): every feature but the premium ones. */
+export const PHARMACY_FEATURES = ALL_FEATURES.filter((f) => !PREMIUM_FEATURES.includes(f));
 
 /** admin / owner: saved by the setup project. employee / account: 12 and 13. */
 export type Role = "admin" | "owner" | "employee" | "account";

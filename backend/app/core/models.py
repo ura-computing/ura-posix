@@ -207,6 +207,9 @@ class Medicament(Base):
     barcode1: Mapped[str | None] = mapped_column(String, nullable=True)
     barcode2: Mapped[str | None] = mapped_column(String, nullable=True)
     laboratoire: Mapped[str | None] = mapped_column(String, nullable=True)
+    # From Sobrus' product list (admin « Produits Sobrus »): the active substance, the galenic form (« Comprimé »).
+    dci: Mapped[str | None] = mapped_column(String, nullable=True)
+    galenic_form: Mapped[str | None] = mapped_column(String, nullable=True)
     product_type: Mapped[str | None] = mapped_column(String, nullable=True)  # pharmacie | parapharmacie | None
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
@@ -417,7 +420,7 @@ class AuditLog(Base):
 
 
 SOBRUS_CONNECTION_STATUSES = ("active", "needs_login", "invalid")
-SOBRUS_RUN_MODES = ("full", "new", "check", "range")
+SOBRUS_RUN_MODES = ("full", "new", "check", "range", "products")
 SOBRUS_RUN_STATUSES = ("queued", "running", "success", "error", "cancelled")
 
 
@@ -454,6 +457,37 @@ class SobrusConnection(Base):
     # The owner was emailed about the current problem (once per problem); failed nights in a row.
     problem_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_nights: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # « Clôture de caisse » report: None = not tried yet, False = this Sobrus account may not read it (only the
+    # owner's login can), True = read at the last run.
+    closing_access: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+
+class SobrusCashClosing(Base):
+    """Sobrus' « Clôture de caisse » of one day (report `cashdeskclosing`, read by the worker at every run): the
+    sales, paid / unpaid, credit, returns, net; `by_method` = {sobrus code: {label, cash_sales, settlements,
+    advances, expenses, other}}; `by_customer` = [{name, credit, balance}] (credit sales of the day). One row per
+    pharmacy and day, replaced at each fetch. Shown read-only in Comptabilité."""
+
+    __tablename__ = "sobrus_cash_closings"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "day", name="uq_sobrus_cash_closings_pharmacy_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    invoices: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    paid: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    unpaid: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    discount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    cash_sales: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    credit_sales: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    unpaid_credit: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    returns: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    net: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    gross_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    by_method: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    by_customer: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class SobrusRun(Base):

@@ -10,6 +10,13 @@ POST   /v1/sobrus/runs                {mode: full | new | check | range, date_fr
 GET    /v1/sobrus/runs                the last runs, newest first (the page polls while one runs)
 POST   /v1/sobrus/runs/{id}/cancel    « Arrêter »: the run ends now (cancelled); a busy robot stops at its next check
 
+Admin, Catalogue « Importer les produits depuis Sobrus » (run mode `products`, one owner's Sobrus login at a
+time, `catalog_import.py`; the catalogue CSV import stays for when Sobrus fails):
+POST   /v1/admin/catalog/sobrus-products         queue the fetch with one owner's account (the next one if refused)
+GET    /v1/admin/catalog/sobrus-products         the last click's tries + how many pharmacies are connected
+GET    /v1/admin/catalog/sobrus-products/history every try, newest first (« Gestion des imports »)
+POST   /v1/admin/catalog/sobrus-products/cancel  « Arrêter »
+
 A queued run wakes the robot at once (`launcher.wake`: Postgres NOTIFY to `worker.py`, its own process).
 """
 
@@ -25,12 +32,21 @@ from sqlalchemy.orm import Session
 from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import SobrusConnection, SobrusRun
-from app.core.permissions import owner
+from app.core.models import Pharmacy, SobrusConnection, SobrusRun
+from app.core.permissions import AdminDep, owner
 from app.core.security import CurrentUserDep
+from app.sobrus.catalog_import import chain_since, queue_next
 from app.sobrus.crypto import encrypt
 from app.sobrus.launcher import wake
-from app.sobrus.schemas import SobrusConnectionIn, SobrusConnectionOut, SobrusRunIn, SobrusRunOut
+from app.sobrus.schemas import (
+    AdminProductsRun,
+    AdminSobrusImportOut,
+    AdminSobrusImportStarted,
+    SobrusConnectionIn,
+    SobrusConnectionOut,
+    SobrusRunIn,
+    SobrusRunOut,
+)
 
 router = APIRouter(tags=["sobrus"])
 
@@ -51,6 +67,8 @@ def _connection_out(db: Session, pharmacy_id: int) -> SobrusConnectionOut:
     if conn is None:
         return SobrusConnectionOut(connected=False)
     run = _active_run(db, pharmacy_id)
+    if run is not None and run.mode == "products":  # the admin's catalogue import: its progress is the admin's
+        run = None
     return SobrusConnectionOut(
         connected=True,
         email=conn.email,
@@ -156,7 +174,7 @@ def start_run(body: SobrusRunIn, pharmacy_id: OwnerSobrus, user: CurrentUserDep,
 def list_runs(pharmacy_id: OwnerSobrus, db: DbDep, limit: Annotated[int, Query(ge=1, le=50)] = 10) -> list[SobrusRun]:
     return (
         db.query(SobrusRun)
-        .filter(SobrusRun.pharmacy_id == pharmacy_id)
+        .filter(SobrusRun.pharmacy_id == pharmacy_id, SobrusRun.mode != "products")  # the admin's, shown to him only
         .order_by(SobrusRun.created_at.desc(), SobrusRun.id.desc())
         .limit(limit)
         .all()
@@ -181,3 +199,70 @@ def cancel_run(run_id: Annotated[int, Path(ge=1)], pharmacy_id: OwnerSobrus, db:
     db.commit()
     db.refresh(run)
     return run
+
+
+@router.post("/admin/catalog/sobrus-products", response_model=AdminSobrusImportStarted, status_code=201)
+def start_products_import(admin: AdminDep, db: DbDep) -> AdminSobrusImportStarted:
+    """« Importer les produits depuis Sobrus »: one owner's Sobrus account, the last that worked; the robot tries the
+    next connected pharmacy if Sobrus refuses it (`catalog_import`)."""
+    if not db.query(SobrusConnection).filter(SobrusConnection.status == "active").count():
+        raise ApiError(409, ErrorCode.SOBRUS_NOT_CONNECTED, "Aucune pharmacie n'est connectée à Sobrus.")
+    if db.query(SobrusRun.id).filter(SobrusRun.mode == "products", SobrusRun.status.in_(ACTIVE)).first():
+        raise ApiError(409, ErrorCode.SOBRUS_RUN_ACTIVE, "Un import Sobrus est déjà en cours.")
+    wake(db)  # delivered by queue_next's commit
+    run = queue_next(db, datetime.now(timezone.utc), admin.id, set())
+    if run is None:  # every connected pharmacy is busy with its own run
+        raise ApiError(409, ErrorCode.SOBRUS_RUN_ACTIVE, "Un import Sobrus est déjà en cours.")
+    return AdminSobrusImportStarted(pharmacy_name=db.get(Pharmacy, run.pharmacy_id).name)
+
+
+@router.get("/admin/catalog/sobrus-products", response_model=AdminSobrusImportOut)
+def products_import(_: AdminDep, db: DbDep) -> AdminSobrusImportOut:
+    """The last click's tries (oldest first: refused accounts, then the one that worked or still runs) + how many
+    pharmacies are connected."""
+    latest = db.query(SobrusRun).filter(SobrusRun.mode == "products").order_by(SobrusRun.id.desc()).first()
+    rows = []
+    if latest is not None:
+        rows = (
+            db.query(SobrusRun, Pharmacy.name)
+            .join(Pharmacy, Pharmacy.id == SobrusRun.pharmacy_id)
+            .filter(SobrusRun.mode == "products", SobrusRun.created_at >= chain_since(latest))
+            .order_by(SobrusRun.id)
+            .all()
+        )
+    connected = db.query(SobrusConnection).filter(SobrusConnection.status == "active").count()
+    return AdminSobrusImportOut(
+        connected=connected,
+        runs=[
+            AdminProductsRun(pharmacy_name=name, run=SobrusRunOut.model_validate(run, from_attributes=True))
+            for run, name in rows
+        ],
+    )
+
+
+@router.get("/admin/catalog/sobrus-products/history", response_model=list[AdminProductsRun])
+def products_import_history(
+    _: AdminDep, db: DbDep, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> list[AdminProductsRun]:
+    """« Gestion des imports » (admin), tab « Produits Sobrus »: every try, newest first, with the account used."""
+    rows = (
+        db.query(SobrusRun, Pharmacy.name)
+        .join(Pharmacy, Pharmacy.id == SobrusRun.pharmacy_id)
+        .filter(SobrusRun.mode == "products")
+        .order_by(SobrusRun.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        AdminProductsRun(pharmacy_name=name, run=SobrusRunOut.model_validate(run, from_attributes=True))
+        for run, name in rows
+    ]
+
+
+@router.post("/admin/catalog/sobrus-products/cancel", response_model=AdminSobrusImportOut)
+def cancel_products_import(admin: AdminDep, db: DbDep) -> AdminSobrusImportOut:
+    """« Arrêter »: the running / queued fetch ends now (what it added stays); no next account is tried."""
+    for run in db.query(SobrusRun).filter(SobrusRun.mode == "products", SobrusRun.status.in_(ACTIVE)):
+        _stop(run)
+    db.commit()
+    return products_import(admin, db)

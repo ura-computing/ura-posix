@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
-import { type DataImport, type DataImportsResponse, type DocType } from "@/types";
+import { type AdminSobrusImport, type DataImport, type DataImportsResponse, type DocType } from "@/types";
 
 export function useImports() {
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -85,4 +85,17 @@ export function useDeleteImports() {
     deleteImports: mutateAsync,
     isDeletingMany: isPending,
   };
+}
+
+/** Admin, tab « Produits Sobrus »: every catalogue import from Sobrus (one owner's account each), newest first;
+ *  looked at again every 3 s while one runs. */
+export function useSobrusProductImports(enabled: boolean) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.admin.sobrusProductsHistory.key,
+    queryFn: () => api.get<AdminSobrusImport["runs"]>(API.admin.sobrusProductsHistory.url),
+    enabled,
+    refetchInterval: (query) =>
+      query.state.data?.some(({ run }) => run.status === "queued" || run.status === "running") ? 3000 : false,
+  });
+  return { runs: data ?? [], isLoading, isError, reload: () => void refetch() };
 }

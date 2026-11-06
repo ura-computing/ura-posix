@@ -22,6 +22,7 @@ from app.core.models import (
 from app.core.permissions import admin_only
 from app.catalog.schemas import (
     CatalogListResponse,
+    CatalogStats,
     CategorySuffixIn,
     CategorySuffixOut,
     MedicamentCreate,
@@ -79,6 +80,18 @@ def unclassified_count(db: DbDep) -> dict:
     admin sidebar badge + owner alert."""
     n = db.query(func.count(Medicament.id)).filter(Medicament.product_type.is_(None)).scalar()
     return {"count": int(n or 0)}
+
+
+@router.get("/admin/catalog/stats", response_model=CatalogStats)
+def catalog_stats(db: DbDep) -> CatalogStats:
+    """The catalogue at a glance (tiles on top of its page): every product, by type, the unclassified ones."""
+    rows = dict(db.query(Medicament.product_type, func.count(Medicament.id)).group_by(Medicament.product_type).all())
+    return CatalogStats(
+        total=sum(rows.values()),
+        pharmacie=rows.get("pharmacie", 0),
+        parapharmacie=rows.get("parapharmacie", 0),
+        unclassified=rows.get(None, 0),
+    )
 
 
 @router.get("/admin/catalog/categories", response_model=list[str])

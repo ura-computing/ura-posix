@@ -4,6 +4,7 @@ import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import type { StatsFilters, StatsResponse, PaymentEntry, PaymentMethod, VenteRow } from "@/types";
 
+import { CashClosingSection } from "./_components/CashClosingSection";
 import { useComptabilitePage, useDeletePayment, useSavePayment } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { useState } from "react";
@@ -581,6 +582,9 @@ export default function ComptabilitePage() {
           <PaymentMethodGrid payments={payments} onOpenMethod={setOpenMethod} />
         )}
       </section>
+
+      {/* Sobrus « Clôture de caisse » of the same month (read-only) */}
+      <CashClosingSection month={activeMonth} />
 
       {/* Ventes ledger */}
       <section className="flex flex-col gap-3">

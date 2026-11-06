@@ -9,7 +9,7 @@ import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useStats, useVentesList } from "@/hooks/sharedQueries";
 
-import type { PaymentMethod, StatsFilters, VentesFilters, PaymentEntry, PaymentEntryIn } from "@/types";
+import type { ClosingMonth, PaymentMethod, StatsFilters, VentesFilters, PaymentEntry, PaymentEntryIn } from "@/types";
 import { translateFr } from "@/i18n/I18nProvider";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
@@ -222,5 +222,32 @@ export function useDeletePayment() {
   return {
     deletePayment: mutateAsync,
     isDeleting: isPending,
+  };
+}
+
+/** « Clôture de caisse » of one month (read-only, fetched by the Sobrus robot at every run) + its Excel file. */
+export function useCashClosings(month: string) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.cashClosings.list.key(month),
+    queryFn: () => api.get<ClosingMonth>(API.cashClosings.list.url, { params: { month } }),
+    staleTime: 30_000,
+  });
+  const exportClosings = () => {
+    if (!data) return;
+    const header = ["Date", "Factures", "Total (MAD)", "Payé (MAD)", "Crédit (MAD)", "Retours (MAD)", "Net (MAD)"];
+    const rows = data.days.map((d) => [d.day, d.invoices, d.total, d.paid, d.credit_sales, d.returns, d.net]);
+    const { invoices, total, paid, credit_sales, returns, net } = data.totals;
+    void downloadXlsx(
+      [header, ...rows, ["Total", invoices, total, paid, credit_sales, returns, net]],
+      exportFilename("Clôture de caisse", "xlsx", `${month}-01`, data.days.at(-1)?.day ?? `${month}-01`),
+      "Clôture de caisse",
+    );
+  };
+  return {
+    closings: data ?? null,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+    exportClosings,
   };
 }

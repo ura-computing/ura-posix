@@ -52,7 +52,7 @@ Topic rules in `.claude/rules/` (each loads with the files it covers):
 - Users barely know how to use a laptop → every screen: plain words, one obvious action, big clear targets, no jargon.
 - Admin / owner type the password on create / reset (8+ chars). Credentials sent with « Ouvrir dans Gmail » (web compose).
 - Admin and owner member pages behave the same (`frontend/src/_components/`, `backend/app/identity/members/`).
-- New pharmacy / user: every feature / permission ON by default.
+- New pharmacy / user: every feature / permission ON by default, except premium (Étiquette `labels`, Commander `orders`): OFF for the pharmacy, the admin switches them on.
 - No access → 404 inside the layout (sidebar stays).
 - Exclusions (special products, BL, suppliers) apply in Comptabilité ONLY.
 - FR ⇄ ES: all text via `fr.ts` + `es.ts`. Backend errors send a `code`, the frontend shows `errors.<code>` (`backend/app/core/errors.py`).

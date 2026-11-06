@@ -11,7 +11,7 @@
 import type { Page } from "@playwright/test";
 
 import { apiGet } from "../lib/api";
-import { ALL_FEATURES, LOGGED_OUT, OWNER, loadState, saveState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, OWNER, PHARMACY_FEATURES, loadState, saveState, sessionFile } from "../lib/auth";
 import { type Row } from "../lib/checks";
 import { expectSame } from "../lib/diff";
 import { expect, test } from "../lib/fixtures";
@@ -244,7 +244,9 @@ test.describe("admin", () => {
     const created = (await apiGet<Row[]>(page, "/admin/pharmacies")).find((p) => p.code === res.pharmacy_code);
     expectSame(created, { name: NEW_PHARMACY.name, city: NEW_PHARMACY.city }, "pharmacie créée");
     const detail = await apiGet<Row>(page, `/admin/pharmacies/${created!.id}`);
-    expect([...detail.enabled_features].sort(), "toutes les fonctionnalités").toEqual([...ALL_FEATURES].sort());
+    expect([...detail.enabled_features].sort(), "toutes les fonctionnalités, premium coupées").toEqual(
+      [...PHARMACY_FEATURES].sort(),
+    );
   });
 
   test("« Refuser » les 2 autres : rien n'est créé, un email part", async ({ page }) => {

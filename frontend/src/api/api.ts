@@ -368,6 +368,14 @@ export const API = {
     },
   },
 
+  /** « Clôture de caisse » (read-only, fetched by the Sobrus robot). */
+  cashClosings: {
+    list: {
+      url: "/accounting/cash-closings",
+      key: (month: string) => ["cash-closings", month] as const,
+    },
+  },
+
   specialProducts: {
     list: { url: "/special-products/", key: ["special-products", "list"] },
     suggestions: {
@@ -537,6 +545,21 @@ export const API = {
         ["admin", "pharmacy-analyse", id, mode, ...p(df, dt), ct] as const,
       all: ["admin", "pharmacy-analyse"],
     },
+    /** Catalogue « Importer les produits depuis Sobrus »: the last click's tries; start; « Arrêter ». */
+    sobrusProducts: { url: "/admin/catalog/sobrus-products", key: ["admin", "sobrus-products", "last"] },
+    /** « Gestion des imports » (admin), tab « Produits Sobrus »: every try, newest first. */
+    sobrusProductsHistory: {
+      url: "/admin/catalog/sobrus-products/history",
+      key: ["admin", "sobrus-products", "history"],
+    },
+    startSobrusProducts: {
+      url: "/admin/catalog/sobrus-products",
+      refreshes: (): Read[] => [API.admin.sobrusProducts, API.admin.sobrusProductsHistory],
+    },
+    cancelSobrusProducts: {
+      url: "/admin/catalog/sobrus-products/cancel",
+      refreshes: (): Read[] => [API.admin.sobrusProducts, API.admin.sobrusProductsHistory],
+    },
     users: { url: "/admin/users", key: ["admin", "users"] },
     signupRequests: { url: "/admin/signup-requests", key: ["admin", "signup-requests"] },
     // A new account (and maybe a new pharmacy): both admin lists change.
@@ -582,21 +605,43 @@ export const API = {
         url: "/admin/catalog/unclassified-count",
         key: ["admin", "catalog", "unclassified-count"],
       },
+      /** Tiles on top of the Catalogue: every product, by type, the unclassified ones. */
+      stats: { url: "/admin/catalog/stats", key: ["admin", "catalog", "stats"] },
       create: {
         url: "/admin/catalog",
-        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
+        refreshes: (): Read[] => [
+          API.admin.catalog.list,
+          API.admin.catalog.categories,
+          API.admin.catalog.stats,
+          API.admin.catalog.unclassifiedCount,
+        ],
       },
       update: {
         url: (id: number) => `/admin/catalog/${id}`,
-        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
+        refreshes: (): Read[] => [
+          API.admin.catalog.list,
+          API.admin.catalog.categories,
+          API.admin.catalog.stats,
+          API.admin.catalog.unclassifiedCount,
+        ],
       },
       remove: {
         url: (id: number) => `/admin/catalog/${id}`,
-        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
+        refreshes: (): Read[] => [
+          API.admin.catalog.list,
+          API.admin.catalog.categories,
+          API.admin.catalog.stats,
+          API.admin.catalog.unclassifiedCount,
+        ],
       },
       importCsv: {
         url: "/uploads/catalog",
-        refreshes: (): Read[] => [API.admin.catalog.list, API.admin.catalog.categories],
+        refreshes: (): Read[] => [
+          API.admin.catalog.list,
+          API.admin.catalog.categories,
+          API.admin.catalog.stats,
+          API.admin.catalog.unclassifiedCount,
+        ],
       },
     },
   },

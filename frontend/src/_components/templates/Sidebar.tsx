@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
+import { formatNumStr } from "@/utils/format";
 import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -61,7 +62,7 @@ function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
       title={t("nav.pendingTitle", { n })}
       aria-label={t("nav.unclassifiedAria", { n })}
     >
-      {n > 99 ? "99+" : n}
+      {collapsed && n > 99 ? "99+" : formatNumStr(n)}
     </span>
   );
 }

@@ -1,23 +1,17 @@
-/** Top of the product sheet, on every tab: « Retour à la liste des produits »; the name, one line « PID · Catégorie ·
- *  TVA · Labo · emplacement », the type and stock badges, the code barre; on the right the stock at a glance and the
- *  sheet's actions: « Modifier », the premium « Étiquette » / « Commander N », « Observations ». */
-import type { ReactNode } from "react";
-import { ArrowLeft, MapPin, Pencil, Printer, ShoppingCart, StickyNote } from "lucide-react";
+/** Top of the product sheet, on every tab, kept calm: « Retour à la liste des produits »; the name; one line with
+ *  the type and stock badges, the PID and the code barre; on the right one row of actions: « Observations », the
+ *  premium « Étiquette » / « Commander N ». */
+import { ArrowLeft, Printer, ShoppingCart, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
-import { Card } from "@/_components/atoms/Card";
-import { SectionTitle } from "@/_components/atoms/SectionTitle";
-import { PremiumTag } from "@/_components/molecules/PremiumTag";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import type { PremiumFeature } from "@/_components/organisms/PremiumDialog";
-import { ROUTES, type ProductSheet, type ProductStock } from "@/types";
+import { ROUTES, type ProductSheet } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatQty } from "@/utils/format";
 
-import { tvaShort, withoutRate } from "../labels";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
 
@@ -51,73 +45,19 @@ function StockStateBadge({ stock }: { stock: number | null }) {
   );
 }
 
-const Dot = () => (
-  <span aria-hidden className="text-muted-foreground">
-    ·
-  </span>
-);
-
-/** Under the name: « PID : … · Catégorie : … · TVA : … · Labo : … · 📍 emplacement », the type and stock badges;
- *  then the code barre (drawn, number, copy). No laboratory: « Non renseigné » + « Compléter » (the owner's edit). */
-export function SheetMeta({
-  sheet,
-  canEdit,
-  onComplete,
-}: {
-  sheet: ProductSheet;
-  canEdit: boolean;
-  /** « Compléter »: the « Identité » block in edit mode. */
-  onComplete: () => void;
-}) {
+/** Under the name, one calm line: the type and stock badges, the PID, the code barre (drawn, number, copy).
+ *  Catégorie, TVA, laboratoire, emplacement: in the « Identité » / « Prix et marge » cards of « Général ». */
+export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
   const t = useT();
-  const items: ReactNode[] = [
-    <span key="pid">
-      {t("products.metaPid")} <span className="font-mono font-medium text-primary">{sheet.pid}</span>
-    </span>,
-  ];
-  if (sheet.category)
-    items.push(
-      <span key="cat">
-        {t("products.metaCategory")} <span className="text-foreground">{withoutRate(sheet.category)}</span>
-      </span>,
-    );
-  if (sheet.tva)
-    items.push(
-      <span key="tva">
-        {t("products.metaTva")} <span className="text-foreground">{tvaShort(sheet.tva)}</span>
-      </span>,
-    );
-  items.push(
-    <span key="lab" className="inline-flex flex-wrap items-center gap-x-2">
-      {t("products.metaLab")}
-      {sheet.laboratoire ? (
-        <span className="text-foreground">{sheet.laboratoire}</span>
-      ) : (
-        <>
-          <span className="font-medium text-warning-subtle-foreground">{t("products.notSet")}</span>
-          <Button variant="link" onClick={onComplete} disabled={!canEdit} className="font-semibold">
-            {t("products.complete")}
-          </Button>
-        </>
-      )}
-    </span>,
-  );
-  if (sheet.stock.zone)
-    items.push(
-      <span key="zone" className="inline-flex items-center gap-1 text-foreground">
-        <MapPin className="size-4 text-muted-foreground" aria-hidden />
-        {sheet.stock.zone}
-      </span>,
-    );
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base">
-        {items.flatMap((item, i) => (i === 0 ? [item] : [<Dot key={`dot-${i}`} />, item]))}
-        <TypeBadge type={sheet.category_type} size="md" />
-        <StockStateBadge stock={sheet.stock.current_stock} />
-      </div>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-base">
+      <TypeBadge type={sheet.category_type} size="md" />
+      <StockStateBadge stock={sheet.stock.current_stock} />
+      <span>
+        {t("products.metaPid")} <span className="font-mono font-medium text-primary">{sheet.pid}</span>
+      </span>
       {sheet.barcode1 && (
-        <span className="flex flex-wrap items-center gap-3">
+        <span className="flex items-center gap-3">
           <BarcodeImage code={sheet.barcode1} className="h-8 w-20" />
           <span className="font-mono text-base font-semibold text-foreground">{sheet.barcode1}</span>
           <CopyButton value={sheet.barcode1} label={t("products.copyBarcode")} iconOnly />
@@ -127,54 +67,16 @@ export function SheetMeta({
   );
 }
 
-/** The stock at a glance: current (red under the minimum), minimum, maximum, « ≈ N jours de ventes ». */
-function StockBox({ stock }: { stock: ProductStock }) {
-  const t = useT();
-  const { current_stock: current, stock_min: min, stock_max: max, coverage_days: days } = stock;
-  const under = current != null && current < min;
-  const row = (label: string, value: number) => (
-    <span className="flex items-center justify-between gap-6 text-sm">
-      <span className="font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="font-mono font-semibold text-foreground">{formatQty(value)}</span>
-    </span>
-  );
-  return (
-    <Card as="div" padding="sm" tone={under ? "warning" : "default"} className="flex min-w-52 flex-col gap-1.5">
-      <span className="flex items-baseline justify-between gap-6">
-        <SectionTitle>{t("products.stock")}</SectionTitle>
-        <span className={cn("font-mono text-3xl font-bold", under ? "text-error" : "text-foreground")}>
-          {current == null ? "—" : formatQty(current)}
-        </span>
-      </span>
-      {row("Min", min)}
-      {row("Max", max)}
-      {days != null && (
-        <span className={cn("text-sm font-medium", under ? "text-warning-subtle-foreground" : "text-muted-foreground")}>
-          {t("products.daysOfSales", { n: days })}
-        </span>
-      )}
-    </Card>
-  );
-}
-
-/** Right of the title: the stock box, then « Modifier » (owner; shown disabled for an employee, with the reason),
- *  « Étiquette » and « Commander N » (premium: « Premium » while the pharmacy does not have it; N = maximum − stock,
- *  disabled when nothing to order), « Observations » (their window). */
+/** Right of the title, one row: « Observations » (their window), « Étiquette » and « Commander N » (premium: without
+ *  it, a click opens the upgrade screen; N = maximum − stock, disabled when nothing to order, the reason
+ *  under the row). No « Modifier » here: each block of « Général » / « Codes » has its own. The stock: the « Stock
+ *  actuel » tile and the « Stock et réappro » card. */
 export function SheetActions({
   sheet,
-  canEdit,
-  editing,
-  onEdit,
-  unlocked,
   onPremium,
   onOpenNotes,
 }: {
   sheet: ProductSheet;
-  canEdit: boolean;
-  /** A block is being edited: one at a time. */
-  editing: boolean;
-  onEdit: () => void;
-  unlocked: Record<PremiumFeature, boolean>;
   onPremium: (feature: PremiumFeature) => void;
   onOpenNotes: () => void;
 }) {
@@ -182,33 +84,24 @@ export function SheetActions({
   const { current_stock: current, stock_max: max } = sheet.stock;
   const toOrder = Math.max(0, max - Math.max(0, current ?? 0));
   const notes = sheet.notes_count;
-  const hint = (text: string) => <span className="max-w-56 text-xs text-muted-foreground">{text}</span>;
   return (
-    <div className="flex flex-wrap items-start gap-3">
-      <StockBox stock={sheet.stock} />
-      <div className="flex min-w-48 flex-col gap-2">
-        <Button variant="primary" onClick={onEdit} disabled={!canEdit || editing}>
-          <Pencil className="size-4" />
-          {t("common.edit")}
-        </Button>
-        {!canEdit && hint(t("products.ownerOnly"))}
-        <Button variant="outline" onClick={() => onPremium("labels")}>
-          <Printer className="size-4" />
-          {t("products.label")}
-          {!unlocked.labels && <PremiumTag />}
-        </Button>
-        <Button variant="outline" onClick={() => onPremium("orders")} disabled={toOrder <= 0}>
-          <ShoppingCart className="size-4" />
-          {toOrder > 0 ? t("products.order", { n: toOrder }) : t("products.orderNone")}
-          {!unlocked.orders && <PremiumTag />}
-        </Button>
-        {toOrder <= 0 && hint(t("products.orderEnough"))}
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" onClick={onOpenNotes}>
           <StickyNote className="size-4" />
           {t("products.observations")}
           {notes > 0 && <Badge tone="warning">{notes}</Badge>}
         </Button>
+        <Button variant="outline" onClick={() => onPremium("labels")}>
+          <Printer className="size-4" />
+          {t("products.label")}
+        </Button>
+        <Button variant="outline" onClick={() => onPremium("orders")} disabled={toOrder <= 0}>
+          <ShoppingCart className="size-4" />
+          {toOrder > 0 ? t("products.order", { n: toOrder }) : t("products.orderNone")}
+        </Button>
       </div>
+      {toOrder <= 0 && <span className="text-xs text-muted-foreground">{t("products.orderEnough")}</span>}
     </div>
   );
 }

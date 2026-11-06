@@ -58,12 +58,6 @@ function ProductSheetPage({ id }: { id: number }) {
   const showNotes = notesOpen === true;
   const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
 
-  /** « Modifier » / « Compléter »: « Général », its « Identité » block in edit mode. */
-  const editInfos = () => {
-    setTab("general");
-    editor.start("infos");
-  };
-
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
     return <SheetSkeleton />;
@@ -84,18 +78,8 @@ function ProductSheetPage({ id }: { id: number }) {
         above={<BackToList />}
         media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
-        subtitle={<SheetMeta sheet={sheet} canEdit={editor.canEdit} onComplete={editInfos} />}
-        actions={
-          <SheetActions
-            sheet={sheet}
-            canEdit={editor.canEdit}
-            editing={editor.section !== null}
-            onEdit={editInfos}
-            unlocked={{ labels: has("labels"), orders: has("orders") }}
-            onPremium={setPremium}
-            onOpenNotes={() => setNotesOpen(true)}
-          />
-        }
+        subtitle={<SheetMeta sheet={sheet} />}
+        actions={<SheetActions sheet={sheet} onPremium={setPremium} onOpenNotes={() => setNotesOpen(true)} />}
       >
         <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
         {/* The page dates: « Performance » (Général), Statistiques; Traçabilité has them in its own
@@ -125,11 +109,7 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "codes" && <CodesTab sheet={sheet} />}
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
-      <PremiumDialog
-        feature={premium}
-        unlocked={premium !== null && has(premium)}
-        onClose={() => setPremium(null)}
-      />
+      <PremiumDialog feature={premium} unlocked={premium !== null && has(premium)} onClose={() => setPremium(null)} />
       <NotesDialog
         open={showNotes}
         product={sheet.product}

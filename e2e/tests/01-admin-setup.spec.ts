@@ -2,7 +2,7 @@
  *  Checks: every feature is on by default, the owner gets every permission,
  *  the password is the one typed, the reveal offers the Gmail link. */
 import { apiGet } from "../lib/api";
-import { ADMIN, ALL_FEATURES, OWNER, PHARMACY, login, saveState } from "../lib/auth";
+import { ADMIN, ALL_FEATURES, OWNER, PHARMACY, PHARMACY_FEATURES, login, saveState } from "../lib/auth";
 import { expect, test } from "../lib/fixtures";
 
 test("backend: /health", async ({ page }) => {
@@ -26,7 +26,9 @@ test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
   const pharmacyId = Number(new URL(page.url()).pathname.split("/").pop());
   const pharmacy = await apiGet(page, `/admin/pharmacies/${pharmacyId}`);
   expect(pharmacy.code, "code derived from the city").toMatch(/^BOU\d{4}$/);
-  expect([...pharmacy.enabled_features].sort(), "all features on by default").toEqual([...ALL_FEATURES].sort());
+  expect([...pharmacy.enabled_features].sort(), "all features on by default, premium off").toEqual(
+    [...PHARMACY_FEATURES].sort(),
+  );
 
   // ── Owner (password typed by the admin) ─────────────────────────────────
   await page.getByRole("button", { name: "Nouvel utilisateur" }).click();

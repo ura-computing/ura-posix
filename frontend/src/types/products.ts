@@ -101,6 +101,9 @@ export interface ProductSheet {
   pid: string;
   product: string;
   laboratoire: string | null;
+  /** From Sobrus' product list (admin « Produits Sobrus »); null = « À renseigner ». */
+  dci: string | null;
+  galenic_form: string | null;
   category: string | null;
   category_type: "pharmacie" | "parapharmacie";
   tva: string | null;
