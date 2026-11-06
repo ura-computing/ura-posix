@@ -19,9 +19,10 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy.exc import IntegrityError
+from uvicorn.logging import DefaultFormatter
 
 from app.core.database import SessionLocal, engine
-from app.core.models import PharmacyFeature, SobrusConnection, SobrusRun
+from app.core.models import Pharmacy, PharmacyFeature, SobrusConnection, SobrusRun
 from app.core.utils import PHARMACY_TZ
 from app.sobrus.launcher import BACKEND_DIR, CHANNEL
 from app.sobrus.sync import execute
@@ -121,6 +122,30 @@ def _listen():
     return raw
 
 
+def describe(run_id: int) -> str:
+    """« products · Pharmacie Demo (pharmacy 1), by user 3 »."""
+    with SessionLocal() as db:
+        run = db.get(SobrusRun, run_id)
+        pharmacy = db.get(Pharmacy, run.pharmacy_id)
+        dates = f" {run.date_from} → {run.date_to}" if run.mode == "range" else ""
+        who = f"by user {run.created_by}" if run.created_by else "nightly"
+        return f"{run.mode}{dates} · {pharmacy.name if pharmacy else '?'} (pharmacy {run.pharmacy_id}), {who}"
+
+
+def result(run_id: int) -> str:
+    with SessionLocal() as db:
+        run = db.get(SobrusRun, run_id)
+        if run.status == "error":
+            return f"error {run.error_code}"
+        return f"{run.status}, {run.lines_added:,} line(s) / product(s) added".replace(",", " ")
+
+
+def _duration(seconds: float) -> str:
+    """75.4 → « 1 min 15 s »."""
+    minutes, rest = divmod(int(seconds), 60)
+    return f"{minutes} min {rest} s" if minutes else f"{seconds:.1f} s"
+
+
 def main() -> None:
     wait_for_schema()
     listen = None
@@ -131,9 +156,10 @@ def main() -> None:
             schedule_nightly()
             recover()
             while (run_id := claim()) is not None:
-                log.info("Sobrus run %s started", run_id)
+                log.info("Sobrus run %s started: %s", run_id, describe(run_id))
+                began = clock.monotonic()
                 execute(run_id)
-                log.info("Sobrus run %s ended", run_id)
+                log.info("Sobrus run %s ended in %s: %s", run_id, _duration(clock.monotonic() - began), result(run_id))
             # Sleep until the API queues a run, at most TICK_S (tonight's runs, a stopped robot's).
             if select.select([listen], [], [], TICK_S)[0]:
                 listen.poll()
@@ -155,7 +181,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s sobrus-robot %(levelname)s %(message)s")
+    # Same look as the API's log (uvicorn: « INFO:     … », colored in a terminal).
+    handler = logging.StreamHandler()
+    handler.setFormatter(DefaultFormatter("%(levelprefix)s %(message)s", use_colors=None))
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
     # httpx logs every URL at INFO: the Sobrus login URLs carry its one-time `code` / `state`.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("alembic").setLevel(logging.WARNING)  # « Context impl … » at every schema check

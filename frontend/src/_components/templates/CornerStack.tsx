@@ -204,9 +204,10 @@ function JobCard({
   );
 }
 
+/** Above the lists' bottom bar (« Précédent / Suivant », rows per page: sticky, ≈ 80 px high), never on it. */
 export function CornerStack({ sobrusOwner, admin }: { sobrusOwner: boolean; admin: boolean }) {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-2">
+    <div className="fixed bottom-24 right-4 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-2">
       {sobrusOwner && <SobrusRunCard />}
       {admin && <AdminSobrusImportCard />}
       <UploadProgressWidget />

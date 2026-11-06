@@ -92,6 +92,7 @@ CLOSING_FULL_YEARS = 1
 PRODUCTS_PARALLEL = int(os.environ.get("SOBRUS_PRODUCTS_PARALLEL", "2"))
 PRODUCTS_BACKOFF_S = (1, 2, 4, 8, 16, 30)  # a 429 on a product page: its rate limit, seconds (the login's are minutes)
 PRODUCTS_BATCH = 40
+PRODUCTS_LOG_PAGES = 250  # a progress line in the robot's log every 250 pages (≈ 15 s)
 PRODUCTS_MAX_PAGES = 10000  # 210 000 products: never an endless loop on a Sobrus that repeats its last page
 PRODUCT_COLUMNS = "laboratory_supplier_id,product_dci_id"
 # Catalogue fields a fetch may fill (only when empty): medicament column → Sobrus product → value.
@@ -226,11 +227,43 @@ def _set(db: Session, run: SobrusRun, **fields) -> None:
     db.commit()
 
 
+def _n(value) -> str:
+    """12345 → « 12 345 » (the robot's log)."""
+    return f"{int(value or 0):,}".replace(",", " ")
+
+
+def _story(code: str, data: dict) -> str:
+    """One event as a sentence for the robot's log (the page translates `sobrus.event.<code>`)."""
+    kind, year, n = data.get("kind", ""), data.get("year", ""), _n(data.get("n"))
+    period = f"{data.get('start')} → {data.get('end')}"
+    return {
+        "login_start": "connecting to Sobrus",
+        "session_reused": "Sobrus session still open, reused",
+        "login_ok": "logged in to Sobrus",
+        "login_busy": f"Sobrus limits logins (429): new try in {data.get('n')} s",
+        "year_done": f"{kind} {year}: {n} line(s) added",
+        "year_empty": f"{kind} {year}: no line on Sobrus",
+        "period_done": f"{kind} {period}: {n} line(s) added",
+        "stock_done": f"today's stock: {n} product(s) updated",
+        "closing_done": f"cash desk closing {period}: {n} day(s) saved",
+        "closing_no_access": "cash desk closing: this Sobrus account may not read it (only the owner's login can)",
+        "closing_failed": f"cash desk closing not fetched: {data.get('error')}",
+        "products_try": "reading the Sobrus product list with this account",
+        "products_done": f"products: {n} added to the catalogue, {_n(data.get('filled'))} filled",
+        "run_success": "done",
+        "run_cancelled": "stopped (« Arrêter »)",
+        "run_error": f"stopped: {data.get('error')}",
+    }.get(code, f"{code} {data}")
+
+
 def _event(db: Session, run: SobrusRun, code: str, **data) -> None:
-    """One line of the run's story (`sobrus.event.<code>` on the page)."""
+    """One line of the run's story (`sobrus.event.<code>` on the page, a sentence in the robot's log)."""
     run.events = [*run.events, {"at": _now().isoformat(), "code": code, **data}]
     run.heartbeat_at = _now()
     db.commit()
+    (log.warning if code in ("run_error", "closing_failed", "login_busy") else log.info)(
+        "Sobrus run %s · %s", run.id, _story(code, data)
+    )
 
 
 def _cancel_requested(db: Session, run: SobrusRun) -> bool:
@@ -292,6 +325,8 @@ class Robot:
         def shown(n: int) -> None:
             _set(self.db, self.run, bytes_received=n)
 
+        what = f"{kind} {start} → {end}" if start else kind
+        log.info("Sobrus run %s · downloading %s…", self.run.id, what)
         try:
             return self.client.export(kind, start, end, shown)
         except SessionExpired:  # ended during the run (≈ 4 days): log in again, once
@@ -320,6 +355,9 @@ class Robot:
             total += 1
             if any("\x00" in v for v in r.values()):
                 raise SobrusError("fileCorrupted")
+        log.info(
+            "Sobrus run %s · downloaded %s: %.1f MB, %s line(s)", self.run.id, kind, len(content) / 1_048_576, _n(total)
+        )
         if not total:
             return None
         _set(self.db, self.run, phase="import", chunk_total=-(-total // CHUNK_SIZE), chunk_current=0)
@@ -545,6 +583,7 @@ class Robot:
         empty fields filled), one commit with the progress, one « Arrêter » check. Deactivated products are left out."""
         added = filled = 0
         page = 0
+        started, logged = time.monotonic(), 0
         _set(self.db, self.run, phase="products", kind=None, year=None, chunk_current=0, chunk_total=0)
         while page < PRODUCTS_MAX_PAGES:
             if _cancel_requested(self.db, self.run):
@@ -565,6 +604,18 @@ class Robot:
                 a, f = self._upsert_products(found)
                 added, filled = added + a, filled + f
             _set(self.db, self.run, chunk_current=page, lines_added=added)  # commits the batch
+            if page - logged >= PRODUCTS_LOG_PAGES or last:
+                logged = page
+                seconds = time.monotonic() - started
+                log.info(
+                    "Sobrus run %s · products: page %s (≈ %s read), %s new, %s filled · %.1f pages/s",
+                    self.run.id,
+                    _n(page),
+                    _n(page * 21),
+                    _n(added),
+                    _n(filled),
+                    page / seconds if seconds else 0,
+                )
             if last:
                 break
         admin = self.db.get(User, self.run.created_by) if self.run.created_by else None
