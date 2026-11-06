@@ -431,6 +431,7 @@ export const fr = {
         "Clôture de caisse : ce compte Sobrus n'y a pas accès (seul le compte du propriétaire peut la lire)",
       closing_failed: "Clôture de caisse non récupérée : {{error}}",
       products_try: "Lecture des produits avec ce compte",
+      products_resume: "Reprise là où le dernier import s'est arrêté : page {{n}}",
       products_done: "Produits : {{n}} ajouté(s) au catalogue, {{filled}} complété(s)",
       run_success: "Terminé",
       run_error: "Arrêté : {{error}}",

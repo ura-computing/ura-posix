@@ -423,6 +423,7 @@ export const es: Dict = {
         "Cierre de caja: esta cuenta Sobrus no tiene acceso (solo la cuenta del propietario puede leerlo)",
       closing_failed: "Cierre de caja no recuperado: {{error}}",
       products_try: "Lectura de los productos con esta cuenta",
+      products_resume: "Reanudación donde se detuvo la última importación: página {{n}}",
       products_done: "Productos: {{n}} añadido(s) al catálogo, {{filled}} completado(s)",
       run_success: "Terminado",
       run_error: "Detenido: {{error}}",

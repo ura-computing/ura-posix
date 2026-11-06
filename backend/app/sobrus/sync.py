@@ -92,6 +92,7 @@ CLOSING_FULL_YEARS = 1
 PRODUCTS_PARALLEL = int(os.environ.get("SOBRUS_PRODUCTS_PARALLEL", "2"))
 PRODUCTS_BACKOFF_S = (1, 2, 4, 8, 16, 30)  # a 429 on a product page: its rate limit, seconds (the login's are minutes)
 PRODUCTS_BATCH = 40
+PRODUCTS_RESUME_OVERLAP = 2  # a resumed import reads again the last 2 pages saved (safety)
 PRODUCTS_LOG_PAGES = 250  # a progress line in the robot's log every 250 pages (≈ 15 s)
 PRODUCTS_MAX_PAGES = 10000  # 210 000 products: never an endless loop on a Sobrus that repeats its last page
 PRODUCT_COLUMNS = "laboratory_supplier_id,product_dci_id"
@@ -249,6 +250,7 @@ def _story(code: str, data: dict) -> str:
         "closing_no_access": "cash desk closing: this Sobrus account may not read it (only the owner's login can)",
         "closing_failed": f"cash desk closing not fetched: {data.get('error')}",
         "products_try": "reading the Sobrus product list with this account",
+        "products_resume": f"resuming where the last import stopped: page {n}",
         "products_done": f"products: {n} added to the catalogue, {_n(data.get('filled'))} filled",
         "run_success": "done",
         "run_cancelled": "stopped (« Arrêter »)",
@@ -580,11 +582,20 @@ class Robot:
     def products(self) -> None:
         """Sobrus' product list into the catalogue (21 a page, no total: until an empty page): PRODUCTS_BATCH pages
         fetched together, then one upsert (a new PID is added, « non classé » for the admin; a known one only gets its
-        empty fields filled), one commit with the progress, one « Arrêter » check. Deactivated products are left out."""
+        empty fields filled), one commit with the progress, one « Arrêter » check. Deactivated products are left out.
+        Resume: an import cut before the end (« Arrêter », restart, error) left its last saved page on the connection;
+        the next one starts there (the furthest of every account: they all list the same Sobrus base), minus
+        PRODUCTS_RESUME_OVERLAP pages. Reaching the end clears it: the next import reads from page 1 (a new product can
+        land on any page)."""
         added = filled = 0
         page = 0
-        started, logged = time.monotonic(), 0
-        _set(self.db, self.run, phase="products", kind=None, year=None, chunk_current=0, chunk_total=0)
+        resume = self.db.query(func.max(SobrusConnection.products_page)).scalar()
+        if resume:
+            page = max(0, resume - PRODUCTS_RESUME_OVERLAP)
+            _event(self.db, self.run, "products_resume", n=page + 1)
+        first = page
+        started, logged = time.monotonic(), page
+        _set(self.db, self.run, phase="products", kind=None, year=None, chunk_current=page, chunk_total=0)
         while page < PRODUCTS_MAX_PAGES:
             if _cancel_requested(self.db, self.run):
                 raise Cancelled()
@@ -603,6 +614,7 @@ class Robot:
             if found:
                 a, f = self._upsert_products(found)
                 added, filled = added + a, filled + f
+            self.conn.products_page = page  # where the next import resumes if this one is cut
             _set(self.db, self.run, chunk_current=page, lines_added=added)  # commits the batch
             if page - logged >= PRODUCTS_LOG_PAGES or last:
                 logged = page
@@ -614,9 +626,11 @@ class Robot:
                     _n(page * 21),
                     _n(added),
                     _n(filled),
-                    page / seconds if seconds else 0,
+                    (page - first) / seconds if seconds else 0,
                 )
             if last:
+                # The whole list read: every account's next import starts from page 1 again.
+                self.db.query(SobrusConnection).update({SobrusConnection.products_page: None})
                 break
         admin = self.db.get(User, self.run.created_by) if self.run.created_by else None
         log_action(

@@ -460,6 +460,9 @@ class SobrusConnection(Base):
     # « Clôture de caisse » report: None = not tried yet, False = this Sobrus account may not read it (only the
     # owner's login can), True = read at the last run.
     closing_access: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Admin « Importer les produits depuis Sobrus »: the last page an import cut before the end saved (None = none
+    # cut, or the last one read the whole list): the next import resumes there.
+    products_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class SobrusCashClosing(Base):
