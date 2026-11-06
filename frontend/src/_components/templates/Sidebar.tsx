@@ -83,6 +83,7 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
       <NavLink
         to={item.to}
         end={item.to === ROUTES.RAPPORT}
+        aria-label={collapsed ? label : undefined} // icons only: its name stays (screen readers)
         className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
       >
         <item.icon className="size-[18px] shrink-0" aria-hidden />
@@ -187,6 +188,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => handleLogout()}
+              aria-label={collapsed ? t("header.logout") : undefined} // icon only: its name stays
               className={cn(itemClasses(false, collapsed), "w-full cursor-pointer")}
             >
               <LogOut className="size-[18px] shrink-0" aria-hidden />

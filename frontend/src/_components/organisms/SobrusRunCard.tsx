@@ -35,7 +35,11 @@ export function SobrusRunCard() {
   );
 
   return (
-    <section aria-label={t("sobrus.cornerTitle")} className="rounded-2xl border border-border bg-card shadow-lg">
+    <section
+      aria-label={t("sobrus.cornerTitle")}
+      aria-live="polite" // its steps read out as they change, like the import cards
+      className="rounded-2xl border border-border bg-card shadow-lg"
+    >
       <button
         type="button"
         onClick={() => nav(ROUTES.SOBRUS)}

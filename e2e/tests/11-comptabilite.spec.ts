@@ -290,5 +290,9 @@ test("comptabilité : modes de paiement — créer, modifier, 2ᵉ mode, supprim
     const gone = pageSend(page, "DELETE", `/accounting/payments/${c.id}`, 204);
     await page.getByRole("dialog").getByRole("button", { name: "Supprimer", exact: true }).click();
     expect(await gone, "DELETE chèques").toBeNull();
+    // The page picker back to this month.
+    await page.getByRole("button", { name: monthLabel(other), exact: true }).click();
+    await page.getByRole("button", { name: MONTHS_SHORT[Number(month.slice(5)) - 1], exact: true }).click();
+    await expect(page.getByRole("button", { name: monthLabel(month), exact: true })).toBeVisible();
   });
 });

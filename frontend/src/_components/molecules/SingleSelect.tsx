@@ -41,6 +41,9 @@ export interface SingleSelectProps {
    *  (panel grows rightward — default). "end" pins panel-right to trigger-right
    *  (panel grows leftward — use when trigger is near the viewport's right edge). */
   align?: "start" | "end";
+  /** With label="" inside a form field: that field's name, so the trigger is named « Pharmacie assignée: X »
+   *  (screen readers), not by its value alone. */
+  ariaLabel?: string;
 }
 
 export function SingleSelect({
@@ -51,6 +54,7 @@ export function SingleSelect({
   emptyValue = "",
   placement = "bottom",
   align = "start",
+  ariaLabel,
 }: SingleSelectProps) {
   const t = useT();
   const { open, setOpen, triggerRef, panelRef, panelStyle, getReferenceProps, getFloatingProps } = usePopover(
@@ -72,6 +76,7 @@ export function SingleSelect({
         ref={triggerRef}
         type="button"
         {...getReferenceProps({ onClick: () => setOpen(!open) })}
+        aria-label={ariaLabel ? `${ariaLabel}: ${selectedLabel ?? ""}` : undefined}
         className={POPOVER_TRIGGER}
       >
         <span>

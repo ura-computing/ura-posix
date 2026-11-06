@@ -660,7 +660,7 @@ flowchart LR
 |---|---|
 | `make tests` | every test, headless. Asks: vente rows (default 100 000, min 1 000), DigitalOcean limits? (default yes, [§9](#9-deployment-digitalocean)), only last failures?, record a new speed baseline? |
 | `make tests 99` · `make tests 06 15` | only those files (number or part of the name); setup 01-02 always first |
-| `make tests-ui` (or `make tests-ui ventes`) | Every test runs by itself in a real browser, slowed down: you watch each click. All inside ONE window (« PharmaGest — tests », Xephyr) that stays on its workspace: nothing pops up elsewhere, nothing takes the focus |
+| `make tests-ui` (or `make tests-ui ventes`) | Every test runs by itself in a real browser, slowed down: you watch each click. All inside ONE window (« PharmaGest — tests », Xephyr), opened once every container is up, that stays on its workspace: nothing pops up elsewhere, nothing takes the focus |
 
 Each run: generate data → build + start the Docker stack (own project `apcm-e2e`, fresh database) →
 Playwright → stack removed. After the run, a summary: tests, checks, oracle values compared, user

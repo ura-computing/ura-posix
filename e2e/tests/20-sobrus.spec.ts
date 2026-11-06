@@ -24,7 +24,7 @@ import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
 import { expect, recordPage, test } from "../lib/fixtures";
 import { lastSobrusProblemEmail } from "../lib/mail";
-import { pageSend, setPeriod } from "../lib/ui";
+import { dates, pageSend, quickPeriods, setPeriod } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
 
@@ -260,6 +260,23 @@ test("importer une période : coupée en années (Sobrus exporte 1 an au plus), 
   const page = owner;
   const start = page.getByRole("button", { name: "Importer", exact: true });
   await page.getByRole("button", { name: "Choisir les dates", exact: true }).click();
+  // The calendar too: a day picked = the start date (then typed over below).
+  await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+  await page.getByRole("button", { name: "Go to the Previous Month" }).click(); // a month not selected yet
+  await page
+    .getByRole("grid")
+    .first()
+    .getByRole("button", { name: /^\S+ 1 \S+ \d{4}$/ })
+    .first()
+    .click();
+  await expect(page.getByLabel("Date début jour", { exact: true })).toHaveValue("01");
+  await page.keyboard.press("Escape");
+  // Each quick period: its dates.
+  for (const [period, want] of quickPeriods(new Date())) {
+    await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+    await page.getByRole("button", { name: period, exact: true }).click();
+    await expect.poll(() => dates(page), { message: period }).toBe(want);
+  }
   await setPeriod(page, "2025-08-01", "2014-03-01");
   await expect(page.getByText("La date de début doit être avant la date de fin.", { exact: true })).toBeVisible();
   await expect(start, "début après la fin").toBeDisabled();
@@ -319,6 +336,31 @@ test("arrêter un import en cours", async () => {
   const [run] = await apiGet(page, "/sobrus/runs");
   expect(run.status, "arrêté").toBe("cancelled");
   await expect(page.getByText(/^Arrêté \([\d\s\u00a0\u202f]+ ligne\(s\) ajoutée\(s\) avant\)$/).first()).toBeVisible();
+});
+
+test("la carte « Import Sobrus » (sur les autres pages) : un clic ouvre la page, « Arrêter », « Fermer »", async () => {
+  test.setTimeout(5 * 60_000);
+  const page = owner;
+  await control(page, { delay: 3 }); // each export waits 3 s: time to click
+  try {
+    await startImport(page, "Tout l'historique");
+    const card = page.getByRole("region", { name: "Import Sobrus", exact: true });
+    await page.locator("aside").getByRole("link", { name: "Produits", exact: true }).click();
+    await expect(card, "l'import suivi sur une autre page").toBeVisible();
+    await card.getByRole("button").first().click(); // the card itself
+    await expect(page).toHaveURL(/\/sobrus$/);
+    await page.locator("aside").getByRole("link", { name: "Produits", exact: true }).click();
+    await card.getByRole("button", { name: "Arrêter", exact: true }).click();
+    await runEnded(page);
+    await expect(card).toContainText(/^.*Arrêté/);
+    await card.getByRole("button", { name: "Fermer", exact: true }).click();
+    await expect(card, "fermée").toHaveCount(0);
+  } finally {
+    await control(page, { delay: 0 });
+  }
+  const [run] = await apiGet(page, "/sobrus/runs");
+  expect(run.status, "arrêté depuis la carte").toBe("cancelled");
+  await openSobrus(page);
 });
 
 test("Sobrus demande une vérification → carte rouge, « Réessayer » une fois faite → reparti", async () => {

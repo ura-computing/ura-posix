@@ -19,6 +19,36 @@ export async function setPeriod(page: Page, from: string, to: string): Promise<v
   }
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+/** « jj/mm/aaaa » of a Date (local day, like the page). */
+export const shown = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+/** The 2 date fields of the page's filter bar, as « jj/mm/aaaa → jj/mm/aaaa » (« → » alone when empty). */
+export async function dates(page: Page): Promise<string> {
+  const side = async (s: "début" | "fin") => {
+    const v: string[] = [];
+    for (const part of ["jour", "mois", "année"])
+      v.push(await page.getByLabel(`Date ${s} ${part}`, { exact: true }).inputValue());
+    return v.every((x) => !x) ? "" : v.join("/");
+  };
+  return `${await side("début")} → ${await side("fin")}`.trim();
+}
+
+/** Each quick period of the calendar → its dates (« jj/mm/aaaa → jj/mm/aaaa »): a whole month, quarter or year. */
+export function quickPeriods(today: Date): [string, string][] {
+  const [y, m] = [today.getFullYear(), today.getMonth()];
+  const q = Math.floor(m / 3) - 1; // the quarter before (-1 = last year's 4th)
+  const [qy, qm] = q < 0 ? [y - 1, 9] : [y, q * 3];
+  const range = (from: Date, to: Date) => `${shown(from)} → ${shown(to)}`;
+  return [
+    ["Année en cours", range(new Date(y, 0, 1), today)],
+    ["Mois actuel", range(new Date(y, m, 1), today)],
+    ["Mois antérieur", range(new Date(y, m - 1, 1), new Date(y, m, 0))],
+    ["Trimestre antérieur", range(new Date(qy, qm, 1), new Date(qy, qm + 3, 0))],
+    ["Année antérieure", range(new Date(y - 1, 0, 1), new Date(y - 1, 11, 31))],
+  ];
+}
+
 /** Query params the request must carry; `null` = the param must be absent. */
 export type Match = Record<string, string | null>;
 

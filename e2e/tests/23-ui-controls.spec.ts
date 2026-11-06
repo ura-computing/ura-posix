@@ -4,42 +4,14 @@
 import { resolve } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 
-import { apiGet } from "../lib/api";
-import { sessionFile } from "../lib/auth";
+import { apiDelete, apiGet, apiPost } from "../lib/api";
+import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
 import { expected } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
 import { REPO_DIR } from "../lib/paths";
+import { dates, quickPeriods, setPeriod, shown } from "../lib/ui";
 
 test.use({ storageState: sessionFile("owner") });
-
-const pad = (n: number) => String(n).padStart(2, "0");
-/** « jj/mm/aaaa » of a Date (local day, like the page). */
-const shown = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-
-/** The 2 date fields of the page's filter bar, as « jj/mm/aaaa → jj/mm/aaaa » (« → » alone when empty). */
-async function dates(page: Page): Promise<string> {
-  const side = async (s: "début" | "fin") => {
-    const v: string[] = [];
-    for (const part of ["jour", "mois", "année"]) v.push(await page.getByLabel(`Date ${s} ${part}`, { exact: true }).inputValue());
-    return v.every((x) => !x) ? "" : v.join("/");
-  };
-  return `${await side("début")} → ${await side("fin")}`.trim();
-}
-
-/** Each quick period of the calendar → its dates (« jj/mm/aaaa → jj/mm/aaaa »): a whole month, quarter or year. */
-function quickPeriods(today: Date): [string, string][] {
-  const [y, m] = [today.getFullYear(), today.getMonth()];
-  const q = Math.floor(m / 3) - 1; // the quarter before (-1 = last year's 4th)
-  const [qy, qm] = q < 0 ? [y - 1, 9] : [y, q * 3];
-  const range = (from: Date, to: Date) => `${shown(from)} → ${shown(to)}`;
-  return [
-    ["Année en cours", range(new Date(y, 0, 1), today)],
-    ["Mois actuel", range(new Date(y, m, 1), today)],
-    ["Mois antérieur", range(new Date(y, m - 1, 1), new Date(y, m, 0))],
-    ["Trimestre antérieur", range(new Date(qy, qm, 1), new Date(qy, qm + 3, 0))],
-    ["Année antérieure", range(new Date(y - 1, 0, 1), new Date(y - 1, 11, 31))],
-  ];
-}
 
 /** The date controls of a filter bar: a day picked in the calendar (it opens on the start date's month, else today's;
  *  the previous month's 1st = that start), every quick period (its dates), the chip's ✕, « Tout réinitialiser ».
@@ -60,9 +32,9 @@ async function dateControls(page: Page) {
     .getByRole("button", { name: /^\S+ 1 \S+ \d{4}$/ })
     .first()
     .click();
-  await expect.poll(() => dates(page), { message: "le 1er du mois d'avant" }).toMatch(
-    new RegExp(`^${shown(firstOfMonthBefore)} → `),
-  );
+  await expect
+    .poll(() => dates(page), { message: "le 1er du mois d'avant" })
+    .toMatch(new RegExp(`^${shown(firstOfMonthBefore)} → `));
 
   for (const [period, want] of quickPeriods(today)) {
     await calendar.click();
@@ -83,7 +55,16 @@ test("dates : calendrier (jour, période rapide), ✕ du filtre, « Tout réinit
   page,
 }) => {
   test.setTimeout(5 * 60_000);
-  for (const path of ["/ventes", "/achats", "/alertes", "/analyses", "/comptabilite", "/rapport", "/historique", "/stock"]) {
+  for (const path of [
+    "/ventes",
+    "/achats",
+    "/alertes",
+    "/analyses",
+    "/comptabilite",
+    "/rapport",
+    "/historique",
+    "/stock",
+  ]) {
     await test.step(path, async () => {
       await page.goto(path);
       await expect(page.getByRole("button", { name: "Ouvrir le calendrier", exact: true })).toBeVisible();
@@ -94,31 +75,57 @@ test("dates : calendrier (jour, période rapide), ✕ du filtre, « Tout réinit
 
 /** « Page 2 / 9 » → [2, 9]. */
 async function pageOf(page: Page): Promise<[number, number]> {
-  const text = await page.locator("main").getByText(/^Page \d+ \/ \d+$/).first().innerText();
+  const text = await page
+    .locator("main")
+    .getByText(/^Page \d+ \/ \d+$/)
+    .first()
+    .innerText();
   const [, now, total] = /^Page (\d+) \/ (\d+)$/.exec(text.trim()) ?? [];
   return [Number(now), Number(total)];
 }
 
 /** « 203 583 résultats » → 203583. */
 async function results(page: Page): Promise<number> {
-  const text = await page.locator("main").getByText(/^[\d\s\u202f\u00a0]+ résultats?$/).first().innerText();
+  const text = await page
+    .locator("main")
+    .getByText(/^[\d\s\u202f\u00a0]+ résultats?$/)
+    .first()
+    .innerText();
   return Number(text.replace(/\D/g, ""));
 }
 
-/** A list's pages: « Suivant », « Précédent », then « 50 / page » (50 rows, fewer pages). */
+/** A list's pages: on page 1 « Précédent » is greyed, « Suivant » too when one page holds everything, else « Suivant »
+ *  → page 2, « Précédent » → page 1. Then another page size: that many rows (or all), the pages follow. */
 async function pagesAndSize(page: Page) {
   await expect.poll(() => pageOf(page).then(([n]) => n), { message: "page 1" }).toBe(1);
   const total = await results(page);
-  const before = await page.locator("tbody tr").count();
-  await page.getByRole("button", { name: "Page suivante", exact: true }).first().click();
-  await expect.poll(() => pageOf(page).then(([n]) => n), { message: "page suivante" }).toBe(2);
-  await page.getByRole("button", { name: "Page précédente", exact: true }).first().click();
-  await expect.poll(() => pageOf(page).then(([n]) => n), { message: "page précédente" }).toBe(1);
-  await page.getByRole("button", { name: `${before} / page`, exact: true }).first().click();
-  await page.getByRole("button", { name: "50 / page", exact: true }).last().click();
-  await expect(page.getByRole("button", { name: "50 / page", exact: true })).toHaveCount(1); // the menu closed
-  await expect(page.locator("tbody tr"), "50 lignes (ou toutes)").toHaveCount(Math.min(50, total));
-  await expect.poll(() => pageOf(page).then(([, t]) => t), { message: "moins de pages" }).toBe(Math.ceil(total / 50));
+  const [, pages] = await pageOf(page);
+  const next = page.getByRole("button", { name: "Page suivante", exact: true }).first();
+  const previous = page.getByRole("button", { name: "Page précédente", exact: true }).first();
+  await expect(previous, "page 1 : « Précédent » grisé").toBeDisabled();
+  if (pages === 1) await expect(next, "une seule page : « Suivant » grisé").toBeDisabled();
+  else {
+    await next.click();
+    await expect.poll(() => pageOf(page).then(([n]) => n), { message: "page suivante" }).toBe(2);
+    await previous.click();
+    await expect.poll(() => pageOf(page).then(([n]) => n), { message: "page précédente" }).toBe(1);
+  }
+  // Another page size (its menu: the page-size list), 50 or more when there is one.
+  const sizeButton = page
+    .locator("main")
+    .getByRole("button", { name: /^\d+ \/ page$/ })
+    .first();
+  const current = Number((await sizeButton.innerText()).trim().split(" ")[0]);
+  await sizeButton.click();
+  const menu = page.locator('[data-list=""]');
+  const sizes = (await menu.getByRole("button").allInnerTexts()).map((s) => Number(s.trim().split(" ")[0]));
+  const size = sizes.find((s) => s !== current && s >= 50) ?? sizes.find((s) => s !== current) ?? current;
+  await menu.getByRole("button", { name: `${size} / page`, exact: true }).click();
+  await expect(menu, "le menu fermé").toHaveCount(0);
+  await expect(page.locator("tbody tr"), `${size} lignes (ou toutes)`).toHaveCount(Math.min(size, total));
+  await expect
+    .poll(() => pageOf(page).then(([, t]) => t), { message: "nombre de pages" })
+    .toBe(Math.max(1, Math.ceil(total / size)));
 }
 
 test("listes : page suivante / précédente, lignes par page", async ({ page }) => {
@@ -138,7 +145,9 @@ async function sortEveryColumn(page: Page, root: Locator = page.locator("main"))
   await expect(headers.first()).toBeVisible();
   const names = await headers.allInnerTexts();
   for (const name of names.map((n) => n.trim())) {
-    const th = root.locator("thead th[aria-sort]").filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) });
+    const th = root
+      .locator("thead th[aria-sort]")
+      .filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) });
     await th.first().getByRole("button").click();
     await expect(th.first(), `tri « ${name} »`).toHaveAttribute("aria-sort", /ascending|descending/);
   }
@@ -177,7 +186,10 @@ test("« Mixte » : revenir à tout après Pharmacie (Alertes, Analyses, Comptab
       const all = page.getByRole("button", { name: "Mixte", exact: true });
       await expect(all).toHaveAttribute("aria-pressed", "true");
       await page.getByRole("button", { name: "Pharmacie", exact: true }).click();
-      await expect(page.getByRole("button", { name: "Pharmacie", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByRole("button", { name: "Pharmacie", exact: true })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
       await expect(all).toHaveAttribute("aria-pressed", "false");
       await all.click();
       await expect(all).toHaveAttribute("aria-pressed", "true");
@@ -236,12 +248,23 @@ test("Stock : chaque statut, pages, tri de chaque colonne, « Fermer » puis cla
   test.setTimeout(3 * 60_000);
   await page.goto("/stock");
   const status = page.getByRole("button", { name: /^Statut/ }).first(); // the selector above the table
-  for (const option of ["Idéal (46-60 j)", "À surveiller (61-99 j)", "Sur-stock (≥100 j)", "Inconnu", "Stock négatif", "Tous statuts"]) {
+  for (const option of [
+    "Idéal (46-60 j)",
+    "À surveiller (61-99 j)",
+    "Sur-stock (≥100 j)",
+    "Inconnu",
+    "Stock négatif",
+    "Tous statuts",
+  ]) {
     await test.step(option, async () => {
       // The list asked again with that status (none: « Tous statuts »).
       const sent = page.waitForRequest((r) => {
         const u = new URL(r.url());
-        return u.pathname === "/v1/stats/stock-abcd" && u.searchParams.has("class_filter") && u.searchParams.has("status") === (option !== "Tous statuts");
+        return (
+          u.pathname === "/v1/stats/stock-abcd" &&
+          u.searchParams.has("class_filter") &&
+          u.searchParams.has("status") === (option !== "Tous statuts")
+        );
       });
       await status.click();
       await page.getByRole("button", { name: option, exact: true }).click();
@@ -271,28 +294,56 @@ test("Stock : chaque statut, pages, tri de chaque colonne, « Fermer » puis cla
   });
 });
 
-test("Alertes : chaque carte ouvre sa liste (tri de chaque colonne, « Fermer »)", async ({ page }) => {
-  test.setTimeout(3 * 60_000);
+test("Alertes : chaque carte ouvre sa liste (tri de chaque colonne, « Fermer »), sur toutes les dates puis chaque période rapide", async ({
+  page,
+}) => {
+  test.setTimeout(5 * 60_000);
   await page.goto("/alertes");
-  // Enabled cards only (an empty one is shown greyed, aria-disabled).
-  const cards = page.locator('main button:not([aria-disabled="true"]):not([disabled])').filter({ hasText: /produits|Unités/ });
+  // Enabled cards only (an empty one is shown greyed, aria-disabled). A card empty on some dates may not be on others
+  // (a margin over a year is not the one of a quarter): every card opens once, on the first dates where it has lines.
+  const cards = page
+    .locator('main button:not([aria-disabled="true"]):not([disabled])')
+    .filter({ hasText: /produits|Unités/ });
+  const opened = new Set<string>();
+  const openNew = async (dates: string) => {
+    const names = (await cards.allInnerTexts()).map((n) => n.split("\n")[0].trim());
+    for (const [i, name] of names.entries()) {
+      if (opened.has(name)) continue;
+      await test.step(`${name} (${dates})`, async () => {
+        await cards.nth(i).click();
+        const dialog = page.getByRole("dialog");
+        await sortEveryColumn(page, dialog);
+        await dialog
+          .getByRole("button", { name: "Fermer", exact: true })
+          .nth(opened.size % 2 ? -1 : 0)
+          .click(); // ✕, or the one below
+        await expect(dialog).toHaveCount(0);
+      });
+      opened.add(name);
+    }
+  };
+  const loaded = () => page.waitForResponse((r) => r.url().includes("/v1/stats/margin-alerts") && r.ok());
+  let answer = loaded();
+  await setPeriod(page, "2000-01-01", shown(new Date()).split("/").reverse().join("-"));
+  await answer;
   await expect(cards.first()).toBeVisible();
-  const names = (await cards.allInnerTexts()).map((n) => n.split("\n")[0].trim());
-  for (const [i, name] of names.entries()) {
-    await test.step(name, async () => {
-      await cards.nth(i).click();
-      const dialog = page.getByRole("dialog");
-      await sortEveryColumn(page, dialog);
-      await dialog.getByRole("button", { name: "Fermer", exact: true }).nth(i % 2 ? -1 : 0).click(); // ✕, or the one below
-      await expect(dialog).toHaveCount(0);
-    });
+  await openNew("toutes les dates");
+  for (const [period] of quickPeriods(new Date())) {
+    answer = loaded();
+    await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
+    await page.getByRole("button", { name: period, exact: true }).click();
+    await answer;
+    await openNew(period);
   }
 });
 
 test("Produits : scanner (« Fermer », « Annuler »), ✕ de la recherche", async ({ page }) => {
   await page.goto("/produits");
   for (const close of ["Fermer", "Annuler"]) {
-    await page.getByRole("button", { name: /Scanner/ }).first().click();
+    await page
+      .getByRole("button", { name: /Scanner/ })
+      .first()
+      .click();
     await page.getByRole("dialog").getByRole("button", { name: close, exact: true }).click();
     await expect(page.getByRole("dialog"), close).toHaveCount(0);
   }
@@ -318,7 +369,10 @@ test("fiche produit : chaque période rapide, calendrier de la date (mois, anné
   }
   await test.step("date de péremption : calendrier, mois et année", async () => {
     await page.getByRole("button", { name: "Modifier", exact: true }).first().click();
-    await page.getByRole("button", { name: /choisir dans le calendrier$/ }).first().click();
+    await page
+      .getByRole("button", { name: /choisir dans le calendrier$/ })
+      .first()
+      .click();
     const month = page.getByRole("grid").first();
     const start = (await month.getAttribute("aria-label")) ?? ""; // « mai 2027 »
     const [name, year] = start.split(" ");
@@ -342,6 +396,147 @@ test("fiche produit : chaque période rapide, calendrier de la date (mois, anné
   });
 });
 
+test("Équipe : « Inviter un employé » (œil, pharmacie, « Annuler », « Fermer »), permissions « Tout activer (où possible) »", async ({
+  page,
+}) => {
+  // Its own employee (made here, removed at the end): the permissions dialog needs one.
+  const employee = { full_name: "E2E Équipe", email: "e2e.equipe.ui@pharmagest.ma", password: "EquipeUi#2026" };
+  const { member } = await apiPost(page, "/owner/employees", {
+    ...employee,
+    role: "employee",
+    pharmacy_id: loadState().pharmacyId,
+  });
+  const dialog = page.getByRole("dialog");
+  try {
+    await page.goto("/owner/employees");
+    for (const close of ["Annuler", "Fermer"]) {
+      await page.getByRole("button", { name: "Inviter un employé", exact: true }).click();
+      const password = dialog.getByLabel("Mot de passe", { exact: true });
+      await password.fill("Visible#2026");
+      await dialog.getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+      await expect(password, "mot de passe affiché").toHaveAttribute("type", "text");
+      await dialog.getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+      await expect(password, "mot de passe caché").toHaveAttribute("type", "password");
+      await dialog.getByRole("button", { name: /^Pharmacie assignée/ }).click();
+      await page
+        .locator('[data-list=""]')
+        .getByRole("button", { name: /^Pharmacie E2E/ })
+        .click();
+      await dialog.getByRole("button", { name: close, exact: true }).first().click();
+      await expect(dialog, close).toHaveCount(0);
+    }
+    await page
+      .getByRole("row", { name: new RegExp(employee.email.replace(/[.]/g, "\\.")) })
+      .getByRole("button", { name: "Gérer les permissions" })
+      .click();
+    await dialog.getByRole("button", { name: "Tout activer (où possible)", exact: true }).click();
+    await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  } finally {
+    await apiDelete(page, `/owner/employees/${member.id}`, 204);
+  }
+});
+
+test("Comptabilité : mois (année précédente / suivante, un mois), carte « Virement et autres » (« Fermer »)", async ({
+  page,
+}) => {
+  await page.goto("/comptabilite");
+  const monthButton = page
+    .locator("main")
+    .getByRole("button", { name: /^\S+ \d{4}$/ })
+    .first(); // « Novembre 2026 »
+  const [month, year] = (await monthButton.innerText()).trim().split(" ");
+  const months = page.locator('[data-list="months"]');
+  await monthButton.click();
+  const shownYear = months.locator("xpath=..").getByText(/^\d{4}$/);
+  await page.getByRole("button", { name: "Année précédente", exact: true }).click();
+  await expect(shownYear).toHaveText(String(Number(year) - 1));
+  await page.getByRole("button", { name: "Année suivante", exact: true }).click();
+  await expect(shownYear).toHaveText(year);
+  await months.getByRole("button").first().click(); // January
+  await expect(monthButton).toHaveText(`Janvier ${year}`);
+  await monthButton.click();
+  await months.getByRole("button").nth(new Date().getMonth()).click(); // back to this month
+  await expect(monthButton).toHaveText(`${month} ${year}`);
+  await page.getByRole("button", { name: /^Virement et autres/i }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Fermer", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("Produits spéciaux : « Effacer la recherche »", async ({ page }) => {
+  await page.goto("/produits-speciaux");
+  const search = page.getByRole("searchbox").first();
+  await search.fill("E2E");
+  await page.getByRole("button", { name: "Effacer la recherche", exact: true }).click();
+  await expect(search).toHaveValue("");
+});
+
+test("Importer un fichier : chaque type, « Changer le type de document », fichier refusé, « Choisir un autre fichier », plusieurs fichiers (« Choisir d'autres fichiers »)", async ({
+  page,
+}) => {
+  const file = (kind: string) => resolve(REPO_DIR, expected().files[kind].path);
+  const changeType = page.getByRole("button", { name: "Changer le type de document", exact: true });
+  const input = page.locator('input[type="file"]');
+  await page.goto("/upload-file");
+  for (const type of ["Ventes", "Stock", "Achats"]) {
+    await page
+      .getByRole("radio")
+      .filter({ hasText: new RegExp(`^${type}`) })
+      .first()
+      .click();
+    await expect(changeType, type).toBeVisible();
+    if (type !== "Achats") await changeType.click();
+  }
+  // Achats: a stock file → refused, the name expected shown.
+  await input.setInputFiles(file("stock"));
+  await expect(page.getByText(/^Nom de fichier invalide\. Format attendu : « Sobrus - Achats /)).toBeVisible();
+  // The right file → « Choisir un autre fichier » brings back the choice.
+  await input.setInputFiles(file("extra_achats"));
+  const start = page.getByRole("button", { name: "Importer dans la base", exact: true });
+  await expect(start).toBeVisible();
+  await page.getByRole("button", { name: "Choisir un autre fichier", exact: true }).click();
+  await expect(start).toHaveCount(0);
+  // Several files → their list → « Choisir d'autres fichiers ».
+  await input.setInputFiles([file("achats"), file("extra_achats")]);
+  await page.getByRole("button", { name: "Choisir d'autres fichiers", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Choisir d'autres fichiers", exact: true })).toHaveCount(0);
+  // Back to the types: the one chosen stays, « Continuer » goes on with it.
+  await changeType.click();
+  await page.getByRole("button", { name: "Continuer", exact: true }).click();
+  await expect(changeType).toBeVisible();
+  // From a list page: « Importer » opens this page for its kind.
+  await page.goto("/ventes");
+  await page.locator("main").getByRole("link", { name: "Importer", exact: true }).click();
+  await expect(page).toHaveURL(/\/upload-file\?type=vente$/);
+});
+
+test("Mon compte : indicatif pays, onglet « Mot de passe » (œil), retour à « Profil » ; le logo du menu → accueil", async ({
+  page,
+}) => {
+  await page.goto("/auth/me");
+  const country = page.getByRole("combobox", { name: "Indicatif pays", exact: true });
+  const before = await country.inputValue();
+  const other = await country
+    .locator("option")
+    .evaluateAll((o, v) => o.map((x) => (x as HTMLOptionElement).value).find((x) => x && x !== v), before);
+  await country.selectOption(other ?? "");
+  await expect(country).toHaveValue(other ?? "");
+  await country.selectOption(before); // nothing saved
+  await page.getByRole("tab", { name: "Mot de passe", exact: true }).click();
+  const current = page.getByLabel("Mot de passe actuel", { exact: true });
+  await current.fill("Visible#2026");
+  await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).first().click();
+  await expect(current, "mot de passe affiché").toHaveAttribute("type", "text");
+  await page.getByRole("tab", { name: "Profil", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Profil", exact: true })).toHaveAttribute("aria-selected", "true");
+  await page
+    .locator("aside")
+    .getByRole("link", { name: /PharmaGest/ })
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("Tableau de bord : les tuiles mènent à leur page (Achats, Alertes, Stock, Importer stock)", async ({ page }) => {
   for (const [name, url] of [
     [/^Total achats/, /\/achats$/],
@@ -353,6 +548,56 @@ test("Tableau de bord : les tuiles mènent à leur page (Achats, Alertes, Stock,
     await page.getByRole("link", { name }).first().click();
     await expect(page, String(name)).toHaveURL(url);
   }
+});
+
+test.describe("visiteur", () => {
+  test.use({ storageState: LOGGED_OUT });
+
+  test("pages de connexion : thème Sombre / Clair sur chacune, œil, liens, inscription « Retour »", async ({
+    page,
+  }) => {
+    const html = page.locator("html");
+    for (const path of ["/login", "/auth/forgot-password", "/auth/signup", "/auth/set-password"]) {
+      await test.step(path, async () => {
+        await page.goto(path);
+        await page.getByRole("button", { name: "Sombre", exact: true }).click();
+        await expect(html).toHaveClass(/\bdark\b/);
+        await page.getByRole("button", { name: "Clair", exact: true }).click();
+        await expect(html).not.toHaveClass(/\bdark\b/);
+        await page.getByRole("button", { name: "Système", exact: true }).click(); // back to the computer's choice
+        await expect(page.getByRole("button", { name: "Système", exact: true })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+      });
+    }
+    await test.step("lien expiré : « Demander un nouveau lien »", async () => {
+      await page.goto("/auth/set-password");
+      await page.getByRole("link", { name: "Demander un nouveau lien", exact: true }).click();
+      await expect(page).toHaveURL(/\/auth\/forgot-password$/);
+    });
+    await test.step("connexion : œil", async () => {
+      await page.goto("/login");
+      const password = page.getByLabel("Mot de passe", { exact: true });
+      await password.fill("Visible#2026");
+      await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+      await expect(password).toHaveAttribute("type", "text");
+    });
+    await test.step("mot de passe oublié : « Retour à la connexion »", async () => {
+      await page.goto("/auth/forgot-password");
+      await page.getByRole("link", { name: "Retour à la connexion", exact: true }).click();
+      await expect(page).toHaveURL(/\/login$/);
+    });
+    await test.step("inscription : « Suivant », « Retour », « Se connecter »", async () => {
+      await page.goto("/auth/signup");
+      await page.getByRole("radio", { name: /^Employé d'une pharmacie/ }).click();
+      await page.getByRole("button", { name: "Suivant", exact: true }).click();
+      await page.getByRole("button", { name: "Retour", exact: true }).click();
+      await expect(page.getByRole("radiogroup", { name: "Vous êtes…" })).toBeVisible();
+      await page.getByRole("link", { name: "Se connecter", exact: true }).click();
+      await expect(page).toHaveURL(/\/login$/);
+    });
+  });
 });
 
 test.describe("administrateur", () => {
@@ -370,7 +615,9 @@ test.describe("administrateur", () => {
       for (const type of ["Parapharmacie", "Tous types"]) {
         await filters.getByRole("button", { name: /^Type/ }).click();
         await page.locator('[data-list="Type"]').getByRole("button", { name: type, exact: true }).click();
-        await expect(filters.getByRole("button", { name: /^Type/ })).toHaveText(type === "Tous types" ? "Type" : `Type: ${type}`);
+        await expect(filters.getByRole("button", { name: /^Type/ })).toHaveText(
+          type === "Tous types" ? "Type" : `Type: ${type}`,
+        );
       }
       await filters.getByRole("button", { name: /^Type/ }).click();
       await page.locator('[data-list="Type"]').getByRole("button", { name: "Parapharmacie", exact: true }).click();
@@ -391,20 +638,51 @@ test.describe("administrateur", () => {
       await filters.getByRole("button", { name: "Tout réinitialiser", exact: true }).click();
       await expect(search).toHaveValue("");
     });
-    await test.step("« Ajouter » : « Annuler », « Fermer »", async () => {
+    await test.step("« Ajouter » : type forcé (chaque type, puis aucun), « Annuler », « Fermer »", async () => {
+      const dialog = page.getByRole("dialog");
       for (const close of ["Annuler", "Fermer"]) {
         await filters.getByRole("button", { name: "Ajouter", exact: true }).click();
-        await page.getByRole("dialog").getByRole("button", { name: close, exact: true }).first().click();
-        await expect(page.getByRole("dialog"), close).toHaveCount(0);
+        if (close === "Annuler") {
+          for (const type of ["Pharmacie", "Parapharmacie"]) {
+            const chip = dialog.getByRole("button", { name: type, exact: true });
+            await chip.click();
+            await expect(chip, `${type} forcé`).toHaveAttribute("aria-pressed", "true");
+            await chip.click();
+            await expect(chip, `${type} retiré`).toHaveAttribute("aria-pressed", "false");
+          }
+        }
+        await dialog.getByRole("button", { name: close, exact: true }).first().click();
+        await expect(dialog, close).toHaveCount(0);
       }
     });
+  });
+
+  test("Tableau de bord : une pharmacie, chaque onglet de l'analyse de marge, ses pages", async ({ page }) => {
+    await page.goto("/rapport");
+    await page
+      .getByRole("button", { name: /^Pharmacie/ })
+      .first()
+      .click();
+    await page
+      .locator('[data-list="Pharmacie"]')
+      .getByRole("button", { name: /· Pharmacie E2E$/ })
+      .click();
+    for (const tab of ["Par catégorie", "Par grossiste", "Par produit"]) {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
+      await expect(page.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true");
+    }
+    await pagesAndSize(page);
   });
 
   test("Catégories : « Nouveau mapping », chaque couleur, « Annuler », « Fermer »", async ({ page }) => {
     await page.goto("/admin/categories");
     await page.getByRole("button", { name: "Nouveau mapping", exact: true }).click();
     const dialog = page.getByRole("dialog");
-    const names = (await dialog.locator("button[aria-pressed]").evaluateAll((b) => b.map((x) => x.getAttribute("aria-label") ?? x.textContent ?? ""))).map((n) => n.trim());
+    const names = (
+      await dialog
+        .locator("button[aria-pressed]")
+        .evaluateAll((b) => b.map((x) => x.getAttribute("aria-label") ?? x.textContent ?? ""))
+    ).map((n) => n.trim());
     expect(names.length, "les couleurs").toBeGreaterThan(1);
     for (const name of names) {
       const color = dialog.getByRole("button", { name, exact: true });
@@ -416,5 +694,138 @@ test.describe("administrateur", () => {
     await page.getByRole("button", { name: "Nouveau mapping", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Fermer", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("Pharmacies : recherche, « Nouvelle pharmacie », « Nouvel utilisateur », un compte (mot de passe, désactiver, réactiver, sa pharmacie), la fiche (fonctionnalités, permissions, « Modifier », retour)", async ({
+    page,
+  }) => {
+    test.setTimeout(3 * 60_000);
+    // Its own pharmacy and owner (made here, removed at the end): these actions change them.
+    const pharmacy = await apiPost(page, "/admin/pharmacies", { name: "E2E Contrôles", city: "Rabat" });
+    const account = { full_name: "E2E Contrôles", email: "e2e.controles@pharmagest.ma", password: "Controles#2026" };
+    const { member } = await apiPost(page, `/admin/pharmacies/${pharmacy.id}/users`, {
+      ...account,
+      role: "owner",
+      pharmacy_id: pharmacy.id,
+    });
+    const dialog = page.getByRole("dialog");
+    /** « Nouvel utilisateur » (list or pharmacy page): the eye shows the password, each role, a pharmacy picked. */
+    const created = { name: "E2E Contrôles Créé", email: "e2e.controles.cree@pharmagest.ma" };
+    /** « Nouvel utilisateur » (list or pharmacy page): name, email, the eye (shown, hidden), each role, the pharmacy;
+     *  then « Créer le compte » (« Compte créé », « Fermer ») or closed without creating. */
+    const newUser = async (close: "Créer le compte" | "Annuler" | "Fermer") => {
+      await page.getByRole("button", { name: "Nouvel utilisateur", exact: true }).click();
+      await dialog.getByLabel("Nom complet").fill(created.name);
+      await dialog.getByLabel("Email").fill(created.email);
+      const password = dialog.getByLabel("Mot de passe", { exact: true });
+      await password.fill("Visible#2026");
+      await dialog.getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+      await expect(password, "mot de passe affiché").toHaveAttribute("type", "text");
+      await dialog.getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+      await expect(password, "mot de passe caché").toHaveAttribute("type", "password");
+      for (const role of [/^Propriétaire/, /^Employé/]) {
+        await dialog.getByRole("radio", { name: role }).click();
+        await expect(dialog.getByRole("radio", { name: role })).toHaveAttribute("aria-checked", "true");
+      }
+      await dialog.getByRole("button", { name: /^Pharmacie assignée/ }).click();
+      await page
+        .locator('[data-list=""]')
+        .getByRole("button", { name: /E2E Contrôles/ })
+        .click();
+      await dialog.getByRole("button", { name: close, exact: true }).first().click();
+      if (close === "Créer le compte") {
+        await expect(dialog.getByText("Compte créé", { exact: true })).toBeVisible();
+        await dialog.getByRole("button", { name: "Fermer", exact: true }).last().click();
+      }
+      await expect(dialog, close).toHaveCount(0);
+    };
+    try {
+      await page.goto("/admin/pharmacies");
+      await test.step("recherche", async () => {
+        const search = page.getByRole("textbox", { name: /^Rechercher par nom/ });
+        await search.fill("E2E Contrôles");
+        await expect(page.locator("tbody tr")).toHaveCount(1);
+        await expect(page.locator("tbody")).toContainText("E2E Contrôles");
+        await page.locator("tbody tr").getByRole("button", { name: "Ouvrir", exact: true }).click();
+        await expect(page).toHaveURL(new RegExp(`/admin/pharmacies/${pharmacy.id}$`));
+        await page.goto("/admin/pharmacies");
+      });
+      await test.step("« Nouvelle pharmacie » : adresse, téléphone, email, « Annuler »", async () => {
+        await page.getByRole("button", { name: "Nouvelle pharmacie", exact: true }).click();
+        for (const [label, value] of [
+          ["Adresse", "12 rue E2E"],
+          ["Téléphone", "+212600000011"],
+          ["Email", "contact@e2e.ma"],
+        ]) {
+          await dialog.getByRole("textbox", { name: label, exact: true }).fill(value);
+          await expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveValue(value);
+        }
+        await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+      });
+      await test.step("« Nouvel utilisateur » : « Fermer », puis un compte créé", async () => {
+        await newUser("Fermer");
+        await newUser("Créer le compte");
+      });
+      await test.step("le compte : « Réinitialiser le mot de passe » (« Annuler »), désactiver, réactiver, sa pharmacie", async () => {
+        await page.getByRole("tab", { name: "Utilisateurs", exact: true }).click();
+        const row = page.getByRole("row", { name: new RegExp(account.email.replace(/[.]/g, "\\.")) });
+        const menu = async (action: string) => {
+          await row.getByRole("button", { name: "Plus d'actions", exact: true }).click();
+          await page.getByRole("menuitem", { name: action, exact: true }).click();
+        };
+        await menu("Réinitialiser le mot de passe");
+        await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+        await menu("Désactiver");
+        await expect(row).toContainText("Inactif");
+        await menu("Réactiver");
+        await expect(row).toContainText("Actif");
+        await row.getByRole("link", { name: /E2E Contrôles/ }).click();
+        await expect(page).toHaveURL(new RegExp(`/admin/pharmacies/${pharmacy.id}$`));
+      });
+      await test.step("la fiche : fonctionnalités (« Tout désactiver », « Annuler », « Tout activer »)", async () => {
+        const switches = page.locator("main").getByRole("switch");
+        const cancel = page.locator("main").getByRole("button", { name: "Annuler", exact: true });
+        await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
+        await expect(switches.and(page.locator("[aria-checked=true]"))).toHaveCount(0);
+        await cancel.click(); // nothing saved: all back on
+        await expect(switches.and(page.locator("[aria-checked=false]"))).toHaveCount(0);
+        await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
+        await page.getByRole("button", { name: "Tout activer", exact: true }).click();
+        await expect(switches.and(page.locator("[aria-checked=false]"))).toHaveCount(0);
+        await expect(cancel, "comme enregistré : rien à annuler").toHaveCount(0);
+      });
+      await test.step("permissions du propriétaire : « Tout activer (où possible) », « Annuler »", async () => {
+        await page.getByRole("button", { name: "Gérer les permissions", exact: true }).first().click();
+        await dialog.getByRole("button", { name: "Tout activer (où possible)", exact: true }).click();
+        await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+      });
+      await test.step("« Modifier » : nom, ville, email, « Annuler »", async () => {
+        await page.locator("main").getByRole("button", { name: "Modifier", exact: true }).first().click();
+        for (const [label, value] of [
+          ["Nom*", "E2E Contrôles"],
+          ["Ville*", "Rabat"],
+          ["Email", "fiche@e2e.ma"],
+        ]) {
+          await dialog.getByRole("textbox", { name: label, exact: true }).fill(value);
+          await expect(dialog.getByRole("textbox", { name: label, exact: true })).toHaveValue(value);
+        }
+        await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+      });
+      await test.step("« Nouvel utilisateur » de la fiche, « Annuler »", () => newUser("Annuler"));
+      await test.step("« Retour aux pharmacies »", async () => {
+        await page.getByRole("link", { name: "Retour aux pharmacies", exact: true }).click();
+        await expect(page).toHaveURL(/\/admin\/pharmacies$/);
+      });
+    } finally {
+      const users: { id: number; email: string }[] = await apiGet(page, "/admin/users");
+      for (const u of users.filter((u) => u.email === created.email))
+        await apiDelete(page, `/admin/users/${u.id}`, 204);
+      await apiDelete(page, `/admin/users/${member.id}`, 204);
+      await apiDelete(page, `/admin/pharmacies/${pharmacy.id}`, 204);
+    }
   });
 });

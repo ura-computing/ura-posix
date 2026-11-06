@@ -209,6 +209,11 @@ test.describe("déconnecté", () => {
 
     await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(PASSWORD_3);
     await page.getByLabel("Confirmer le nouveau mot de passe", { exact: true }).fill(PASSWORD_3);
+    // The eye shows what was typed.
+    await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).first().click();
+    await expect(page.getByLabel("Nouveau mot de passe", { exact: true })).toHaveAttribute("type", "text");
+    await page.getByRole("button", { name: "Masquer le mot de passe", exact: true }).first().click();
+    await expect(page.getByLabel("Nouveau mot de passe", { exact: true })).toHaveAttribute("type", "password");
     const set = pageSend(page, "POST", "/auth/set-password", 204);
     await page.getByRole("button", { name: "Réinitialiser mon mot de passe" }).click();
     await set;

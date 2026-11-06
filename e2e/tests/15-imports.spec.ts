@@ -178,6 +178,9 @@ test("annuler un import en cours : les lignes déjà importées sont retirées",
   );
   await expect(page.getByRole("heading", { name: "Import annulé" })).toBeVisible();
   saveState({ cancelledBatch: c1.batch_id });
+  // « Recommencer »: a new import from the start.
+  await page.getByRole("button", { name: "Recommencer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Import annulé" })).toHaveCount(0);
 });
 
 test("réimporter puis supprimer l'import depuis la liste", async ({ page }) => {
@@ -528,6 +531,50 @@ test("supprimer l'import de stock retire son stock ; le réimporter le remet", a
     e.products.rows.slice(0, 25).map((r: Row) => ({ pid: r.pid, current_stock: r.current_stock })),
     "stock de la page 1",
   );
+});
+
+test("la carte d'un import (en bas à droite), sur une autre page, ramène à son import ; envoi coupé : rien n'est importé — chaque type", async ({
+  page,
+}) => {
+  test.setTimeout(3 * 60_000);
+  for (const [type, kind, label] of [
+    ["achat", "achats", "ACHATS"],
+    ["vente", "ventes", "VENTES"],
+    ["stock", "stock", "STOCK"],
+  ] as const) {
+    await test.step(label, async () => {
+      // Its lines are held, then cut: they never reach the server (no import, no line).
+      let release!: () => void;
+      const clicked = new Promise<void>((r) => {
+        release = r;
+      });
+      const route = `**/v1/uploads/${type}-json`;
+      await page.route(route, async (r) => {
+        await clicked;
+        await r.abort().catch(() => {}); // already gone when the test ends early
+      });
+      try {
+        await page.goto(`/upload-file?type=${type}`);
+        await page.locator('input[type="file"]').setInputFiles(resolve(REPO_DIR, expected().files[kind].path));
+        await page.getByRole("button", { name: "Importer dans la base" }).click();
+        await page.locator("aside").getByRole("link", { name: "Gestion des imports", exact: true }).click();
+        await expect(page).toHaveURL(/\/imports$/);
+        // Its text is « Achats » (the capitals are CSS only).
+        await page
+          .locator("[aria-live] button")
+          .filter({ hasText: new RegExp(`^${label}`, "i") })
+          .click();
+        await expect(page, "la carte ramène à son import").toHaveURL(new RegExp(`/upload-file\\?type=${type}$`));
+        release();
+        await expect(page.getByRole("heading", { level: 3, name: /^Erreur d'importation$/ })).toBeVisible({
+          timeout: 60_000,
+        });
+      } finally {
+        release();
+        await page.unroute(route);
+      }
+    });
+  }
 });
 
 test("après l'annulation et la suppression, rien n'a bougé", async ({ page }) => {

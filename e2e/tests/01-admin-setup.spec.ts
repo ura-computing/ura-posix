@@ -20,6 +20,8 @@ test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
   await dialog.getByLabel("Ville").fill(PHARMACY.city);
   await dialog.getByRole("button", { name: "Créer la pharmacie" }).click();
   await page.waitForURL(/\/admin\/pharmacies\/\d+$/);
+  // Its page on screen (the list, still shown while it loads, has its own « Nouvel utilisateur »).
+  await expect(page.getByRole("heading", { level: 1, name: PHARMACY.name, exact: true })).toBeVisible();
 
   const pharmacyId = Number(new URL(page.url()).pathname.split("/").pop());
   const pharmacy = await apiGet(page, `/admin/pharmacies/${pharmacyId}`);

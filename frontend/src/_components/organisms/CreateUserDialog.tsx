@@ -189,6 +189,7 @@ export function CreateUserDialog({
               <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
                 <SingleSelect
                   label=""
+                  ariaLabel={t("adminPharm.assignedPharmacy")}
                   options={pharmacies.map((p) => ({
                     value: String(p.id),
                     label: [p.name, p.city].filter(Boolean).join(" · "),

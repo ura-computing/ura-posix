@@ -185,6 +185,14 @@ const UI_SCRIPT = () => {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 60) ?? "";
+  /** A <label>'s own words, without the controls inside it (a month button in « Mois » is named « Mois », not
+   *  « Mois Octobre 2026 »: one key whatever it shows). */
+  const labelText = (label: Element | undefined) => {
+    if (!label) return "";
+    const own = label.cloneNode(true) as Element;
+    own.querySelectorAll(SELECTOR).forEach((c) => c.remove());
+    return own.textContent ?? "";
+  };
   const name = (el: Element): string => {
     const h = el as HTMLInputElement;
     const label =
@@ -195,7 +203,7 @@ const UI_SCRIPT = () => {
           .split(" ")
           .map((id) => document.getElementById(id)?.textContent)
           .join(" ")) ||
-      (h.labels && h.labels[0]?.textContent) ||
+      (h.labels && labelText(h.labels[0])) ||
       (h.placeholder ?? "") ||
       (el as HTMLElement).innerText ||
       el.getAttribute("title") ||

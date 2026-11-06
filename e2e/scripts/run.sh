@@ -70,20 +70,19 @@ fi
 if [ "$MODE" = ui ]; then
   # Every test in a real browser, slowed down (250 ms per action), one after the other — inside ONE window (Xephyr:
   # a screen in a window). It stays on the workspace where you put it: nothing pops up elsewhere, nothing takes the
-  # focus. Closed at the end. No Xephyr / no X11 desktop: the browser opens on the desktop itself.
+  # focus. It opens once the stack is up, closes at the end. No Xephyr / no X11 desktop: the browser opens on the
+  # desktop itself.
   export E2E_HEADED=1 E2E_SLOWMO=250
   args+=(--headed)
-  if command -v   > /dev/null && command -v xdotool > /dev/null && [ -n "${DISPLAY:-}" ]; then
+  if command -v Xephyr > /dev/null && command -v xdotool > /dev/null && [ -n "${DISPLAY:-}" ]; then
+    # The window itself opens once every container is up, just before the first test (global-setup.ts), not while
+    # the images build. Its size: the desktop's, minus room for the desktop's bars and the window title.
     read -r width height < <(xdotool getdisplaygeometry)
-    export E2E_SCREEN="$((width * 95 / 100))x$((height - 110))" # room for the desktop's bars + the window title
-    screen=99
-    while [ -e "/tmp/.X11-unix/X$screen" ]; do screen=$((screen + 1)); done
-    Xephyr ":$screen" -screen "$E2E_SCREEN" -title "PharmaGest — tests" -ac -br -noreset -no-host-grab > /dev/null 2>&1 &
-    xephyr=$!
+    export E2E_XEPHYR=1 E2E_SCREEN="$((width * 95 / 100))x$((height - 110))"
     # That window has none of the desktop's settings: the app's font (« system-ui ») would fall back to DejaVu (an old
     # look) → the desktop's own font (gsettings); the browser in French (on Linux: LANGUAGE), so it offers no translation.
     fonts="$(mktemp -d)"
-    trap 'kill "$xephyr" 2> /dev/null || true; rm -rf "$fonts"' EXIT
+    trap 'rm -rf "$fonts"' EXIT
     desktop_font="$(gsettings get org.gnome.desktop.interface font-name 2> /dev/null | tr -d "'" | sed 's/ [0-9.]*$//')" ||
       desktop_font="" # not GNOME: the system's fonts
     {
@@ -97,8 +96,6 @@ if [ "$MODE" = ui ]; then
       echo '</fontconfig>'
     } > "$fonts/fonts.conf"
     export FONTCONFIG_FILE="$fonts/fonts.conf" LANGUAGE=fr
-    for _ in $(seq 50); do [ -e "/tmp/.X11-unix/X$screen" ] && break; sleep 0.1; done
-    export DISPLAY=":$screen"
   fi
 elif [ ${#SPECS[@]} -eq 0 ]; then
   if [ "$(ask "Only the tests that failed last time? (y/n)" n)" = y ]; then

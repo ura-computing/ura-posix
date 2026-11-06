@@ -67,6 +67,11 @@ async function signUp(page: Page, kind: Kind, person: Person, pharmacy: { code: 
   await next();
   await page.getByLabel("Mot de passe", { exact: true }).fill(person.password);
   await page.getByLabel("Confirmer le mot de passe").fill(person.password);
+  // The eye shows what was typed.
+  await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).first().click();
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Masquer le mot de passe", exact: true }).first().click();
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toHaveAttribute("type", "password");
   const sent = pageSend(page, "POST", "/auth/signup");
   await page.getByRole("button", { name: "Envoyer ma demande" }).click();
   expect(await sent, "POST /auth/signup").toEqual({ detail: "Demande envoyée" });
