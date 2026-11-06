@@ -112,6 +112,10 @@ export interface ProductSheet {
   stock: ProductStock;
   /** 5 latest, newest first. */
   recent_movements: ProductMovement[];
+  /** « Dernière entrée »: the latest purchase line that brought units; null = never bought. */
+  last_purchase: { date: string | null; quantity: number; unit_price: number | null; supplier: string | null } | null;
+  /** null = never sold. */
+  last_sale: { date: string | null; quantity: number | null } | null;
   /** Fields the owner edited → their imported value (« Revenir à la valeur importée »). */
   imported: Partial<Record<EditField, string | number | null>>;
   /** « Observations »: > 0 = their window opens with the page. */

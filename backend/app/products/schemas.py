@@ -125,6 +125,20 @@ class ProductLookup(BaseModel):
     id: int  # the product's sheet: /produits/{id}
 
 
+class ProductLastPurchase(BaseModel):
+    """The latest purchase line that brought units (« Dernière entrée »)."""
+
+    date: str | None
+    quantity: float
+    unit_price: float | None
+    supplier: str | None
+
+
+class ProductLastSale(BaseModel):
+    date: str | None
+    quantity: float | None
+
+
 class ProductSheet(BaseModel):
     id: int
     pid: str
@@ -139,6 +153,8 @@ class ProductSheet(BaseModel):
     prices: ProductPrices
     stock: ProductStock
     recent_movements: list[ProductMovement]  # 5 latest, newest first
+    last_purchase: ProductLastPurchase | None  # None = never bought
+    last_sale: ProductLastSale | None  # None = never sold
     notes_count: int  # « Observations »: > 0 = the window opens with the page
     # Fields the owner edited → their imported value (« Revenir à la valeur importée »).
     imported: dict[str, str | float | int | None]

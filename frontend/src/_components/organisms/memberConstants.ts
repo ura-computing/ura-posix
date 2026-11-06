@@ -11,6 +11,8 @@ import {
   Bell,
   Star,
   Package,
+  PackagePlus,
+  Printer,
   RefreshCw,
   type LucideIcon,
 } from "lucide-react";
@@ -26,7 +28,9 @@ export type FeatureKey =
   | "alertes"
   | "special_products"
   | "produits"
-  | "sobrus";
+  | "sobrus"
+  | "labels"
+  | "orders";
 
 export interface FeatureDef {
   key: FeatureKey;
@@ -35,6 +39,8 @@ export interface FeatureDef {
   icon: LucideIcon;
   /** Owners only (« Connexion Sobrus »): not offered on an employee's accesses. */
   ownerOnly?: boolean;
+  /** Premium (« Étiquette », « Commander »): OFF for a new pharmacy, the admin switches it on. */
+  premium?: boolean;
 }
 
 // label/description hold i18n KEYS (adminFeat.*) — translate at render with t().
@@ -50,6 +56,8 @@ export const FEATURES: FeatureDef[] = [
   { key: "special_products", label: "adminFeat.special", description: "adminFeat.specialD", icon: Star },
   { key: "produits", label: "adminFeat.produits", description: "adminFeat.produitsD", icon: Package },
   { key: "sobrus", label: "adminFeat.sobrus", description: "adminFeat.sobrusD", icon: RefreshCw, ownerOnly: true },
+  { key: "labels", label: "adminFeat.labels", description: "adminFeat.labelsD", icon: Printer, premium: true },
+  { key: "orders", label: "adminFeat.orders", description: "adminFeat.ordersD", icon: PackagePlus, premium: true },
 ];
 
 export const FEATURE_KEYS: readonly FeatureKey[] = FEATURES.map((f) => f.key);

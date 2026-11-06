@@ -456,6 +456,7 @@ class Oracle:
         units = sum(v.qty for v in self.ventes if v.p is p and start <= v.day <= end)
         pu = self.pu_alltime.get(p.pid)
         last = max((a for a in self.achats if a.p is p and a.qty > 0), key=lambda a: (a.day, a.seq), default=None)
+        sold = max((v for v in self.ventes if v.p is p), key=lambda v: (v.day, v.seq), default=None)
         moves = [(a.day, "achat", a.seq, a.qty, a.unit, a.ref, a.supplier) for a in self.achats if a.p is p]
         moves += [(v.day, "vente", v.seq, -v.qty, v.unit, v.ref, v.client or None) for v in self.ventes if v.p is p]
         moves.sort(key=lambda m: (m[0], m[1], m[2]), reverse=True)
@@ -485,6 +486,10 @@ class Oracle:
                  "party": party}
                 for day, kind, _, qty, unit, ref, party in moves[:5]
             ],
+            # « Dernière entrée »: the latest purchase line that brought units; « dernière vente ».
+            "last_purchase": {"date": last.day.isoformat(), "quantity": last.qty, "unit_price": last.unit,
+                              "supplier": last.supplier} if last else None,
+            "last_sale": {"date": sold.day.isoformat(), "quantity": sold.qty} if sold else None,
             "imported": {},   # no owner edit (18-produits « modifier » puts everything back)
             "notes_count": 0,
         }

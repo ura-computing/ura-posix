@@ -340,6 +340,19 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
     moves = _movements(pharmacy_id, med_id)
     recent = db.execute(select(moves).order_by(*_newest_first(moves)).limit(5)).all()
     current, ppv = v["current_stock"], v["ppv"]
+    # « Dernière entrée » (latest purchase line that brought units) and « dernière vente ».
+    last_in = (
+        db.query(Achat.delivery_date, Achat.quantity, Achat.unit_price, Achat.supplier)
+        .filter(Achat.pharmacy_id == pharmacy_id, Achat.medicament_id == med_id, Achat.quantity > 0)
+        .order_by(Achat.delivery_date.desc().nullslast(), Achat.id.desc())
+        .first()
+    )
+    last_out = (
+        db.query(Vente.date, Vente.quantity)
+        .filter(Vente.pharmacy_id == pharmacy_id, Vente.medicament_id == med_id)
+        .order_by(Vente.date.desc().nullslast(), Vente.id.desc())
+        .first()
+    )
 
     return {
         "id": med.id,
@@ -395,6 +408,17 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             }
             for m in recent
         ],
+        "last_purchase": (
+            {
+                "date": last_in.delivery_date,
+                "quantity": last_in.quantity,
+                "unit_price": last_in.unit_price,
+                "supplier": last_in.supplier,
+            }
+            if last_in
+            else None
+        ),
+        "last_sale": {"date": last_out.date, "quantity": last_out.quantity} if last_out else None,
         "notes_count": note_counts(db, pharmacy_id, [med_id]).get(med_id, 0),
         "imported": {f: imported[f] for f in edited},
     }

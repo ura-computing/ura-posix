@@ -14,6 +14,7 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
+import { PremiumTag } from "@/_components/molecules/PremiumTag";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
 import { MembersSection } from "@/_components/organisms/MembersSection";
 import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDialog";
@@ -110,7 +111,10 @@ function FeatureToggleGrid({
                   <Icon className="size-4" />
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-sm font-semibold text-foreground">{t(f.label)}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    {t(f.label)}
+                    {f.premium && <PremiumTag />}
+                  </span>
                   <span className="text-[11.5px] leading-snug text-muted-foreground">{t(f.description)}</span>
                 </div>
                 <Switch checked={on} onChange={(next) => onToggle(f.key, next)} />

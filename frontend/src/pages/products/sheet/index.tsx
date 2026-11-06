@@ -8,6 +8,8 @@ import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react"
 import { useParams } from "react-router-dom";
 
 import { FilterBar } from "@/_components/organisms/FilterBar";
+import { PremiumDialog, type PremiumFeature } from "@/_components/organisms/PremiumDialog";
+import { useMe } from "@/hooks/useMe";
 import { Page } from "@/_components/templates/Page";
 import { TabBar, type TabItem } from "@/_components/molecules/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
@@ -22,7 +24,7 @@ import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { NotesDialog } from "./_components/NotesDialog";
-import { BackToList, SheetFacts, SheetMeta } from "./_components/SheetHeader";
+import { BackToList, SheetActions, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
   useProductNotes,
@@ -30,14 +32,22 @@ import {
   useProduitPage,
   useSheetEditor,
   useStatsRange,
+  type SheetPeriod,
   type SheetTab,
 } from "./hooks";
+
+/** A period button on (same look as « Mixte », the other segments of the app). */
+const PERIOD_ON = "bg-primary text-primary-foreground shadow-sm";
 
 function ProductSheetPage({ id }: { id: number }) {
   const t = useT();
   const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(id);
   const editor = useSheetEditor(sheet);
-  const { range, setRange } = useStatsRange();
+  const { range, setRange, period, setPeriod } = useStatsRange();
+  // « Étiquette » / « Commander » (premium): unlocked = in the account's effective permissions.
+  const { me } = useMe();
+  const has = (f: PremiumFeature) => !!me?.permissions.includes(f);
+  const [premium, setPremium] = useState<PremiumFeature | null>(null);
   const { stats } = useProductStats(id, range, !!sheet);
   useScanner(); // a scan anywhere on the page → that product
   // « Observations »: their window opens with the page when there are some — once (switching tabs
@@ -47,6 +57,12 @@ function ProductSheetPage({ id }: { id: number }) {
   if (notesOpen === null && sheet) setNotesOpen(sheet.notes_count > 0);
   const showNotes = notesOpen === true;
   const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
+
+  /** « Modifier » / « Compléter »: « Général », its « Identité » block in edit mode. */
+  const editInfos = () => {
+    setTab("general");
+    editor.start("infos");
+  };
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
@@ -68,12 +84,15 @@ function ProductSheetPage({ id }: { id: number }) {
         above={<BackToList />}
         media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
-        subtitle={<SheetMeta sheet={sheet} />}
-        below={
-          <SheetFacts
-            zone={sheet.stock.zone}
-            barcode={sheet.barcode1}
-            notes={sheet.notes_count}
+        subtitle={<SheetMeta sheet={sheet} canEdit={editor.canEdit} onComplete={editInfos} />}
+        actions={
+          <SheetActions
+            sheet={sheet}
+            canEdit={editor.canEdit}
+            editing={editor.section !== null}
+            onEdit={editInfos}
+            unlocked={{ labels: has("labels"), orders: has("orders") }}
+            onPremium={setPremium}
             onOpenNotes={() => setNotesOpen(true)}
           />
         }
@@ -82,7 +101,21 @@ function ProductSheetPage({ id }: { id: number }) {
         {/* The page dates: « Performance » (Général), Statistiques; Traçabilité has them in its own
             toolbar, with its search and filters. */}
         {(tab === "general" || tab === "stats") && (
-          <FilterBar dateRange={{ from: range.from, to: range.to, onChange: setRange }} />
+          <FilterBar<SheetPeriod | "custom">
+            dateRange={{ from: range.from, to: range.to, onChange: setRange }}
+            segment={{
+              value: period ?? "custom",
+              onChange: (v) => v !== "custom" && setPeriod(v),
+              options: (
+                [
+                  ["30d", "products.period30"],
+                  ["90d", "products.period90"],
+                  ["year", "products.periodYear"],
+                  ["12m", "products.period12"],
+                ] as const
+              ).map(([value, label]) => ({ value, label: t(label), activeBg: PERIOD_ON })),
+            }}
+          />
         )}
         {tab === "general" && (
           <GeneralTab sheet={sheet} stats={stats} range={range} onShowMovements={() => setTab("movements")} />
@@ -92,6 +125,11 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "codes" && <CodesTab sheet={sheet} />}
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
+      <PremiumDialog
+        feature={premium}
+        unlocked={premium !== null && has(premium)}
+        onClose={() => setPremium(null)}
+      />
       <NotesDialog
         open={showNotes}
         product={sheet.product}

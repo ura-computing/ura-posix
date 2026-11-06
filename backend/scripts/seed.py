@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.ingestion.csv_parse import classify_product_type, parse_catalog_csv
 from app.core.database import SessionLocal
 from app.identity.members.service import create_member, generate_pharmacy_code
-from app.core.models import ALLOWED_FEATURES, Medicament, Pharmacy, PharmacyFeature, User
+from app.core.models import ALLOWED_FEATURES, PREMIUM_FEATURES, Medicament, Pharmacy, PharmacyFeature, User
 from app.core.security import hash_password
 
 
@@ -108,7 +108,7 @@ def _seed_owner_with_pharmacy(db: Session, cfg: dict | None) -> tuple[str, str] 
     db.add(pharmacy)
     db.flush()
     for feature in ALLOWED_FEATURES:
-        db.add(PharmacyFeature(pharmacy_id=pharmacy.id, feature=feature, enabled=True))
+        db.add(PharmacyFeature(pharmacy_id=pharmacy.id, feature=feature, enabled=feature not in PREMIUM_FEATURES))
     owner = create_member(
         db, email=cfg["email"], name=cfg["name"], password=cfg["password"], role=ROLE_OWNER, pharmacy_id=pharmacy.id
     )

@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import ALLOWED_FEATURES, Pharmacy, PharmacyFeature, User, UserPermission
+from app.core.models import ALLOWED_FEATURES, PREMIUM_FEATURES, Pharmacy, PharmacyFeature, User, UserPermission
 from app.identity.members.schemas import MemberOut
 from app.core.security import hash_password
 
@@ -186,7 +186,7 @@ def add_pharmacy(
             db.rollback()
             continue
         for feature in ALLOWED_FEATURES:
-            db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feature, enabled=True))
+            db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feature, enabled=feature not in PREMIUM_FEATURES))
         db.flush()
         return pharm
     raise ApiError(
