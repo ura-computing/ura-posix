@@ -1,16 +1,19 @@
 /** Top of the product sheet, on every tab, kept calm: « Retour à la liste des produits »; the name; one line with
- *  the type and stock badges, the PID and the code barre; on the right one row of actions: « Observations », the
- *  premium « Étiquette » / « Commander N ». */
+ *  the type and stock badges, the PID and the code barre; on the right the stock box and the actions: « Observations »,
+ *  the premium « Étiquette » / « Commander N ». */
 import { ArrowLeft, Printer, ShoppingCart, StickyNote } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
+import { Card } from "@/_components/atoms/Card";
+import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import type { PremiumFeature } from "@/_components/organisms/PremiumDialog";
-import { ROUTES, type ProductSheet } from "@/types";
+import { ROUTES, type ProductSheet, type ProductStock } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
+import { formatQty } from "@/utils/format";
 
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
@@ -67,10 +70,40 @@ export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
   );
 }
 
-/** Right of the title, one row: « Observations » (their window), « Étiquette » and « Commander N » (premium: without
- *  it, a click opens the upgrade screen; N = maximum − stock, disabled when nothing to order, the reason
- *  under the row). No « Modifier » here: each block of « Général » / « Codes » has its own. The stock: the « Stock
- *  actuel » tile and the « Stock et réappro » card. */
+/** The stock at a glance: the current one (red under the minimum, then an orange border), minimum, maximum,
+ *  « ≈ N jours de ventes ». */
+function StockBox({ stock }: { stock: ProductStock }) {
+  const t = useT();
+  const { current_stock: current, stock_min: min, stock_max: max, coverage_days: days } = stock;
+  const under = current != null && current < min;
+  const row = (label: string, value: number) => (
+    <span className="flex items-center justify-between gap-6 text-sm">
+      <span className="font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="font-mono font-semibold text-foreground">{formatQty(value)}</span>
+    </span>
+  );
+  return (
+    <Card as="div" className={cn("flex min-w-56 flex-col gap-1.5", under && "border-2 border-warning-border")}>
+      <span className="flex items-center justify-between gap-6">
+        <SectionTitle>{t("products.stock")}</SectionTitle>
+        <span className={cn("font-mono text-4xl font-bold", under ? "text-error" : "text-foreground")}>
+          {current == null ? "—" : formatQty(current)}
+        </span>
+      </span>
+      {row(t("products.boxMin"), min)}
+      {row(t("products.boxMax"), max)}
+      {days != null && (
+        <span className={cn("mt-1 text-sm font-medium", under ? "text-warning" : "text-muted-foreground")}>
+          {t("products.daysOfSales", { n: days })}
+        </span>
+      )}
+    </Card>
+  );
+}
+
+/** Right of the title: the stock box, then, stacked, « Observations » (their window), « Étiquette » and « Commander N »
+ *  (premium: without it, a click opens the upgrade screen; N = maximum − stock, disabled when nothing to order, the
+ *  reason under it). No « Modifier » here: each block of « Général » / « Codes » has its own. */
 export function SheetActions({
   sheet,
   onPremium,
@@ -85,8 +118,9 @@ export function SheetActions({
   const toOrder = Math.max(0, max - Math.max(0, current ?? 0));
   const notes = sheet.notes_count;
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-wrap items-start gap-3">
+      <StockBox stock={sheet.stock} />
+      <div className="flex min-w-48 flex-col gap-2">
         <Button variant="outline" onClick={onOpenNotes}>
           <StickyNote className="size-4" />
           {t("products.observations")}
@@ -100,8 +134,8 @@ export function SheetActions({
           <ShoppingCart className="size-4" />
           {toOrder > 0 ? t("products.order", { n: toOrder }) : t("products.orderNone")}
         </Button>
+        {toOrder <= 0 && <span className="max-w-48 text-sm text-muted-foreground">{t("products.orderEnough")}</span>}
       </div>
-      {toOrder <= 0 && <span className="text-xs text-muted-foreground">{t("products.orderEnough")}</span>}
     </div>
   );
 }

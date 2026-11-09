@@ -435,7 +435,7 @@ test("produits: un employé voit la liste", async ({ page, browser }) => {
     await expect(other.getByRole("button", { name: "Imprimer", exact: true }), "employé : pas d'imprimer").toHaveCount(
       0,
     );
-    await expect(other.getByText("Seul le propriétaire peut modifier ce produit.")).toBeVisible();
+    await expect(other.getByText("Seul le propriétaire peut modifier ce produit.").first()).toBeVisible();
     const refused = await apiPut(other, `/products/${got.data[0].id}`, { ppv: 1 }, 403);
     expect(refused.code, "PUT par un employé").toBe("ownerOnly");
 
@@ -516,13 +516,22 @@ test("fiche produit: chaque cas = oracle, à l'écran aussi", async ({ page }) =
         );
       }
       await expectTile(page, "Ventes 12 mois", e.stock.units_sold_12m);
-      await expectTile(page, "Rythme de vente", Math.round((e.stock.units_sold_12m / 12) * 10) / 10);
+      await expect(tileBox(page, "Rythme de vente")).toContainText(
+        new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+          e.stock.units_sold_12m / 12,
+        ),
+      );
 
       // Card « Stock et réappro » (Stock page rules): actuel, minimum, maximum (0 = the default from the sales).
       if (e.stock.current_stock == null) await expect(field(page, "Stock actuel")).toHaveText("Hors stock");
       else await expectNumber(page, "Stock actuel", e.stock.current_stock);
-      if (e.stock.stock_min > 0) await expectNumber(page, "Stock minimum", e.stock.stock_min);
-      if (e.stock.stock_max > 0) await expectNumber(page, "Stock maximum", e.stock.stock_max);
+      for (const [label, value] of [
+        ["Stock minimum", e.stock.stock_min],
+        ["Stock maximum", e.stock.stock_max],
+      ] as const) {
+        if (value > 0) await expectNumber(page, label, value);
+        else if (e.stock.units_sold_12m > 0) await expect(field(page, label), label).toContainText("par défaut");
+      }
       // Emplacement + date de péremption (stock file), with its hint (Périmé / < 30 j / < 90 j).
       await expect(field(page, "Emplacement")).toHaveText(e.stock.zone || "Non disponible");
       if (!e.stock.expiry_date) await expect(field(page, "Date de péremption")).toHaveText("Non disponible");
@@ -618,6 +627,38 @@ test("fiche produit: copier le code barre (en-tête)", async ({ page }) => {
   await page.locator("main header").getByRole("button", { name: "Copier le code barre", exact: true }).click();
   await expect(page.getByText(`Copié : ${e.barcode1}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText()), "presse-papiers").toBe(e.barcode1);
+});
+
+test("fiche produit: « Étiquette » et « Commander » premium : verrouillés, puis ouverts par l'administrateur", async ({
+  page,
+  browser,
+}) => {
+  // A product with something to order (« Commander N », N = maximum − stock).
+  const [pid] = Object.entries<Row>(expected().products.sheets).find(
+    ([, s]) => s.stock.stock_max - Math.max(0, s.stock.current_stock ?? 0) > 0,
+  ) as [string, Row];
+  const click = async (name: RegExp, text: string) => {
+    await page.locator("main header").getByRole("button", { name }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog, String(name)).toContainText(text);
+    await dialog.getByRole("button", { name: "Fermer", exact: true }).last().click();
+    await expect(dialog).toHaveCount(0);
+  };
+  await openSheet(page, pid);
+  await click(/^Étiquette/, "Pour l'activer, contactez APCM.");
+  await click(/^Commander/, "Pour l'activer, contactez APCM.");
+  const ctx = await browser.newContext({ storageState: sessionFile("admin") });
+  const admin = await ctx.newPage();
+  const features = `/admin/pharmacies/${loadState().pharmacyId}/features`;
+  await apiPut(admin, features, { features: { labels: true, orders: true } });
+  try {
+    await page.reload();
+    await click(/^Étiquette/, "Bientôt disponible");
+    await click(/^Commander/, "Bientôt disponible");
+  } finally {
+    await apiPut(admin, features, { features: { labels: false, orders: false } });
+    await ctx.close();
+  }
 });
 
 test("fiche produit: pas de bouton « Imprimer »", async ({ page }) => {
@@ -1744,6 +1785,13 @@ test.describe("modifier", () => {
     await expect(field(page, "Code barre")).toContainText("3760000000082");
     await expect(page.locator("main header").getByText("3760000000082", { exact: true })).toBeVisible();
 
+    // The Stock page shows his minimum / maximum.
+    await page.goto("/stock");
+    await page.getByPlaceholder("Nom, code-barres, PID…").fill(pid);
+    const stockCells = page.locator("tbody tr").filter({ hasText: e.product }).first().locator("td");
+    await expect(stockCells.nth(3), "Stock : minimum modifié").toHaveText("3");
+    await expect(stockCells.nth(4), "Stock : maximum modifié").toHaveText("9");
+
     // The list shows his values too (Produits only); the type is still the catalogue's.
     await open(page);
     const found = pageCall(page, "/products", { search: pid });
@@ -1871,6 +1919,11 @@ test.describe("modifier", () => {
       }
     }
     await expect(page.getByText("modifié", { exact: true })).toHaveCount(0);
+    const stockBack = (await apiGet(page, "/stats/stock-abcd")).products.find((p: Row) => p.pid === pid);
+    expect([stockBack.stock_min, stockBack.stock_max], "Stock : la règle à nouveau").toEqual([
+      e.stock.stock_min,
+      e.stock.stock_max,
+    ]);
     const back = await apiGet(page, `/products/${id}`);
     expectSame(back, e, "fiche revenue aux valeurs importées");
     expect(back.imported, "plus rien de modifié").toEqual({});

@@ -18,10 +18,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.core.models import Achat, Medicament, PharmacyStock, Vente
+from app.core.models import Achat, Medicament, PharmacyProductEdit, PharmacyStock, Vente
 from app.analytics.query_parts import avg_pu_subquery
 from app.core.utils import today as pharmacy_today
 
@@ -216,6 +216,9 @@ def compute_stock_abcd(
     rows = (
         db.query(
             Medicament.id,
+            Medicament.pid,
+            Medicament.barcode1,
+            Medicament.barcode2,
             Medicament.product,
             Medicament.ppv,
             func.coalesce(sales_12m.c.units, 0).label("units_sold_12m"),
@@ -232,6 +235,15 @@ def compute_stock_abcd(
         .filter(Medicament.id.in_(all_med_ids))
         .all()
     )
+
+    # The owner's own minimum / maximum (« Modifier » on the product page) win over the formula.
+    edits = {
+        e.medicament_id: e
+        for e in db.query(PharmacyProductEdit).filter(
+            PharmacyProductEdit.pharmacy_id == pharmacy_id,
+            or_(PharmacyProductEdit.stock_min.isnot(None), PharmacyProductEdit.stock_max.isnot(None)),
+        )
+    }
 
     distribution: dict[str, int] = {c: 0 for c in _ABCD_CLASSES}
     products: list[dict] = []
@@ -250,13 +262,17 @@ def compute_stock_abcd(
             ppv_potentiel += float(r.ppv) * current_stock
 
         distribution[cat] += 1
+        edit = edits.get(r.id)
         products.append(
             {
                 "product": r.product or "---",
+                "pid": r.pid,
+                "barcode1": r.barcode1,
+                "barcode2": r.barcode2,
                 "category": cat,
                 "units_sold_12m": units,
-                "stock_min": _stock_min_for(units),
-                "stock_max": _stock_max_for(units),
+                "stock_min": edit.stock_min if edit and edit.stock_min is not None else _stock_min_for(units),
+                "stock_max": edit.stock_max if edit and edit.stock_max is not None else _stock_max_for(units),
                 "current_stock": current_stock,
                 "ppv": round(float(r.ppv), 2) if r.ppv is not None else None,
                 "avg_pu": round(float(r.avg_pu), 4) if r.avg_pu is not None else None,

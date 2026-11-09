@@ -27,7 +27,9 @@ const TO = iso(today);
 const MONTH = TO.slice(0, 7);
 
 /** The fake's closing of one day (fake-sobrus/server.py `closing_day`): null on Sunday. */
-function closingDay(day: string): { invoices: number; total: number; paid: number; credit: number; returns: number; net: number } | null {
+function closingDay(
+  day: string,
+): { invoices: number; total: number; paid: number; credit: number; returns: number; net: number } | null {
   const d = new Date(`${day}T00:00:00`);
   if (d.getDay() === 0) return null;
   const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -162,7 +164,10 @@ test.describe("administrateur", () => {
       const list = page.waitForResponse(
         (r) => r.url().includes("/v1/admin/catalog?") && new URL(r.url()).searchParams.get("type") === type,
       );
-      await page.getByRole("button", { name: new RegExp(`^${label}`, "i") }).first().click();
+      await page
+        .getByRole("button", { name: new RegExp(`^${label}`, "i") })
+        .first()
+        .click();
       expect((await (await list).json()).pagination.total, label).toBe(n);
     }
     await page.getByRole("button", { name: /^Produits au catalogue/i }).click();
@@ -174,7 +179,7 @@ test.describe("administrateur", () => {
   }) => {
     test.setTimeout(8 * 60_000);
     const pid = loadState().pharmacyId;
-    await control(page, { products_delay: 2 });
+    await control(page, { products_delay: 1 });
     await page.goto("/admin/catalogue");
     await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
     await page.goto("/admin/pharmacies");
@@ -182,8 +187,17 @@ test.describe("administrateur", () => {
     await expect(popup, "la progression, sur une autre page").toBeVisible();
     await popup.getByRole("button", { name: "Voir le détail" }).click();
     await expect(popup).toContainText("Compte Sobrus");
+    await popup.getByRole("button", { name: "Masquer le détail" }).click();
+    await popup.getByRole("button", { name: /^Produits Sobrus/ }).click();
+    await expect(page, "la carte ouvre le Catalogue").toHaveURL(/\/admin\/catalogue$/);
     await popup.getByRole("button", { name: "Arrêter" }).click();
-    expect((await importEnded(page)).status, "arrêté").toBe("cancelled");
+    expect((await importEnded(page)).status, "arrêté (popup)").toBe("cancelled");
+
+    // The same from the Catalogue's own card.
+    await page.goto("/admin/catalogue");
+    await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+    await page.locator("main").getByRole("button", { name: "Arrêter", exact: true }).click();
+    expect((await importEnded(page)).status, "arrêté (carte)").toBe("cancelled");
     await control(page, { products_delay: 0 });
 
     const before = (await apiGet(page, "/admin/catalog/stats")).total;
@@ -215,7 +229,7 @@ test.describe("administrateur", () => {
       await control(page, { forbid: null });
     }
     await page.goto("/admin/catalogue");
-    await expect(page.getByText("Sobrus a refusé ce compte : le compte suivant est essayé.")).toBeVisible();
+    await expect(page.getByText("Sobrus a refusé ce compte : le compte suivant est essayé.").first()).toBeVisible();
   });
 });
 
@@ -226,12 +240,16 @@ test.describe("propriétaire, après", () => {
     page,
   }) => {
     const { data } = await apiGet(page, "/products", { page: "1" });
-    const sheet = await apiGet(page, `/products/${data[0].id}`);
+    const product = data.find((r: { current_stock: number | null }) => r.current_stock != null); // in the stock file = in Sobrus' list
+    const sheet = await apiGet(page, `/products/${product.id}`);
     expect([sheet.dci, sheet.galenic_form]).toEqual([`DCI ${sheet.pid}`, "Comprimé"]);
-    await page.goto(`/produits/${data[0].id}`);
+    await page.goto(`/produits/${product.id}`);
     await expect(page.getByText(`DCI ${sheet.pid}`, { exact: true })).toBeVisible();
     const runs = await apiGet(page, "/sobrus/runs");
-    expect(runs.some((r: { mode: string }) => r.mode === "products"), "pas dans ses imports").toBe(false);
+    expect(
+      runs.some((r: { mode: string }) => r.mode === "products"),
+      "pas dans ses imports",
+    ).toBe(false);
     await apiDelete(page, "/sobrus/connection", 204);
   });
 });

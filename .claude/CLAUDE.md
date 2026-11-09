@@ -59,6 +59,7 @@ Topic rules in `.claude/rules/` (each loads with the files it covers):
 - Exports `.xlsx` (never CSV), French headers. % = 2 decimals + comma.
 - Pharmacy code from the city: Casablanca → `CAS0001`.
 - Admin sees every account (tab « Utilisateurs »).
+- Every Sobrus call runs in the worker (`app/sobrus/sync.py`, a run mode); the API only queues runs and reads what the worker stored.
 - « Ma boutique en ligne » (`store_website`): hidden, built later. Moved as-is, not in the E2E yet.
 
 # Docs

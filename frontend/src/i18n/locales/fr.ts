@@ -457,7 +457,7 @@ export const fr = {
     tabHistory: "Historique",
     ownerOnly: "Seul le propriétaire peut modifier ce produit.",
     editHint:
-      "Changez les valeurs puis cliquez sur « Enregistrer ». Ces valeurs comptent seulement pour votre pharmacie, dans « Produits ».",
+      "Changez les valeurs puis cliquez sur « Enregistrer ». Ces valeurs comptent seulement pour votre pharmacie, dans « Produits » (le minimum et le maximum aussi dans « Stock »).",
     saving: "Enregistrement…",
     saved: "Fiche enregistrée",
     edited: "modifié",
@@ -560,6 +560,9 @@ export const fr = {
     missingUnits: "manque {{n}} u.",
     coverage: "Couverture",
     coverageValue: "≈ {{days}} jours à {{rate}} u. / jour",
+    daysOfSales: "≈ {{n}} jours de ventes",
+    boxMin: "Min",
+    boxMax: "Max",
     byDefault: "par défaut (selon les ventes)",
     label: "Étiquette",
     order: "Commander {{n}}",
@@ -738,6 +741,7 @@ export const fr = {
   },
 
   stock: {
+    searchPh: "Nom, code-barres, PID…",
     healthIndex: "Indice de santé",
     classAria: "Classe {{k}} : {{n}} références",
     empty: "Aucune donnée de stock",

@@ -188,7 +188,7 @@ flowchart LR
 | `make migrate` | `scripts/bootstrap.py`: extensions, `immutable_unaccent()`, migrations; then `scripts/load_product_infos.py` (product photos) |
 | `make seed` | seed accounts + « Pharmacie Demo » + catalogue (idempotent) |
 | `make dev` | backend uvicorn **:8000** (hot reload, applies new migrations first) + Sobrus robot + Vite **:5173** |
-| `make backend` · `make worker` · `make frontend` | one of the three |
+| `make backend` · `make worker` · `make frontend` | one of the three; backend and worker reload when a `.py` file changes (the worker's run goes back in the queue) |
 | `make format` | Prettier (frontend + e2e) + ruff (backend), width 120 |
 | `make build` | backend Docker image + `tsc -b && vite build` |
 | `make demo` · `make down` · `make logs` | full Docker stack (app **:4173**; asks « DigitalOcean limits? », Enter = yes, [§9](#9-deployment-digitalocean)) · stop · logs |
@@ -438,7 +438,7 @@ stateDiagram-v2
 - `scripts/bootstrap.py` (`make migrate` + container start): `CREATE EXTENSION pg_trgm, unaccent` →
   `immutable_unaccent()` (schema-qualified) + self-check under `search_path = pg_catalog, pg_temp` →
   fresh DB: `create_all` + `alembic stamp head`; managed DB: `alembic upgrade head`.
-- Head **0029** (0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
+- Head **0037** (0035: premium features `labels` / `orders`, OFF for every pharmacy; 0036: `sobrus_cash_closings`, `sobrus_connections.closing_access`, run mode `products`, `medicaments.dci` / `galenic_form`; 0037: `sobrus_connections.products_page`, where a cut product import resumes; 0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
   0022: emails stored trimmed + lower case; 0023: `signup_requests`; 0024: feature `produits` ON for
   everyone; 0025: `product_infos`; 0026: `pharmacy_stock.import_batch_id`; 0027: `pharmacy_product_edits`;
   0028: waiting sign-ups get their `pending` account; 0029: `product_notes` + `audit_logs`, the imports already made written in it).
@@ -596,7 +596,8 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 | Marge | (1 − average PU / PPV) × 100, every purchase of the pharmacy, with the PPV shown |
 | Photo (header, list) | the `product_infos` row with the same PID, else the same barcode (1 or 2), matched when shown: a product imported later finds its photo. Dead photo address → box icon |
 | Header badges | Pharmacie / Parapharmacie; stock: « En stock » (> 0), « Rupture » (≤ 0), « Hors stock » (not in the stock file). Catégorie / TVA without their rate: « Médicament (33.930%) » → « Médicament », « TVA (20.00%) » → « 20,00 % » |
-| Général | 5 tiles: PPV, prix d'achat moyen, dernier prix d'achat, marge brute (PPV − prix d'achat moyen), marge %; « Informations générales » = 3 parts side by side, like a pharmacy software sheet: « Données générales » (produit, catégorie, laboratoire, TVA without their rate, code barre, « Emplacement » (file « Zone »: PLACARD 2…; also big in the header), « Date de péremption » (typed or picked in a calendar « « ‹ mois › » ») with « Périmé » / « Moins de 30 jours » (red) / « Moins de 90 jours » (orange)) · « Prix » (PPV, PPH, prix d'achat moyen, dernier prix d'achat) · « Stock » (actuel, minimum, maximum); « Historique des ventes (par année) » = the Ventes lines of Statistiques' « Historique (par année) »; « Traçabilité récente » (5 latest lines); « Performance » = ventes / achats over the page dates + % vs the period before |
+| Général | 6 tiles: PPV, prix d'achat moyen, marge unitaire, stock actuel, ventes 12 mois, rythme de vente; 3 cards, each with its own « Modifier »: « Identité », « Prix et marge », « Stock et réappro »; no source yet: « À renseigner »; DCI / forme: from Sobrus (§7.10); minimum / maximum at 0 → default from the sales (3 weeks / 40 days, rounded up to 5), marked « par défaut », display only |
+| Header | badges, PID, code barre; « Observations », « Étiquette » and « Commander N » (premium: OFF until the admin switches them on; locked → upgrade screen, on → « Bientôt disponible ») |
 | Page dates | the Ventes date picker (2 date fields, calendar, « Périodes rapides ») in a toolbar under the tabs, one for Général (« Performance »), Statistiques and Traçabilité; opens on the current year (1 January → today); its own dates (Ventes / Achats keep theirs). Each % = vs the period before: whole months → as many months before (2025 → 2024, septembre → août); the year so far → the same dates a year before (like Tableau de bord); else as many days before |
 | Statistiques: figures | quantités vendues / achetées, CA = Σ qty × PPV, marge générée = CA − quantité vendue × prix d'achat moyen, transactions = distinct tickets. Top 3 suppliers of the period + « Autres »; the 5 latest prices (each supplier's latest priced purchase); « Voir tout (N) » = the whole list in a window (prices with their date) |
 | Historique (par année) | « Tous · Ventes · Achats »: per year (newest first) a Ventes line (light green) and an Achats line (light blue), a kind without any unit that year left out: units each month, total, « Montant » = CA (sales) or Σ line totals (purchases); « Copier » (Excel) = what is shown; not tied to the period |
@@ -614,7 +615,7 @@ Accent- and case-insensitive; product search also matches PID and barcodes. Back
 flowchart LR
   I["imports<br/>medicaments · pharmacy_stock"] --> S["value shown<br/>= the owner's if any, else the imported one"]
   E["pharmacy_product_edits<br/>the owner's values, his pharmacy"] --> S
-  S --> P["Produits list + sheet only"]
+  S --> P["Produits list + sheet<br/>Stock page: minimum / maximum only"]
   I --> O["Rapport · Stock · Comptabilité · …<br/>always the imported values"]
 ```
 
@@ -630,6 +631,29 @@ flowchart LR
 
 Example: import PPV 189 → the owner types 165 → the next import writes 195 → the sheet shows 165
 « modifié · Valeur importée : 195,00 MAD » → « Revenir » → 195.
+
+### 7.9 Clôture de caisse (Comptabilité)
+| Rule | Value |
+|---|---|
+| Source | Sobrus report `/reports/cashdeskclosing` (`by_day=1`), read by the worker at every run but `check` / `products`, one call per month, one row per day (`sobrus_cash_closings`) |
+| Days read | nightly: same start as the achats; « Choisir les dates »: those dates; « Tout l'historique »: from 1 January of last year |
+| Page | read-only block under the payment-method cards, same month; a day clicked → payment ways + credit customers; « Exporter la clôture » (`.xlsx`) |
+| No access | only the owner's Sobrus login may read it: `closing_access = false`, a warning on the page, the run still succeeds |
+
+Example: run of 3 Nov → row 3 Nov: Total, Payé, Crédit, Retours, Net as Sobrus reports them.
+
+### 7.10 Produits depuis Sobrus (admin Catalogue)
+| Rule | Value |
+|---|---|
+| Start | « Importer les produits depuis Sobrus »: run mode `products`, one owner's Sobrus account (the last that worked); refused → the next connected pharmacy (`app/sobrus/catalog_import.py`). « Importer CSV » stays for when Sobrus fails |
+| Reading | `/products`, 21 a page (fixed by Sobrus), no total: until an empty page; 2 pages at a time, one upsert per 40 pages |
+| Values | new PID added (`product_type` empty: « non classé »); known PID: only its empty fields filled, never the admin's values, never the name |
+| Cut (« Arrêter », restart, error) | the next import resumes at the last saved page − 2 (`products_page`, the furthest of every account); list read to the end → page 1 again |
+| Who sees it | the admin only: popup on every page, Catalogue card, « Gestion des imports » tab « Produits Sobrus »; the owner: one line in « Historique » |
+
+Example: import cut at page 6 120 → next import starts at page 6 118.
+
+Every Sobrus call runs in the worker (`app/sobrus/sync.py`); the API only queues runs and reads what the worker stored.
 
 ---
 
@@ -690,6 +714,7 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 19-historique | « Historique des modifications »: owner page = API (newest first, 02 imports), filters type / person / text / dates, product link, Excel; product tab (its lines per import); employee: no menu, 404, `GET /history` 403 |
 | 21-sobrus-live | the robot's own client against the **real** Sobrus (account of `e2e/tests.env`: `make tests` asks the email + password the first time and saves it, gitignored): login + 7-day Achats export, the robot's log line on failure |
 | 22-api-errors | every error code a user can't reach by clicking (wrong id, role, empty body…) with its status + `code`; the API-only fields (notes at exclusion, `include_non_declared` on Achats, `include_archived`, PPH / description, signup address) |
+| 25-sobrus-catalogue | Clôture de caisse in Comptabilité (not connected, each day = the fake Sobrus, day details, Excel, no access); admin Catalogue tiles, Sobrus product import (popup, « Arrêter », new products + empty fields, refused account, « Produits Sobrus » tab), the owner does not see it |
 | 99-gates | **coverage** (every `/openapi.json` route called; every query param + request field sent; every error code triggered; every button / link / tab / menu / checkbox / field shown is used — `.results/{params,codes,ui}-missing.txt`, exceptions with their reason in `e2e/coverage-allowlist.json`, store skipped) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** · **DigitalOcean limits** (with them: backend never killed and < 512 MB, ≤ 22 connections, none refused, database < 10 GB; speed vs `e2e/perf-baseline.do.json`) |
 
 ### 8.4 When a test fails

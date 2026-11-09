@@ -602,6 +602,8 @@ class Robot:
                 raise Cancelled()
             pages = list(range(page + 1, min(page + PRODUCTS_BATCH, PRODUCTS_MAX_PAGES) + 1))
             answers = self._fetch_pages(pages)
+            if _cancel_requested(self.db, self.run):  # « Arrêter » during the fetch: this batch is not saved
+                raise Cancelled()
             found: dict[str, dict] = {}
             last = False
             for number, items in zip(pages, answers):

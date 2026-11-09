@@ -8,6 +8,7 @@ import { monthsAgo, todayIso } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/pages/analytics/hooks";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import type { AbcdClass, StockRow } from "@/types";
+import { matchesFields } from "@/utils/text";
 import { translateFr } from "@/i18n/I18nProvider";
 
 export type StockSortKey =
@@ -40,12 +41,15 @@ export function useStockPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // The search looks in every class: the product wanted is rarely in the class shown.
+  const [search, setSearchText] = useState("");
+  const searching = search.trim() !== "";
   // Peremption-card → product-list dialog. Same DialogDescriptor type as
   // /alertes uses so the shared <AlertDetailDialog/> wires up identically.
   const [dialog, setDialog] = useState<DialogDescriptor | null>(null);
 
   /** Table renders only when at least one of these is active. */
-  const hasTableFilter = classFilter !== null || status !== "";
+  const hasTableFilter = classFilter !== null || status !== "" || searching;
 
   // ---- 1) FULL fetch: drives circles + gauge + alert cards (NO class/status) ----
   const { abcd, isLoading, isError, reload } = useStockAbcd({
@@ -58,7 +62,7 @@ export function useStockPage() {
     {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
-      class_filter: classFilter ?? undefined,
+      class_filter: searching ? undefined : (classFilter ?? undefined),
       status: status || undefined,
       sort_by: sortBy,
       sort_order: sortOrder,
@@ -69,6 +73,17 @@ export function useStockPage() {
   const { peremptions } = usePeremptions();
 
   const fullProducts: StockRow[] = useMemo(() => abcd?.products ?? [], [abcd]);
+
+  // The table: the server's rows (class / status), then the search (name, PID, barcodes; accents, several words).
+  const tableRows: StockRow[] = useMemo(() => {
+    const rows = filtered?.products ?? [];
+    return searching ? rows.filter((r) => matchesFields([r.product, r.pid, r.barcode1, r.barcode2], search)) : rows;
+  }, [filtered, search, searching]);
+
+  const setSearch = useCallback((v: string) => {
+    setSearchText(v);
+    setPage(1);
+  }, []);
 
   // ---- health gauge score: ideal / non-inconnu * 10 ----
   const healthScore = useMemo(() => {
@@ -103,12 +118,14 @@ export function useStockPage() {
     setLocalTo(null);
     setClassFilter(null);
     setStatus("");
+    setSearchText("");
     setPage(1);
   }, []);
 
   const closeTable = useCallback(() => {
     setClassFilter(null);
     setStatus("");
+    setSearchText("");
     setPage(1);
   }, []);
 
@@ -129,7 +146,7 @@ export function useStockPage() {
       "PU moyen",
       "Statut",
     ];
-    const rowsToExport = hasTableFilter ? (filtered?.products ?? []) : fullProducts;
+    const rowsToExport = hasTableFilter ? tableRows : fullProducts;
     const body = rowsToExport.map((r) => [
       r.product,
       r.category,
@@ -142,7 +159,7 @@ export function useStockPage() {
       translateFr(`stockStatus.${r.status}`), // « À surveiller », not the code « a-surveiller »
     ]);
     downloadXlsx([header, ...body], exportFilename("STOCK", "xlsx", dateFrom, dateTo));
-  }, [fullProducts, filtered, hasTableFilter, dateFrom, dateTo]);
+  }, [fullProducts, tableRows, hasTableFilter, dateFrom, dateTo]);
 
   return {
     // queries
@@ -150,7 +167,7 @@ export function useStockPage() {
     isLoading,
     isError,
     reload, // full fetch: circles + gauge + alert cards (no class / status)
-    tableRows: filtered?.products ?? [],
+    tableRows,
     isTableLoading,
     peremptions,
     // derived
@@ -163,8 +180,10 @@ export function useStockPage() {
     dateFrom,
     dateTo,
     isDateDefault,
-    classFilter,
+    classFilter: searching ? null : classFilter, // the search looks in every class
     status,
+    search,
+    setSearch,
     setDateFrom,
     setDateTo,
     setStatus: changeStatus,

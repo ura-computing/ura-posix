@@ -19,6 +19,10 @@ import { WEB } from "./lib/paths";
 const HEADED = process.env.E2E_HEADED === "1";
 const SCREEN = (process.env.E2E_SCREEN ?? "1920x1080").replace("x", ",");
 
+// The tests' « today » = the app's (Casablanca, UTC+1): on a UTC machine, 23:00 → 00:00 UTC is already tomorrow there.
+// A fixed offset: this machine's timezone data puts Africa/Casablanca at UTC+0, the browser and the backend at UTC+1.
+process.env.TZ = "Etc/GMT-1";
+
 export default defineConfig({
   testDir: "./tests",
   globalSetup: require.resolve("./global-setup"),

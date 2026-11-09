@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost } from "../lib/api";
+import type { Row } from "../lib/checks";
 import { LOGGED_OUT, PREMIUM_FEATURES, loadState, sessionFile } from "../lib/auth";
 import { expected } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
@@ -242,6 +243,22 @@ test("Stock : chaque classe ABCD (filtre), liens « Importer stock », « voir l
   await expect(page).toHaveURL(/\/upload-file/);
 });
 
+test("Stock : la recherche (nom, PID, code barre) regarde toutes les classes", async ({ page }) => {
+  const { products } = await apiGet(page, "/stats/stock-abcd");
+  const other = products.find((p: Row) => p.category !== "A" && p.barcode1) as Row; // not in the class shown first
+  await page.goto("/stock");
+  await expect(page.getByText("Classe A", { exact: true }).first(), "classe A au départ").toBeVisible();
+  const search = page.getByPlaceholder("Nom, code-barres, PID…");
+  for (const value of [other.product, other.pid, other.barcode1]) {
+    await search.fill(value);
+    await expect(page.locator("tbody tr").first(), value).toContainText(other.product);
+  }
+  await search.fill("ZZZ INTROUVABLE");
+  await expect(page.getByText("Aucun résultat", { exact: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Supprimer le filtre" }).first().click();
+  await expect(search, "le filtre retiré").toHaveValue("");
+});
+
 test("Stock : chaque statut, pages, tri de chaque colonne, « Fermer » puis classe A, péremptions (tri, « Fermer »)", async ({
   page,
 }) => {
@@ -363,10 +380,18 @@ test("fiche produit : chaque période rapide, calendrier de la date (mois, anné
   for (const [period, want] of quickPeriods(new Date())) {
     await test.step(period, async () => {
       await calendar.click();
-      await page.getByRole("button", { name: period, exact: true }).click();
+      // .last(): the calendar's list (« Année en cours » is also a button of the toolbar).
+      await page.getByRole("button", { name: period, exact: true }).last().click();
       await expect.poll(() => dates(page), { message: period }).toBe(want);
     });
   }
+  await test.step("périodes de la barre : 30 j, 90 j, 12 mois, année en cours", async () => {
+    for (const name of ["30 j", "90 j", "12 mois", "Année en cours"]) {
+      const button = page.locator("main").getByRole("button", { name, exact: true });
+      await button.click();
+      await expect(button, name).toHaveAttribute("aria-pressed", "true");
+    }
+  });
   await test.step("date de péremption : calendrier, mois et année", async () => {
     await page.getByRole("button", { name: "Modifier", exact: true }).first().click();
     await page

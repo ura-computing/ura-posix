@@ -102,12 +102,20 @@ function MonthBars({ months, label }: { months: { name: string; sold: number }[]
   );
 }
 
-/** Stock now against its maximum: a bar (orange under the minimum). */
-function StockBar({ current, max, under }: { current: number; max: number; under: boolean }) {
-  const pct = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
+/** Stock now against its maximum: a bar (orange under the minimum), a tick at the minimum. */
+function StockBar({ current, min, max, under }: { current: number; min: number; max: number; under: boolean }) {
+  const percent = (n: number) => (max > 0 ? Math.min(100, Math.max(0, (n / max) * 100)) : 0);
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-      <div className={cn("h-full rounded-full", under ? "bg-warning" : "bg-success")} style={{ width: `${pct}%` }} />
+    <div className="relative h-2 w-full" aria-hidden>
+      <div className="h-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn("h-full rounded-full", under ? "bg-warning" : "bg-success")}
+          style={{ width: `${percent(current)}%` }}
+        />
+      </div>
+      {min > 0 && (
+        <span className="absolute -top-0.5 h-3 w-0.5 rounded-full bg-foreground" style={{ left: `${percent(min)}%` }} />
+      )}
     </div>
   );
 }
@@ -158,6 +166,11 @@ export function GeneralTab({
   const current = stock.current_stock;
   const under = current != null && current < stock.stock_min;
   const suggestion = suggested(perDay);
+  // Under the bar of « Stock actuel »: « ≈ 3 jours de couverture · manque 49 u. ».
+  const stockNote = join([
+    stock.coverage_days != null && t("products.coverageDays", { n: stock.coverage_days }),
+    under && t("products.missingUnits", { n: formatNumStr(stock.stock_min - (current ?? 0)) }),
+  ]);
   // Nothing set (0): the default from the sales, marked « par défaut »; a value set always wins.
   const withDefault = (value: number, fallback: number | undefined) =>
     value > 0 || !fallback ? (
@@ -220,25 +233,20 @@ export function GeneralTab({
           label={t("products.stockCurrent")}
           icon={<Boxes className="size-5" />}
           iconTone={under ? "warning" : "success"}
+          className={cn(under && "border-warning-border bg-warning-subtle")}
           value={
             current != null ? (
               <TileNumber
-                value={formatQty(current)}
+                value={<span className={cn(under && "text-warning")}>{formatQty(current)}</span>}
                 unit={t("products.stockOf", { min: formatNumStr(stock.stock_min), max: formatNumStr(stock.stock_max) })}
               />
             ) : (
               "—"
             )
           }
-          sub={
-            join([
-              stock.coverage_days != null && t("products.coverageDays", { n: stock.coverage_days }),
-              under && t("products.missingUnits", { n: formatNumStr(stock.stock_min - (current ?? 0)) }),
-            ]) || undefined
-          }
-          subTone={under ? "warning" : undefined}
         >
-          {current != null && <StockBar current={current} max={stock.stock_max} under={under} />}
+          {current != null && <StockBar current={current} min={stock.stock_min} max={stock.stock_max} under={under} />}
+          {stockNote && <p className={cn("text-sm", under ? "text-warning" : "text-muted-foreground")}>{stockNote}</p>}
         </KpiTile>
         <KpiTile
           label={t("products.sales12m")}

@@ -155,6 +155,9 @@ class AdminStatsResponse(BaseModel):
 
 class StockRow(BaseModel):
     product: str
+    pid: str  # the page's search: name, PID, barcodes
+    barcode1: str | None
+    barcode2: str | None
     category: str  # A | A- | B+ | B | C | C- | C-N | D
     units_sold_12m: int
     stock_min: int  # round(ventes_12m / 300 × 14); class C (6-47): 0

@@ -533,11 +533,13 @@ export default function StockPage() {
     pageSize,
     peremptions,
     reload,
+    search,
     selectClass,
     setDateFrom,
     setDateTo,
     setPage,
     setPageSize,
+    setSearch,
     setStatus,
     sortBy,
     sortOrder,
@@ -547,6 +549,13 @@ export default function StockPage() {
   } = useStockPage();
 
   const activeFilters: ActiveFilter[] = [
+    search.trim()
+      ? {
+          key: "search",
+          label: <>{t("catalogue.filterSearch", { value: search })}</>,
+          onClear: () => setSearch(""),
+        }
+      : null,
     // Only a pill for an EXPLICIT range — not the local 12-month default (whose
     // "clear" would just revert to the same default and feel broken).
     !isDateDefault && (dateFrom || dateTo)
@@ -579,6 +588,7 @@ export default function StockPage() {
   return (
     <Page title={t("nav.stock")}>
       <FilterBar
+        search={{ value: search, onChange: setSearch, placeholder: t("stock.searchPh"), suggestions: null }}
         dateRange={{
           from: dateFrom || null,
           to: dateTo || null,

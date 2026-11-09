@@ -280,7 +280,14 @@ export const API = {
     /** Owner's « Enregistrer » / « Revenir à la valeur importée ». */
     save: {
       url: (id: number) => `/products/${id}`,
-      refreshes: (): Read[] => [API.products.list, API.products.sheet, API.products.history, API.history.list],
+      refreshes: (): Read[] => [
+        API.products.list,
+        API.products.sheet,
+        API.products.history,
+        API.history.list,
+        API.stats.stockAbcdFull, // the owner's minimum / maximum show on the Stock page too
+        API.stats.stockAbcdFiltered,
+      ],
     },
     /** « Observations » of a product; add one, delete one (its author or the owner). */
     notes: {

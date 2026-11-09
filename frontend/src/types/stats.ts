@@ -137,6 +137,9 @@ export type StockStatus = "sous-stock" | "ideal" | "a-surveiller" | "sur-stock" 
 
 export interface StockRow {
   product: string;
+  pid: string;
+  barcode1: string | null;
+  barcode2: string | null;
   category: AbcdClass;
   units_sold_12m: number;
   stock_min: number;

@@ -22,7 +22,7 @@ export interface CallRecord {
 
 /** Answers that carry error codes while being 2xx: the Sobrus robot's runs / connection, the catalogue import's
  *  rows refused (`errors[].code`). */
-export const CODES_IN_ANSWER = ["/v1/sobrus/", "/v1/uploads/catalog"];
+export const CODES_IN_ANSWER = ["/v1/sobrus/", "/v1/uploads/catalog", "/v1/admin/catalog/sobrus-products"];
 
 /** `error_code` / `last_error_code` / `code` values anywhere in a JSON answer. */
 export function answerCodes(json: unknown, out: Set<string> = new Set()): string[] {

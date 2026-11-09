@@ -448,7 +448,8 @@ export const es: Dict = {
     tabMovements: "Trazabilidad",
     tabHistory: "Historial",
     ownerOnly: "Solo el propietario puede modificar este producto.",
-    editHint: "Cambie los valores y pulse « Guardar ». Estos valores solo cuentan para su farmacia, en « Productos ».",
+    editHint:
+      "Cambie los valores y pulse « Guardar ». Estos valores solo cuentan para su farmacia, en « Productos » (el mínimo y el máximo también en « Stock »).",
     saving: "Guardando…",
     saved: "Ficha guardada",
     edited: "modificado",
@@ -551,6 +552,9 @@ export const es: Dict = {
     missingUnits: "faltan {{n}} u.",
     coverage: "Cobertura",
     coverageValue: "≈ {{days}} días a {{rate}} u. / día",
+    daysOfSales: "≈ {{n}} días de ventas",
+    boxMin: "Mín",
+    boxMax: "Máx",
     byDefault: "por defecto (según las ventas)",
     label: "Etiqueta",
     order: "Pedir {{n}}",
@@ -729,6 +733,7 @@ export const es: Dict = {
   },
 
   stock: {
+    searchPh: "Nombre, código de barras, PID…",
     healthIndex: "Índice de salud",
     classAria: "Clase {{k}}: {{n}} referencias",
     empty: "Ningún dato de stock",
