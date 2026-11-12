@@ -213,6 +213,7 @@ flowchart LR
 | `FRONTEND_URL` | exact CORS origin + base of the password links |
 | `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_SERVER`, `MAIL_PORT`, `MAIL_STARTTLS`, `MAIL_SSL_TLS` | SMTP. Empty `MAIL_USERNAME` → links are **printed to the log** |
 | `WEB_CONCURRENCY` | uvicorn processes in Docker (default 2) |
+| `DB_POOL_SIZE` · `DB_MAX_OVERFLOW` | Postgres connections of one process (default 4 + 4; worker: 2 + 1). Every process together ≤ the plan's limit (DigitalOcean 1 GB: 22): more processes or instances → lower them, bigger plan → raise them |
 | `PORT` | container port (default 8000) |
 | `RATE_LIMIT=0`, `SEED_CATALOG=0` | **E2E only**: no login limit, no catalogue in the seed |
 | `PRODUCT_INFOS_FILE` | **E2E only**: another photos file than `backend/data/product_infos.json` (the test fixture) |

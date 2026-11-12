@@ -7,21 +7,22 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from app.core.config import settings
 
 
-# Single-process deployment (no --workers, see entrypoint.sh) — every tenant
-# shares this one pool. SQLAlchemy's bare defaults (pool_size=5,
-# max_overflow=10) proved too thin: a handful of slow requests from one
-# pharmacy (e.g. an unindexed catalog scan during import — see migration
-# 0019) could exhaust all 15 slots and time out unrelated tenants'
-# requests. Widened as a stop-gap headroom bump, not a fix for slow queries
-# themselves. pool_recycle guards against the managed Postgres side dropping
-# idle connections out from under us. Check the DB plan's max_connections
-# before raising these further — this backend is presumably not the only
-# consumer of that budget.
+# One pool per process, all of them inside the managed Postgres' 22 connections (25 − 3 reserved for its superuser):
+#
+#   API      WEB_CONCURRENCY 2 processes × (DB_POOL_SIZE 4 + DB_MAX_OVERFLOW 4) = 16
+#   worker   1 process × (2 + 1, set by entrypoint.sh worker) + its LISTEN connection = 4
+#   total    20, 2 left (console, a deploy's new instance starting)
+#
+# A request that finds the pool busy waits up to pool_timeout for a free connection instead of asking Postgres for one
+# more: before (10 + 20 per process, 2026-11-12) a burst of requests went past 22 and Postgres refused them (500).
+# More processes or instances → lower DB_POOL_SIZE / DB_MAX_OVERFLOW so the total stays ≤ 22; a bigger database plan →
+# raise them (env vars, no code change). pool_recycle: the managed Postgres drops idle connections.
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=30,
     pool_recycle=1800,
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

@@ -30,6 +30,8 @@ PY
 
 if [ "$ROLE" = worker ]; then
   echo "▸ Starting the Sobrus robot"
+  # One run at a time: 1 session (+ a spare), its LISTEN connection outside the pool (app/core/database.py budget).
+  export DB_POOL_SIZE="${DB_POOL_SIZE_WORKER:-2}" DB_MAX_OVERFLOW="${DB_MAX_OVERFLOW_WORKER:-1}"
   exec uv run python -m app.sobrus.worker
 fi
 

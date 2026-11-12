@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     DATABASE_URL: str
+    # Connections of ONE process (app/core/database.py). The managed Postgres gives the app 22 (25 − 3 reserved):
+    # API 2 processes × (4 + 4) = 16, worker (entrypoint.sh worker: 2 + 1) + its LISTEN = 4 → 20, 2 left over.
+    DB_POOL_SIZE: int = 4
+    DB_MAX_OVERFLOW: int = 4
     JWT_SECRET: str
     # JWT access-token lifetime in minutes. 7 days by default so users aren't
     # interrupted by "Session expirée" popups during normal work. Revocation
