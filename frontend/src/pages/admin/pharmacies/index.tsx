@@ -37,6 +37,7 @@ import {
   useAssignPharmacy,
   useDeleteUser,
   useResetUserPassword,
+  useResetUserPin,
   useSetUserStatus,
   useSignupRequests,
 } from "./hooks";
@@ -244,6 +245,8 @@ function UsersTab() {
   const [search, setSearch] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
+  const [pinTarget, setPinTarget] = useState<MemberOut | null>(null);
+  const { resetUserPin } = useResetUserPin();
   const [removeTarget, setRemoveTarget] = useState<AdminUserRow | null>(null);
   const [assignTarget, setAssignTarget] = useState<AdminUserRow | null>(null);
 
@@ -362,6 +365,7 @@ function UsersTab() {
             <MemberKebab
               member={toMember(u)}
               onResetPassword={() => setResetTarget(toMember(u))}
+              onResetPin={() => setPinTarget(toMember(u))}
               onToggleStatus={() =>
                 void setUserStatus({ userId: u.id, status: u.status === "active" ? "inactive" : "active" })
               }
@@ -404,6 +408,15 @@ function UsersTab() {
           emptyTitle={t("adminUsers.empty")}
         />
       )}
+
+      <ResetPasswordDialog
+        kind="pin"
+        member={pinTarget}
+        onClose={() => setPinTarget(null)}
+        onSubmit={async (pin) => {
+          if (pinTarget) await resetUserPin({ userId: pinTarget.id, pin });
+        }}
+      />
 
       <ResetPasswordDialog
         member={resetTarget}

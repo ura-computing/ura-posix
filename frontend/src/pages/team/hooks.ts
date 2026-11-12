@@ -2,8 +2,10 @@
  *  returns named data / actions (never the raw query or mutation); actions
  *  return a Promise so the page can await them. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { api } from "@/api/client";
+import { useT } from "@/i18n/I18nProvider";
 import { API, refresh } from "@/api/api";
 
 import type {
@@ -81,6 +83,19 @@ export function useResetEmployeePassword() {
   return {
     resetEmployeePassword: mutateAsync,
     isResetting: isPending,
+  };
+}
+
+export function useResetEmployeePin() {
+  const t = useT();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: ({ employeeId, pin }: { employeeId: number; pin: string }) =>
+      api.post<ResetPasswordOut>(API.employees.resetPin.url(employeeId), { pin }),
+    onSuccess: () => toast.success(t("members.pinReset")),
+  });
+  return {
+    resetEmployeePin: mutateAsync,
+    isResettingPin: isPending,
   };
 }
 

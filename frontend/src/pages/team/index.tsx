@@ -27,6 +27,7 @@ import {
   useDeleteEmployee,
   useOwnerEmployees,
   useResetEmployeePassword,
+  useResetEmployeePin,
   useSetEmployeePermissions,
   useSetEmployeeStatus,
 } from "./hooks";
@@ -42,6 +43,8 @@ export default function OwnerEmployeesPage() {
   const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
   const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
   const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
+  const [pinTarget, setPinTarget] = useState<MemberOut | null>(null);
+  const { resetEmployeePin } = useResetEmployeePin();
 
   const { team, isError, reload } = useOwnerEmployees();
   const { createEmployee } = useCreateEmployee();
@@ -158,6 +161,7 @@ export default function OwnerEmployeesPage() {
         members={employees}
         onManagePermissions={setPermDialogUser}
         onResetPassword={setResetTarget}
+        onResetPin={setPinTarget}
         onToggleStatus={handleToggleStatus}
         onRemove={setRemoveTarget}
       />
@@ -172,6 +176,14 @@ export default function OwnerEmployeesPage() {
         onSubmit={handleCreate}
       />
 
+      <ResetPasswordDialog
+        kind="pin"
+        member={pinTarget}
+        onClose={() => setPinTarget(null)}
+        onSubmit={async (pin) => {
+          if (pinTarget) await resetEmployeePin({ employeeId: pinTarget.id, pin });
+        }}
+      />
       <ResetPasswordDialog member={resetTarget} onClose={() => setResetTarget(null)} onSubmit={handleResetPassword} />
 
       <UserPermissionsDialog

@@ -15,6 +15,7 @@ function toFlat(r: MeResponse): Me {
     status: r.user.status,
     pharmacy: r.pharmacy ? { id: r.pharmacy.id, name: r.pharmacy.name, code: r.pharmacy.code } : undefined,
     permissions: r.permissions,
+    lock: r.lock,
   };
 }
 

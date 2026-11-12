@@ -5,8 +5,9 @@
  *  3,4 Mo, import paquet 12 / 69…, « Arrêter »), the last runs. Password refused / Sobrus asks a
  *  check → a red card with « Mettre à jour le mot de passe ». The password is never shown again. */
 import { useState } from "react";
-import { CheckCircle2, CircleAlert, Unplug } from "lucide-react";
+import { Check, CheckCircle2, CircleAlert, Unplug } from "lucide-react";
 
+import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
 import { Segmented } from "@/_components/molecules/Segmented";
 import { Checkbox } from "@/_components/atoms/Checkbox";
@@ -24,7 +25,7 @@ import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { useT } from "@/i18n/I18nProvider";
 import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
 import { cn } from "@/utils/cn";
-import { todayIso } from "@/utils/dateRange";
+import { PERIOD_LABELS, PERIOD_PRESETS, presetOf, type PeriodPreset } from "@/utils/dateRange";
 import { formatDateTime, formatNumStr } from "@/utils/format";
 import { currentStep, eventText, modeName, runResult } from "@/utils/sobrus";
 
@@ -36,12 +37,15 @@ const CHOICE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 
 function ConnectForm({
   email: knownEmail,
+  locked,
   update,
   isSaving,
   onSave,
 }: {
-  /** The saved email (update) or empty (first connection). */
+  /** The saved email (update), the pharmacy's Sobrus account (reconnection) or empty (first connection). */
   email: string;
+  /** The pharmacy's Sobrus account is set: only that email (the admin can change it). */
+  locked: boolean;
   update: boolean;
   isSaving: boolean;
   onSave: (body: SobrusConnectionBody) => Promise<unknown>;
@@ -60,8 +64,8 @@ function ConnectForm({
           void onSave({ email: email.trim(), password, consent: update || consent }).then(() => setPassword(""));
       }}
     >
-      <FormField label={t("sobrus.email")} required>
-        <FormInput value={email} onChange={setEmail} type="email" autoComplete="off" />
+      <FormField label={t("sobrus.email")} required hint={locked ? t("sobrus.emailLocked") : undefined}>
+        <FormInput value={email} onChange={setEmail} type="email" autoComplete="off" readOnly={locked} />
       </FormField>
       <FormField
         label={update ? t("sobrus.newPassword") : t("sobrus.password")}
@@ -180,15 +184,32 @@ function Connected({
   onDisconnect: () => void;
 }) {
   const t = useT();
-  const [choice, setChoice] = useState<"full" | "range">("full");
-  const [from, setFrom] = useState<string | null>(`${new Date().getFullYear()}-01-01`);
-  const [to, setTo] = useState<string | null>(todayIso());
+  // « Période »: a preset (its dates), « Tout l'historique », or dates picked (custom).
+  const [choice, setChoice] = useState<PeriodPreset | "full" | "custom">("year");
+  const [from, setFrom] = useState<string | null>(PERIOD_PRESETS.year().from);
+  const [to, setTo] = useState<string | null>(PERIOD_PRESETS.year().to);
+  const [force, setForce] = useState(false);
   const blocked = connection.status !== "active" || !!activeRun || isStarting;
   const badPeriod = !!from && !!to && from > to;
   const ready = choice === "full" || (!!from && !!to && !badPeriod);
+  const pick = (v: PeriodPreset | "full" | "custom") => {
+    setChoice(v);
+    if (v !== "full" && v !== "custom") {
+      const p = PERIOD_PRESETS[v]();
+      setFrom(p.from);
+      setTo(p.to);
+    }
+  };
+  // Past years already imported in full that this period covers: skipped unless « Réimporter quand même ».
+  const doneYears = [...new Set(Object.values(connection.imported_years).flat())].sort();
+  const thisYear = new Date().getFullYear();
+  const covered = doneYears.filter(
+    (y) => y < thisYear && (choice === "full" || (!!from && !!to && from <= `${y}-01-01` && `${y}-12-31` <= to)),
+  );
   const importNow = () => {
-    if (choice === "full") onStart({ mode: "full" });
-    else if (from && to) onStart({ mode: "range", date_from: from, date_to: to });
+    const again = force && covered.length > 0;
+    if (choice === "full") onStart({ mode: "full", force: again });
+    else if (from && to) onStart({ mode: "range", date_from: from, date_to: to, force: again });
   };
   return (
     <section className={CARD}>
@@ -214,29 +235,49 @@ function Connected({
       </div>
       <div className="flex flex-col gap-3 border-t border-border pt-4">
         <h2 className="text-base font-semibold text-foreground">{t("sobrus.importTitle")}</h2>
-        <Segmented
-          value={choice}
-          onChange={setChoice}
-          options={[
-            { value: "full", label: t("sobrus.choiceAll"), activeBg: CHOICE_ACTIVE },
-            { value: "range", label: t("sobrus.choicePeriod"), activeBg: CHOICE_ACTIVE },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-muted-foreground">{t("products.period")}</span>
+          <Segmented
+            value={choice}
+            onChange={pick}
+            options={[
+              ...PERIOD_LABELS.map(([value, label]) => ({ value, label: t(label), activeBg: CHOICE_ACTIVE })),
+              { value: "full" as const, label: t("sobrus.choiceAll"), activeBg: CHOICE_ACTIVE },
+            ]}
+          />
+          {choice !== "full" && (
+            <DateRangePicker
+              from={from}
+              to={to}
+              onChange={(start, end) => {
+                setFrom(start);
+                setTo(end);
+                setChoice(presetOf(start, end) ?? "custom");
+              }}
+            />
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {choice === "full" ? t("sobrus.allHint") : t("sobrus.periodHint")}
         </p>
-        {choice === "range" && (
-          <DateRangePicker
-            from={from}
-            to={to}
-            onChange={(start, end) => {
-              setFrom(start);
-              setTo(end);
-            }}
-            className="self-start"
-          />
+        {choice !== "full" && badPeriod && <p className="text-sm text-error">{t("sobrus.periodInvalid")}</p>}
+        {doneYears.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{t("sobrus.alreadyIn")}</span>
+            {doneYears.map((y) => (
+              <Badge key={y} tone="success">
+                <Check className="size-3.5" />
+                {y}
+              </Badge>
+            ))}
+          </div>
         )}
-        {choice === "range" && badPeriod && <p className="text-sm text-error">{t("sobrus.periodInvalid")}</p>}
+        {covered.length > 0 && (
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-foreground">
+            <Checkbox checked={force} onChange={setForce} aria-label={t("sobrus.forceReimport")} className="mt-0.5" />
+            <span>{t("sobrus.forceReimportYears", { years: covered.join(", ") })}</span>
+          </label>
+        )}
         <Button size="lg" onClick={importNow} disabled={blocked || !ready} className="self-start">
           {t("sobrus.import")}
         </Button>
@@ -278,7 +319,14 @@ export default function SobrusPage() {
         ) : !connection.connected ? (
           <section className={CARD}>
             <p className="text-sm text-muted-foreground">{t("sobrus.intro")}</p>
-            <ConnectForm key="connect" email="" update={false} isSaving={isSaving} onSave={saveConnection} />
+            <ConnectForm
+              key="connect"
+              email={connection.locked_email ?? ""}
+              locked={!!connection.locked_email}
+              update={false}
+              isSaving={isSaving}
+              onSave={saveConnection}
+            />
           </section>
         ) : (
           <>
@@ -305,6 +353,7 @@ export default function SobrusPage() {
                 <ConnectForm
                   key={`update-${connection.last_error_code}`}
                   email={connection.email ?? ""}
+                  locked
                   update
                   isSaving={isSaving}
                   onSave={saveConnection}

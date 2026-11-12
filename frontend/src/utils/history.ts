@@ -79,6 +79,7 @@ export function historyText(t: TFn, row: AuditRow): string {
     case "sobrus_password_updated":
     case "sobrus_disconnected":
     case "sobrus_login_refused":
+    case "sobrus_email_reset":
       return t(`history.${row.action}`, { email: String(d.email ?? "—") });
     case "sobrus_products_fetched":
       return t("history.sobrus_products_fetched", {

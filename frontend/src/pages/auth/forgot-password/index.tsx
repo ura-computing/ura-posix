@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Check } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
+import { AuthLayout } from "@/_components/templates/AuthLayout";
 import { TextField } from "@/_components/molecules/TextField";
 import { ROUTES } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";

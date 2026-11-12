@@ -13,8 +13,10 @@
  *  Every mutation refreshes what its `API.admin.*` entry lists (`refreshes`):
  *  the pharmacy list + every detail (member counts, features), the users tab. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { api } from "@/api/client";
+import { useT } from "@/i18n/I18nProvider";
 import { API, refresh } from "@/api/api";
 
 import type {
@@ -105,6 +107,21 @@ export function useArchivePharmacy(id: number) {
   };
 }
 
+/** « Changer l'email Sobrus »: its Sobrus connection stops, the years « déjà importés » are forgotten. */
+export function useResetSobrusEmail(id: number) {
+  const qc = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: () => api.delete(API.admin.resetSobrusEmail.url(id)),
+    onSuccess: () => {
+      void refresh(qc, API.admin.resetSobrusEmail);
+    },
+  });
+  return {
+    resetSobrusEmail: () => mutateAsync().then(() => undefined),
+    isResettingSobrus: isPending,
+  };
+}
+
 export function useSetPharmacyFeatures(id: number) {
   const qc = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
@@ -166,6 +183,19 @@ export function useResetUserPassword() {
   return {
     resetUserPassword: mutateAsync,
     isResetting: isPending,
+  };
+}
+
+export function useResetUserPin() {
+  const t = useT();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: ({ userId, pin }: { userId: number; pin: string }) =>
+      api.post<ResetPasswordOut>(API.admin.resetUserPin.url(userId), { pin }),
+    onSuccess: () => toast.success(t("members.pinReset")),
+  });
+  return {
+    resetUserPin: mutateAsync,
+    isResettingPin: isPending,
   };
 }
 

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/_components/atoms/Button";
-import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
+import { AuthLayout } from "@/_components/templates/AuthLayout";
 import { PasswordField } from "@/_components/molecules/PasswordField";
 import { TextField } from "@/_components/molecules/TextField";
 import { ROUTES } from "@/types";

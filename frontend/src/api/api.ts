@@ -150,6 +150,10 @@ export const API = {
       all: ["auth", "validate-token"],
     },
     setPassword: { url: "/auth/set-password" },
+    /** Lock screen: settings (« Mon compte »), lock this device (idle), unlock with the code. */
+    lockSettings: { url: "/auth/me/lock", refreshes: (): Read[] => [API.auth.me] },
+    lock: { url: "/auth/lock" },
+    unlock: { url: "/auth/unlock" },
   },
   sessions: {
     list: {
@@ -494,6 +498,9 @@ export const API = {
     resetPassword: {
       url: (id: number) => `/owner/employees/${id}/reset-password`,
     },
+    resetPin: {
+      url: (id: number) => `/owner/employees/${id}/reset-pin`,
+    },
     remove: {
       url: (id: number) => `/owner/employees/${id}`,
       refreshes: (): Read[] => [API.employees.list],
@@ -520,6 +527,11 @@ export const API = {
     archivePharmacy: {
       url: (id: number) => `/admin/pharmacies/${id}`,
       refreshes: (): Read[] => [API.admin.pharmacies, API.admin.users],
+    },
+    /** « Changer l'email Sobrus »: the pharmacy may connect another Sobrus account. */
+    resetSobrusEmail: {
+      url: (id: number) => `/admin/pharmacies/${id}/sobrus-email`,
+      refreshes: (): Read[] => [API.admin.pharmacies],
     },
     setPharmacyFeatures: {
       url: (id: number) => `/admin/pharmacies/${id}/features`,
@@ -588,6 +600,9 @@ export const API = {
     },
     resetUserPassword: {
       url: (id: number) => `/admin/users/${id}/reset-password`,
+    },
+    resetUserPin: {
+      url: (id: number) => `/admin/users/${id}/reset-pin`,
     },
     removeUser: {
       url: (id: number) => `/admin/users/${id}`,

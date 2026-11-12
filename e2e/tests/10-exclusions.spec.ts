@@ -27,7 +27,7 @@ const NOTE_PRODUCT = "E2E : produit offert";
 
 const scenario = (): Row => expected().exclusions;
 
-type Tab = "Produits" | "Bons de livraison" | "Produit sur un BL" | "Fournisseurs";
+type Tab = "Produits" | "Retirer un BL" | "Retirer un produit d'un BL" | "Fournisseurs";
 const PRODUCTS = "/special-products/suggestions";
 const BLS = "/bl-exclusions/search";
 const SUPPLIERS = "/supplier-exclusions/search";
@@ -131,7 +131,7 @@ test("exclure un produit : une recherche, un clic ; « Annuler » ; une note", a
 test("exclure un BL trouvé par un de ses produits (filtre fournisseur, contenu) + une note", async ({ page }) => {
   const x = scenario().bl;
   const list0 = pageCall(page, "/bl-exclusions/");
-  await openPs(page, "Bons de livraison");
+  await openPs(page, "Retirer un BL");
   expect(await list0, "aucun BL exclu au départ").toEqual([]);
 
   const bls = await search(page, BLS, x.query);
@@ -214,7 +214,7 @@ test("exclure un fournisseur + une note", async ({ page }) => {
 test("exclure un produit sur certains BL : « Ses BL », filtre fournisseur, cocher = exclu", async ({ page }) => {
   const x = scenario().bl_line;
   const list0 = pageCall(page, "/bl-line-exclusions/");
-  await openPs(page, "Produit sur un BL");
+  await openPs(page, "Retirer un produit d'un BL");
   expect(await list0, "aucun au départ").toEqual([]);
 
   const products = await search(page, PRODUCTS, x.query);
@@ -341,7 +341,7 @@ test("réintégrer : « Réintégrer » sur la ligne de chaque onglet → compta
     "/special-products/",
   );
   await reintegrate(
-    "Bons de livraison",
+    "Retirer un BL",
     x.bl.ref,
     "/bl-exclusions/reintegrate",
     { reintegrated: 1, not_excluded: 0, delivery_refs: [x.bl.ref] },
@@ -357,7 +357,7 @@ test("réintégrer : « Réintégrer » sur la ligne de chaque onglet → compta
     "/supplier-exclusions/",
   );
   await reintegrate(
-    "Produit sur un BL",
+    "Retirer un produit d'un BL",
     `BL ${x.bl_line.ref}`,
     "/bl-line-exclusions/reintegrate",
     { reintegrated: 1, not_excluded: 0 },

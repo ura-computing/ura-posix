@@ -30,7 +30,12 @@ class SobrusRunOut(BaseModel):
 
 
 class SobrusConnectionOut(BaseModel):
+    """`locked_email`: the pharmacy's Sobrus account, also once disconnected (a new connection must use it);
+    `imported_years`: past years already imported in full, by kind (« 2024 ✓ »)."""
+
     connected: bool
+    locked_email: str | None = None
+    imported_years: dict[str, list[int]] = {}
     email: str | None = None
     status: Literal["active", "needs_login", "invalid"] | None = None
     consent_at: datetime | None = None
@@ -62,6 +67,7 @@ class SobrusRunIn(BaseModel):
     mode: Literal["full", "new", "check", "range"]
     date_from: date | None = None
     date_to: date | None = None
+    force: bool = False  # « Réimporter quand même »: the past years already imported are read again
 
     @model_validator(mode="after")
     def _period(self) -> "SobrusRunIn":

@@ -75,6 +75,7 @@ class PharmacyDetail(BaseModel):
     # editing employees — so admin sees up-front whether their grant will
     # be effective after the 3-layer intersection at read time.
     owners_union_permissions: list[str]
+    sobrus_email: str | None = None  # its Sobrus account, set once (« Changer l'email Sobrus »: the admin)
 
 
 class PharmacyIn(BaseModel):
@@ -163,6 +164,12 @@ class ResetPasswordIn(BaseModel):
 
 class ResetPasswordOut(BaseModel):
     user_id: int
+
+
+class ResetPinIn(BaseModel):
+    """« Réinitialiser le code » (lock screen) — the admin / owner types the new 6-digit code."""
+
+    pin: str = Field(..., pattern=r"^\d{6}$")
 
 
 class StatusPatchIn(BaseModel):

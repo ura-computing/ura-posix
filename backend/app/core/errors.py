@@ -97,6 +97,11 @@ class ErrorCode(StrEnum):
     SOBRUS_EXPORT_FAILED = "sobrusExportFailed"
     SOBRUS_INTERRUPTED = "sobrusInterrupted"
     SOBRUS_NO_ACCESS = "sobrusNoAccess"
+    SOBRUS_EMAIL_LOCKED = "sobrusEmailLocked"
+    SCREEN_LOCKED = "screenLocked"
+    PIN_REQUIRED = "pinRequired"
+    PIN_WRONG = "pinWrong"
+    PIN_TOO_MANY = "pinTooMany"
     CONSENT_REQUIRED = "consentRequired"
     # Store website (hidden feature)
     REQUEST_NOT_FOUND = "requestNotFound"

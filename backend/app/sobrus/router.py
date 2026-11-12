@@ -32,9 +32,10 @@ from sqlalchemy.orm import Session
 from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Pharmacy, SobrusConnection, SobrusRun
+from app.core.models import Pharmacy, SobrusConnection, SobrusImportedYear, SobrusRun
 from app.core.permissions import AdminDep, owner
 from app.core.security import CurrentUserDep
+from app.core.utils import normalize_email
 from app.sobrus.catalog_import import chain_since, queue_next
 from app.sobrus.crypto import encrypt
 from app.sobrus.launcher import wake
@@ -62,15 +63,28 @@ def _active_run(db: Session, pharmacy_id: int) -> SobrusRun | None:
     return db.query(SobrusRun).filter(SobrusRun.pharmacy_id == pharmacy_id, SobrusRun.status.in_(ACTIVE)).first()
 
 
+def _imported_years(db: Session, pharmacy_id: int) -> dict[str, list[int]]:
+    years: dict[str, list[int]] = {"achat": [], "vente": []}
+    rows = db.query(SobrusImportedYear).filter_by(pharmacy_id=pharmacy_id).order_by(SobrusImportedYear.year)
+    for row in rows:
+        years.setdefault(row.kind, []).append(row.year)
+    return years
+
+
 def _connection_out(db: Session, pharmacy_id: int) -> SobrusConnectionOut:
     conn = _connection(db, pharmacy_id)
+    known = {
+        "locked_email": db.get(Pharmacy, pharmacy_id).sobrus_email,
+        "imported_years": _imported_years(db, pharmacy_id),
+    }
     if conn is None:
-        return SobrusConnectionOut(connected=False)
+        return SobrusConnectionOut(connected=False, **known)
     run = _active_run(db, pharmacy_id)
     if run is not None and run.mode == "products":  # the admin's catalogue import: its progress is the admin's
         run = None
     return SobrusConnectionOut(
         connected=True,
+        **known,
         email=conn.email,
         status=conn.status,
         consent_at=conn.consent_at,
@@ -81,9 +95,16 @@ def _connection_out(db: Session, pharmacy_id: int) -> SobrusConnectionOut:
 
 
 def _queue(
-    db: Session, pharmacy_id: int, mode: str, user_id: int, date_from: date | None = None, date_to: date | None = None
+    db: Session,
+    pharmacy_id: int,
+    mode: str,
+    user_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    force: bool = False,
 ) -> SobrusRun:
     run = SobrusRun(
+        force_reimport=force,
         pharmacy_id=pharmacy_id,
         mode=mode,
         status="queued",
@@ -113,6 +134,19 @@ def save_connection(
     body: SobrusConnectionIn, pharmacy_id: OwnerSobrus, user: CurrentUserDep, db: DbDep
 ) -> SobrusConnectionOut:
     conn = _connection(db, pharmacy_id)
+    pharmacy = db.get(Pharmacy, pharmacy_id)
+    email = normalize_email(body.email) if body.email else None
+    # One Sobrus account per pharmacy, set by its first connection (what was imported belongs to it): only the admin
+    # lets it change (DELETE /admin/pharmacies/{id}/sobrus-email).
+    if email and pharmacy.sobrus_email and email != normalize_email(pharmacy.sobrus_email):
+        raise ApiError(
+            409,
+            ErrorCode.SOBRUS_EMAIL_LOCKED,
+            "Cette pharmacie est attachée à un autre compte Sobrus.",
+            email=pharmacy.sobrus_email,
+        )
+    if email and not pharmacy.sobrus_email:
+        pharmacy.sobrus_email = email
     if conn is None:
         if not body.email:
             raise ApiError(422, ErrorCode.INVALID_INPUT, "Email Sobrus requis.")
@@ -167,7 +201,7 @@ def start_run(body: SobrusRunIn, pharmacy_id: OwnerSobrus, user: CurrentUserDep,
         raise ApiError(409, ErrorCode.SOBRUS_NOT_CONNECTED, "Aucune connexion Sobrus.")
     if conn.status == "invalid":
         raise ApiError(409, ErrorCode.SOBRUS_BAD_CREDENTIALS, "Mot de passe Sobrus refusé : mettez-le à jour.")
-    return _queue(db, pharmacy_id, body.mode, user.id, body.date_from, body.date_to)
+    return _queue(db, pharmacy_id, body.mode, user.id, body.date_from, body.date_to, body.force)
 
 
 @router.get("/sobrus/runs", response_model=list[SobrusRunOut])
@@ -266,3 +300,26 @@ def cancel_products_import(admin: AdminDep, db: DbDep) -> AdminSobrusImportOut:
         _stop(run)
     db.commit()
     return products_import(admin, db)
+
+
+PharmacyIdPath = Annotated[int, Path(ge=1)]
+
+
+@router.delete("/admin/pharmacies/{pharmacy_id}/sobrus-email", status_code=204)
+def reset_sobrus_email(pharmacy_id: PharmacyIdPath, admin: AdminDep, db: DbDep) -> None:
+    """« Changer l'email Sobrus » (admin): the pharmacy may connect another Sobrus account. Its connection stops (the
+    owner connects the new account) and the years « déjà importés » are forgotten (they were the old account's)."""
+    pharmacy = db.get(Pharmacy, pharmacy_id)
+    if pharmacy is None:
+        raise ApiError(404, ErrorCode.PHARMACY_NOT_FOUND, "Pharmacie introuvable.")
+    old = pharmacy.sobrus_email
+    conn = _connection(db, pharmacy_id)
+    if conn is not None:
+        run = _active_run(db, pharmacy_id)
+        if run is not None:
+            _stop(run)
+        db.delete(conn)
+    db.query(SobrusImportedYear).filter_by(pharmacy_id=pharmacy_id).delete()
+    pharmacy.sobrus_email = None
+    log_action(db, admin, pharmacy_id, AuditAction.SOBRUS_EMAIL_RESET, {"email": old or "—"})
+    db.commit()

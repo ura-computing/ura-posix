@@ -128,3 +128,21 @@ export function useChangePassword(onDone?: () => void) {
     error,
   };
 }
+
+/** « Verrouillage »: on / off, the idle delay, a new 6-digit code. */
+export function useLockSettings() {
+  const t = useT();
+  const queryClient = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (body: { enabled: boolean; seconds: number; pin?: string }) =>
+      api.put<MeResponse>(API.auth.lockSettings.url, body),
+    onSuccess: () => refresh(queryClient, API.auth.lockSettings),
+  });
+  return {
+    saveLock: (body: { enabled: boolean; seconds: number; pin?: string }, done: string) =>
+      mutateAsync(body).then(() => {
+        toast.success(t(done));
+      }),
+    isSavingLock: isPending,
+  };
+}

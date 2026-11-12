@@ -67,6 +67,9 @@ class Pharmacy(Base):
     # Soft-delete marker. NULL = active, timestamp = archived. Admin can restore
     # by clearing the value. Related transactions/stock/payments stay linked.
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The Sobrus account of this pharmacy, set by its first « Connexion Sobrus » and kept after a disconnect: a new
+    # connection must use it (what was imported belongs to that account). Only the admin clears it.
+    sobrus_email: Mapped[str | None] = mapped_column(String, nullable=True)
 
     features: Mapped[list["PharmacyFeature"]] = relationship(back_populates="pharmacy", cascade="all, delete-orphan")
 
@@ -88,6 +91,12 @@ class User(Base):
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID), nullable=True)
     reset_token: Mapped[str | None] = mapped_column(String, nullable=True)  # SHA-256 hash of the raw token
     reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Lock screen: after `lock_seconds` without a click or a key, the screen locks; the 6-digit code (hashed like the
+    # password) unlocks it. `lock_failed`: wrong codes in a row (5 → logged out).
+    lock_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    lock_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
+    lock_pin_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    lock_failed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     pharmacy: Mapped[Pharmacy | None] = relationship()
     permissions: Mapped[list["UserPermission"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -104,6 +113,8 @@ class Session(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Lock screen on: every API call of this session answers 423 `screenLocked` until the code is typed.
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class SignupRequest(Base):
@@ -465,6 +476,24 @@ class SobrusConnection(Base):
     products_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
+class SobrusImportedYear(Base):
+    """A past year of achats or ventes the Sobrus robot imported in full: the next imports skip it (« déjà importé »),
+    unless « Réimporter quand même ». Removed when an import of that year is deleted (« Gestion des imports ») or the
+    admin changes the pharmacy's Sobrus email."""
+
+    __tablename__ = "sobrus_imported_years"
+    __table_args__ = (UniqueConstraint("pharmacy_id", "kind", "year", name="uq_sobrus_imported_years"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)  # achat | vente
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    batch_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("import_batches.id", ondelete="SET NULL"), nullable=True
+    )
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class SobrusCashClosing(Base):
     """Sobrus' « Clôture de caisse » of one day (report `cashdeskclosing`, read by the worker at every run): the
     sales, paid / unpaid, credit, returns, net; `by_method` = {sobrus code: {label, cash_sales, settlements,
@@ -520,6 +549,7 @@ class SobrusRun(Base):
     mode: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="queued")
     cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    force_reimport: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # « Réimporter quand même »
     date_from: Mapped[date | None] = mapped_column(Date, nullable=True)  # mode `range` only
     date_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Now: login | download | import (+ kind / year), with its counters.

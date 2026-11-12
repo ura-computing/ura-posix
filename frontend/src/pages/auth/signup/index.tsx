@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Building2, Check, Store, UserRound, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import { AuthLayout } from "@/pages/auth/_components/AuthLayout";
+import { AuthLayout } from "@/_components/templates/AuthLayout";
 import { PasswordField } from "@/_components/molecules/PasswordField";
 import { TextField } from "@/_components/molecules/TextField";
 import { ROUTES, type SignupIn } from "@/types";

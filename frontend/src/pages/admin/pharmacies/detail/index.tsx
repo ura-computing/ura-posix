@@ -15,12 +15,12 @@ import { useT } from "@/i18n/I18nProvider";
 import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { PremiumTag } from "@/_components/molecules/PremiumTag";
+import { SwitchCard } from "@/_components/molecules/SwitchCard";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
 import { MembersSection } from "@/_components/organisms/MembersSection";
 import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDialog";
 import { allFeatures, toFeatureRecord, type FeatureKey, FEATURES } from "@/_components/organisms/memberConstants";
 import { ROUTES, type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types";
-import { cn } from "@/utils/cn";
 
 import { PharmacyFormDialog } from "../_components/PharmacyFormDialog";
 import {
@@ -28,13 +28,14 @@ import {
   useArchivePharmacy,
   useCreateUser,
   useDeleteUser,
+  useResetSobrusEmail,
   useResetUserPassword,
+  useResetUserPin,
   useSetPharmacyFeatures,
   useSetUserPermissions,
   useSetUserStatus,
   useUpdatePharmacy,
 } from "../hooks";
-import { Switch } from "@/_components/atoms/Switch";
 import { Page } from "@/_components/templates/Page";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
@@ -86,41 +87,24 @@ function FeatureToggleGrid({
           <p className="text-sm text-muted-foreground">{t("adminPharm.pharmacyFeaturesDesc")}</p>
         </div>
         <span className="font-mono text-xs tabular-nums text-muted-foreground">
-          {enabledCount} / 9 {t("adminPharm.activatedFem")}
+          {enabledCount} / {FEATURES.length} {t("adminPharm.activatedFem")}
         </span>
       </div>
 
       <div className="flex flex-col gap-4 p-5">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => {
-            const on = values[f.key];
-            const dirty = on !== serverValues[f.key];
-            const Icon = f.icon;
-            return (
-              <div
-                key={f.key}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors",
-                  dirty && "border-primary/40 bg-primary/5",
-                )}
-              >
-                <span
-                  data-on={on}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground data-[on=true]:bg-primary/15 data-[on=true]:text-primary"
-                >
-                  <Icon className="size-4" />
-                </span>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    {t(f.label)}
-                    {f.premium && <PremiumTag />}
-                  </span>
-                  <span className="text-[11.5px] leading-snug text-muted-foreground">{t(f.description)}</span>
-                </div>
-                <Switch checked={on} onChange={(next) => onToggle(f.key, next)} />
-              </div>
-            );
-          })}
+          {FEATURES.map((f) => (
+            <SwitchCard
+              key={f.key}
+              icon={f.icon}
+              title={t(f.label)}
+              tag={f.premium ? <PremiumTag /> : undefined}
+              description={t(f.description)}
+              checked={values[f.key]}
+              onChange={(next) => onToggle(f.key, next)}
+              dirty={values[f.key] !== serverValues[f.key]}
+            />
+          ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
@@ -166,7 +150,11 @@ export default function AdminPharmacyDetail() {
   const [permDialogUser, setPermDialogUser] = useState<MemberOut | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<MemberOut | null>(null);
+  const [pinTarget, setPinTarget] = useState<MemberOut | null>(null);
+  const { resetUserPin } = useResetUserPin();
   const [removeTarget, setRemoveTarget] = useState<MemberOut | null>(null);
+  const [sobrusResetOpen, setSobrusResetOpen] = useState(false);
+  const { resetSobrusEmail } = useResetSobrusEmail(id);
 
   // Pending feature toggles — separate from the server values; resets after save.
   const [pendingFeatures, setPendingFeatures] = useState<Record<FeatureKey, boolean> | null>(null);
@@ -252,6 +240,12 @@ export default function AdminPharmacyDetail() {
         <>
           <p>{[detail.city, detail.code, detail.address].filter(Boolean).join(" · ")}</p>
           <p>{[detail.phone, detail.email].filter(Boolean).join(" · ")}</p>
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {t("adminPharm.sobrusEmail", { email: detail.sobrus_email ?? t("adminPharm.sobrusNone") })}
+            <Button variant="link" disabled={!detail.sobrus_email} onClick={() => setSobrusResetOpen(true)}>
+              {t("adminPharm.sobrusChange")}
+            </Button>
+          </p>
         </>
       }
       actions={
@@ -289,6 +283,7 @@ export default function AdminPharmacyDetail() {
         members={detail.members}
         onManagePermissions={setPermDialogUser}
         onResetPassword={setResetTarget}
+        onResetPin={setPinTarget}
         onToggleStatus={handleToggleStatus}
         onRemove={setRemoveTarget}
       />
@@ -320,6 +315,15 @@ export default function AdminPharmacyDetail() {
         onSubmit={handleCreateUser}
       />
 
+      <ResetPasswordDialog
+        kind="pin"
+        member={pinTarget}
+        onClose={() => setPinTarget(null)}
+        onSubmit={async (pin) => {
+          if (pinTarget) await resetUserPin({ userId: pinTarget.id, pin });
+        }}
+      />
+
       <ResetPasswordDialog member={resetTarget} onClose={() => setResetTarget(null)} onSubmit={handleResetPassword} />
 
       <UserPermissionsDialog
@@ -349,6 +353,17 @@ export default function AdminPharmacyDetail() {
         isSaving={isSavingPerms}
         onSave={async (next) => {
           if (permDialogUser) await handleSavePerms(permDialogUser, next);
+        }}
+      />
+
+      <ConfirmDialog
+        open={sobrusResetOpen}
+        onClose={() => setSobrusResetOpen(false)}
+        title={t("adminPharm.sobrusChangeTitle", { email: detail.sobrus_email ?? "" })}
+        description={t("adminPharm.sobrusChangeDesc")}
+        onConfirm={async () => {
+          await resetSobrusEmail();
+          setSobrusResetOpen(false);
         }}
       />
 

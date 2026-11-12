@@ -1,7 +1,7 @@
 /** Row actions for a pharmacy member (owner / employee) — shared by the admin
  *  pharmacy detail page and the owner's "Gérer mon équipe" page so both offer
- *  the same menu: reset password / (dés)activer / supprimer. */
-import { Power, RefreshCw, Trash2 } from "lucide-react";
+ *  the same menu: reset password / lock-screen code / (dés)activer / supprimer. */
+import { KeyRound, Power, RefreshCw, Trash2 } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { KebabItem, KebabMenu } from "@/_components/molecules/KebabMenu";
@@ -10,11 +10,14 @@ import type { MemberOut } from "@/types";
 export function MemberKebab({
   member,
   onResetPassword,
+  onResetPin,
   onToggleStatus,
   onRemove,
 }: {
   member: MemberOut;
   onResetPassword: () => void;
+  /** « Réinitialiser le code » (lock screen); absent = not offered. */
+  onResetPin?: () => void;
   onToggleStatus: () => void;
   onRemove: () => void;
 }) {
@@ -27,6 +30,11 @@ export function MemberKebab({
           <KebabItem icon={<RefreshCw className="size-3.5" />} onSelect={onResetPassword} close={close}>
             {t("members.resetPassword")}
           </KebabItem>
+          {onResetPin && (
+            <KebabItem icon={<KeyRound className="size-3.5" />} onSelect={onResetPin} close={close}>
+              {t("members.resetPin")}
+            </KebabItem>
+          )}
           <KebabItem icon={<Power className="size-3.5" />} onSelect={onToggleStatus} close={close}>
             {toggleLabel}
           </KebabItem>

@@ -5,7 +5,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
-import { ApiErr, setUnauthorizedHandler } from "@/api/client";
+import { ApiErr, setLockedHandler, setUnauthorizedHandler } from "@/api/client";
 import { API } from "@/api/api";
 import App from "@/App";
 import { UploadProvider } from "@/hooks/UploadContext";
@@ -67,7 +67,7 @@ function SessionExpiredDialog() {
  *  already toasts. The text is the server's French `detail` (or the
  *  translated network / generic message from api/client.ts). */
 function toastError(err: unknown): void {
-  if (err instanceof ApiErr && err.status === 401) return;
+  if (err instanceof ApiErr && (err.status === 401 || err.status === 423)) return; // 423: the lock screen says it
   toast.error(err instanceof ApiErr ? err.detail : translate("toast.genericError"));
 }
 
@@ -143,6 +143,11 @@ const queryClient = new QueryClient({
 // stale cache in place and open the dialog; the user's "Actualiser" click
 // triggers a hard reload, which boots without a session cookie and lands on
 // /login through the natural auth-guard path.
+// Lock screen: a 423 anywhere → `me` again (its `lock.locked` shows the lock screen over the page).
+setLockedHandler(() => {
+  void queryClient.invalidateQueries({ queryKey: API.auth.me.key });
+});
+
 setUnauthorizedHandler(() => {
   if (queryClient.getQueryData(API.auth.me.key) !== undefined) {
     openSessionExpiredDialog();

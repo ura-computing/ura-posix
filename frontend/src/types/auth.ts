@@ -22,10 +22,19 @@ export interface Pharmacy {
 }
 
 /** Backend response shape from GET /v1/auth/me. */
+/** Lock screen of the user (backend `LockOut`): on / off, idle delay (seconds), a code set, this device locked now. */
+export interface LockState {
+  enabled: boolean;
+  seconds: number;
+  has_pin: boolean;
+  locked: boolean;
+}
+
 export interface MeResponse {
   user: User;
   pharmacy: Pharmacy | null;
   permissions: Feature[];
+  lock: LockState;
 }
 
 /**
@@ -42,6 +51,7 @@ export interface Me {
   status: Status;
   pharmacy?: { id: number; name: string; code: string | null };
   permissions: Feature[];
+  lock: LockState;
 }
 
 export interface Session {

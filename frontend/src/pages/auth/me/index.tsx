@@ -11,7 +11,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/_components/atoms/Button";
 import { PasswordField } from "@/_components/molecules/PasswordField";
-import { useChangePassword, useUpdateProfile, useKillSession, useRevokeOtherSessions, useSessions } from "./hooks";
+import {
+  useChangePassword,
+  useLockSettings,
+  useUpdateProfile,
+  useKillSession,
+  useRevokeOtherSessions,
+  useSessions,
+} from "./hooks";
+import { FormField } from "@/_components/molecules/FormField";
+import { SwitchCard } from "@/_components/molecules/SwitchCard";
+import { PinField } from "@/_components/molecules/PinField";
+import { Segmented } from "@/_components/molecules/Segmented";
 import { Lock, Monitor } from "lucide-react";
 import { TextField } from "@/_components/molecules/TextField";
 import type { Me, Session } from "@/types";
@@ -273,8 +284,131 @@ function SessionRow({
 const buildTabs = (t: TFn): TabItem[] => [
   { id: "profil", label: t("me.tabProfil") },
   { id: "password", label: t("me.tabPassword") },
+  { id: "lock", label: t("me.tabLock") },
   { id: "sessions", label: t("me.tabSessions") },
 ];
+
+/** The idle delays (seconds) and their labels: 15 s, 1, 5, 15, 30 min. */
+const LOCK_DELAYS = ["15", "60", "300", "900", "1800"] as const;
+const delayLabel = (t: TFn, seconds: number) =>
+  seconds < 60 ? t("me.lockSeconds", { n: seconds }) : t("me.lockMinutes", { n: seconds / 60 });
+
+const makePinSchema = (t: (k: string) => string) =>
+  z
+    .object({
+      pin: z.string().regex(/^\d{6}$/, t("me.pinSixDigits")),
+      confirm: z.string().min(1, t("me.confirmRequired")),
+    })
+    .refine((d) => d.pin === d.confirm, { message: t("me.pinMismatch"), path: ["confirm"] });
+
+/** « Verrouillage » (optional, off by default): the switch card; on without a code → the code form first. The code
+ *  form has the « Mot de passe » tab's shape: the new code, the code again. */
+function LockTab({ me }: { me: Me }) {
+  const t = useT();
+  const { saveLock, isSavingLock } = useLockSettings();
+  const { enabled, seconds, has_pin: hasPin } = me.lock;
+  const [editing, setEditing] = useState(false);
+  // Switched on without a code: the switch shows « on » at once, the code form opens; « Annuler » puts it back off.
+  const [turningOn, setTurningOn] = useState(false);
+  const form = useForm<{ pin: string; confirm: string }>({
+    resolver: zodResolver(makePinSchema(t)),
+    defaultValues: { pin: "", confirm: "" },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
+  const close = () => {
+    reset();
+    setEditing(false);
+    setTurningOn(false);
+  };
+  const toggle = (next: boolean) => {
+    if (next && !hasPin) {
+      setTurningOn(true); // a code first
+      setEditing(true);
+      return;
+    }
+    if (!next) close();
+    void saveLock({ enabled: next, seconds }, "me.lockSaved");
+  };
+  const submit = handleSubmit((d) => saveLock({ enabled: true, seconds, pin: d.pin }, "me.pinSaved").then(close));
+  return (
+    <div className="flex max-w-[480px] flex-col gap-6">
+      <SwitchCard
+        icon={Lock}
+        title={t("me.lockTitle")}
+        description={t("me.lockText")}
+        checked={enabled || turningOn}
+        onChange={toggle}
+        disabled={isSavingLock}
+      />
+      {enabled && (
+        <FormField label={t("me.lockDelay")}>
+          <Segmented<(typeof LOCK_DELAYS)[number]>
+            value={String(seconds) as (typeof LOCK_DELAYS)[number]}
+            onChange={(v) => void saveLock({ enabled, seconds: Number(v) }, "me.lockSaved")}
+            options={LOCK_DELAYS.map((n) => ({
+              value: n,
+              label: delayLabel(t, Number(n)),
+              activeBg: "bg-primary text-primary-foreground shadow-sm",
+            }))}
+          />
+        </FormField>
+      )}
+      {(hasPin || editing) && <SectionTitle>{t("me.pinTitle")}</SectionTitle>}
+      {editing ? (
+        <form className="flex flex-col gap-5" onSubmit={submit} noValidate>
+          <Controller
+            control={control}
+            name="pin"
+            render={({ field }) => (
+              <PinField
+                label={t("me.pinNew")}
+                hint={t("me.pinHint")}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.pin?.message}
+                autoFocus
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="confirm"
+            render={({ field }) => (
+              <PinField
+                label={t("me.pinConfirm")}
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.confirm?.message}
+              />
+            )}
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={close} disabled={isSavingLock}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isSavingLock}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        hasPin && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">{t("me.pinSet")}</p>
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              {t("me.pinChange")}
+            </Button>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
 
 export default function MePage() {
   const t = useT();
@@ -288,6 +422,7 @@ export default function MePage() {
       <div>
         {active === "profil" && <ProfileTab me={me} />}
         {active === "password" && <PasswordTab />}
+        {active === "lock" && <LockTab me={me} />}
         {active === "sessions" && <SessionsTab me={me} />}
       </div>
     </Page>

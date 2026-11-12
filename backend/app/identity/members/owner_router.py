@@ -31,6 +31,7 @@ from app.identity.members.service import (
     member_out,
     member_to_out,
     reset_member_password,
+    reset_member_pin,
     set_member_status,
 )
 from app.core.models import PharmacyFeature, User
@@ -41,6 +42,7 @@ from app.identity.members.schemas import (
     MemberOut,
     PermissionsBulkSet,
     ResetPasswordIn,
+    ResetPinIn,
     ResetPasswordOut,
     StatusPatchIn,
 )
@@ -175,6 +177,16 @@ def reset_employee_password(
     """Set the password the owner typed + bump token_version so live sessions die."""
     emp = _get_employee_or_404(db, pharmacy_id, employee_id)
     reset_member_password(db, emp, body.password)
+    return ResetPasswordOut(user_id=emp.id)
+
+
+@router.post("/owner/employees/{employee_id}/reset-pin", response_model=ResetPasswordOut)
+def reset_employee_pin(
+    body: ResetPinIn, pharmacy_id: OwnerDep, db: DbDep, employee_id: Annotated[int, Path(ge=1)]
+) -> ResetPasswordOut:
+    """Set the lock-screen code the owner typed."""
+    emp = _get_employee_or_404(db, pharmacy_id, employee_id)
+    reset_member_pin(db, emp, body.pin)
     return ResetPasswordOut(user_id=emp.id)
 
 

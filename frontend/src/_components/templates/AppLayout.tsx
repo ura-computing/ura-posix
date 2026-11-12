@@ -1,9 +1,11 @@
 import { Suspense, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
+import { useIdleLock } from "@/hooks/useLockScreen";
 import { useMe } from "@/hooks/useMe";
 import { ROLES, ROUTES, STATUSES } from "@/types";
 import { Skeleton } from "@/_components/atoms/Skeleton";
+import { LockScreen } from "@/_components/organisms/LockScreen";
 import { SobrusBanner } from "@/_components/organisms/SobrusBanner";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
 import { CornerStack } from "@/_components/templates/CornerStack";
@@ -16,6 +18,8 @@ export function AppLayout() {
   const { me, isLoading, isError } = useMe();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === "1");
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Lock screen: idle → this device locks; locked → the code over the page (the page stays mounted under it).
+  useIdleLock(me?.lock);
 
   if (isLoading) return <AppShellSkeleton />;
   if (isError || !me) return <Navigate to={ROUTES.LOGIN} replace />;
@@ -53,6 +57,7 @@ export function AppLayout() {
         </main>
       </div>
       <CornerStack sobrusOwner={sobrusOwner} admin={me.role === ROLES.ADMIN} />
+      {me.lock.locked && <LockScreen name={me.name} />}
     </div>
   );
 }

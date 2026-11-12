@@ -22,6 +22,7 @@ export interface MembersSectionProps {
   members: MemberOut[];
   onManagePermissions: (member: MemberOut) => void;
   onResetPassword: (member: MemberOut) => void;
+  onResetPin: (member: MemberOut) => void;
   onToggleStatus: (member: MemberOut) => void;
   onRemove: (member: MemberOut) => void;
 }
@@ -42,6 +43,7 @@ export function MembersSection({
   members,
   onManagePermissions,
   onResetPassword,
+  onResetPin,
   onToggleStatus,
   onRemove,
 }: MembersSectionProps) {
@@ -115,6 +117,7 @@ export function MembersSection({
                     <MemberKebab
                       member={m}
                       onResetPassword={() => onResetPassword(m)}
+                      onResetPin={() => onResetPin(m)}
                       onToggleStatus={() => onToggleStatus(m)}
                       onRemove={() => onRemove(m)}
                     />

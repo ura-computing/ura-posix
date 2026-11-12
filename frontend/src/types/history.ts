@@ -14,7 +14,8 @@ export type AuditAction =
   | "sobrus_password_updated"
   | "sobrus_disconnected"
   | "sobrus_login_refused"
-  | "sobrus_products_fetched";
+  | "sobrus_products_fetched"
+  | "sobrus_email_reset";
 
 export interface AuditRow {
   id: number;

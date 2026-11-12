@@ -15,18 +15,22 @@ from app.core.rate_limit import limiter
 from app.identity.auth.schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    LockOut,
+    LockSettingsIn,
     LoginRequest,
     MeResponse,
     PharmacyOut,
     SessionOut,
     SetPasswordRequest,
     SignupIn,
+    UnlockIn,
     UpdateProfileRequest,
     UserOut,
     ValidateTokenResponse,
 )
 from app.core.security import (
     create_access_token,
+    CurrentSessionDep,
     CurrentUserDep,
     hash_password,
     SESSION_COOKIE_NAME,
@@ -51,11 +55,17 @@ INVALID_TOKEN_DETAIL = "Lien invalide ou expiré"
 BAD_CREDS_DETAIL = "Email ou mot de passe incorrect"
 
 
-def _me_response(db: DbSession, user: User) -> MeResponse:
+def _me_response(db: DbSession, user: User, session_row: UserSession | None = None) -> MeResponse:
     return MeResponse(
         user=UserOut.model_validate(user),
         pharmacy=PharmacyOut.model_validate(user.pharmacy) if user.pharmacy else None,
         permissions=effective_permissions(db, user),
+        lock=LockOut(
+            enabled=user.lock_enabled,
+            seconds=user.lock_seconds,
+            has_pin=user.lock_pin_hash is not None,
+            locked=session_row is not None and session_row.locked_at is not None,
+        ),
     )
 
 
@@ -137,8 +147,67 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
 
 
 @router.get("/auth/me")
-def me(user: CurrentUserDep, db: DbDep) -> MeResponse:
-    return _me_response(db, user)
+def me(current: CurrentSessionDep, db: DbDep) -> MeResponse:
+    """Also with the screen locked (`lock.locked`): the lock screen shows the user's name."""
+    user, session_row = current
+    return _me_response(db, user, session_row)
+
+
+# ═══ Lock screen ═════════════════════════════════════════════════════════════
+# After `lock_seconds` without a click or a key the page calls /auth/lock: every route of this session answers 423
+# `screenLocked` until /auth/unlock gets the user's 6-digit code. 5 wrong codes in a row → this session ends.
+
+PIN_TRIES = 5
+
+
+@router.put("/auth/me/lock")
+def save_lock(body: LockSettingsIn, current: CurrentSessionDep, db: DbDep) -> MeResponse:
+    """On / off, the idle delay, a new code (typed twice on the page)."""
+    user, session_row = current
+    if session_row.locked_at is not None:
+        raise ApiError(status.HTTP_423_LOCKED, ErrorCode.SCREEN_LOCKED, "Écran verrouillé : tapez votre code.")
+    if body.pin is not None:
+        user.lock_pin_hash = hash_password(body.pin)
+        user.lock_failed = 0
+    if body.enabled and user.lock_pin_hash is None:
+        raise ApiError(status.HTTP_400_BAD_REQUEST, ErrorCode.PIN_REQUIRED, "Choisissez d'abord votre code.")
+    user.lock_enabled = body.enabled
+    user.lock_seconds = body.seconds
+    db.commit()
+    return _me_response(db, user, session_row)
+
+
+@router.post("/auth/lock", status_code=204)
+def lock_screen(current: CurrentSessionDep, db: DbDep) -> None:
+    """The page was idle: this device's screen locks (nothing happens when the user has no lock screen)."""
+    user, session_row = current
+    if user.lock_enabled and user.lock_pin_hash and session_row.locked_at is None:
+        session_row.locked_at = datetime.now(timezone.utc)
+        db.commit()
+
+
+@router.post("/auth/unlock")
+@limiter.limit("20/minute")
+def unlock_screen(request: Request, body: UnlockIn, current: CurrentSessionDep, db: DbDep) -> MeResponse:
+    """The right code: back where the user was. Wrong: `pinWrong` with the tries left; the 5th ends this session
+    (`pinTooMany`: the page logs out)."""
+    user, session_row = current
+    if user.lock_pin_hash and verify_password(body.pin, user.lock_pin_hash):
+        session_row.locked_at = None
+        user.lock_failed = 0
+        db.commit()
+        return _me_response(db, user, session_row)
+    user.lock_failed += 1
+    if user.lock_failed >= PIN_TRIES:
+        user.lock_failed = 0
+        db.delete(session_row)
+        db.commit()
+        # 403, not 401: the page logs out itself (a 401 would open « Session expirée » over the lock screen).
+        raise ApiError(status.HTTP_403_FORBIDDEN, ErrorCode.PIN_TOO_MANY, "Trop de codes faux : reconnectez-vous.")
+    db.commit()
+    raise ApiError(
+        status.HTTP_400_BAD_REQUEST, ErrorCode.PIN_WRONG, "Code incorrect.", left=str(PIN_TRIES - user.lock_failed)
+    )
 
 
 @router.patch("/auth/me")

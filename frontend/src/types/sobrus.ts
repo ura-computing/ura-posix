@@ -45,6 +45,10 @@ export interface SobrusRun {
 
 export interface SobrusConnection {
   connected: boolean;
+  /** The pharmacy's Sobrus account, also once disconnected: a new connection must use it (the admin can change it). */
+  locked_email: string | null;
+  /** Past years already imported in full, by kind: skipped by the next imports. */
+  imported_years: Record<string, number[]>;
   email: string | null;
   status: SobrusConnectionStatus | null;
   consent_at: string | null;
@@ -58,6 +62,8 @@ export interface SobrusRunBody {
   mode: SobrusRunMode;
   date_from?: string;
   date_to?: string;
+  /** « Réimporter quand même »: the years already imported are read again. */
+  force?: boolean;
 }
 
 export interface SobrusConnectionBody {

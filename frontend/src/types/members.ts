@@ -41,6 +41,8 @@ export interface PharmacyDetail {
   /** Union of active owners' enabled permissions. Used as the second
    *  ceiling in the admin's permission dialog when editing an employee. */
   owners_union_permissions: string[];
+  /** Its Sobrus account, set once by the first connection; only the admin changes it. */
+  sobrus_email: string | null;
 }
 
 /** GET /admin/users — every account (« Utilisateurs » tab). `role` / `status`

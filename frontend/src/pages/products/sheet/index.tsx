@@ -14,6 +14,7 @@ import { Page } from "@/_components/templates/Page";
 import { TabBar, type TabItem } from "@/_components/molecules/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
 import { useT } from "@/i18n/I18nProvider";
+import { PERIOD_LABELS, type PeriodPreset } from "@/utils/dateRange";
 
 import { ProductPhoto } from "../_components/ProductPhoto";
 import { useScanner } from "../_components/useScanner";
@@ -32,7 +33,6 @@ import {
   useProduitPage,
   useSheetEditor,
   useStatsRange,
-  type SheetPeriod,
   type SheetTab,
 } from "./hooks";
 
@@ -85,19 +85,12 @@ function ProductSheetPage({ id }: { id: number }) {
         {/* The page dates: « Performance » (Général), Statistiques; Traçabilité has them in its own
             toolbar, with its search and filters. */}
         {(tab === "general" || tab === "stats") && (
-          <FilterBar<SheetPeriod | "custom">
+          <FilterBar<PeriodPreset | "custom">
             dateRange={{ from: range.from, to: range.to, onChange: setRange }}
             segment={{
               value: period ?? "custom",
               onChange: (v) => v !== "custom" && setPeriod(v),
-              options: (
-                [
-                  ["30d", "products.period30"],
-                  ["90d", "products.period90"],
-                  ["year", "products.periodYear"],
-                  ["12m", "products.period12"],
-                ] as const
-              ).map(([value, label]) => ({ value, label: t(label), activeBg: PERIOD_ON })),
+              options: PERIOD_LABELS.map(([value, label]) => ({ value, label: t(label), activeBg: PERIOD_ON })),
             }}
           />
         )}

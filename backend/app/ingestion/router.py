@@ -19,7 +19,7 @@ from app.ingestion.csv_parse import (
 from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
+from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, SobrusImportedYear, User, Vente
 from app.core.permissions import AdminDep, member, require_pharmacy_owner
 from app.catalog.schemas import CatalogImportResponse
 from app.ingestion.schemas import ImportsListResponse, JsonUploadBody, PatchBatchBody
@@ -406,6 +406,20 @@ def delete_import(
         raise ApiError(409, ErrorCode.BATCH_ALREADY_DELETED, "Ce lot a déjà été supprimé.")
 
     deleted_rows = 0
+    if batch.file_type in ("achat", "vente"):
+        # Its years are no longer complete: the Sobrus robot reads them again (« déjà importé » forgotten).
+        day = Achat.delivery_date if batch.file_type == "achat" else Vente.date
+        table = Achat if batch.file_type == "achat" else Vente
+        years = {
+            int(y)
+            for (y,) in db.query(func.substr(day, 1, 4)).filter(table.import_batch_id == batch.id).distinct()
+            if y and y.isdigit()
+        }
+        db.query(SobrusImportedYear).filter(
+            SobrusImportedYear.pharmacy_id == batch.pharmacy_id,
+            SobrusImportedYear.kind == batch.file_type,
+            or_(SobrusImportedYear.year.in_(years), SobrusImportedYear.batch_id == batch.id),
+        ).delete(synchronize_session=False)
     if batch.file_type == "achat":
         deleted_rows = db.query(Achat).filter(Achat.import_batch_id == batch.id).delete()
     elif batch.file_type == "vente":

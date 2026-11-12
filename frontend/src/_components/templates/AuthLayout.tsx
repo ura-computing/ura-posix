@@ -1,3 +1,4 @@
+/** The login / sign-up / password pages and the lock screen: the brand panel on the left, the form on the right. */
 import type { ReactNode } from "react";
 
 import { ThemeToggle } from "@/_components/molecules/ThemeToggle";

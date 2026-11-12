@@ -24,6 +24,7 @@ import { ChoiceCard } from "@/_components/molecules/ChoiceCard";
 import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
 import { FormField, FormInput } from "@/_components/molecules/FormField";
 import { PasswordField } from "@/_components/molecules/PasswordField";
+import { PinField } from "@/_components/molecules/PinField";
 import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { ROLE_LABEL } from "@/_components/organisms/memberConstants";
@@ -229,13 +230,17 @@ export interface ResetPasswordDialogProps {
   /** Member whose password is being reset; null = closed. */
   member: MemberOut | null;
   onClose: () => void;
-  /** Fires the reset mutation with the typed password; on success the
-   *  dialog flips to the reveal state. */
+  /** Fires the reset mutation with the typed password (or code); on success the
+   *  dialog flips to the reveal state (password) or closes (code: the page toasts). */
   onSubmit: (password: string) => Promise<unknown>;
+  /** « Réinitialiser le code » (lock screen): the same dialog with a 6-digit code. */
+  kind?: "password" | "pin";
 }
 
-/** Two states like CreateUserDialog: A. new-password form → B. reveal. */
-export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPasswordDialogProps) {
+/** Two states like CreateUserDialog: A. new-password form → B. reveal. `kind="pin"`: the lock-screen code, same
+ *  look, closes once saved. */
+export function ResetPasswordDialog({ member, onClose, onSubmit, kind = "password" }: ResetPasswordDialogProps) {
+  const pinMode = kind === "pin";
   const t = useT();
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -255,7 +260,8 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
     setSaving(true);
     try {
       await onSubmit(password);
-      setDone(true);
+      if (pinMode) onClose();
+      else setDone(true);
     } finally {
       setSaving(false);
     }
@@ -271,29 +277,45 @@ export function ResetPasswordDialog({ member, onClose, onSubmit }: ResetPassword
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHeader
           icon={done ? <CheckCircle2 className="size-4" /> : <KeyRound className="size-4" />}
-          title={done ? t("adminPharm.passwordReset") : t("members.resetPassword")}
-          subtitle={t("adminPharm.resetSubtitle")}
+          title={
+            pinMode
+              ? t("members.resetPinTitle", { name: member?.full_name ?? member?.email ?? "" })
+              : done
+                ? t("adminPharm.passwordReset")
+                : t("members.resetPassword")
+          }
+          subtitle={pinMode ? t("members.resetPinHint") : t("adminPharm.resetSubtitle")}
           onClose={onClose}
         />
         {member && !done && (
           <form className="flex flex-col" onSubmit={handleSubmit}>
             <DialogBody>
-              <PasswordField
-                label={t("adminPharm.newPassword")}
-                hint={t("adminPharm.passwordMinHint")}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                minLength={8}
-                required
-                autoFocus
-              />
+              {pinMode ? (
+                <PinField label={t("me.pinNew")} value={password} onChange={setPassword} autoFocus />
+              ) : (
+                <PasswordField
+                  label={t("adminPharm.newPassword")}
+                  hint={t("adminPharm.passwordMinHint")}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  autoFocus
+                />
+              )}
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>
                 {t("common.cancel")}
               </Button>
-              <Button type="submit" variant="primary" isLoading={saving} loadingText={t("common.saving")}>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={saving}
+                loadingText={t("common.saving")}
+                disabled={pinMode ? password.length !== 6 : password.length < 8}
+              >
                 {t("common.save")}
               </Button>
             </DialogFooter>

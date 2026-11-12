@@ -88,6 +88,32 @@ export function currentYear(now: Date = new Date()): DateRange {
   return { from: `${y}-01-01`, to: fmt(now) };
 }
 
+/** « Période » next to a page's dates (product sheet, Sobrus import): 30 / 90 days, the year so far, 12 months,
+ *  today included. */
+export type PeriodPreset = "30d" | "90d" | "year" | "12m";
+export const PERIOD_PRESETS: Record<PeriodPreset, () => DateRange> = {
+  "30d": () => ({ from: daysAgo(29), to: todayIso() }),
+  "90d": () => ({ from: daysAgo(89), to: todayIso() }),
+  year: () => currentYear(),
+  "12m": () => ({ from: dayAfter(yearsAgo(1)), to: todayIso() }),
+};
+/** Its button labels (fr.ts / es.ts), in order. */
+export const PERIOD_LABELS = [
+  ["30d", "products.period30"],
+  ["90d", "products.period90"],
+  ["year", "products.periodYear"],
+  ["12m", "products.period12"],
+] as const;
+/** The preset these dates are (none: dates typed or picked). */
+export function presetOf(from: string | null, to: string | null): PeriodPreset | null {
+  return (
+    (Object.keys(PERIOD_PRESETS) as PeriodPreset[]).find((k) => {
+      const p = PERIOD_PRESETS[k]();
+      return p.from === from && p.to === to;
+    }) ?? null
+  );
+}
+
 export const DATE_PRESETS = [
   { key: "current-year", label: "datePreset.currentYear", get: currentYear },
   { key: "current-month", label: "datePreset.currentMonth", get: currentMonth },

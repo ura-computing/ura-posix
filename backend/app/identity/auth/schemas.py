@@ -101,10 +101,32 @@ class UserOut(BaseModel):
     last_login_at: datetime | None
 
 
+class LockOut(BaseModel):
+    """Lock screen of this user: on / off, idle delay (seconds), a code set, this device locked now."""
+
+    enabled: bool
+    seconds: int
+    has_pin: bool
+    locked: bool
+
+
+class LockSettingsIn(BaseModel):
+    """« Mon compte » → « Verrouillage » (optional, off by default): on / off, idle delay, a new 6-digit code."""
+
+    enabled: bool
+    seconds: Literal[15, 60, 300, 900, 1800] = 300  # 15 s, 1, 5, 15, 30 min
+    pin: str | None = Field(None, pattern=r"^\d{6}$")
+
+
+class UnlockIn(BaseModel):
+    pin: str = Field(..., pattern=r"^\d{6}$")
+
+
 class MeResponse(BaseModel):
     user: UserOut
     pharmacy: PharmacyOut | None
     permissions: list[str]
+    lock: LockOut
 
 
 # ═══ Sessions ════════════════════════════════════════════════════════════════

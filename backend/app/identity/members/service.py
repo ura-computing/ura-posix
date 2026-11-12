@@ -133,6 +133,13 @@ def reset_member_password(db: Session, target: User, password: str) -> None:
     db.commit()
 
 
+def reset_member_pin(db: Session, target: User, pin: str) -> None:
+    """Set the lock-screen code typed by the admin / owner (« Code oublié »); the wrong tries start again."""
+    target.lock_pin_hash = hash_password(pin)
+    target.lock_failed = 0
+    db.commit()
+
+
 def generate_pharmacy_code(db: Session, city: str) -> str:
     """Build a deterministic pharmacy code from the city name.
 

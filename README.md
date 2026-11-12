@@ -354,6 +354,18 @@ sequenceDiagram
 
 - Password change / reset / deactivation bump `token_version`: every JWT dies (change-password keeps
   the current device logged in). Removing a session row logs that device out at once.
+
+**Lock screen** (« Mon compte » → « Verrouillage », off by default)
+
+| Rule | Value |
+|---|---|
+| When | no click, key, touch or scroll for 15 s, 1, 5, 15 or 30 min in any tab → `POST /auth/lock` → `sessions.locked_at` |
+| While locked | every route of that session answers 423 `screenLocked`, except `GET /auth/me`, `/auth/lock`, `/auth/unlock`, `/auth/logout`; the page stays under the lock screen |
+| Code | 6 digits (typed twice), hashed like the password; the first code turns the lock on |
+| Wrong code | `pinWrong` (tries left); the 5th → `pinTooMany`, the session ends |
+| Forgotten | « Code oublié ? Se déconnecter », log in with the password, new code; or the admin / the owner types a new one (« Réinitialiser le code ») |
+
+Example: lock at 5 min → 5 min idle → lock screen → `246810` → back on the same page.
 - Emails are stored and compared trimmed + lower case (`normalize_email`): `Ali@Gmail.com` = `ali@gmail.com`.
 - Forgot password: always 200, 60-min hashed token, link `FRONTEND_URL/auth/set-password?token=…`.
 - Rate limits (slowapi, in memory, per process): login **5/min**, forgot-password **3/hour**, sign-up **5/hour** per IP.
@@ -653,6 +665,16 @@ Example: run of 3 Nov → row 3 Nov: Total, Payé, Crédit, Retours, Net as Sobr
 | Who sees it | the admin only: popup on every page, Catalogue card, « Gestion des imports » tab « Produits Sobrus »; the owner: one line in « Historique » |
 
 Example: import cut at page 6 120 → next import starts at page 6 118.
+
+### 7.11 Import Sobrus (« Connexion Sobrus »)
+| Rule | Value |
+|---|---|
+| Période | 30 j · 90 j · Année en cours · 12 mois (dates) · Tout l'historique; dates picked = a custom period |
+| Already imported | a past year imported in full (`sobrus_imported_years`) is skipped (« déjà importé »); this year starts from the last success − 3 days; « Réimporter quand même » reads them again |
+| Deleted import | « Gestion des imports » → the years its lines covered are read again next time |
+| Sobrus email | set by the pharmacy's first connection (`pharmacies.sobrus_email`), kept after a disconnect; another email → `sobrusEmailLocked`; only the admin changes it (« Changer l'email Sobrus »: connection stopped, imported years forgotten) |
+
+Example: « Tout l'historique » on 12/11/2026 with 2022–2025 already in → 2026 from 09/11, 2022–2025 skipped.
 
 Every Sobrus call runs in the worker (`app/sobrus/sync.py`); the API only queues runs and reads what the worker stored.
 

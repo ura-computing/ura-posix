@@ -44,7 +44,15 @@ from app.core.audit import AuditAction, log_action
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.email_service import send_sobrus_problem
-from app.core.models import ImportBatch, Medicament, SobrusCashClosing, SobrusConnection, SobrusRun, User
+from app.core.models import (
+    ImportBatch,
+    Medicament,
+    SobrusCashClosing,
+    SobrusConnection,
+    SobrusImportedYear,
+    SobrusRun,
+    User,
+)
 from app.core.utils import PHARMACY_TZ, today
 from app.ingestion.csv_parse import iter_csv, parse_int
 from app.ingestion.service import (
@@ -244,6 +252,7 @@ def _story(code: str, data: dict) -> str:
         "login_busy": f"Sobrus limits logins (429): new try in {data.get('n')} s",
         "year_done": f"{kind} {year}: {n} line(s) added",
         "year_empty": f"{kind} {year}: no line on Sobrus",
+        "year_skipped": f"{kind} {year}: already imported, skipped",
         "period_done": f"{kind} {period}: {n} line(s) added",
         "stock_done": f"today's stock: {n} product(s) updated",
         "closing_done": f"cash desk closing {period}: {n} day(s) saved",
@@ -284,6 +293,16 @@ class Robot:
         except InvalidToken:  # saved with another key (`crypto.py`): log in again
             cookies = None
         self.client = SobrusClient(cookies)
+        self.last_batch_id: int | None = None  # the import batch of the last file (`import_file`)
+        # Past years already imported in full (« déjà importé »): skipped, unless « Réimporter quand même ».
+        self.done_years: set[tuple[str, int]] = (
+            set()
+            if run.force_reimport
+            else {
+                (y.kind, y.year)
+                for y in db.query(SobrusImportedYear).filter(SobrusImportedYear.pharmacy_id == run.pharmacy_id)
+            }
+        )
 
     def _save_session(self) -> None:
         self.conn.session_enc = encrypt(json.dumps(self.client.cookies()))
@@ -399,21 +418,52 @@ class Robot:
                 end_batch(self.db, batch, status, self.owner, None if status == "cancelled" else "Sobrus robot")
             raise
         end_batch(self.db, self.db.get(ImportBatch, batch_id), "success", self.owner)
+        self.last_batch_id = batch_id
         return added
+
+    def _year_done(self, kind: str, year: int) -> None:
+        """A past year imported in full: the next imports skip it."""
+        stmt = insert(SobrusImportedYear).values(
+            pharmacy_id=self.run.pharmacy_id, kind=kind, year=year, batch_id=self.last_batch_id, imported_at=_now()
+        )
+        self.db.execute(
+            stmt.on_conflict_do_update(
+                constraint="uq_sobrus_imported_years",
+                set_={"batch_id": stmt.excluded.batch_id, "imported_at": stmt.excluded.imported_at},
+            )
+        )
+        self.db.commit()
+        self.done_years.add((kind, year))
+
+    def _skip(self, kind: str, year: int) -> bool:
+        """A past year already imported in full (and no « Réimporter quand même »): noted, not downloaded."""
+        if year >= today().year or (kind, year) not in self.done_years:
+            return False
+        _event(self.db, self.run, "year_skipped", kind=kind, year=year)
+        return True
 
     def full(self) -> None:
         last = today()
+        # This year: from the last success − NEW_DAYS_BACK (like the nightly run), else from 1 January.
+        this_year_from = max(self.new_start(), date(last.year, 1, 1))
         for kind in KINDS:
             empty = 0
             year = last.year
             while empty < EMPTY_YEARS_TO_STOP and year >= OLDEST_YEAR:
+                if self._skip(kind, year):  # already in: counts as a year with lines
+                    empty = 0
+                    year -= 1
+                    continue
+                start = this_year_from if year == last.year else date(year, 1, 1)
                 end = last.isoformat() if year == last.year else f"{year}-12-31"
-                added = self.import_file(kind, year, f"{year}-01-01", end)
+                added = self.import_file(kind, year, start.isoformat(), end)
                 if added is None:
                     empty += 1
                     _event(self.db, self.run, "year_empty", kind=kind, year=year)
                 else:
                     empty = 0
+                    if year < last.year:
+                        self._year_done(kind, year)
                     _event(self.db, self.run, "year_done", kind=kind, year=year, n=added)
                 year -= 1
 
@@ -444,7 +494,12 @@ class Robot:
         for kind in KINDS:
             for year in range(end.year, start.year - 1, -1):
                 first, last = max(start, date(year, 1, 1)), min(end, date(year, 12, 31))
+                whole = first == date(year, 1, 1) and last == date(year, 12, 31)
+                if whole and self._skip(kind, year):
+                    continue
                 added = self.import_file(kind, year, first.isoformat(), last.isoformat())
+                if whole and added is not None and year < today().year:
+                    self._year_done(kind, year)
                 _event(
                     self.db,
                     self.run,

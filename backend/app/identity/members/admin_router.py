@@ -38,6 +38,7 @@ from app.identity.members.service import (
     member_out,
     member_to_out,
     reset_member_password,
+    reset_member_pin,
     set_member_status,
 )
 from app.core.models import (
@@ -61,6 +62,7 @@ from app.identity.members.schemas import (
     PharmacyIn,
     PharmacyListRow,
     ResetPasswordIn,
+    ResetPinIn,
     ResetPasswordOut,
     SignupAcceptOut,
     SignupPharmacyRef,
@@ -228,6 +230,7 @@ def get_pharmacy(
         enabled_features=_enabled_features(db, pharm.id),
         members=[member_to_out(m, granted.get(m.id, [])) for m in members],
         owners_union_permissions=sorted(owners_union),
+        sobrus_email=pharm.sobrus_email,
     )
 
 
@@ -355,6 +358,14 @@ def reset_user_password(
     token_version bump so the user must log in with the new password."""
     target = _get_member_or_404(db, user_id)
     reset_member_password(db, target, body.password)
+    return ResetPasswordOut(user_id=target.id)
+
+
+@router.post("/admin/users/{user_id}/reset-pin", response_model=ResetPasswordOut)
+def reset_user_pin(body: ResetPinIn, db: DbDep, user_id: Annotated[int, Path(ge=1)]) -> ResetPasswordOut:
+    """Set the lock-screen code the admin typed."""
+    target = _get_member_or_404(db, user_id)
+    reset_member_pin(db, target, body.pin)
     return ResetPasswordOut(user_id=target.id)
 
 

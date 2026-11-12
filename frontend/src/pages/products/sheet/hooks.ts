@@ -23,7 +23,7 @@ import {
   type ProductSheet,
   type ProductStats,
 } from "@/types";
-import { currentYear, dayAfter, daysAgo, todayIso, yearsAgo } from "@/utils/dateRange";
+import { PERIOD_PRESETS, currentYear, presetOf, type PeriodPreset } from "@/utils/dateRange";
 
 export const SHEET_TABS = ["general", "stats", "movements", "codes", "history"] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
@@ -71,29 +71,14 @@ export interface StatsRange {
 /** The page dates (the Ventes date picker, in the toolbar under the tabs): « Performance »,
  *  Statistiques and Traçabilité. The current year first (1 January → today); kept while switching tabs.
  *  Its own: the Ventes / Achats dates do not move. */
-/** « Période » next to the page dates: 30 / 90 days, the year so far, 12 months (today included). */
-export type SheetPeriod = "30d" | "90d" | "year" | "12m";
-const PERIODS: Record<SheetPeriod, () => StatsRange> = {
-  "30d": () => ({ from: daysAgo(29), to: todayIso() }),
-  "90d": () => ({ from: daysAgo(89), to: todayIso() }),
-  year: () => currentYear(),
-  "12m": () => ({ from: dayAfter(yearsAgo(1)), to: todayIso() }),
-};
-
 export function useStatsRange() {
   const [range, setRangeState] = useState<StatsRange>(() => currentYear());
   const setRange = (from: string | null, to: string | null) => setRangeState({ from, to });
-  // The period the dates are (none: dates typed or picked).
-  const period =
-    (Object.keys(PERIODS) as SheetPeriod[]).find((k) => {
-      const p = PERIODS[k]();
-      return p.from === range.from && p.to === range.to;
-    }) ?? null;
   return {
     range,
     setRange,
-    period,
-    setPeriod: (k: SheetPeriod) => setRangeState(PERIODS[k]()),
+    period: presetOf(range.from, range.to), // « Période » (utils/dateRange.ts)
+    setPeriod: (k: PeriodPreset) => setRangeState(PERIOD_PRESETS[k]()),
   };
 }
 

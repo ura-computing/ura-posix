@@ -36,6 +36,14 @@ export function setUnauthorizedHandler(fn: (() => void) | null): void {
   onUnauthorized = fn;
 }
 
+// 423 `screenLocked` (lock screen: this session was locked, maybe from another tab): main.tsx refreshes `me`, whose
+// `lock.locked` shows the lock screen.
+let onLocked: (() => void) | null = null;
+
+export function setLockedHandler(fn: (() => void) | null): void {
+  onLocked = fn;
+}
+
 function toQuery(params?: object): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(params ?? {})) {
@@ -94,6 +102,7 @@ async function request<T>(method: string, path: string, body?: unknown, opts: Ap
             ? data.detail
             : translate("toast.genericError");
     if (res.status === 401) onUnauthorized?.();
+    if (res.status === 423) onLocked?.();
     throw new ApiErr(res.status, detail);
   }
 
