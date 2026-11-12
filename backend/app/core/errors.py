@@ -77,6 +77,7 @@ class ErrorCode(StrEnum):
     BATCH_NOT_FOUND = "batchNotFound"
     BATCH_FORBIDDEN = "batchForbidden"
     BATCH_ALREADY_DELETED = "batchAlreadyDeleted"
+    BATCH_READ_ONLY = "batchReadOnly"
     # Lists, stats, exclusions, accounting
     EXPORT_TOO_LARGE = "exportTooLarge"
     LISTE_MODE_USE_POST = "listeModeUsePost"

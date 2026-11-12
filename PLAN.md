@@ -1,6 +1,6 @@
 # PharmaGest — the plan (everything left, in order)
 
-Updated 2026-10-07. One list, top to bottom. Open items only: a step leaves this file when
+Updated 2026-11-12. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
 **Order:** §3 production tools (DO console, yours) → §8 Later.
@@ -30,7 +30,7 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | Later | Rapport server cache keyed by a data version (bumped on import, exclusion, catalogue change) | repeat visits only; first view after an import stays the same | add only if `/stats` is still a problem in production (`pg_stat_statements`) |
 | Later | **Valkey** (DO Managed Caching; open-source Redis fork) | shared Rapport cache + shared rate limit (B3) (jobs: Postgres queue, done) | one more paid DO part |
 | Later | Big file imports + Excel exports as jobs | same pattern as the Sobrus robot: Postgres queue + the DO « Worker » component (no RQ / Valkey needed); the page polls the status (B4) | no new DO part |
-| Later | **PgBouncer** (DO connection pools) | many workers without hitting the DB connection limit | needed once workers × instances × 30 > DB limit |
+| Later | **PgBouncer** (DO connection pools) | many workers without hitting the DB connection limit | needed before one more backend instance or worker: today API 2 processes × (4 + 4) + worker 2 + 1 + its LISTEN = 20 of the 22 connections |
 | Later | Read replica (DO managed Postgres) | Rapport / Analyses read from it, imports write to the primary | only if DB CPU is high (see `pg_stat_statements`) |
 | Later | **SigNoz** (open source, decision 2026-10-02) | errors with stack traces, slow requests, logs, metrics in one place | self-hosted on a DO Droplet (≥ 4 GB RAM, Docker Compose). App sends OpenTelemetry (`opentelemetry-instrumentation-fastapi`, `-sqlalchemy`); same code works with Grafana (Tempo / Loki / Prometheus) |
 
@@ -55,5 +55,6 @@ Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **manag
 | Microservices: ingestion + analytics | each = move `backend/app/ingestion/` or `backend/app/analytics/` out; blockers §7; Rapport cache moves to Valkey |
 | « Today » per user (pharmacies in Spain / France) | browser sends `X-Timezone`; `app/core/utils.py today()` uses it (Casablanca today). Only near midnight: Péremptions, default ABCD window, trend last point |
 | Currency per pharmacy (decision 2026-10-04: MAD only for now) | the day a pharmacy in Spain / France signs up: `pharmacies.currency` (MAD / EUR), admin picks it, `formatMAD` → `formatMoney`, labels and Excel headers « (MAD) » → « (€) » |
+| « Étiquette » (`labels`) · « Commander » (`orders`) | premium switches + « Fonction Premium » window exist; what each screen does = your decisions first |
 | « Ma boutique en ligne » | hidden; add its E2E specs the day it is shown (allowlisted in `99-gates.spec.ts`) |
 

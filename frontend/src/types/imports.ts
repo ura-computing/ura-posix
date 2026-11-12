@@ -50,10 +50,13 @@ export interface BatchPatchResult {
   deleted_rows: number;
 }
 
+/** What a row of « Gestion des imports » is: a file, or the « Clôture de caisse » the Sobrus robot read (read-only). */
+export type ImportKind = DocType | "closing";
+
 /** A row from GET /v1/data/imports — drives the /imports page. */
 export interface DataImport {
   id: number;
-  file_type: DocType;
+  file_type: ImportKind;
   filename: string | null;
   rows_inserted: number;
   rows_skipped: number;

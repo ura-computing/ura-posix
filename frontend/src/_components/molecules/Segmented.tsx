@@ -28,7 +28,7 @@ export function Segmented<V extends string>({ value, options, onChange, classNam
     <div
       className={cn(
         // Match date-input shape: h-9 + rounded-md + bordered surface-subtle shell
-        "inline-flex h-9 items-center self-start rounded-md border border-input bg-surface-subtle p-0.5",
+        "inline-flex h-9 max-w-full items-center self-start overflow-x-auto rounded-md border border-input bg-surface-subtle p-0.5",
         className,
       )}
     >
@@ -42,7 +42,7 @@ export function Segmented<V extends string>({ value, options, onChange, classNam
             onClick={() => onChange(opt.value)}
             className={cn(
               // h-full fills the parent's h-9; rounded-sm sits visually nested inside rounded-md
-              "h-full cursor-pointer rounded-sm px-3 text-sm font-semibold transition-colors",
+              "h-full shrink-0 cursor-pointer whitespace-nowrap rounded-sm px-3 text-sm font-semibold transition-colors",
               active ? opt.activeBg : "text-muted-foreground hover:text-foreground",
             )}
           >

@@ -16,7 +16,10 @@ All code in `backend/app/`, one folder per business area (like `frontend/src/pag
 | `app/core/` | config, database, models, errors, security, permissions, rate_limit, search, utils, email_service, `/health` |
 | `app/identity/auth/` · `app/identity/members/` | login, me, sessions · admin pharmacies + owner team (`admin_router.py`, `owner_router.py`, `service.py`) |
 | `app/catalog/` | médicaments + category suffixes (admin) |
-| `app/ingestion/` | Sobrus imports + history / undo, `csv_parse.py` |
+| `app/ingestion/` | CSV imports (achats, ventes, stock) + « Gestion des imports » list / undo, `csv_parse.py` |
+| `app/sobrus/` | Sobrus robot: `router.py` (queues runs, reads what the worker stored), `worker.py` + `sync.py` (every Sobrus call: run modes full / new / range / check / products, cash closing), `sobrus_client.py`, `catalog_import.py` |
+| `app/products/` | Produits list + product sheet, owner edits, « Observations » (`product_queries.py`, `notes_queries.py`) |
+| `app/history/` | « Historique des modifications » (`audit_logs`, read-only) |
 | `app/ledger/` | ventes + achats lists, suggestions, exports |
 | `app/analytics/` | stats, alerts, stock, analyse: `router.py` + `*_queries.py` + `query_parts.py` |
 | `app/accounting/payments/` · `app/accounting/exclusions/` | payments · special products / BL / suppliers (`service.py`), Comptabilité only |

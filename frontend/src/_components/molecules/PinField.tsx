@@ -31,7 +31,7 @@ export function PinField({
       }}
       inputMode="numeric"
       autoComplete="one-time-code"
-      maxLength={6}
+      // No `maxLength`: the browser would cut « 12 34 56 » (pasted) to « 12 34 » before the digits are kept.
       placeholder="••••••"
       hint={hint}
       error={error}

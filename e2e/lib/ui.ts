@@ -49,6 +49,18 @@ export function quickPeriods(today: Date): [string, string][] {
   ];
 }
 
+/** Each button of a « Période » bar (product page, Sobrus import) → its dates, today included. */
+export function barPeriods(today: Date): [string, string][] {
+  const [y, m, d] = [today.getFullYear(), today.getMonth(), today.getDate()];
+  const range = (from: Date) => `${shown(from)} → ${shown(today)}`;
+  return [
+    ["30 j", range(new Date(y, m, d - 29))],
+    ["90 j", range(new Date(y, m, d - 89))],
+    ["12 mois", range(new Date(y - 1, m, d + 1))],
+    ["Année en cours", range(new Date(y, 0, 1))],
+  ];
+}
+
 /** Query params the request must carry; `null` = the param must be absent. */
 export type Match = Record<string, string | null>;
 

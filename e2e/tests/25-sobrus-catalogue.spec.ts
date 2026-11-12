@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
 import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { loadState, sessionFile } from "../lib/auth";
 import { expect, test } from "../lib/fixtures";
-import { downloadXlsx, frNumber } from "../lib/ui";
+import { downloadXlsx, frNumber, pageSend } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
 
@@ -54,6 +54,14 @@ async function ownerRunEnded(page: Page): Promise<void> {
   await expect
     .poll(async () => (await apiGet(page, "/sobrus/connection")).active_run, { timeout: 5 * 60_000, intervals: [1000] })
     .toBeNull();
+}
+
+/** « Importer les produits depuis Sobrus », then its answer: the new run exists (`importEnded` then sees it, not the
+ *  one before). */
+async function startProducts(page: Page): Promise<void> {
+  const sent = pageSend(page, "POST", "/admin/catalog/sobrus-products", 201);
+  await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+  await sent;
 }
 
 /** The admin's product import is over: its last try. */
@@ -135,6 +143,31 @@ test.describe("propriétaire", () => {
     expect(file.rows.length, "un jour par ligne + le total").toBe(DAYS.length + 2);
   });
 
+  test("clôture de caisse : sa ligne dans « Gestion des imports » (badge, jours lus), lecture seule", async ({
+    page,
+  }) => {
+    const { data } = await apiGet(page, "/data/imports", { limit: 50 });
+    const closing = data.find((i: { file_type: string }) => i.file_type === "closing");
+    if (DAYS.length === 0) {
+      expect(closing, "aucun jour lu : pas de ligne").toBeUndefined();
+      return;
+    }
+    expect(closing, "la ligne du robot").toMatchObject({
+      filename: `Sobrus - Clôture de caisse ${FROM} - ${TO}`,
+      rows_inserted: DAYS.length,
+      status: "success",
+    });
+    await page.goto("/imports");
+    const row = page.getByRole("row", { name: new RegExp(`Clôture de caisse ${FROM} - ${TO}`) }).first();
+    await expect(row.getByText("Clôture de caisse", { exact: true }), "son badge").toBeVisible();
+    // Read again from Sobrus at every run: shown, never deleted.
+    await expect(row.getByRole("button", { name: "Supprimer", exact: true })).toBeDisabled();
+    await expect(row.getByText("Relue à chaque import Sobrus", { exact: true })).toBeVisible();
+    await expect(row.getByRole("checkbox")).toBeDisabled();
+    const refused = (await apiDelete(page, `/data/imports/${closing.id}`, 409)) as { code: string };
+    expect(refused.code, "API refusée").toBe("batchReadOnly");
+  });
+
   test("clôture de caisse : compte Sobrus sans accès → l'avertissement", async ({ page }) => {
     test.setTimeout(6 * 60_000);
     await control(page, { forbid: "closing" });
@@ -181,7 +214,7 @@ test.describe("administrateur", () => {
     const pid = loadState().pharmacyId;
     await control(page, { products_delay: 1 });
     await page.goto("/admin/catalogue");
-    await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+    await startProducts(page);
     await page.goto("/admin/pharmacies");
     const popup = page.getByRole("region", { name: "Produits Sobrus" });
     await expect(popup, "la progression, sur une autre page").toBeVisible();
@@ -195,14 +228,14 @@ test.describe("administrateur", () => {
 
     // The same from the Catalogue's own card.
     await page.goto("/admin/catalogue");
-    await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+    await startProducts(page);
     await page.locator("main").getByRole("button", { name: "Arrêter", exact: true }).click();
     expect((await importEnded(page)).status, "arrêté (carte)").toBe("cancelled");
     await control(page, { products_delay: 0 });
 
     const before = (await apiGet(page, "/admin/catalog/stats")).total;
     await page.goto("/admin/catalogue");
-    await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+    await startProducts(page);
     const done = await importEnded(page);
     expect([done.status, done.lines_added], "SOB-E2E-1…3 ajoutés").toEqual(["success", 3]);
     expect((await apiGet(page, "/admin/catalog/stats")).total, "le catalogue grandit").toBe(before + 3);
@@ -223,7 +256,7 @@ test.describe("administrateur", () => {
     await control(page, { forbid: "products" });
     try {
       await page.goto("/admin/catalogue");
-      await page.getByRole("button", { name: "Importer les produits depuis Sobrus" }).click();
+      await startProducts(page);
       expect((await importEnded(page)).error_code).toBe("sobrusNoAccess");
     } finally {
       await control(page, { forbid: null });

@@ -7,9 +7,12 @@
  *  - « Tout l'historique » → « Importer »: the steps shown live (connexion, import Ventes 2026 paquet
  *    x / y), on another page the corner card (step, « Arrêter », then « Terminé »), every year done +
  *    5 empty years per kind, then today's stock; its /stats + stock summary = the oracle (02-import)
- *  - the nightly run (mode `new`, API: no button) → 0 line (already there); « Choisir les dates »
- *    01/03/2014 → 01/08/2025 = one export per year, newest first (2025-01-01 → 2025-08-01 …
- *    2014-03-01 → 2014-12-31); « Arrêter » a run (slow fake exports)
+ *  - the nightly run (mode `new`, API: no button) → 0 line (already there); the « Période » bar (30 j, 90 j,
+ *    Année en cours, 12 mois: their dates; the calendar) then 01/03/2014 → 01/08/2025: the past years
+ *    « Déjà importé » are skipped; « Réimporter quand même » = one export per year, newest first
+ *    (2025-01-01 → 2025-08-01 … 2014-03-01 → 2014-12-31); « Arrêter » a run (slow fake exports)
+ *  - the Sobrus email is set by the first connection: read-only, another one refused (`sobrusEmailLocked`);
+ *    the admin « Changer l'email Sobrus » → the owner may connect another account
  *  - Sobrus asks a check (« Confirmez votre numéro ») → red card; once done, « Réessayer » → active again
  *  - Sobrus answers 429 (too many logins) → the robot waits and logs in again; longer → stops, no red card
  *  - password changed on Sobrus → next run refused → banner + email → new password → banner gone
@@ -24,7 +27,7 @@ import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
 import { expect, recordPage, test } from "../lib/fixtures";
 import { lastSobrusProblemEmail } from "../lib/mail";
-import { dates, pageSend, quickPeriods, setPeriod } from "../lib/ui";
+import { barPeriods, dates, pageSend, quickPeriods, setPeriod } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
 
@@ -59,9 +62,9 @@ async function clickQueuing(page: Page, name: string, method: "POST" | "PUT", pa
   await sent;
 }
 
-/** « Importer depuis Sobrus »: the choice, then the one « Importer » button. */
-async function startImport(page: Page, choice: "Tout l'historique" | "Choisir les dates"): Promise<void> {
-  await page.getByRole("button", { name: choice, exact: true }).click();
+/** « Importer depuis Sobrus »: « Tout l'historique » in the « Période » bar, then the one « Importer » button. */
+async function startImport(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Tout l'historique", exact: true }).click();
   await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
 }
 
@@ -150,9 +153,18 @@ test("connexion : accord obligatoire, mot de passe refusé → carte rouge, band
 test("mettre à jour le mot de passe → connexion vérifiée, bandeau parti", async () => {
   test.setTimeout(120_000);
   const page = owner;
-  // Refused: the email can be wrong too, so it stays editable (the saved one shown).
-  await expect(page.getByLabel("Email Sobrus")).toHaveValue(SOBRUS.email);
-  await expect(page.getByLabel("Email Sobrus")).toBeEditable();
+  // Set by the first connection (even refused): shown, never typed again; only the admin changes it.
+  const email = page.getByLabel("Email Sobrus");
+  await expect(email).toHaveValue(SOBRUS.email);
+  await email.click();
+  await expect(email, "attaché à la pharmacie").not.toBeEditable();
+  await expect(
+    page.getByText("Ce compte Sobrus est attaché à la pharmacie. Pour en changer, contactez APCM.", { exact: true }),
+  ).toBeVisible();
+  // Another Sobrus account: refused, nothing changed.
+  const other = await apiPut(page, "/sobrus/connection", { email: "autre@sobrus.e2e", password: "Autre#2026" }, 409);
+  expect(other.code, "un autre compte Sobrus").toBe("sobrusEmailLocked");
+  expect((await apiGet(page, "/sobrus/connection")).email).toBe(SOBRUS.email);
   await page.getByLabel("Nouveau mot de passe Sobrus").fill(SOBRUS.password);
   await clickQueuing(page, "Mettre à jour le mot de passe", "PUT", "/sobrus/connection", 200);
   await runEnded(page);
@@ -170,7 +182,7 @@ test("importer tout l'historique : chaque étape à l'écran, puis les chiffres 
   await control(page, { delay: 3 }); // each export waits 3 s: every step stays on screen long enough
   const corner = page.getByRole("region", { name: "Import Sobrus" });
   try {
-    await startImport(page, "Tout l'historique");
+    await startImport(page);
     const progress = page.locator("section", {
       has: page.getByRole("heading", { name: "Import de tout l'historique" }),
     });
@@ -226,8 +238,12 @@ test("importer tout l'historique : chaque étape à l'écran, puis les chiffres 
   expect(imports.length, "un import par année").toBeGreaterThan(1);
   for (const i of imports) {
     expect(i.status, i.filename).toBe("success");
-    expect(i.filename).toMatch(/^Sobrus - ((Achats|Ventes) \d{4}-01-01 - \d{4}-\d{2}-\d{2}|Stock \d{8})\.csv$/);
+    // + the « Clôture de caisse » the robot read (no file: its days).
+    expect(i.filename).toMatch(
+      /^Sobrus - ((Achats|Ventes) \d{4}-01-01 - \d{4}-\d{2}-\d{2}\.csv|Stock \d{8}\.csv|Clôture de caisse \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2})$/,
+    );
   }
+  expect(imports.filter((i) => i.file_type === "closing").length, "la clôture de caisse : sa ligne").toBe(1);
   const stock = imports.filter((i) => i.file_type === "stock");
   expect(stock.length, "un import du stock").toBe(1);
   expect(stock[0].rows_inserted, "stock : produits").toBe(stockWant.inserted);
@@ -255,11 +271,22 @@ test("import de la nuit (nouveautés, sans bouton) : rien de nouveau → 0 ligne
   await expect(page.getByText("Terminé : 0 ligne(s) ajoutée(s)", { exact: true }).first()).toBeVisible();
 });
 
-test("importer une période : coupée en années (Sobrus exporte 1 an au plus), la plus récente d'abord", async () => {
-  test.setTimeout(5 * 60_000);
+test("importer une période : la barre « Période », le calendrier ; les années déjà importées sautées, sauf « Réimporter quand même »", async () => {
+  test.setTimeout(8 * 60_000);
   const page = owner;
-  const start = page.getByRole("button", { name: "Importer", exact: true });
-  await page.getByRole("button", { name: "Choisir les dates", exact: true }).click();
+  const main = page.locator("main");
+  const start = main.getByRole("button", { name: "Importer", exact: true });
+  // The « Période » bar: each button = its dates (« Année en cours » at first, like the product page).
+  for (const [name, want] of barPeriods(new Date())) {
+    const button = main.getByRole("button", { name, exact: true });
+    await button.click();
+    await expect(button, name).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(() => dates(page), { message: name }).toBe(want);
+  }
+  // « Tout l'historique »: no dates to pick.
+  await main.getByRole("button", { name: "Tout l'historique", exact: true }).click();
+  await expect(page.getByLabel("Date début jour", { exact: true })).toHaveCount(0);
+  await main.getByRole("button", { name: "Année en cours", exact: true }).click();
   // The calendar too: a day picked = the start date (then typed over below).
   await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
   await page.getByRole("button", { name: "Go to the Previous Month" }).click(); // a month not selected yet
@@ -271,10 +298,11 @@ test("importer une période : coupée en années (Sobrus exporte 1 an au plus), 
     .click();
   await expect(page.getByLabel("Date début jour", { exact: true })).toHaveValue("01");
   await page.keyboard.press("Escape");
-  // Each quick period: its dates.
+  // Each quick period of the calendar: its dates.
   for (const [period, want] of quickPeriods(new Date())) {
     await page.getByRole("button", { name: "Ouvrir le calendrier", exact: true }).click();
-    await page.getByRole("button", { name: period, exact: true }).click();
+    // .last(): the calendar's list (« Année en cours » is also a button of the bar).
+    await page.getByRole("button", { name: period, exact: true }).last().click();
     await expect.poll(() => dates(page), { message: period }).toBe(want);
   }
   await setPeriod(page, "2025-08-01", "2014-03-01");
@@ -283,9 +311,20 @@ test("importer une période : coupée en années (Sobrus exporte 1 an au plus), 
   await setPeriod(page, "2014-03-01", "2025-08-01");
   await expect(page.getByText("La date de début doit être avant la date de fin.", { exact: true })).toHaveCount(0);
   await expect(start).toBeEnabled();
-  await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
-  await runEnded(page);
-  await expect(page.getByText("Import du 01 mars 2014 au 01 août 2025", { exact: false }).first()).toBeVisible();
+
+  // The past years « Tout l'historique » imported (with lines): « Déjà importé : 2024 ✓ … ».
+  const done: Record<string, number[]> = (await apiGet(page, "/sobrus/connection")).imported_years;
+  const years = [...new Set(Object.values(done).flat())].sort();
+  expect(years.length, "années passées déjà importées").toBeGreaterThan(0);
+  await expect(main.getByText("Déjà importé :", { exact: true })).toBeVisible();
+  for (const y of years) await expect(main.getByText(String(y), { exact: true }).first(), `puce ${y}`).toBeVisible();
+  // The whole years of this period among them: skipped, unless « Réimporter quand même ».
+  const covered = years.filter((y) => y >= 2015 && y <= 2024);
+  const again = page.getByRole("checkbox", { name: "Réimporter quand même", exact: true });
+  await expect(again).not.toBeChecked();
+  await expect(
+    main.getByText(`Réimporter quand même ${covered.join(", ")} (déjà importé)`, { exact: true }),
+  ).toBeVisible();
 
   // 01/03/2014 → 01/08/2025 = 2025-01-01 → 2025-08-01, 2024, …, 2015, 2014-03-01 → 2014-12-31.
   const want = [
@@ -293,18 +332,49 @@ test("importer une période : coupée en années (Sobrus exporte 1 an au plus), 
     ...Array.from({ length: 10 }, (_, i) => [`${2024 - i}-01-01`, `${2024 - i}-12-31`]),
     ["2014-03-01", "2014-12-31"],
   ];
-  const [run] = await apiGet(page, "/sobrus/runs");
-  expect(run.mode).toBe("range");
-  expect(run.status).toBe("success");
-  expect([run.date_from, run.date_to]).toEqual(["2014-03-01", "2025-08-01"]);
-  for (const kind of ["achat", "vente"]) {
-    const done = run.events.filter((e: { code: string; kind?: string }) => e.code === "period_done" && e.kind === kind);
-    expect(
-      done.map((e: { start: string; end: string }) => [e.start, e.end]),
-      `${kind} : une année à la fois`,
-    ).toEqual(want);
-  }
-  expect(run.lines_added, "déjà importées").toBe(0);
+  type Event = { code: string; kind?: string; year?: number; start?: string; end?: string };
+  const lastRun = async () => {
+    const [run] = await apiGet(page, "/sobrus/runs");
+    expect(run.mode).toBe("range");
+    expect(run.status).toBe("success");
+    expect([run.date_from, run.date_to]).toEqual(["2014-03-01", "2025-08-01"]);
+    expect(run.lines_added, "déjà importées").toBe(0);
+    return run.events as Event[];
+  };
+  const periods = (events: Event[], kind: string) =>
+    events.filter((e) => e.code === "period_done" && e.kind === kind).map((e) => [e.start, e.end]);
+
+  await test.step("sans la case : les années déjà importées sautées", async () => {
+    await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
+    await runEnded(page);
+    await expect(page.getByText("Import du 01 mars 2014 au 01 août 2025", { exact: false }).first()).toBeVisible();
+    const events = await lastRun();
+    for (const kind of ["achat", "vente"]) {
+      const skipped = (done[kind] ?? []).filter((y) => y >= 2015 && y <= 2024).sort((x, y) => y - x);
+      expect(
+        events.filter((e) => e.code === "year_skipped" && e.kind === kind).map((e) => e.year),
+        `${kind} : sautées`,
+      ).toEqual(skipped);
+      expect(periods(events, kind), `${kind} : le reste, une année à la fois`).toEqual(
+        want.filter(([from, to]) => !skipped.some((y) => from === `${y}-01-01` && to === `${y}-12-31`)),
+      );
+    }
+  });
+
+  await test.step("« Réimporter quand même » : chaque année, la plus récente d'abord", async () => {
+    await again.click();
+    await expect(again).toBeChecked();
+    await clickQueuing(page, "Importer", "POST", "/sobrus/runs", 201);
+    await runEnded(page);
+    const events = await lastRun();
+    for (const kind of ["achat", "vente"]) {
+      expect(periods(events, kind), `${kind} : une année à la fois`).toEqual(want);
+      expect(
+        events.filter((e) => e.code === "year_skipped" && e.kind === kind),
+        `${kind} : rien sauté`,
+      ).toEqual([]);
+    }
+  });
 
   // Nothing counted twice: the Tableau de bord still = the oracle.
   const w = testWindow();
@@ -318,7 +388,7 @@ test("arrêter un import en cours", async () => {
   const page = owner;
   await control(page, { delay: 3 }); // each export waits 3 s: time to click
   try {
-    await startImport(page, "Tout l'historique");
+    await startImport(page);
     // While the robot downloads (slow fake export): « Arrêter » ends the run at once — no waiting
     // for the download, the progress goes away (no more polling).
     await expect(page.getByText(/^Téléchargement .* depuis Sobrus…/)).toBeVisible({ timeout: 60_000 });
@@ -343,7 +413,7 @@ test("la carte « Import Sobrus » (sur les autres pages) : un clic ouvre la pag
   const page = owner;
   await control(page, { delay: 3 }); // each export waits 3 s: time to click
   try {
-    await startImport(page, "Tout l'historique");
+    await startImport(page);
     const card = page.getByRole("region", { name: "Import Sobrus", exact: true });
     await page.locator("aside").getByRole("link", { name: "Produits", exact: true }).click();
     await expect(card, "l'import suivi sur une autre page").toBeVisible();
@@ -368,7 +438,7 @@ test("Sobrus demande une vérification → carte rouge, « Réessayer » une foi
   const page = owner;
   await control(page, { verify: true }); // « Confirmez votre numéro de téléphone » on sobrus.com
   try {
-    await startImport(page, "Tout l'historique");
+    await startImport(page);
     await runEnded(page);
     expect((await apiGet(page, "/sobrus/connection")).status).toBe("needs_login");
     await page.reload();
@@ -451,7 +521,7 @@ test("mot de passe changé sur Sobrus → refusé, bandeau + email, nouveau mot 
   const NEW = "Change2026#Sobrus";
   await control(page, { password: NEW });
   try {
-    await startImport(page, "Tout l'historique");
+    await startImport(page);
     await runEnded(page);
     expect((await apiGet(page, "/sobrus/connection")).status).toBe("invalid");
     await lastSobrusProblemEmail(OWNER.email);
@@ -542,4 +612,41 @@ test("employé : pas d'entrée de menu, 404 dans l'interface, API refusée", asy
     await ctx.close();
     await apiDelete(owner, `/owner/employees/${member.id}`, 204);
   }
+});
+
+test("l'administrateur « Changer l'email Sobrus » → le propriétaire peut connecter un autre compte Sobrus", async ({
+  browser,
+}) => {
+  const page = owner;
+  // Disconnected (above): the form keeps the pharmacy's email, read-only.
+  await openSobrus(page);
+  const email = page.getByLabel("Email Sobrus");
+  await expect(email).toHaveValue(SOBRUS.email);
+  await expect(email).not.toBeEditable();
+  const ctx = await browser.newContext({ storageState: sessionFile("admin") });
+  const admin = await ctx.newPage();
+  const flushAdmin = recordPage(admin, () => test.info().title);
+  try {
+    await admin.goto(`/admin/pharmacies/${pharmacyId}`);
+    await expect(admin.getByText(`Compte Sobrus : ${SOBRUS.email}`)).toBeVisible();
+    await admin.getByRole("button", { name: "Changer l'email Sobrus", exact: true }).click();
+    const dialog = admin.getByRole("dialog");
+    await expect(dialog.getByText(`Détacher le compte Sobrus ${SOBRUS.email} ?`, { exact: true })).toBeVisible();
+    const sent = pageSend(admin, "DELETE", `/admin/pharmacies/${pharmacyId}/sobrus-email`, 204);
+    await dialog.getByRole("button", { name: "Confirmer", exact: true }).click();
+    await sent;
+    await expect(dialog).toHaveCount(0);
+    await expect(admin.getByText("Compte Sobrus : aucun")).toBeVisible();
+    await expect(admin.getByRole("button", { name: "Changer l'email Sobrus", exact: true })).toBeDisabled();
+  } finally {
+    await flushAdmin();
+    await ctx.close();
+  }
+  // The owner: another Sobrus account may be typed, nothing « déjà importé » any more.
+  await page.reload();
+  await expect(email).toBeEditable();
+  await expect(email).toHaveValue("");
+  const conn = await apiGet(page, "/sobrus/connection");
+  expect(conn.locked_email, "plus d'email attaché").toBeNull();
+  expect(conn.imported_years, "années oubliées").toEqual({ achat: [], vente: [] });
 });

@@ -261,7 +261,7 @@ class ImportBatch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
-    file_type: Mapped[str] = mapped_column(String, nullable=False)  # achat | vente | stock
+    file_type: Mapped[str] = mapped_column(String, nullable=False)  # achat | vente | stock | closing
     filename: Mapped[str | None] = mapped_column(String, nullable=True)
     rows_inserted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     rows_skipped: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

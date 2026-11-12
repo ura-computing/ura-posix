@@ -570,14 +570,35 @@ class Robot:
             self.db.rollback()
             log.warning("Sobrus closing %s → %s: %s", start, end, e.code)
             _event(self.db, self.run, "closing_failed", error=e.code)
+            self._closing_batch(start, end, 0, e.code)
             return
         except (KeyError, TypeError, ValueError, AttributeError):  # not the JSON Sobrus sends today
             self.db.rollback()
             log.exception("Sobrus closing %s → %s: unexpected answer", start, end)
             _event(self.db, self.run, "closing_failed", error="sobrusExportFailed")
+            self._closing_batch(start, end, 0, "sobrusExportFailed")
             return
         self.conn.closing_access = True
         _event(self.db, self.run, "closing_done", start=start.isoformat(), end=end.isoformat(), n=days)
+        if days:
+            self._closing_batch(start, end, days, None)
+
+    def _closing_batch(self, start: date, end: date, days: int, error: str | None) -> None:
+        """Its line in « Gestion des imports » (badge « Clôture de caisse », read-only: the next run reads the days
+        again): the days saved, or why Sobrus did not give them."""
+        self.db.add(
+            ImportBatch(
+                pharmacy_id=self.run.pharmacy_id,
+                file_type="closing",
+                filename=f"Sobrus - Clôture de caisse {start.isoformat()} - {end.isoformat()}",
+                rows_inserted=days,
+                rows_skipped=0,
+                status="error" if error else "success",
+                error_message=error,
+                created_by_user_id=self.owner.id if self.owner else None,
+            )
+        )
+        self.db.commit()
 
     def _fetch_pages(self, pages: list[int]) -> list[list[dict]]:
         """These product pages from Sobrus, PRODUCTS_PARALLEL at a time (a request ≈ 70 ms, so waiting for each one in

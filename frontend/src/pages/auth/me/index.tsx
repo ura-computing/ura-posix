@@ -346,7 +346,7 @@ function LockTab({ me }: { me: Me }) {
         disabled={isSavingLock}
       />
       {enabled && (
-        <FormField label={t("me.lockDelay")}>
+        <FormField label={t("me.lockDelay")} group>
           <Segmented<(typeof LOCK_DELAYS)[number]>
             value={String(seconds) as (typeof LOCK_DELAYS)[number]}
             onChange={(v) => void saveLock({ enabled, seconds: Number(v) }, "me.lockSaved")}

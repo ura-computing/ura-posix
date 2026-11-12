@@ -1,13 +1,14 @@
 /** « Connexion Sobrus » (owner): PharmaGest imports the Sobrus achats + ventes + stock by itself.
- *  Not connected → email + password + consent. Connected → one « Importer » for « Tout l'historique »
- *  or « Choisir les dates » (début → fin, cut into years by the robot); the last days come every night.
+ *  Not connected → email + password + consent. Connected → a status card, then « Importer depuis Sobrus »: the
+ *  product page's toolbar (dates + 30 j · 90 j · Année en cours · 12 mois · Tout l'historique; cut into years by the
+ *  robot, years « Déjà importé » skipped unless « Réimporter quand même »); the last days come every night.
  *  The run in progress step by step (connexion, téléchargement Ventes 2026
  *  3,4 Mo, import paquet 12 / 69…, « Arrêter »), the last runs. Password refused / Sobrus asks a
  *  check → a red card with « Mettre à jour le mot de passe ». The password is never shown again. */
 import { useState } from "react";
 import { Check, CheckCircle2, CircleAlert, Unplug } from "lucide-react";
 
-import { Badge } from "@/_components/atoms/Badge";
+import { Badge, type BadgeTone } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
 import { Segmented } from "@/_components/molecules/Segmented";
 import { Checkbox } from "@/_components/atoms/Checkbox";
@@ -31,9 +32,14 @@ import { currentStep, eventText, modeName, runResult } from "@/utils/sobrus";
 
 import { useSobrusPage } from "./hooks";
 
-const CARD = "flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm";
-
 const CHOICE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
+
+/** A run's result as a badge: done = green, stopped by Sobrus = red, stopped by the user = grey. */
+const RUN_TONE: Partial<Record<SobrusRun["status"], BadgeTone>> = {
+  success: "success",
+  error: "error",
+  cancelled: "neutral",
+};
 
 function ConnectForm({
   email: knownEmail,
@@ -93,7 +99,7 @@ function RunProgress({ run, isCancelling, onCancel }: { run: SobrusRun; isCancel
   const importing = run.phase === "import" && run.chunk_total > 0;
   const steps = [...run.events].reverse().slice(0, 12);
   return (
-    <section className={CARD} aria-live="polite">
+    <Card className="flex flex-col gap-4" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-foreground">{modeName(t, run)}</h2>
         {run.mode !== "check" && (
@@ -125,7 +131,7 @@ function RunProgress({ run, isCancelling, onCancel }: { run: SobrusRun; isCancel
           ))}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -145,28 +151,20 @@ function RunsList({
   if (isError) return <LoadError onRetry={onRetry} />;
   if (runs.length === 0) return null;
   return (
-    <section className={CARD}>
+    <Card className="flex flex-col gap-2">
       <SectionTitle>{t("sobrus.lastRuns")}</SectionTitle>
       <ul className="flex flex-col divide-y divide-border">
         {runs.map((run) => (
-          <li key={run.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5 text-sm">
-            <span className="text-muted-foreground">
-              {formatDateTime(run.created_at)} · {modeName(t, run)}
-            </span>
-            <span
-              className={cn(
-                "font-medium",
-                run.status === "success" && "text-success",
-                run.status === "error" && "text-error",
-                run.status !== "success" && run.status !== "error" && "text-foreground",
-              )}
-            >
-              {runResult(t, run)}
-            </span>
+          <li key={run.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-3">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium text-foreground">{modeName(t, run)}</span>
+              <span className="text-xs tabular-nums text-muted-foreground">{formatDateTime(run.created_at)}</span>
+            </div>
+            <Badge tone={RUN_TONE[run.status] ?? "info"}>{runResult(t, run)}</Badge>
           </li>
         ))}
       </ul>
-    </section>
+    </Card>
   );
 }
 
@@ -212,12 +210,14 @@ function Connected({
     else if (from && to) onStart({ mode: "range", date_from: from, date_to: to, force: again });
   };
   return (
-    <section className={CARD}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" aria-hidden />
-          <div className="flex flex-col gap-1">
-            <span className="text-base font-semibold text-foreground">
+    <>
+      <Card className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-success-subtle text-success">
+            <CheckCircle2 className="size-5" aria-hidden />
+          </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="break-all text-base font-semibold text-foreground">
               {t("sobrus.connectedAs", { email: connection.email ?? "" })}
             </span>
             <span className="text-sm text-muted-foreground">
@@ -228,15 +228,16 @@ function Connected({
             <span className="text-sm text-muted-foreground">{t("sobrus.nightly")}</span>
           </div>
         </div>
-        <Button variant="ghost" onClick={onDisconnect}>
+        <Button variant="secondary" onClick={onDisconnect}>
           <Unplug className="size-4" />
           {t("sobrus.disconnect")}
         </Button>
-      </div>
-      <div className="flex flex-col gap-3 border-t border-border pt-4">
-        <h2 className="text-base font-semibold text-foreground">{t("sobrus.importTitle")}</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold text-muted-foreground">{t("products.period")}</span>
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <SectionTitle>{t("sobrus.importTitle")}</SectionTitle>
+        {/* The product page's toolbar: the periods (+ « Tout l'historique »: no dates), then their dates. */}
+        <div className="flex flex-wrap items-center gap-2.5 overflow-x-auto rounded-xl border border-border bg-surface-subtle p-3">
           <Segmented
             value={choice}
             onChange={pick}
@@ -257,9 +258,6 @@ function Connected({
             />
           )}
         </div>
-        <p className="text-sm text-muted-foreground">
-          {choice === "full" ? t("sobrus.allHint") : t("sobrus.periodHint")}
-        </p>
         {choice !== "full" && badPeriod && <p className="text-sm text-error">{t("sobrus.periodInvalid")}</p>}
         {doneYears.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -278,11 +276,16 @@ function Connected({
             <span>{t("sobrus.forceReimportYears", { years: covered.join(", ") })}</span>
           </label>
         )}
-        <Button size="lg" onClick={importNow} disabled={blocked || !ready} className="self-start">
-          {t("sobrus.import")}
-        </Button>
-      </div>
-    </section>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p className="max-w-md text-sm text-muted-foreground">
+            {choice === "full" ? t("sobrus.allHint") : t("sobrus.periodHint")}
+          </p>
+          <Button size="lg" onClick={importNow} disabled={blocked || !ready}>
+            {t("sobrus.import")}
+          </Button>
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -317,7 +320,7 @@ export default function SobrusPage() {
         ) : isLoading || !connection ? (
           <Skeleton className="h-48 w-full" />
         ) : !connection.connected ? (
-          <section className={CARD}>
+          <Card className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">{t("sobrus.intro")}</p>
             <ConnectForm
               key="connect"
@@ -327,7 +330,7 @@ export default function SobrusPage() {
               isSaving={isSaving}
               onSave={saveConnection}
             />
-          </section>
+          </Card>
         ) : (
           <>
             {connection.status !== "active" && !activeRun && (

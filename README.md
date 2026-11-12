@@ -72,12 +72,12 @@ is in `PLAN.md` « Later »).
 | `/alertes` | Margin alerts, ventes sans achat, stock and expiry alerts | `alertes` |
 | `/comptabilite` | Accounting KPIs (exclusions applied), payment methods per month, sales journal | `accounting` |
 | `/produits-speciaux` | Leave products / BLs / suppliers out of Comptabilité | `special_products` |
-| `/upload-file`, `/imports` | Import wizard, import history (cancel / delete) | `import` |
+| `/upload-file`, `/imports` | Import wizard, import history (cancel / delete; the Sobrus « Clôture de caisse » lines are read-only) | `import` |
 | `/owner/employees` | Gérer mon équipe | role `owner` |
 | `/historique` | « Historique des modifications »: who changed what and when (imports, product edits, observations), filters + Excel; nothing can be deleted ([§7.8](#78-produits-list--product-sheet)) | role `owner` |
 | `/admin/pharmacies` (+ `/:id`) | Pharmacies et utilisateurs: tabs Pharmacies · Utilisateurs · Demandes (N) (sign-ups to accept); one pharmacy: info, features, members | role `admin` |
 | `/admin/catalogue`, `/admin/categories` | Global catalogue (CRUD + CSV import); category → reference suffix | role `admin` |
-| `/auth/me` | Mon compte: profile, password, sessions | any logged-in user |
+| `/auth/me` | Mon compte: profile, password, « Verrouillage » (lock screen, 6-digit code, off by default), sessions | any logged-in user |
 | `/login`, `/auth/signup`, `/auth/forgot-password`, `/auth/set-password` | Auth (guests only); `/auth/signup` = « Créer un compte » | none |
 
 No access to a page → 404 inside the layout (the sidebar stays).
@@ -301,11 +301,11 @@ erDiagram
 | Table | Holds |
 |---|---|
 | `pharmacies` | name, city, code (`CAS0001`, from the city), address, phone, email, `archived_at` |
-| `users` | email, name, role, status (`active` / `inactive`), `pharmacy_id`, `token_version`, hashed reset token |
-| `sessions` | one row per logged-in device |
+| `users` | email, name, role, status (`active` / `inactive`), `pharmacy_id`, `token_version`, hashed reset token; lock screen: `lock_enabled`, `lock_seconds`, `lock_pin_hash`, `lock_failed` |
+| `sessions` | one row per logged-in device; `locked_at` = its screen is locked |
 | `signup_requests` | « Créer un compte » waiting for the admin (`pending` / `accepted` / `refused`); `user_id` = its account (`users.status = 'pending'` until « Accepter ») |
 | `medicaments` | **one global catalogue**: `pid` (Sobrus id, unique), product, tva, pph, ppv, category, zone, barcodes, laboratoire, `product_type` |
-| `import_batches` | one row per imported file: type, counts, status, `last_chunk_at`, creator, soft delete |
+| `import_batches` | one row per imported file (`achat` / `vente` / `stock`) or per Sobrus « Clôture de caisse » read (`closing`, read-only): counts, status, `last_chunk_at`, creator, soft delete |
 | `achats` | purchase lines: `delivery_date`, `delivery_ref` (BL), supplier, quantity, unit_price (PU), total, expiry, `created_at_source` |
 | `ventes` | sale lines: `date`, `transaction_ref`, client, quantity, discount (%), unit_price, total |
 | `pharmacy_stock` | latest stock per (pharmacy, medicament), UPSERTed by stock imports; `import_batch_id` = the import that wrote it last (deleting / cancelling it removes the row) |
@@ -314,6 +314,9 @@ erDiagram
 | `audit_logs` | « Historique des modifications »: pharmacy, who (+ name kept), when, `action` code + `details` JSON (file, field before → after, note text…), product; never edited or deleted |
 | `pharmacy_product_edits` | the owner's own values for a product (« Modifier »), one row per (pharmacy, medicament), NULL = not edited; shown in Produits only |
 | `category_suffixes` | category → reference suffix + color (shown on ventes / achats refs) |
+| `sobrus_connections` · `sobrus_runs` | a pharmacy's Sobrus login (password encrypted) · the worker's queue: one run per import (mode, status, steps in `events`) |
+| `sobrus_imported_years` | past years imported in full per (pharmacy, kind): skipped by the next imports |
+| `sobrus_cash_closings` | Sobrus « Clôture de caisse », one row per (pharmacy, day), replaced at each read |
 | `store_website_*` | hidden « Ma boutique en ligne » |
 
 Dates in `achats` / `ventes` are **ISO text** (`"2026-01-15"`, `"2026-01-15 14:19:00"`), always written
@@ -451,7 +454,7 @@ stateDiagram-v2
 - `scripts/bootstrap.py` (`make migrate` + container start): `CREATE EXTENSION pg_trgm, unaccent` →
   `immutable_unaccent()` (schema-qualified) + self-check under `search_path = pg_catalog, pg_temp` →
   fresh DB: `create_all` + `alembic stamp head`; managed DB: `alembic upgrade head`.
-- Head **0037** (0035: premium features `labels` / `orders`, OFF for every pharmacy; 0036: `sobrus_cash_closings`, `sobrus_connections.closing_access`, run mode `products`, `medicaments.dci` / `galenic_form`; 0037: `sobrus_connections.products_page`, where a cut product import resumes; 0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
+- Head **0038** (0038: lock screen `users.lock_*` + `sessions.locked_at`, `pharmacies.sobrus_email`, `sobrus_runs.force_reimport`, `sobrus_imported_years`; 0035: premium features `labels` / `orders`, OFF for every pharmacy; 0036: `sobrus_cash_closings`, `sobrus_connections.closing_access`, run mode `products`, `medicaments.dci` / `galenic_form`; 0037: `sobrus_connections.products_page`, where a cut product import resumes; 0020: `import_batches.last_chunk_at`; 0021: dates already stored rewritten as ISO;
   0022: emails stored trimmed + lower case; 0023: `signup_requests`; 0024: feature `produits` ON for
   everyone; 0025: `product_infos`; 0026: `pharmacy_stock.import_batch_id`; 0027: `pharmacy_product_edits`;
   0028: waiting sign-ups get their `pending` account; 0029: `product_notes` + `audit_logs`, the imports already made written in it).
@@ -551,10 +554,10 @@ flowchart LR
   LI["a product on some BLs<br/>(ticked one by one)"] -- "Comptabilité only" --> ACH["drop only those achat lines<br/>its other BLs + its ventes stay"]
 ```
 
-- The page: one tab per kind (Produits · Bons de livraison · Produit sur un BL · Fournisseurs), each
+- The page: one tab per kind (Produits · Retirer un BL · Retirer un produit d'un BL · Fournisseurs), each
   « 1. Cherchez … » (its search, one click « Exclure », « Annuler » in the message) and « 2. … exclus »
   (« Réintégrer », « Ajouter une note »: the note comes after, on the line). No pop-up window.
-- « Produit sur un BL »: search the product → « Voir ses BL » (« Fournisseur » filter) → tick one =
+- « Retirer un produit d'un BL »: search the product → « Voir ses BL » (« Fournisseur » filter) → tick one =
   excluded at once (untick = back). Example: X bought on BL-1 (Sophadims) and BL-2 (GPM), BL-1 ticked
   → only X's BL-1 purchase leaves Comptabilité. A whole BL keeps its rule (every product on it).
 
@@ -649,7 +652,8 @@ Example: import PPV 189 → the owner types 165 → the next import writes 195 �
 | Rule | Value |
 |---|---|
 | Source | Sobrus report `/reports/cashdeskclosing` (`by_day=1`), read by the worker at every run but `check` / `products`, one call per month, one row per day (`sobrus_cash_closings`) |
-| Days read | nightly: same start as the achats; « Choisir les dates »: those dates; « Tout l'historique »: from 1 January of last year |
+| Days read | nightly: same start as the achats; « Période »: those dates; « Tout l'historique »: from 1 January of last year |
+| Gestion des imports | one line per run that saved days: badge « Clôture de caisse », `Sobrus - Clôture de caisse <from> - <to>`, lines = days (not read: « Erreur »); read-only, the next run reads the days again (`DELETE` → 409 `batchReadOnly`) |
 | Page | read-only block under the payment-method cards, same month; a day clicked → payment ways + credit customers; « Exporter la clôture » (`.xlsx`) |
 | No access | only the owner's Sobrus login may read it: `closing_access = false`, a warning on the page, the run still succeeds |
 
@@ -735,9 +739,13 @@ and 1 stock expiry in 25 with hand-typed dates. `oracle.py` never imports app co
 | 17-inscription | sign-up (5 screens), login before « Accepter » (empty menu, 404 + hint), admin « Demandes »: accept a new pharmacy + an employee by code, refuse an unknown code / a used email, logins |
 | 18-produits | list (pages, 50 / page, sort, search, Mixte / Pharmacie / Parapharmacie, reset, Excel), photos; product sheet of 8 products = oracle on screen (header, badges, barcode copy, Général, Statistiques on the current year); best seller: the date picker (quick periods, typed dates), 3 charts + tooltips, « Détail mensuel » + « Copier », Historique Tous / Ventes / Achats (colors), months following the dates (a whole year = Jan → Dec), suppliers + prices « Voir tout », no Tendances; Traçabilité (current year, test window, filters, sort, 20 / page, every line's details, no line message), « Voir tout le ticket / BL »; emplacement + péremption hints; Codes (copy), scanner (barcode, PID, unknown, Échap), reader anywhere on the page (Entrée, no Entrée, slow typing ignored), list search; Observations (window at opening / scan, list badge, employee rights, delete); expiry date in a calendar; owner edits (every field, « Éditer », wrong values, an import keeps them, « Revenir », lookup by his barcode), type not editable, employee read only + « Voir tout le ticket / BL » by permission, feature OFF, 404, Spanish |
 | 19-historique | « Historique des modifications »: owner page = API (newest first, 02 imports), filters type / person / text / dates, product link, Excel; product tab (its lines per import); employee: no menu, 404, `GET /history` 403 |
+| 20-sobrus | « Connexion Sobrus » on the fake Sobrus: consent, wrong password (red card, banner, email), the email set once (read-only, `sobrusEmailLocked`), « Tout l'historique » (steps live, corner card, = oracle, one closing line), nightly run, « Période » bar + calendar, years « Déjà importé » skipped / « Réimporter quand même », « Arrêter », 429, Sobrus down, password changed, Spanish, access removed, employee, admin « Changer l'email Sobrus » |
 | 21-sobrus-live | the robot's own client against the **real** Sobrus (account of `e2e/tests.env`: `make tests` asks the email + password the first time and saves it, gitignored): login + 7-day Achats export, the robot's log line on failure |
 | 22-api-errors | every error code a user can't reach by clicking (wrong id, role, empty body…) with its status + `code`; the API-only fields (notes at exclusion, `include_non_declared` on Achats, `include_archived`, PPH / description, signup address) |
-| 25-sobrus-catalogue | Clôture de caisse in Comptabilité (not connected, each day = the fake Sobrus, day details, Excel, no access); admin Catalogue tiles, Sobrus product import (popup, « Arrêter », new products + empty fields, refused account, « Produits Sobrus » tab), the owner does not see it |
+| 23-ui-controls | every control not covered elsewhere: quick periods, calendars, pages, sorts, searches, dialogs « Annuler » / « Fermer », product sheet card « Modifier », Stock search, admin feature switches one by one |
+| 24-matrix | each role × page: its pages open at once, the others 404 inside the layout; API down → « Réessayer »; a feature taken away by the admin / owner, then given back |
+| 25-sobrus-catalogue | Clôture de caisse in Comptabilité (not connected, each day = the fake Sobrus, day details, Excel, no access, its read-only line in « Gestion des imports »); admin Catalogue tiles, Sobrus product import (popup, « Arrêter », new products + empty fields, refused account, « Produits Sobrus » tab), the owner does not see it |
+| 26-verrouillage | lock screen on an employee: off at first, the code first (`pinRequired`), « Annuler », two codes, each delay; 15 s idle → « Écran verrouillé » in both tabs, 423 `screenLocked`, wrong code (`pinWrong`), right code; 5 wrong → logged out (`pinTooMany`); « Code oublié ? Se déconnecter »; owner + admin « Réinitialiser le code »; switched off → never locked |
 | 99-gates | **coverage** (every `/openapi.json` route called; every query param + request field sent; every error code triggered; every button / link / tab / menu / checkbox / field shown is used — `.results/{params,codes,ui}-missing.txt`, exceptions with their reason in `e2e/coverage-allowlist.json`, store skipped) · **speed** vs `e2e/perf-baseline.json` (route ≤ max(×1.2, +50 ms), FLOW ≤ max(×1.35, +150 ms)) · **error codes** equal front ⇄ back · **0 react-hooks lint errors** · **DigitalOcean limits** (with them: backend never killed and < 512 MB, ≤ 22 connections, none refused, database < 10 GB; speed vs `e2e/perf-baseline.do.json`) |
 
 ### 8.4 When a test fails
@@ -798,7 +806,7 @@ here too.
 | Part | DigitalOcean | Local with the limits |
 |---|---|---|
 | Worker (Sobrus robot) | 512 MB RAM | 512 MB, no swap |
-| Backend app | 512 MB RAM, 1 shared vCPU | 512 MB, no swap (over it: killed, not restarted) · CPU not limited (this machine's Docker has no CPU controller) |
+| Backend app | 2 GB RAM, 2 vCPU (since 2026-11) | 512 MB, no swap (stricter on purpose; over it: killed, not restarted) · CPU not limited (this machine's Docker has no CPU controller) |
 | Managed Postgres | 1 GB RAM, 1 vCPU, 10 GB, 22 connections for the app | 1 GB, `max_connections=22`, `shared_buffers=256MB` (DO's real value: its console) · E2E: data on disk, size checked |
 | Frontend | static site | `serve` container, same files |
 

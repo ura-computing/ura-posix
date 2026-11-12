@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { TabBar } from "@/_components/molecules/TabBar";
 import type { TabItem } from "@/_components/molecules/TabBar";
 import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
-import type { DataImport, DocType, ImportBatchStatus } from "@/types";
+import type { DataImport, ImportBatchStatus, ImportKind } from "@/types";
 
 import { useMe } from "@/hooks/useMe";
 import { ROLES } from "@/types";
@@ -28,11 +28,15 @@ const buildTabs = (t: TFn, admin: boolean): TabItem[] => [
   ...(admin ? [{ id: "sobrus", label: t("imports.tabSobrus") }] : []),
 ];
 
-const TYPE_LABEL: Record<DocType, string> = {
+const TYPE_LABEL: Record<ImportKind, string> = {
   achat: "imports.typeAchat",
   vente: "imports.typeVente",
   stock: "imports.typeStock",
+  closing: "imports.typeClosing",
 };
+
+/** « Clôture de caisse » (the Sobrus robot): read again at every run, so never deleted. */
+const readOnly = (row: DataImport) => row.file_type === "closing";
 
 // Indigo (cancelled) / violet (deleted) = nothing to do; orange = act (import the file again).
 const CANCELLED = "border-transparent bg-[color-mix(in_srgb,var(--chart-7)_14%,transparent)] text-[var(--chart-7)]";
@@ -81,8 +85,8 @@ function ImportsTab() {
   const [confirmMany, setConfirmMany] = useState(false);
 
   const sorted = useMemo(() => [...imports].sort((a, b) => b.imported_at.localeCompare(a.imported_at)), [imports]);
-  // Only imports not deleted yet can be ticked; an id that left the list is simply ignored.
-  const deletable = useMemo(() => sorted.filter((r) => r.deleted_at === null), [sorted]);
+  // Only imports not deleted yet (and not read-only) can be ticked; an id that left the list is simply ignored.
+  const deletable = useMemo(() => sorted.filter((r) => r.deleted_at === null && !readOnly(r)), [sorted]);
   const selectedRows = useMemo(() => deletable.filter((r) => selected.has(r.id)), [deletable, selected]);
   const allSelected = deletable.length > 0 && selectedRows.length === deletable.length;
 
@@ -157,7 +161,9 @@ function ImportsTab() {
                     {!isDeleted && (
                       <Checkbox
                         aria-label={t("imports.selectRow", { name: row.filename ?? t("imports.noName") })}
+                        title={readOnly(row) ? t("imports.closingReadOnly") : undefined}
                         checked={selected.has(row.id)}
+                        disabled={readOnly(row)}
                         onChange={() => toggle(row.id)}
                       />
                     )}
@@ -167,7 +173,7 @@ function ImportsTab() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium"
+                      className="inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium"
                       style={{
                         background: `var(--color-doc-${row.file_type}-bg)`,
                         color: `var(--color-doc-${row.file_type})`,
@@ -224,10 +230,22 @@ function ImportsTab() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {!isDeleted && (
-                      <Button variant="danger-outline" size="sm" onClick={() => setPendingRow(row)}>
-                        <Trash2 className="size-3.5" />
-                        {t("imports.deleteBtn")}
-                      </Button>
+                      <div className="flex flex-col items-end gap-1">
+                        <Button
+                          variant="danger-outline"
+                          size="sm"
+                          disabled={readOnly(row)}
+                          onClick={() => setPendingRow(row)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          {t("imports.deleteBtn")}
+                        </Button>
+                        {readOnly(row) && (
+                          <span className="whitespace-nowrap text-xs text-muted-foreground">
+                            {t("imports.closingReadOnly")}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>

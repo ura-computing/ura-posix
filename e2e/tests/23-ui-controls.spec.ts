@@ -254,7 +254,7 @@ test("Stock : la recherche (nom, PID, code barre) regarde toutes les classes", a
     await expect(page.locator("tbody tr").first(), value).toContainText(other.product);
   }
   await search.fill("ZZZ INTROUVABLE");
-  await expect(page.getByText("Aucun résultat", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Aucun produit trouvé", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Supprimer le filtre" }).first().click();
   await expect(search, "le filtre retiré").toHaveValue("");
 });
@@ -393,7 +393,12 @@ test("fiche produit : chaque période rapide, calendrier de la date (mois, anné
     }
   });
   await test.step("date de péremption : calendrier, mois et année", async () => {
-    await page.getByRole("button", { name: "Modifier", exact: true }).first().click();
+    // The card's own « Modifier » (each card has one): the expiry date is in « Stock et réappro ».
+    await page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Stock et réappro", exact: true }) })
+      .getByRole("button", { name: "Modifier", exact: true })
+      .click();
     await page
       .getByRole("button", { name: /choisir dans le calendrier$/ })
       .first()
@@ -822,6 +827,14 @@ test.describe("administrateur", () => {
         await expect(off).toHaveCount(0);
         await cancel.click(); // premium switched on only on screen: back as saved
         await expect(off).toHaveCount(PREMIUM_FEATURES.length);
+        // Each switch by itself: one click changes it, a second puts it back (nothing to save).
+        for (const one of await switches.all()) {
+          const was = await one.getAttribute("aria-checked");
+          await one.click();
+          await expect(one).not.toHaveAttribute("aria-checked", was ?? "");
+          await one.click();
+          await expect(one).toHaveAttribute("aria-checked", was ?? "");
+        }
         await expect(cancel, "comme enregistré : rien à annuler").toHaveCount(0);
       });
       await test.step("permissions du propriétaire : « Tout activer (où possible) », « Annuler »", async () => {
