@@ -3,6 +3,8 @@
 Updated 2026-11-12. One list, top to bottom. Open items only: a step leaves this file when
 `make tests` is green. Rules: `.claude/CLAUDE.md`. App + setup: `README.md`.
 
+**Now (2026-11-13): split into services** — plan `.claude/plans/microservices.md`, progress `.claude/HANDOFF.md` §2.
+
 **Order:** §3 production tools (DO console, yours) → §8 Later.
 
 ---

@@ -12,7 +12,7 @@ All code in `backend/app/`, one folder per business area (like `frontend/src/pag
 
 | Folder | Holds |
 |---|---|
-| `main.py` (backend root, deployments run `main:app`) | FastAPI app; `from app.<area> import router as <name>` + `app.include_router(...)` |
+| `main.py` (backend root, deployments run `main:app`) | FastAPI app; includes the routers of its `SERVICE` (`app/core/services.py`: identity · analytics · ingestion · sobrus; unset = all). New router → add it to `ROUTER_MODULES` + one service, then `uv run python scripts/gateway_routes.py` (writes `gateway/Caddyfile`) |
 | `app/core/` | config, database, models, errors, security, permissions, rate_limit, search, utils, email_service, `/health` |
 | `app/identity/auth/` · `app/identity/members/` | login, me, sessions · admin pharmacies + owner team (`admin_router.py`, `owner_router.py`, `service.py`) |
 | `app/catalog/` | médicaments + category suffixes (admin) |

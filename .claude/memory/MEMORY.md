@@ -1,0 +1,15 @@
+- [User profile](user-profile.md) — who drives PharmaGest, how he works, autosync script, color taste
+- [Project state](project-state.md) — 2026-11-13: microservices split started (SERVICE env + gateway); handoff in .claude/HANDOFF.md
+- [Product decisions](product-decisions.md) — pharmacy privacy, sign-up approval (pending login), G2/G3/Q1 formulas, MAD only
+- [ClickUp tickets](clickup-tickets.md) — plain text, short, title + description; last batch artifact link
+- [Forms step by step](forms-step-by-step.md) — Gmail-like wizard, one question per screen, password twice
+- [README last](readme-last.md) — update README.md only at the end, not per step
+- [Visible disabled actions](visible-disabled-actions.md) — buttons always shown, disabled + hint; app-styled controls only
+- [No silent removals](no-silent-removals.md) — simplify by rearranging; ask before dropping any field or feature
+- [Tests per feature](tests-per-feature.md) — every feature ships with E2E, written at the END of the ticket batch
+- [Chart style](chart-style.md) — solid curves only, one distinct color per curve, no dashes
+- [Big back button](big-back-button.md) — detail pages: big « Retour à la liste … » button, not only breadcrumb
+- [Short visual answers](short-visual-answers.md) — talk little, on the point, tables / diagrams over text
+- [tests-ui = watch in one window](tests-ui-watch.md) — headed + slowMo inside one Xephyr window; never Playwright --ui
+- [Design system first](design-system-first.md) — ALWAYS reuse/extract components, copy the closest screen, screenshot-check before « done »
+- [Sobrus = worker only](sobrus-worker-only.md) — every Sobrus call is a queued run mode in sync.py; API only queues + reads

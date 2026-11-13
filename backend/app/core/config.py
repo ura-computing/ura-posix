@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Demo recordings only: « today » for every rule that depends on it (YYYY-MM-DD, e.g. the last
     # day of the imported files). Empty = the real date in Casablanca (dev, E2E, production).
     TODAY: str = ""
+    # Which part of the API this process runs (app/core/services.py): identity · analytics · ingestion · sobrus.
+    # Empty = every router (dev, E2E, one-component production).
+    SERVICE: str = ""
 
     # « Connexion Sobrus » (app/sobrus/). SOBRUS_SECRET_KEY = Fernet key that encrypts the Sobrus
     # passwords + sessions (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`);

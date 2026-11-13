@@ -1,0 +1,20 @@
+GET https://apcm-app-2kx83.ondigitalocean.app/api/v1/stats?category_type=all&include_non_declared=true
+{
+    "detail": "Le logiciel a rencontré un problème. Réessayez dans quelques minutes.",
+    "code": "serverError",
+    "params": {}
+}
+
+GET https://apcm-app-2kx83.ondigitalocean.app/api/v1/stats/margin-alerts?category_type=all&include_non_declared=true
+{
+    "detail": "Le logiciel a rencontré un problème. Réessayez dans quelques minutes.",
+    "code": "serverError",
+    "params": {}
+}
+
+GET https://apcm-app-2kx83.ondigitalocean.app/api/v1/stats/analyse-marge?mode=produit&category_type=all
+{
+    "detail": "Écran verrouillé : tapez votre code.",
+    "code": "screenLocked",
+    "params": {}
+}

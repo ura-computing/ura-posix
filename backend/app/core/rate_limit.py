@@ -20,7 +20,14 @@ from slowapi.util import get_remote_address
 from app.core.errors import ErrorCode, error_body
 
 
-limiter = Limiter(key_func=get_remote_address, enabled=os.environ.get("RATE_LIMIT", "1") != "0")
+def client_ip(request: Request) -> str:
+    """The visitor's IP. Behind DigitalOcean's router (and the gateway) every request comes from the router's address:
+    keyed on it, « 5 logins / min » was shared by every user of the app. DigitalOcean puts the real address in
+    `do-connecting-ip`; without it (dev, E2E) the direct client."""
+    return request.headers.get("do-connecting-ip") or get_remote_address(request)
+
+
+limiter = Limiter(key_func=client_ip, enabled=os.environ.get("RATE_LIMIT", "1") != "0")
 
 
 def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

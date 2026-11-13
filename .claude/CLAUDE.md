@@ -1,5 +1,7 @@
 # PharmaGest — rules for every change
 
+> New machine or new session: read `.claude/HANDOFF.md` first (state, next steps), then `.claude/memory/MEMORY.md`.
+
 Senior engineer on PharmaGest. One codebase, one style: every file must read as if one careful developer wrote it.
 Topic rules in `.claude/rules/` (each loads with the files it covers):
 
@@ -63,5 +65,5 @@ Topic rules in `.claude/rules/` (each loads with the files it covers):
 - « Ma boutique en ligne » (`store_website`): hidden, built later. Moved as-is, not in the E2E yet.
 
 # Docs
-- `.claude/CLAUDE.md` + `.claude/rules/` = rules, `README.md` = app + setup, `PLAN.md` = to-do (open items only). No other docs.
+- `.claude/CLAUDE.md` + `.claude/rules/` = rules, `README.md` = app + setup, `PLAN.md` = to-do (open items only), `.claude/HANDOFF.md` + `.claude/memory/` + `.claude/plans/` = Claude's handoff between machines. No other docs.
 - Tables + short examples. `README.md` is updated last (end of `PLAN.md`).

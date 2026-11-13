@@ -4,26 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from app.identity.auth import router as auth
+from importlib import import_module
+
 from app.core import health
-from app.identity.members import admin_router as admin_pharmacies, owner_router as owner_employees
 from app.core.config import settings
 from app.core.errors import ApiError, CatchServerErrors, api_error_handler, validation_error_handler
 from app.core.rate_limit import limiter, rate_limit_handler
-from app.accounting.exclusions import router as exclusions
-from app.accounting.closings import router as closings
-from app.accounting.payments import router as accounting
-from app.analytics import router as stats
-from app.catalog import router as catalog
-from app.ingestion import router as imports
-from app.ledger import router as transactions
-from app.history import router as history
-from app.products import router as products
-from app.sobrus import router as sobrus
-from app.store_website import router as store_website
+from app.core.services import ROUTER_MODULES, routers_of
 
 
-app = FastAPI(title="PharmaGest", version="0.1.0")
+app = FastAPI(title=f"PharmaGest {settings.SERVICE}".strip(), version="0.1.0")
 
 # Crash → JSON 500 `serverError` (« Le logiciel a rencontré un problème »). Added before
 # CORS = inside it, so the answer keeps the CORS headers and the browser can read it.
@@ -51,18 +41,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.add_exception_handler(ApiError, api_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 
+# Every service answers /v1/health; then its own routers (`SERVICE` env, app/core/services.py; unset = all).
 app.include_router(health.router, prefix="/v1")
-app.include_router(auth.router, prefix="/v1")
-app.include_router(stats.router, prefix="/v1")
-app.include_router(catalog.router, prefix="/v1")
-app.include_router(admin_pharmacies.router, prefix="/v1")
-app.include_router(owner_employees.router, prefix="/v1")
-app.include_router(imports.router, prefix="/v1")
-app.include_router(transactions.router, prefix="/v1")
-app.include_router(products.router, prefix="/v1")
-app.include_router(history.router, prefix="/v1")
-app.include_router(sobrus.router, prefix="/v1")
-app.include_router(exclusions.router, prefix="/v1")
-app.include_router(accounting.router, prefix="/v1")
-app.include_router(closings.router, prefix="/v1")
-app.include_router(store_website.router, prefix="/v1")
+for name in routers_of(settings.SERVICE):
+    app.include_router(import_module(ROUTER_MODULES[name]).router, prefix="/v1")
