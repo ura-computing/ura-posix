@@ -49,7 +49,7 @@ export function quickPeriods(today: Date): [string, string][] {
   ];
 }
 
-/** Each button of a « Période » bar (product page, Sobrus import) → its dates, today included. */
+/** Each button of the Sobrus import's « Période » bar → its dates, today included (« 7 j » = the default, clicked last). */
 export function barPeriods(today: Date): [string, string][] {
   const [y, m, d] = [today.getFullYear(), today.getMonth(), today.getDate()];
   const range = (from: Date) => `${shown(from)} → ${shown(today)}`;
@@ -58,6 +58,7 @@ export function barPeriods(today: Date): [string, string][] {
     ["90 j", range(new Date(y, m, d - 89))],
     ["12 mois", range(new Date(y - 1, m, d + 1))],
     ["Année en cours", range(new Date(y, 0, 1))],
+    ["7 j", range(new Date(y, m, d - 6))],
   ];
 }
 

@@ -1237,6 +1237,13 @@ class Oracle:
         line_ref = max((a for a in self.aw if a.p.pid == line_holder.pid), key=lambda a: (a.day, a.ref)).ref
         line_rows = lines_of(line_holder)
         line = next(r for r in line_rows if r["delivery_ref"] == line_ref)
+        # « BL par Fournisseur »: every BL of that BL's supplier (names compared trimmed, like the app), newest first.
+        line_supplier = line["supplier"].strip()
+        supplier_refs = {a.ref for a in self.achats if a.supplier.strip() == line_supplier}
+        supplier_bls = [bl_summary(r, []) for r in sorted(supplier_refs, key=lambda r: max(a.day for a in by_ref[r]),
+                                                          reverse=True)]
+        line_detail = [{"pid": a.p.pid, "product": a.p.name, "quantity": a.qty, "unit_price": a.unit,
+                        "total": a.total} for a in by_ref[line_ref]]
 
         compta = Oracle(self.products, [v for v in self.ventes if v.p.pid not in excluded],
                         [a for a in self.achats if a.p.pid not in excluded
@@ -1265,7 +1272,8 @@ class Oracle:
             },
             "bl_line": {
                 "pid": line_holder.pid, "product": line_holder.name, "query": self.unique_query(line_holder),
-                "lines": line_rows, "ref": line_ref, "supplier": line["supplier"],
+                "lines": line_rows, "ref": line_ref, "supplier": line["supplier"], "supplier_name": line_supplier,
+                "supplier_bls": supplier_bls, "detail_lines": line_detail,
                 "excluded": {k: line[k] for k in ("delivery_ref", "supplier", "delivery_date", "quantity", "total")}
                 | {"pid": line_holder.pid, "product": line_holder.name},
             },

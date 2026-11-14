@@ -63,9 +63,11 @@ class MedicamentSuggestion(BaseModel):
 class BlLine(BaseModel):
     product: str | None
     pid: str | None
+    medicament_id: int | None
     quantity: float | None
     unit_price: float | None
     total: float | None
+    exclusion_id: int | None = None  # this product left out on this BL only (the star of its line)
 
 
 class BlSummary(BaseModel):
@@ -126,28 +128,8 @@ class BlReintegrateResult(BaseModel):
 
 
 # ═══ BL line exclusions ══════════════════════════════════════════════════════
-# « Exclure un produit d'un BL »: the same product bought on several BLs, only some of them left
-# out of Comptabilité (those achat lines only; its other BLs and its ventes stay).
-
-
-class ProductBlLine(BaseModel):
-    """One BL holding the product (its lines of that product added up)."""
-
-    delivery_ref: str
-    supplier: str | None
-    delivery_date: str | None
-    quantity: float
-    total: float
-    nb_lines: int
-    already_excluded: bool
-    exclusion_id: int | None = None  # set when already excluded (« Réintégrer » = untick)
-
-
-class ProductBlLines(BaseModel):
-    medicament_id: int
-    pid: str
-    product: str
-    lines: list[ProductBlLine]  # newest BL first
+# One product left out of Comptabilité on one BL only (the star of a product line in a BL's content): those achat
+# lines only; its other BLs and its ventes stay.
 
 
 class BlLineExclusionOut(BaseModel):

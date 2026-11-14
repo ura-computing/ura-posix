@@ -37,7 +37,6 @@ from app.accounting.exclusions.schemas import (
     BlReintegrateResult,
     BlSummary,
     MedicamentSuggestion,
-    ProductBlLines,
     SpecialProductBulkResult,
     SpecialProductCreate,
     SpecialProductNote,
@@ -340,13 +339,24 @@ def list_bl_exclusions(pharmacy_id: Annotated[int, member("special_products")], 
 def search_bls(
     pharmacy_id: Annotated[int, member("special_products")],
     db: DbDep,
-    q: Annotated[str, Query(min_length=2, description="BL reference (substring) or product name")],
+    q: Annotated[str | None, Query(min_length=2, description="BL reference (substring) or product name")] = None,
+    supplier: Annotated[
+        str | None, Query(min_length=1, description="Every BL of this supplier (« BL par Fournisseur »)")
+    ] = None,
 ) -> list[dict]:
     """Find BLs matching `q` either by delivery reference (substring, accent/case
-    insensitive) OR by a product they contain. Returns BL summaries so the user
-    can pick the right one; already-excluded BLs are flagged."""
-    term = q.strip()
-    tokens = tokenize_search(term)
+    insensitive) OR by a product they contain; or, with `supplier`, every BL of that supplier (its name as the
+    supplier search gives it). Returns BL summaries, newest first; already-excluded BLs are flagged."""
+    if supplier is not None:
+        name = supplier.strip()
+        refs = {
+            r[0]
+            for r in db.query(Achat.delivery_ref)
+            .filter(Achat.pharmacy_id == pharmacy_id, Achat.delivery_ref.isnot(None), func.trim(Achat.supplier) == name)
+            .distinct()
+        }
+        return _bl_summaries(db, pharmacy_id, refs, {})
+    tokens = tokenize_search((q or "").strip())
 
     # (a) direct reference match — tokenized, accent/case-insensitive, `*`-aware
     # (prefix `LVC*`, suffix `*2606`, infix `LV*06`) via the shared search helper.
@@ -374,10 +384,13 @@ def search_bls(
             if product and product not in names and len(names) < 3:
                 names.append(product)
     refs |= set(matched_by_ref.keys())
+    return _bl_summaries(db, pharmacy_id, refs, matched_by_ref)
 
+
+def _bl_summaries(db, pharmacy_id: int, refs: set[str], matched_by_ref: dict[str, list[str]]) -> list[dict]:
+    """These BLs as search results, newest first (`matched_products`: the products the search matched)."""
     if not refs:
         return []
-
     rows = _bl_aggregate(db, pharmacy_id, list(refs)).order_by(func.max(Achat.delivery_date).desc()).all()
     excluded = _excluded_refs(db, pharmacy_id)
     return [
@@ -417,13 +430,21 @@ def bl_detail(
     supplier = next((a.supplier for a, _ in rows if a.supplier), None)
     date = next((a.delivery_date for a, _ in rows if a.delivery_date), None)
     total = round(sum(float(a.total or 0) for a, _ in rows), 2)
+    # Its products already left out on this BL only (« BL par Fournisseur » → the star of a product line).
+    left_out = dict(
+        db.query(PharmacyBlLineExclusion.medicament_id, PharmacyBlLineExclusion.id).filter(
+            PharmacyBlLineExclusion.pharmacy_id == pharmacy_id, PharmacyBlLineExclusion.delivery_ref == delivery_ref
+        )
+    )
     lines = [
         {
             "product": m.product if m else None,
             "pid": m.pid if m else None,
+            "medicament_id": a.medicament_id,
             "quantity": a.quantity,
             "unit_price": a.unit_price,
             "total": a.total,
+            "exclusion_id": left_out.get(a.medicament_id),
         }
         for a, m in rows
     ]
@@ -564,47 +585,6 @@ def list_bl_line_exclusions(pharmacy_id: Annotated[int, member("special_products
             }
         )
     return out
-
-
-@router.get("/bl-line-exclusions/lines", response_model=ProductBlLines)
-def product_bl_lines(
-    pharmacy_id: Annotated[int, member("special_products")],
-    db: DbDep,
-    medicament_id: Annotated[int, Query(ge=1)],
-) -> dict:
-    """Every BL this product was bought on (newest first), the ones already left out flagged."""
-    med = db.get(Medicament, medicament_id)
-    if med is None:
-        raise ApiError(404, ErrorCode.MEDICAMENT_NOT_FOUND, "Produit introuvable.")
-    rows = (
-        _line_aggregate(db, pharmacy_id, medicament_id)
-        .order_by(func.max(Achat.delivery_date).desc(), Achat.delivery_ref)
-        .all()
-    )
-    excluded = {
-        ref: x_id
-        for ref, x_id in db.query(PharmacyBlLineExclusion.delivery_ref, PharmacyBlLineExclusion.id).filter(
-            PharmacyBlLineExclusion.pharmacy_id == pharmacy_id, PharmacyBlLineExclusion.medicament_id == medicament_id
-        )
-    }
-    return {
-        "medicament_id": med.id,
-        "pid": med.pid,
-        "product": med.product,
-        "lines": [
-            {
-                "delivery_ref": r.ref,
-                "supplier": r.supplier,
-                "delivery_date": r.delivery_date,
-                "quantity": float(r.quantity),
-                "total": round(float(r.total), 2),
-                "nb_lines": int(r.nb_lines),
-                "already_excluded": r.ref in excluded,
-                "exclusion_id": excluded.get(r.ref),
-            }
-            for r in rows
-        ],
-    }
 
 
 @router.post("/bl-line-exclusions/", response_model=BlLineExclusionResult, status_code=201)

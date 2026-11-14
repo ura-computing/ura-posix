@@ -41,7 +41,6 @@
     "GET /v1/bl-exclusions/detail": 23,
     "GET /v1/bl-exclusions/search": 71,
     "GET /v1/bl-line-exclusions/": 30,
-    "GET /v1/bl-line-exclusions/lines": 29,
     "GET /v1/category-suffixes": 11,
     "GET /v1/data/imports": 19,
     "GET /v1/health": 40,

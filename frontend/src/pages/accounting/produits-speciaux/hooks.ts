@@ -16,7 +16,6 @@ import type {
   BlLineExclusionResult,
   BlSummary,
   MedicamentSuggestion,
-  ProductBlLines,
   SpecialProduct,
   SupplierExclusion,
   SupplierSummary,
@@ -196,15 +195,15 @@ export function useExclusions() {
   };
 }
 
-/** One tab's search (2+ letters), for its kind only: products (« Produits », « Produit sur un BL »),
- *  BLs (by reference or by a product they hold) or suppliers. */
+/** One tab's search (2+ letters), for its kind only: products (« Produits »), BLs (by reference or by a product
+ *  they hold) or suppliers (« Fournisseurs », « BL par Fournisseur »). */
 export function useExclusionSearch(kind: ExclusionKind) {
   const [q, setQ] = useState("");
   const ready = q.trim().length >= 2;
   const products = useQuery({
     queryKey: API.specialProducts.suggestions.key(q),
     queryFn: () => api.get<MedicamentSuggestion[]>(API.specialProducts.suggestions.url, { params: { q } }),
-    enabled: ready && (kind === "product" || kind === "line"),
+    enabled: ready && kind === "product",
     staleTime: 30_000,
   });
   const bls = useQuery({
@@ -216,7 +215,7 @@ export function useExclusionSearch(kind: ExclusionKind) {
   const suppliers = useQuery({
     queryKey: API.supplierExclusions.search.key(q),
     queryFn: () => api.get<SupplierSummary[]>(API.supplierExclusions.search.url, { params: { q } }),
-    enabled: ready && kind === "supplier",
+    enabled: ready && (kind === "supplier" || kind === "line"),
     staleTime: 30_000,
   });
   return {
@@ -243,15 +242,15 @@ export function useBlDetail(deliveryRef: string) {
   };
 }
 
-/** Every BL one product was bought on (« Voir ses BL »). */
-export function useProductBlLines(medicamentId: number) {
+/** Every BL of one supplier, newest first (« BL par Fournisseur » → « Voir ses BL »). */
+export function useSupplierBls(supplier: string) {
   const { data, isLoading, isError } = useQuery({
-    queryKey: API.blLineExclusions.lines.key(medicamentId),
-    queryFn: () => api.get<ProductBlLines>(API.blLineExclusions.lines.url, { params: { medicament_id: medicamentId } }),
+    queryKey: API.blExclusions.ofSupplier.key(supplier),
+    queryFn: () => api.get<BlSummary[]>(API.blExclusions.ofSupplier.url, { params: { supplier } }),
   });
   return {
-    productLines: data?.lines ?? [],
-    isLoadingProductLines: isLoading,
-    productLinesError: isError,
+    supplierBls: data ?? [],
+    isLoadingBls: isLoading,
+    blsError: isError,
   };
 }

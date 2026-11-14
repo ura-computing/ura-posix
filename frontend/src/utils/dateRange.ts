@@ -88,10 +88,11 @@ export function currentYear(now: Date = new Date()): DateRange {
   return { from: `${y}-01-01`, to: fmt(now) };
 }
 
-/** « Période » next to a page's dates (product sheet, Sobrus import): 30 / 90 days, the year so far, 12 months,
- *  today included. */
-export type PeriodPreset = "30d" | "90d" | "year" | "12m";
+/** « Période » next to a page's dates (product sheet, Sobrus import): 7 (Sobrus import only) / 30 / 90 days, the year
+ *  so far, 12 months, today included. */
+export type PeriodPreset = "7d" | "30d" | "90d" | "year" | "12m";
 export const PERIOD_PRESETS: Record<PeriodPreset, () => DateRange> = {
+  "7d": () => ({ from: daysAgo(6), to: todayIso() }),
   "30d": () => ({ from: daysAgo(29), to: todayIso() }),
   "90d": () => ({ from: daysAgo(89), to: todayIso() }),
   year: () => currentYear(),

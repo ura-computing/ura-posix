@@ -1,26 +1,23 @@
-/** What one tab's search found, each line with ONE button that excludes it at once:
- *   - Produits: « Exclure » (its sales and purchases)
- *   - Bons de livraison (by reference or by a product they hold, « Fournisseur » filter): « Exclure »
- *     (every product on it), « Contenu » = its lines
- *   - Produit sur un BL: « Voir ses BL » → tick a BL = only that purchase of the product leaves
- *     (untick = back)
- *   - Fournisseurs: « Exclure » (every product bought from it)
- *  Already excluded: « déjà exclu », no button (« Réintégrer » is in the list below). */
+/** What one tab's search found. One control everywhere: the star (☆ still in Comptabilité, ★ taken out; a click
+ *  toggles):
+ *   - Produits: ★ = its sales and purchases out
+ *   - BL (by reference or by a product it holds) and BL par Fournisseur (a supplier → « Voir ses BL »): the same BL
+ *     rows: ★ on the BL = every product on it out; « Voir le contenu » → ★ on a product = only it, on that BL
+ *   - Fournisseurs: ★ = every product bought from it out */
 import { useState, type ReactNode } from "react";
 import { Building2, ChevronRight, FileText, Package } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
 import { cn } from "@/utils/cn";
-import { Checkbox } from "@/_components/atoms/Checkbox";
-import { SingleSelect } from "@/_components/molecules/SingleSelect";
+import { StarToggle } from "@/_components/atoms/StarToggle";
 import { SkeletonRows, SkeletonText } from "@/_components/molecules/Skeletons";
 import { Card } from "@/_components/atoms/Card";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import type { BlSummary, MedicamentSuggestion, SupplierSummary } from "@/types";
 import { formatDate, formatMAD, formatNumStr, formatQty } from "@/utils/format";
 
-import { useBlDetail, useProductBlLines, type ExclusionTarget } from "../hooks";
+import { useBlDetail, useSupplierBls, type ExclusionTarget } from "../hooks";
 
 /** « déjà exclu » next to a found BL / supplier. */
 function AlreadyExcluded() {
@@ -28,46 +25,18 @@ function AlreadyExcluded() {
   return <Badge>{t("ps.dejaExclu")}</Badge>;
 }
 
-/** « Fournisseur » filter over the suppliers found (shown when there are 2 or more). */
-function SupplierFilter({
-  suppliers,
-  value,
-  onChange,
-}: {
-  suppliers: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const t = useT();
-  if (suppliers.length < 2) return null;
-  return (
-    <SingleSelect
-      label={t("ps.fournisseur")}
-      options={[{ value: "", label: t("ps.tousFournisseurs") }, ...suppliers.map((s) => ({ value: s, label: s }))]}
-      value={suppliers.includes(value) ? value : ""}
-      onChange={onChange}
-      align="end"
-    />
-  );
-}
-
-const suppliersOf = (rows: { supplier: string | null }[]) =>
-  [...new Set(rows.map((r) => r.supplier).filter((s): s is string => !!s))].sort();
-
 /** The lines found (`title` names the list), « Rien trouvé » when none, a spinner while it searches. */
 function Found({
   title,
   q,
   count,
   isSearching,
-  extra,
   children,
 }: {
   title: string;
   q: string;
   count: number;
   isSearching: boolean;
-  extra?: ReactNode;
   children: ReactNode;
 }) {
   const t = useT();
@@ -81,12 +50,9 @@ function Found({
     );
   }
   return (
-    <div className="flex flex-col gap-2">
-      {extra && <div className="flex justify-end">{extra}</div>}
-      <ul aria-label={title} className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
-        {children}
-      </ul>
-    </div>
+    <ul aria-label={title} className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
+      {children}
+    </ul>
   );
 }
 
@@ -148,24 +114,42 @@ function Row({
   );
 }
 
-/** « Voir ses BL » / « Contenu »: opens one line's details. */
-function ExcludeButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+/** « Exclure » = a star ticked like a box: ☆ = still in Comptabilité (click → taken out), ★ = taken out (click → back
+ *  in, like « Réintégrer »). Produits, BL, Fournisseurs. */
+function ExcludeStar({
+  excluded = false,
+  disabled,
+  onClick,
+}: {
+  excluded?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   const t = useT();
   return (
-    <Button disabled={disabled} onClick={onClick}>
-      {t("ps.exclure")}
-    </Button>
+    <StarToggle
+      checked={excluded}
+      disabled={disabled}
+      onChange={onClick}
+      aria-label={t("ps.exclure")}
+      title={excluded ? t("ps.reintegrer") : t("ps.exclure")}
+    />
   );
 }
 
 const productFacts = (t: TFn, p: MedicamentSuggestion) =>
   [p.pid, p.category, t("ps.nbVentes", { n: formatNumStr(p.nb_ventes) })].filter(Boolean).join(" · ");
 
-interface Common {
-  q: string;
-  isSearching: boolean;
+/** What a star does (exclude / put back), passed down to every row. */
+interface StarActions {
   isExcluding: boolean;
   onExclude: (x: ExclusionTarget) => void;
+  onReintegrate: (x: ExclusionTarget) => void;
+}
+
+interface Common extends StarActions {
+  q: string;
+  isSearching: boolean;
 }
 
 /** « Produits »: the whole product leaves Comptabilité. */
@@ -186,7 +170,7 @@ export function ProductResults({
           title={<span className="truncate">{p.product}</span>}
           facts={productFacts(t, p)}
           actions={
-            <ExcludeButton
+            <ExcludeStar
               disabled={isExcluding}
               onClick={() => onExclude({ kind: "product", medicamentId: p.id, name: p.product })}
             />
@@ -197,17 +181,19 @@ export function ProductResults({
   );
 }
 
-/** « Contenu » of a BL: its product lines. */
-function BlContent({ deliveryRef }: { deliveryRef: string }) {
+/** A BL's content: its product lines, each with its star = that product out of Comptabilité on this BL only (its
+ *  other BLs and its sales stay). The whole BL out: every line out, its stars filled and locked. */
+function BlContent({ bl, isExcluding, onExclude, onReintegrate }: StarActions & { bl: BlSummary }) {
   const t = useT();
-  const { blLines, isLoadingLines, linesError } = useBlDetail(deliveryRef);
+  const { blLines, isLoadingLines, linesError } = useBlDetail(bl.delivery_ref);
   if (isLoadingLines) return <SkeletonText lines={3} className="ml-8" />;
   if (linesError) return <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>;
   return (
-    <div className="ml-8 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface-subtle/50">
+    <div className="ml-8 max-h-72 overflow-y-auto rounded-lg border border-border bg-surface-subtle/50">
       <table className="w-full text-left text-sm">
         <thead className="sticky top-0 bg-surface-subtle text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
+            <th className="w-10 px-3 py-1.5" aria-label={t("ps.exclure")} />
             <th className="px-3 py-1.5 font-semibold">{t("col.produit")}</th>
             <th className="px-3 py-1.5 text-right font-semibold">{t("col.qte")}</th>
             <th className="px-3 py-1.5 text-right font-semibold">{t("col.puAchat")}</th>
@@ -215,180 +201,176 @@ function BlContent({ deliveryRef }: { deliveryRef: string }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {blLines.map((ln, i) => (
-            <tr key={i}>
-              <td className="max-w-[260px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>
-                {ln.product ?? "—"}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">
-                {ln.quantity != null ? formatQty(ln.quantity) : "—"}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">
-                {ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}
-              </td>
-              <td className="px-3 py-1.5 text-right font-medium tabular-nums">
-                {ln.total != null ? formatMAD(ln.total) : "—"}
-              </td>
-            </tr>
-          ))}
+          {blLines.map((ln, i) => {
+            const out = ln.exclusion_id != null;
+            return (
+              <tr key={i}>
+                <td className="px-3 py-1.5">
+                  <StarToggle
+                    checked={bl.already_excluded || out}
+                    disabled={bl.already_excluded || isExcluding || ln.medicament_id == null}
+                    aria-label={ln.product ?? t("ps.exclure")}
+                    title={bl.already_excluded ? t("ps.wholeBlOut") : out ? t("ps.reintegrer") : t("ps.exclure")}
+                    onChange={() => {
+                      if (ln.medicament_id == null) return;
+                      const target = {
+                        kind: "line" as const,
+                        medicamentId: ln.medicament_id,
+                        ref: bl.delivery_ref,
+                        ids: ln.exclusion_id != null ? [ln.exclusion_id] : [],
+                        name: `${ln.product ?? ""} · BL ${bl.delivery_ref}`,
+                      };
+                      if (out) onReintegrate(target);
+                      else onExclude(target);
+                    }}
+                  />
+                </td>
+                <td className="max-w-[260px] truncate px-3 py-1.5 text-foreground" title={ln.product ?? ""}>
+                  {ln.product ?? "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">
+                  {ln.quantity != null ? formatQty(ln.quantity) : "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">
+                  {ln.unit_price != null ? formatMAD(ln.unit_price) : "—"}
+                </td>
+                <td className="px-3 py-1.5 text-right font-medium tabular-nums">
+                  {ln.total != null ? formatMAD(ln.total) : "—"}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-/** « Bons de livraison »: every product on the BL leaves Comptabilité. */
-export function BlResults({ bls, q, isSearching, isExcluding, onExclude }: Common & { bls: BlSummary[] }) {
+/** One BL, the same in « BL » and « BL par Fournisseur »: ★ = the whole BL out; « Voir le contenu » = its products. */
+function BlRow({
+  bl,
+  open,
+  onToggle,
+  ...actions
+}: StarActions & { bl: BlSummary; open: boolean; onToggle: () => void }) {
+  const t = useT();
+  const { isExcluding, onExclude, onReintegrate } = actions;
+  return (
+    <Row
+      icon={<FileText className="size-5" />}
+      title={
+        <>
+          <span className="truncate font-mono">{bl.delivery_ref}</span>
+          {bl.already_excluded && <AlreadyExcluded />}
+        </>
+      }
+      facts={
+        <>
+          {[bl.supplier ?? "—", formatDate(bl.delivery_date), `${formatNumStr(bl.nb_products)} ${t("ps.ref")}`].join(
+            " · ",
+          )}
+          {bl.matched_products.length > 0 && (
+            <span className="text-primary">
+              {" "}
+              · {t("ps.contient")} {bl.matched_products.join(", ")}
+            </span>
+          )}
+        </>
+      }
+      amount={formatMAD(bl.total)}
+      expand={{ open, label: t("ps.seeContent"), onToggle }}
+      actions={
+        <ExcludeStar
+          excluded={bl.already_excluded}
+          disabled={isExcluding}
+          onClick={() => {
+            const target = { kind: "bl" as const, ref: bl.delivery_ref, name: `BL ${bl.delivery_ref}` };
+            if (bl.already_excluded) onReintegrate(target);
+            else onExclude(target);
+          }}
+        />
+      }
+    >
+      {open && <BlContent bl={bl} {...actions} />}
+    </Row>
+  );
+}
+
+/** « BL »: the BLs found by reference or by a product they hold. */
+export function BlResults({ bls, q, isSearching, ...actions }: Common & { bls: BlSummary[] }) {
   const t = useT();
   const [opened, setOpened] = useState<string | null>(null);
-  const [supplier, setSupplier] = useState("");
-  const suppliers = suppliersOf(bls);
-  const shown = supplier && suppliers.includes(supplier) ? bls.filter((b) => b.supplier === supplier) : bls;
   return (
-    <Found
-      title={t("ps.groupBls")}
-      q={q}
-      count={shown.length}
-      isSearching={isSearching}
-      extra={<SupplierFilter suppliers={suppliers} value={supplier} onChange={setSupplier} />}
-    >
-      {shown.map((b) => (
-        <Row
+    <Found title={t("ps.groupBls")} q={q} count={bls.length} isSearching={isSearching}>
+      {bls.map((b) => (
+        <BlRow
           key={b.delivery_ref}
-          icon={<FileText className="size-5" />}
-          title={
-            <>
-              <span className="truncate font-mono">{b.delivery_ref}</span>
-              {b.already_excluded && <AlreadyExcluded />}
-            </>
-          }
-          facts={
-            <>
-              {[b.supplier ?? "—", formatDate(b.delivery_date), `${formatNumStr(b.nb_products)} ${t("ps.ref")}`].join(
-                " · ",
-              )}
-              {b.matched_products.length > 0 && (
-                <span className="text-primary">
-                  {" "}
-                  · {t("ps.contient")} {b.matched_products.join(", ")}
-                </span>
-              )}
-            </>
-          }
-          amount={formatMAD(b.total)}
-          expand={{
-            open: opened === b.delivery_ref,
-            label: t("ps.seeContent"),
-            onToggle: () => setOpened(opened === b.delivery_ref ? null : b.delivery_ref),
-          }}
-          actions={
-            <>
-              {!b.already_excluded && (
-                <ExcludeButton
-                  disabled={isExcluding}
-                  onClick={() => onExclude({ kind: "bl", ref: b.delivery_ref, name: `BL ${b.delivery_ref}` })}
-                />
-              )}
-            </>
-          }
-        >
-          {opened === b.delivery_ref && <BlContent deliveryRef={b.delivery_ref} />}
-        </Row>
+          bl={b}
+          open={opened === b.delivery_ref}
+          onToggle={() => setOpened(opened === b.delivery_ref ? null : b.delivery_ref)}
+          {...actions}
+        />
       ))}
     </Found>
   );
 }
 
-/** « Voir ses BL »: one checkbox per BL the product was bought on; tick = only that purchase leaves. */
-function ProductBls({
-  product,
-  onExclude,
-  onReintegrate,
-}: {
-  product: MedicamentSuggestion;
-  onExclude: (x: ExclusionTarget) => void;
-  onReintegrate: (x: ExclusionTarget) => void;
-}) {
+/** « Voir ses BL » of one supplier: every BL bought from it, newest first, the same rows as « BL ». */
+function SupplierBls({ supplier, ...actions }: StarActions & { supplier: string }) {
   const t = useT();
-  const [supplier, setSupplier] = useState("");
-  const { productLines, isLoadingProductLines, productLinesError } = useProductBlLines(product.id);
-  const suppliers = suppliersOf(productLines);
-  const shown =
-    supplier && suppliers.includes(supplier) ? productLines.filter((l) => l.supplier === supplier) : productLines;
+  const { supplierBls, isLoadingBls, blsError } = useSupplierBls(supplier);
+  const [opened, setOpened] = useState<string | null>(null);
+  if (isLoadingBls) return <SkeletonText lines={3} className="ml-8" />;
+  if (blsError) return <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>;
+  if (supplierBls.length === 0) return <p className="ml-8 text-sm text-muted-foreground">{t("ps.noBl")}</p>;
   return (
-    <div className="ml-8 flex flex-col gap-2 rounded-lg border border-border bg-surface-subtle/50 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm text-muted-foreground">{t("ps.linesHint")}</span>
-        <SupplierFilter suppliers={suppliers} value={supplier} onChange={setSupplier} />
-      </div>
-      {isLoadingProductLines ? (
-        <SkeletonText lines={3} />
-      ) : productLinesError ? (
-        <p className="text-sm text-error">{t("ps.loadDetailErr")}</p>
-      ) : shown.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("ps.lignesNone")}</p>
-      ) : (
-        <ul data-list="bl-lines" className="flex max-h-80 flex-col overflow-y-auto">
-          {shown.map((l) => (
-            <li key={l.delivery_ref}>
-              <label className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 hover:bg-card">
-                <Checkbox
-                  checked={l.already_excluded}
-                  aria-label={l.delivery_ref}
-                  onChange={(on) => {
-                    const target = {
-                      kind: "line" as const,
-                      medicamentId: product.id,
-                      ref: l.delivery_ref,
-                      ids: l.exclusion_id != null ? [l.exclusion_id] : [],
-                      name: `${product.product} · BL ${l.delivery_ref}`,
-                    };
-                    if (on) onExclude(target);
-                    else onReintegrate(target);
-                  }}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                  <span className="font-mono font-medium">{l.delivery_ref}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {l.supplier ?? "—"} · {formatDate(l.delivery_date)} · {t("col.qte")} {formatQty(l.quantity)}
-                  </span>
-                </span>
-                <span className="font-mono text-sm font-semibold tabular-nums">{formatMAD(l.total)}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul
+      aria-label={t("ps.groupBls")}
+      className="ml-8 flex flex-col divide-y divide-border rounded-xl border border-border bg-card"
+    >
+      {supplierBls.map((b) => (
+        <BlRow
+          key={b.delivery_ref}
+          bl={b}
+          open={opened === b.delivery_ref}
+          onToggle={() => setOpened(opened === b.delivery_ref ? null : b.delivery_ref)}
+          {...actions}
+        />
+      ))}
+    </ul>
   );
 }
 
-/** « Produit sur un BL »: pick the product, then tick its BLs. */
-export function LineResults({
-  products,
+/** « BL par Fournisseur »: the suppliers found; each opens its BLs. */
+export function SupplierBlResults({
+  suppliers,
   q,
   isSearching,
-  onExclude,
-  onReintegrate,
-}: Common & { products: MedicamentSuggestion[]; onReintegrate: (x: ExclusionTarget) => void }) {
+  ...actions
+}: Common & { suppliers: SupplierSummary[] }) {
   const t = useT();
-  const [opened, setOpened] = useState<number | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
   return (
-    <Found title={t("ps.groupProducts")} q={q} count={products.length} isSearching={isSearching}>
-      {products.map((p) => (
+    <Found title={t("ps.groupSuppliers")} q={q} count={suppliers.length} isSearching={isSearching}>
+      {suppliers.map((s) => (
         <Row
-          key={p.id}
-          icon={<Package className="size-5" />}
-          title={<span className="truncate">{p.product}</span>}
-          facts={productFacts(t, p)}
+          key={s.supplier}
+          icon={<Building2 className="size-5" />}
+          title={
+            <>
+              <span className="truncate">{s.supplier}</span>
+              {s.already_excluded && <AlreadyExcluded />}
+            </>
+          }
+          facts={t("ps.supplierDetail", { lines: formatNumStr(s.nb_lines), products: formatNumStr(s.nb_products) })}
+          amount={formatMAD(s.total)}
           expand={{
-            open: opened === p.id,
+            open: opened === s.supplier,
             label: t("ps.seeBls"),
-            onToggle: () => setOpened(opened === p.id ? null : p.id),
+            onToggle: () => setOpened(opened === s.supplier ? null : s.supplier),
           }}
         >
-          {opened === p.id && <ProductBls product={p} onExclude={onExclude} onReintegrate={onReintegrate} />}
+          {opened === s.supplier && <SupplierBls supplier={s.supplier} {...actions} />}
         </Row>
       ))}
     </Found>
@@ -402,6 +384,7 @@ export function SupplierResults({
   isSearching,
   isExcluding,
   onExclude,
+  onReintegrate,
 }: Common & { suppliers: SupplierSummary[] }) {
   const t = useT();
   return (
@@ -419,12 +402,15 @@ export function SupplierResults({
           facts={t("ps.supplierDetail", { lines: formatNumStr(s.nb_lines), products: formatNumStr(s.nb_products) })}
           amount={formatMAD(s.total)}
           actions={
-            !s.already_excluded && (
-              <ExcludeButton
-                disabled={isExcluding}
-                onClick={() => onExclude({ kind: "supplier", supplier: s.supplier, name: s.supplier })}
-              />
-            )
+            <ExcludeStar
+              excluded={s.already_excluded}
+              disabled={isExcluding}
+              onClick={() => {
+                const target = { kind: "supplier" as const, supplier: s.supplier, name: s.supplier };
+                if (s.already_excluded) onReintegrate(target);
+                else onExclude(target);
+              }}
+            />
           }
         />
       ))}

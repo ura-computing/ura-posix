@@ -276,7 +276,11 @@ test("importer une période : la barre « Période », le calendrier ; les anné
   const page = owner;
   const main = page.locator("main");
   const start = main.getByRole("button", { name: "Importer", exact: true });
-  // The « Période » bar: each button = its dates (« Année en cours » at first, like the product page).
+  // The « Période » bar: « 7 j » at first, then each button = its dates.
+  await expect(main.getByRole("button", { name: "7 j", exact: true }), "« 7 j » par défaut").toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   for (const [name, want] of barPeriods(new Date())) {
     const button = main.getByRole("button", { name, exact: true });
     await button.click();

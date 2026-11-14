@@ -13,7 +13,7 @@ import { SearchInput } from "@/_components/atoms/Input";
 import { useT } from "@/i18n/I18nProvider";
 
 import { ExcludedList } from "./_components/ExcludedList";
-import { BlResults, LineResults, ProductResults, SupplierResults } from "./_components/SearchResults";
+import { BlResults, ProductResults, SupplierBlResults, SupplierResults } from "./_components/SearchResults";
 import { useExclusionSearch, useExclusions, type ExclusionKind } from "./hooks";
 
 /** One tab: « 1. Cherchez … », its results; « 2. … exclus ». Mounted per tab: its search starts empty. */
@@ -31,7 +31,7 @@ function KindTab({ kind }: { kind: ExclusionKind }) {
     isReintegrating,
     saveNote,
   } = useExclusions();
-  const common = { q: q.trim(), isSearching, isExcluding, onExclude: exclude };
+  const common = { q: q.trim(), isSearching, isExcluding, onExclude: exclude, onReintegrate: reintegrate };
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,6 +39,7 @@ function KindTab({ kind }: { kind: ExclusionKind }) {
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-foreground">{t(`ps.find.${kind}`)}</h2>
           <p className="text-sm text-muted-foreground">{t(`ps.hint.${kind}`)}</p>
+          <p className="text-sm text-muted-foreground">{t("ps.starHint")}</p>
         </div>
         <SearchInput
           autoFocus
@@ -49,7 +50,7 @@ function KindTab({ kind }: { kind: ExclusionKind }) {
         />
         {ready && kind === "product" && <ProductResults {...common} products={foundProducts} />}
         {ready && kind === "bl" && <BlResults {...common} bls={foundBls} />}
-        {ready && kind === "line" && <LineResults {...common} products={foundProducts} onReintegrate={reintegrate} />}
+        {ready && kind === "line" && <SupplierBlResults {...common} suppliers={foundSuppliers} />}
         {ready && kind === "supplier" && <SupplierResults {...common} suppliers={foundSuppliers} />}
       </Card>
 
@@ -71,7 +72,7 @@ export default function ProduitsSpeciauxPage() {
   const t = useT();
   const [tab, setTab] = useState<ExclusionKind>("product");
   return (
-    <Page title={t("nav.produitsSpeciaux")} subtitle={t("ps.subtitle")}>
+    <Page title={t("nav.produitsSpeciaux")}>
       <TabBar<ExclusionKind>
         tabs={[
           { id: "product", label: t("ps.tab.product"), icon: <Package className="size-4" /> },

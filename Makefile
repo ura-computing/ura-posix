@@ -87,12 +87,12 @@ db:
 	    docker compose exec -T db psql -U apcm -d postgres -c "CREATE DATABASE $(DEV_DB);"; \
 	  }
 
-backend: install db migrate 
+backend: install db migrate seed
 	cd $(BACKEND_DIR) && uv run uvicorn main:app --port 8000 --reload
 
 # The Sobrus robot, its own process (like the DigitalOcean « Worker »): no migrate here, it waits for the
 # backend's (make dev starts both).
-worker: db
+worker: install db
 	cd $(BACKEND_DIR) && uv run watchfiles --filter python "python -m app.sobrus.worker" app
 
 frontend: install

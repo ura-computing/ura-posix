@@ -34,6 +34,9 @@ import { useSobrusPage } from "./hooks";
 
 const CHOICE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 
+/** The product page's periods + « 7 j » first (the default here). */
+const SOBRUS_PERIODS = [["7d", "products.period7"], ...PERIOD_LABELS] as const;
+
 /** A run's result as a badge: done = green, stopped by Sobrus = red, stopped by the user = grey. */
 const RUN_TONE: Partial<Record<SobrusRun["status"], BadgeTone>> = {
   success: "success",
@@ -183,9 +186,10 @@ function Connected({
 }) {
   const t = useT();
   // « Période »: a preset (its dates), « Tout l'historique », or dates picked (custom).
-  const [choice, setChoice] = useState<PeriodPreset | "full" | "custom">("year");
-  const [from, setFrom] = useState<string | null>(PERIOD_PRESETS.year().from);
-  const [to, setTo] = useState<string | null>(PERIOD_PRESETS.year().to);
+  // The last 7 days at first: the usual « catch up » import (the nightly run already brings the rest).
+  const [choice, setChoice] = useState<PeriodPreset | "full" | "custom">("7d");
+  const [from, setFrom] = useState<string | null>(PERIOD_PRESETS["7d"]().from);
+  const [to, setTo] = useState<string | null>(PERIOD_PRESETS["7d"]().to);
   const [force, setForce] = useState(false);
   const blocked = connection.status !== "active" || !!activeRun || isStarting;
   const badPeriod = !!from && !!to && from > to;
@@ -242,7 +246,7 @@ function Connected({
             value={choice}
             onChange={pick}
             options={[
-              ...PERIOD_LABELS.map(([value, label]) => ({ value, label: t(label), activeBg: CHOICE_ACTIVE })),
+              ...SOBRUS_PERIODS.map(([value, label]) => ({ value, label: t(label), activeBg: CHOICE_ACTIVE })),
               { value: "full" as const, label: t("sobrus.choiceAll"), activeBg: CHOICE_ACTIVE },
             ]}
           />

@@ -293,7 +293,8 @@ test("produits spéciaux, BL, fournisseurs : vide ou introuvable", async ({ page
   expect(codeOf(await apiPost(page, "/special-products/", { medicament_ids: [NONE] }, {}, 404))).toBe(
     "medicamentsNotFound",
   );
-  expect(codeOf(await apiGet(page, "/bl-line-exclusions/lines", { medicament_id: NONE }, 404))).toBe(
+  // A note on a product that is not excluded.
+  expect(codeOf(await apiPut(page, "/special-products/note", { medicament_id: NONE, notes: "x" }, 404))).toBe(
     "medicamentNotFound",
   );
 });

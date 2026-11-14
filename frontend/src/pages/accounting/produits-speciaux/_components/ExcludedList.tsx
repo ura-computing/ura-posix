@@ -1,10 +1,11 @@
 /** « 2. … exclus » of one tab: what this kind left out of Comptabilité, newest first. One click
  *  « Réintégrer » puts it back; « Ajouter une note » writes why (Entrée saves, Échap cancels). */
 import { useState } from "react";
-import { Pencil, Undo2 } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import { Input } from "@/_components/atoms/Input";
+import { StarToggle } from "@/_components/atoms/StarToggle";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD } from "@/utils/format";
@@ -14,8 +15,16 @@ import type { ExcludedRow, ExclusionKind, ExclusionTarget } from "../hooks";
 const TITLE: Record<ExclusionKind, string> = {
   product: "ps.listProduct",
   bl: "ps.listBl",
-  line: "ps.listLine",
+  line: "ps.listBl",
   supplier: "ps.listSupplier",
+};
+
+/** What each tab lists: the two BL tabs share one list (whole BLs + products left out of a BL). */
+const LISTED: Record<ExclusionKind, ExclusionKind[]> = {
+  product: ["product"],
+  bl: ["bl", "line"],
+  line: ["bl", "line"],
+  supplier: ["supplier"],
 };
 
 /** The note, or « Ajouter une note »; a click → a box (Entrée / leaving it saves, Échap cancels). */
@@ -98,7 +107,7 @@ export function ExcludedList({
   onSaveNote: (target: ExclusionTarget, notes: string) => Promise<unknown>;
 }) {
   const t = useT();
-  const shown = rows.filter((r) => r.target.kind === kind);
+  const shown = rows.filter((r) => LISTED[kind].includes(r.target.kind));
 
   const columns: ColumnDef<ExcludedRow>[] = [
     {
@@ -148,13 +157,18 @@ export function ExcludedList({
     {
       key: "_action",
       label: "",
-      width: 150,
+      width: 64,
       sortable: false,
       align: "right",
+      // ★ = out of Comptabilité, like in the search: a click puts it back (« Réintégrer »).
       render: (r) => (
-        <Button variant="secondary" type="button" disabled={isReintegrating} onClick={() => onReintegrate(r.target)}>
-          <Undo2 className="size-4" /> {t("ps.reintegrer")}
-        </Button>
+        <StarToggle
+          checked
+          disabled={isReintegrating}
+          onChange={() => onReintegrate(r.target)}
+          aria-label={t("ps.exclure")}
+          title={t("ps.reintegrer")}
+        />
       ),
     },
   ];

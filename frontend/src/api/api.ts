@@ -127,7 +127,6 @@ const blExclusionReads = (): Read[] => [
   API.blExclusions.search,
   API.blExclusions.detail,
   API.blLineExclusions.list,
-  API.blLineExclusions.lines,
 ];
 const supplierExclusionReads = (): Read[] => [API.supplierExclusions.list, API.supplierExclusions.search];
 
@@ -412,6 +411,11 @@ export const API = {
       key: (q: string) => ["bl-exclusions", "search", q] as const,
       all: ["bl-exclusions", "search"],
     },
+    /** Every BL of one supplier (« BL par Fournisseur »): the same search with `supplier`. */
+    ofSupplier: {
+      url: "/bl-exclusions/search",
+      key: (supplier: string) => ["bl-exclusions", "search", "supplier", supplier] as const,
+    },
     detail: {
       url: "/bl-exclusions/detail",
       key: (ref: string) => ["bl-exclusions", "detail", ref] as const,
@@ -430,18 +434,13 @@ export const API = {
   // « Exclure un produit d'un BL »: only those achat lines leave Comptabilité.
   blLineExclusions: {
     list: { url: "/bl-line-exclusions/", key: ["bl-line-exclusions", "list"] },
-    lines: {
-      url: "/bl-line-exclusions/lines",
-      key: (medicamentId: number) => ["bl-line-exclusions", "lines", medicamentId] as const,
-      all: ["bl-line-exclusions", "lines"],
-    },
     exclude: {
       url: "/bl-line-exclusions/",
-      refreshes: (): Read[] => [API.blLineExclusions.list, API.blLineExclusions.lines, ...afterExclusion()],
+      refreshes: (): Read[] => [API.blLineExclusions.list, API.blExclusions.detail, ...afterExclusion()],
     },
     reintegrate: {
       url: "/bl-line-exclusions/reintegrate",
-      refreshes: (): Read[] => [API.blLineExclusions.list, API.blLineExclusions.lines, ...afterExclusion()],
+      refreshes: (): Read[] => [API.blLineExclusions.list, API.blExclusions.detail, ...afterExclusion()],
     },
     note: { url: "/bl-line-exclusions/note", refreshes: (): Read[] => [API.blLineExclusions.list] },
   },
