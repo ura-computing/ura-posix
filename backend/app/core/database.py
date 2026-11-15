@@ -1,7 +1,7 @@
 from typing import Annotated, Iterator
 
 from fastapi import Depends
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -25,6 +25,20 @@ engine = create_engine(
     pool_timeout=30,
     pool_recycle=1800,
 )
+
+
+# A query running longer than DB_STATEMENT_TIMEOUT_MS is stopped by Postgres: its request fails alone (500, its traceback
+# in the log) instead of keeping a connection while the others wait for the pool and fail too. Example: the dashboard
+# asked with no dates over a whole history on the 1-vCPU database. Set on each new connection (works the same through
+# DigitalOcean's connection pool); 0 = no limit (the worker: entrypoint.sh).
+@event.listens_for(engine, "connect")
+def _statement_timeout(dbapi_connection, _record) -> None:
+    if settings.DB_STATEMENT_TIMEOUT_MS > 0:
+        with dbapi_connection.cursor() as cursor:
+            cursor.execute(f"SET statement_timeout = {int(settings.DB_STATEMENT_TIMEOUT_MS)}")
+        dbapi_connection.commit()
+
+
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 

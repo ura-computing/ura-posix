@@ -16,6 +16,10 @@ COMPOSE="docker compose -f $ROOT/e2e/docker-compose.e2e.yml"
 if [ "${E2E_DO:-0}" = 1 ]; then
   COMPOSE="$COMPOSE -f $ROOT/env/do/limits.yml -f $ROOT/e2e/docker-compose.do.yml"
 fi
+# E2E_SPLIT=1 (run.sh asks): gateway + identity / analytics / ingestion / sobrus (e2e/docker-compose.split.yml).
+if [ "${E2E_SPLIT:-0}" = 1 ]; then
+  COMPOSE="$COMPOSE -f $ROOT/e2e/docker-compose.split.yml"
+fi
 mkdir -p "$(dirname "$LOG")"
 : > "$LOG"
 : > "$RESOURCES"

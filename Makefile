@@ -93,7 +93,7 @@ backend: install db migrate seed
 # The Sobrus robot, its own process (like the DigitalOcean « Worker »): no migrate here, it waits for the
 # backend's (make dev starts both).
 worker: install db
-	cd $(BACKEND_DIR) && uv run watchfiles --filter python "python -m app.sobrus.worker" app
+	cd $(BACKEND_DIR) && DB_STATEMENT_TIMEOUT_MS=0 uv run watchfiles --filter python "python -m app.sobrus.worker" app
 
 frontend: install
 	cd $(FRONTEND_DIR) && npm run dev

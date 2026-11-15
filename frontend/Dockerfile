@@ -9,6 +9,9 @@ COPY . .
 
 ARG VITE_BACKEND_URL=http://localhost:8000
 ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+# Sentry for the page (empty = off): the DSN of the « pharmagest-frontend » project, read at build time.
+ARG VITE_SENTRY_DSN=""
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 
 RUN npm run build
 

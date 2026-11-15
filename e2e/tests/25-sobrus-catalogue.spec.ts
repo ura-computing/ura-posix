@@ -248,6 +248,8 @@ test.describe("administrateur", () => {
     await page.goto("/imports");
     await page.getByRole("tab", { name: "Produits Sobrus", exact: true }).click();
     await expect(page.locator("tbody tr").first()).toContainText("Réussi");
+    await page.getByRole("tab", { name: "Imports", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Imports", exact: true })).toHaveAttribute("aria-selected", "true");
     expect(pid, "la pharmacie E2E").toBeTruthy();
   });
 

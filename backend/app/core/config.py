@@ -9,10 +9,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     DATABASE_URL: str
+    # The database itself, not DigitalOcean's connection pool (PgBouncer, transaction mode: no LISTEN, and migrations
+    # are safer direct): the worker's LISTEN and scripts/bootstrap.py use it. Empty = DATABASE_URL (no pool).
+    DATABASE_URL_DIRECT: str = ""
     # Connections of ONE process (app/core/database.py). The managed Postgres gives the app 22 (25 − 3 reserved):
     # API 2 processes × (4 + 4) = 16, worker (entrypoint.sh worker: 2 + 1) + its LISTEN = 4 → 20, 2 left over.
     DB_POOL_SIZE: int = 4
     DB_MAX_OVERFLOW: int = 4
+    # A query longer than this is stopped by Postgres (app/core/database.py); 0 = no limit (the worker).
+    DB_STATEMENT_TIMEOUT_MS: int = 30_000
     JWT_SECRET: str
     # JWT access-token lifetime in minutes. 7 days by default so users aren't
     # interrupted by "Session expirée" popups during normal work. Revocation
@@ -27,6 +32,9 @@ class Settings(BaseSettings):
     # Which part of the API this process runs (app/core/services.py): identity · analytics · ingestion · sobrus.
     # Empty = every router (dev, E2E, one-component production).
     SERVICE: str = ""
+    # Sentry (app/core/observability.py): empty = nothing sent (dev, E2E).
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "production"
 
     # « Connexion Sobrus » (app/sobrus/). SOBRUS_SECRET_KEY = Fernet key that encrypts the Sobrus
     # passwords + sessions (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`);
@@ -36,6 +44,10 @@ class Settings(BaseSettings):
     SOBRUS_API_URL: str = "https://api.pharmav4.sobrus.com"
     SOBRUS_ACCOUNT_API_URL: str = "https://api.account.sobrus.com"
     SOBRUS_COUNTRY: str = "MA"
+
+    @property
+    def direct_database_url(self) -> str:
+        return self.DATABASE_URL_DIRECT or self.DATABASE_URL
 
     @field_validator("SOBRUS_SECRET_KEY")
     @classmethod

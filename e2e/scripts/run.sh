@@ -60,6 +60,10 @@ done
 if [ "$(ask "DigitalOcean limits (backend 512 MB, Postgres 1 GB, 22 connections)? (y/n)" y)" = y ]; then
   export E2E_DO=1
 fi
+# The API split into services behind the gateway (e2e/docker-compose.split.yml), like DigitalOcean after the switch.
+if [ "$(ask "Services split (gateway + identity / analytics / ingestion / sobrus)? (y/n)" n)" = y ]; then
+  export E2E_SPLIT=1
+fi
 args=()
 
 if [ ${#SPECS[@]} -gt 0 ]; then         # files given on the command line

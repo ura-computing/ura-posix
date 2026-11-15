@@ -2,8 +2,8 @@
  *  - `Input`: `onValueChange` gets the text (or `onChange` the event); `leftIcon` / `rightSlot`
  *    (e.g. the eye of a password) inside its edges
  *  - `SearchInput`: loupe + ✕ to clear; one size everywhere (filters, Produits spéciaux…)
- *  - `Textarea`, `Select`: same border and focus */
-import type { InputHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+ *  - `Textarea`: same border and focus (a dropdown: `SingleSelect`, the app's own list) */
+import type { InputHTMLAttributes, ReactNode, Ref, TextareaHTMLAttributes } from "react";
 import { Search, X } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
@@ -91,20 +91,6 @@ export function Textarea({
     <textarea
       aria-invalid={invalid || undefined}
       className={cn(FIELD, "resize-none px-3 py-2", border(invalid), className)}
-      {...rest}
-    />
-  );
-}
-
-export function Select({
-  invalid,
-  className,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean; ref?: Ref<HTMLSelectElement> }) {
-  return (
-    <select
-      aria-invalid={invalid || undefined}
-      className={cn(FIELD, "h-9 px-3", border(invalid), className)}
       {...rest}
     />
   );

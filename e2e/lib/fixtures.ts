@@ -80,6 +80,12 @@ export async function fakeApi(
  *  elements). The fixture page is recorded by itself; a page a spec opens in its own context (another
  *  user) calls this once, before its first page load. Resolves the returned function once every call seen
  *  so far is written. */
+/** A page made by hand (another account): its calls and clicks count in the gates, under the running test.
+ *  Await `uiReady(page)` before its first `goto`, else its first clicks happen before the UI recorder is in. */
+export function uiReady(page: Page, title: () => string): Promise<void> {
+  return recordUi(page.context(), title);
+}
+
 export function recordPage(page: Page, title: () => string): () => Promise<void> {
   const pending: Promise<void>[] = [];
   const onRequest = (req: Request) => {

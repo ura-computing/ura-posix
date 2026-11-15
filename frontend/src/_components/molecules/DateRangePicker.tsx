@@ -14,7 +14,7 @@ import {
   useInteractions,
 } from "@floating-ui/react";
 
-import { DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/molecules/dayPicker";
+import { CALENDAR_PANEL, DAY_PICKER_CLASSES, DAY_PICKER_MODIFIERS } from "@/_components/molecules/dayPicker";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { DATE_PRESETS, type DateRange as IsoRange } from "@/utils/dateRange";
@@ -355,7 +355,7 @@ export function DateRangePicker({ from, to, onChange, showPresets = true, classN
             ref={setPanelEl}
             {...getFloatingProps()}
             style={floatingStyles}
-            className="z-[60] flex flex-col overflow-auto rounded-xl border border-border bg-card shadow-2xl"
+            className={cn(CALENDAR_PANEL, "gap-0 overflow-auto p-0")}
           >
             {showPresets && (
               <div className="border-b border-border bg-muted/30 px-3 pb-3 pt-2.5">

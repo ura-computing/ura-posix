@@ -235,7 +235,7 @@ export function usePeremptions() {
 
 /** Products with ventes in the window but no matching achat — the root cause of
  *  "—" cells for Marge %/DH on /ventes. Same filter shape as MarginAlerts. */
-export function useVentesSansAchat(filters: MarginAlertsFilters) {
+function useVentesSansAchat(filters: MarginAlertsFilters) {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.stats.ventesSansAchat.key(
       filters.date_from ?? null,

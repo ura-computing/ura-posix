@@ -214,6 +214,10 @@ flowchart LR
 | `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_SERVER`, `MAIL_PORT`, `MAIL_STARTTLS`, `MAIL_SSL_TLS` | SMTP. Empty `MAIL_USERNAME` → links are **printed to the log** |
 | `WEB_CONCURRENCY` | uvicorn processes in Docker (default 2) |
 | `DB_POOL_SIZE` · `DB_MAX_OVERFLOW` | Postgres connections of one process (default 4 + 4; worker: 2 + 1). Every process together ≤ the plan's limit (DigitalOcean 1 GB: 22): more processes or instances → lower them, bigger plan → raise them |
+| `DB_STATEMENT_TIMEOUT_MS` | a query longer than this is stopped by Postgres (default 30 000 = 30 s; worker: 0 = no limit): one slow request fails alone instead of holding a connection |
+| `DATABASE_URL_DIRECT` | the database itself, not DigitalOcean's connection pool: the worker's `LISTEN` + migrations (empty = `DATABASE_URL`) |
+| `SERVICE` | the part of the API this process runs: `identity` · `analytics` · `ingestion` · `sobrus` (empty = all; `app/core/services.py`, routes for the gateway: `scripts/gateway_routes.py` → `gateway/Caddyfile`) |
+| `SENTRY_DSN` · `SENTRY_ENVIRONMENT` | errors to Sentry with traceback + request id (empty = off); frontend: build arg `VITE_SENTRY_DSN` |
 | `PORT` | container port (default 8000) |
 | `RATE_LIMIT=0`, `SEED_CATALOG=0` | **E2E only**: no login limit, no catalogue in the seed |
 | `PRODUCT_INFOS_FILE` | **E2E only**: another photos file than `backend/data/product_infos.json` (the test fixture) |

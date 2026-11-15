@@ -21,18 +21,18 @@ export function todayIso(now: Date = new Date()): string {
 }
 
 /** ISO date `n` days before today (0 = today). */
-export function daysAgo(n: number, now: Date = new Date()): string {
+function daysAgo(n: number, now: Date = new Date()): string {
   return fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate() - n));
 }
 
 /** ISO date the day after `iso`. */
-export function dayAfter(iso: string): string {
+function dayAfter(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return fmt(new Date(y, m - 1, d + 1));
 }
 
 /** ISO date `n` years before today (same month/day). */
-export function yearsAgo(n: number, now: Date = new Date()): string {
+function yearsAgo(n: number, now: Date = new Date()): string {
   return fmt(new Date(now.getFullYear() - n, now.getMonth(), now.getDate()));
 }
 
@@ -49,20 +49,20 @@ export function monthsAgo(n: number, now: Date = new Date()): string {
 }
 
 /** First day of current month → today. */
-export function currentMonth(now: Date = new Date()): DateRange {
+function currentMonth(now: Date = new Date()): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
   return { from: fmt(from), to: fmt(now) };
 }
 
 /** Full previous calendar month (1st → last day). */
-export function previousMonth(now: Date = new Date()): DateRange {
+function previousMonth(now: Date = new Date()): DateRange {
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const to = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of prev month
   return { from: fmt(from), to: fmt(to) };
 }
 
 /** Full previous calendar quarter (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec). */
-export function previousQuarter(now: Date = new Date()): DateRange {
+function previousQuarter(now: Date = new Date()): DateRange {
   const currentQ = Math.floor(now.getMonth() / 3); // 0..3
   let prevQ = currentQ - 1;
   let year = now.getFullYear();
@@ -77,7 +77,7 @@ export function previousQuarter(now: Date = new Date()): DateRange {
 }
 
 /** Full previous calendar year (Jan 1 → Dec 31). */
-export function previousYear(now: Date = new Date()): DateRange {
+function previousYear(now: Date = new Date()): DateRange {
   const y = now.getFullYear() - 1;
   return { from: `${y}-01-01`, to: `${y}-12-31` };
 }

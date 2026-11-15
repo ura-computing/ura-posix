@@ -5,6 +5,7 @@ import { AsYouType, getCountryCallingCode, type CountryCode } from "libphonenumb
 
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
+import { SingleSelect } from "@/_components/molecules/SingleSelect";
 
 const COUNTRIES: { code: CountryCode; label: string }[] = [
   { code: "MA", label: "Maroc" },
@@ -47,22 +48,19 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
             "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
           )}
         >
-          <select
-            aria-label={t("shared.countryCode")}
+          {/* The app's dropdown (not the browser's own list), inside the field. */}
+          <SingleSelect
+            inline
+            label=""
+            ariaLabel={t("shared.countryCode")}
+            options={COUNTRIES.map((c) => ({ value: c.code, label: `+${getCountryCallingCode(c.code)}` }))}
             value={country}
-            onChange={(e) => {
-              const c = e.target.value as CountryCode;
+            onChange={(v) => {
+              const c = v as CountryCode;
               setCountry(c);
               emit(national, c);
             }}
-            className="cursor-pointer border-r border-border bg-transparent py-2 pl-3 pr-2 font-mono text-sm text-foreground outline-none"
-          >
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                +{getCountryCallingCode(c.code)}
-              </option>
-            ))}
-          </select>
+          />
           <input
             id={id}
             ref={ref}

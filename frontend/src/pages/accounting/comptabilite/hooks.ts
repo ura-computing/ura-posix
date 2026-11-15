@@ -183,7 +183,7 @@ export function useComptabilitePage() {
  *  so the page card grid updates without a manual refetch. */
 
 /** Payment entries for `month` (YYYY-MM). Omit `month` to load all entries. */
-export function usePayments(month?: string) {
+function usePayments(month?: string) {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.payments.list.key(month),
     queryFn: () => api.get<PaymentEntry[]>(API.payments.list.url, { params: { month } }),

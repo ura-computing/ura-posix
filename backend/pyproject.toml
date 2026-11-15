@@ -11,13 +11,14 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "pydantic-settings>=2.2",
     "bcrypt>=4.1",
-    "python-jose[cryptography]>=3.3",
+    "pyjwt>=2.10",
     "pydantic[email]>=2.6",
     "questionary>=2.1.1",
     "httpx>=0.28.1",
     "rich>=15.0.0",
     "slowapi>=0.1.10",
     "cryptography>=45",
+    "sentry-sdk[fastapi]>=2.20",
 ]
 
 [dependency-groups]

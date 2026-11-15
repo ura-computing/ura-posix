@@ -25,7 +25,7 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { sessionFile } from "../lib/auth";
 import { CATEGORY_TYPES, checkStats, checkStockSummary } from "../lib/checks";
 import { expected, testWindow } from "../lib/expected";
-import { expect, recordPage, test } from "../lib/fixtures";
+import { expect, recordPage, test, uiReady } from "../lib/fixtures";
 import { lastSobrusProblemEmail } from "../lib/mail";
 import { barPeriods, dates, pageSend, quickPeriods, setPeriod } from "../lib/ui";
 
@@ -630,6 +630,7 @@ test("l'administrateur « Changer l'email Sobrus » → le propriétaire peut co
   const ctx = await browser.newContext({ storageState: sessionFile("admin") });
   const admin = await ctx.newPage();
   const flushAdmin = recordPage(admin, () => test.info().title);
+  await uiReady(admin, () => test.info().title);
   try {
     await admin.goto(`/admin/pharmacies/${pharmacyId}`);
     await expect(admin.getByText(`Compte Sobrus : ${SOBRUS.email}`)).toBeVisible();

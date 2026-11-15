@@ -88,6 +88,7 @@ export const es: Dict = {
     home: "Inicio",
     subtitle: "Vista general de su farmacia",
     logout: "Cerrar sesión",
+    lock: "Bloquear la pantalla",
     notifications: "Notificaciones",
   },
 

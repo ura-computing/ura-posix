@@ -2,10 +2,11 @@
  *  - `useIdleLock`: after `lock.seconds` with no click, key, touch or scroll in ANY tab of the app (the last activity is
  *    shared through localStorage: one tab in use keeps the others open), this device's session is locked
  *    (`POST /auth/lock`) and `me` refreshed → `AppLayout` shows `LockScreen` over the page (nothing is lost under it);
+ *  - `useLockNow`: « Verrouiller l'écran » (sidebar), the same lock at once;
  *  - `useUnlock`: the 6-digit code → every query again (they got 423 while locked); 5 wrong codes → logged out.
  *  Locking / unlocking reaches the other tabs at once (BroadcastChannel). */
 import { useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { API } from "@/api/api";
@@ -43,6 +44,13 @@ function tellOtherTabs(): void {
   }
 }
 
+/** This device's session locks; `me` refreshed → the lock screen (here and in the other tabs). */
+async function lockThisDevice(qc: QueryClient): Promise<void> {
+  await api.post(API.auth.lock.url);
+  tellOtherTabs();
+  await qc.invalidateQueries({ queryKey: API.auth.me.key });
+}
+
 export function useIdleLock(lock: LockState | undefined) {
   const qc = useQueryClient();
   const enabled = !!lock?.enabled && lock.has_pin && !lock.locked;
@@ -77,16 +85,23 @@ export function useIdleLock(lock: LockState | undefined) {
       const idle = Date.now() - Math.max(last, readActivity());
       if (idle < limitMs) return;
       window.clearInterval(timer);
-      void api.post(API.auth.lock.url).then(() => {
-        tellOtherTabs();
-        void qc.invalidateQueries({ queryKey: API.auth.me.key });
-      });
+      void lockThisDevice(qc);
     }, 1000); // 15 s is a choice: checked every second
     return () => {
       window.clearInterval(timer);
       for (const e of EVENTS) window.removeEventListener(e, onActivity);
     };
   }, [enabled, limitMs, qc]);
+}
+
+/** « Verrouiller l'écran »: lock now, without waiting for the idle delay (the counter PC left for a minute). */
+export function useLockNow() {
+  const qc = useQueryClient();
+  const { mutate, isPending } = useMutation({ mutationFn: () => lockThisDevice(qc) });
+  return {
+    lockNow: () => mutate(),
+    isLocking: isPending,
+  };
 }
 
 export function useUnlock() {

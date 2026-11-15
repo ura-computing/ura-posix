@@ -19,9 +19,12 @@ from datetime import datetime, time, timedelta, timezone
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 from uvicorn.logging import DefaultFormatter
 
+from app.core.config import settings
+from app.core.observability import init_sentry
 from app.core.database import SessionLocal, engine
 from app.core.models import Pharmacy, PharmacyFeature, SobrusConnection, SobrusRun
 from app.core.utils import PHARMACY_TZ
@@ -116,7 +119,8 @@ def _listen():
     """A Postgres connection of its own, outside the pool (a pooled one is taken back and closed under us), LISTENing
     to `sobrus_runs`. TCP keepalives: a connection the database drops (DigitalOcean idle limit, maintenance) fails at
     once instead of hanging."""
-    url = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)
+    # Direct, never through DigitalOcean's pool (PgBouncer in transaction mode does not keep a LISTEN).
+    url = make_url(settings.direct_database_url).set(drivername="postgresql").render_as_string(hide_password=False)
     raw = psycopg2.connect(url, keepalives=1, keepalives_idle=60, keepalives_interval=10, keepalives_count=3)
     raw.autocommit = True
     raw.cursor().execute(f"LISTEN {CHANNEL}")
@@ -146,6 +150,8 @@ def describe(run_id: int) -> str:
     """« products · Pharmacie Demo (pharmacy 1), by user 3 »."""
     with SessionLocal() as db:
         run = db.get(SobrusRun, run_id)
+        if run is None:  # deleted meanwhile (its pharmacy deleted)
+            return f"run {run_id} (deleted)"
         pharmacy = db.get(Pharmacy, run.pharmacy_id)
         dates = f" {run.date_from} → {run.date_to}" if run.mode == "range" else ""
         who = f"by user {run.created_by}" if run.created_by else "nightly"
@@ -155,6 +161,8 @@ def describe(run_id: int) -> str:
 def result(run_id: int) -> str:
     with SessionLocal() as db:
         run = db.get(SobrusRun, run_id)
+        if run is None:
+            return "deleted"
         if run.status == "error":
             return f"error {run.error_code}"
         return f"{run.status}, {run.lines_added:,} line(s) / product(s) added".replace(",", " ")
@@ -213,6 +221,7 @@ if __name__ == "__main__":
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("alembic").setLevel(logging.WARNING)  # « Context impl … » at every schema check
     signal.signal(signal.SIGTERM, _stop_on_sigterm)
+    init_sentry("worker")
     try:
         main()
     except KeyboardInterrupt:  # Ctrl+C, or `make worker` reloading after a code change

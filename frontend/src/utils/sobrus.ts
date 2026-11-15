@@ -5,13 +5,13 @@ import type { TFn } from "@/i18n/I18nProvider";
 import type { SobrusEvent, SobrusRun } from "@/types";
 import { formatDate, formatNumStr } from "@/utils/format";
 
-export const kindName = (t: TFn, kind: string | null | undefined) =>
+const kindName = (t: TFn, kind: string | null | undefined) =>
   kind === "achat" ? t("nav.achats") : kind === "vente" ? t("nav.ventes") : kind === "stock" ? t("nav.stock") : "";
 /** « Ventes 2026 », « Stock ». */
 export const fileName = (t: TFn, run: SobrusRun) => [kindName(t, run.kind), run.year].filter(Boolean).join(" ");
 export const modeName = (t: TFn, run: SobrusRun) =>
   t(`sobrus.mode.${run.mode}`, { start: formatDate(run.date_from), end: formatDate(run.date_to) });
-export const errorText = (t: TFn, code: string | null | undefined) => {
+const errorText = (t: TFn, code: string | null | undefined) => {
   const key = `errors.${code}`;
   const text = t(key);
   return text === key ? t("errors.serverError") : text;

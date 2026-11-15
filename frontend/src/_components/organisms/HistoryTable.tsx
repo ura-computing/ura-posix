@@ -40,7 +40,7 @@ const columns = (t: TFn, withProduct: boolean): ColumnDef<AuditRow>[] => [
   {
     key: "kind",
     label: t("history.colType"),
-    width: 130,
+    width: 190,
     sortable: false,
     render: (r) => (
       <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-semibold", toneOf(r))}>

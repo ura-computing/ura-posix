@@ -2,7 +2,15 @@ import { useState } from "react";
 import { FloatingPortal } from "@floating-ui/react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { POPOVER_OPTION, POPOVER_PANEL, POPOVER_TRIGGER, usePopover } from "@/_components/molecules/popover";
+import {
+  CALENDAR_CELL,
+  CALENDAR_CELL_SELECTED,
+  CALENDAR_CELL_TODAY,
+  CALENDAR_NAV,
+  CALENDAR_PANEL,
+  CALENDAR_TITLE,
+} from "@/_components/molecules/dayPicker";
+import { POPOVER_TRIGGER, usePopover } from "@/_components/molecules/popover";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -58,6 +66,9 @@ export function MonthPicker({ value, onChange, label = "", placement = "bottom",
   // the user can browse other years before committing.
   const [displayYear, setDisplayYear] = useState(valueY);
 
+  const now = new Date();
+  const [thisYear, thisMonth] = [now.getFullYear(), now.getMonth()];
+
   const pick = (monthIdx: number) => {
     onChange(formatYearMonth(displayYear, monthIdx));
     setOpen(false);
@@ -87,23 +98,23 @@ export function MonthPicker({ value, onChange, label = "", placement = "bottom",
 
       {open && (
         <FloatingPortal>
-          <div ref={panelRef} {...getFloatingProps()} style={panelStyle} className={cn(POPOVER_PANEL, "w-64 p-2")}>
-            {/* Year stepper */}
-            <div className="mb-1 flex items-center justify-between px-1">
+          <div ref={panelRef} {...getFloatingProps()} style={panelStyle} className={cn(CALENDAR_PANEL, "w-72")}>
+            {/* Year: the same title and arrows as the day calendars */}
+            <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setDisplayYear(displayYear - 1)}
                 aria-label={t("shared.prevYear")}
-                className="rounded p-1 hover:bg-surface-subtle"
+                className={CALENDAR_NAV}
               >
                 <ChevronLeft className="size-4" />
               </button>
-              <span className="text-sm font-semibold text-foreground">{displayYear}</span>
+              <span className={CALENDAR_TITLE}>{displayYear}</span>
               <button
                 type="button"
                 onClick={() => setDisplayYear(displayYear + 1)}
                 aria-label={t("shared.nextYear")}
-                className="rounded p-1 hover:bg-surface-subtle"
+                className={CALENDAR_NAV}
               >
                 <ChevronRight className="size-4" />
               </button>
@@ -113,16 +124,14 @@ export function MonthPicker({ value, onChange, label = "", placement = "bottom",
             <div data-list="months" className="grid grid-cols-3 gap-1">
               {MONTHS_FR_SHORT.map((name, idx) => {
                 const active = displayYear === valueY && idx === valueM;
+                const current = displayYear === thisYear && idx === thisMonth;
                 return (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => pick(idx)}
-                    className={cn(
-                      POPOVER_OPTION,
-                      "justify-center px-2 py-2 text-xs",
-                      active && "bg-surface-subtle font-semibold text-foreground",
-                    )}
+                    aria-pressed={active}
+                    className={cn(CALENDAR_CELL, current && CALENDAR_CELL_TODAY, active && CALENDAR_CELL_SELECTED)}
                   >
                     {name}
                   </button>

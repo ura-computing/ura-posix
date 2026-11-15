@@ -3,7 +3,8 @@ from typing import Annotated
 
 import bcrypt
 from fastapi import Cookie, Depends, status
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 
 from app.core.config import settings
 from app.core.database import DbDep
@@ -48,7 +49,7 @@ def _authenticate(db: DbDep, access_token: AccessCookieDep = None) -> tuple[User
         raise creds_exc
     try:
         payload = jwt.decode(access_token, settings.JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except JWTError:
+    except PyJWTError:
         raise creds_exc
 
     user = db.get(User, int(payload["sub"]))

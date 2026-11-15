@@ -1,0 +1,87 @@
+# E2E stack split into services (make tests asks « Services split? »), the shape PharmaGest goes to on DigitalOcean:
+#   gateway (Caddy, gateway/Caddyfile: each path → its service) on :8001, where the frontend points
+#   backend = identity (still runs the migrations + seed, its log = the magic links), then analytics, ingestion,
+#   sobrus: the same image, entrypoint.sh serve, one process each
+# Connections: 4 services × (2 + 1) + the worker (2 + 1 + LISTEN) = 16 ≤ 22.
+x-service: &service
+  build: ../backend
+  command: ["./entrypoint.sh", "serve"]
+  ports: !reset []
+  depends_on:
+    backend:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/health || exit 1"]
+    interval: 2s
+    timeout: 5s
+    retries: 60
+
+x-split-env: &split_env
+  WEB_CONCURRENCY: "1"
+  DB_POOL_SIZE: "2"
+  DB_MAX_OVERFLOW: "1"
+
+services:
+  backend:
+    environment:
+      <<: *split_env
+      SERVICE: identity
+    ports: !reset []
+
+  analytics:
+    <<: *service
+    environment: &service_env
+      DATABASE_URL: postgresql+psycopg2://apcm:apcm@db:5432/apcm_e2e
+      JWT_SECRET: e2e-jwt-secret-only-for-the-test-stack-0123456789
+      FRONTEND_URL: http://localhost:5174
+      COOKIE_SECURE: "false"
+      MAIL_USERNAME: ""
+      RATE_LIMIT: "0"
+      PORT: "8001"
+      PYTHONUNBUFFERED: "1"
+      SOBRUS_API_URL: http://sobrus.e2e.test:9100
+      SOBRUS_ACCOUNT_API_URL: http://sobrus.e2e.test:9100
+      <<: *split_env
+      SERVICE: analytics
+
+  ingestion:
+    <<: *service
+    environment:
+      <<: *service_env
+      SERVICE: ingestion
+
+  sobrus:
+    <<: *service
+    environment:
+      <<: *service_env
+      SERVICE: sobrus
+
+  gateway:
+    build: ../gateway
+    environment:
+      PORT: "8001"
+      IDENTITY_URL: http://backend:8001
+      ANALYTICS_URL: http://analytics:8001
+      INGESTION_URL: http://ingestion:8001
+      SOBRUS_URL: http://sobrus:8001
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      backend:
+        condition: service_healthy
+      analytics:
+        condition: service_healthy
+      ingestion:
+        condition: service_healthy
+      sobrus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8001/healthz || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  frontend:
+    depends_on:
+      gateway:
+        condition: service_healthy

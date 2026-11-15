@@ -44,7 +44,13 @@ export interface SingleSelectProps {
   /** With label="" inside a form field: that field's name, so the trigger is named « Pharmacie assignée: X »
    *  (screen readers), not by its value alone. */
   ariaLabel?: string;
+  /** Inside another field (the phone number's country code): no border of its own, a line on its right. */
+  inline?: boolean;
 }
+
+/** The trigger inside another field: the field draws the border. */
+const INLINE_TRIGGER =
+  "inline-flex cursor-pointer items-center gap-1.5 border-r border-border bg-transparent px-3 font-mono text-sm text-foreground hover:bg-muted/50";
 
 export function SingleSelect({
   label,
@@ -55,6 +61,7 @@ export function SingleSelect({
   placement = "bottom",
   align = "start",
   ariaLabel,
+  inline = false,
 }: SingleSelectProps) {
   const t = useT();
   const { open, setOpen, triggerRef, panelRef, panelStyle, getReferenceProps, getFloatingProps } = usePopover(
@@ -77,7 +84,7 @@ export function SingleSelect({
         type="button"
         {...getReferenceProps({ onClick: () => setOpen(!open) })}
         aria-label={ariaLabel ? `${ariaLabel}: ${selectedLabel ?? ""}` : undefined}
-        className={POPOVER_TRIGGER}
+        className={inline ? INLINE_TRIGGER : POPOVER_TRIGGER}
       >
         <span>
           {label}

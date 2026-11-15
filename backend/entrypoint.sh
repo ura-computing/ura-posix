@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 # Boot sequence for the backend container. Idempotent: safe to re-run on every
 # `docker compose up` regardless of whether the DB is fresh or already populated.
-#   entrypoint.sh          the API: migrations, photos, seed, uvicorn
+#   entrypoint.sh          the API: migrations, photos, seed, uvicorn (with SERVICE=identity when split)
+#   entrypoint.sh serve    one more API service (SERVICE=analytics|ingestion|sobrus): uvicorn only, started once
+#                          the one above has migrated (app/core/services.py)
 #   entrypoint.sh worker   the Sobrus robot (DigitalOcean « Worker » component): waits for the API's
 #                          migrations, never migrates (app/sobrus/worker.py)
 set -eu
@@ -32,7 +34,13 @@ if [ "$ROLE" = worker ]; then
   echo "▸ Starting the Sobrus robot"
   # One run at a time: 1 session (+ a spare), its LISTEN connection outside the pool (app/core/database.py budget).
   export DB_POOL_SIZE="${DB_POOL_SIZE_WORKER:-2}" DB_MAX_OVERFLOW="${DB_MAX_OVERFLOW_WORKER:-1}"
+  export DB_STATEMENT_TIMEOUT_MS=0  # a whole year of a big pharmacy imported in one run: no limit here
   exec uv run python -m app.sobrus.worker
+fi
+
+if [ "$ROLE" = serve ]; then
+  echo "▸ Starting uvicorn (${SERVICE:-all routers}) on :${PORT:-8000}"
+  exec uv run uvicorn main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers "${WEB_CONCURRENCY:-1}"
 fi
 
 # 2. Schema bootstrap (extensions + migrations or stamp). Shared with

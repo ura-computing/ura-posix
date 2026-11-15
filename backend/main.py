@@ -9,9 +9,12 @@ from importlib import import_module
 from app.core import health
 from app.core.config import settings
 from app.core.errors import ApiError, CatchServerErrors, api_error_handler, validation_error_handler
+from app.core.observability import init_sentry
 from app.core.rate_limit import limiter, rate_limit_handler
 from app.core.services import ROUTER_MODULES, routers_of
 
+
+init_sentry(settings.SERVICE or "api")
 
 app = FastAPI(title=f"PharmaGest {settings.SERVICE}".strip(), version="0.1.0")
 

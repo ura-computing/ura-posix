@@ -258,7 +258,7 @@ export function useAnalysePage() {
  *  - useAnalyseListe: POST with CSV-parsed items. Mutation-shape since upload is user-triggered.
  */
 
-export function useAnalyseListe() {
+function useAnalyseListe() {
   const { mutate, data, isPending, isError, error } = useMutation({
     mutationFn: (body: ListeRequest) => api.post<AnalyseMargeResponse>(API.stats.analyseListe.url, body),
   });
@@ -297,7 +297,7 @@ const orFb = (a: number | null | undefined, b: number | null | undefined) => n(a
 const maxBy = <T>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) > f(a) ? b : a));
 const minBy = <T>(arr: T[], f: (t: T) => number): T => arr.reduce((a, b) => (f(b) < f(a) ? b : a));
 
-export function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
+function computeKpisFromRows(rows: AnalyseMargeRow[]): AnalyseMargeKpis {
   const totalCa = rows.reduce((s, r) => s + n(r.ca), 0);
   const totalUnites = rows.reduce((s, r) => s + n(r.qty), 0);
   const unitsAvail = rows.reduce((s, r) => s + n(r.stock_dispo), 0);

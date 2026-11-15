@@ -35,9 +35,9 @@ Branch `dev`. Last feature commit `ccf1998` (closing rows in Gestion des imports
 |---|---|---|
 | 1 | `SERVICE` env picks the routers: `backend/app/core/services.py` (map service → routers, checked at import), `backend/main.py` loads only those (unset = all, same 143 routes as before, checked) | **done** |
 | 2 | Gateway: `backend/scripts/gateway_routes.py` writes `gateway/Caddyfile` from the routes (fixed paths first, then `{id}` ones; every path checked to reach its own service; `--check` for CI); `gateway/Dockerfile` (Caddy 2.10) | **done, not run in Docker yet** |
-| 3 | E2E / compose in production shape: gateway + `identity`, `analytics`, `ingestion`, `sobrus` (all `SERVICE=…`, same backend image) + worker; frontend `VITE_API_URL` → gateway | next |
-| 4 | Request id middleware + JSON logs; Sentry SDK in backend, worker, frontend (DSN env, off when empty) | todo |
-| 5 | Two DB URLs: services → DO connection pool `app` (transaction mode); worker → direct URL (its `LISTEN` breaks in transaction mode); pool sizes per component | todo |
+| 3 | E2E stack split (`e2e/docker-compose.split.yml`, `make tests` asks « Services split? »): gateway :8001 + backend=identity (migrations) + analytics / ingestion / sobrus (`entrypoint.sh serve`) | **done**, smoke-tested (login through the gateway, each path → its service) |
+| 4 | Request id (`X-Request-ID`, in crash logs + Sentry); Sentry in backend / worker / frontend (`SENTRY_DSN`, `VITE_SENTRY_DSN`; off when empty) | **done** |
+| 5 | `DATABASE_URL_DIRECT` (worker LISTEN + migrations); services use `DATABASE_URL` = the pool | **done** (code); set the URLs on DO at step 6 |
 | 6 | New DO app spec from the current one: staging app first (`doctl apps create --spec`), `make tests` against it, then prod; rollback = old spec | todo |
 
 Service split (`app/core/services.py`): identity 39 operations · analytics 74 · ingestion 18 · sobrus 11 (+ `/v1/health` everywhere).

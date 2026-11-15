@@ -90,6 +90,7 @@ export const fr = {
     home: "Accueil",
     subtitle: "Vue d'ensemble de votre pharmacie",
     logout: "Déconnexion",
+    lock: "Verrouiller l'écran",
     notifications: "Notifications",
   },
 

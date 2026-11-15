@@ -6,6 +6,7 @@
  *  - 15 s without a click or a key → « Écran verrouillé » over the page, in the 2nd tab too; every route 423
  *    `screenLocked`, `/auth/me` still answers; a wrong code → the tries left (`pinWrong`); the right code in the
  *    other tab → both pages back
+ *  - « Verrouiller l'écran » (sidebar) locks at once; the lock screen's eye and theme buttons
  *  - 5 wrong codes → logged out (`pinTooMany`); « Code oublié ? Se déconnecter » → the login page
  *  - the owner (« Gérer mon équipe ») then the admin (pharmacy page) « Réinitialiser le code » → the new code unlocks
  *  - switched off → never locked (`POST /auth/lock` does nothing).
@@ -14,7 +15,7 @@ import type { Browser, Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { LOGGED_OUT, loadState, sessionFile } from "../lib/auth";
-import { expect, recordPage, test } from "../lib/fixtures";
+import { expect, recordPage, test, uiReady } from "../lib/fixtures";
 import { pageSend } from "../lib/ui";
 
 test.describe.configure({ mode: "serial" });
@@ -41,10 +42,12 @@ async function openLockTab(page: Page): Promise<void> {
 }
 
 /** This session locked (API), then the page reloaded: the lock screen, over « Mon compte ». */
+/** « Verrouiller l'écran » (sidebar, once the lock is on): the lock screen at once, over « Mon compte ». */
 async function lockNow(page: Page): Promise<void> {
   await page.goto("/auth/me");
-  await apiPost(page, "/auth/lock", {}, {}, 204);
-  await page.reload();
+  const sent = pageSend(page, "POST", "/auth/lock", 204);
+  await page.locator("aside").getByRole("button", { name: "Verrouiller l'écran", exact: true }).click();
+  await sent;
   await expect(lockScreen(page)).toBeVisible();
 }
 
@@ -66,6 +69,7 @@ async function openAs(browser: Browser, role: "owner" | "admin"): Promise<{ page
   const ctx = await browser.newContext({ storageState: sessionFile(role) });
   const page = await ctx.newPage();
   const flush = recordPage(page, () => test.info().title);
+  await uiReady(page, () => test.info().title);
   return {
     page,
     done: async () => {
@@ -178,6 +182,11 @@ test.describe("employé", () => {
     // A wrong code: the tries left, the field emptied.
     const field = lockScreen(page).getByLabel("Code à 6 chiffres");
     await lockScreen(page).getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
+    await lockScreen(page).getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+    // The login page's layout: its theme buttons work here too (back to « Système » at the end).
+    for (const theme of ["Sombre", "Clair", "Système"]) {
+      await lockScreen(page).getByRole("button", { name: theme, exact: true }).click();
+    }
     expect((await typeCode(page, "000000", 400)).code).toBe("pinWrong");
     await expect(lockScreen(page).getByText("Code incorrect : encore 4 essai(s).", { exact: true })).toBeVisible();
     await expect(field, "vidé").toHaveValue("");

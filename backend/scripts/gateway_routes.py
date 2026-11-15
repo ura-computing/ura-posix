@@ -29,6 +29,8 @@ def service_paths() -> dict[str, list[str]]:
     out: dict[str, set[str]] = {}
     for service, routers in SERVICE_ROUTERS.items():
         app = FastAPI()  # its OpenAPI lists every path (FastAPI 0.138 keeps included routers lazy)
+        if service == "identity":  # /v1/health: every service has it, the gateway asks identity's
+            app.include_router(import_module("app.core.health").router, prefix="/v1")
         for name in routers:
             app.include_router(import_module(ROUTER_MODULES[name]).router, prefix="/v1")
         out[service] = set(app.openapi()["paths"])
@@ -54,8 +56,6 @@ def build() -> str:
         "",
         ":{$PORT:8080} {",
         "\t@gateway_health path /healthz",
-        '\trespond @gateway_health "ok" 200',
-        "",
     ]
     handlers: list[str] = []
     for kind in ("fixed", "param"):
@@ -73,6 +73,7 @@ def build() -> str:
     lines += [
         "",
         "\troute {",
+        '\t\trespond @gateway_health "ok" 200',  # inside `route`: Caddy runs `route` before a bare `respond`
         *handlers,
         '\t\trespond `{"detail":"Not Found"}` 404',
         "\t}",

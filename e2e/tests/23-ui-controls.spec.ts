@@ -544,14 +544,16 @@ test("Mon compte : indicatif pays, onglet « Mot de passe » (œil), retour à �
   page,
 }) => {
   await page.goto("/auth/me");
-  const country = page.getByRole("combobox", { name: "Indicatif pays", exact: true });
-  const before = await country.inputValue();
-  const other = await country
-    .locator("option")
-    .evaluateAll((o, v) => o.map((x) => (x as HTMLOptionElement).value).find((x) => x && x !== v), before);
-  await country.selectOption(other ?? "");
-  await expect(country).toHaveValue(other ?? "");
-  await country.selectOption(before); // nothing saved
+  // The country code: the app's own dropdown, like every other one (named « Indicatif pays: +212 »).
+  const country = page.getByRole("button", { name: /^Indicatif pays: / });
+  const before = ((await country.getAttribute("aria-label")) ?? "").replace("Indicatif pays: ", "");
+  const codes = page.locator('[data-list=""]');
+  await country.click();
+  const other = (await codes.getByRole("button").allInnerTexts()).map((s) => s.trim()).find((s) => s !== before) ?? "";
+  await codes.getByRole("button", { name: other, exact: true }).click();
+  await expect(country).toHaveAttribute("aria-label", `Indicatif pays: ${other}`);
+  await country.click();
+  await codes.getByRole("button", { name: before, exact: true }).click(); // nothing saved
   await page.getByRole("tab", { name: "Mot de passe", exact: true }).click();
   const current = page.getByLabel("Mot de passe actuel", { exact: true });
   await current.fill("Visible#2026");
@@ -612,6 +614,8 @@ test.describe("visiteur", () => {
       await password.fill("Visible#2026");
       await page.getByRole("button", { name: "Afficher le mot de passe", exact: true }).click();
       await expect(password).toHaveAttribute("type", "text");
+      await page.getByRole("button", { name: "Masquer le mot de passe", exact: true }).click();
+      await expect(password).toHaveAttribute("type", "password");
     });
     await test.step("mot de passe oublié : « Retour à la connexion »", async () => {
       await page.goto("/auth/forgot-password");
@@ -805,6 +809,11 @@ test.describe("administrateur", () => {
           await page.getByRole("menuitem", { name: action, exact: true }).click();
         };
         await menu("Réinitialiser le mot de passe");
+        await dialog.getByLabel("Nouveau mot de passe", { exact: true }).fill("Annule#2026");
+        await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+        await menu("Réinitialiser le code");
+        await dialog.getByLabel("Nouveau code").fill("123456");
         await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
         await expect(dialog).toHaveCount(0);
         await menu("Désactiver");

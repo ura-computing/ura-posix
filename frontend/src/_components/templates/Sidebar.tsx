@@ -1,8 +1,9 @@
 /** The menu on the left: the links the account may open (role + features), collapsible, a drawer on phones. */
+import type { ComponentType } from "react";
 import { NavLink, Link } from "react-router-dom";
 
 import { ROLES, ROUTES } from "@/types";
-import { ChevronLeft, ChevronRight, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, LogOut } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -12,7 +13,9 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { Tooltip } from "@/_components/atoms/Tooltip";
+import { useLockNow } from "@/hooks/useLockScreen";
 import { useLogout } from "@/hooks/useLogout";
+import { useMe } from "@/hooks/useMe";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
 import { ACCOUNT_ITEM, SETTINGS_ITEM, visibleGroups, type NavItem } from "@/_components/templates/nav";
 
@@ -100,6 +103,36 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
   );
 }
 
+/** A row of the sidebar's foot that acts (lock, log out) instead of opening a page: the same look as `NavRow`. */
+function ActionRow({
+  icon: Icon,
+  label,
+  collapsed,
+  disabled,
+  onClick,
+}: {
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  label: string;
+  collapsed: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip label={collapsed ? label : ""} placement="right" className="relative block">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={collapsed ? label : undefined} // icon only: its name stays
+        className={cn(itemClasses(false, collapsed), "w-full cursor-pointer")}
+      >
+        <Icon className="size-[18px] shrink-0" aria-hidden />
+        <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
 export function Sidebar({
   role,
   permissions,
@@ -111,6 +144,10 @@ export function Sidebar({
 }: SidebarProps) {
   const t = useT();
   const { handleLogout } = useLogout();
+  const { me } = useMe();
+  const { lockNow, isLocking } = useLockNow();
+  // « Verrouiller l'écran »: only once the lock is on and has its code (« Mon compte » → « Verrouillage »).
+  const canLock = !!me?.lock.enabled && me.lock.has_pin;
   const groups = pending ? [] : visibleGroups(role, permissions);
   const unclassifiedCount = useUnclassifiedCount(role);
 
@@ -185,17 +222,16 @@ export function Sidebar({
             <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
           )}
           <NavRow item={ACCOUNT_ITEM} collapsed={collapsed} />
-          <Tooltip label={collapsed ? t("header.logout") : ""} placement="right" className="relative block">
-            <button
-              type="button"
-              onClick={() => handleLogout()}
-              aria-label={collapsed ? t("header.logout") : undefined} // icon only: its name stays
-              className={cn(itemClasses(false, collapsed), "w-full cursor-pointer")}
-            >
-              <LogOut className="size-[18px] shrink-0" aria-hidden />
-              <span className={collapsed ? "md:hidden" : ""}>{t("header.logout")}</span>
-            </button>
-          </Tooltip>
+          {canLock && (
+            <ActionRow
+              icon={Lock}
+              label={t("header.lock")}
+              collapsed={collapsed}
+              disabled={isLocking}
+              onClick={lockNow}
+            />
+          )}
+          <ActionRow icon={LogOut} label={t("header.logout")} collapsed={collapsed} onClick={handleLogout} />
         </div>
       </aside>
     </>

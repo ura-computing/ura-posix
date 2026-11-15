@@ -11,6 +11,8 @@ ErrorCode values = `frontend/src/api/errors.ts` (gate: e2e/tests/99-gates.spec.t
 from __future__ import annotations
 
 import logging
+import uuid
+from contextvars import ContextVar
 from enum import StrEnum
 from typing import Any
 
@@ -18,6 +20,7 @@ from fastapi import HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+import sentry_sdk
 
 
 class ErrorCode(StrEnum):
@@ -147,8 +150,13 @@ def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     )
 
 
+# The request being answered (« 4f1c2a9b0e7d »): in the log of a crash, in its Sentry event, in the answer's
+# `X-Request-ID` header (taken from the request when the caller sent one).
+REQUEST_ID: ContextVar[str] = ContextVar("request_id", default="-")
+
+
 class CatchServerErrors:
-    """Any exception nothing else handled → JSON 500 `{detail, code: serverError}`.
+    """Every request gets its request id; any exception nothing else handled → JSON 500 `{detail, code: serverError}`.
 
     Added INSIDE the CORS middleware (main.py), so the answer carries the CORS headers:
     without them the browser drops a crash answer and the user read « Serveur
@@ -163,23 +171,30 @@ class CatchServerErrors:
             await self.app(scope, receive, send)
             return
         started = False
+        sent_id = dict(scope.get("headers") or []).get(b"x-request-id", b"").decode("latin-1")[:64]
+        request_id = sent_id or uuid.uuid4().hex[:12]
+        token = REQUEST_ID.set(request_id)
+        sentry_sdk.get_isolation_scope().set_tag("request_id", request_id)
 
         async def send_tracking(message: Any) -> None:
             nonlocal started
             if message["type"] == "http.response.start":
                 started = True
+                message["headers"] = [*message.get("headers", []), (b"x-request-id", request_id.encode())]
             await send(message)
 
         try:
             await self.app(scope, receive, send_tracking)
         except Exception:
-            log.exception("Unhandled error on %s %s", scope.get("method"), scope.get("path"))
+            log.exception("Unhandled error on %s %s (request %s)", scope.get("method"), scope.get("path"), request_id)
             if started:  # part of the answer already left: nothing clean to send
                 raise
             body = error_body(
                 ErrorCode.SERVER_ERROR, "Le logiciel a rencontré un problème. Réessayez dans quelques minutes."
             )
-            await JSONResponse(body, status_code=500)(scope, receive, send)
+            await JSONResponse(body, status_code=500, headers={"X-Request-ID": request_id})(scope, receive, send)
+        finally:
+            REQUEST_ID.reset(token)
 
 
 def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

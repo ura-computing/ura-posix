@@ -27,10 +27,14 @@ from pathlib import Path
 # Make `from database import …` work when invoked as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/ → `import app…`
 
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 
-from app.core.database import Base, engine
+from app.core.config import settings
+from app.core.database import Base
 from app.core import models  # noqa: F401 — registers all tables on Base.metadata
+
+# Migrations on the database itself, not through DigitalOcean's connection pool (DATABASE_URL_DIRECT).
+engine = create_engine(settings.direct_database_url)
 
 
 def _ensure_extensions() -> None:

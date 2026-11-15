@@ -2,7 +2,7 @@
  *
  *  RULES:
  *    - Money values → `formatMAD()` (always emits "X MAD" suffix)
- *    - Counts / quantities → `formatQty()` or `formatQtyDec()`
+ *    - Counts / quantities → `formatQty()`
  *    - Percentages → `formatPct()`
  *    - Date + time → `formatDateTime()`
  *    - NEVER call `.toLocaleString()` or `.toFixed()` directly in a component
@@ -43,7 +43,6 @@ const MAD = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 const QTY = new Intl.NumberFormat("fr-FR");
-const QTY_DEC = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
 const PCT2 = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function formatMAD(n: number | null | undefined): ReactNode {
@@ -96,11 +95,6 @@ export function formatMoney(n: number | null | undefined): ReactNode {
 export function formatQty(n: number | null | undefined): ReactNode {
   if (n == null) return "—";
   return tighten(QTY.format(n));
-}
-
-export function formatQtyDec(n: number | null | undefined): ReactNode {
-  if (n == null) return "—";
-  return tighten(QTY_DEC.format(n));
 }
 
 export function formatPct(n: number | null | undefined, decimals = 2): ReactNode {

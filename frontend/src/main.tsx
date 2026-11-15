@@ -154,6 +154,14 @@ setUnauthorizedHandler(() => {
   }
 });
 
+// The page's own crashes in Sentry, only when the build got a DSN (VITE_SENTRY_DSN): nothing is loaded otherwise.
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+if (sentryDsn) {
+  void import("@sentry/react").then(
+    (Sentry) => Sentry.init({ dsn: sentryDsn, environment: import.meta.env.MODE }), // no personal data by default
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
