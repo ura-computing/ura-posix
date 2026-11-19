@@ -11,5 +11,5 @@ Bindings to the C library and the operating system: files, sockets, processes, t
 Add it to your project's `ura-config`, then run `ura install`:
 
 ```ura
-@dependency "ura-posix" "0.1.0"
+@dependency "ura-posix" "0.1.1"
 ```
