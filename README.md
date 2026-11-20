@@ -23,11 +23,11 @@
 ## Install
 
 ```
-ura install ura-posix 0.1.2 https://github.com/mohammedhrima/ura-posix
+ura install ura-posix 0.1.0 https://github.com/mohammedhrima/ura-posix
 ```
 
 It adds this line to your project's `ura.conf`, and `ura install` also gets its own dependency, ura-math:
 
 ```ura
-@dependency "ura-posix" "0.1.2" "https://github.com/mohammedhrima/ura-posix"
+@dependency "ura-posix" "0.1.0" "https://github.com/mohammedhrima/ura-posix"
 ```
