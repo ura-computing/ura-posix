@@ -1,5 +1,0 @@
-@name "ura-posix"
-@version "0.1.1"
-@main "header.ura"
-
-@dependency "ura-math" "0.1.0" "https://github.com/mohammedhrima/ura-math"
