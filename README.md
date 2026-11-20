@@ -93,20 +93,10 @@ It adds this line to your project's `ura.conf`. `ura install` also gets ura-posi
 
 ## From ura to the kernel
 
-```mermaid
-flowchart LR
-    A["your code<br/>use &quot;@/io&quot;"]:::code --> B["io.ura<br/>proto fopen(...)"]:::lib
-    B --> C{"@if os"}:::step
-    C -->|"linux"| D["glibc / musl"]:::native
-    C -->|"macOS"| E["libSystem"]:::native
-    D --> F["kernel<br/>syscalls"]:::kernel
-    E --> F
-    classDef code fill:#4a5568,stroke:#2F74E8,color:#fff
-    classDef lib fill:#2F74E8,stroke:#2d3748,color:#fff
-    classDef step fill:#f4f8fb,stroke:#2F74E8,color:#1a202c
-    classDef native fill:#2d3748,stroke:#2F74E8,color:#fff
-    classDef kernel fill:#1a202c,stroke:#2F74E8,color:#fff
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/kernel-dark.svg">
+  <img src="assets/kernel-light.svg" alt="Your code calls io.ura, which reaches glibc or musl on Linux and libSystem on macOS, then the kernel">
+</picture>
 
 - Function declarations are the same on Linux and macOS, because C names them the same.
 - The constants whose values differ between systems (`O_CREAT`, `O_TRUNC`, `O_APPEND`, `SIGUSR1`, `SIGCHLD`...) are written for both, as `@if linux:` / `@elif macos:` blocks. Those blocks are still commented out, so these constants aren't available yet. The constants that are the same everywhere (`O_RDONLY`, `SIGINT`, `ENOENT`...) work today.
@@ -189,17 +179,10 @@ Types and constants: `Pollfd`, `IPPROTO_IP` `IPPROTO_TCP` `IPPROTO_UDP` `IPPROTO
 
 ## The ura standard library
 
-```mermaid
-flowchart TD
-    P["your project<br/>ura.conf"]:::you --> C["ura-core<br/>Array, String, Range"]:::lib
-    P --> X["ura-posix<br/>files, sockets, time"]:::here
-    P --> M["ura-math<br/>libm"]:::lib
-    P --> G["ura-graphics<br/>SDL2, raylib, OpenGL"]:::lib
-    X --> M
-    classDef you fill:#4a5568,stroke:#2F74E8,color:#fff
-    classDef here fill:#2F74E8,stroke:#2d3748,color:#fff
-    classDef lib fill:#f4f8fb,stroke:#2F74E8,color:#1a202c
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/ecosystem-dark.svg">
+  <img src="assets/ecosystem-light.svg" alt="A project depends on ura-core, ura-posix, ura-math and ura-graphics; ura-posix uses ura-math">
+</picture>
 
 | Repo | Version | What | Depends on |
 |---|---|---|---|
