@@ -22,8 +22,8 @@
 ## At a glance
 
 ```ura
-use "@/io"
-use "@/time"
+use "@/ura-posix/io"
+use "@/ura-posix/time"
 
 fn main() i32:
     @if os == "linux":
@@ -106,21 +106,21 @@ It adds this line to your project's `ura.conf`. `ura install` also gets ura-posi
 
 | Module | Import | Key types and functions | Notes |
 |---|---|---|---|
-| io | `use "@/io"` | `fopen` `fgets` `fputs` `fread` `fwrite` `printf` `sprintf` `scanf` | 52 functions, the whole of `stdio.h` |
-| net | `use "@/net"` | `socket` `bind` `listen` `accept` `connect` `send` `recv` `poll`, `Pollfd` | IPv4 and IPv6 helpers |
-| stdlib | `use "@/stdlib"` | `exit` `getenv` `system` `rand` `atoi` `strtol` `qsort` | |
-| string | `use "@/string"` | `strlen` `strcmp` `strcpy` `strstr` `strtok` `memcpy` `memset` | C strings; ura-core's `String` is separate |
-| memory | `use "@/memory"` | `malloc` `calloc` `realloc` `free` `aligned_alloc` | |
-| time | `use "@/time"` | `time` `clock_gettime` `gmtime` `strftime` `nanosleep`, `Tm` `Timespec` `Timeval` | |
-| unistd | `use "@/unistd"` | `fork` `execvp` `pipe` `dup2` `close` `getcwd` `sleep` | plus `F_OK` `R_OK` `STDOUT_FILENO`... |
-| fcntl | `use "@/fcntl"` | `open` `openat` `creat` `fcntl` | `O_RDONLY` `O_WRONLY` `O_RDWR` |
-| dirent | `use "@/dirent"` | `opendir` `readdir` `closedir` | |
-| stat | `use "@/stat"` | `stat` `fstat` `mkdir` `chmod` `umask` | `S_IFDIR` `S_IFREG`... |
-| signals | `use "@/signals"` | `signal` `raise` `kill` `sigaction` | `SIGINT` `SIGTERM` `SIGSEGV`... |
-| errno | `use "@/errno"` | `strerror` `perror` | `ENOENT` `EACCES` `EINVAL`... |
-| ctype | `use "@/ctype"` | `isalpha` `isdigit` `isspace` `toupper` `tolower` | |
-| common | `use "@/common"` | `printf` `calloc` `free` `write` `exit` `strlen` `getenv` | the few calls most programs need |
-| header | `use "@/header"` | every module above, and ura-math | one line to get everything |
+| io | `use "@/ura-posix/io"` | `fopen` `fgets` `fputs` `fread` `fwrite` `printf` `sprintf` `scanf` | 52 functions, the whole of `stdio.h` |
+| net | `use "@/ura-posix/net"` | `socket` `bind` `listen` `accept` `connect` `send` `recv` `poll`, `Pollfd` | IPv4 and IPv6 helpers |
+| stdlib | `use "@/ura-posix/stdlib"` | `exit` `getenv` `system` `rand` `atoi` `strtol` `qsort` | |
+| string | `use "@/ura-posix/string"` | `strlen` `strcmp` `strcpy` `strstr` `strtok` `memcpy` `memset` | C strings; ura-core's `String` is separate |
+| memory | `use "@/ura-posix/memory"` | `malloc` `calloc` `realloc` `free` `aligned_alloc` | |
+| time | `use "@/ura-posix/time"` | `time` `clock_gettime` `gmtime` `strftime` `nanosleep`, `Tm` `Timespec` `Timeval` | |
+| unistd | `use "@/ura-posix/unistd"` | `fork` `execvp` `pipe` `dup2` `close` `getcwd` `sleep` | plus `F_OK` `R_OK` `STDOUT_FILENO`... |
+| fcntl | `use "@/ura-posix/fcntl"` | `open` `openat` `creat` `fcntl` | `O_RDONLY` `O_WRONLY` `O_RDWR` |
+| dirent | `use "@/ura-posix/dirent"` | `opendir` `readdir` `closedir` | |
+| stat | `use "@/ura-posix/stat"` | `stat` `fstat` `mkdir` `chmod` `umask` | `S_IFDIR` `S_IFREG`... |
+| signals | `use "@/ura-posix/signals"` | `signal` `raise` `kill` `sigaction` | `SIGINT` `SIGTERM` `SIGSEGV`... |
+| errno | `use "@/ura-posix/errno"` | `strerror` `perror` | `ENOENT` `EACCES` `EINVAL`... |
+| ctype | `use "@/ura-posix/ctype"` | `isalpha` `isdigit` `isspace` `toupper` `tolower` | |
+| common | `use "@/ura-posix/common"` | `printf` `calloc` `free` `write` `exit` `strlen` `getenv` | the few calls most programs need |
+| header | `use "@/ura-posix"` | every module above, and ura-math | one line to get everything |
 
 <details>
 <summary><b>io</b>: 52 functions</summary>

@@ -13,7 +13,7 @@
 // Declaring them here instead of hardcoding them in codegen means the language
 // depends on this file, not on libc being baked into the compiler.
 //
-// Re-declaring any of these via use "@/io" / "@/memory" / "@/stdlib" is fine —
+// Re-declaring any of these via use "@/ura-posix/io" / "@/ura-posix/memory" / "@/ura-posix/stdlib" is fine —
 // identical protos collapse to one declaration.
 
 proto printf(format i8[], ...) i32
