@@ -3,8 +3,8 @@
 // These are the C functions the compiler itself emits code for, so they must
 // always be in scope:
 //
-//   printf  output(...)
-//   dprintf errput(...)
+//   printf  (none since output/errput moved to ura-core's io)
+//   dprintf (none since output/errput moved to ura-core's io)
 //   calloc  new T[n]
 //   free    clean x
 //   write   runtime traps (divide by zero, bounds, unbound ref)
@@ -24,12 +24,3 @@ proto write(fd i32, ptr i8[], len i64) i64
 proto exit(code i32) void
 proto strlen(s i8[]) i64
 proto getenv(name i8[]) i8[]
-
-struct Os:
-    argc i32
-    argv char[][]
-
-    fn get(name char[]) i8[]:
-        return getenv(name)
-
-os Os
