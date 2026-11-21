@@ -5,12 +5,12 @@
 <h1 align="center">ura-posix</h1>
 
 <p align="center">
-  The C library and the operating system for <a href="https://github.com/mohammedhrima/ura-lang">ura</a>: files, sockets, processes, time, signals.<br>
+  The C library and the operating system for <a href="https://github.com/ura-computing/ura-lang">ura</a>: files, sockets, processes, time, signals.<br>
   Plain <code>proto</code> declarations, so every call goes straight to libc.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-2F74E8" alt="version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.0.1-2F74E8" alt="version 0.0.1">
   <img src="https://img.shields.io/badge/ura-standard%20library-2F74E8" alt="ura standard library">
   <img src="https://img.shields.io/badge/modules-15-2F74E8" alt="15 modules">
   <img src="https://img.shields.io/badge/depends%20on-ura--math-555" alt="depends on ura-math">
@@ -82,13 +82,13 @@ platform: linux
 ## Install
 
 ```
-ura install ura-posix 0.1.0 https://github.com/mohammedhrima/ura-posix
+ura install ura-posix 0.0.1 https://github.com/ura-computing/ura-posix
 ```
 
 It adds this line to your project's `ura.conf`. `ura install` also gets ura-posix's own dependency, ura-math, inside it.
 
 ```ura
-@dependency "ura-posix" "0.1.0" "https://github.com/mohammedhrima/ura-posix"
+@dependency "ura-posix" "0.0.1" "https://github.com/ura-computing/ura-posix"
 ```
 
 ## From ura to the kernel
@@ -186,13 +186,13 @@ Types and constants: `Pollfd`, `IPPROTO_IP` `IPPROTO_TCP` `IPPROTO_UDP` `IPPROTO
 
 | Repo | Version | What | Depends on |
 |---|---|---|---|
-| [ura-core](https://github.com/mohammedhrima/ura-core) | 0.1.0 | Array, String, Range, Error, Os | nothing |
-| **ura-posix** | 0.1.0 | the C library and the OS | ura-math |
-| [ura-math](https://github.com/mohammedhrima/ura-math) | 0.1.0 | C's math library | nothing |
-| [ura-graphics](https://github.com/mohammedhrima/ura-graphics) | 0.1.0 | SDL2, raylib, OpenGL | nothing |
+| [ura-core](https://github.com/ura-computing/ura-core) | 0.0.1 | Array, String, Range, Error, Os | nothing |
+| **ura-posix** | 0.0.1 | the C library and the OS | ura-math |
+| [ura-math](https://github.com/ura-computing/ura-math) | 0.0.1 | C's math library | nothing |
+| [ura-graphics](https://github.com/ura-computing/ura-graphics) | 0.0.1 | SDL2, raylib, OpenGL | nothing |
 
 ---
 
 <p align="center">
-  Part of <a href="https://github.com/mohammedhrima/ura-lang">ura-lang</a>
+  Part of <a href="https://github.com/ura-computing/ura-lang">ura-lang</a>
 </p>
