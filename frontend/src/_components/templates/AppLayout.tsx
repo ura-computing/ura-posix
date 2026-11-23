@@ -3,7 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 
 import { useIdleLock } from "@/hooks/useLockScreen";
 import { useMe } from "@/hooks/useMe";
-import { ROLES, ROUTES, STATUSES } from "@/types";
+import { ROLES, ROUTES, STATUSES, isStaff } from "@/types";
 import { Skeleton } from "@/_components/atoms/Skeleton";
 import { LockScreen } from "@/_components/organisms/LockScreen";
 import { SobrusBanner } from "@/_components/organisms/SobrusBanner";
@@ -56,7 +56,7 @@ export function AppLayout() {
           </Suspense>
         </main>
       </div>
-      <CornerStack sobrusOwner={sobrusOwner} admin={me.role === ROLES.ADMIN} />
+      <CornerStack sobrusOwner={sobrusOwner} admin={isStaff(me.role)} />
       {me.lock.locked && <LockScreen name={me.name} />}
     </div>
   );

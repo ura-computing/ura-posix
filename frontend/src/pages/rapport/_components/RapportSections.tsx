@@ -1,5 +1,5 @@
 import { useMe } from "@/hooks/useMe";
-import { ROLES, type MarginAlertsResponse } from "@/types";
+import { isStaff, type MarginAlertsResponse } from "@/types";
 import type { CategoryType, Feature, StatsFilters } from "@/types";
 import { useStockSummary } from "../hooks";
 import { useStats } from "@/hooks/sharedQueries";
@@ -31,7 +31,7 @@ export function RapportSections({ stats, filters, alerts, stock, category }: Sec
   const { me } = useMe();
   // Admin bypass: see every section regardless of feature flags. Non-admin:
   // hide sections whose backing feature isn't in their effective permissions.
-  const has = (f: Feature) => me?.role === ROLES.ADMIN || (me?.permissions.includes(f) ?? false);
+  const has = (f: Feature) => isStaff(me?.role) || (me?.permissions.includes(f) ?? false);
 
   return (
     <>

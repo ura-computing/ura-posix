@@ -2,7 +2,7 @@
 import type { ComponentType } from "react";
 import { NavLink, Link } from "react-router-dom";
 
-import { ROLES, ROUTES } from "@/types";
+import { ROUTES, isStaff } from "@/types";
 import { ChevronLeft, ChevronRight, Lock, LogOut } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
@@ -23,7 +23,7 @@ function useUnclassifiedCount(role: Role): number {
   const { data } = useQuery({
     queryKey: API.admin.catalog.unclassifiedCount.key,
     queryFn: () => api.get<{ count: number }>(API.admin.catalog.unclassifiedCount.url),
-    enabled: role === ROLES.ADMIN,
+    enabled: isStaff(role),
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -218,7 +218,7 @@ export function Sidebar({
         </nav>
 
         <div className="flex shrink-0 flex-col gap-0.5 border-t border-border p-2.5">
-          {(role === ROLES.ADMIN || !SETTINGS_ITEM.feature || permissions.includes(SETTINGS_ITEM.feature)) && (
+          {(isStaff(role) || !SETTINGS_ITEM.feature || permissions.includes(SETTINGS_ITEM.feature)) && (
             <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
           )}
           <NavRow item={ACCOUNT_ITEM} collapsed={collapsed} />

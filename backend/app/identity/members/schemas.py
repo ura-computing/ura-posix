@@ -208,6 +208,28 @@ class AssignPharmacyIn(BaseModel):
     pharmacy_id: int
 
 
+# ── « Support » tab: the admin's helpers (role "support", same rights as the admin, no pharmacy) ─────────────────
+
+
+class SupportCreateIn(BaseModel):
+    """« Ajouter une personne du Support »: the admin types the password (8+ characters), like for a pharmacist."""
+
+    full_name: str = Field(..., min_length=1, max_length=200)
+    email: Annotated[str, BeforeValidator(normalize_email)] = Field(..., max_length=200)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class SupportAccountRow(BaseModel):
+    """One Support person. `open_requests` = online-store requests they took and did not close yet."""
+
+    id: int
+    full_name: str | None
+    email: str
+    status: MemberStatus
+    open_requests: int
+    last_login_at: datetime | None
+
+
 # ═══ Owner: my team ══════════════════════════════════════════════════════════
 # Shapes for the owner's /owner/employees (Gérer mon équipe) page.
 #

@@ -2,7 +2,7 @@ import { ArrowLeft, Boxes, CheckCircle2, ChevronRight, ShoppingBasket, ShoppingC
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMe } from "@/hooks/useMe";
-import { ROLES } from "@/types";
+import { isStaff } from "@/types";
 import type { DocType, Feature } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { useUpload } from "./hooks";
@@ -153,7 +153,7 @@ export default function UploadFilePage() {
   const { me } = useMe();
   const allowedTypes = useMemo<DocType[]>(() => {
     const all: DocType[] = ["achat", "vente", "stock"];
-    if (me?.role === ROLES.ADMIN) return all; // admin bypass
+    if (isStaff(me?.role)) return all; // staff bypass
     return all.filter((dt) => me?.permissions.includes(TYPE_FEATURE[dt]));
   }, [me]);
 

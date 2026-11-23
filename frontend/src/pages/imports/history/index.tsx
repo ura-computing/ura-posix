@@ -11,7 +11,7 @@ import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
 import type { DataImport, ImportBatchStatus, ImportKind } from "@/types";
 
 import { useMe } from "@/hooks/useMe";
-import { ROLES } from "@/types";
+import { isStaff } from "@/types";
 
 import { SobrusProductsTab } from "./_components/SobrusProductsTab";
 import { useDeleteImport, useDeleteImports, useImports } from "./hooks";
@@ -61,7 +61,7 @@ function relativeDate(iso: string, t: TFn): string {
 export default function ImportsPage() {
   const t = useT();
   const { me } = useMe();
-  const admin = me?.role === ROLES.ADMIN;
+  const admin = isStaff(me?.role);
   const [active, setActive] = useState("imports");
 
   return (

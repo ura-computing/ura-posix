@@ -20,8 +20,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import ALLOWED_FEATURES, PREMIUM_FEATURES, Pharmacy, PharmacyFeature, User, UserPermission
-from app.identity.members.schemas import MemberOut
+from app.core.models import (
+    ALLOWED_FEATURES,
+    PREMIUM_FEATURES,
+    Pharmacy,
+    PharmacyFeature,
+    StoreWebsiteRequest,
+    User,
+    UserPermission,
+)
+from app.identity.members.schemas import MemberOut, SupportAccountRow
 from app.core.security import hash_password
 
 
@@ -101,6 +109,44 @@ def create_member(
     db.commit()
     db.refresh(user)
     return user
+
+
+def support_accounts(db: Session) -> list[SupportAccountRow]:
+    """Every Support person, by name, with their open online-store requests (0 when none)."""
+    open_counts = (
+        db.query(StoreWebsiteRequest.claimed_by_id, func.count(StoreWebsiteRequest.id).label("n"))
+        .filter(StoreWebsiteRequest.state != "cloturee")
+        .group_by(StoreWebsiteRequest.claimed_by_id)
+        .subquery()
+    )
+    rows = (
+        db.query(User, open_counts.c.n)
+        .outerjoin(open_counts, User.id == open_counts.c.claimed_by_id)
+        .filter(User.role == "support")
+        .order_by(User.name.asc(), User.id.asc())
+        .all()
+    )
+    return [support_row(u, n or 0) for u, n in rows]
+
+
+def add_support(db: Session, *, email: str, name: str, password: str) -> User:
+    """An active Support account, no pharmacy, no permission rows (staff gets every feature). Caller checks the email."""
+    user = User(email=email, name=name, password_hash=hash_password(password), role="support", status="active")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def support_row(u: User, open_requests: int = 0) -> SupportAccountRow:
+    return SupportAccountRow(
+        id=u.id,
+        full_name=u.name,
+        email=u.email,
+        status="active" if u.status == "active" else "inactive",
+        open_requests=open_requests,
+        last_login_at=u.last_login_at,
+    )
 
 
 def activate_member(db: Session, user: User, *, pharmacy_id: int) -> User:

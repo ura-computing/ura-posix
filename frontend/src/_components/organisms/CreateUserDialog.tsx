@@ -1,4 +1,4 @@
-/** Create a new owner or employee account (Screen 5).
+/** Create a new owner or employee account (Screen 5), or a Support person (`support`: no role, no pharmacy).
  *
  *  TWO-STATE dialog:
  *    A. FORM    — full_name + email + password + role (owner/employee) +
@@ -28,7 +28,7 @@ import { PinField } from "@/_components/molecules/PinField";
 import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { ROLE_LABEL } from "@/_components/organisms/memberConstants";
-import type { CreateUserIn, CreateUserOut, MemberOut, MemberRole } from "@/types";
+import type { AccountRef, CreateUserIn, MemberRole } from "@/types";
 
 export interface PharmacyOption {
   id: number;
@@ -45,10 +45,12 @@ export interface CreateUserDialogProps {
   /** When set, hide the Rôle radio and force every create to this role.
    *  Owner pages pass "employee" — owner can't create co-owners. */
   roleLocked?: MemberRole;
+  /** The admin « Support » tab: name + email + password only (the parent ignores `role` / `pharmacy_id`). */
+  support?: boolean;
   isSaving?: boolean;
   /** Submit fires the POST mutation; on success the parent passes back the
-   *  CreateUserOut so this dialog flips to the reveal state. */
-  onSubmit: (values: CreateUserIn) => Promise<CreateUserOut>;
+   *  created account so this dialog flips to the reveal state. */
+  onSubmit: (values: CreateUserIn) => Promise<{ member: AccountRef }>;
 }
 
 const ROLE_DESC: Record<MemberRole, string> = {
@@ -62,6 +64,7 @@ export function CreateUserDialog({
   pharmacies,
   defaultPharmacyId,
   roleLocked,
+  support = false,
   isSaving,
   onSubmit,
 }: CreateUserDialogProps) {
@@ -77,7 +80,7 @@ export function CreateUserDialog({
 
   const [values, setValues] = useState<CreateUserIn>(initialValues);
   /** Reveal state — non-null after a successful create. */
-  const [revealed, setRevealed] = useState<{ member: MemberOut; password: string } | null>(null);
+  const [revealed, setRevealed] = useState<{ member: AccountRef; password: string } | null>(null);
 
   // Reset everything when the dialog (re)opens — uses the recommended
   // "derive state from a prop change" pattern instead of useEffect, so we
@@ -112,8 +115,14 @@ export function CreateUserDialog({
       <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
         <DialogHeader
           icon={revealed ? <CheckCircle2 className="size-4" /> : <UserPlus className="size-4" />}
-          title={revealed ? t("adminPharm.accountCreated") : t("adminPharm.newUser")}
-          subtitle={revealed ? t("adminPharm.revealSubtitle") : t("adminPharm.createSubtitle")}
+          title={revealed ? t("adminPharm.accountCreated") : support ? t("adminSupport.add") : t("adminPharm.newUser")}
+          subtitle={
+            revealed
+              ? t("adminPharm.revealSubtitle")
+              : support
+                ? t("adminSupport.createSubtitle")
+                : t("adminPharm.createSubtitle")
+          }
           onClose={onClose}
         />
 
@@ -152,7 +161,7 @@ export function CreateUserDialog({
 
               {/* Rôle radio — hidden when roleLocked is set (owner-side caller
                 forces "employee"; admin-side caller shows the choice). */}
-              {!roleLocked && (
+              {!roleLocked && !support && (
                 <FormField label={t("adminPharm.role")} required group>
                   <div
                     role="radiogroup"
@@ -187,18 +196,20 @@ export function CreateUserDialog({
                 </FormField>
               )}
 
-              <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
-                <SingleSelect
-                  label=""
-                  ariaLabel={t("adminPharm.assignedPharmacy")}
-                  options={pharmacies.map((p) => ({
-                    value: String(p.id),
-                    label: [p.name, p.city].filter(Boolean).join(" · "),
-                  }))}
-                  value={String(values.pharmacy_id)}
-                  onChange={(v) => set("pharmacy_id", Number(v))}
-                />
-              </FormField>
+              {!support && (
+                <FormField label={t("adminPharm.assignedPharmacy")} required hint={assignHint} group>
+                  <SingleSelect
+                    label=""
+                    ariaLabel={t("adminPharm.assignedPharmacy")}
+                    options={pharmacies.map((p) => ({
+                      value: String(p.id),
+                      label: [p.name, p.city].filter(Boolean).join(" · "),
+                    }))}
+                    value={String(values.pharmacy_id)}
+                    onChange={(v) => set("pharmacy_id", Number(v))}
+                  />
+                </FormField>
+              )}
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
@@ -227,8 +238,8 @@ export function CreateUserDialog({
 }
 
 export interface ResetPasswordDialogProps {
-  /** Member whose password is being reset; null = closed. */
-  member: MemberOut | null;
+  /** Account whose password is being reset; null = closed. */
+  member: AccountRef | null;
   onClose: () => void;
   /** Fires the reset mutation with the typed password (or code); on success the
    *  dialog flips to the reveal state (password) or closes (code: the page toasts). */
@@ -345,7 +356,7 @@ function CredentialsReveal({
   kind,
   onClose,
 }: {
-  member: MemberOut;
+  member: AccountRef;
   tempPassword: string;
   banner: string;
   kind: MailKind;
@@ -402,7 +413,7 @@ function CredentialsReveal({
 
 /** Gmail web compose URL with the credentials prefilled. The admin reviews +
  *  sends from Gmail in a new tab of the current browser. */
-function buildGmailUrl(member: MemberOut, tempPassword: string, kind: MailKind, t: TFn): string {
+function buildGmailUrl(member: AccountRef, tempPassword: string, kind: MailKind, t: TFn): string {
   const body = [
     t("adminPharm.mailGreeting", { name: member.full_name ?? "" }),
     "",

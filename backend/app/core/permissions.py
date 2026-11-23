@@ -5,11 +5,13 @@ exposes the FastAPI dependencies routers declare (no guard code in handler bodie
     pharmacy_id: MemberDep                           # owner / employee, no feature
     pharmacy_id: OwnerDep                            # owner only
     pharmacy_id: Annotated[int, owner("import")]     # owner + feature(s)
-    user: AdminDep / DeveloperDep                    # role-only, gives the user
+    user: AdminDep                                   # staff only (admin or Support), gives the user
     APIRouter(dependencies=[admin_only])             # a whole admin router
 
+Staff = admin + Support (`STAFF_ROLES`): Support has the same rights as the admin.
+
 Three-layer permission model:
-  - admin:    bypasses everything (gets every feature in ALLOWED_FEATURES)
+  - staff:    bypasses everything (gets every feature in ALLOWED_FEATURES)
   - owner:    pharmacy_features ∩ user_permissions
   - employee: pharmacy_features ∩ user_permissions ∩ (union of active owners'
               user_permissions in the same pharmacy). I.e. the owner ceiling —
@@ -31,6 +33,14 @@ from app.core.errors import ApiError, ErrorCode
 from app.core.models import ALLOWED_FEATURES, PharmacyFeature, User, UserPermission
 from app.core.security import CurrentUserDep
 
+# The APCM team: the admin and the Support accounts, same rights everywhere. Example: role "support" → every feature,
+# every admin page, the store-website queue.
+STAFF_ROLES: tuple[str, ...] = ("admin", "support")
+
+
+def is_staff(user: User) -> bool:
+    return user.role in STAFF_ROLES
+
 
 def _user_enabled_perms(db: Session, user_ids: list[int]) -> set[str]:
     """Set of permission strings any of the given users has enabled. Used both
@@ -47,7 +57,7 @@ def _user_enabled_perms(db: Session, user_ids: list[int]) -> set[str]:
 
 def effective_permissions(db: Session, user: User) -> list[str]:
     """Returns the sorted list of feature strings this user can access."""
-    if user.role == "admin":
+    if is_staff(user):
         return list(ALLOWED_FEATURES)
     if not user.pharmacy_id:
         return []
@@ -94,8 +104,8 @@ def require_feature(feature: str, user: User, db: Session) -> None:
 
 
 def require_admin(user: User) -> None:
-    """Raise 403 for non-admin callers. Use on endpoints that manage system-wide state."""
-    if user.role != "admin":
+    """Raise 403 unless the caller is staff (admin or Support). Use on endpoints that manage system-wide state."""
+    if not is_staff(user):
         raise ApiError(
             status.HTTP_403_FORBIDDEN,
             ErrorCode.ADMIN_ONLY,
@@ -103,27 +113,15 @@ def require_admin(user: User) -> None:
         )
 
 
-def require_developer(user: User) -> None:
-    """Raise 403 unless the caller is an APCM developer. Backs the
-    /v1/store-website developer-side endpoints (list requests, claim,
-    edit customization, mark delivered)."""
-    if user.role != "developer":
-        raise ApiError(
-            status.HTTP_403_FORBIDDEN,
-            ErrorCode.DEVELOPER_ONLY,
-            "Réservé aux développeurs.",
-        )
-
-
 def require_pharmacy_owner(user: User, db: Session, *, feature: str | None = None) -> int:
     """For pharmacy-scoped non-admin endpoints. Returns the user's pharmacy_id.
 
-    - Rejects admins (they use /v1/admin/... mirror routes — deferred).
-    - Rejects roles that don't belong to a pharmacy (e.g. developer).
+    - Rejects staff (admin, Support: they use /v1/admin/... routes).
+    - Rejects roles that don't belong to a pharmacy.
     - Rejects users without a pharmacy.
     - Optionally enforces a feature gate ("import", "achats", "ventes", …).
     """
-    if user.role == "admin":
+    if is_staff(user):
         raise ApiError(
             status.HTTP_403_FORBIDDEN,
             ErrorCode.ADMIN_USE_ADMIN_ROUTES,
@@ -183,13 +181,7 @@ def _admin(user: CurrentUserDep) -> User:
     return user
 
 
-def _developer(user: CurrentUserDep) -> User:
-    require_developer(user)
-    return user
-
-
 MemberDep = Annotated[int, member()]
 OwnerDep = Annotated[int, Depends(_owner)]
 AdminDep = Annotated[User, Depends(_admin)]
-DeveloperDep = Annotated[User, Depends(_developer)]
 admin_only = Depends(_admin)

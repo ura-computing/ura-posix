@@ -579,6 +579,8 @@ export const API = {
       refreshes: (): Read[] => [API.admin.sobrusProducts, API.admin.sobrusProductsHistory],
     },
     users: { url: "/admin/users", key: ["admin", "users"] },
+    support: { url: "/admin/support", key: ["admin", "support"] },
+    createSupport: { url: "/admin/support", refreshes: (): Read[] => [API.admin.support, API.admin.users] },
     signupRequests: { url: "/admin/signup-requests", key: ["admin", "signup-requests"] },
     // A new account (and maybe a new pharmacy): both admin lists change.
     acceptSignup: {
@@ -595,7 +597,7 @@ export const API = {
     },
     setUserStatus: {
       url: (id: number) => `/admin/users/${id}/status`,
-      refreshes: (): Read[] => [API.admin.pharmacy, API.admin.users],
+      refreshes: (): Read[] => [API.admin.pharmacy, API.admin.users, API.admin.support],
     },
     resetUserPassword: {
       url: (id: number) => `/admin/users/${id}/reset-password`,
@@ -605,7 +607,7 @@ export const API = {
     },
     removeUser: {
       url: (id: number) => `/admin/users/${id}`,
-      refreshes: (): Read[] => [API.admin.pharmacies, API.admin.users],
+      refreshes: (): Read[] => [API.admin.pharmacies, API.admin.users, API.admin.support],
     },
     // The account moves: both pharmacies' pages change.
     assignPharmacy: {
@@ -697,10 +699,6 @@ export const API = {
     preview: {
       url: (id: string) => `/store-website/public/preview/${id}`,
       key: (id: string | null) => ["store-website", "preview", id] as const,
-    },
-    developers: {
-      url: "/store-website/admin/developers",
-      key: ["admin", "developers"],
     },
   },
 } as const;

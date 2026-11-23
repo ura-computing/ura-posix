@@ -54,7 +54,7 @@ def list_special_products(pharmacy_id: int, db: Session) -> list[dict]:
         .join(Medicament, PharmacyMedicamentStatus.medicament_id == Medicament.id)
         .filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-            PharmacyMedicamentStatus.declared == False,
+            PharmacyMedicamentStatus.declared == False,  # noqa: E712
         )
         .order_by(PharmacyMedicamentStatus.created_at.desc())
         .all()
@@ -131,7 +131,7 @@ def reintegrate_products(body: SpecialProductReintegrate, pharmacy_id: int, db: 
         .filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
             PharmacyMedicamentStatus.medicament_id.in_(ids),
-            PharmacyMedicamentStatus.declared == False,
+            PharmacyMedicamentStatus.declared == False,  # noqa: E712
         )
         .all()
     )
@@ -167,7 +167,7 @@ def medicament_suggestions(pharmacy_id: int, db: Session, q: str) -> list[dict]:
         db.query(PharmacyMedicamentStatus.medicament_id)
         .filter(
             PharmacyMedicamentStatus.pharmacy_id == pharmacy_id,
-            PharmacyMedicamentStatus.declared == False,
+            PharmacyMedicamentStatus.declared == False,  # noqa: E712
         )
         .scalar_subquery()
     )

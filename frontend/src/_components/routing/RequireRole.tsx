@@ -6,8 +6,8 @@
  *    <Route element={<RequireRole role={ROLES.ADMIN} />}>            // single
  *      <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
  *    </Route>
- *    <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>  // any-of
- *      <Route path="/dev" element={<DevDashboard />} />
+ *    <Route element={<RequireRole role={STAFF} />}>                  // any-of (admin or Support)
+ *      <Route path={ROUTES.STORE_REQUESTS} element={<StoreRequestsPage />} />
  *    </Route>
  */
 import { Navigate, Outlet } from "react-router-dom";

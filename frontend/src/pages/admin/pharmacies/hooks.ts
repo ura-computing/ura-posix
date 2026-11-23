@@ -9,6 +9,7 @@
  *    useSetUserPermissions()       — Screen 3 bulk save (owners only)
  *    useResetUserPassword() / useSetUserStatus() / useDeleteUser()
  *    useSignupRequests() / useAcceptSignup() / useRefuseSignup() — « Demandes » tab
+ *    useSupportAccounts() / useCreateSupport() — « Support » tab (reset / status / delete: the user hooks)
  *
  *  Every mutation refreshes what its `API.admin.*` entry lists (`refreshes`):
  *  the pharmacy list + every detail (member counts, features), the users tab. */
@@ -30,6 +31,8 @@ import type {
   ResetPasswordOut,
   SignupAcceptOut,
   SignupRequestRow,
+  SupportAccountRow,
+  SupportCreateIn,
 } from "@/types";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
@@ -45,6 +48,32 @@ export function useAdminUsers() {
     isLoading,
     isError,
     reload: () => void refetch(),
+  };
+}
+
+export function useSupportAccounts() {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.admin.support.key,
+    queryFn: () => api.get<SupportAccountRow[]>(API.admin.support.url),
+    staleTime: 30_000,
+  });
+  return {
+    accounts: data ?? [],
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+  };
+}
+
+export function useCreateSupport() {
+  const qc = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (body: SupportCreateIn) => api.post<SupportAccountRow>(API.admin.createSupport.url, body),
+    onSuccess: () => void refresh(qc, API.admin.createSupport),
+  });
+  return {
+    createSupport: mutateAsync,
+    isCreatingSupport: isPending,
   };
 }
 

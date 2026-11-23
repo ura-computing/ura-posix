@@ -31,6 +31,7 @@ from app.core.email_service import send_signup_decision
 from app.core.errors import ApiError, ErrorCode
 from app.identity.members.service import (
     activate_member,
+    add_support,
     apply_permissions_bulk,
     add_pharmacy,
     create_member,
@@ -40,6 +41,8 @@ from app.identity.members.service import (
     reset_member_password,
     reset_member_pin,
     set_member_status,
+    support_accounts,
+    support_row,
 )
 from app.core.models import (
     ALLOWED_FEATURES,
@@ -49,7 +52,7 @@ from app.core.models import (
     User,
     UserPermission,
 )
-from app.core.permissions import AdminDep, admin_only
+from app.core.permissions import AdminDep, admin_only, is_staff
 from app.identity.members.schemas import (
     AdminUserRow,
     AssignPharmacyIn,
@@ -68,6 +71,8 @@ from app.identity.members.schemas import (
     SignupPharmacyRef,
     SignupRequestRow,
     StatusPatchIn,
+    SupportAccountRow,
+    SupportCreateIn,
     UserPharmacyRef,
 )
 
@@ -308,7 +313,7 @@ def set_user_permissions(
     one active owner also have it (see effective_permissions in
     backend/core/permissions.py)."""
     target = _get_member_or_404(db, user_id)
-    if target.role == "admin":
+    if is_staff(target):
         raise ApiError(
             400,
             ErrorCode.ADMIN_NO_PERMISSIONS,
@@ -465,6 +470,23 @@ def delete_user(
         raise ApiError(400, ErrorCode.ADMIN_NOT_DELETABLE, "Impossible de supprimer un administrateur.")
     db.delete(target)
     db.commit()
+
+
+# ── « Support » tab ──────────────────────────────────────────────────────────
+# Reset password / deactivate / delete: the « Utilisateurs » routes above (/admin/users/{id}/…).
+
+
+@router.get("/admin/support", response_model=list[SupportAccountRow])
+def list_support(db: DbDep) -> list[SupportAccountRow]:
+    return support_accounts(db)
+
+
+@router.post("/admin/support", response_model=SupportAccountRow, status_code=201)
+def create_support(body: SupportCreateIn, db: DbDep) -> SupportAccountRow:
+    """A Support account: active at once, no pharmacy, every right of the admin (`STAFF_ROLES`)."""
+    if db.query(User).filter(User.email == body.email).first():
+        raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
+    return support_row(add_support(db, email=body.email, name=body.full_name, password=body.password))
 
 
 # ── Sign-up requests (« Demandes » tab) ───────────────────────────────────────

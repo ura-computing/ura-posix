@@ -3,11 +3,14 @@
 
 export const ROLES = {
   ADMIN: "admin",
+  SUPPORT: "support",
   OWNER: "owner",
   EMPLOYEE: "employee",
-  DEVELOPER: "developer",
 } as const;
 export type Role = (typeof ROLES)[keyof typeof ROLES];
+/** The APCM team: Support has the same rights as the admin (backend `STAFF_ROLES`). */
+export const STAFF: Role[] = [ROLES.ADMIN, ROLES.SUPPORT];
+export const isStaff = (role: string | null | undefined): boolean => STAFF.includes(role as Role);
 
 /** User account status, same values as the backend (`auth/schemas.py` `UserOut`). `pending` =
  *  signed up, not accepted yet: logs in, no pharmacy, empty menu, 404 everywhere. */
@@ -67,7 +70,7 @@ export const ROUTES = {
   ADMIN_PHARMACY: "/admin/pharmacies/:id",
   ADMIN_CATALOGUE: "/admin/catalogue",
   ADMIN_CATEGORIES: "/admin/categories",
-  ADMIN_DEVELOPERS: "/admin/developers",
+  ADMIN_SUPPORT: "/admin/support",
 
   // Owner — "Ma boutique en ligne" (3-tab page, gated by ?tab=)
   STORE_WEBSITE: "/store-website",

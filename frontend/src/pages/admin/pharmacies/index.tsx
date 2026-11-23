@@ -3,7 +3,8 @@
  *    Utilisateurs — EVERY account, with or without a pharmacy (UsersTab):
  *                   the only admin view where nobody is hidden.
  *    Demandes (N) — pending « Créer un compte » (_components/SignupRequestsTab).
- *  The tab lives in the URL (?tab=utilisateurs / ?tab=demandes) so a reload keeps it. */
+ *    Support      — the admin's helpers, same rights as the admin (_components/SupportTab).
+ *  The tab lives in the URL (?tab=utilisateurs / ?tab=demandes / ?tab=support) so a reload keeps it. */
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 
 import { TabBar } from "@/_components/molecules/TabBar";
@@ -30,6 +31,7 @@ import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/C
 import { FeaturePills } from "@/_components/molecules/FeaturePills";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
 import { SignupRequestsTab } from "./_components/SignupRequestsTab";
+import { SupportTab } from "./_components/SupportTab";
 import {
   useCreatePharmacy,
   useCreateUser,
@@ -214,7 +216,7 @@ function AvatarStack({ initials, count }: { initials: string[]; count: number })
 }
 
 /** « Utilisateurs » tab of /admin/pharmacies — EVERY account (admin, owner,
- *  employee, developer), with or without a pharmacy, archived pharmacies
+ *  employee, Support), with or without a pharmacy, archived pharmacies
  *  included. The pharmacy pages only list the owner/employee members of active
  *  pharmacies, so an account without one used to be invisible to the admin.
  *
@@ -223,7 +225,7 @@ function AvatarStack({ initials, count }: { initials: string[]; count: number })
 
 type Scope = "all" | "with" | "without";
 
-const KNOWN_ROLES = ["admin", "owner", "employee", "developer"];
+const KNOWN_ROLES = ["admin", "support", "owner", "employee"];
 const SCOPE_ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 
 const isMember = (u: AdminUserRow) => u.role === "owner" || u.role === "employee";
@@ -516,7 +518,12 @@ function AssignPharmacyDialog({
 }
 
 /** URL value of each tab (?tab=…); the pharmacies list has none. */
-const TAB_PARAM: Record<string, string | null> = { pharmacies: null, users: "utilisateurs", requests: "demandes" };
+const TAB_PARAM: Record<string, string | null> = {
+  pharmacies: null,
+  users: "utilisateurs",
+  requests: "demandes",
+  support: "support",
+};
 
 export default function AdminPharmaciesIndex() {
   const t = useT();
@@ -531,6 +538,7 @@ export default function AdminPharmaciesIndex() {
           { id: "pharmacies", label: t("adminUsers.tabPharmacies") },
           { id: "users", label: t("adminUsers.tabUsers") },
           { id: "requests", label: t("adminUsers.tabRequests", { n: requests.length }) },
+          { id: "support", label: t("adminUsers.tabSupport") },
         ]}
         activeId={tab}
         onChange={(id) => {
@@ -539,7 +547,15 @@ export default function AdminPharmaciesIndex() {
         }}
       />
 
-      {tab === "pharmacies" ? <PharmaciesTab /> : tab === "users" ? <UsersTab /> : <SignupRequestsTab />}
+      {tab === "pharmacies" ? (
+        <PharmaciesTab />
+      ) : tab === "users" ? (
+        <UsersTab />
+      ) : tab === "requests" ? (
+        <SignupRequestsTab />
+      ) : (
+        <SupportTab />
+      )}
     </Page>
   );
 }

@@ -29,7 +29,7 @@ from app.core.security import hash_password
 
 ROLE_ADMIN = "admin"
 ROLE_OWNER = "owner"
-ROLE_DEVELOPER = "developer"
+ROLE_SUPPORT = "support"
 STATUS_OK = "active"
 
 SEED_FILE = Path(__file__).parent / "seed.json"
@@ -136,9 +136,9 @@ def seed_database() -> None:
             inserted.append(f"Owner     : {owner_pair[0]}")
             inserted.append(f"Pharmacie : {owner_pair[1]}")
 
-        dev_email = _seed_simple_user(db, cfg.get("developer"), ROLE_DEVELOPER)
-        if dev_email:
-            inserted.append(f"Developer : {dev_email}")
+        support_email = _seed_simple_user(db, cfg.get("support"), ROLE_SUPPORT)
+        if support_email:
+            inserted.append(f"Support   : {support_email}")
 
         db.commit()
 

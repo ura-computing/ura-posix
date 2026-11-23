@@ -20,7 +20,7 @@ from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, SobrusImportedYear, User, Vente
-from app.core.permissions import AdminDep, member, require_pharmacy_owner
+from app.core.permissions import AdminDep, is_staff, member, require_pharmacy_owner
 from app.catalog.schemas import CatalogImportResponse
 from app.ingestion.schemas import ImportsListResponse, JsonUploadBody, PatchBatchBody
 from app.ingestion.service import (
@@ -244,7 +244,7 @@ def patch_batch_status(
     batch = db.get(ImportBatch, batch_id)
     if batch is None:
         raise ApiError(404, ErrorCode.BATCH_NOT_FOUND, "Lot d'import introuvable.")
-    if batch.pharmacy_id != user.pharmacy_id and user.role != "admin":
+    if batch.pharmacy_id != user.pharmacy_id and not is_staff(user):
         raise ApiError(403, ErrorCode.BATCH_FORBIDDEN, "Accès refusé à ce lot d'import.")
 
     deleted_rows = end_batch(db, batch, body.status, user, body.error_message)
@@ -285,7 +285,7 @@ def _visible_batches_query(db: Session, user: User) -> OrmQuery:
     - employee → caller's own batches
     """
     base = db.query(ImportBatch)
-    if user.role == "admin":
+    if is_staff(user):
         return base.filter(ImportBatch.created_by_user_id == user.id)
     if user.role == "owner":
         employee_ids_sq = (
@@ -347,8 +347,8 @@ def list_imports(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict:
-    # Non-admin must have the `import` feature; admin bypasses.
-    if user.role != "admin":
+    # Non-staff must have the `import` feature; staff bypasses.
+    if not is_staff(user):
         require_pharmacy_owner(user, db, feature="import")
 
     creator = aliased(User)
@@ -384,7 +384,7 @@ def delete_import(
     Per-role authz mirrors the list scope (see `_visible_batches_query`):
     if you can see it, you can delete it. 404 on out-of-scope to avoid
     leaking existence."""
-    if user.role != "admin":
+    if not is_staff(user):
         require_pharmacy_owner(user, db, feature="import")
 
     batch = _visible_batches_query(db, user).filter(ImportBatch.id == batch_id).first()

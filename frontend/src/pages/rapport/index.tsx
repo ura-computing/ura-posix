@@ -5,7 +5,7 @@ import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar"
 import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { useMe } from "@/hooks/useMe";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { ROLES } from "@/types";
+import { isStaff } from "@/types";
 import type { MargeMode, StatsFilters } from "@/types";
 import {
   useAdminPharmacyStats,
@@ -77,7 +77,7 @@ const INITIAL_LOCAL: LocalStatsFilters = {
 export default function RapportPage() {
   const { me } = useMe();
   if (!me) return null;
-  return me.role === ROLES.ADMIN ? <AdminView /> : <OwnerView />;
+  return isStaff(me.role) ? <AdminView /> : <OwnerView />;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

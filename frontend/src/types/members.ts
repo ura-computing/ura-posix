@@ -16,6 +16,31 @@ export interface MemberOut {
   granted_permissions: string[];
 }
 
+/** Who a create / reset dialog talks about: a pharmacy member or a Support person. */
+export type AccountRole = MemberRole | "support";
+export interface AccountRef {
+  id: number;
+  full_name: string | null;
+  email: string;
+  role: AccountRole;
+}
+
+/** GET /admin/support — one Support person (« Support » tab). `open_requests` = online-store requests they took. */
+export interface SupportAccountRow {
+  id: number;
+  full_name: string | null;
+  email: string;
+  status: MemberStatus;
+  open_requests: number;
+  last_login_at: string | null;
+}
+
+export interface SupportCreateIn {
+  full_name: string;
+  email: string;
+  password: string;
+}
+
 export interface PharmacyListRow {
   id: number;
   name: string;

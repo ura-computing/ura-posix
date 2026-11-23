@@ -240,23 +240,6 @@ export interface ExportRow {
   downloadUrl: string;
 }
 
-export type DeveloperStatus = "actif" | "en_attente" | "desactive";
-
-export const DEVELOPER_STATUS_LABEL: Record<DeveloperStatus, string> = {
-  actif: "Actif",
-  en_attente: "En attente",
-  desactive: "Désactivé",
-};
-
-export interface DeveloperAccount {
-  id: string;
-  name: string;
-  email: string;
-  status: DeveloperStatus;
-  activeRequests: number;
-  lastActiveAt: string | null;
-}
-
 // ── API contract for `/v1/store-website/*` (mirrors backend/app/store_website/schemas.py) ──
 // Wire shapes only — no computed / display fields.
 
@@ -340,11 +323,3 @@ export interface StateTransition {
   state: RequestState;
 }
 
-export interface DeveloperAccountOut {
-  id: string;
-  name: string;
-  email: string;
-  status: "actif" | "en_attente" | "desactive";
-  active_requests: number;
-  last_active_at: string | null;
-}

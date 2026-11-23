@@ -1,7 +1,7 @@
 """Pydantic shapes for the "Ma boutique en ligne" endpoints.
 
 Mirrors `frontend/src/types/storeWebsite.ts`. Owner-authored fields live on
-`WebsiteRequest*`; developer-authored styling on `Customization*`.
+`WebsiteRequest*`; Support-authored styling on `Customization*`.
 """
 
 from __future__ import annotations
@@ -48,7 +48,13 @@ class WebsiteRequestPatch(BaseModel):
     vision: str | None = Field(None, max_length=2000)
 
 
-# ─── developer-side ─────────────────────────────────────────────────────────
+class FeaturedCategoriesIn(BaseModel):
+    """PATCH /v1/store-website/requests/{id}/featured-categories — the owner's pick, e.g. ["beaute", "bebe"]."""
+
+    featured_category_ids: list[str] = Field(..., max_length=50)
+
+
+# ─── Support-side ──────────────────────────────────────────────────────────
 
 
 class CustomizationPatch(BaseModel):
@@ -132,17 +138,3 @@ class PublicPreviewOut(BaseModel):
     featured_category_ids: list[str]
     store_name: str
     pharmacy_phone: str
-
-
-# ─── Admin — developer directory ────────────────────────────────────────────
-
-
-class DeveloperAccountOut(BaseModel):
-    """GET /v1/store-website/admin/developers — one row per APCM developer."""
-
-    id: str
-    name: str
-    email: str
-    status: Literal["actif", "en_attente", "desactive"]
-    active_requests: int
-    last_active_at: datetime | None

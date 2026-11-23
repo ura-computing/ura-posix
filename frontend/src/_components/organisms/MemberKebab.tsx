@@ -1,5 +1,5 @@
 /** Row actions for a pharmacy member (owner / employee) — shared by the admin
- *  pharmacy detail page and the owner's "Gérer mon équipe" page so both offer
+ *  pharmacy detail page, the owner's "Gérer mon équipe" page and the admin « Support » tab, so all offer
  *  the same menu: reset password / lock-screen code / (dés)activer / supprimer. */
 import { KeyRound, Power, RefreshCw, Trash2 } from "lucide-react";
 
@@ -14,7 +14,7 @@ export function MemberKebab({
   onToggleStatus,
   onRemove,
 }: {
-  member: MemberOut;
+  member: Pick<MemberOut, "status">;
   onResetPassword: () => void;
   /** « Réinitialiser le code » (lock screen); absent = not offered. */
   onResetPin?: () => void;

@@ -1,6 +1,6 @@
 /** The sidebar's links: groups, roles and features that show each one, the page titles. */
 
-import { ROLES, ROUTES } from "@/types";
+import { ROLES, ROUTES, STAFF, isStaff } from "@/types";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -40,8 +40,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const ALL: Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE];
-const ALL_HUMAN: Role[] = [ROLES.ADMIN, ROLES.OWNER, ROLES.EMPLOYEE, ROLES.DEVELOPER];
+const ALL: Role[] = [...STAFF, ROLES.OWNER, ROLES.EMPLOYEE];
 const DATA: Role[] = [ROLES.OWNER, ROLES.EMPLOYEE];
 
 const NAV_GROUPS: NavGroup[] = [
@@ -113,11 +112,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "nav.groupAdministration",
     items: [
-      { label: "nav.pharmacies", to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: [ROLES.ADMIN], ready: true },
-      { label: "nav.catalogue", to: ROUTES.ADMIN_CATALOGUE, icon: BookOpen, roles: [ROLES.ADMIN], ready: true },
-      { label: "nav.categories", to: ROUTES.ADMIN_CATEGORIES, icon: Tags, roles: [ROLES.ADMIN], ready: true },
-      // HIDDEN 2026-07-03 — admin/developers panel.
-      // { label: "Développeurs", to: ROUTES.ADMIN_DEVELOPERS, icon: Code2, roles: [ROLES.ADMIN], ready: true },
+      { label: "nav.pharmacies", to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: STAFF, ready: true },
+      { label: "nav.catalogue", to: ROUTES.ADMIN_CATALOGUE, icon: BookOpen, roles: STAFF, ready: true },
+      { label: "nav.categories", to: ROUTES.ADMIN_CATEGORIES, icon: Tags, roles: STAFF, ready: true },
     ],
   },
 ];
@@ -135,22 +132,22 @@ export const ACCOUNT_ITEM: NavItem = {
   label: "nav.compte",
   to: ROUTES.ME,
   icon: CircleUser,
-  roles: ALL_HUMAN,
+  roles: ALL,
   ready: true,
 };
 
-/** Filter the nav for a given user. Admin sees every entry their role allows
- *  (feature flags don't gate admin). Non-admin: drops any entry whose `feature`
+/** Filter the nav for a given user. Staff (admin, Support) sees every entry their role allows
+ *  (feature flags don't gate staff). Others: drops any entry whose `feature`
  *  isn't in their effective permission set (from /me — already the 3-layer
  *  intersection). Role-only entries (no `feature`) stay visible. */
 export function visibleGroups(role: Role, permissions: readonly string[] = []): NavGroup[] {
   const perms = new Set(permissions);
-  const isAdmin = role === ROLES.ADMIN;
+  const staff = isStaff(role);
   return NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.filter((i) => {
       if (!i.roles.includes(role)) return false;
-      if (isAdmin) return true;
+      if (staff) return true;
       if (!i.feature) return true;
       return perms.has(i.feature);
     }),

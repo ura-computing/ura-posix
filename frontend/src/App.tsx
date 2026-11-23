@@ -8,7 +8,7 @@ import { RequireRole } from "@/_components/routing/RequireRole";
 import HomePage from "@/pages/home";
 import LoginPage from "@/pages/auth/login";
 import NotFoundPage from "@/pages/auth/not-found";
-import { ROLES, ROUTES } from "@/types";
+import { ROLES, ROUTES, STAFF } from "@/types";
 
 // Every other page has its own JS file: the first screen downloads one page,
 // not the whole app. The others download in the background right after.
@@ -47,7 +47,6 @@ const ProduitsSpeciauxPage = lazy(PAGES.ProduitsSpeciauxPage);
 // HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
 // admin/developers surfaces are wired end-to-end but not ready to ship. Restore
 // these imports and the matching Route blocks below when the feature is done.
-// import AdminDevelopersPage from "@/pages/admin/developers";
 // import DevDashboardPage from "@/pages/store/dev";
 // import DevExportsPage from "@/pages/store/dev/exports";
 // import DevEditorPage from "@/pages/store/dev/requests/$id.editor";
@@ -148,14 +147,11 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route element={<RequireRole role={ROLES.ADMIN} />}>
+          <Route element={<RequireRole role={STAFF} />}>
             <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
             <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
             <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
             <Route path={ROUTES.ADMIN_PHARMACY} element={<AdminPharmacyDetail />} />
-            {/* HIDDEN 2026-07-03 — admin/developers panel.
-            <Route path={ROUTES.ADMIN_DEVELOPERS} element={<AdminDevelopersPage />} />
-            */}
           </Route>
 
           <Route element={<RequireRole role={ROLES.OWNER} />}>

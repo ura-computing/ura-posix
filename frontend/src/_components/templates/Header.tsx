@@ -47,9 +47,9 @@ export interface HeaderProps {
 
 const ROLE_KEYS: Record<Role, string> = {
   [ROLES.ADMIN]: "roles.admin",
+  [ROLES.SUPPORT]: "roles.support",
   [ROLES.OWNER]: "roles.owner",
   [ROLES.EMPLOYEE]: "roles.employee",
-  [ROLES.DEVELOPER]: "roles.developer",
 };
 
 export function Header({ onOpenMobile }: HeaderProps) {

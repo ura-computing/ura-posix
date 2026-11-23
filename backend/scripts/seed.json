@@ -13,9 +13,9 @@
     "pharmacy_city":    "Casablanca",
     "pharmacy_address": "123 Rue Mohammed V, Casablanca"
   },
-  "developer": {
-    "email":    "dev@gmail.com",
-    "name":     "Développeur Demo",
-    "password": "dev@123"
+  "support": {
+    "email":    "support@gmail.com",
+    "name":     "Support Demo",
+    "password": "support@123"
   }
 }

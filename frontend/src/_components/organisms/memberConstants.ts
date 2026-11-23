@@ -82,5 +82,9 @@ export function allFeatures(v: boolean): Record<FeatureKey, boolean> {
 }
 
 // Values are i18n KEYS — translate at render with t().
-export const ROLE_LABEL = { owner: "adminFeat.roleOwner", employee: "adminFeat.roleEmployee" } as const;
+export const ROLE_LABEL = {
+  owner: "adminFeat.roleOwner",
+  employee: "adminFeat.roleEmployee",
+  support: "roles.support",
+} as const;
 export const STATUS_LABEL = { active: "adminFeat.statusActive", inactive: "adminFeat.statusInactive" } as const;

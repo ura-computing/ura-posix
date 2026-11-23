@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
     func,
@@ -727,7 +728,7 @@ class StoreWebsiteRequest(Base):
 
 
 class StoreCustomization(Base):
-    """Developer-authored styling state, 1:1 with a request. Created in the
+    """Support-authored styling state, 1:1 with a request. Created in the
     same transaction as the request with defaults derived from the picked
     palette."""
 
@@ -741,7 +742,9 @@ class StoreCustomization(Base):
     template: Mapped[str] = mapped_column(String, nullable=False, default="lumiere")
     sections: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # { hero:{visible:true}, ... }
     brand_colors: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # { primary, secondary, accent }
-    logo_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String, nullable=True)  # GET /store-website/logo/{id}?v=…
+    logo_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)  # the file, ≤ 2 MB
+    logo_type: Mapped[str | None] = mapped_column(String, nullable=True)  # its content type, e.g. "image/png"
     font_pairing: Mapped[str] = mapped_column(String, nullable=False, default="moderne")
     featured_category_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # owner-managed later
     updated_at: Mapped[datetime] = mapped_column(

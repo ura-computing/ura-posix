@@ -13,6 +13,7 @@ import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import {
   ROUTES,
+  isStaff,
   type EditField,
   type MovementsFilters,
   type ProductEditIn,
@@ -139,7 +140,7 @@ export function useMovements(id: number, { from, to }: StatsRange) {
   const setOrder = (order: MovementsFilters["order"]) => patch({ order });
   /** Ventes / Achats open for this user (an employee may not have them). */
   const canSeeDetail = (kind: ProductMovementLine["kind"]) =>
-    me?.role === "admin" || !!me?.permissions.includes(kind === "achat" ? "achats" : "ventes");
+    isStaff(me?.role) || !!me?.permissions.includes(kind === "achat" ? "achats" : "ventes");
   const seeDetail = (m: ProductMovementLine) => {
     if (!m.document) return;
     setRange(null, null);

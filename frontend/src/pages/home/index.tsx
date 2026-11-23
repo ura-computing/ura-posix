@@ -4,17 +4,8 @@ import { ShoppingCart, TrendingUp, Boxes, PieChart, Layers, LineChart, ShieldChe
 import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
 import { useMe } from "@/hooks/useMe";
-import { ROLES, ROUTES, type Role } from "@/types";
+import { ROUTES } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
-
-/** Pick the post-login landing route for a role. Developers don't have
- *  /rapport (it's feature-gated on `rapports` which they never get); while
- *  the developer surfaces are HIDDEN 2026-07-03 we fall them back to /me so
- *  they land somewhere valid. Restore the DEV_DASHBOARD target when the
- *  developer feature ships. */
-function landingRouteFor(role: Role): string {
-  return role === ROLES.DEVELOPER ? ROUTES.ME : ROUTES.RAPPORT;
-}
 
 function firstName(full: string | null | undefined, fallback: string): string {
   if (!full) return fallback;
@@ -58,11 +49,11 @@ export default function HomePage() {
     admin: t("roles.admin"),
     owner: t("roles.owner"),
     employee: t("roles.employee"),
-    developer: t("roles.developer"),
+    support: t("roles.support"),
   } as const;
   const { me } = useMe();
   const isAuthed = !!me;
-  const myLanding = isAuthed ? landingRouteFor(me!.role as Role) : ROUTES.LOGIN;
+  const myLanding = isAuthed ? ROUTES.RAPPORT : ROUTES.LOGIN;
   return (
     <div className="bg-background text-foreground">
       <style>{`
