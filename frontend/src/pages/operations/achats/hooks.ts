@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -11,6 +10,7 @@ import { useListFilters } from "@/hooks/useListFilters";
 import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
+import { useRefParam } from "../_components/useRefParam";
 
 // Local filter state — same shape as AchatsFilters minus the two date fields
 // that now live in the cross-route GlobalDateRangeProvider.
@@ -43,23 +43,11 @@ export function useAchatsPage() {
   // existing API + sub-components expect.
   // « Voir détail » from a product's « Mouvements »: `?ref=` = every line of that one
   // BL, until its filter is removed.
-  const [params, setParams] = useSearchParams();
-  const ref = params.get("ref") ?? "";
+  const { ref, clearRef } = useRefParam(setPage);
   const filters: AchatsFilters = useMemo(
     () => ({ ...localFilters, ...(ref ? { ref } : {}), date_from: dateFrom, date_to: dateTo }),
     [localFilters, ref, dateFrom, dateTo],
   );
-  const clearRef = () => {
-    setPage(1);
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("ref");
-        return next;
-      },
-      { replace: true },
-    );
-  };
 
   const {
     data: list,

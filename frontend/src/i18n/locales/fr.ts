@@ -160,6 +160,7 @@ export const fr = {
   },
 
   kpi: {
+    operationsShort: "opé",
     ca: "Chiffre d'affaires",
     totalAchats: "Total achats",
     margeBruteMoy: "Marge brute moyenne",
@@ -757,6 +758,8 @@ export const fr = {
   },
 
   stock: {
+    scoreHint: "Part des produits en couverture idéale (46-60 j) sur ceux qui ont des ventes.",
+    referencesCount: "références",
     searchPh: "Nom, code-barres, PID…",
     healthIndex: "Indice de santé",
     classAria: "Classe {{k}} : {{n}} références",
@@ -1608,6 +1611,9 @@ export const fr = {
     footer: "© PharmaGest · Gestion d'officine",
   },
   uploadFile: {
+    previewRows: "Aperçu — {{shown}} lignes affichées sur {{total}}",
+    filePeriod: "Période : {{from}} → {{to}}",
+    moreRows: "… et {{n}} lignes supplémentaires seront importées.",
     missingColumns: "Ce fichier ne correspond pas à ce type d'import. Colonnes manquantes : {{columns}}",
     emptyFile: "Le fichier est vide : aucune ligne à importer.",
     corrupted: "Ce fichier est abîmé (ligne {{line}}). Téléchargez-le à nouveau depuis Sobrus, puis réessayez.",

@@ -30,6 +30,44 @@ function margeColor(pct: number | null | undefined): string {
   return "text-success";
 }
 
+// ─── Columns several modes share, word for word ────────────────────────────────
+
+const QTY_COL: AnalyseColDef = {
+  key: "qty",
+  label: "col.qteVendue",
+  align: "right",
+  render: (r) => formatQty(r.qty ?? 0),
+  raw: (r) => r.qty ?? 0,
+};
+const CA_COL: AnalyseColDef = {
+  key: "ca",
+  label: "col.ca",
+  align: "right",
+  render: (r) => formatMAD(r.ca ?? 0),
+  raw: (r) => r.ca ?? 0,
+};
+/** « Marge moy. % » + « Marge moy. DH » (colored by the % like every margin). */
+const MARGE_AVG_COLS: AnalyseColDef[] = [
+  {
+    key: "marge_pct_avg",
+    label: "col.margeMoyPct",
+    align: "right",
+    render: (r) => (
+      <span className={margeColor(r.marge_pct_avg)}>{r.marge_pct_avg != null ? formatPct(r.marge_pct_avg) : "—"}</span>
+    ),
+    raw: (r) => r.marge_pct_avg ?? null,
+  },
+  {
+    key: "marge_dh_avg",
+    label: "col.margeMoyDh",
+    align: "right",
+    render: (r) => (
+      <span className={margeColor(r.marge_pct_avg)}>{r.marge_dh_avg != null ? formatMAD(r.marge_dh_avg) : "—"}</span>
+    ),
+    raw: (r) => r.marge_dh_avg ?? null,
+  },
+];
+
 // ─── Per-mode column configs ──────────────────────────────────────────────────
 
 const PRODUIT_COLS: AnalyseColDef[] = [
@@ -43,8 +81,8 @@ const PRODUIT_COLS: AnalyseColDef[] = [
     render: (r) => (r.stock_dispo != null ? formatQty(r.stock_dispo) : "—"),
     raw: (r) => r.stock_dispo ?? null,
   },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
   {
     key: "prix_min",
     label: "col.puMin",
@@ -93,8 +131,8 @@ const PRODUIT_COLS: AnalyseColDef[] = [
 
 const CATEGORIE_COLS: AnalyseColDef[] = [
   { key: "category", label: "col.categorie", render: (r) => r.category ?? "—", raw: (r) => r.category ?? "" },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
   {
     key: "prix_min",
     label: "col.puMin",
@@ -116,24 +154,7 @@ const CATEGORIE_COLS: AnalyseColDef[] = [
     render: (r) => formatMAD(r.prix_max ?? 0),
     raw: (r) => r.prix_max ?? null,
   },
-  {
-    key: "marge_pct_avg",
-    label: "col.margeMoyPct",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_pct_avg != null ? formatPct(r.marge_pct_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_pct_avg ?? null,
-  },
-  {
-    key: "marge_dh_avg",
-    label: "col.margeMoyDh",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_dh_avg != null ? formatMAD(r.marge_dh_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_dh_avg ?? null,
-  },
+  ...MARGE_AVG_COLS,
 ];
 
 const LABORATOIRE_COLS: AnalyseColDef[] = [
@@ -143,8 +164,8 @@ const LABORATOIRE_COLS: AnalyseColDef[] = [
     render: (r) => r.laboratoire ?? "—",
     raw: (r) => r.laboratoire ?? "",
   },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
   {
     key: "total_achat_cost",
     label: "col.coutAchats",
@@ -152,30 +173,13 @@ const LABORATOIRE_COLS: AnalyseColDef[] = [
     render: (r) => formatMAD(r.total_achat_cost ?? 0),
     raw: (r) => r.total_achat_cost ?? 0,
   },
-  {
-    key: "marge_pct_avg",
-    label: "col.margeMoyPct",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_pct_avg != null ? formatPct(r.marge_pct_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_pct_avg ?? null,
-  },
-  {
-    key: "marge_dh_avg",
-    label: "col.margeMoyDh",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_dh_avg != null ? formatMAD(r.marge_dh_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_dh_avg ?? null,
-  },
+  ...MARGE_AVG_COLS,
 ];
 
 const GROSSISTE_COLS: AnalyseColDef[] = [
   { key: "grossiste", label: "col.grossiste", render: (r) => r.grossiste ?? "—", raw: (r) => r.grossiste ?? "" },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
   {
     key: "total_achat_cost",
     label: "col.coutAchats",
@@ -183,24 +187,7 @@ const GROSSISTE_COLS: AnalyseColDef[] = [
     render: (r) => formatMAD(r.total_achat_cost ?? 0),
     raw: (r) => r.total_achat_cost ?? 0,
   },
-  {
-    key: "marge_pct_avg",
-    label: "col.margeMoyPct",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_pct_avg != null ? formatPct(r.marge_pct_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_pct_avg ?? null,
-  },
-  {
-    key: "marge_dh_avg",
-    label: "col.margeMoyDh",
-    align: "right",
-    render: (r) => (
-      <span className={margeColor(r.marge_pct_avg)}>{r.marge_dh_avg != null ? formatMAD(r.marge_dh_avg) : "—"}</span>
-    ),
-    raw: (r) => r.marge_dh_avg ?? null,
-  },
+  ...MARGE_AVG_COLS,
 ];
 
 const OPERATEUR_COLS: AnalyseColDef[] = [
@@ -212,8 +199,8 @@ const OPERATEUR_COLS: AnalyseColDef[] = [
     render: (r) => formatQty(r.nb_transactions ?? 0),
     raw: (r) => r.nb_transactions ?? 0,
   },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
 ];
 
 const MOIS_COLS: AnalyseColDef[] = [
@@ -225,8 +212,8 @@ const MOIS_COLS: AnalyseColDef[] = [
     render: (r) => formatQty(r.nb_transactions ?? 0),
     raw: (r) => r.nb_transactions ?? 0,
   },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
-  { key: "ca", label: "col.ca", align: "right", render: (r) => formatMAD(r.ca ?? 0), raw: (r) => r.ca ?? 0 },
+  QTY_COL,
+  CA_COL,
 ];
 
 const MONTH_KEYS = ["m01", "m02", "m03", "m04", "m05", "m06", "m07", "m08", "m09", "m10", "m11", "m12"] as const;
@@ -290,7 +277,7 @@ const LISTE_COLS: AnalyseColDef[] = [
     render: (r) => (r.stock_dispo != null ? formatQty(r.stock_dispo) : "—"),
     raw: (r) => r.stock_dispo ?? null,
   },
-  { key: "qty", label: "col.qteVendue", align: "right", render: (r) => formatQty(r.qty ?? 0), raw: (r) => r.qty ?? 0 },
+  QTY_COL,
   {
     key: "ppv",
     label: "col.ppv",

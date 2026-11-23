@@ -21,6 +21,7 @@ import { DataTable, type ColumnDef, type DataTablePagination } from "@/_componen
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { Page } from "@/_components/templates/Page";
 import { Input } from "@/_components/atoms/Input";
+import { Card } from "@/_components/atoms/Card";
 import { Checkbox } from "@/_components/atoms/Checkbox";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 
@@ -40,19 +41,19 @@ function KpiCards({ stats }: { stats: StatsResponse }) {
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-      <Card icon={<Wallet className="size-5" />} title={t("comptabilite.kpiCA")} tone="primary">
+      <KpiBlock icon={<Wallet className="size-5" />} title={t("comptabilite.kpiCA")} tone="primary">
         <Row label={t("comptabilite.ventesTotal")} value={formatMAD(ca)} hero />
         <Row label={t("comptabilite.marge")} value={formatPct(stats.marge.marge_pct)} />
         <Row label={t("comptabilite.tvaEncaissee")} value={formatMAD(stats.tva.tva_encaissee)} />
-      </Card>
+      </KpiBlock>
 
-      <Card icon={<Receipt className="size-5" />} title={t("comptabilite.kpiAchats")} tone="warning">
+      <KpiBlock icon={<Receipt className="size-5" />} title={t("comptabilite.kpiAchats")} tone="warning">
         <Row label={t("kpi.totalAchats")} value={formatMAD(achats)} hero />
         <Row label={t("comptabilite.operations")} value={String(stats.kpis.achats_count)} />
         <Row label={t("comptabilite.tvaPayee")} value={formatMAD(stats.tva.tva_payee)} />
-      </Card>
+      </KpiBlock>
 
-      <Card icon={<BarChart3 className="size-5" />} title={t("comptabilite.bilanTva")} tone="info">
+      <KpiBlock icon={<BarChart3 className="size-5" />} title={t("comptabilite.bilanTva")} tone="info">
         <Row label={t("comptabilite.resultat")} value={formatMAD(stats.marge.marge_brute_dh)} hero />
         <Row label={t("comptabilite.tvaADeclarer")} value={formatMAD(stats.tva.tva_a_declarer)} />
         <Row
@@ -60,12 +61,13 @@ function KpiCards({ stats }: { stats: StatsResponse }) {
           value={formatMAD(stats.tva.tva_a_declarer)}
           subtle
         />
-      </Card>
+      </KpiBlock>
     </div>
   );
 }
 
-function Card({
+/** One KPI block (Chiffre d'affaires, Achats, Bilan & TVA): icon + title, then its rows. */
+function KpiBlock({
   icon,
   title,
   tone,
@@ -78,13 +80,13 @@ function Card({
 }) {
   const tint = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : "text-info";
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm">
+    <Card className="flex flex-col gap-3 shadow-sm">
       <div className="flex items-center gap-2 text-base font-semibold text-foreground">
         <span className={tint}>{icon}</span>
         {title}
       </div>
       <div className="flex flex-col gap-2.5">{children}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -263,13 +265,17 @@ const METHOD_ICON: Record<PaymentMethod, React.ReactNode> = {
   virement: <ArrowRightLeft className="size-5" />,
 };
 
-/** Tailwind-friendly tint per method. Light bg + dark icon, mirrors the old
- *  apcm-pharma color story (blue / green / purple / amber). */
+/** Tint per method, from the app's tokens (right in dark mode too): blue / green / violet / amber. Whole class names
+ *  (Tailwind only sees literal strings). */
 const METHOD_TINT: Record<PaymentMethod, { bg: string; fg: string; border: string }> = {
-  tpe: { bg: "bg-blue-50", fg: "text-blue-600", border: "border-blue-200" },
-  especes: { bg: "bg-green-50", fg: "text-green-600", border: "border-green-200" },
-  cheques: { bg: "bg-purple-50", fg: "text-purple-600", border: "border-purple-200" },
-  virement: { bg: "bg-amber-50", fg: "text-amber-600", border: "border-amber-200" },
+  tpe: { bg: "bg-info-subtle", fg: "text-info", border: "border-info-border" },
+  especes: { bg: "bg-success-subtle", fg: "text-success", border: "border-success-border" },
+  cheques: {
+    bg: "bg-[color-mix(in_srgb,var(--chart-4)_12%,transparent)]",
+    fg: "text-[var(--chart-4)]",
+    border: "border-[color-mix(in_srgb,var(--chart-4)_30%,transparent)]",
+  },
+  virement: { bg: "bg-warning-subtle", fg: "text-warning", border: "border-warning-border" },
 };
 
 function PaymentMethodGrid({

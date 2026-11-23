@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Download, Upload } from "lucide-react";
 
-import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { FilterBar } from "@/_components/organisms/FilterBar";
 import { ROUTES } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatMAD, formatQty, formatPct } from "@/utils/format";
@@ -11,8 +11,9 @@ import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import type { AchatRow, AchatsSupplierSummary } from "@/types";
 import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
-import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { Page } from "@/_components/templates/Page";
+import { LedgerFooter } from "../_components/LedgerFooter";
+import { ledgerActiveFilters, ledgerProductColumns } from "../_components/ledgerColumns";
 
 interface AchatsTableProps {
   rows: AchatRow[];
@@ -65,53 +66,7 @@ const buildColumns = (t: TFn): ColumnDef<AchatRow>[] => [
         <span className="text-muted-foreground">—</span>
       ),
   },
-  {
-    key: "product",
-    label: t("col.produit"),
-    width: 260,
-    render: (r) => (
-      <div className="flex flex-col">
-        <span className="truncate text-base" title={r.product ?? ""}>
-          {r.product ?? "—"}
-        </span>
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid ?? ""}</span>
-      </div>
-    ),
-  },
-  {
-    key: "category",
-    label: t("col.categorie"),
-    width: 160,
-    render: (r) => (
-      <span className="block max-w-[150px] truncate text-sm text-muted-foreground">{r.category ?? "—"}</span>
-    ),
-  },
-  {
-    key: "category_type",
-    label: t("col.type"),
-    width: 110,
-    sortable: false,
-    render: (r) => <TypeBadge type={r.category_type} />,
-  },
-  {
-    key: "tva",
-    label: t("col.tva"),
-    width: 80,
-    sortable: false,
-    render: (r) =>
-      r.tva ? (
-        <span className="font-mono text-xs text-muted-foreground">{r.tva}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      ),
-  },
-  {
-    key: "quantity",
-    label: t("col.qte"),
-    width: 70,
-    align: "right",
-    render: (r) => (r.quantity != null ? formatQty(r.quantity) : "—"),
-  },
+  ...ledgerProductColumns<AchatRow>(t, { productWidth: 260, typeKey: "category_type" }),
   {
     key: "pph",
     label: t("col.pph"),
@@ -237,64 +192,14 @@ export default function AchatsPage() {
   const totalRows = list?.pagination.total ?? 0;
 
   // Build active filter pills array — empty when no filter set, FilterBar hides the row.
-  const activeFilters: ActiveFilter[] = [
-    filters.ref
-      ? {
-          key: "ref",
-          label: (
-            <>
-              {t("achats.blFilter")} {filters.ref}
-            </>
-          ),
-          onClear: clearRef,
-        }
-      : null,
-    filters.search
-      ? {
-          key: "search",
-          label: (
-            <>
-              {t("common.recherche")} {filters.search}
-            </>
-          ),
-          onClear: () => setSearch(""),
-        }
-      : null,
-    filters.date_from || filters.date_to
-      ? {
-          key: "dates",
-          label: (
-            <>
-              {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
-            </>
-          ),
-          onClear: () => setDateRange(null, null),
-        }
-      : null,
-    filters.category.length > 0
-      ? {
-          key: "category",
-          label: (
-            <>
-              {t("dashboard.categorieFilter")} {filters.category[0]}
-              {filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}
-            </>
-          ),
-          onClear: () => setCategories([]),
-        }
-      : null,
-    filters.tva.length > 0
-      ? {
-          key: "tva",
-          label: (
-            <>
-              {t("common.tvaFilter")} {filters.tva.length}
-            </>
-          ),
-          onClear: () => setTva([]),
-        }
-      : null,
-  ].filter(Boolean) as ActiveFilter[];
+  const activeFilters = ledgerActiveFilters(t, filters, {
+    refLabel: t("achats.blFilter"),
+    clearRef,
+    setSearch,
+    setDateRange,
+    setCategories,
+    setTva,
+  });
 
   return (
     <Page title={t("achats.title")} subtitle={t("achats.subtitle")}>
@@ -364,19 +269,13 @@ export default function AchatsPage() {
 
       {/* Summary footer — TVA payé + CA total over the FULL filtered set */}
       {(list?.data ?? []).length > 0 && summary && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-4 py-2 text-xs">
-          <span className="text-muted-foreground">
-            {t("achats.tvaPaye")} <span className="text-foreground/60">{t("common.filtresActifs")}</span> :
-            <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">
-              {formatMAD(summary.tva_payee)}
-            </span>
-            <span className="mx-2 text-foreground/40">·</span>
-            {t("achats.totalFooter")}
-            <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">
-              {formatMAD(summary.grand_total)}
-            </span>
-          </span>
-        </div>
+        <LedgerFooter
+          t={t}
+          tvaLabel={t("achats.tvaPaye")}
+          tva={summary.tva_payee}
+          totalLabel={t("achats.totalFooter")}
+          total={summary.grand_total}
+        />
       )}
     </Page>
   );

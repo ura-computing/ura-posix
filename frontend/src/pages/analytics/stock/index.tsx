@@ -25,6 +25,8 @@ import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { LoadError } from "@/_components/molecules/LoadError";
+import { Skeleton } from "@/_components/atoms/Skeleton";
+import { peremptionBuckets } from "@/pages/analytics/constants";
 
 // src/pages/stock/_components/AbcdAnalysisCard.tsx
 
@@ -101,11 +103,11 @@ function AbcdAnalysisCard({
           </div>
           {/* Explanation: pharmacists need to know what the needle measures */}
           <p className="mt-0.5 max-w-[220px] text-center text-xs leading-snug text-muted-foreground">
-            Part des produits en couverture idéale <span className="whitespace-nowrap">(46-60 j)</span> sur ceux qui ont
-            des ventes.
+            {t("stock.scoreHint")}
           </p>
           <span className="mt-0.5 text-sm text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground">{formatQty(totalReferences)}</span> références
+            <span className="font-mono tabular-nums text-foreground">{formatQty(totalReferences)}</span>{" "}
+            {t("stock.referencesCount")}
           </span>
         </div>
       </div>
@@ -254,47 +256,7 @@ function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
   // AlertDetailDialog with the per-bucket product list (sortable + Excel
   // export). The fourth bucket (`no_date`) is data-quality: products
   // whose Sobrus export had no expiry date.
-  const cards: {
-    key: keyof PeremptionsResponse;
-    tone: IconTone;
-    title: string;
-    sub: string;
-    dlgTitle: string;
-    dlgSubtitle: string;
-  }[] = [
-    {
-      key: "expired",
-      tone: "error",
-      title: t("peremptions.expiresStock"),
-      sub: t("peremptions.actionUrgente"),
-      dlgTitle: t("peremptions.dlgExpires"),
-      dlgSubtitle: t("peremptions.dlgExpiresSub"),
-    },
-    {
-      key: "very_close",
-      tone: "warning",
-      title: t("peremptions.tresProche"),
-      sub: t("peremptions.tresUrgent"),
-      dlgTitle: t("peremptions.dlgTresProche"),
-      dlgSubtitle: t("peremptions.dlgTresProcheSub"),
-    },
-    {
-      key: "close",
-      tone: "warning",
-      title: t("peremptions.proche"),
-      sub: t("peremptions.aSurveiller"),
-      dlgTitle: t("peremptions.dlgProche"),
-      dlgSubtitle: t("peremptions.dlgProcheSub"),
-    },
-    {
-      key: "no_date",
-      tone: "muted",
-      title: t("peremptions.sansDate"),
-      sub: t("peremptions.aRenseigner"),
-      dlgTitle: t("peremptions.dlgSansDate"),
-      dlgSubtitle: t("peremptions.dlgSansDateSub"),
-    },
-  ];
+  const cards = peremptionBuckets(t, "peremptions.expiresStock");
 
   return (
     <section className="flex flex-col gap-3">
@@ -696,38 +658,34 @@ export default function StockPage() {
 }
 
 /* ---- loading skeleton ---- */
-function Pulse({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-full bg-muted ${className ?? ""}`} />;
-}
-
 function StockSkeleton() {
   return (
     <>
       <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-        <Pulse className="mb-5 h-3 w-60" />
+        <Skeleton className="rounded-full mb-5 h-3 w-60" />
         <div className="grid items-center gap-6 md:grid-cols-[1.5fr_1fr]">
           <div className="grid grid-cols-4 gap-x-2 gap-y-3.5">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-2">
-                <Pulse className="size-16" />
-                <Pulse className="h-3.5 w-10" />
-                <Pulse className="h-2 w-7" />
+                <Skeleton className="rounded-full size-16" />
+                <Skeleton className="rounded-full h-3.5 w-10" />
+                <Skeleton className="rounded-full h-2 w-7" />
               </div>
             ))}
           </div>
           <div className="flex flex-col items-center gap-3">
-            <Pulse className="h-[108px] w-[200px] rounded-xl" />
-            <Pulse className="h-3 w-28" />
+            <Skeleton className="rounded-full h-[108px] w-[200px] rounded-xl" />
+            <Skeleton className="rounded-full h-3 w-28" />
           </div>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="rounded-xl border border-border bg-card p-4">
-            <Pulse className="mb-4 h-3 w-3/5" />
+            <Skeleton className="rounded-full mb-4 h-3 w-3/5" />
             <div className="grid grid-cols-2 gap-2.5">
               {Array.from({ length: 4 }).map((__, j) => (
-                <Pulse key={j} className="h-7 rounded-md" />
+                <Skeleton key={j} className="rounded-full h-7 rounded-md" />
               ))}
             </div>
           </div>
@@ -736,9 +694,9 @@ function StockSkeleton() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
-            <Pulse className="h-3 w-1/2" />
-            <Pulse className="h-6 w-2/5 rounded-md" />
-            <Pulse className="h-2.5 w-3/4" />
+            <Skeleton className="rounded-full h-3 w-1/2" />
+            <Skeleton className="rounded-full h-6 w-2/5 rounded-md" />
+            <Skeleton className="rounded-full h-2.5 w-3/4" />
           </div>
         ))}
       </div>

@@ -134,18 +134,8 @@ def fix_mojibake(s: str | None) -> str | None:
 ENCODINGS = ("utf-8-sig", "utf-8", "latin-1")  # BOM-aware UTF-8, then plain UTF-8, then Latin-1
 
 
-def _decode(content: bytes) -> str:
-    """Try BOM-aware UTF-8, then plain UTF-8, then Latin-1 fallback."""
-    for enc in ENCODINGS:
-        try:
-            return content.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    raise ValueError("Impossible de décoder le fichier — encodage inconnu")
-
-
 def _encoding(content: bytes) -> str:
-    """The encoding `_decode` picks, without keeping the decoded text."""
+    """The file's encoding: BOM-aware UTF-8, then plain UTF-8, then Latin-1 (the text itself is decoded later)."""
     for enc in ENCODINGS:
         try:
             content.decode(enc)

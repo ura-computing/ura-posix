@@ -2,7 +2,6 @@
 
 from pydantic import BaseModel
 
-
 # ═══ Pagination ══════════════════════════════════════════════════════════════
 # Shapes shared by several routers.
 

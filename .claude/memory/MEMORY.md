@@ -13,3 +13,4 @@
 - [tests-ui = watch in one window](tests-ui-watch.md) — headed + slowMo inside one Xephyr window; never Playwright --ui
 - [Design system first](design-system-first.md) — ALWAYS reuse/extract components, copy the closest screen, screenshot-check before « done »
 - [Sobrus = worker only](sobrus-worker-only.md) — every Sobrus call is a queued run mode in sync.py; API only queues + reads
+- [Stop after each step](stop-after-each-step.md) — after each step: UI test list for the user, wait OK; no tests until the batch ends

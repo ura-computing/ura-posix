@@ -51,6 +51,27 @@ def _render_magic_link_html(name: str, magic_link: str, is_setup: bool) -> str:
 </body></html>"""
 
 
+def _send(to: str, subject: str, text: str, what: str, html: str | None = None) -> None:
+    """One email through SMTP (plain text, + HTML when given). Never raises: a failed email is logged, the request
+    that sent it still succeeds. `what`: its name in the log (« magic_link is_setup=True »)."""
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+    msg["To"] = to
+    msg.set_content(text)
+    if html is not None:
+        msg.add_alternative(html, subtype="html")
+    try:
+        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
+            if settings.MAIL_STARTTLS:
+                smtp.starttls(context=ssl.create_default_context())
+            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+            smtp.send_message(msg)
+        log.info("email.sent %s to=%s", what, to)
+    except Exception:
+        log.exception("email.send_failed %s to=%s", what, to)
+
+
 def send_magic_link(*, to: str, name: str, magic_link: str, is_setup: bool) -> None:
     if not settings.MAIL_USERNAME:
         # Dev / no-SMTP fallback: print, same as the previous behavior.
@@ -64,22 +85,13 @@ def send_magic_link(*, to: str, name: str, magic_link: str, is_setup: bool) -> N
         else "Réinitialisation de votre mot de passe PharmaGest"
     )
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
-    msg["To"] = to
-    msg.set_content(f"{subject}\n\nLien d'activation : {magic_link}\n\n(Ce lien expire dans 60 minutes.)")
-    msg.add_alternative(_render_magic_link_html(name=name, magic_link=magic_link, is_setup=is_setup), subtype="html")
-
-    try:
-        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
-            if settings.MAIL_STARTTLS:
-                smtp.starttls(context=ssl.create_default_context())
-            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            smtp.send_message(msg)
-        log.info("magic_link.sent to=%s is_setup=%s", to, is_setup)
-    except Exception:
-        log.exception("magic_link.send_failed to=%s", to)
+    _send(
+        to,
+        subject,
+        f"{subject}\n\nLien d'activation : {magic_link}\n\n(Ce lien expire dans 60 minutes.)",
+        f"magic_link is_setup={is_setup}",
+        html=_render_magic_link_html(name=name, magic_link=magic_link, is_setup=is_setup),
+    )
 
 
 def send_signup_decision(*, to: str, name: str, accepted: bool, login_url: str) -> None:
@@ -103,21 +115,7 @@ def send_signup_decision(*, to: str, name: str, accepted: bool, login_url: str) 
             f"Bonjour {name},\n\nVotre demande de compte PharmaGest n'a pas été acceptée. "
             "Pour toute question, contactez votre administrateur."
         )
-
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
-    msg["To"] = to
-    msg.set_content(text)
-    try:
-        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
-            if settings.MAIL_STARTTLS:
-                smtp.starttls(context=ssl.create_default_context())
-            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            smtp.send_message(msg)
-        log.info("signup_decision.sent to=%s accepted=%s", to, accepted)
-    except Exception:
-        log.exception("signup_decision.send_failed to=%s", to)
+    _send(to, subject, text, f"signup_decision accepted={accepted}")
 
 
 def send_sobrus_problem(*, to: str, name: str, needs_password: bool, app_url: str) -> None:
@@ -137,17 +135,4 @@ def send_sobrus_problem(*, to: str, name: str, needs_password: bool, app_url: st
         f"Bonjour {name},\n\n{why} Les imports automatiques de vos achats et ventes sont en pause.\n\n"
         f"Pour les relancer, ouvrez « Connexion Sobrus » dans PharmaGest :\n{app_url}"
     )
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
-    msg["To"] = to
-    msg.set_content(text)
-    try:
-        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as smtp:
-            if settings.MAIL_STARTTLS:
-                smtp.starttls(context=ssl.create_default_context())
-            smtp.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            smtp.send_message(msg)
-        log.info("sobrus_problem.sent to=%s", to)
-    except Exception:
-        log.exception("sobrus_problem.send_failed to=%s", to)
+    _send(to, subject, text, "sobrus_problem")

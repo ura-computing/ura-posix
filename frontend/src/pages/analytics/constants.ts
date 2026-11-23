@@ -1,6 +1,8 @@
 // src/pages/stock/_constants.ts
 // Shared, locked design constants for the Stock page.
-import type { AbcdClass, StockRow } from "@/types";
+import type { IconTone } from "@/_components/organisms/KpiTile";
+import type { TFn } from "@/i18n/I18nProvider";
+import type { AbcdClass, PeremptionsResponse, StockRow } from "@/types";
 
 /** ABCD class colours — LOCKED (pharmacist memory). Do not shift to tokens. */
 export const ABCD_COLORS: Record<AbcdClass, string> = {
@@ -58,3 +60,52 @@ export const STATUS_META: Record<StockRow["status"], { pill: string; dot: string
     dot: "bg-red-600",
   },
 };
+
+/** The 4 expiry buckets of Alertes and Stock (same order, labels, dialog texts): 3 by urgency, then `no_date` (no expiry
+ *  date in the stock file). `expiredTitle`: « Expirés » (Alertes) or « Expirés en stock » (Stock). */
+export function peremptionBuckets(
+  t: TFn,
+  expiredTitle: "peremptions.expires" | "peremptions.expiresStock",
+): {
+  key: keyof PeremptionsResponse;
+  tone: IconTone;
+  title: string;
+  sub: string;
+  dlgTitle: string;
+  dlgSubtitle: string;
+}[] {
+  return [
+    {
+      key: "expired",
+      tone: "error",
+      title: t(expiredTitle),
+      sub: t("peremptions.actionUrgente"),
+      dlgTitle: t("peremptions.dlgExpires"),
+      dlgSubtitle: t("peremptions.dlgExpiresSub"),
+    },
+    {
+      key: "very_close",
+      tone: "warning",
+      title: t("peremptions.tresProche"),
+      sub: t("peremptions.tresUrgent"),
+      dlgTitle: t("peremptions.dlgTresProche"),
+      dlgSubtitle: t("peremptions.dlgTresProcheSub"),
+    },
+    {
+      key: "close",
+      tone: "warning",
+      title: t("peremptions.proche"),
+      sub: t("peremptions.aSurveiller"),
+      dlgTitle: t("peremptions.dlgProche"),
+      dlgSubtitle: t("peremptions.dlgProcheSub"),
+    },
+    {
+      key: "no_date",
+      tone: "muted",
+      title: t("peremptions.sansDate"),
+      sub: t("peremptions.aRenseigner"),
+      dlgTitle: t("peremptions.dlgSansDate"),
+      dlgSubtitle: t("peremptions.dlgSansDateSub"),
+    },
+  ];
+}

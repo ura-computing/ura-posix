@@ -40,6 +40,8 @@ import { Page } from "@/_components/templates/Page";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { Skeleton } from "@/_components/atoms/Skeleton";
+import { LabeledValue } from "@/_components/molecules/LabeledValue";
+import { peremptionBuckets } from "@/pages/analytics/constants";
 
 // src/pages/alertes/_components/GlobalSummaryStrip.tsx
 
@@ -214,62 +216,13 @@ interface PeremptionsSectionProps {
   onOpen: (d: DialogDescriptor) => void;
 }
 
-function MiniStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-px">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="font-mono text-base font-semibold tabular-nums text-foreground">{value}</span>
-    </div>
-  );
-}
-
 function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
   const t = useT();
   // 4 mutually-exclusive cards — labels + buckets port the old apcm-pharma
   // app verbatim (client-requested parity). The first three are date-bucketed
   // by urgency; the fourth (`no_date`) is a data-quality bucket — products
   // whose Sobrus export had no expiry date.
-  const cards: {
-    key: keyof PeremptionsResponse;
-    tone: IconTone;
-    title: string;
-    sub: string;
-    dlgTitle: string;
-    dlgSubtitle: string;
-  }[] = [
-    {
-      key: "expired",
-      tone: "error",
-      title: t("peremptions.expires"),
-      sub: t("peremptions.actionUrgente"),
-      dlgTitle: t("peremptions.dlgExpires"),
-      dlgSubtitle: t("peremptions.dlgExpiresSub"),
-    },
-    {
-      key: "very_close",
-      tone: "warning",
-      title: t("peremptions.tresProche"),
-      sub: t("peremptions.tresUrgent"),
-      dlgTitle: t("peremptions.dlgTresProche"),
-      dlgSubtitle: t("peremptions.dlgTresProcheSub"),
-    },
-    {
-      key: "close",
-      tone: "warning",
-      title: t("peremptions.proche"),
-      sub: t("peremptions.aSurveiller"),
-      dlgTitle: t("peremptions.dlgProche"),
-      dlgSubtitle: t("peremptions.dlgProcheSub"),
-    },
-    {
-      key: "no_date",
-      tone: "muted",
-      title: t("peremptions.sansDate"),
-      sub: t("peremptions.aRenseigner"),
-      dlgTitle: t("peremptions.dlgSansDate"),
-      dlgSubtitle: t("peremptions.dlgSansDateSub"),
-    },
-  ];
+  const cards = peremptionBuckets(t, "peremptions.expires");
 
   return (
     <section className="flex flex-col gap-3">
@@ -309,8 +262,8 @@ function PeremptionsSection({ data, onOpen }: PeremptionsSectionProps) {
               }
             >
               <div className="flex items-center gap-5 pt-0.5">
-                <MiniStat label={t("col.unites")} value={formatQty(b?.total_units ?? 0)} />
-                <MiniStat label={t("peremptions.valeurAchat")} value={formatMAD(b?.purchase_value ?? 0)} />
+                <LabeledValue label={t("col.unites")} value={formatQty(b?.total_units ?? 0)} />
+                <LabeledValue label={t("peremptions.valeurAchat")} value={formatMAD(b?.purchase_value ?? 0)} />
               </div>
             </KpiTile>
           );

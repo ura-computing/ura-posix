@@ -109,6 +109,27 @@ def _lookup_valid_reset(db: DbSession, raw_token: str) -> User | None:
     return user
 
 
+def _open_session(db: DbSession, user: User, request: Request, response: Response) -> UserSession:
+    """A new session for this device (login, after a password change): its row (committed, so its id is in the JWT)
+    and both cookies."""
+    now = datetime.now(timezone.utc)
+    raw_session_token = generate_token()
+    session_row = UserSession(
+        user_id=user.id,
+        refresh_token_hash=hash_token(raw_session_token),
+        device_label=parse_user_agent(request.headers.get("user-agent")),
+        ip=request.client.host if request.client else None,
+        created_at=now,
+        last_used_at=now,
+        expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
+    )
+    db.add(session_row)
+    db.commit()
+    _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
+    _set_session_cookie(response, raw_session_token)
+    return session_row
+
+
 @router.post("/auth/login")
 @limiter.limit("5/minute")
 def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -> MeResponse:
@@ -123,26 +144,9 @@ def login(body: LoginRequest, request: Request, response: Response, db: DbDep) -
             "Votre compte a été désactivé. Contactez votre administrateur.",
         )
 
-    now = datetime.now(timezone.utc)
-    user.last_login_at = now
-
-    # Create a session row so this device shows up in /v1/sessions.
-    raw_session_token = generate_token()
-    session_row = UserSession(
-        user_id=user.id,
-        refresh_token_hash=hash_token(raw_session_token),
-        device_label=parse_user_agent(request.headers.get("user-agent")),
-        ip=request.client.host if request.client else None,
-        created_at=now,
-        last_used_at=now,
-        expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
-    )
-    db.add(session_row)
-    db.commit()  # commit so session_row.id is populated before signing the JWT
+    user.last_login_at = datetime.now(timezone.utc)
+    _open_session(db, user, request, response)  # this device shows up in /v1/sessions
     db.refresh(user)
-
-    _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
-    _set_session_cookie(response, raw_session_token)
     return _me_response(db, user)
 
 
@@ -242,21 +246,7 @@ def change_password(
     db.refresh(user)
 
     # Re-issue session + cookies for the current device so this caller stays logged in.
-    now = datetime.now(timezone.utc)
-    raw_session_token = generate_token()
-    session_row = UserSession(
-        user_id=user.id,
-        refresh_token_hash=hash_token(raw_session_token),
-        device_label=parse_user_agent(request.headers.get("user-agent")),
-        ip=request.client.host if request.client else None,
-        created_at=now,
-        last_used_at=now,
-        expires_at=now + timedelta(days=SESSION_EXPIRY_DAYS),
-    )
-    db.add(session_row)
-    db.commit()
-    _set_access_cookie(response, create_access_token(user.id, user.token_version, session_row.id))
-    _set_session_cookie(response, raw_session_token)
+    _open_session(db, user, request, response)
 
 
 @router.post("/auth/logout", status_code=204)

@@ -174,40 +174,28 @@ def upload_catalog(
 # ─── JSON endpoints (import page) ────────────────────────────────────────────
 
 
-@router.post("/uploads/achat-json")
-def upload_achat_json(
-    body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "achats")], user: CurrentUserDep, db: DbDep
-) -> dict:
+def _insert_rows(body: JsonUploadBody, pharmacy_id: int, user_id: int, db: DbDep, cfg) -> dict:
+    """One chunk of an Achats / Ventes import: refused when empty or damaged, else inserted into its batch."""
     if not body.rows:
         raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
     _reject_corrupted(body.rows)
     return insert_transactions(
-        db,
-        body.rows,
-        pharmacy_id=pharmacy_id,
-        filename=body.filename,
-        batch_id=body.batch_id,
-        user_id=user.id,
-        cfg=ACHAT_CFG,
+        db, body.rows, pharmacy_id=pharmacy_id, filename=body.filename, batch_id=body.batch_id, user_id=user_id, cfg=cfg
     )
+
+
+@router.post("/uploads/achat-json")
+def upload_achat_json(
+    body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "achats")], user: CurrentUserDep, db: DbDep
+) -> dict:
+    return _insert_rows(body, pharmacy_id, user.id, db, ACHAT_CFG)
 
 
 @router.post("/uploads/vente-json")
 def upload_vente_json(
     body: JsonUploadBody, pharmacy_id: Annotated[int, member("import", "ventes")], user: CurrentUserDep, db: DbDep
 ) -> dict:
-    if not body.rows:
-        raise ApiError(400, ErrorCode.EMPTY_BODY, EMPTY_BODY_DETAIL)
-    _reject_corrupted(body.rows)
-    return insert_transactions(
-        db,
-        body.rows,
-        pharmacy_id=pharmacy_id,
-        filename=body.filename,
-        batch_id=body.batch_id,
-        user_id=user.id,
-        cfg=VENTE_CFG,
-    )
+    return _insert_rows(body, pharmacy_id, user.id, db, VENTE_CFG)
 
 
 @router.post("/uploads/stock-json")

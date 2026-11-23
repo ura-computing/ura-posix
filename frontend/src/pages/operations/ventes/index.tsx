@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Download, Upload } from "lucide-react";
 
-import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
+import { FilterBar } from "@/_components/organisms/FilterBar";
 import { ROUTES, SURVEILLANCE_TABS } from "@/types";
 import { formatMAD, formatQty, formatPct } from "@/utils/format";
 
@@ -11,9 +11,10 @@ import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
 import type { VentesDiscountSummary, SurveillanceTab, VentesSurveillanceCounts, VenteRow } from "@/types";
 import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
-import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { Page } from "@/_components/templates/Page";
 import { ToggleChip } from "@/_components/molecules/ToggleChip";
+import { LedgerFooter } from "../_components/LedgerFooter";
+import { ledgerActiveFilters, ledgerProductColumns } from "../_components/ledgerColumns";
 
 /** Remise gauge. Per the manager's framing on this pharmacy, granting a
  *  remise is treated as the *desirable* outcome — so "Avec remise" sits on
@@ -166,53 +167,7 @@ const buildColumns = (t: TFn): ColumnDef<VenteRow>[] => [
     width: 160,
     render: (r) => (r.client ? r.client : <span className="italic text-muted-foreground">{t("ventes.anonyme")}</span>),
   },
-  {
-    key: "product",
-    label: t("col.produit"),
-    width: 240,
-    render: (r) => (
-      <div className="flex flex-col">
-        <span className="truncate text-base" title={r.product ?? ""}>
-          {r.product ?? "—"}
-        </span>
-        <span className="truncate font-mono text-[11px] text-muted-foreground">{r.pid ?? ""}</span>
-      </div>
-    ),
-  },
-  {
-    key: "category",
-    label: t("col.categorie"),
-    width: 160,
-    render: (r) => (
-      <span className="block max-w-[150px] truncate text-sm text-muted-foreground">{r.category ?? "—"}</span>
-    ),
-  },
-  {
-    key: "type",
-    label: t("col.type"),
-    width: 110,
-    sortable: false,
-    render: (r) => <TypeBadge type={r.category_type} />,
-  },
-  {
-    key: "tva",
-    label: t("col.tva"),
-    width: 80,
-    sortable: false,
-    render: (r) =>
-      r.tva ? (
-        <span className="font-mono text-xs text-muted-foreground">{r.tva}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      ),
-  },
-  {
-    key: "quantity",
-    label: t("col.qte"),
-    width: 70,
-    align: "right",
-    render: (r) => (r.quantity != null ? formatQty(r.quantity) : "—"),
-  },
+  ...ledgerProductColumns<VenteRow>(t, { productWidth: 240, typeKey: "type" }),
   {
     key: "discount",
     label: t("col.remise"),
@@ -321,64 +276,14 @@ export default function VentesPage() {
   const totalRows = list?.pagination.total ?? 0;
 
   // Active filter pills (surveillance has its own dedicated tab row, so it stays out of this array).
-  const activeFilters: ActiveFilter[] = [
-    filters.ref
-      ? {
-          key: "ref",
-          label: (
-            <>
-              {t("ventes.ticketFilter")} {filters.ref}
-            </>
-          ),
-          onClear: clearRef,
-        }
-      : null,
-    filters.search
-      ? {
-          key: "search",
-          label: (
-            <>
-              {t("common.recherche")} {filters.search}
-            </>
-          ),
-          onClear: () => setSearch(""),
-        }
-      : null,
-    filters.date_from || filters.date_to
-      ? {
-          key: "dates",
-          label: (
-            <>
-              {filters.date_from ?? "…"} → {filters.date_to ?? "…"}
-            </>
-          ),
-          onClear: () => setDateRange(null, null),
-        }
-      : null,
-    filters.category.length > 0
-      ? {
-          key: "category",
-          label: (
-            <>
-              {t("dashboard.categorieFilter")} {filters.category[0]}
-              {filters.category.length > 1 ? `, +${filters.category.length - 1}` : ""}
-            </>
-          ),
-          onClear: () => setCategories([]),
-        }
-      : null,
-    filters.tva.length > 0
-      ? {
-          key: "tva",
-          label: (
-            <>
-              {t("common.tvaFilter")} {filters.tva.length}
-            </>
-          ),
-          onClear: () => setTva([]),
-        }
-      : null,
-  ].filter(Boolean) as ActiveFilter[];
+  const activeFilters = ledgerActiveFilters(t, filters, {
+    refLabel: t("ventes.ticketFilter"),
+    clearRef,
+    setSearch,
+    setDateRange,
+    setCategories,
+    setTva,
+  });
 
   return (
     <Page title={t("ventes.title")} subtitle={t("ventes.subtitle")}>
@@ -452,19 +357,13 @@ export default function VentesPage() {
 
       {/* SummaryFooter — TVA encaissée from backend aggregate (full filtered set, pagination-ignored) */}
       {(list?.data ?? []).length > 0 && summary && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-4 py-2 text-xs">
-          <span className="text-muted-foreground">
-            {t("ventes.tvaEncFooter")} <span className="text-foreground/60">{t("common.filtresActifs")}</span> :
-            <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">
-              {formatMAD(summary.tva_collected)}
-            </span>
-            <span className="mx-2 text-foreground/40">·</span>
-            {t("ventes.caFooter")}
-            <span className="ml-1 font-mono tabular-nums font-semibold text-foreground">
-              {formatMAD(summary.grand_total)}
-            </span>
-          </span>
-        </div>
+        <LedgerFooter
+          t={t}
+          tvaLabel={t("ventes.tvaEncFooter")}
+          tva={summary.tva_collected}
+          totalLabel={t("ventes.caFooter")}
+          total={summary.grand_total}
+        />
       )}
     </Page>
   );

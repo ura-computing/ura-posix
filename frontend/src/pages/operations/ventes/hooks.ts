@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { api } from "@/api/client";
@@ -20,6 +19,7 @@ import type {
 } from "@/types";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
+import { useRefParam } from "../_components/useRefParam";
 
 // Local filter state — date fields live in the cross-route global context.
 type LocalVentesFilters = Omit<VentesFilters, "date_from" | "date_to">;
@@ -60,23 +60,11 @@ export function useVentesPage() {
   // existing API + sub-components expect.
   // « Voir détail » from a product's « Mouvements »: `?ref=` = every line of that one
   // ticket, until its filter is removed.
-  const [params, setParams] = useSearchParams();
-  const ref = params.get("ref") ?? "";
+  const { ref, clearRef } = useRefParam(setPage);
   const filters: VentesFilters = useMemo(
     () => ({ ...localFilters, ...(ref ? { ref } : {}), date_from: dateFrom, date_to: dateTo }),
     [localFilters, ref, dateFrom, dateTo],
   );
-  const clearRef = () => {
-    setPage(1);
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("ref");
-        return next;
-      },
-      { replace: true },
-    );
-  };
 
   const key = useMemo(() => trimForKey(filters), [filters]);
 

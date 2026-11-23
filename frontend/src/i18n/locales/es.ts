@@ -158,6 +158,7 @@ export const es: Dict = {
   },
 
   kpi: {
+    operationsShort: "op.",
     ca: "Facturación",
     totalAchats: "Total compras",
     margeBruteMoy: "Margen bruto medio",
@@ -749,6 +750,8 @@ export const es: Dict = {
   },
 
   stock: {
+    scoreHint: "Parte de los productos con cobertura ideal (46-60 d) entre los que tienen ventas.",
+    referencesCount: "referencias",
     searchPh: "Nombre, código de barras, PID…",
     healthIndex: "Índice de salud",
     classAria: "Clase {{k}}: {{n}} referencias",
@@ -1596,6 +1599,9 @@ export const es: Dict = {
     footer: "© PharmaGest · Gestión de farmacia",
   },
   uploadFile: {
+    previewRows: "Vista previa — {{shown}} líneas mostradas de {{total}}",
+    filePeriod: "Periodo: {{from}} → {{to}}",
+    moreRows: "… y {{n}} líneas más se importarán.",
     missingColumns: "Este archivo no corresponde a este tipo de importación. Columnas faltantes: {{columns}}",
     emptyFile: "El archivo está vacío: ninguna línea para importar.",
     corrupted: "Este archivo está dañado (línea {{line}}). Descárgalo de nuevo desde Sobrus e inténtalo otra vez.",
