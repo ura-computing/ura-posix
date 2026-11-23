@@ -40,8 +40,17 @@ export function useMyStore() {
     onSettled: () => void refresh(qc, API.storeWebsite.create),
   });
 
+  const { mutateAsync: deleteStore } = useMutation({
+    mutationFn: () => api.delete(API.storeWebsite.deleteMyStore.url),
+    onSuccess: () => {
+      toast.success(t("myStore.deleted"));
+      void refresh(qc, API.storeWebsite.deleteMyStore);
+    },
+  });
+
   return {
     request: data ?? null,
+    deleteStore,
     isLoading,
     isError,
     reload: () => void refetch(),

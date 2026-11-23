@@ -13,29 +13,9 @@ import type {
   StoreTemplate,
 } from "@/types/storeWebsite";
 
-import type { StorePage, TemplateCustomization } from "../_templates/_shared/customizationTypes";
+import type { StorePage } from "../_templates/_shared/customizationTypes";
 import { defaultCustomization } from "../_templates/_shared/defaultCustomization";
-
-/** The API's flat customization → what the models read (keys missing on an old row: the model's defaults). */
-function toCustomization(template: StoreTemplate, out: PublicPreviewOut): TemplateCustomization {
-  const base = defaultCustomization(template);
-  return {
-    ...base,
-    storeName: out.store_name,
-    logoUrl: out.logo_url ? apiUrl(out.logo_url) : null,
-    brandColors: {
-      primary: out.brand_colors.primary ?? base.brandColors.primary,
-      secondary: out.brand_colors.secondary ?? base.brandColors.secondary,
-      accent: out.brand_colors.accent ?? base.brandColors.accent,
-    },
-    fontPairing: (out.font_pairing as TemplateCustomization["fontPairing"]) ?? base.fontPairing,
-    featuredCategoryIds: out.featured_category_ids,
-    sections: base.sections.map((s) => {
-      const override = out.sections[s.key];
-      return override ? { ...s, visible: override.visible } : s;
-    }),
-  };
-}
+import { toCustomization } from "../_templates/_shared/toCustomization";
 
 export function usePreviewStore({
   template,
@@ -87,7 +67,7 @@ export function usePreviewStore({
   return {
     customization: requestId
       ? preview.data
-        ? toCustomization(template, preview.data)
+        ? toCustomization(template, preview.data, apiUrl(""))
         : null
       : defaultCustomization(template),
     pharmacyPhone: preview.data?.pharmacy_phone ?? "",

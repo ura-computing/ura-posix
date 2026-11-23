@@ -9,7 +9,7 @@ from fastapi import APIRouter, Path, Query
 
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import StorePack, StorePackItem, StoreProduct
+from app.core.models import Store, StorePack, StorePackItem, StoreProduct
 from app.core.permissions import OwnerDep
 from app.store_website.catalog_queries import (
     OWNER_VIEWS,
@@ -19,6 +19,7 @@ from app.store_website.catalog_queries import (
     packs_of,
     store_of,
 )
+from app.store_website.service import open_request_of
 from app.store_website.schemas import (
     CategoryChoice,
     OwnerProductPatch,
@@ -126,4 +127,17 @@ def update_pack(pack_id: PackId, body: PackIn, pharmacy_id: OwnerDep, db: DbDep)
 def delete_pack(pack_id: PackId, pharmacy_id: OwnerDep, db: DbDep) -> None:
     store = store_of(db, pharmacy_id)
     db.query(StorePack).filter_by(id=pack_id, store_id=store.id).delete()
+    db.commit()
+
+
+@router.delete("", status_code=204)
+def delete_store(pharmacy_id: OwnerDep, db: DbDep) -> None:
+    """« Supprimer ma boutique »: the store and its key are deleted (the live site gets no data any more), its
+    products / packs settings too, and the request is closed (a new one can be sent)."""
+    store = db.query(Store).filter_by(pharmacy_id=pharmacy_id).first()
+    if store is not None:
+        db.delete(store)
+    req = open_request_of(db, pharmacy_id)
+    if req is not None:
+        req.state = "cloturee"
     db.commit()

@@ -9,6 +9,11 @@ Lifecycle of a request (one open request per pharmacy):
 
 from __future__ import annotations
 
+import hashlib
+import re
+import secrets
+from datetime import datetime, timezone
+
 from uuid import UUID, uuid4
 
 from fastapi import UploadFile
@@ -16,9 +21,9 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Pharmacy, StoreCustomization, StoreWebsiteRequest, User
+from app.core.models import Pharmacy, Store, StoreCustomization, StoreWebsiteRequest, User
 from app.notifications.service import notify
-from app.store_website.schemas import ClaimedByOut, CustomizationOut, WebsiteRequestOut
+from app.store_website.schemas import ClaimedByOut, CustomizationOut, PublicPreviewOut, WebsiteRequestOut
 
 DEFAULT_TEMPLATE = "lumiere"
 DEFAULT_FONT_PAIRING = "moderne"
@@ -89,6 +94,45 @@ async def save_logo(cust: StoreCustomization, request_id: UUID, file: UploadFile
     cust.logo_type = file.content_type
     # New `v` at each upload: browsers drop the old cached image.
     cust.logo_url = f"/store-website/logo/{request_id}?v={uuid4().hex[:8]}"
+
+
+def preview_out(req: StoreWebsiteRequest) -> PublicPreviewOut:
+    """What the models need, plus the WhatsApp number. No owner data."""
+    cust = customization_of(req)
+    return PublicPreviewOut(
+        template=cust.template,
+        sections=dict(cust.sections or {}),
+        brand_colors=dict(cust.brand_colors or {}),
+        logo_url=cust.logo_url,
+        font_pairing=cust.font_pairing,
+        featured_category_ids=list(cust.featured_category_ids or []),
+        store_name=req.store_name,
+        pharmacy_phone=req.phone,
+    )
+
+
+_DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9-]+\.)*[a-z0-9-]+(:\d{1,5})?$")
+
+
+def clean_domain(raw: str) -> str:
+    """« https://www.Pharmacie-Demo.ma/ » → « pharmacie-demo.ma » (a port stays: « localhost:4173 »). Bad = 422."""
+    host = re.sub(r"^[a-z]+://", "", raw.strip().lower()).split("/")[0].removeprefix("www.")
+    if not _DOMAIN.match(host):
+        raise ApiError(422, ErrorCode.DOMAIN_INVALID, "Nom de domaine invalide.")
+    return host
+
+
+def key_hash(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def new_site_key(store: Store, domain: str) -> str:
+    """A new secret key for the store's site (the old one stops working). Only its hash is kept. The caller commits."""
+    key = f"pgs_{secrets.token_urlsafe(32)}"
+    store.domain = domain
+    store.key_hash = key_hash(key)
+    store.key_created_at = datetime.now(tz=timezone.utc)
+    return key
 
 
 def get_request_or_404(db: Session, request_id: UUID) -> StoreWebsiteRequest:

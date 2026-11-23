@@ -10,6 +10,7 @@ import {
   REQUEST_STATE_LABEL,
   type RequestState,
   type WebsiteRequestOut,
+  type WebsiteRequestPatch,
   type WebsiteRequestWithCustomizationOut,
 } from "@/types/storeWebsite";
 
@@ -59,5 +60,22 @@ export function useRequestActions(id: string) {
     releaseRequest: release.mutateAsync,
     moveRequestTo: moveTo.mutateAsync,
     isBusy: claim.isPending || release.isPending || moveTo.isPending,
+  };
+}
+
+/** Support corrects what the owner sent (name, slogan, WhatsApp, domain): any step. */
+export function useEditBrief(id: string) {
+  const qc = useQueryClient();
+  const t = useT();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (body: WebsiteRequestPatch) => api.patch<WebsiteRequestOut>(API.storeWebsite.brief.url(id), body),
+    onSuccess: () => {
+      toast.success(t("myStore.saved"));
+      void refresh(qc, API.storeWebsite.brief);
+    },
+  });
+  return {
+    editBrief: mutateAsync,
+    isEditingBrief: isPending,
   };
 }

@@ -6,10 +6,11 @@
  *    Packs      — several products at one price */
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ExternalLink, Pencil, Store } from "lucide-react";
+import { ExternalLink, Pencil, Store, Trash2 } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import { buttonClass } from "@/_components/atoms/buttonClass";
+import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { FieldList } from "@/_components/molecules/FieldList";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { TabBar } from "@/_components/molecules/TabBar";
@@ -35,7 +36,8 @@ const TABS: Tab[] = ["request", "products", "categories", "packs"];
 
 export default function MyStorePage() {
   const t = useT();
-  const { request, isLoading, isError, reload, submitRequest, isSending } = useMyStore();
+  const { request, isLoading, isError, reload, submitRequest, isSending, deleteStore } = useMyStore();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [params, setParams] = useSearchParams();
   const tab = TABS.find((id) => id === params.get("tab")) ?? "request";
@@ -139,6 +141,27 @@ export default function MyStorePage() {
               ]}
             />
           </SectionCard>
+          <SectionCard title={t("myStore.dangerTitle")}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">{t("myStore.deleteHint")}</p>
+              <Button variant="danger-outline" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="size-4" />
+                {t("myStore.delete")}
+              </Button>
+            </div>
+          </SectionCard>
+          <ConfirmDialog
+            open={deleteOpen}
+            onClose={() => setDeleteOpen(false)}
+            variant="destructive"
+            title={t("myStore.deleteTitle")}
+            description={t("myStore.deleteHint")}
+            confirmLabel={t("myStore.delete")}
+            onConfirm={async () => {
+              await deleteStore();
+              setDeleteOpen(false);
+            }}
+          />
         </>
       )}
     </Page>

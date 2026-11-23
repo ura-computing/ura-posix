@@ -12,6 +12,7 @@ from app.core.errors import ApiError, CatchServerErrors, api_error_handler, vali
 from app.core.observability import init_sentry
 from app.core.rate_limit import limiter, rate_limit_handler
 from app.core.services import ROUTER_MODULES, routers_of
+from app.store_website.site_cors import StoreSiteCors
 
 
 init_sentry(settings.SERVICE or "api")
@@ -31,6 +32,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-Requested-With"],
 )
+# Downloaded store sites call /v1/store-public from their own domain (outside the CORS above).
+app.add_middleware(StoreSiteCors)
 # Gzip every JSON answer > 1 kB: the 45k-row ventes export goes 17.7 MB → 1.5 MB.
 # Level 5: 85 ms on that export (Starlette's default 9: 450 ms for 10 % less).
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)

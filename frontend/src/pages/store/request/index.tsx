@@ -7,7 +7,7 @@
  *  Only the person who took it moves it forward, opens the editor or gives it back (« Libérer »). */
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, Check, Hand, Phone, Undo2 } from "lucide-react";
+import { ArrowRight, Check, Hand, Pencil, Phone, Undo2 } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
 import { buttonClass } from "@/_components/atoms/buttonClass";
@@ -27,7 +27,8 @@ import { formatDateTime } from "@/utils/format";
 
 import { PaletteSwatches, UrgencyBadge } from "../_components/RequestBadges";
 import { editorPath } from "../paths";
-import { useRequestActions, useStoreRequest } from "./hooks";
+import { BriefDialog } from "./_components/BriefDialog";
+import { useEditBrief, useRequestActions, useStoreRequest } from "./hooks";
 
 /** The next step and its button, for the person who took the request. */
 const NEXT: Partial<Record<RequestState, { to: RequestState; label: string }>> = {
@@ -43,6 +44,8 @@ export default function StoreRequestPage() {
   const { request, isMine, isLoading, isError, reload } = useStoreRequest(id);
   const { claimRequest, releaseRequest, moveRequestTo, isBusy } = useRequestActions(id);
   const [confirm, setConfirm] = useState<"release" | "close" | null>(null);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const { editBrief, isEditingBrief } = useEditBrief(id);
 
   const back = <BackLink to={ROUTES.STORE_REQUESTS} label={t("store.backToRequests")} />;
   if (isLoading) return <PageSkeleton />;
@@ -72,6 +75,10 @@ export default function StoreRequestPage() {
           </Button>
         ) : isMine ? (
           <>
+            <Button variant="outline" onClick={() => setBriefOpen(true)}>
+              <Pencil className="size-4" />
+              {t("store.editBrief")}
+            </Button>
             {canRelease && (
               <Button variant="outline" disabled={isBusy} onClick={() => setConfirm("release")}>
                 <Undo2 className="size-4" />
@@ -144,6 +151,14 @@ export default function StoreRequestPage() {
         </SectionCard>
       </div>
 
+      {briefOpen && (
+        <BriefDialog
+          request={request}
+          isSaving={isEditingBrief}
+          onClose={() => setBriefOpen(false)}
+          onSave={editBrief}
+        />
+      )}
       <ConfirmDialog
         open={confirm !== null}
         onClose={() => setConfirm(null)}

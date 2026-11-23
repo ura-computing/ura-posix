@@ -10,8 +10,6 @@
 
 import { Sparkles } from "lucide-react";
 
-import { useT } from "@/i18n/I18nProvider";
-
 import type { StoreTemplate } from "@/types/storeWebsite";
 import { TEMPLATE_LABEL } from "@/types/storeWebsite";
 
@@ -27,17 +25,16 @@ export interface TemplateEntry {
 
 function comingSoonPage(template: StoreTemplate): Renderer {
   return function ComingSoon() {
-    const t = useT();
     return (
-      <div className="grid min-h-screen place-items-center bg-gradient-to-br from-slate-100 to-slate-200 p-8">
+      <div className="grid min-h-screen place-items-center bg-slate-100 p-8">
         <div className="flex max-w-md flex-col items-center gap-4 rounded-3xl bg-white p-10 text-center shadow-2xl ring-1 ring-black/5">
-          <span className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+          <span className="grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
             <Sparkles className="size-6" strokeWidth={1.75} />
           </span>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {t("store.templateSoon", { name: TEMPLATE_LABEL[template] })}
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            {TEMPLATE_LABEL[template]} — bientôt disponible
           </h1>
-          <p className="text-sm text-muted-foreground">{t("store.templateSoonHint")}</p>
+          <p className="text-sm text-slate-500">Ce modèle est en préparation. Le modèle Lumière est prêt.</p>
         </div>
       </div>
     );

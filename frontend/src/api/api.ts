@@ -723,6 +723,18 @@ export const API = {
       url: (id: string) => `/store-website/requests/${id}/customization/reset`,
     },
     logo: { url: (id: string) => `/store-website/requests/${id}/logo` },
+    // Support corrects the owner's request (name, WhatsApp, domain…).
+    brief: {
+      url: (id: string) => `/store-website/requests/${id}/brief`,
+      refreshes: (): Read[] => [API.storeWebsite.request, API.storeWebsite.requests],
+    },
+    // « Télécharger le site »: a new secret key for the domain (shown once, it goes in the site's .env).
+    siteKey: { url: (id: string) => `/store-website/requests/${id}/site-key` },
+    // « Supprimer ma boutique » (owner): the store, its key, its settings; the request closes.
+    deleteMyStore: {
+      url: "/store-website/my-store",
+      refreshes: (): Read[] => [API.storeWebsite.myRequest, API.storeWebsite.requests],
+    },
     preview: {
       url: (id: string) => `/store-website/public/preview/${id}`,
       key: (id: string | null) => ["store-website", "preview", id] as const,

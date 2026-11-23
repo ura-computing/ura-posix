@@ -24,7 +24,8 @@ import { StateBadge } from "../_components/RequestBadges";
 import { requestPath } from "../paths";
 import { EditorSettings } from "./_components/EditorSettings";
 import { StorePreview } from "./_components/StorePreview";
-import { useStoreEditor } from "./hooks";
+import { DownloadSiteDialog } from "./_components/DownloadSiteDialog";
+import { useDownloadSite, useStoreEditor } from "./hooks";
 
 export default function StoreEditorPage() {
   const t = useT();
@@ -48,6 +49,8 @@ export default function StoreEditorPage() {
     isResetting,
   } = useStoreEditor(id);
   const [resetOpen, setResetOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const { downloadSite, isDownloading } = useDownloadSite(id);
 
   const back = <BackLink to={requestPath(id)} label={t("store.backToRequest")} />;
   if (isLoading) return <PageSkeleton />;
@@ -115,8 +118,7 @@ export default function StoreEditorPage() {
       }
       actions={
         <>
-          {/* No backend yet for the site's files: shown, greyed out, with the reason. */}
-          <Button variant="outline" disabled title={t("store.downloadSoon")}>
+          <Button variant="outline" onClick={() => setDownloadOpen(true)}>
             <Download className="size-4" />
             {t("store.download")}
           </Button>
@@ -153,6 +155,14 @@ export default function StoreEditorPage() {
         </div>
       </div>
 
+      {downloadOpen && (
+        <DownloadSiteDialog
+          initialDomain={request.custom_domain ?? ""}
+          isDownloading={isDownloading}
+          onClose={() => setDownloadOpen(false)}
+          onDownload={(domain) => downloadSite({ domain, storeName: request.store_name })}
+        />
+      )}
       <ConfirmDialog
         open={resetOpen}
         onClose={() => setResetOpen(false)}

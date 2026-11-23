@@ -250,3 +250,14 @@ class PackIn(BaseModel):
     price: float = Field(..., gt=0, le=1_000_000)
     hidden: bool = False
     items: list[PackItemIn] = Field(..., min_length=1, max_length=20)
+
+
+class SiteKeyIn(BaseModel):
+    """The domain where the site will live, e.g. « pharmacie-exemple.ma »."""
+
+    domain: str = Field(..., min_length=3, max_length=255)
+
+
+class SiteKeyOut(BaseModel):
+    key: str  # shown once: it goes in the site's `.env`
+    domain: str

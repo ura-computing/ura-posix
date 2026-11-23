@@ -22,6 +22,7 @@ ROUTER_MODULES: dict[str, str] = {
     "accounting": "app.accounting.payments.router",
     "closings": "app.accounting.closings.router",
     "store_owner": "app.store_website.owner_router",
+    "store_public": "app.store_website.public_router",
     "store_website": "app.store_website.router",
     "notifications": "app.notifications.router",
 }
@@ -40,6 +41,7 @@ SERVICE_ROUTERS: dict[str, tuple[str, ...]] = {
         "closings",
         "exclusions",
         "store_owner",
+        "store_public",
         "store_website",
     ),
     # Big uploads (memory): achats / ventes / stock, the admin catalogue.

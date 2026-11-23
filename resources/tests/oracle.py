@@ -1281,6 +1281,27 @@ class Oracle:
             "stats": {ct: compta.stats(ct) for ct in CATEGORY_TYPES},
         }
 
+    # ── Online store (e2e/tests/09-boutique.spec.ts) ────────────────────────
+
+    def store(self) -> dict:
+        """The E2E pharmacy's store shelf, as /store-website/public/{id}/* shows it before any owner choice: every
+        product of the stock file; its category without Sobrus' margin (« Parapharmacie (33.330%) » → « Parapharmacie »,
+        no shop info yet: 18-produits adds it later); in stock = quantity > 0. Searches = the Produits grammar."""
+        rows = [{"pid": p.pid, "name": p.name, "ppv": r2(p.ppv), "in_stock": p.stock > 0,
+                 "category": strip_pct(p.category) or None} for p in self.stocked]
+        categories: dict[str, int] = defaultdict(int)
+        for r in rows:
+            if r["category"]:
+                categories[r["category"]] += 1
+        return {
+            "total": len(rows),
+            "in_stock": sum(1 for r in rows if r["in_stock"]),
+            "categories": dict(sorted(categories.items())),
+            "products": sorted(rows, key=lambda r: r["name"]),
+            "search": {q: sorted(p.name for p in self.stocked if all(product_match(p, t) for t in tokenize(q)))
+                       for q in PRODUCT_QUERIES},
+        }
+
     # ── Everything ──────────────────────────────────────────────────────────
 
     def build(self, liste_items: list[dict], photo_setup: dict) -> dict:
@@ -1301,4 +1322,5 @@ class Oracle:
             "analyse_search": {q: self.analyse_search(q) for q in ANALYSE_QUERIES},
             "analyse_annee_product": {"q": ANNEE_PRODUCT, **self.analyse("all", "annee", ANNEE_PRODUCT)},
             "exclusions": self.exclusion_scenario(),
+            "store": self.store(),
         }

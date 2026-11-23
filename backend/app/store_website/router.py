@@ -29,6 +29,8 @@ from app.store_website.schemas import (
     CustomizationPatch,
     FeaturedCategoriesIn,
     PublicPreviewOut,
+    SiteKeyIn,
+    SiteKeyOut,
     StateTransition,
     StoreProductDetail,
     StoreProductsPage,
@@ -49,7 +51,10 @@ from app.store_website.service import (
     customization_out,
     deep_merge,
     default_brand_colors,
+    clean_domain,
     get_request_or_404,
+    new_site_key,
+    preview_out,
     notify_store_step,
     open_request_of,
     own_request_or_404,
@@ -266,6 +271,36 @@ async def upload_logo(
     return customization_out(cust)
 
 
+@router.patch("/requests/{request_id}/brief", response_model=WebsiteRequestOut)
+def support_patch_request(
+    request_id: RequestId, body: WebsiteRequestPatch, user: AdminDep, db: DbDep
+) -> WebsiteRequestOut:
+    """Support corrects what the owner sent (name, slogan, WhatsApp, colors, domain…), whatever the step. A new
+    domain also moves the live site's allowed domain."""
+    req = claimed_request_or_403(db, request_id, user)
+    changes = body.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(req, field, value)
+    store = store_of(db, req.pharmacy_id)
+    if changes.get("custom_domain") and store.key_hash:
+        store.domain = clean_domain(changes["custom_domain"])
+    db.commit()
+    db.refresh(req)
+    return request_out(db, req)
+
+
+@router.post("/requests/{request_id}/site-key", response_model=SiteKeyOut)
+def create_site_key(request_id: RequestId, body: SiteKeyIn, user: AdminDep, db: DbDep) -> SiteKeyOut:
+    """« Télécharger le site »: the domain where the site will live + a NEW secret key (the old one stops working).
+    The key is shown once (it goes in the site's `.env`); only its hash is kept."""
+    req = claimed_request_or_403(db, request_id, user)
+    store = store_of(db, req.pharmacy_id)
+    store.request_id = req.id
+    key = new_site_key(store, clean_domain(body.domain))
+    db.commit()
+    return SiteKeyOut(key=key, domain=store.domain or "")
+
+
 # ─── Public ─────────────────────────────────────────────────────────────────
 
 
@@ -275,17 +310,7 @@ def public_preview(request_id: RequestId, db: DbDep) -> PublicPreviewOut:
     req = db.get(StoreWebsiteRequest, request_id)
     if req is None or req.customization is None:
         raise ApiError(404, ErrorCode.PREVIEW_NOT_FOUND, "Aperçu introuvable.")
-    cust = req.customization
-    return PublicPreviewOut(
-        template=cust.template,
-        sections=dict(cust.sections or {}),
-        brand_colors=dict(cust.brand_colors or {}),
-        logo_url=cust.logo_url,
-        font_pairing=cust.font_pairing,
-        featured_category_ids=list(cust.featured_category_ids or []),
-        store_name=req.store_name,
-        pharmacy_phone=req.phone,
-    )
+    return preview_out(req)
 
 
 def _preview_store(db: DbDep, request_id: UUID) -> Store:

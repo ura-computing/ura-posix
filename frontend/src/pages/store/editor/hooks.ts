@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { api } from "@/api/client";
+import { api, apiUrl } from "@/api/client";
 import { API } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 import type { CustomizationOut, CustomizationPatch, WebsiteRequestWithCustomizationOut } from "@/types/storeWebsite";
@@ -143,5 +143,27 @@ export function useStoreEditor(id: string) {
       return reset.mutateAsync();
     },
     isResetting: reset.isPending,
+  };
+}
+
+/** « Télécharger le site »: a new key for the domain (the old site's key stops working), then the ZIP is made in the
+ *  browser and downloaded (nothing kept on the server but the key's hash). */
+export function useDownloadSite(id: string) {
+  const t = useT();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: async ({ domain, storeName }: { domain: string; storeName: string }) => {
+      const { key, domain: clean } = await api.post<{ key: string; domain: string }>(API.storeWebsite.siteKey.url(id), {
+        domain,
+      });
+      // The API's full address without « /v1 » (the site adds it): « http://localhost:8000 », « https://api… ».
+      const apiOrigin = new URL(apiUrl(""), window.location.origin).href.replace(/\/v1\/?$/, "");
+      const { downloadSite } = await import("../_kit/buildZip");
+      await downloadSite({ storeName, apiUrl: apiOrigin, key, domain: clean });
+    },
+    onSuccess: () => toast.success(t("store.downloadDone")),
+  });
+  return {
+    downloadSite: mutateAsync,
+    isDownloading: isPending,
   };
 }
