@@ -9,12 +9,15 @@ Lifecycle of a request (one open request per pharmacy):
 
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
+
+from fastapi import UploadFile
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import StoreCustomization, StoreWebsiteRequest, User
+from app.core.models import Pharmacy, StoreCustomization, StoreWebsiteRequest, User
+from app.notifications.service import notify
 from app.store_website.schemas import ClaimedByOut, CustomizationOut, WebsiteRequestOut
 
 DEFAULT_TEMPLATE = "lumiere"
@@ -24,8 +27,8 @@ DEFAULT_SECTIONS: dict[str, dict] = {
     "brands": {"visible": True},
     "catalogue": {"visible": True},
     "soldes": {"visible": True},
+    "packs": {"visible": True},
     "featured_categories": {"visible": True},
-    "testimonials": {"visible": True},
     "contact": {"visible": True},
     "footer": {"visible": True},
 }
@@ -75,6 +78,19 @@ def reset_customization(cust: StoreCustomization, palette: list[str]) -> None:
     cust.featured_category_ids = []
 
 
+async def save_logo(cust: StoreCustomization, request_id: UUID, file: UploadFile) -> None:
+    """PNG / JPG / SVG / WebP, 2 MB max, kept in the database (served by /logo/{id}). The caller commits."""
+    if file.content_type not in LOGO_TYPES:
+        raise ApiError(422, ErrorCode.LOGO_FORMAT, "Format non pris en charge. Utilisez PNG, JPG, SVG ou WebP.")
+    contents = await file.read()
+    if len(contents) > LOGO_MAX_BYTES:
+        raise ApiError(413, ErrorCode.LOGO_TOO_LARGE, "Le logo dépasse 2 Mo.")
+    cust.logo_data = contents
+    cust.logo_type = file.content_type
+    # New `v` at each upload: browsers drop the old cached image.
+    cust.logo_url = f"/store-website/logo/{request_id}?v={uuid4().hex[:8]}"
+
+
 def get_request_or_404(db: Session, request_id: UUID) -> StoreWebsiteRequest:
     req = db.get(StoreWebsiteRequest, request_id)
     if req is None:
@@ -113,16 +129,28 @@ def open_request_of(db: Session, pharmacy_id: int) -> StoreWebsiteRequest | None
     )
 
 
+def notify_store_step(db: Session, req: StoreWebsiteRequest) -> None:
+    """The owner's bell: « Votre boutique « Pharmacie Demo Shop » : En cours »."""
+    notify(db, [req.owner_id], "storeStep", {"store": req.store_name, "state": req.state}, "/ma-boutique")
+
+
 def request_out(db: Session, req: StoreWebsiteRequest) -> WebsiteRequestOut:
     claimed_by = None
     if req.claimed_by_id is not None:
         person = db.get(User, req.claimed_by_id)
         if person is not None:
             claimed_by = ClaimedByOut(id=person.id, name=person.name or person.email)
+    pharmacy = db.get(Pharmacy, req.pharmacy_id)
+    owner = db.get(User, req.owner_id)
     return WebsiteRequestOut(
         id=req.id,
         pharmacy_id=req.pharmacy_id,
+        pharmacy_name=pharmacy.name if pharmacy else "—",
+        pharmacy_code=pharmacy.code if pharmacy else None,
         owner_id=req.owner_id,
+        owner_name=(owner.name or owner.email) if owner else "—",
+        logo_url=req.customization.logo_url if req.customization else None,
+        template=req.customization.template if req.customization else "lumiere",
         store_name=req.store_name,
         slogan=req.slogan,
         brand_palette=list(req.brand_palette or []),

@@ -5,13 +5,13 @@ import { HistoryTable } from "@/_components/organisms/HistoryTable";
 import { useT } from "@/i18n/I18nProvider";
 
 import { useProductHistory } from "../hooks";
-import { SheetCard } from "./SheetCard";
+import { SectionCard } from "@/_components/molecules/SectionCard";
 
 export function HistoryTab({ id }: { id: number }) {
   const t = useT();
   const { rows, total, page, setPage, isLoading, isError, reload } = useProductHistory(id);
   return (
-    <SheetCard title={t("history.title")} hint={t("history.tabHint")}>
+    <SectionCard title={t("history.title")} hint={t("history.tabHint")}>
       <HistoryTable
         rows={rows}
         isLoading={isLoading}
@@ -19,6 +19,6 @@ export function HistoryTab({ id }: { id: number }) {
         onRetry={reload}
         pagination={{ page, pageSize: 20, total, onPage: setPage, onPageSize: () => {}, pageSizes: [20] }}
       />
-    </SheetCard>
+    </SectionCard>
   );
 }

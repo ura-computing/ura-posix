@@ -162,7 +162,7 @@ apcm-pharma/
         ├── main.tsx · App.tsx  providers · routes + guards
         ├── api/                client.ts, api.ts (every call), errors.ts (error codes)
         ├── _components/        shared UI: atoms/ molecules/ organisms/ templates/ routing/
-        ├── hooks/              app-wide hooks (useMe, sharedQueries, useListFilters, UploadContext, …)
+        ├── hooks/              app-wide hooks, every file named use… (useMe, useSharedQueries, useListFilters, useUpload, …)
         ├── pages/              one folder per area, then one per route (§6.3)
         ├── i18n/               I18nProvider (useT) + locales/fr.ts, es.ts
         ├── types/              one file per backend area, import from "@/types"
@@ -473,7 +473,7 @@ stateDiagram-v2
 ```mermaid
 flowchart TB
   P["pages/area/route/index.tsx<br/>UI only"] --> H["hooks.ts beside it<br/>state + reads + named actions"]
-  H --> SQ["hooks/sharedQueries.ts<br/>reads used by 2+ pages"]
+  H --> SQ["hooks/useSharedQueries.ts<br/>reads used by 2+ pages"]
   H --> LF["hooks/useListFilters.ts<br/>filter · sort · page"]
   H --> API["api/api.ts<br/>read = {url, key} · write = {url, refreshes}"]
   SQ --> API

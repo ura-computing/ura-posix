@@ -21,13 +21,15 @@ ROUTER_MODULES: dict[str, str] = {
     "exclusions": "app.accounting.exclusions.router",
     "accounting": "app.accounting.payments.router",
     "closings": "app.accounting.closings.router",
+    "store_owner": "app.store_website.owner_router",
     "store_website": "app.store_website.router",
+    "notifications": "app.notifications.router",
 }
 
 # Service → its routers. Each router in exactly one service (checked below).
 SERVICE_ROUTERS: dict[str, tuple[str, ...]] = {
     # Every page asks /auth/me; login rate limit stays right while it runs as one instance.
-    "identity": ("auth", "admin_pharmacies", "owner_employees"),
+    "identity": ("auth", "admin_pharmacies", "owner_employees", "notifications"),
     # The heavy reads: scaled alone.
     "analytics": (
         "stats",
@@ -37,6 +39,7 @@ SERVICE_ROUTERS: dict[str, tuple[str, ...]] = {
         "accounting",
         "closings",
         "exclusions",
+        "store_owner",
         "store_website",
     ),
     # Big uploads (memory): achats / ventes / stock, the admin catalogue.

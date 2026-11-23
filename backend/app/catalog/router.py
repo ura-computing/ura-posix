@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query
 from sqlalchemy import asc, desc, func
 
+from app.notifications.service import sync_unclassified
 from app.ingestion.csv_parse import strip_accents, suffix_key
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
@@ -72,14 +73,6 @@ def _row(m: Medicament) -> dict:
         "created_at": m.created_at.isoformat() if m.created_at else "",
         "updated_at": m.updated_at.isoformat() if m.updated_at else None,
     }
-
-
-@router.get("/admin/catalog/unclassified-count")
-def unclassified_count(db: DbDep) -> dict:
-    """How many Medicaments still have product_type IS NULL — drives the
-    admin sidebar badge + owner alert."""
-    n = db.query(func.count(Medicament.id)).filter(Medicament.product_type.is_(None)).scalar()
-    return {"count": int(n or 0)}
 
 
 @router.get("/admin/catalog/stats", response_model=CatalogStats)
@@ -175,6 +168,7 @@ def create_medicament(
         product_type=body.product_type,
     )
     db.add(m)
+    sync_unclassified(db)  # staff's « N produits à classer »
     db.commit()
     db.refresh(m)
     return _row(m)
@@ -193,6 +187,7 @@ def update_medicament(
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(m, k, v)
+    sync_unclassified(db)  # staff's « N produits à classer »
     db.commit()
     db.refresh(m)
     return _row(m)
@@ -214,6 +209,7 @@ def delete_medicament(med_id: MedIdPath, db: DbDep) -> None:
                 "Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible.",
             )
     db.delete(m)
+    sync_unclassified(db)  # staff's « N produits à classer »
     db.commit()
 
 

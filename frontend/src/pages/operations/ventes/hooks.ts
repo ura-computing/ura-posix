@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { useVentesList } from "@/hooks/sharedQueries";
+import { useVentesList } from "@/hooks/useSharedQueries";
 import { useListFilters } from "@/hooks/useListFilters";
 
 import type {

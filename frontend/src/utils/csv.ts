@@ -67,7 +67,7 @@ function unquote(s: string): string {
   return t.startsWith('"') && t.endsWith('"') ? t.slice(1, -1) : t;
 }
 
-/** Chunk an array into N-row pieces. Used by UploadContext for batched uploads. */
+/** Chunk an array into N-row pieces. Used by the upload provider (`hooks/useUpload.tsx`) for batched uploads. */
 export function chunk<T>(arr: T[], size: number): T[][] {
   if (size <= 0) return [arr];
   const out: T[][] = [];

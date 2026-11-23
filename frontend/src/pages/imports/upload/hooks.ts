@@ -10,13 +10,13 @@ import {
 } from "@/utils/csv";
 import type { DocType } from "@/types";
 
-import { useUploadCtx, type UploadPhase } from "@/hooks/UploadContext";
+import { useUploadCtx, type UploadPhase } from "@/hooks/useUpload";
 import { translate } from "@/i18n/I18nProvider";
 
 /**
  * Wizard state machine — owns step navigation + selected doc-type + parsed
  * file preview. Delegates upload execution + queue to the global
- * UploadContext.
+ * the upload provider (`hooks/useUpload.tsx`).
  *
  * Steps:
  *   1. Pick docType (Achats | Ventes | Stock)
@@ -110,7 +110,7 @@ export function useUpload(initialDocType: DocType | null = null) {
   // wizard goes back to the picker. Cleared when the user picks a type
   // (entering the wizard for that type means they want to see its card).
   // On next page mount (real navigation), this resets to false — the
-  // global UploadContext still tracks the running job and the indicator
+  // global the upload provider (`hooks/useUpload.tsx`) still tracks the running job and the indicator
   // bubble in the layout keeps showing progress.
   const [dismissedRunningCard, setDismissedRunningCard] = useState(false);
 
@@ -238,7 +238,7 @@ export function useUpload(initialDocType: DocType | null = null) {
 
   /** "Nouvel import" — return to step 1, like any normal navigation.
    *  • If the job is still in flight: leave it running in the global
-   *    UploadContext (the indicator bubble keeps showing it) and just
+   *    the upload provider (`hooks/useUpload.tsx`) (the indicator bubble keeps showing it) and just
    *    hide its card for this mount via `dismissedRunningCard`.
    *  • If the job is finished (success / error / cancelled): dismiss its
    *    card from the global state so navigating back doesn't keep

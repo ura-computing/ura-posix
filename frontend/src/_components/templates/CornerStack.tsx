@@ -7,7 +7,7 @@ import { Ban, CheckCircle2, Clock, FileSpreadsheet, X } from "lucide-react";
 import type { DocType } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { AdminSobrusImportCard, SobrusRunCard } from "@/_components/organisms/SobrusRunCard";
-import { useUploadCtx, type UploadJob } from "@/hooks/UploadContext";
+import { useUploadCtx, type UploadJob } from "@/hooks/useUpload";
 import { formatQty } from "@/utils/format";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";

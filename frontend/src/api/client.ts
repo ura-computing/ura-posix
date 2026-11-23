@@ -8,8 +8,11 @@ import { translate } from "@/i18n/I18nProvider";
  *  - Without it (dev with no env): falls back to "/v1" → Vite dev-server proxy
  *    forwards to VITE_BACKEND_URL.
  *
- *  Only `request()` below uses it — don't re-declare BASE elsewhere. */
+ *  Only `request()` and `apiUrl()` below use it — don't re-declare BASE elsewhere. */
 const API_BASE = `${import.meta.env.VITE_BACKEND_URL ?? ""}/v1`;
+
+/** A backend path the browser loads by itself, e.g. an `<img src>`: "/store-website/logo/…" → "/v1/store-website/logo/…". */
+export const apiUrl = (path: string): string => `${API_BASE}${path}`;
 
 export class ApiErr extends Error {
   status: number;

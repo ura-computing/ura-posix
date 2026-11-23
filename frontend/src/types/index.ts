@@ -70,18 +70,14 @@ export const ROUTES = {
   ADMIN_PHARMACY: "/admin/pharmacies/:id",
   ADMIN_CATALOGUE: "/admin/catalogue",
   ADMIN_CATEGORIES: "/admin/categories",
-  ADMIN_SUPPORT: "/admin/support",
 
-  // Owner — "Ma boutique en ligne" (3-tab page, gated by ?tab=)
-  STORE_WEBSITE: "/store-website",
-  STORE_WEBSITE_NEW: "/store-website/new",
+  // Owner — « Ma boutique en ligne »: ask for the store (step by step), then follow it
+  STORE_WEBSITE: "/ma-boutique",
 
-  // Developer — sibling top-level routes (not nested under /dev) so
-  // "Demandes" and "Mes exports" feel independent in the URL too.
-  DEV_DASHBOARD: "/requests",
-  DEV_REQUEST: "/requests/:id",
-  DEV_EDITOR: "/requests/:id/editor",
-  DEV_EXPORTS: "/exports",
+  // Staff (admin + Support) — « Boutiques en ligne »: the queue, a request, its editor
+  STORE_REQUESTS: "/admin/boutiques",
+  STORE_REQUEST: "/admin/boutiques/:id",
+  STORE_EDITOR: "/admin/boutiques/:id/editeur",
 
   // Public store preview (no app chrome, no auth)
   STORE_PREVIEW: "/preview/:template/:page",
@@ -100,3 +96,4 @@ export * from "./storeWebsite";
 export * from "./products";
 export * from "./history";
 export * from "./sobrus";
+export * from "./notifications";

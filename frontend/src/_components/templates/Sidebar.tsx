@@ -7,28 +7,13 @@ import { ChevronLeft, ChevronRight, Lock, LogOut } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
-import { formatNumStr } from "@/utils/format";
 import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/api/client";
-import { API } from "@/api/api";
 import { Tooltip } from "@/_components/atoms/Tooltip";
 import { useLockNow } from "@/hooks/useLockScreen";
 import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/useMe";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
 import { ACCOUNT_ITEM, SETTINGS_ITEM, visibleGroups, type NavItem } from "@/_components/templates/nav";
-
-function useUnclassifiedCount(role: Role): number {
-  const { data } = useQuery({
-    queryKey: API.admin.catalog.unclassifiedCount.key,
-    queryFn: () => api.get<{ count: number }>(API.admin.catalog.unclassifiedCount.url),
-    enabled: isStaff(role),
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-  });
-  return data?.count ?? 0;
-}
 
 export interface SidebarProps {
   role: Role;
@@ -52,25 +37,7 @@ function itemClasses(isActive: boolean, collapsed: boolean) {
   );
 }
 
-function CountBadge({ n, collapsed }: { n: number; collapsed: boolean }) {
-  const t = useT();
-  if (n <= 0) return null;
-  return (
-    <span
-      className={cn(
-        "inline-flex min-w-[18px] items-center justify-center rounded-full bg-warning px-1.5 text-[10px] font-bold tabular-nums text-warning-foreground",
-        // When collapsed, dot floats top-right of the icon instead of inline.
-        collapsed ? "absolute right-0 top-0 size-[14px] min-w-0 px-0 text-[9px]" : "ml-auto",
-      )}
-      title={t("nav.pendingTitle", { n })}
-      aria-label={t("nav.unclassifiedAria", { n })}
-    >
-      {collapsed && n > 99 ? "99+" : formatNumStr(n)}
-    </span>
-  );
-}
-
-function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean; badge?: number }) {
+function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const t = useT();
   const label = t(item.label);
   // Tooltip only fires when collapsed — labels are visible inline when expanded.
@@ -92,7 +59,6 @@ function NavRow({ item, collapsed, badge }: { item: NavItem; collapsed: boolean;
       >
         <item.icon className="size-[18px] shrink-0" aria-hidden />
         <span className={collapsed ? "md:hidden" : ""}>{label}</span>
-        {badge != null && <CountBadge n={badge} collapsed={collapsed} />}
       </NavLink>
     );
 
@@ -149,14 +115,6 @@ export function Sidebar({
   // « Verrouiller l'écran »: only once the lock is on and has its code (« Mon compte » → « Verrouillage »).
   const canLock = !!me?.lock.enabled && me.lock.has_pin;
   const groups = pending ? [] : visibleGroups(role, permissions);
-  const unclassifiedCount = useUnclassifiedCount(role);
-
-  /** Lookup: route path → badge number. Currently only the admin Catalogue row
-   *  has one (unclassified product count). Extend the map when more dynamic
-   *  badges land. */
-  const badges: Record<string, number> = {
-    [ROUTES.ADMIN_CATALOGUE]: unclassifiedCount,
-  };
 
   return (
     <>
@@ -211,7 +169,7 @@ export function Sidebar({
                 </span>
               )}
               {group.items.map((item) => (
-                <NavRow key={item.to} item={item} collapsed={collapsed} badge={badges[item.to]} />
+                <NavRow key={item.to} item={item} collapsed={collapsed} />
               ))}
             </div>
           ))}
@@ -242,7 +200,7 @@ export function Sidebar({
  * Bottom-right widget (in the corner stack of `AppLayout`, under the Sobrus card) — renders one
  * card per non-dismissed job on EVERY route, including /upload-file. With concurrency=1 we typically see: 1
  * running + N queued + recent successes fading out. Auto-dismiss for
- * "success" is owned by UploadContext (per-job timer); cancelled/error stay
+ * "success" is owned by the upload provider (`hooks/useUpload.tsx`) (per-job timer); cancelled/error stay
  * until the user closes them.
  *
  * The wizard at /upload-file shows ONE doc-type's job inline as a bigger

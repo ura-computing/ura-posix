@@ -10,6 +10,7 @@ from fastapi import APIRouter, File, Path, Query, status, UploadFile
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import aliased, Query as OrmQuery, Session
 
+from app.notifications.service import sync_unclassified
 from app.ingestion.csv_parse import (
     classify_product_type,
     existing_by_name,
@@ -161,6 +162,7 @@ def upload_catalog(
             nkey = normalized_name(row.get("product"))
             if nkey:
                 by_name[nkey] = med  # later same-name rows in this CSV merge onto it
+    sync_unclassified(db)  # staff's « N produits à classer »
     db.commit()
     return {
         "total_rows": len(parsed),

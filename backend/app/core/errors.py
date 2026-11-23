@@ -112,6 +112,7 @@ class ErrorCode(StrEnum):
     REQUEST_LOCKED = "requestLocked"
     REQUEST_CLAIMED = "requestClaimed"
     NOT_ASSIGNED = "notAssigned"
+    PACK_NOT_FOUND = "packNotFound"
     TRANSITION_NOT_ALLOWED = "transitionNotAllowed"
     CUSTOMIZATION_MISSING = "customizationMissing"
     LOGO_FORMAT = "logoFormat"

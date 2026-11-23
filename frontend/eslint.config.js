@@ -25,18 +25,14 @@ export default defineConfig([
   },
   {
     // A context provider and its hook stay in one file (useT, useUpload, useGlobalDateRange); main.tsx = the app root.
-    files: [
-      "src/i18n/I18nProvider.tsx",
-      "src/hooks/UploadContext.tsx",
-      "src/hooks/useGlobalDateRange.tsx",
-      "src/main.tsx",
-    ],
+    files: ["src/i18n/I18nProvider.tsx", "src/hooks/useUpload.tsx", "src/hooks/useGlobalDateRange.tsx", "src/main.tsx"],
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
     // Pages use the atoms (Button, Input, Select, Textarea): one look everywhere. Only a file input stays raw.
     files: ["src/pages/**/*.tsx"],
-    ignores: ["src/pages/store/**"],
+    // The storefront templates draw the pharmacy's own site (its look, not the app's).
+    ignores: ["src/pages/store/_templates/**"],
     rules: {
       "no-restricted-syntax": [
         "error",

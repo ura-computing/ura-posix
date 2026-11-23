@@ -13,7 +13,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { useMemo, useState } from "react";
 import { ArrowRight, Plus, UserPlus, Building2 } from "lucide-react";
 import { Button } from "@/_components/atoms/Button";
-import { useAdminPharmaciesList } from "@/hooks/sharedQueries";
+import { useAdminPharmaciesList } from "@/hooks/useSharedQueries";
 import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";

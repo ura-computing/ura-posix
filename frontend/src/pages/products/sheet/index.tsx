@@ -10,10 +10,12 @@ import { useParams } from "react-router-dom";
 import { FilterBar } from "@/_components/organisms/FilterBar";
 import { PremiumDialog, type PremiumFeature } from "@/_components/organisms/PremiumDialog";
 import { useMe } from "@/hooks/useMe";
+import { BackLink } from "@/_components/molecules/BackLink";
 import { Page } from "@/_components/templates/Page";
 import { TabBar, type TabItem } from "@/_components/molecules/TabBar";
 import NotFoundPage from "@/pages/auth/not-found";
 import { useT } from "@/i18n/I18nProvider";
+import { ROUTES } from "@/types";
 import { PERIOD_LABELS, type PeriodPreset } from "@/utils/dateRange";
 
 import { ProductPhoto } from "../_components/ProductPhoto";
@@ -25,7 +27,7 @@ import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { NotesDialog } from "./_components/NotesDialog";
-import { BackToList, SheetActions, SheetMeta } from "./_components/SheetHeader";
+import { SheetActions, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
   useProductNotes,
@@ -75,7 +77,7 @@ function ProductSheetPage({ id }: { id: number }) {
   return (
     <SheetEditContext value={{ editor, sheet }}>
       <Page
-        above={<BackToList />}
+        above={<BackLink to={ROUTES.PRODUITS} label={t("products.backToList")} />}
         media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
         subtitle={<SheetMeta sheet={sheet} />}

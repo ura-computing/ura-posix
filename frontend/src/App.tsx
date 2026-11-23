@@ -16,6 +16,11 @@ const PAGES = {
   CataloguePage: () => import("@/pages/admin/catalogue"),
   AdminCategoriesPage: () => import("@/pages/admin/categories"),
   AdminPharmaciesIndex: () => import("@/pages/admin/pharmacies"),
+  MyStorePage: () => import("@/pages/store/my-store"),
+  StoreRequestsPage: () => import("@/pages/store/requests"),
+  StoreRequestPage: () => import("@/pages/store/request"),
+  StoreEditorPage: () => import("@/pages/store/editor"),
+  StorePreviewPage: () => import("@/pages/store/preview"),
   AdminPharmacyDetail: () => import("@/pages/admin/pharmacies/detail"),
   OwnerEmployeesPage: () => import("@/pages/team"),
   HistoryPage: () => import("@/pages/history"),
@@ -44,22 +49,15 @@ const AdminPharmacyDetail = lazy(PAGES.AdminPharmacyDetail);
 const OwnerEmployeesPage = lazy(PAGES.OwnerEmployeesPage);
 const HistoryPage = lazy(PAGES.HistoryPage);
 const ProduitsSpeciauxPage = lazy(PAGES.ProduitsSpeciauxPage);
-// HIDDEN 2026-07-03 — the "Ma boutique en ligne" (owner) + developer editor +
-// admin/developers surfaces are wired end-to-end but not ready to ship. Restore
-// these imports and the matching Route blocks below when the feature is done.
-// import DevDashboardPage from "@/pages/store/dev";
-// import DevExportsPage from "@/pages/store/dev/exports";
-// import DevEditorPage from "@/pages/store/dev/requests/$id.editor";
-// import DevRequestDetailPage from "@/pages/store/dev/requests/$id";
-// import StoreWebsitePage from "@/pages/store/store-website";
-// import StoreWebsiteNewPage from "@/pages/store/store-website/new";
+const StoreRequestsPage = lazy(PAGES.StoreRequestsPage);
+const StoreRequestPage = lazy(PAGES.StoreRequestPage);
+const StoreEditorPage = lazy(PAGES.StoreEditorPage);
+const StorePreviewPage = lazy(PAGES.StorePreviewPage);
+const MyStorePage = lazy(PAGES.MyStorePage);
 const ForgotPasswordPage = lazy(PAGES.ForgotPasswordPage);
 const SignupPage = lazy(PAGES.SignupPage);
 const MePage = lazy(PAGES.MePage);
 const SetPasswordPage = lazy(PAGES.SetPasswordPage);
-// HIDDEN 2026-07-03 — public preview page renders customization data from the
-// hidden feature. Restore alongside the block below.
-// import StorePreviewPage from "@/pages/store/preview";
 const ImportsPage = lazy(PAGES.ImportsPage);
 const SobrusPage = lazy(PAGES.SobrusPage);
 const RapportPage = lazy(PAGES.RapportPage);
@@ -87,10 +85,8 @@ export default function App() {
       <Routes>
         <Route path={ROUTES.HOME} element={<HomePage />} />
 
-        {/* HIDDEN 2026-07-03 — public template preview belongs to the hidden
-            store-website feature. Restore when the feature ships.
+        {/* A pharmacy's online store as customers will see it (no app chrome, no login): the editor shows it. */}
         <Route path={ROUTES.STORE_PREVIEW} element={<StorePreviewPage />} />
-        */}
 
         {/* Auth routes: only accessible to UNauthenticated visitors */}
         <Route element={<RequireGuest />}>
@@ -152,26 +148,16 @@ export default function App() {
             <Route path={ROUTES.ADMIN_CATEGORIES} element={<AdminCategoriesPage />} />
             <Route path={ROUTES.ADMIN_PHARMACIES} element={<AdminPharmaciesIndex />} />
             <Route path={ROUTES.ADMIN_PHARMACY} element={<AdminPharmacyDetail />} />
+            <Route path={ROUTES.STORE_REQUESTS} element={<StoreRequestsPage />} />
+            <Route path={ROUTES.STORE_REQUEST} element={<StoreRequestPage />} />
+            <Route path={ROUTES.STORE_EDITOR} element={<StoreEditorPage />} />
           </Route>
 
           <Route element={<RequireRole role={ROLES.OWNER} />}>
             <Route path={ROUTES.OWNER_EMPLOYEES} element={<OwnerEmployeesPage />} />
             <Route path={ROUTES.HISTORY} element={<HistoryPage />} />
-            {/* HIDDEN 2026-07-03 — "Ma boutique en ligne" for owners.
-            <Route path={ROUTES.STORE_WEBSITE}     element={<StoreWebsitePage />} />
-            <Route path={ROUTES.STORE_WEBSITE_NEW} element={<StoreWebsiteNewPage />} />
-            */}
+            <Route path={ROUTES.STORE_WEBSITE} element={<MyStorePage />} />
           </Route>
-
-          {/* HIDDEN 2026-07-03 — developer-only routes (queue + request detail +
-              editor + exports). Restore when the feature is complete.
-          <Route element={<RequireRole role={[ROLES.DEVELOPER, ROLES.ADMIN]} />}>
-            <Route path={ROUTES.DEV_DASHBOARD} element={<DevDashboardPage />} />
-            <Route path={ROUTES.DEV_REQUEST}   element={<DevRequestDetailPage />} />
-            <Route path={ROUTES.DEV_EDITOR}    element={<DevEditorPage />} />
-            <Route path={ROUTES.DEV_EXPORTS}   element={<DevExportsPage />} />
-          </Route>
-          */}
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

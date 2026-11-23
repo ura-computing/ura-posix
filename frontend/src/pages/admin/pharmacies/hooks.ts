@@ -1,7 +1,7 @@
 /** TanStack Query wrappers for the admin permission-management pages.
  *
  *  Hooks:
- *    (Screen 1 table data: useAdminPharmaciesList in hooks/sharedQueries.ts, shared with Rapport)
+ *    (Screen 1 table data: useAdminPharmaciesList in hooks/useSharedQueries.ts, shared with Rapport)
  *    useAdminPharmacy(id)          — Screen 2 detail (info + features + members)
  *    useCreatePharmacy() / useUpdatePharmacy() / useArchivePharmacy()
  *    useSetPharmacyFeatures(id)    — Section A bulk save

@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
-import { useStats, useVentesList } from "@/hooks/sharedQueries";
+import { useStats, useVentesList } from "@/hooks/useSharedQueries";
 
 import type { ClosingMonth, PaymentMethod, StatsFilters, VentesFilters, PaymentEntry, PaymentEntryIn } from "@/types";
 import { translateFr } from "@/i18n/I18nProvider";

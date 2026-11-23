@@ -12,7 +12,8 @@ paths:
 | A page | `pages/<feature>/<route>/index.tsx` + its `hooks.ts` (+ `_components/` used by that page only) |
 | Shared UI | `src/_components/atoms/` (one control) → `molecules/` (2+ atoms) → `organisms/` (app blocks) → `templates/` (`Page`, `AppLayout`), `routing/` (`Require*`). README §6.3 lists them |
 | Every backend call | `api/api.ts`: read `API.<group>.<action> = { url, key }`, write `{ url, refreshes }`; after a write `refresh(qc, API.x.write)` |
-| A read used by 2+ pages | `hooks/sharedQueries.ts`, one hook per query |
+| An app-wide hook | `hooks/use….ts(x)`: every file of a `hooks/` folder starts with `use` (`useMe.ts`, `useUpload.tsx`); a helper that is not a hook goes in `utils/` |
+| A read used by 2+ pages | `hooks/useSharedQueries.ts`, one hook per query |
 | List filters + sort + page | `hooks/useListFilters.ts`; the date range is shared (`useGlobalDateRange`, `setRange(from, to)` both at once) |
 | Numbers / dates on screen | `utils/format.tsx` only (`formatMAD`, `formatQty`, `formatPct`, `formatDate`, `formatDateTime`); never `toLocaleString` / `toFixed` |
 | Client-side search | `utils/text.ts` `matchesFields` (accents, several words, `*`) |

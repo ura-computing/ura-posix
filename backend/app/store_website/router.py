@@ -4,7 +4,7 @@
 |---|---|---|
 | Owner / employee | `MemberDep` | sends the pharmacy's request, edits it while `soumise`, picks the featured categories |
 | Support (staff) | `AdminDep` | the queue: takes a request, moves it forward, builds the store in the editor, uploads the logo |
-| Anyone | none | `/public/preview/{id}` (safe subset for the preview page), `/logo/{id}` (the logo file) |
+| Anyone | none | `/public/preview/{id}` (safe subset for the preview page), `/public/{id}/summary`, `/products`, `/products/{pid}` (ONLY that request's pharmacy's shelf: `catalog_queries.py`), `/logo/{id}` |
 
 The owner never sees the work in progress; the featured categories belong to the owner (own endpoint).
 """
@@ -15,19 +15,24 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, File, Path as PathParam, Response, UploadFile, status as http_status
+from fastapi import APIRouter, File, Path as PathParam, Query, Response, UploadFile, status as http_status
 
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import StoreCustomization, StoreWebsiteRequest
-from app.core.permissions import AdminDep, MemberDep
+from app.core.models import Pharmacy, Store, StoreCustomization, StoreWebsiteRequest
+from app.core.permissions import AdminDep, MemberDep, OwnerDep
 from app.core.security import CurrentUserDep
+from app.notifications.service import notify, staff_ids
+from app.store_website.catalog_queries import store_of, store_product, store_products, store_summary
 from app.store_website.schemas import (
     CustomizationOut,
     CustomizationPatch,
     FeaturedCategoriesIn,
     PublicPreviewOut,
     StateTransition,
+    StoreProductDetail,
+    StoreProductsPage,
+    StoreSummary,
     WebsiteRequestCreate,
     WebsiteRequestOut,
     WebsiteRequestPatch,
@@ -39,18 +44,18 @@ from app.store_website.service import (
     DEFAULT_SECTIONS,
     DEFAULT_TEMPLATE,
     JSON_MERGE_FIELDS,
-    LOGO_MAX_BYTES,
-    LOGO_TYPES,
     claimed_request_or_403,
     customization_of,
     customization_out,
     deep_merge,
     default_brand_colors,
     get_request_or_404,
+    notify_store_step,
     open_request_of,
     own_request_or_404,
     request_out,
     reset_customization,
+    save_logo,
 )
 
 router = APIRouter(prefix="/store-website", tags=["store-website"])
@@ -70,7 +75,7 @@ def get_my_request(pharmacy_id: MemberDep, db: DbDep) -> WebsiteRequestOut | Non
 
 @router.post("/requests", response_model=WebsiteRequestOut, status_code=http_status.HTTP_201_CREATED)
 def create_request(
-    body: WebsiteRequestCreate, pharmacy_id: MemberDep, user: CurrentUserDep, db: DbDep
+    body: WebsiteRequestCreate, pharmacy_id: OwnerDep, user: CurrentUserDep, db: DbDep
 ) -> WebsiteRequestOut:
     """A new request (one open per pharmacy: 409 with a clear code, not the unique index error). Its customization
     starts from the defaults, so the editor always has something to show."""
@@ -80,6 +85,15 @@ def create_request(
         id=uuid4(), pharmacy_id=pharmacy_id, owner_id=user.id, state="soumise", **body.model_dump()
     )
     db.add(req)
+    store_of(db, pharmacy_id).request_id = req.id
+    pharmacy = db.get(Pharmacy, pharmacy_id)
+    notify(
+        db,
+        staff_ids(db),
+        "storeRequest",
+        {"pharmacy": pharmacy.name if pharmacy else "", "store": body.store_name},
+        "/admin/boutiques",
+    )
     db.flush()
     db.add(
         StoreCustomization(
@@ -98,7 +112,7 @@ def create_request(
 
 @router.patch("/requests/{request_id}", response_model=WebsiteRequestOut)
 def patch_request(
-    request_id: RequestId, body: WebsiteRequestPatch, pharmacy_id: MemberDep, db: DbDep
+    request_id: RequestId, body: WebsiteRequestPatch, pharmacy_id: OwnerDep, db: DbDep
 ) -> WebsiteRequestOut:
     """The owner edits the request while `soumise` (afterwards Support is working on it)."""
     req = own_request_or_404(db, request_id, pharmacy_id)
@@ -113,11 +127,26 @@ def patch_request(
 
 @router.patch("/requests/{request_id}/featured-categories", response_model=CustomizationOut)
 def patch_featured_categories(
-    request_id: RequestId, body: FeaturedCategoriesIn, pharmacy_id: MemberDep, db: DbDep
+    request_id: RequestId, body: FeaturedCategoriesIn, pharmacy_id: OwnerDep, db: DbDep
 ) -> CustomizationOut:
     """The categories shown first on the store's home page (the owner's choice)."""
     cust = customization_of(own_request_or_404(db, request_id, pharmacy_id))
     cust.featured_category_ids = body.featured_category_ids
+    db.commit()
+    db.refresh(cust)
+    return customization_out(cust)
+
+
+@router.post("/my-request/logo", response_model=CustomizationOut)
+async def upload_my_logo(pharmacy_id: OwnerDep, db: DbDep, file: UploadFile = File(...)) -> CustomizationOut:
+    """The owner sends the store's logo with the request (while « Envoyée »: then Support handles it)."""
+    req = open_request_of(db, pharmacy_id)
+    if req is None:
+        raise ApiError(404, ErrorCode.REQUEST_NOT_FOUND, "Demande introuvable.")
+    if req.state != "soumise":
+        raise ApiError(409, ErrorCode.REQUEST_LOCKED, "La demande ne peut plus être modifiée à ce stade.")
+    cust = customization_of(req)
+    await save_logo(cust, req.id, file)
     db.commit()
     db.refresh(cust)
     return customization_out(cust)
@@ -158,6 +187,7 @@ def claim_request(request_id: RequestId, user: AdminDep, db: DbDep) -> WebsiteRe
     req.claimed_at = datetime.now(tz=timezone.utc)
     if req.state == "soumise":
         req.state = "prise_en_charge"
+    notify_store_step(db, req)
     db.commit()
     db.refresh(req)
     return request_out(db, req)
@@ -171,6 +201,7 @@ def release_request(request_id: RequestId, user: AdminDep, db: DbDep) -> Website
     req.claimed_at = None
     if req.state == "prise_en_charge":
         req.state = "soumise"
+    notify_store_step(db, req)
     db.commit()
     db.refresh(req)
     return request_out(db, req)
@@ -189,6 +220,7 @@ def transition_state(request_id: RequestId, body: StateTransition, user: AdminDe
             to_state=body.state,
         )
     req.state = body.state
+    notify_store_step(db, req)
     db.commit()
     db.refresh(req)
     return request_out(db, req)
@@ -226,17 +258,9 @@ def reset_customization_route(request_id: RequestId, user: AdminDep, db: DbDep) 
 async def upload_logo(
     request_id: RequestId, user: AdminDep, db: DbDep, file: UploadFile = File(...)
 ) -> CustomizationOut:
-    """The store's logo: PNG / JPG / SVG / WebP, 2 MB max, kept in the database (served by /logo/{id})."""
+    """Support replaces the store's logo (the person who took the request)."""
     cust = customization_of(claimed_request_or_403(db, request_id, user))
-    if file.content_type not in LOGO_TYPES:
-        raise ApiError(422, ErrorCode.LOGO_FORMAT, "Format non pris en charge. Utilisez PNG, JPG, SVG ou WebP.")
-    contents = await file.read()
-    if len(contents) > LOGO_MAX_BYTES:
-        raise ApiError(413, ErrorCode.LOGO_TOO_LARGE, "Le logo dépasse 2 Mo.")
-    cust.logo_data = contents
-    cust.logo_type = file.content_type
-    # New `v` at each upload: browsers drop the old cached image.
-    cust.logo_url = f"/store-website/logo/{request_id}?v={uuid4().hex[:8]}"
+    await save_logo(cust, request_id, file)
     db.commit()
     db.refresh(cust)
     return customization_out(cust)
@@ -262,6 +286,42 @@ def public_preview(request_id: RequestId, db: DbDep) -> PublicPreviewOut:
         store_name=req.store_name,
         pharmacy_phone=req.phone,
     )
+
+
+def _preview_store(db: DbDep, request_id: UUID) -> Store:
+    """The store of a request's pharmacy (unknown id = 404, like the preview)."""
+    req = db.get(StoreWebsiteRequest, request_id)
+    if req is None:
+        raise ApiError(404, ErrorCode.PREVIEW_NOT_FOUND, "Aperçu introuvable.")
+    return store_of(db, req.pharmacy_id)
+
+
+@router.get("/public/{request_id}/summary", response_model=StoreSummary)
+def public_summary(request_id: RequestId, db: DbDep) -> StoreSummary:
+    """The store's home page data: ONLY this request's pharmacy (`catalog_queries`)."""
+    return store_summary(db, _preview_store(db, request_id))
+
+
+@router.get("/public/{request_id}/products", response_model=StoreProductsPage)
+def public_products(
+    request_id: RequestId,
+    db: DbDep,
+    category: Annotated[str | None, Query(max_length=200)] = None,
+    search: Annotated[str | None, Query(max_length=200)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=60)] = 24,
+) -> StoreProductsPage:
+    """The catalogue page: in stock first; a category and / or a search narrow it."""
+    return store_products(db, _preview_store(db, request_id), category=category, search=search, page=page, limit=limit)
+
+
+@router.get("/public/{request_id}/products/{product_id}", response_model=StoreProductDetail)
+def public_product(request_id: RequestId, product_id: Annotated[int, PathParam(ge=1)], db: DbDep) -> StoreProductDetail:
+    """One product of this pharmacy (another pharmacy's = 404)."""
+    product = store_product(db, _preview_store(db, request_id), product_id)
+    if product is None:
+        raise ApiError(404, ErrorCode.PRODUCT_NOT_FOUND, "Ce produit n'est pas dans votre pharmacie.")
+    return product
 
 
 @router.get("/logo/{request_id}", response_class=Response)

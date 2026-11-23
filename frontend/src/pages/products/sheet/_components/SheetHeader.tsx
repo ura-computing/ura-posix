@@ -1,8 +1,7 @@
-/** Top of the product sheet, on every tab, kept calm: « Retour à la liste des produits »; the name; one line with
+/** Top of the product sheet, on every tab, kept calm (above it: `BackLink` « Retour à la liste des produits »): the name; one line with
  *  the type and stock badges, the PID and the code barre; on the right the stock box and the actions: « Observations »,
  *  the premium « Étiquette » / « Commander N ». */
-import { ArrowLeft, Printer, ShoppingCart, StickyNote } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Printer, ShoppingCart, StickyNote } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
@@ -10,27 +9,13 @@ import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import type { PremiumFeature } from "@/_components/organisms/PremiumDialog";
-import { ROUTES, type ProductSheet, type ProductStock } from "@/types";
+import type { ProductSheet, ProductStock } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";
 
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
-
-/** A big « Retour à la liste des produits » (easy to spot; the top bar already shows where we are). */
-export function BackToList() {
-  const t = useT();
-  return (
-    <Link
-      to={ROUTES.PRODUITS}
-      className="inline-flex h-11 w-fit items-center gap-2 rounded-lg border border-border bg-card px-4 text-base font-semibold text-foreground transition-colors hover:bg-surface-subtle"
-    >
-      <ArrowLeft className="size-5" />
-      {t("products.backToList")}
-    </Link>
-  );
-}
 
 /** « En stock » (more than 0), « Rupture » (0 or less), « Hors stock » (not in the last stock file). */
 function StockStateBadge({ stock }: { stock: number | null }) {

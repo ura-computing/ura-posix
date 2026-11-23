@@ -8,6 +8,7 @@ import type { Role } from "@/types";
 import { useI18n, useT } from "@/i18n/I18nProvider";
 import { LANGS, LANG_LABELS } from "@/i18n/config";
 import { cn } from "@/utils/cn";
+import { NotificationBell } from "@/_components/organisms/NotificationBell";
 import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
 import { navTitle } from "@/_components/templates/nav";
@@ -104,6 +105,7 @@ export function Header({ onOpenMobile }: HeaderProps) {
             {code}
           </span>
         )}
+        {me && <NotificationBell />}
         <LanguageToggle />
         <ThemeToggle />
       </div>

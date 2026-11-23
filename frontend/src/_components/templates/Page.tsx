@@ -36,7 +36,7 @@ export function Page({ title, subtitle, actions, above, media, below, narrow, ch
       ) : (
         heading
       )}
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </>
   );
   const rowClass = cn("flex flex-wrap justify-between gap-4", media ? "items-start" : "items-end");

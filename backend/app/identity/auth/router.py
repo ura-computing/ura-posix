@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, Response, status
 from sqlalchemy.orm import Session as DbSession
 
+from app.notifications.service import notify, staff_ids
 from app.core.config import settings
 from app.core.database import DbDep
 from app.core.email_service import send_magic_link
@@ -319,6 +320,7 @@ def signup(body: SignupIn, request: Request, db: DbDep) -> dict:
             user_id=pending_user.id if pending_user else None,
         )
     )
+    notify(db, staff_ids(db), "signupRequest", {"name": body.full_name}, "/admin/pharmacies?tab=demandes")
     db.commit()
     return {"detail": "Demande envoyée"}
 

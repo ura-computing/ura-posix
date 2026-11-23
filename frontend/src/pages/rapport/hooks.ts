@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { API } from "@/api/api";
-import { useAnalyseMarge } from "@/hooks/sharedQueries";
+import { useAnalyseMarge } from "@/hooks/useSharedQueries";
 
 import type {
   AdminStatsResponse,

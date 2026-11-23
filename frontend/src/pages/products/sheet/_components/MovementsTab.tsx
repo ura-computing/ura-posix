@@ -18,7 +18,8 @@ import { formatDate, formatDateTime, formatMAD, formatPct, formatQty } from "@/u
 import { useMovements, type StatsRange } from "../hooks";
 import { tvaShort } from "../labels";
 import { KindBadge } from "./KindBadge";
-import { FieldList, SheetCard } from "./SheetCard";
+import { FieldList } from "@/_components/molecules/FieldList";
+import { SectionCard } from "@/_components/molecules/SectionCard";
 
 const ACTIVE = "bg-primary text-primary-foreground shadow-sm";
 const dash = <span className="text-muted-foreground">—</span>;
@@ -232,13 +233,13 @@ export function MovementsTab({
           isRowSelected={(m) => selected != null && keyOf(m) === keyOf(selected)}
         />
         {hasLines && (
-          <SheetCard title={t("products.lineDetail")}>
+          <SectionCard title={t("products.lineDetail")}>
             {selected ? (
               <LineDetail line={selected} tva={sheet.tva} canSeeDetail={canSeeDetail} seeDetail={seeDetail} />
             ) : (
               <p className="py-6 text-center text-sm text-muted-foreground">{t("products.pickLine")}</p>
             )}
-          </SheetCard>
+          </SectionCard>
         )}
       </div>
     </div>

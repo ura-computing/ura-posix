@@ -33,7 +33,10 @@ import type { EditSection, FormField, StatsRange } from "../hooks";
 import { tvaShort, withoutRate } from "../labels";
 import { EditHint, Editable, SectionEditActions, type EditKind } from "./Editable";
 import { KindBadge } from "./KindBadge";
-import { FieldList, SheetCard, TileNumber, type Field } from "./SheetCard";
+import { FieldList, type Field } from "@/_components/molecules/FieldList";
+import { SectionCard } from "@/_components/molecules/SectionCard";
+
+import { TileNumber } from "./TileNumber";
 import { historyLines, LINE_TONE, yearColumns, type HistoryLine } from "./yearHistory";
 
 const dash = <span className="text-muted-foreground">—</span>;
@@ -275,7 +278,7 @@ export function GeneralTab({
           edit mode keeps the text. PID: header and Codes tab. */}
       <EditHint sections={["identity", "prices", "stock"]} />
       <div className="grid gap-4 xl:grid-cols-3">
-        <SheetCard title={t("products.identity")} actions={<SectionEditActions section="identity" />}>
+        <SectionCard title={t("products.identity")} actions={<SectionEditActions section="identity" />}>
           <FieldList
             fields={[
               identity("product", t("col.produit"), sheet.product),
@@ -294,9 +297,9 @@ export function GeneralTab({
               ),
             ]}
           />
-        </SheetCard>
+        </SectionCard>
 
-        <SheetCard
+        <SectionCard
           title={t("products.pricesCard")}
           actions={
             <span className="flex flex-wrap items-center gap-2">
@@ -338,9 +341,9 @@ export function GeneralTab({
               priced("tva", t("col.tva"), sheet.tva && tvaShort(sheet.tva)),
             ]}
           />
-        </SheetCard>
+        </SectionCard>
 
-        <SheetCard
+        <SectionCard
           title={t("products.stockCard")}
           actions={
             <span className="flex flex-wrap items-center gap-2">
@@ -392,11 +395,11 @@ export function GeneralTab({
               },
             ]}
           />
-        </SheetCard>
+        </SectionCard>
       </div>
 
       {/* Ventes only (Statistiques has Tous · Ventes · Achats). */}
-      <SheetCard title={t("products.salesYearHistory")}>
+      <SectionCard title={t("products.salesYearHistory")}>
         {!range.from || !range.to ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{t("products.pickDates")}</p>
         ) : !stats ? (
@@ -410,10 +413,10 @@ export function GeneralTab({
             rowClassName={(r) => LINE_TONE[r.kind]}
           />
         )}
-      </SheetCard>
+      </SectionCard>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SheetCard
+        <SectionCard
           title={t("products.recent")}
           actions={
             <Button variant="secondary" size="sm" onClick={onShowMovements}>
@@ -428,9 +431,9 @@ export function GeneralTab({
             emptyTitle={t("products.noMovement")}
             rowKey={(_, i) => i}
           />
-        </SheetCard>
+        </SectionCard>
 
-        <SheetCard
+        <SectionCard
           title={t("products.performance")}
           hint={
             range.from && range.to
@@ -465,7 +468,7 @@ export function GeneralTab({
               />
             </div>
           )}
-        </SheetCard>
+        </SectionCard>
       </div>
     </div>
   );

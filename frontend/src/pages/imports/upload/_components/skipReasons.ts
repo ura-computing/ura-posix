@@ -1,7 +1,7 @@
 import type { UploadStockResult } from "@/types";
 import { type TFn } from "@/i18n/I18nProvider";
 import { formatNumStr } from "@/utils/format";
-import type { UploadProgress } from "@/hooks/UploadContext";
+import type { UploadProgress } from "@/hooks/useUpload";
 
 /** Why lines were not imported (Success card, list of files imported together). Stock: unknown
  *  PIDs; achats / ventes: one line per reason the backend counted. formatNumStr (plain string), not

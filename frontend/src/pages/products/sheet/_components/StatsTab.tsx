@@ -20,7 +20,9 @@ import { formatDate, formatMAD, formatMoney, formatNumStr, formatPct, formatQty,
 import type { StatsRange } from "../hooks";
 import { CopyButton } from "./CopyButton";
 import { SeeAllDialog } from "./SeeAllDialog";
-import { SheetCard, TileNumber } from "./SheetCard";
+import { SectionCard } from "@/_components/molecules/SectionCard";
+
+import { TileNumber } from "./TileNumber";
 import { ChartLegend, MonthsChart, type ChartSeries } from "./StatsCharts";
 import { historyLines, kindLabel, LINE_TONE, yearColumns, type HistoryFilter, type HistoryLine } from "./yearHistory";
 
@@ -263,18 +265,18 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <SheetCard title={t("products.salesByMonth")}>
+        <SectionCard title={t("products.salesByMonth")}>
           <MonthsChart months={monthKeys} series={[sold]} kind="bars" label={t("products.salesByMonth")} />
-        </SheetCard>
-        <SheetCard title={t("products.purchasesByMonth")}>
+        </SectionCard>
+        <SectionCard title={t("products.purchasesByMonth")}>
           <MonthsChart months={monthKeys} series={[bought]} kind="bars" label={t("products.purchasesByMonth")} />
-        </SheetCard>
-        <SheetCard title={t("products.salesVsPurchases")} actions={<ChartLegend series={[sold, bought]} />}>
+        </SectionCard>
+        <SectionCard title={t("products.salesVsPurchases")} actions={<ChartLegend series={[sold, bought]} />}>
           <MonthsChart months={monthKeys} series={[sold, bought]} kind="lines" label={t("products.salesVsPurchases")} />
-        </SheetCard>
+        </SectionCard>
       </div>
 
-      <SheetCard
+      <SectionCard
         title={t("products.yearHistory")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -296,18 +298,18 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
           rowKey={(r) => `${r.year}-${r.kind}`}
           rowClassName={(r) => LINE_TONE[r.kind]}
         />
-      </SheetCard>
+      </SectionCard>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SheetCard
+        <SectionCard
           title={t("products.monthlyDetail")}
           actions={<CopyButton value={tsv} label={t("products.copyTable")} copiedText={t("products.tableCopied")} />}
         >
           <DataTable<MonthFigures> rows={monthly} columns={monthColumns(t, monthName)} rowKey={(r) => r.month} />
-        </SheetCard>
+        </SectionCard>
 
         <div className="flex flex-col gap-4">
-          <SheetCard
+          <SectionCard
             title={t("products.topSuppliers")}
             actions={<SeeAllButton n={stats.suppliers.length} onClick={() => setSeeAll("suppliers")} />}
           >
@@ -317,8 +319,8 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
               emptyTitle={t("products.noPurchase")}
               rowKey={(_, i) => i}
             />
-          </SheetCard>
-          <SheetCard
+          </SectionCard>
+          <SectionCard
             title={t("products.lastPrices")}
             actions={<SeeAllButton n={stats.last_prices.length} onClick={() => setSeeAll("prices")} />}
           >
@@ -328,7 +330,7 @@ export function StatsTab({ stats, range }: { stats: ProductStats | null; range: 
               emptyTitle={t("products.noPricedPurchase")}
               rowKey={(_, i) => i}
             />
-          </SheetCard>
+          </SectionCard>
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
-import { useAdminSobrusImport } from "@/hooks/sharedQueries";
+import { useAdminSobrusImport } from "@/hooks/useSharedQueries";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
 

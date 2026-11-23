@@ -2,7 +2,7 @@ import { useMe } from "@/hooks/useMe";
 import { isStaff, type MarginAlertsResponse } from "@/types";
 import type { CategoryType, Feature, StatsFilters } from "@/types";
 import { useStockSummary } from "../hooks";
-import { useStats } from "@/hooks/sharedQueries";
+import { useStats } from "@/hooks/useSharedQueries";
 import { useT } from "@/i18n/I18nProvider";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { MarginAlertCards } from "./MarginAlertCards";

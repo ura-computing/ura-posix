@@ -8,7 +8,7 @@ import { Toaster, toast } from "sonner";
 import { ApiErr, setLockedHandler, setUnauthorizedHandler } from "@/api/client";
 import { API } from "@/api/api";
 import App from "@/App";
-import { UploadProvider } from "@/hooks/UploadContext";
+import { UploadProvider } from "@/hooks/useUpload";
 import { GlobalDateRangeProvider } from "@/hooks/useGlobalDateRange";
 import { I18nProvider, translate, useT } from "@/i18n/I18nProvider";
 

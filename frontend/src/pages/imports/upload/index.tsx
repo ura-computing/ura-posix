@@ -6,6 +6,7 @@ import { isStaff } from "@/types";
 import type { DocType, Feature } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { useUpload } from "./hooks";
+import { Stepper } from "@/_components/molecules/Stepper";
 import { Page } from "@/_components/templates/Page";
 import { Button } from "@/_components/atoms/Button";
 import { EmptyState } from "@/_components/molecules/EmptyState";
@@ -14,7 +15,6 @@ import { DropZone } from "./_components/DropZone";
 import { PickedFiles } from "./_components/PickedFiles";
 import { BatchFiles } from "./_components/BatchFiles";
 import { PreviewTable } from "./_components/PreviewTable";
-import { Stepper } from "./_components/Stepper";
 import { TypeCard } from "./_components/TypeCard";
 
 /**
@@ -167,7 +167,7 @@ export default function UploadFilePage() {
 
   return (
     <Page title={t("uploadFile.pageTitle")} subtitle={t("uploadFile.pageDesc")} narrow>
-      <Stepper current={step} />
+      <Stepper steps={[t("uploadFile.step1"), t("uploadFile.step2"), t("uploadFile.step3")]} current={step - 1} />
 
       {/* ─── STEP 1 — Type ─── */}
       {step === 1 && (

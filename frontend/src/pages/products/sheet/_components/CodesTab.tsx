@@ -12,7 +12,7 @@ import { ScanDialog } from "../../_components/ScanDialog";
 import { BarcodeImage } from "./BarcodeImage";
 import { CopyButton } from "./CopyButton";
 import { EditHint, Editable, SectionEditActions } from "./Editable";
-import { SheetCard } from "./SheetCard";
+import { SectionCard } from "@/_components/molecules/SectionCard";
 import { Callout } from "@/_components/molecules/Callout";
 
 function InfoNote({ children }: { children: ReactNode }) {
@@ -43,7 +43,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
   const drawn = sheet.barcode1 ?? sheet.barcode2;
   return (
     <div className="max-w-3xl">
-      <SheetCard title={t("products.identifiers")} actions={<SectionEditActions section="codes" />}>
+      <SectionCard title={t("products.identifiers")} actions={<SectionEditActions section="codes" />}>
         <EditHint sections={["codes"]} />
         <InfoNote>{t("products.pidInfo")}</InfoNote>
         <dl className="flex flex-col gap-3">
@@ -76,7 +76,7 @@ export function CodesTab({ sheet }: { sheet: ProductSheet }) {
           {t("products.scan")}
         </Button>
         <ScanDialog open={scanning} onClose={() => setScanning(false)} />
-      </SheetCard>
+      </SectionCard>
     </div>
   );
 }

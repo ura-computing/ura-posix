@@ -411,6 +411,23 @@ class ProductNote(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class Notification(Base):
+    """One line of a user's bell (top bar). `kind` + `params` → the text (`notifications.<kind>` in fr.ts / es.ts),
+    `link` → the page it opens. Kinds that are a running count (« 12 produits à classer ») keep ONE unread line per
+    user, updated in place (`app/notifications/service.py`)."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    params: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    link: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AuditLog(Base):
     """« Historique des modifications »: who changed what in a pharmacy, kept as proof — never edited
     or deleted. `action` = a code the page translates (`history.<action>`), `details` = its values
@@ -725,6 +742,73 @@ class StoreWebsiteRequest(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+
+class Store(Base):
+    """A pharmacy's online store (one per pharmacy), created with its first request; lives on after it is delivered.
+    What the request holds (name, logo, WhatsApp, colors) stays on the request; here: what makes the live site work
+    and what the owner changes at any time (shown categories, products: `StoreProduct`, packs: `StorePack`).
+
+    The site reaches our API with a secret key (its `.env`) from its domain only: only the key's hash is kept.
+    Deleting the store deletes its key: the site gets no data any more."""
+
+    __tablename__ = "stores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False, unique=True
+    )
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("store_website_requests.id", ondelete="SET NULL"), nullable=True
+    )
+    domain: Mapped[str | None] = mapped_column(String, nullable=True)  # « pharmacie-exemple.ma », typed by Support
+    key_hash: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)  # sha256 of the secret key
+    key_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # null = every category shows; else only these names (« Soins visage », « Parapharmacie »…)
+    shown_categories: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class StoreProduct(Base):
+    """The owner's choice for one product of the shelf: hidden from the site, and / or a promo price (MAD). A product
+    without a row shows at its PPV."""
+
+    __tablename__ = "store_products"
+    __table_args__ = (UniqueConstraint("store_id", "medicament_id", name="uq_store_products"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id", ondelete="CASCADE"), nullable=False)
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False
+    )
+    hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    promo_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class StorePack(Base):
+    """A pack the owner makes from several products, sold together at one price (« Pack bébé : 3 produits, 199 MAD »)."""
+
+    __tablename__ = "store_packs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    store_id: Mapped[int] = mapped_column(Integer, ForeignKey("stores.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    items: Mapped[list["StorePackItem"]] = relationship(cascade="all, delete-orphan", order_by="StorePackItem.id")
+
+
+class StorePackItem(Base):
+    __tablename__ = "store_pack_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pack_id: Mapped[int] = mapped_column(Integer, ForeignKey("store_packs.id", ondelete="CASCADE"), nullable=False)
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False
+    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
 
 class StoreCustomization(Base):

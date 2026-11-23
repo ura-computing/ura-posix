@@ -8,7 +8,7 @@
  *  `detail.owners_union_permissions` in the GET response. */
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Pencil, Trash2, Check } from "lucide-react";
+import { ChevronRight, Pencil, Trash2, Check } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 
@@ -36,6 +36,7 @@ import {
   useSetUserStatus,
   useUpdatePharmacy,
 } from "../hooks";
+import { BackLink } from "@/_components/molecules/BackLink";
 import { Page } from "@/_components/templates/Page";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
@@ -219,13 +220,7 @@ export default function AdminPharmacyDetail() {
         <>
           {/* Prominent back button — easy to spot when admin lands deep in a
               pharmacy detail. Breadcrumb below confirms location. */}
-          <Link
-            to={ROUTES.ADMIN_PHARMACIES}
-            className="inline-flex h-9 w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface-subtle"
-          >
-            <ArrowLeft className="size-4" />
-            {t("adminPharm.backToPharmacies")}
-          </Link>
+          <BackLink to={ROUTES.ADMIN_PHARMACIES} label={t("adminPharm.backToPharmacies")} />
           <nav className="flex items-center gap-1 text-xs text-muted-foreground">
             <Link to={ROUTES.ADMIN_PHARMACIES} className="hover:text-foreground">
               {t("adminPharm.pharmacies")}

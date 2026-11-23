@@ -1,8 +1,4 @@
-/** "Ma boutique en ligne" — shared domain types (UI layer only).
- *
- *  Mirrors the handoff types at PharmaGest Delivery/code/store-website/types.ts
- *  + dev/types.ts. No data hooks; pages receive these as props (mocked in
- *  src/fixtures/storeWebsite.ts for v1). */
+/** « Ma boutique en ligne »: request steps, models, editor labels, and the API shapes of `/v1/store-website/*`. */
 
 // ── Request lifecycle ───────────────────────────────────────────────────────
 
@@ -11,20 +7,22 @@ export type RequestState = "soumise" | "prise_en_charge" | "en_cours" | "livree"
 
 export const REQUEST_STATE_ORDER: RequestState[] = ["soumise", "prise_en_charge", "en_cours", "livree", "cloturee"];
 
+/** i18n keys: `t(REQUEST_STATE_LABEL[state])`. */
 export const REQUEST_STATE_LABEL: Record<RequestState, string> = {
-  soumise: "Soumise",
-  prise_en_charge: "Prise en charge",
-  en_cours: "En cours",
-  livree: "Livrée",
-  cloturee: "Clôturée",
+  soumise: "store.stateSoumise",
+  prise_en_charge: "store.statePriseEnCharge",
+  en_cours: "store.stateEnCours",
+  livree: "store.stateLivree",
+  cloturee: "store.stateCloturee",
 };
 
 export type Urgency = "asap" | "ce_mois" | "flexible";
 
+/** i18n keys: `t(URGENCY_LABEL[urgency])`. */
 export const URGENCY_LABEL: Record<Urgency, string> = {
-  asap: "ASAP",
-  ce_mois: "Ce mois",
-  flexible: "Flexible",
+  asap: "store.urgencyAsap",
+  ce_mois: "store.urgencyCeMois",
+  flexible: "store.urgencyFlexible",
 };
 
 // ── Templates ───────────────────────────────────────────────────────────────
@@ -41,204 +39,30 @@ export const TEMPLATE_LABEL: Record<StoreTemplate, string> = {
 
 export const TEMPLATES: StoreTemplate[] = ["lumiere", "classique", "moderne", "apotheose", "elegance"];
 
-// ── Owner request ───────────────────────────────────────────────────────────
-
-export interface BrandColors {
-  palette: string[]; // 2-3 hex strings
-}
-
-export interface RequestTimelineStep {
-  state: RequestState;
-  reachedAt: string | null;
-}
-
-export interface WebsiteRequest {
-  id: string;
-  storeName: string;
-  slogan: string;
-  logoUrl: string | null;
-  brand: BrandColors;
-  phone: string; // Moroccan phone, dev calls this
-  customDomain: string | null;
-  urgency: Urgency;
-  vision: string;
-  template: StoreTemplate | null;
-  state: RequestState;
-  timeline: RequestTimelineStep[];
-  developerName: string | null; // hidden until claimed
-  createdAt: string;
-  deliverable: { sizeBytes: number; downloadUrl: string } | null;
-}
-
-export interface PastRequest {
-  id: string;
-  storeName: string;
-  brandColor: string;
-  logoUrl: string | null;
-  template: StoreTemplate;
-  createdAt: string;
-}
-
-// ── Categories (shared owner ↔ dev) ────────────────────────────────────────
-
-export interface StoreCategory {
-  id: string;
-  name: string;
-  description: string | null;
-  icon: string; // one of the 12 fixed icon keys
-  color: string; // one of the 8 fixed brand-safe colors
-  productCount: number;
-  updatedByDeveloper: boolean; // true for 7 days after dev edited
-  isDefault?: boolean; // the non-deletable "Autres" bucket
-}
-
-export const MAX_STORE_CATEGORIES = 12;
-export const STORE_CATEGORY_WARN_AT = 10;
-
-/** Fixed palette: 8 brand-safe colors. */
-export const STORE_CATEGORY_COLORS = [
-  "#34CBB7",
-  "#0E9E8C",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#EC4899",
-  "#3B82F6",
-  "#10B981",
-] as const;
-export type StoreCategoryColor = (typeof STORE_CATEGORY_COLORS)[number];
-
-/** Fixed palette: 12 pharmacy icon keys. UI maps these to actual lucide
- *  components in `pages/store-website/_components/categoryIcons.tsx`. */
-export const STORE_CATEGORY_ICONS = [
-  "bebe",
-  "bienetre",
-  "vitamines",
-  "soins",
-  "hygiene",
-  "beaute",
-  "solaire",
-  "bucco",
-  "materiel",
-  "bio",
-  "maman",
-  "sport",
-] as const;
-export type StoreCategoryIcon = (typeof STORE_CATEGORY_ICONS)[number];
-
-// ── Products (visibility + SOLDE) ──────────────────────────────────────────
-
-export interface VisibleProduct {
-  id: string;
-  name: string;
-  sobrusCategory: string;
-  storeCategoryId: string | null; // null → "Autres"
-  stock: number;
-  ppv: number; // MAD
-  solde: number | null; // sale price in MAD when active
-  visible: boolean;
-}
-
-export type SoldeLockReason = "editable" | "locked_dev" | "live";
-
-export function soldeLockFor(state: RequestState | null): SoldeLockReason {
-  if (state === null || state === "soumise") return "editable";
-  if (state === "prise_en_charge" || state === "en_cours") return "locked_dev";
-  return "live"; // livree | cloturee
-}
-
-export type StockBucket = "en_stock" | "limite" | "rupture";
-
-export function stockBucket(stock: number): StockBucket {
-  if (stock <= 0) return "rupture";
-  if (stock <= 5) return "limite";
-  return "en_stock";
-}
-
-export const STOCK_BUCKET_LABEL: Record<StockBucket, string> = {
-  en_stock: "En stock",
-  limite: "Stock limité",
-  rupture: "Rupture",
-};
-
-// ── Developer side ─────────────────────────────────────────────────────────
-
-export interface DevRequest {
-  id: string;
-  pharmacyName: string;
-  brandColor: string;
-  submittedAt: string;
-  urgency: Urgency;
-  state: RequestState;
-  claimedBy: { id: string; name: string } | null;
-  claimedAt: string | null;
-}
-
-export interface DevKpis {
-  pending: number;
-  mineActive: number;
-  exportsThisMonth: number;
-}
-
-export interface RequestBrief {
-  id: string;
-  pharmacyName: string;
-  ownerName: string;
-  ownerPhone: string;
-  storeName: string;
-  slogan: string;
-  logoUrl: string | null;
-  brandPalette: string[];
-  customDomain: string | null;
-  urgency: Urgency;
-  vision: string;
-  state: RequestState;
-  claimedByMe: boolean;
-  categories: { id: string; name: string; productCount: number }[];
-  soldes: { id: string; name: string; ppv: number; solde: number }[];
-}
-
 // ── Editor sections ────────────────────────────────────────────────────────
 
 export type EditorSectionKey =
-  "hero" | "brands" | "catalogue" | "soldes" | "featured_categories" | "testimonials" | "contact" | "footer";
+  "hero" | "brands" | "catalogue" | "soldes" | "packs" | "featured_categories" | "contact" | "footer";
 
+/** i18n keys, in the order of the store's home page. */
 export const EDITOR_SECTION_LABEL: Record<EditorSectionKey, string> = {
-  hero: "Hero",
-  brands: "Bandeau de marques",
-  catalogue: "Catalogue",
-  soldes: "SOLDES",
-  featured_categories: "Catégories en vedette",
-  testimonials: "Témoignages",
-  contact: "Contact",
-  footer: "Pied de page",
+  hero: "store.sectionHero",
+  brands: "store.sectionBrands",
+  catalogue: "store.sectionCatalogue",
+  soldes: "store.sectionSoldes",
+  packs: "store.sectionPacks",
+  featured_categories: "store.sectionFeatured",
+  contact: "store.sectionContact",
+  footer: "store.sectionFooter",
 };
 
-export interface EditorSection {
-  key: EditorSectionKey;
-  visible: boolean;
-}
-
-export type DeviceMode = "desktop" | "tablet" | "mobile";
-
+/** `label`: i18n key; `sample`: the two fonts (names, not translated). */
 export const FONT_PAIRINGS = [
-  { id: "classique", label: "Classique", sample: "Cormorant · Spectral" },
-  { id: "moderne", label: "Moderne", sample: "Space Grotesk · Inter" },
-  { id: "editorial", label: "Éditorial", sample: "Playfair · Inter" },
+  { id: "classique", label: "store.fontClassique", sample: "Cormorant · Spectral" },
+  { id: "moderne", label: "store.fontModerne", sample: "Space Grotesk · Inter" },
+  { id: "editorial", label: "store.fontEditorial", sample: "Playfair · Inter" },
 ] as const;
 export type FontPairing = (typeof FONT_PAIRINGS)[number]["id"];
-
-// ── Exports + developers admin ─────────────────────────────────────────────
-
-export interface ExportRow {
-  id: string;
-  pharmacyName: string;
-  brandColor: string;
-  template: StoreTemplate;
-  exportedAt: string;
-  sizeBytes: number;
-  downloadUrl: string;
-}
 
 // ── API contract for `/v1/store-website/*` (mirrors backend/app/store_website/schemas.py) ──
 // Wire shapes only — no computed / display fields.
@@ -254,7 +78,14 @@ export interface ClaimedByOut {
 export interface WebsiteRequestOut {
   id: string; // UUID
   pharmacy_id: number;
+  pharmacy_name: string;
+  pharmacy_code: string | null;
   owner_id: number;
+  owner_name: string;
+  /** The store's logo: `apiUrl(logo_url)`. */
+  logo_url: string | null;
+  /** The model Support picked. */
+  template: StoreTemplate;
   store_name: string;
   slogan: string | null;
   brand_palette: string[];
@@ -323,3 +154,81 @@ export interface StateTransition {
   state: RequestState;
 }
 
+// ── The store's data: ONLY the request's pharmacy (backend `store_website/catalog_queries.py`) ──
+
+/** One product of the pharmacy's shelf, as a customer may see it. */
+export interface StoreProduct {
+  id: number;
+  name: string;
+  laboratoire: string | null;
+  /** « Soins visage », « Parapharmacie » (never Sobrus' margin). */
+  category: string | null;
+  ppv: number | null;
+  /** The owner's promo (MAD): shown instead of the PPV, the PPV struck out. */
+  promo_price: number | null;
+  in_stock: boolean;
+  photo: string | null;
+}
+
+/** « Pack bébé » — 199 MAD instead of `ppv_total` (its products at their PPV). */
+export interface StorePack {
+  id: number;
+  name: string;
+  price: number;
+  hidden: boolean;
+  ppv_total: number | null;
+  items: { product: StoreProduct; quantity: number }[];
+}
+
+export interface StoreSummary {
+  pharmacy_name: string;
+  city: string | null;
+  address: string | null;
+  /** Most products first. */
+  categories: { name: string; count: number }[];
+  /** Laboratoires with the most products. */
+  brands: string[];
+  /** In stock, with a photo first. */
+  featured: StoreProduct[];
+  /** The owner's promo prices. */
+  promos: StoreProduct[];
+  /** The owner's packs (not hidden). */
+  packs: StorePack[];
+}
+
+// ── The owner's store settings (any time, the site live too) ──
+
+export interface OwnerProduct extends StoreProduct {
+  hidden: boolean;
+}
+
+export type OwnerProductsView = "all" | "shown" | "hidden" | "promo";
+
+export interface OwnerProductsPage {
+  items: OwnerProduct[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+  counts: { all: number; hidden: number; promo: number };
+}
+
+export interface CategoryChoice {
+  name: string;
+  count: number;
+  shown: boolean;
+}
+
+export interface PackIn {
+  name: string;
+  price: number;
+  hidden: boolean;
+  items: { product_id: number; quantity: number }[];
+}
+
+export interface StoreProductsPage {
+  items: StoreProduct[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+}
+
+export interface StoreProductDetail extends StoreProduct {
+  description: string | null;
+  related: StoreProduct[];
+}

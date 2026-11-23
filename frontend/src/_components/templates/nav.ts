@@ -19,6 +19,7 @@ import {
   CircleUser,
   Settings,
   RefreshCw,
+  Globe,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Feature, Role } from "@/types";
@@ -96,25 +97,16 @@ const NAV_GROUPS: NavGroup[] = [
         ready: true,
         feature: "sobrus",
       },
-      // HIDDEN 2026-07-03 — restore when the store-website feature ships.
-      // { label: "Ma boutique en ligne", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
+      { label: "nav.myStore", to: ROUTES.STORE_WEBSITE, icon: Globe, roles: [ROLES.OWNER], ready: true },
     ],
   },
-  // HIDDEN 2026-07-03 — the whole "Espace développeur" group. Restore when the
-  // developer editor + exports pipeline are ready to ship.
-  // {
-  //   title: "Espace développeur",
-  //   items: [
-  //     { label: "Demandes",   to: ROUTES.DEV_DASHBOARD, icon: Code2,      roles: [ROLES.DEVELOPER], ready: true },
-  //     { label: "Mes exports", to: ROUTES.DEV_EXPORTS,  icon: FolderDown, roles: [ROLES.DEVELOPER], ready: true },
-  //   ],
-  // },
   {
     title: "nav.groupAdministration",
     items: [
       { label: "nav.pharmacies", to: ROUTES.ADMIN_PHARMACIES, icon: Building2, roles: STAFF, ready: true },
       { label: "nav.catalogue", to: ROUTES.ADMIN_CATALOGUE, icon: BookOpen, roles: STAFF, ready: true },
       { label: "nav.categories", to: ROUTES.ADMIN_CATEGORIES, icon: Tags, roles: STAFF, ready: true },
+      { label: "nav.boutiques", to: ROUTES.STORE_REQUESTS, icon: Globe, roles: STAFF, ready: true },
     ],
   },
 ];

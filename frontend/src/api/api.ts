@@ -624,10 +624,6 @@ export const API = {
         url: "/admin/catalog/categories",
         key: ["admin", "catalog", "categories"],
       },
-      unclassifiedCount: {
-        url: "/admin/catalog/unclassified-count",
-        key: ["admin", "catalog", "unclassified-count"],
-      },
       /** Tiles on top of the Catalogue: every product, by type, the unclassified ones. */
       stats: { url: "/admin/catalog/stats", key: ["admin", "catalog", "stats"] },
       create: {
@@ -636,7 +632,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.admin.catalog.unclassifiedCount,
+          API.notifications.list, // staff's « N produits à classer »
         ],
       },
       update: {
@@ -645,7 +641,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.admin.catalog.unclassifiedCount,
+          API.notifications.list, // staff's « N produits à classer »
         ],
       },
       remove: {
@@ -654,7 +650,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.admin.catalog.unclassifiedCount,
+          API.notifications.list, // staff's « N produits à classer »
         ],
       },
       importCsv: {
@@ -663,17 +659,36 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.admin.catalog.unclassifiedCount,
+          API.notifications.list, // staff's « N produits à classer »
         ],
       },
     },
   },
 
   // HIDDEN feature (« Ma boutique en ligne »): moved as-is, its pages refresh by themselves.
+  // The bell of the top bar (every user, own lines only).
+  notifications: {
+    list: { url: "/notifications", key: ["notifications"] },
+    readAll: { url: "/notifications/read-all", refreshes: (): Read[] => [API.notifications.list] },
+    read: { url: (id: number) => `/notifications/${id}/read`, refreshes: (): Read[] => [API.notifications.list] },
+  },
   storeWebsite: {
     myRequest: {
       url: "/store-website/my-request",
       key: ["store-website", "my-request"],
+    },
+    // The owner sends / edits the request (while « Envoyée »), then its logo.
+    create: {
+      url: "/store-website/requests",
+      refreshes: (): Read[] => [API.storeWebsite.myRequest, API.storeWebsite.requests],
+    },
+    update: {
+      url: (id: string) => `/store-website/requests/${id}`,
+      refreshes: (): Read[] => [API.storeWebsite.myRequest, API.storeWebsite.requests],
+    },
+    myLogo: {
+      url: "/store-website/my-request/logo",
+      refreshes: (): Read[] => [API.storeWebsite.myRequest],
     },
     requests: {
       url: "/store-website/requests",
@@ -682,13 +697,25 @@ export const API = {
     request: {
       url: (id: string) => `/store-website/requests/${id}`,
       key: (id: string) => ["store-website", "request", id] as const,
+      all: ["store-website", "request"],
     },
     featuredCategories: {
       url: (id: string) => `/store-website/requests/${id}/featured-categories`,
     },
-    claim: { url: (id: string) => `/store-website/requests/${id}/claim` },
-    release: { url: (id: string) => `/store-website/requests/${id}/release` },
-    state: { url: (id: string) => `/store-website/requests/${id}/state,` },
+    // « Prendre en charge » / « Libérer » / next step: the queue and the request page change.
+    claim: {
+      url: (id: string) => `/store-website/requests/${id}/claim`,
+      refreshes: (): Read[] => [API.storeWebsite.requests, API.storeWebsite.request, API.admin.support],
+    },
+    release: {
+      url: (id: string) => `/store-website/requests/${id}/release`,
+      refreshes: (): Read[] => [API.storeWebsite.requests, API.storeWebsite.request, API.admin.support],
+    },
+    state: {
+      url: (id: string) => `/store-website/requests/${id}/state`,
+      refreshes: (): Read[] => [API.storeWebsite.requests, API.storeWebsite.request, API.admin.support],
+    },
+    // The editor writes its answer into the request's cache itself (no refetch while typing).
     customization: {
       url: (id: string) => `/store-website/requests/${id}/customization`,
     },
@@ -699,6 +726,46 @@ export const API = {
     preview: {
       url: (id: string) => `/store-website/public/preview/${id}`,
       key: (id: string | null) => ["store-website", "preview", id] as const,
+    },
+    // The owner's settings (any time, the site live too): products shown / promo, categories, packs.
+    myProducts: {
+      url: "/store-website/my-store/products",
+      key: (view: string, category: string | null, search: string, page: number) =>
+        ["store-website", "my-products", view, category, search, page] as const,
+      all: ["store-website", "my-products"],
+    },
+    setProduct: {
+      url: (id: number) => `/store-website/my-store/products/${id}`,
+      refreshes: (): Read[] => [API.storeWebsite.myProducts, API.storeWebsite.myCategories],
+    },
+    myCategories: { url: "/store-website/my-store/categories", key: ["store-website", "my-categories"] },
+    setCategories: {
+      url: "/store-website/my-store/categories",
+      refreshes: (): Read[] => [API.storeWebsite.myCategories],
+    },
+    myPacks: { url: "/store-website/my-store/packs", key: ["store-website", "my-packs"] },
+    createPack: { url: "/store-website/my-store/packs", refreshes: (): Read[] => [API.storeWebsite.myPacks] },
+    updatePack: {
+      url: (id: number) => `/store-website/my-store/packs/${id}`,
+      refreshes: (): Read[] => [API.storeWebsite.myPacks],
+    },
+    removePack: {
+      url: (id: number) => `/store-website/my-store/packs/${id}`,
+      refreshes: (): Read[] => [API.storeWebsite.myPacks],
+    },
+    // The store's data (public, ONLY the request's pharmacy): home, catalogue page, one product.
+    publicSummary: {
+      url: (id: string) => `/store-website/public/${id}/summary`,
+      key: (id: string) => ["store-website", "public-summary", id] as const,
+    },
+    publicProducts: {
+      url: (id: string) => `/store-website/public/${id}/products`,
+      key: (id: string, category: string | null, search: string, page: number) =>
+        ["store-website", "public-products", id, category, search, page] as const,
+    },
+    publicProduct: {
+      url: (id: string, productId: number) => `/store-website/public/${id}/products/${productId}`,
+      key: (id: string, productId: number) => ["store-website", "public-product", id, productId] as const,
     },
   },
 } as const;

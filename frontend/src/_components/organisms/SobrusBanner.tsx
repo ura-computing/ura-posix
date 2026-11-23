@@ -5,7 +5,7 @@ import { useLocation } from "react-router-dom";
 
 import { ButtonLink } from "@/_components/atoms/Button";
 import { Callout } from "@/_components/molecules/Callout";
-import { useSobrusConnection } from "@/hooks/sharedQueries";
+import { useSobrusConnection } from "@/hooks/useSharedQueries";
 import { useT } from "@/i18n/I18nProvider";
 import { ROUTES } from "@/types";
 

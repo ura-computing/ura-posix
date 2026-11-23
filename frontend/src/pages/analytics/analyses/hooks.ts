@@ -20,7 +20,7 @@ import { normalizeText, matchesText, matchesFields } from "@/utils/text";
 
 import { EXPORT_COLS, MARGE_COLS } from "./constants";
 import { useMutation } from "@tanstack/react-query";
-import { useAnalyseMarge } from "@/hooks/sharedQueries";
+import { useAnalyseMarge } from "@/hooks/useSharedQueries";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
@@ -254,7 +254,7 @@ export function useAnalysePage() {
 /** TanStack Query wrappers for /v1/stats/analyse-marge + /v1/stats/analyse-liste.
  *
  *  Pattern matches the other stats hooks (useStats, useMarginAlerts, useStockAbcd).
- *  - useAnalyseMarge (hooks/sharedQueries.ts, shared with Rapport): GET per (mode, filters).
+ *  - useAnalyseMarge (hooks/useSharedQueries.ts, shared with Rapport): GET per (mode, filters).
  *  - useAnalyseListe: POST with CSV-parsed items. Mutation-shape since upload is user-triggered.
  */
 

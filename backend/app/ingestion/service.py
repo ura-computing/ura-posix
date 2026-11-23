@@ -12,6 +12,7 @@ from sqlalchemy import or_, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from app.notifications.service import sync_unclassified
 from app.core.audit import AuditAction, log_action
 from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, User, Vente
 from app.ingestion.csv_parse import (
@@ -484,6 +485,8 @@ def end_batch(db: Session, batch: ImportBatch, status: str, user: User | None, e
         if status == "error":
             details["error"] = batch.error_message
         log_action(db, user, batch.pharmacy_id, IMPORT_ENDS[status], details)
+    if status == "success":  # new products of the file: staff's « N produits à classer »
+        sync_unclassified(db)
     db.commit()
     if status in ("success", "cancelled"):
         analyze(db, batch.file_type)

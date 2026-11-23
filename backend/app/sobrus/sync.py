@@ -40,6 +40,7 @@ from sqlalchemy.dialects.postgresql import insert
 from cryptography.fernet import InvalidToken
 from sqlalchemy.orm import Session
 
+from app.notifications.service import notify, owner_ids, sync_unclassified
 from app.core.audit import AuditAction, log_action
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -754,7 +755,21 @@ def _finish(db: Session, run: SobrusRun, status: str, error_code: str | None = N
         *run.events,
         {"at": _now().isoformat(), "code": f"run_{status}", **({"error": error_code} if error_code else {})},
     ]
+    _notify_end(db, run, status, error_code)
     db.commit()
+
+
+def _notify_end(db: Session, run: SobrusRun, status: str, error_code: str | None) -> None:
+    """The bell: the catalogue run → who started it; an import → the pharmacy's owners (a connection test: nobody).
+    New products may be unclassified: staff's « N produits à classer » follows."""
+    if run.mode == "check" or status == "cancelled":
+        return
+    who = [run.created_by] if run.mode == "products" and run.created_by else owner_ids(db, run.pharmacy_id)
+    if status == "success":
+        notify(db, who, "sobrusDone", {"mode": run.mode, "n": run.lines_added}, "/sobrus")
+        sync_unclassified(db)
+    else:
+        notify(db, who, "sobrusFailed", {"mode": run.mode, "error": error_code or "serverError"}, "/sobrus")
 
 
 def execute(run_id: int) -> None:

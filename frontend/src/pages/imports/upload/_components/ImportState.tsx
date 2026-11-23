@@ -2,7 +2,7 @@ import { CheckCircle2, X, Ban, Clock, Loader2, RotateCcw } from "lucide-react";
 import type { DocType, UploadStockResult } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { formatQty } from "@/utils/format";
-import type { UploadPhase, UploadProgress } from "@/hooks/UploadContext";
+import type { UploadPhase, UploadProgress } from "@/hooks/useUpload";
 import { Button } from "@/_components/atoms/Button";
 import { Callout } from "@/_components/molecules/Callout";
 import { skipReasonsOf } from "./skipReasons";

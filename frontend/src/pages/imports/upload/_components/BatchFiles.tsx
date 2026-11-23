@@ -2,7 +2,7 @@ import { CheckCircle2, UploadCloud, X, AlertCircle, Ban, Clock } from "lucide-re
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatNumStr } from "@/utils/format";
-import type { UploadJob } from "@/hooks/UploadContext";
+import type { UploadJob } from "@/hooks/useUpload";
 import { Button } from "@/_components/atoms/Button";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { Card } from "@/_components/atoms/Card";

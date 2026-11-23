@@ -15,7 +15,7 @@ import {
   useAdminPharmacyMarginAlerts,
   useAdminPharmacyStockSummary,
 } from "./hooks";
-import { useAdminPharmaciesList, useMarginAlerts, useStats } from "@/hooks/sharedQueries";
+import { useAdminPharmaciesList, useMarginAlerts, useStats } from "@/hooks/useSharedQueries";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { Page } from "@/_components/templates/Page";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";

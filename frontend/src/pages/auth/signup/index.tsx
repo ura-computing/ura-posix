@@ -12,6 +12,7 @@ import { Button } from "@/_components/atoms/Button";
 import { AuthLayout } from "@/_components/templates/AuthLayout";
 import { PasswordField } from "@/_components/molecules/PasswordField";
 import { TextField } from "@/_components/molecules/TextField";
+import { WizardProgress } from "@/_components/molecules/WizardProgress";
 import { ROUTES, type SignupIn } from "@/types";
 import { cn } from "@/utils/cn";
 import { useT, type TFn } from "@/i18n/I18nProvider";
@@ -198,16 +199,7 @@ export default function SignupPage() {
   return (
     <AuthLayout>
       <form className="flex w-full flex-col gap-6" onSubmit={next} noValidate>
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-1.5" aria-hidden>
-            {STEPS.map((s, i) => (
-              <span key={s} className={cn("h-1 flex-1 rounded-full", i <= index ? "bg-primary" : "bg-muted")} />
-            ))}
-          </div>
-          <span className="text-xs font-medium text-muted-foreground">
-            {t("signup.title")} · {t("signup.stepOf", { n: index + 1, total: STEPS.length })}
-          </span>
-        </div>
+        <WizardProgress label={t("signup.title")} total={STEPS.length} current={index} />
 
         <header className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>

@@ -21,14 +21,14 @@
   --teal-900: #0b473f;
   --brand-blue: #1cb5d4; /* secondary brand accent */
   --brand-green: #7fbf3f; /* tertiary brand accent  */
-  --brand-violet: #7c5cf0; /* quaternary — used by the developer role badge */
+  --brand-violet: #7c5cf0; /* quaternary — used by the Support role badge */
 
   /* Role accent colors (header role badge). Identity tags only;
      unrelated to status semantics. Defined once, same in light + dark. */
   --role-admin: var(--brand-blue);
   --role-owner: var(--primary);
   --role-employee: var(--brand-green);
-  --role-developer: var(--brand-violet);
+  --role-support: var(--brand-violet);
 
   /* ============ SHADCN SEMANTIC — LIGHT ============ */
   --background: #f9fbfa;
