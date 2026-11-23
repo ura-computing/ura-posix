@@ -82,13 +82,15 @@ platform: linux
 ## Install
 
 ```
-ura install ura-posix 0.0.1 https://github.com/ura-computing/ura-posix
+ura deps add posix@0.0.1
 ```
 
-It adds this line to your project's `ura.conf`. `ura install` also gets ura-posix's own dependency, ura-math, inside it.
+It adds this block to your project's `ura.conf`. `ura deps install` also gets ura-posix's own dependency, ura-math, inside it.
 
 ```ura
-@dependency "ura-posix" "0.0.1" "https://github.com/ura-computing/ura-posix"
+@dep "posix":
+    @url "https://github.com/ura-computing/ura-posix"
+    @version "0.0.1"
 ```
 
 ## From ura to the kernel
