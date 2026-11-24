@@ -63,6 +63,16 @@ src/
 
 ---
 
+## 2. Sobrus tickets → stock abîmé → Promis → Commandes (planned 2026-11-24)
+
+Full plan + every decision: `.claude/plans/commandes-promis.md`.
+
+```
+A. Sobrus (products .xlsx, suppliers, avoirs by date)  →  B. stock abîmé  →  C. Promis  →  D. Commandes 01–12 + AI document reader  →  E. tests
+```
+
+---
+
 ## 3. Production tools (DigitalOcean)
 
 Production = 3 parts on DigitalOcean: **backend** app, **frontend** app, **managed Postgres 17**.

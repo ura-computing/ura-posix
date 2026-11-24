@@ -52,6 +52,7 @@ Topic rules in `.claude/rules/` (each loads with the files it covers):
 
 # Product rules
 - Users barely know how to use a laptop → every screen: plain words, one obvious action, big clear targets, no jargon.
+- Slow, old computers → light pages: server-side lists in pages (never load everything), no heavy animation in the app, a skeleton within 1 s, every long job in the background with a clear « en cours ».
 - Admin / owner type the password on create / reset (8+ chars). Credentials sent with « Ouvrir dans Gmail » (web compose).
 - Admin and owner member pages behave the same (`frontend/src/_components/`, `backend/app/identity/members/`).
 - New pharmacy / user: every feature / permission ON by default, except premium (Étiquette `labels`, Commander `orders`): OFF for the pharmacy, the admin switches them on.

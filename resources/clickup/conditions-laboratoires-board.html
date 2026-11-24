@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<link rel="icon" href="data:," />
+<title>Conditions laboratoires — tldraw Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#1d1d1f; --muted:#6b6b70; --line:#1d1d1f;
+    --blue:#dbeafe; --blue-d:#2563eb; --yellow:#fef08a; --yellow-bg:#fef9c3;
+    --pink:#fee2e2; --pink-d:#dc2626; --green:#dcfce7; --green-d:#16a34a;
+    --violet:#ede9fe; --orange:#ffedd5; --paper:#ffffff;
+    --tl-blue:#4465e9;
+    --c-blue:#4c6ef5; --c-green:#40c057; --c-violet:#7950f2; --c-orange:#fd7e14; --c-red:#fa5252;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{margin:0; font-family:"Plus Jakarta Sans",system-ui,sans-serif; color:var(--ink); background:#f4f4f5; overflow:hidden;}
+  button{font-family:inherit; cursor:pointer;}
+
+  /* ---------- Top bar (tldraw style) ---------- */
+  .topbar{position:fixed; inset:0 0 auto 0; z-index:60; display:flex; align-items:center; gap:10px; padding:10px 12px; pointer-events:none;}
+  .topbar > *{pointer-events:auto;}
+  .tl-pill{background:#fff; border:1px solid #e4e4e7; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.05); display:flex; align-items:center; gap:4px; padding:5px;}
+  .tl-pill.brand{padding:7px 14px 7px 9px; gap:9px;}
+  .dot-logo{width:26px;height:26px;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;flex:none;}
+  .brand-name{font-weight:800; font-size:14px; line-height:1.1; white-space:nowrap;}
+  .brand-sub{font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap;}
+  .tbtn{border:0; background:transparent; width:34px; height:34px; border-radius:8px; display:grid; place-items:center; color:#3f3f46;}
+  .tbtn:hover{background:#f4f4f5;}
+  .tbtn.active{background:var(--tl-blue); color:#fff;}
+  .tbtn svg{width:19px;height:19px;}
+  .topbar .spacer{flex:1;}
+  .present-btn{border:0; background:var(--ink); color:#fff; font-weight:700; font-size:13.5px; padding:10px 16px; border-radius:10px; box-shadow:0 4px 14px rgba(0,0,0,.18); display:flex; align-items:center; gap:8px;}
+  .present-btn:hover{background:#000;}
+  .present-btn svg{width:16px;height:16px;}
+  .page-name{font-size:12.5px; font-weight:700; color:#3f3f46; padding:6px 10px; white-space:nowrap;}
+  @media (max-width:760px){ .pagename-pill{display:none;} }
+  @media (max-width:640px){ .brand-sub{display:none;} .tools-pill{display:none;} .present-btn{padding:10px 11px; font-size:12.5px;} .brand-name{font-size:12.5px;} }
+
+  /* ---------- Canvas ---------- */
+  #viewport{position:fixed; inset:0; overflow:hidden; background:#fbfbfc;
+    background-image:radial-gradient(circle, #d4d4d8 1.15px, transparent 1.15px); background-size:26px 26px;
+    cursor:grab; touch-action:none;}
+  #viewport.panning{cursor:grabbing;}
+  #world{position:absolute; left:0; top:0; width:2900px; height:4800px; transform-origin:0 0;}
+  #arrows{position:absolute; inset:0; width:2900px; height:4800px; pointer-events:none; overflow:visible;}
+
+  /* ---------- Shapes ---------- */
+  .shape{position:absolute; background:var(--paper); border:2px solid var(--line); border-radius:14px;
+    box-shadow:3px 4px 0 rgba(29,29,31,.9); padding:20px 22px; user-select:none;}
+  .shape .drag-handle{cursor:grab;}
+  .shape.selected{outline:2.5px solid var(--tl-blue); outline-offset:4px;}
+  .shape h2{margin:0 0 4px; font-size:21px; font-weight:800; letter-spacing:-.01em; display:flex; align-items:center; gap:9px;}
+  .shape h2 .ic{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;border:2px solid var(--line);}
+  .shape h2 .ic svg{width:17px;height:17px;}
+  .shape .sub{font-size:12.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; margin-bottom:12px;}
+  .shape p,.shape li{font-size:15px; line-height:1.55;}
+  .shape ul{margin:6px 0; padding-inline-start:2px; list-style:none;}
+  .shape li{padding:5px 0 5px 0; display:flex; gap:9px; align-items:flex-start;}
+  .shape li::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--ink); flex:none; margin-top:8px;}
+  .shape li b{font-weight:800;}
+  .tag{display:inline-block; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:999px; border:1.5px solid var(--line); background:#fff;}
+  .hand{font-family:"Caveat",cursive; font-weight:700; color:#b91c1c;}
+  .hand.blue{color:var(--tl-blue);} .hand.green{color:#15803d;}
+
+  .s-title{background:var(--ink); color:#fff; border-color:#000; text-align:left; box-shadow:5px 6px 0 rgba(29,29,31,.35);}
+  .s-title h1{margin:0; font-size:37px; font-weight:800; letter-spacing:-.02em; line-height:1.08;}
+  .s-title .k{font-size:13px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#fbbf24; margin-bottom:10px;}
+  .s-title p{color:#d4d4d8; font-size:15.5px; margin:10px 0 0;}
+  .s-title .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+  .s-title .tag{background:transparent; color:#fff; border-color:#52525b;}
+
+  .s-yellow{background:#fefce8;} .s-yellow h2 .ic{background:var(--yellow);}
+  .sticky{border-radius:4px 14px 14px 14px; box-shadow:2px 3px 0 rgba(29,29,31,.85);}
+
+  .funnel{display:flex; align-items:stretch; gap:0;}
+  .fstep{flex:1; text-align:center; padding:14px 8px; border:2px solid var(--line); background:#fff; position:relative;}
+  .fstep:first-child{border-radius:12px 0 0 12px;} .fstep:last-child{border-radius:0 12px 12px 0; background:var(--ink); color:#fff;}
+  .fstep + .fstep{border-left:0;}
+  .fstep .fi{margin-bottom:6px; display:grid; place-items:center;} .fstep .fi svg{width:21px;height:21px;}
+  .fstep b{display:block; font-size:15.5px;} .fstep span{font-size:12.5px; color:var(--muted); display:block; margin-top:3px; line-height:1.4;} .fstep:last-child span{color:#d4d4d8;}
+
+  .note{position:absolute; font-family:"Caveat",cursive; font-weight:700; font-size:26px; line-height:1.15; pointer-events:none; max-width:520px;}
+
+  /* ---------- Lab cards ---------- */
+  .lab-head{display:flex; align-items:center; gap:14px; margin:-20px -22px 16px; padding:15px 22px; border-radius:12px 12px 0 0; color:#fff; border-bottom:2px solid var(--line);}
+  .lab-head.c-blue{background:var(--c-blue);} .lab-head.c-green{background:var(--c-green);}
+  .lab-head.c-violet{background:var(--c-violet);} .lab-head.c-orange{background:var(--c-orange);}
+  .lab-head.c-red{background:var(--c-red);}
+  .lab-head .num{width:44px;height:44px;flex:none;border-radius:50%;border:2.5px dashed rgba(255,255,255,.9);display:grid;place-items:center;font-weight:800;font-size:21px;}
+  .lab-head .lt{flex:1; min-width:0;}
+  .lab-head .lname{font-size:21px; font-weight:800; line-height:1.15;}
+  .lab-head .ltag{font-size:13px; color:rgba(255,255,255,.93); margin-top:2px; line-height:1.35;}
+  .pill-complet{flex:none; background:#fff; color:#15803d; font-size:12.5px; font-weight:800; letter-spacing:.06em; padding:6px 13px; border-radius:999px; border:2px dashed #15803d;}
+  .expl{font-size:15px; line-height:1.6; margin:0 0 14px;}
+  table.facts{width:100%; border-collapse:collapse; font-size:14.5px;}
+  table.facts th{text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:6px 8px; border-bottom:2px solid var(--line);}
+  table.facts td{padding:8px; border-bottom:1.5px dashed #d4d4d8; vertical-align:top; line-height:1.45;}
+  table.facts tr:last-child td{border-bottom:0;}
+  table.facts td.lab{font-weight:800; width:27%;}
+  .missing{background:var(--yellow-bg); border:1.5px dashed #a16207; border-radius:10px; padding:11px 14px; font-size:14px; line-height:1.5; margin-top:14px;}
+  .missing b{color:#854d0e;}
+
+  /* ---------- Mini stickies (à compléter) ---------- */
+  .minis{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .mini{border:2px solid var(--line); border-radius:4px 12px 12px 12px; padding:12px 14px; font-size:13.5px; line-height:1.5; box-shadow:2px 3px 0 rgba(29,29,31,.85);}
+  .mini .mname{font-weight:800; font-size:15.5px; margin-bottom:3px;}
+  .mini:nth-child(4n+1){background:#fef9c3; transform:rotate(-.5deg);}
+  .mini:nth-child(4n+2){background:#eff6ff; transform:rotate(.4deg);}
+  .mini:nth-child(4n+3){background:#f0fdf4; transform:rotate(-.35deg);}
+  .mini:nth-child(4n+4){background:#fff1f2; transform:rotate(.5deg);}
+
+  /* ---------- Final dark box ---------- */
+  .s-final{background:#0e2a38; color:#fff; border-color:#000; box-shadow:5px 6px 0 rgba(29,29,31,.35);}
+  .s-final .fk{font-size:13px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#fbbf24; margin-bottom:8px;}
+  .s-final h2{color:#fff; font-size:26px;}
+  .s-final p{color:#d8dde0; font-size:15.5px; line-height:1.6;}
+  .field{display:flex; gap:12px; padding:11px 0; border-top:1.5px dashed #3d5a68;}
+  .field:first-of-type{border-top:0;}
+  .field .n{width:34px;height:34px;flex:none;border-radius:50%;background:#fbbf24;color:#0e2a38;display:grid;place-items:center;font-weight:800;font-size:15px;}
+  .field h3{margin:0 0 3px; font-size:16.5px; font-weight:800; color:#fff;}
+  .field p{margin:0; font-size:14px; color:#c3ced4;}
+  .next{background:var(--green-d); border:2px dashed #fff; border-radius:12px; padding:14px 18px; margin-top:16px; font-size:15.5px; line-height:1.55; color:#fff;}
+
+  /* ---------- Bottom UI ---------- */
+  .zoombar{position:fixed; left:12px; bottom:12px; z-index:60; display:flex; align-items:center; gap:2px;}
+  .zoombar .pct{min-width:52px; text-align:center; font-size:12.5px; font-weight:700; border:0; background:transparent; padding:8px 2px; border-radius:8px;}
+  .zoombar .pct:hover{background:#f4f4f5;}
+  .hint{position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:55; background:rgba(29,29,31,.88); color:#fff; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:999px; white-space:nowrap;}
+  @media (max-width:760px){ .hint{display:none;} }
+
+  /* presentation bar */
+  #presBar{position:fixed; inset:auto 0 0 0; z-index:70; display:none; background:#fff; border-top:1px solid #e4e4e7; box-shadow:0 -6px 24px rgba(0,0,0,.08); padding:12px 16px calc(12px + env(safe-area-inset-bottom));}
+  body.presenting #presBar{display:block;}
+  body.presenting .hint{display:none;}
+  #presBar .inner{max-width:860px; margin:0 auto; display:flex; align-items:center; gap:12px;}
+  #presLabel{flex:1; min-width:0;}
+  #presLabel b{display:block; font-size:15.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #presLabel span{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .pbtn{border:2px solid var(--line); background:#fff; font-weight:800; font-size:13.5px; padding:10px 16px; border-radius:10px; box-shadow:2px 2px 0 rgba(29,29,31,.9);}
+  .pbtn:hover{transform:translate(-1px,-1px);}
+  .pbtn.main{background:var(--ink); color:#fff;}
+  .pbtn:disabled{opacity:.35; box-shadow:none; transform:none;}
+  .dots{display:flex; gap:6px; justify-content:center; margin-bottom:10px;}
+  .dots i{width:8px;height:8px;border-radius:50%;background:#d4d4d8; display:block;}
+  .dots i.on{background:var(--ink); width:22px; border-radius:99px;}
+  @media (max-width:640px){
+    #presBar .inner{flex-wrap:wrap; row-gap:8px;}
+    #presLabel{flex:1 1 100%; order:-1;}
+    #presLabel b{white-space:normal;}
+    .pbtn{padding:9px 12px; font-size:12.5px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="tl-pill brand">
+    <span class="dot-logo">P</span>
+    <span><span class="brand-name">Pharmagest</span><br /><span class="brand-sub">Module commande — Para Les Joyaux</span></span>
+  </div>
+  <div class="tl-pill tools-pill" role="toolbar" aria-label="Outils">
+    <button class="tbtn active" title="Sélection (déplacer les cartes)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 3l7.5 18 2.3-7.7L22 11z"/></svg></button>
+    <button class="tbtn" id="btnHand" title="Main (déplacer le board)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6.5a1.5 1.5 0 0 0-3 0V11m0-5.5v-2a1.5 1.5 0 0 0-3 0V11m0-7.5a1.5 1.5 0 0 0-3 0V12m6-1a1.5 1.5 0 0 1 3 0v3c0 3.5-2.5 6-6 6s-5-1.6-6.7-4.6L4 12.6c-.5-.9.8-1.9 1.6-1.2L7 9"/></svg></button>
+    <button class="tbtn" id="btnFit" title="Vue d'ensemble"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+  </div>
+  <div class="spacer"></div>
+  <div class="tl-pill pagename-pill"><span class="page-name">Conditions laboratoires — TLDR</span></div>
+  <button class="present-btn" id="btnPresent"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Mode présentation</button>
+</div>
+
+<!-- Canvas -->
+<div id="viewport">
+  <div id="world">
+    <svg id="arrows" viewBox="0 0 2900 4800" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#1d1d1f"/></marker>
+        <marker id="ahr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+      </defs>
+      <!-- titre -> parcours -->
+      <path d="M1450 445 C 1450 465, 1450 475, 1450 495" fill="none" stroke="#1d1d1f" stroke-width="2.5" marker-end="url(#ah)"/>
+      <!-- parcours -> avertissement -->
+      <path d="M1450 735 C 1450 750, 1450 760, 1450 778" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ahr)"/>
+      <!-- avertissement -> les 5 labos -->
+      <path d="M1450 1065 C 1450 1090, 1450 1110, 1450 1145" fill="none" stroke="#1d1d1f" stroke-width="2.5" marker-end="url(#ah)"/>
+      <!-- les 5 labos -> à compléter -->
+      <path d="M1450 3010 C 1450 3050, 1450 3080, 1450 3125" fill="none" stroke="#1d1d1f" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#ah)"/>
+      <!-- à compléter -> Pharmagest -->
+      <path d="M1450 3930 C 1450 3945, 1450 3955, 1450 3975" fill="none" stroke="#1d1d1f" stroke-width="2.5" marker-end="url(#ah)"/>
+    </svg>
+
+    <!-- TITLE -->
+    <section class="shape s-title" data-step="1" style="left:760px; top:90px; width:1380px;">
+      <div class="drag-handle">
+        <div class="k">Pharmagest • Module commande</div>
+        <h1>Conditions laboratoires — TLDR</h1>
+        <p>Les <b style="color:#fff">5 labos</b> dont les conditions sont complètes, et les <b style="color:#fff">16 autres</b> à compléter. Chaque chiffre vient du document source — extrait des 25 fichiers Drive, rien n'est inventé.</p>
+        <div class="row">
+          <span class="tag">5 labos prêts à paramétrer</span>
+          <span class="tag">16 labos à compléter</span>
+          <span class="tag">21 labos au total</span>
+          <span class="tag">Sources : 25 fichiers Drive</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section class="shape" data-step="2" style="left:760px; top:500px; width:1380px;">
+      <div class="drag-handle"><h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>Le parcours</h2>
+      <div class="sub">Où on en est — des fichiers Drive au paramétrage Pharmagest</div></div>
+      <div class="funnel">
+        <div class="fstep"><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><b>5 labos prêts</b><span>Minimum, remises et paiement connus</span></div>
+        <div class="fstep"><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H4v5M15 3h5v5M9 21H4v-5M15 21h5v-5M3 12h18"/></svg></span><b>16 labos à compléter</b><span>Conditions partielles — ou rien du tout dans les fichiers</span></div>
+        <div class="fstep"><span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span><b>Pharmagest</b><span>5 champs manquants — pour les 21 labos</span></div>
+      </div>
+    </section>
+
+    <!-- WARNING -->
+    <section class="shape s-yellow sticky" data-step="3" style="left:810px; top:780px; width:1280px; transform:rotate(-.5deg);">
+      <div class="drag-handle"><h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>À lire d'abord</h2>
+      <div class="sub">Ce que « complet » veut dire — et ce qu'il ne veut pas dire</div></div>
+      <p style="margin-top:0;">« <b>Complet</b> » veut dire : le minimum, les remises et le paiement sont connus. Mais il manque encore à <b>TOUS</b> les labos, sans exception : les <b>jours de livraison</b>, l'<b>heure limite de commande</b> (cut-off), le <b>délai commande → livraison</b> et le <b>canal de commande</b>. Ces infos ne sont dans <b>aucun des 25 fichiers</b> — elles doivent venir des <b>talks</b> (WhatsApp avec les délégués).</p>
+      <p style="margin:10px 0 0; font-size:14px; color:#3f3f46;"><b>Comment lire ce board :</b> chaque labo a une explication simple, puis le détail exact tiré du document source. Quand une info n'existe pas dans les fichiers, c'est écrit noir sur blanc.</p>
+    </section>
+    <div class="note" style="left:130px; top:1100px; transform:rotate(-2deg);">les 5 qu'on peut paramétrer dès maintenant ↓</div>
+
+    <!-- 1 · BOTTU -->
+    <section class="shape" data-step="4" style="left:90px; top:1150px; width:880px;">
+      <div class="lab-head c-blue"><span class="num">1</span><div class="lt"><div class="lname">Laboratoires Bottu</div><div class="ltag">Le plus complet du lot — bon de commande + conditions sur le même document</div></div><span class="pill-complet">COMPLET</span></div>
+      <p class="expl">Bottu, c'est le dossier le plus simple à paramétrer : le minimum est écrit, les remises sont par quantité, le paiement est clair, et le transport est nommé. En pratique : on ne commande pas chez Bottu en dessous de 200 unités, on paie par chèque au comptant, et ce qu'on commande ne se reprend ni ne s'échange.</p>
+      <table class="facts">
+        <tr><th>Condition</th><th>Détail</th></tr>
+        <tr><td class="lab">Commande minimum</td><td>200 unités par commande</td></tr>
+        <tr><td class="lab">Minimum par produit</td><td>5 ou 10 unités selon le produit</td></tr>
+        <tr><td class="lab">Remises (RF)</td><td>12 % / 16 % / 20 % / 25 % selon la quantité par produit (ex. Doliprane, Physiomer, Azix, Mobic, Zamox)</td></tr>
+        <tr><td class="lab">Pack</td><td>Pack 10 % (hors marché)</td></tr>
+        <tr><td class="lab">Paiement</td><td>Chèque au comptant</td></tr>
+        <tr><td class="lab">Transport</td><td>CTM</td></tr>
+        <tr><td class="lab">Retour / échange</td><td>Produits commandés ni repris ni échangés</td></tr>
+        <tr><td class="lab">Contact</td><td>Tél 05 22 67 51 51 / 52 / 53</td></tr>
+      </table>
+      <div class="missing"><b>Ce qui manque encore :</b> jours de livraison, heure limite de commande, délai de livraison.</div>
+    </section>
+
+    <!-- 2 · AFRIC-PHAR -->
+    <section class="shape" data-step="5" style="left:1010px; top:1150px; width:880px;">
+      <div class="lab-head c-green"><span class="num">2</span><div class="lt"><div class="lname">Afric-Phar</div><div class="ltag">Des packs clairs par volume — plus on commande, plus la remise monte</div></div><span class="pill-complet">COMPLET</span></div>
+      <p class="expl">Afric-Phar fonctionne par packs : 3 niveaux selon le nombre d'unités commandées. Deux produits ont leurs propres paliers (Fortimel et Algik). Côté paiement, il y a un escompte de 1,5 % et un chèque possible à 60 jours — mais le document n'explique pas exactement comment les deux s'articulent, donc à confirmer avec le délégué.</p>
+      <table class="facts">
+        <tr><th>Condition</th><th>Détail</th></tr>
+        <tr><td class="lab">Pack 1</td><td>20 % — quantité minimum 100 unités</td></tr>
+        <tr><td class="lab">Pack 2</td><td>23 % — quantité minimum 200 unités</td></tr>
+        <tr><td class="lab">Pack 3</td><td>25 % — quantité minimum 300 unités</td></tr>
+        <tr><td class="lab">Fortimel</td><td>7 % (min 24) / 10 % (min 48)</td></tr>
+        <tr><td class="lab">Algik</td><td>7 % (min 30) / 10 % (min 50)</td></tr>
+        <tr><td class="lab">Paiement</td><td>Escompte 1,5 % chèque ; escompte 1,5 % virement ; échéance chèque 60 jours</td></tr>
+        <tr><td class="lab">Retour / échange</td><td>Aucun retour ni échange sur l'offre spéciale</td></tr>
+        <tr><td class="lab">Divers</td><td>4 000 à 5 000 DH → 7 % ; plus de 6 000 DH → 10 % (champ d'application non précisé)</td></tr>
+        <tr><td class="lab">Contact</td><td>Boudiar Amal — GSM 0631497715 — ZI Ouest Aïn Harrouda, Mohammedia</td></tr>
+      </table>
+      <div class="missing"><b>Ce qui manque encore :</b> jours de livraison, heure limite, délai — et la mécanique exacte escompte 1,5 % / chèque 60 jours.</div>
+    </section>
+
+    <!-- 3 · MAPHAR -->
+    <section class="shape" data-step="6" style="left:1930px; top:1150px; width:880px;">
+      <div class="lab-head c-violet"><span class="num">3</span><div class="lt"><div class="lname">Maphar — CFAO Healthcare</div><div class="ltag">Des remises par palier de montant, produit par produit</div></div><span class="pill-complet">COMPLET</span></div>
+      <p class="expl">Maphar ne raisonne pas en quantité mais en montant de commande : trois paliers (5 000, 15 000 et 25 000 MAD), et chaque produit a son propre taux à chaque palier. C'est le fichier le plus détaillé côté remises — il faudra le paramétrer produit par produit dans Pharmagest, pas avec une règle unique.</p>
+      <table class="facts">
+        <tr><th>Condition</th><th>Détail</th></tr>
+        <tr><td class="lab">Paliers de commande</td><td>5 000 / 15 000 / 25 000 MAD</td></tr>
+        <tr><td class="lab">PFF (la plupart)</td><td>10 % / 15 % / 18 % — Allegra, Baralgin, No-Dol, No-Spa, Rhinathiol, Avlocardyl…</td></tr>
+        <tr><td class="lab">PFI — exemples</td><td>Enterogermina, Nasacort 6 / 8 / 10 % ; Aspegic 6 / 8 / 14 % ; Arcoxia, Cerazette, Mercilon, Singulair 11 / 13 / 17 %</td></tr>
+        <tr><td class="lab">Cas particuliers</td><td>Duphalac (≥ 80) 13 / 18 / 21 % ; Celestene 0 % ; Nautamine 4 % ; solution hydro-alcoolique 5 L : 35 %</td></tr>
+        <tr><td class="lab">Offre</td><td>1 boîte de solution hydro-alcoolique F100ML offerte par commande</td></tr>
+      </table>
+      <div class="missing"><b>Ce qui manque encore :</b> minimum de commande, paiement, jours de livraison, heure limite, délai.</div>
+    </section>
+
+    <!-- 4 · PHI -->
+    <section class="shape" data-step="7" style="left:90px; top:2130px; width:1330px;">
+      <div class="lab-head c-orange"><span class="num">4</span><div class="lt"><div class="lname">Laboratoire Phi (+ Reckitt : Gaviscon, Strepsils, Durex)</div><div class="ltag">Des remises par listes + des offres spéciales très précises</div></div><span class="pill-complet">COMPLET</span></div>
+      <p class="expl">Phi a deux visages dans les fichiers : des remises par listes de produits (7 listes, de 10 % à 30 %), et des offres spéciales sur les marques Reckitt — Strepsils et Durex avec des paliers par quantité, et une règle dure sur Gaviscon : si on ne respecte pas le colisage, la commande n'est pas livrée du tout. C'est le labo où il faut faire le plus attention au colisage au moment de saisir la commande.</p>
+      <table class="facts">
+        <tr><th>Condition</th><th>Détail</th></tr>
+        <tr><td class="lab">Listes 1 à 7</td><td>Liste 1 : 15 % ; Liste 2 : 10 % ; Liste 3 : 15 % ; Liste 4 : 25 % ; Liste 5 : 30 % (Vigorex) ; Liste 6 : 15 % ; Liste 7 : 10 %</td></tr>
+        <tr><td class="lab">Médicaments conseils</td><td>Gaviscon ~16 % ; Strepsils ~25 %</td></tr>
+        <tr><td class="lab">Offre Strepsils (panaché)</td><td>30 unités → 16 % ; 40 unités → 20 % ; 60 unités → 25 % (minimum 30 unités, colisage 144)</td></tr>
+        <tr><td class="lab">Offre Durex</td><td>36 unités → 20 % ; 48 unités → 24 % ; 96 unités → 30 % (colisage 288 ou 72)</td></tr>
+        <tr><td class="lab">Gaviscon</td><td>Colisage 10 ou 12 — toute commande qui ne respecte pas le colisage ne sera PAS livrée</td></tr>
+        <tr><td class="lab">Paiement</td><td>Au comptant avec escompte de 2 %</td></tr>
+        <tr><td class="lab">Retour / échange</td><td>Produits ni repris ni échangés</td></tr>
+      </table>
+      <div class="missing"><b>Ce qui manque encore :</b> jours de livraison, heure limite, délai, canal de commande. Anomalie à vérifier : « Anginib » affiche un PPH supérieur au PPV (probable erreur de saisie dans le document source).</div>
+    </section>
+
+    <!-- 5 · GSK -->
+    <section class="shape" data-step="8" style="left:1460px; top:2130px; width:1350px;">
+      <div class="lab-head c-red"><span class="num">5</span><div class="lt"><div class="lname">GSK — Transfert direct</div><div class="ltag">Deux paliers simples, et vérifiés sur une vraie commande</div></div><span class="pill-complet">COMPLET</span></div>
+      <p class="expl">GSK, c'est le plus simple à comprendre : deux paliers selon le montant, 12 % puis 14 %. Et ce n'est pas de la théorie — la commande de novembre 2024 (27 675,46 MAD) a bien eu 14 %, ce qui correspond exactement au palier 2. « Transfert direct » veut dire qu'on commande directement au laboratoire, sans passer par le grossiste.</p>
+      <table class="facts">
+        <tr><th>Condition</th><th>Détail</th></tr>
+        <tr><td class="lab">Palier 1</td><td>À partir de 14 900 → 12 % FD</td></tr>
+        <tr><td class="lab">Palier 2</td><td>À partir de 24 900 → 14 % FD</td></tr>
+        <tr><td class="lab">Produits</td><td>Augmentin, Clavulin, Amoxil, Clamoxyl, Dermoval, Bactroban, Zentel, Zovirax</td></tr>
+        <tr><td class="lab">Vérification</td><td>Commande nov. 2024 : 27 675,46 MAD → remise 14 % (palier 2 confirmé)</td></tr>
+        <tr><td class="lab">Mode</td><td>Transfert direct = commande directe au laboratoire, hors grossiste</td></tr>
+      </table>
+      <div class="missing"><b>Ce qui manque encore :</b> « FD » n'est pas défini dans le document ; devise des seuils non écrite (probablement DH) ; jours de livraison, heure limite, délai, paiement.</div>
+    </section>
+    <div class="note blue" style="left:100px; top:3065px; transform:rotate(-1.5deg);">à compléter — les 16 autres labos : ce qu'on sait + ce qu'il faut demander ↓</div>
+
+    <!-- À COMPLÉTER 1/2 -->
+    <section class="shape" data-step="9" style="left:90px; top:3130px; width:1330px;">
+      <div class="drag-handle"><h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>À compléter — 1 / 2</h2>
+      <div class="sub">Conditions partielles — quelque chose existe, mais pas assez pour paramétrer</div></div>
+      <div class="minis">
+        <div class="mini"><div class="mname">Pharma5</div>Offre 3+1 (éq. 25 %), « 90 jours » ambigu → à clarifier : paiement ou livraison ? « Min x3 » = 3 unités ?</div>
+        <div class="mini"><div class="mname">Medipro</div>Commande groupée ; +300 u → 16 % ; +400 u → 20 %. Manque : minimum, paiement, livraison, cut-off, délai.</div>
+        <div class="mini"><div class="mname">BP Pharm</div>Comptant à la livraison, LCN refusés, livraison à leur charge. Manque : montant du minimum + remises.</div>
+        <div class="mini"><div class="mname">Pharmed</div>Chèque à vue, réclamations 8 j, prix du jour de livraison. Manque : minimum, remises, livraison.</div>
+        <div class="mini"><div class="mname">Miradent</div>Échange jusqu'à 6 mois avant péremption. Tout le reste manque.</div>
+        <div class="mini"><div class="mname">Classeur1</div>Remises 10–30 % + 50 % UG. D'abord : quel labo ? (aucun nom dans le fichier)</div>
+        <div class="mini"><div class="mname">Esnapharm</div>Rien — juste un bon de commande 2023. Tout à demander.</div>
+        <div class="mini"><div class="mname">Health Innovation</div>Rien — juste des bons de commande. Tout à demander.</div>
+      </div>
+    </section>
+
+    <!-- À COMPLÉTER 2/2 -->
+    <section class="shape" data-step="10" style="left:1460px; top:3130px; width:1350px;">
+      <div class="drag-handle"><h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>À compléter — 2 / 2</h2>
+      <div class="sub">Aucune condition dans les fichiers — tout est à demander au délégué</div></div>
+      <div class="minis">
+        <div class="mini"><div class="mname">Meduria</div>Rien — juste une liste de prix 09/24. Tout à demander.</div>
+        <div class="mini"><div class="mname">GUM (Sunstar)</div>Rien — tarif 2024, ligne « Escompte » sans taux. Tout à demander.</div>
+        <div class="mini"><div class="mname">Mason Vitamins</div>Rien — juste un tarif 2024. Tout à demander.</div>
+        <div class="mini"><div class="mname">Distribio</div>Rien — catalogue 18 pages (prix + colisage). Tout à demander.</div>
+        <div class="mini"><div class="mname">Gilbert</div>Offres ponctuelles (produit offert). Conditions générales à demander.</div>
+        <div class="mini"><div class="mname">Oral-B / Crest</div>Rien — bon 2023 (packs 1+1 / 2+1). Tout à demander.</div>
+        <div class="mini"><div class="mname">Elmex / Meridol</div>Rien — bon 2024 (colisage 12 / 48). Tout à demander.</div>
+        <div class="mini"><div class="mname">ACM</div>Rien — bon de commande 2023. Tout à demander.</div>
+      </div>
+    </section>
+
+    <!-- FINAL — PHARMAGEST -->
+    <section class="shape s-final" data-step="11" style="left:90px; top:3980px; width:2720px;">
+      <div class="drag-handle"><div class="fk">📌 Pour Pharmagest</div>
+      <h2>Ce qu'il faut encore obtenir — les 5 champs manquants</h2></div>
+      <p style="margin-top:0;">Les 5 labos du haut peuvent déjà être paramétrés sur minimum, remises et paiement. Mais pour que le module commande fonctionne vraiment, il manque à tout le monde les mêmes 5 champs :</p>
+      <div class="field"><span class="n">1</span><div><h3>Jours de livraison</h3><p>Quels jours de la semaine chaque labo livre.</p></div></div>
+      <div class="field"><span class="n">2</span><div><h3>Heure limite de commande (cut-off)</h3><p>Jusqu'à quelle heure on peut commander pour être livré au prochain passage.</p></div></div>
+      <div class="field"><span class="n">3</span><div><h3>Délai commande → livraison</h3><p>Combien de jours entre la commande et la réception.</p></div></div>
+      <div class="field"><span class="n">4</span><div><h3>Canal de commande</h3><p>Téléphone, fax, e-mail, WhatsApp, EDI, ou visite du délégué.</p></div></div>
+      <div class="field"><span class="n">5</span><div><h3>Frais de livraison</h3><p>Qui paie le transport, et à partir de quel montant c'est gratuit.</p></div></div>
+      <p>Source la plus probable pour ces 5 champs : les <b style="color:#fff">talks</b> (WhatsApp avec les délégués). Ils ne sont pas dans ce lot de fichiers — dès qu'ils arrivent, on complète le board. Et comme la plupart des documents datent de 2023–2024, il faut confirmer que les conditions n'ont pas changé avant de les figer dans Pharmagest.</p>
+      <div class="next"><b>Prochaine étape :</b> envoyer les talks → on complète les 5 champs manquants pour les 21 labos → puis on peut figer les 5 labos prêts dans Pharmagest.</div>
+    </section>
+
+    <div class="note" style="left:2380px; top:4720px; transform:rotate(2deg); font-size:22px;">DX Media — board TLDR</div>
+  </div>
+</div>
+
+<!-- Zoom bar -->
+<div class="tl-pill zoombar">
+  <button class="tbtn" id="btnMinus" title="Zoom −"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+  <button class="pct" id="pctLabel" title="Réinitialiser le zoom">100%</button>
+  <button class="tbtn" id="btnPlus" title="Zoom +"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<div class="hint">Glissez pour explorer le board · Molette / pincement pour zoomer · Cliquez une carte pour la déplacer</div>
+
+<!-- Presentation bar -->
+<div id="presBar">
+  <div class="dots" id="presDots"></div>
+  <div class="inner">
+    <button class="pbtn" id="btnExit">Quitter</button>
+    <div id="presLabel"><b></b><span></span></div>
+    <button class="pbtn" id="btnPrev">← Précédent</button>
+    <button class="pbtn main" id="btnNext">Suivant →</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var vp = document.getElementById('viewport');
+  var world = document.getElementById('world');
+  var WORLD_W = 2900, WORLD_H = 4800;
+  var cam = {x:0, y:0, z:0.5};
+  var anim = null;
+
+  function apply(){
+    world.style.transform = 'translate(' + cam.x + 'px,' + cam.y + 'px) scale(' + cam.z + ')';
+    vp.style.backgroundPosition = cam.x + 'px ' + cam.y + 'px';
+    vp.style.backgroundSize = (26 * cam.z) + 'px ' + (26 * cam.z) + 'px';
+    document.getElementById('pctLabel').textContent = Math.round(cam.z * 100) + '%';
+  }
+  function fit(){
+    var z = Math.min(vp.clientWidth / WORLD_W, vp.clientHeight / WORLD_H) * 0.98;
+    cam.z = z;
+    cam.x = (vp.clientWidth - WORLD_W * z) / 2;
+    cam.y = (vp.clientHeight - WORLD_H * z) / 2 + 14;
+    apply();
+  }
+  function animateTo(target, dur){
+    if (anim) cancelAnimationFrame(anim);
+    var start = {x:cam.x, y:cam.y, z:cam.z}, t0 = performance.now();
+    dur = dur || 650;
+    function frame(t){
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      cam.x = start.x + (target.x - start.x) * e;
+      cam.y = start.y + (target.y - start.y) * e;
+      cam.z = start.z + (target.z - start.z) * e;
+      apply();
+      if (p < 1) anim = requestAnimationFrame(frame);
+    }
+    anim = requestAnimationFrame(frame);
+  }
+  function focusShape(el, pad){
+    var wx = el.offsetLeft, wy = el.offsetTop, ww = el.offsetWidth, wh = el.offsetHeight;
+    var parent = el.offsetParent;
+    while (parent && parent !== world){ wx += parent.offsetLeft; wy += parent.offsetTop; parent = parent.offsetParent; }
+    pad = pad || 90;
+    var z = Math.min((vp.clientWidth - pad) / ww, (vp.clientHeight - pad - 90) / wh, 1.15);
+    z = Math.max(z, 0.3);
+    animateTo({ z: z, x: (vp.clientWidth - ww * z) / 2 - wx * z, y: (vp.clientHeight - wh * z) / 2 - wy * z + 10 });
+  }
+
+  /* ---------- Pan ---------- */
+  var panning = null;
+  vp.addEventListener('pointerdown', function(e){
+    if (e.target.closest('.shape') || e.target.closest('.topbar') || e.target.closest('#presBar')) return;
+    panning = {sx:e.clientX, sy:e.clientY, cx:cam.x, cy:cam.y};
+    vp.classList.add('panning');
+    vp.setPointerCapture(e.pointerId);
+    clearSel();
+  });
+  vp.addEventListener('pointermove', function(e){
+    if (!panning) return;
+    cam.x = panning.cx + (e.clientX - panning.sx);
+    cam.y = panning.cy + (e.clientY - panning.sy);
+    apply();
+  });
+  ['pointerup','pointercancel'].forEach(function(ev){ vp.addEventListener(ev, function(){ panning = null; vp.classList.remove('panning'); }); });
+
+  /* wheel zoom */
+  vp.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var f = e.deltaY < 0 ? 1.09 : 0.92;
+    zoomAt(e.clientX, e.clientY, cam.z * f);
+  }, {passive:false});
+  function zoomAt(px, py, nz){
+    nz = Math.max(0.12, Math.min(2.2, nz));
+    var wx = (px - cam.x) / cam.z, wy = (py - cam.y) / cam.z;
+    cam.z = nz; cam.x = px - wx * nz; cam.y = py - wy * nz;
+    apply();
+  }
+  /* pinch */
+  var pinch = null;
+  vp.addEventListener('touchstart', function(e){
+    if (e.touches.length === 2){
+      pinch = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), z: cam.z,
+                mx: (e.touches[0].clientX + e.touches[1].clientX)/2, my: (e.touches[0].clientY + e.touches[1].clientY)/2 };
+    }
+  }, {passive:true});
+  vp.addEventListener('touchmove', function(e){
+    if (pinch && e.touches.length === 2){
+      var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      zoomAt(pinch.mx, pinch.my, pinch.z * d / pinch.d);
+    }
+  }, {passive:true});
+  vp.addEventListener('touchend', function(){ pinch = null; });
+
+  /* ---------- Drag shapes ---------- */
+  var zTop = 10;
+  function clearSel(){ document.querySelectorAll('.shape.selected').forEach(function(s){ s.classList.remove('selected'); }); }
+  document.querySelectorAll('.shape').forEach(function(shape){
+    shape.addEventListener('pointerdown', function(e){
+      if (e.target.closest('button') || e.target.closest('a')) return;
+      e.stopPropagation();
+      clearSel(); shape.classList.add('selected');
+      shape.style.zIndex = ++zTop;
+      var sx = e.clientX, sy = e.clientY, ox = shape.offsetLeft, oy = shape.offsetTop;
+      function mv(ev){
+        var dx = (ev.clientX - sx) / cam.z, dy = (ev.clientY - sy) / cam.z;
+        shape.style.left = (ox + dx) + 'px';
+        shape.style.top = (oy + dy) + 'px';
+      }
+      function up(){ window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); }
+      window.addEventListener('pointermove', mv);
+      window.addEventListener('pointerup', up);
+    });
+  });
+
+  /* ---------- Zoom buttons ---------- */
+  document.getElementById('btnPlus').onclick = function(){ zoomAt(vp.clientWidth/2, vp.clientHeight/2, cam.z * 1.2); };
+  document.getElementById('btnMinus').onclick = function(){ zoomAt(vp.clientWidth/2, vp.clientHeight/2, cam.z / 1.2); };
+  document.getElementById('pctLabel').onclick = function(){ var z=1; var wx=(vp.clientWidth/2-cam.x)/cam.z, wy=(vp.clientHeight/2-cam.y)/cam.z; animateTo({z:z, x: vp.clientWidth/2 - wx*z, y: vp.clientHeight/2 - wy*z}); };
+  document.getElementById('btnFit').onclick = function(){ var z = Math.min(vp.clientWidth/WORLD_W, vp.clientHeight/WORLD_H)*0.98; animateTo({z:z, x:(vp.clientWidth-WORLD_W*z)/2, y:(vp.clientHeight-WORLD_H*z)/2+14}); };
+  document.getElementById('btnHand').onclick = function(){ clearSel(); };
+
+  /* ---------- Presentation mode ---------- */
+  var steps = [
+    {el:null, label:'Vue d\u2019ensemble du board', sub:'Conditions laboratoires — 5 labos prêts, 16 à compléter'},
+    {label:'Conditions laboratoires — TLDR', sub:'Pharmagest • Module commande — extrait des 25 fichiers Drive'},
+    {label:'Le parcours', sub:'5 labos prêts → 16 labos à compléter → Pharmagest : 5 champs manquants'},
+    {label:'À lire d\u2019abord — le mot « complet »', sub:'Minimum, remises et paiement connus — mais livraison, cut-off, délai et canal manquent pour TOUS'},
+    {label:'1 · Laboratoires Bottu', sub:'Min 200 unités, RF 12–25 %, chèque au comptant, transport CTM'},
+    {label:'2 · Afric-Phar', sub:'Packs 20 / 23 / 25 % (min 100 / 200 / 300), escompte 1,5 %, chèque 60 jours'},
+    {label:'3 · Maphar — CFAO Healthcare', sub:'Paliers 5 000 / 15 000 / 25 000 MAD, remises 0–35 % par produit'},
+    {label:'4 · Laboratoire Phi (+ Reckitt)', sub:'Listes 10–30 %, Strepsils 16/20/25 %, Durex 20/24/30 %, colisage Gaviscon obligatoire'},
+    {label:'5 · GSK — Transfert direct', sub:'≥ 14 900 → 12 % FD ; ≥ 24 900 → 14 % FD — vérifié sur une commande réelle de 27 675,46 MAD'},
+    {label:'À compléter — 1 / 2', sub:'Pharma5, Medipro, BP Pharm, Pharmed, Miradent, Classeur1, Esnapharm, Health Innovation'},
+    {label:'À compléter — 2 / 2', sub:'Meduria, GUM, Mason Vitamins, Distribio, Gilbert, Oral-B/Crest, Elmex/Meridol, ACM'},
+    {label:'Pour Pharmagest — les 5 champs manquants', sub:'Jours de livraison, cut-off, délai, canal, frais — prochaine étape : envoyer les talks'}
+  ];
+  var stepEls = {};
+  document.querySelectorAll('.shape[data-step]').forEach(function(s){ stepEls[s.getAttribute('data-step')] = s; });
+  var cur = -1;
+  var dotsBox = document.getElementById('presDots');
+  steps.forEach(function(){ var i = document.createElement('i'); dotsBox.appendChild(i); });
+  function goStep(n){
+    cur = Math.max(0, Math.min(steps.length - 1, n));
+    var st = steps[cur];
+    document.querySelector('#presLabel b').textContent = st.label;
+    document.querySelector('#presLabel span').textContent = st.sub;
+    document.getElementById('btnPrev').disabled = cur === 0;
+    document.getElementById('btnNext').disabled = cur === steps.length - 1;
+    Array.prototype.forEach.call(dotsBox.children, function(d, i){ d.className = i === cur ? 'on' : ''; });
+    clearSel();
+    if (cur === 0){
+      var z = Math.min(vp.clientWidth/WORLD_W, vp.clientHeight/WORLD_H)*0.98;
+      animateTo({z:z, x:(vp.clientWidth-WORLD_W*z)/2, y:(vp.clientHeight-WORLD_H*z)/2+14}, 700);
+    } else {
+      var el = stepEls[String(cur)];
+      if (el){ el.classList.add('selected'); focusShape(el); }
+    }
+  }
+  document.getElementById('btnPresent').onclick = function(){
+    document.body.classList.add('presenting');
+    goStep(0);
+  };
+  document.getElementById('btnExit').onclick = function(){ document.body.classList.remove('presenting'); clearSel(); };
+  document.getElementById('btnNext').onclick = function(){ goStep(cur + 1); };
+  document.getElementById('btnPrev').onclick = function(){ goStep(cur - 1); };
+  document.addEventListener('keydown', function(e){
+    if (!document.body.classList.contains('presenting')) return;
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goStep(cur + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goStep(cur - 1); }
+    if (e.key === 'Escape') document.getElementById('btnExit').click();
+  });
+
+  window.addEventListener('resize', function(){ apply(); });
+  fit();
+})();
+</script>
+</body>
+</html>
