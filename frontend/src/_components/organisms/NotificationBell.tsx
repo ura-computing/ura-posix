@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/_components/atoms/Button";
 import { EmptyState } from "@/_components/molecules/EmptyState";
 import { POPOVER_PANEL, usePopover } from "@/_components/molecules/popover";
+import { useMe } from "@/hooks/useMe";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useT } from "@/i18n/I18nProvider";
 import type { NotificationKind, NotificationOut } from "@/types";
@@ -27,6 +28,7 @@ const ICON: Record<NotificationKind, LucideIcon> = {
 export function NotificationBell() {
   const t = useT();
   const navigate = useNavigate();
+  const { me } = useMe();
   const { notifications, unread, markRead, markAllRead } = useNotifications();
   const { open, setOpen, triggerRef, panelRef, panelStyle, getReferenceProps, getFloatingProps } = usePopover(
     "bottom",
@@ -36,7 +38,7 @@ export function NotificationBell() {
   const openLine = (n: NotificationOut) => {
     if (!n.read_at) markRead(n.id);
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link && me) navigate(`/${me.role}/${n.link}`);
   };
 
   return (
@@ -75,7 +77,7 @@ export function NotificationBell() {
             {notifications.length === 0 ? (
               <EmptyState icon={<Bell className="size-5" />} title={t("notifications.empty")} className="py-10" />
             ) : (
-              <ul className="flex flex-col divide-y divide-border">
+              <ul data-list="notifications" className="flex flex-col divide-y divide-border">
                 {notifications.map((n) => {
                   const Icon = ICON[n.kind] ?? Bell;
                   return (

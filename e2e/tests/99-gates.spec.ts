@@ -2,8 +2,7 @@
  *  (.results/calls.jsonl, written by lib/fixtures.ts + lib/api.ts):
  *
  *  1. COVERAGE — every backend route in /openapi.json must have been called at
- *     least once with a 2xx/3xx answer. Only /v1/store-website/* is allowlisted
- *     (feature hidden, see memory "store website skipped").
+ *     least once with a 2xx/3xx answer.
  *  2. SPEED — median duration per route (and total per FLOW, e.g. import/ventes, +35 %)
  *     ≤ max(baseline × 1.2, baseline + 50 ms); FLOW ≤ max(baseline × 1.35, baseline + 150 ms). Baseline = e2e/perf-baseline.json
  *     (committed, recorded for one ROWS size — other sizes are not compared).
@@ -12,7 +11,7 @@
  *  3. ERROR CODES — backend `errors.py` ErrorCode values = frontend `api/errors.ts`
  *     (fr.ts / es.ts already fail the build when a frontend code has no text).
  *  4. REACT COMPILER — 0 `react-hooks` lint errors: the compiler skips (no auto
- *     memo) every component with one. Hidden store pages (moved as-is) excluded.
+ *     memo) every component with one.
  *  5. DIGITALOCEAN LIMITS (E2E_DO=1, `make tests` asks) — from e2e/.logs/resources.log (written every 5 s by
  *     scripts/start-stack.sh): backend and worker (Sobrus robot) never killed (out of memory) or stopped, each
  *     under 512 MB, no robot inside the backend; Postgres never
@@ -25,7 +24,7 @@ import { resolve } from "node:path";
 import { expect, test, type CallRecord } from "../lib/fixtures";
 import { API, CALLS_FILE, E2E_DIR, REPO_DIR, RESULTS_DIR, UI_FILE } from "../lib/paths";
 
-const ALLOWLIST = [/^\/v1\/store-website\//];
+const ALLOWLIST: RegExp[] = [];
 const DO_LIMITS = process.env.E2E_DO === "1";
 // Under DigitalOcean's limits the timings differ: their own baseline.
 const BASELINE_FILE = resolve(E2E_DIR, DO_LIMITS ? "perf-baseline.do.json" : "perf-baseline.json");
@@ -359,12 +358,10 @@ test("gate: the React Compiler compiles every component (0 react-hooks lint erro
   // No JSON = eslint itself failed (not installed, config error…): show its own message.
   expect(run.stdout.trim(), `npx eslint failed (exit ${run.status}): ${run.stderr || run.error?.message}`).not.toBe("");
   const files: { filePath: string; messages: { ruleId: string | null; line: number }[] }[] = JSON.parse(run.stdout);
-  const found = files
-    .flatMap((f) =>
-      f.messages
-        .filter((m) => m.ruleId?.startsWith("react-hooks/"))
-        .map((m) => `${f.filePath.replace(/^.*\/frontend\//, "")}:${m.line} ${m.ruleId}`),
-    )
-    .filter((s) => !s.startsWith("src/pages/store/"));
+  const found = files.flatMap((f) =>
+    f.messages
+      .filter((m) => m.ruleId?.startsWith("react-hooks/"))
+      .map((m) => `${f.filePath.replace(/^.*\/frontend\//, "")}:${m.line} ${m.ruleId}`),
+  );
   expect(found, "react-hooks lint errors (npx eslint src in frontend/)").toEqual([]);
 });

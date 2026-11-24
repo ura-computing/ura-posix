@@ -1,8 +1,8 @@
 /** Bottom-right, on every page: the Sobrus robot's run (owners with « Connexion Sobrus »), the admin's Catalogue
  *  « Importer les produits depuis Sobrus », then the files being imported. */
+import { useMe } from "@/hooks/useMe";
 import { useNavigate } from "react-router-dom";
 
-import { ROUTES } from "@/types";
 import { Ban, CheckCircle2, Clock, FileSpreadsheet, X } from "lucide-react";
 import type { DocType } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
@@ -25,6 +25,8 @@ const MAX_VISIBLE = 3;
 
 function UploadProgressWidget() {
   const t = useT();
+  const { me } = useMe();
+  const role = me?.role;
   const { jobs: all, cancelUpload, dismissJob } = useUploadCtx();
   const nav = useNavigate();
   // Files imported together leave the corner 4 s after their success (their wizard list keeps them).
@@ -46,7 +48,7 @@ function UploadProgressWidget() {
           key={job.id}
           job={job}
           queuePosition={job.phase === "queued" ? queuedOrdered.indexOf(job) + 1 : null}
-          onOpenWizard={() => nav(`${ROUTES.UPLOAD_FILE}?type=${job.docType}`)}
+          onOpenWizard={() => nav(`/${role}/upload-file?type=${job.docType}`)}
           onCancel={() => cancelUpload(job.id)}
           onDismiss={() => dismissJob(job.id)}
         />
@@ -54,7 +56,7 @@ function UploadProgressWidget() {
       {jobs.length > MAX_VISIBLE && (
         <button
           type="button"
-          onClick={() => nav(`${ROUTES.UPLOAD_FILE}?type=${visible[visible.length - 1].docType}`)}
+          onClick={() => nav(`/${role}/upload-file?type=${visible[visible.length - 1].docType}`)}
           className="cursor-pointer self-end rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground shadow-md hover:text-foreground"
         >
           {t("upload.moreJobs", { n: jobs.length - MAX_VISIBLE })}

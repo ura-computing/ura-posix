@@ -21,7 +21,7 @@ from app.core.audit import AuditAction, log_action
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import Achat, ImportBatch, Medicament, PharmacyStock, SobrusImportedYear, User, Vente
-from app.core.permissions import AdminDep, is_staff, member, require_pharmacy_owner
+from app.core.permissions import AdminDep, member, require_pharmacy_owner
 from app.catalog.schemas import CatalogImportResponse
 from app.ingestion.schemas import ImportsListResponse, JsonUploadBody, PatchBatchBody
 from app.ingestion.service import (
@@ -162,7 +162,7 @@ def upload_catalog(
             nkey = normalized_name(row.get("product"))
             if nkey:
                 by_name[nkey] = med  # later same-name rows in this CSV merge onto it
-    sync_unclassified(db)  # staff's « N produits à classer »
+    sync_unclassified(db)  # the admin's and Support's « N produits à classer »
     db.commit()
     return {
         "total_rows": len(parsed),
@@ -246,7 +246,7 @@ def patch_batch_status(
     batch = db.get(ImportBatch, batch_id)
     if batch is None:
         raise ApiError(404, ErrorCode.BATCH_NOT_FOUND, "Lot d'import introuvable.")
-    if batch.pharmacy_id != user.pharmacy_id and not is_staff(user):
+    if batch.pharmacy_id != user.pharmacy_id and user.role not in ("admin", "support"):
         raise ApiError(403, ErrorCode.BATCH_FORBIDDEN, "Accès refusé à ce lot d'import.")
 
     deleted_rows = end_batch(db, batch, body.status, user, body.error_message)
@@ -287,7 +287,7 @@ def _visible_batches_query(db: Session, user: User) -> OrmQuery:
     - employee → caller's own batches
     """
     base = db.query(ImportBatch)
-    if is_staff(user):
+    if user.role in ("admin", "support"):
         return base.filter(ImportBatch.created_by_user_id == user.id)
     if user.role == "owner":
         employee_ids_sq = (
@@ -349,8 +349,8 @@ def list_imports(
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict:
-    # Non-staff must have the `import` feature; staff bypasses.
-    if not is_staff(user):
+    # Owner / employee need the `import` feature; the admin and Support do not.
+    if user.role not in ("admin", "support"):
         require_pharmacy_owner(user, db, feature="import")
 
     creator = aliased(User)
@@ -386,7 +386,7 @@ def delete_import(
     Per-role authz mirrors the list scope (see `_visible_batches_query`):
     if you can see it, you can delete it. 404 on out-of-scope to avoid
     leaking existence."""
-    if not is_staff(user):
+    if user.role not in ("admin", "support"):
         require_pharmacy_owner(user, db, feature="import")
 
     batch = _visible_batches_query(db, user).filter(ImportBatch.id == batch_id).first()

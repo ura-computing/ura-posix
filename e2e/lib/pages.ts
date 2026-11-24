@@ -1,6 +1,7 @@
 /** Every page of the app, for the specs that check all of them (24-matrix): who opens it, the switch that hides it,
  *  the GET that fills it. A new page = one line here, and every generic check covers it.
- *  « Ma boutique en ligne » and the developer pages: hidden, not in the suite. A product sheet (/produits/:id): 18. */
+ *  The online store's Support pages (/admin/boutiques…): Support only (no opener here → 404 for everyone below),
+ *  checked in 09-boutique with the store's own pages. A product sheet (/produits/:id): 18. */
 
 /** The accounts that open pages. An employee has every permission unless a test removes one. */
 export type Opener = "owner" | "employee" | "admin";
@@ -89,6 +90,20 @@ export const PAGES: AppPage[] = [
     nav: "Historique",
     feature: null,
     open: { owner: "/history" },
+  },
+  {
+    path: "/ma-boutique",
+    title: "Ma boutique en ligne",
+    nav: "Ma boutique en ligne",
+    feature: null,
+    open: { owner: "/store-website/my-request" },
+  },
+  {
+    path: "/admin/boutiques",
+    title: "Boutiques en ligne",
+    nav: null,
+    feature: null,
+    open: {}, // Support only (09-boutique): the admin, the owner, the employee get the 404
   },
   {
     path: "/auth/me",

@@ -175,7 +175,7 @@ def open_request_of(db: Session, pharmacy_id: int) -> StoreWebsiteRequest | None
 
 def notify_store_step(db: Session, req: StoreWebsiteRequest) -> None:
     """The owner's bell: « Votre boutique « Pharmacie Demo Shop » : En cours »."""
-    notify(db, [req.owner_id], "storeStep", {"store": req.store_name, "state": req.state}, "/ma-boutique")
+    notify(db, [req.owner_id], "storeStep", {"store": req.store_name, "state": req.state}, "ma-boutique")
 
 
 def request_out(db: Session, req: StoreWebsiteRequest) -> WebsiteRequestOut:
@@ -200,7 +200,6 @@ def request_out(db: Session, req: StoreWebsiteRequest) -> WebsiteRequestOut:
         brand_palette=list(req.brand_palette or []),
         phone=req.phone,
         custom_domain=req.custom_domain,
-        urgency=req.urgency,
         vision=req.vision,
         state=req.state,
         claimed_by=claimed_by,

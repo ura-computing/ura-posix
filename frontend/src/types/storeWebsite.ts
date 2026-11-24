@@ -16,15 +16,6 @@ export const REQUEST_STATE_LABEL: Record<RequestState, string> = {
   cloturee: "store.stateCloturee",
 };
 
-export type Urgency = "asap" | "ce_mois" | "flexible";
-
-/** i18n keys: `t(URGENCY_LABEL[urgency])`. */
-export const URGENCY_LABEL: Record<Urgency, string> = {
-  asap: "store.urgencyAsap",
-  ce_mois: "store.urgencyCeMois",
-  flexible: "store.urgencyFlexible",
-};
-
 // ── Templates ───────────────────────────────────────────────────────────────
 
 export type StoreTemplate = "classique" | "moderne" | "lumiere" | "apotheose" | "elegance";
@@ -91,7 +82,6 @@ export interface WebsiteRequestOut {
   brand_palette: string[];
   phone: string;
   custom_domain: string | null;
-  urgency: Urgency;
   vision: string | null;
   state: RequestState;
   claimed_by: ClaimedByOut | null;
@@ -135,7 +125,6 @@ export interface WebsiteRequestCreate {
   brand_palette: string[]; // 2-3 hex
   phone: string;
   custom_domain?: string | null;
-  urgency: Urgency;
   vision?: string | null;
 }
 

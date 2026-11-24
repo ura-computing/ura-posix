@@ -1,24 +1,14 @@
 {
-  "params": [
-    {
-      "pattern": "^\\w+ /v1/store-website",
-      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
-    }
-  ],
-  "body": [
-    {
-      "pattern": "^\\w+ /v1/store-website",
-      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
-    }
-  ],
+  "params": [],
+  "body": [],
   "codes": [
     {
       "pattern": "^serverError$",
       "why": "only a crash sends it (CatchServerErrors)"
     },
     {
-      "pattern": "^(customizationMissing|featuredIdsInvalid|logoFormat|logoTooLarge|notAssignedDeveloper|previewNotFound|requestActiveExists|requestClaimed|requestLocked|requestNotFound|transitionNotAllowed|developerOnly)$",
-      "why": "« Ma boutique en ligne » (store) + its developers: hidden, not built yet — skipped everywhere"
+      "pattern": "^customizationMissing$",
+      "why": "a store request always gets its customization in the same transaction: only a broken row sends it"
     },
     {
       "pattern": "^tooManyAttempts$",
@@ -30,7 +20,7 @@
     },
     {
       "pattern": "^forbidden$",
-      "why": "only a developer account reaches it (the hidden store)"
+      "why": "only an account whose role is none of admin / support / owner / employee reaches it (none can be made)"
     },
     {
       "pattern": "^fileTooLarge$",
@@ -43,12 +33,12 @@
   ],
   "ui": [
     {
-      "pattern": "^/(store-website|preview)",
-      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+      "pattern": "^/preview",
+      "why": "the pharmacy's online store (its own look, its own data: every product card, chip, link); 09-boutique checks its pages, data and main links, not each data-made control"
     },
     {
-      "pattern": "\\|link\\|/(store-website|preview)",
-      "why": "« Ma boutique en ligne » (store): hidden, not built yet — skipped everywhere"
+      "pattern": "\\|link-out\\|(wa\\.me|www\\.google\\.com)?$",
+      "why": "phone (tel:), WhatsApp and Google Maps links leave the app; 09-boutique checks their addresses"
     }
   ]
 }

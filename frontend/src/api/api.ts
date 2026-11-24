@@ -632,7 +632,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.notifications.list, // staff's « N produits à classer »
+          API.notifications.list, // the admin's and Support's « N produits à classer »
         ],
       },
       update: {
@@ -641,7 +641,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.notifications.list, // staff's « N produits à classer »
+          API.notifications.list, // the admin's and Support's « N produits à classer »
         ],
       },
       remove: {
@@ -650,7 +650,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.notifications.list, // staff's « N produits à classer »
+          API.notifications.list, // the admin's and Support's « N produits à classer »
         ],
       },
       importCsv: {
@@ -659,7 +659,7 @@ export const API = {
           API.admin.catalog.list,
           API.admin.catalog.categories,
           API.admin.catalog.stats,
-          API.notifications.list, // staff's « N produits à classer »
+          API.notifications.list, // the admin's and Support's « N produits à classer »
         ],
       },
     },
@@ -698,9 +698,6 @@ export const API = {
       url: (id: string) => `/store-website/requests/${id}`,
       key: (id: string) => ["store-website", "request", id] as const,
       all: ["store-website", "request"],
-    },
-    featuredCategories: {
-      url: (id: string) => `/store-website/requests/${id}/featured-categories`,
     },
     // « Prendre en charge » / « Libérer » / next step: the queue and the request page change.
     claim: {

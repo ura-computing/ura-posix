@@ -16,6 +16,8 @@ export interface Account {
 }
 
 export const ADMIN: Account = { email: "admin@gmail.com", password: "admin@123", name: "Administrateur" }; // backend/seed.json
+/** The seed's Support account (backend/scripts/seed.json): same rights as the admin, builds the online stores. */
+export const SUPPORT: Account = { email: "support@gmail.com", password: "support@123", name: "Support Demo" };
 export const OWNER: Account = { email: "owner.e2e@pharmagest.ma", password: "OwnerE2e#2026", name: "Owner E2E" };
 export const PHARMACY = { name: "Pharmacie E2E", city: "Bouskoura" };
 
@@ -40,7 +42,7 @@ export const PREMIUM_FEATURES = ["labels", "orders"];
 export const PHARMACY_FEATURES = ALL_FEATURES.filter((f) => !PREMIUM_FEATURES.includes(f));
 
 /** admin / owner: saved by the setup project. employee / account: 12 and 13. */
-export type Role = "admin" | "owner" | "employee" | "account";
+export type Role = "admin" | "owner" | "employee" | "account" | "support";
 
 /** Browser state with no cookie: a visitor who is not logged in. */
 export const LOGGED_OUT = { cookies: [], origins: [] };

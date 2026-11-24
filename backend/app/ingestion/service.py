@@ -485,7 +485,7 @@ def end_batch(db: Session, batch: ImportBatch, status: str, user: User | None, e
         if status == "error":
             details["error"] = batch.error_message
         log_action(db, user, batch.pharmacy_id, IMPORT_ENDS[status], details)
-    if status == "success":  # new products of the file: staff's « N produits à classer »
+    if status == "success":  # new products of the file: the admin's and Support's « N produits à classer »
         sync_unclassified(db)
     db.commit()
     if status in ("success", "cancelled"):

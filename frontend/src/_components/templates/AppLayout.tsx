@@ -1,9 +1,10 @@
+import { ROUTES } from "@/routes";
 import { Suspense, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { useIdleLock } from "@/hooks/useLockScreen";
 import { useMe } from "@/hooks/useMe";
-import { ROLES, ROUTES, STATUSES, isStaff } from "@/types";
+import { ROLES, STATUSES, type Role } from "@/types";
 import { Skeleton } from "@/_components/atoms/Skeleton";
 import { LockScreen } from "@/_components/organisms/LockScreen";
 import { SobrusBanner } from "@/_components/organisms/SobrusBanner";
@@ -56,7 +57,10 @@ export function AppLayout() {
           </Suspense>
         </main>
       </div>
-      <CornerStack sobrusOwner={sobrusOwner} admin={isStaff(me.role)} />
+      <CornerStack
+        sobrusOwner={sobrusOwner}
+        admin={([ROLES.ADMIN, ROLES.SUPPORT] as (Role | undefined)[]).includes(me.role)}
+      />
       {me.lock.locked && <LockScreen name={me.name} />}
     </div>
   );

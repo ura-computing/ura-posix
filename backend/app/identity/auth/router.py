@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, Response, status
 from sqlalchemy.orm import Session as DbSession
 
-from app.notifications.service import notify, staff_ids
+from app.notifications.service import notify, admin_and_support_ids
 from app.core.config import settings
 from app.core.database import DbDep
 from app.core.email_service import send_magic_link
@@ -271,7 +271,7 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
         user.reset_token = hash_token(raw)
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRY_MIN)
         db.commit()
-        magic_link = f"{settings.FRONTEND_URL}/auth/set-password?token={raw}"
+        magic_link = f"{settings.FRONTEND_URL}/set-password?token={raw}"
         is_setup = user.password_hash is None
         # email_service.send_magic_link prints to stdout ONLY when MAIL_USERNAME
         # is empty (no SMTP configured). In prod with SMTP set, nothing leaks to
@@ -320,7 +320,7 @@ def signup(body: SignupIn, request: Request, db: DbDep) -> dict:
             user_id=pending_user.id if pending_user else None,
         )
     )
-    notify(db, staff_ids(db), "signupRequest", {"name": body.full_name}, "/admin/pharmacies?tab=demandes")
+    notify(db, admin_and_support_ids(db), "signupRequest", {"name": body.full_name}, "pharmacies?tab=demandes")
     db.commit()
     return {"detail": "Demande envoyée"}
 

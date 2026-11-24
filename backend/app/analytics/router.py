@@ -12,7 +12,7 @@ from app.analytics.analyse_queries import compute_analyse_liste, compute_analyse
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import Medicament, Pharmacy, User
-from app.core.permissions import STAFF_ROLES, admin_only, member
+from app.core.permissions import admin_only, member
 from app.analytics.schemas import (
     AdminStatsResponse,
     AnalyseMargeResponse,
@@ -194,7 +194,7 @@ def admin_stats(db: DbDep) -> dict:
         "total_active_users": db.query(func.count(User.id))
         .filter(
             User.status == "active",
-            User.role.notin_(STAFF_ROLES),
+            User.role.notin_(("admin", "support")),
             or_(User.pharmacy_id.is_(None), User.pharmacy_id.in_(active_pharm_ids)),
         )
         .scalar()

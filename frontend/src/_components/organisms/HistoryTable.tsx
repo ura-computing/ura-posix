@@ -1,10 +1,11 @@
 /** « Historique des modifications »: one line per change, newest first — when, who, the kind
  *  (Import / Fiche produit / Observation), on the owner's page the product (a link to its page),
  *  then what (a sentence). Used by the owner's page and a product's « Historique » tab. */
+import { useMe } from "@/hooks/useMe";
 import { Link } from "react-router-dom";
 
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
-import { ROUTES, type AuditRow } from "@/types";
+import { type AuditRow } from "@/types";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";
@@ -22,7 +23,7 @@ const toneOf = (row: AuditRow) =>
       ? KIND_TONE.note
       : KIND_TONE.product;
 
-const columns = (t: TFn, withProduct: boolean): ColumnDef<AuditRow>[] => [
+const columns = (t: TFn, withProduct: boolean, role: string | undefined): ColumnDef<AuditRow>[] => [
   {
     key: "created_at",
     label: t("history.colDate"),
@@ -58,7 +59,7 @@ const columns = (t: TFn, withProduct: boolean): ColumnDef<AuditRow>[] => [
           render: (r: AuditRow) =>
             r.medicament_id ? (
               <Link
-                to={ROUTES.PRODUIT.replace(":id", String(r.medicament_id))}
+                to={`/${role}/produits/${r.medicament_id}`}
                 className="line-clamp-2 break-words text-primary hover:underline"
               >
                 {r.product}
@@ -95,10 +96,12 @@ export function HistoryTable({
   withProduct?: boolean;
 }) {
   const t = useT();
+  const { me } = useMe();
+  const role = me?.role;
   return (
     <DataTable<AuditRow>
       rows={rows}
-      columns={columns(t, withProduct)}
+      columns={columns(t, withProduct, role)}
       isLoading={isLoading}
       isError={isError}
       onRetry={onRetry}

@@ -2,19 +2,13 @@
  *  wrong role, or an account not accepted yet (`pending`) → the 404 page INSIDE the layout
  *  (sidebar stays, like RequireFeature).
  *
- *  Usage in App.tsx:
- *    <Route element={<RequireRole role={ROLES.ADMIN} />}>            // single
- *      <Route path={ROUTES.ADMIN_CATALOGUE} element={<CataloguePage />} />
- *    </Route>
- *    <Route element={<RequireRole role={STAFF} />}>                  // any-of (admin or Support)
- *      <Route path={ROUTES.STORE_REQUESTS} element={<StoreRequestsPage />} />
- *    </Route>
- */
+ *  App.tsx puts each role's pages (`ROLE_ROUTES`) inside `<RequireRole role={role} />`. */
+import { ROUTES } from "@/routes";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
-import NotFoundPage from "@/pages/auth/not-found";
-import { ROUTES, STATUSES } from "@/types";
+import NotFoundPage from "@/pages/common/not-found";
+import { STATUSES } from "@/types";
 import type { Role } from "@/types";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
 

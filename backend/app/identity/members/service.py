@@ -130,7 +130,7 @@ def support_accounts(db: Session) -> list[SupportAccountRow]:
 
 
 def add_support(db: Session, *, email: str, name: str, password: str) -> User:
-    """An active Support account, no pharmacy, no permission rows (staff gets every feature). Caller checks the email."""
+    """An active Support account, no pharmacy, no permission rows (the admin and Support get every feature). Caller checks the email."""
     user = User(email=email, name=name, password_hash=hash_password(password), role="support", status="active")
     db.add(user)
     db.commit()

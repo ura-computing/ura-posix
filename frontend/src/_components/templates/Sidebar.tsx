@@ -2,8 +2,7 @@
 import type { ComponentType } from "react";
 import { NavLink, Link } from "react-router-dom";
 
-import { ROUTES, isStaff } from "@/types";
-import { ChevronLeft, ChevronRight, Lock, LogOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleUser, Lock, LogOut, type LucideIcon } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -13,13 +12,12 @@ import { useLockNow } from "@/hooks/useLockScreen";
 import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/useMe";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
-import { ACCOUNT_ITEM, SETTINGS_ITEM, visibleGroups, type NavItem } from "@/_components/templates/nav";
+import { ROLE_ROUTES, ROUTES } from "@/routes";
 
 export interface SidebarProps {
   role: Role;
-  /** User's effective permissions (3-layer intersection from /me). Drives the
-   *  feature-flag filter on nav items. Admin's bypass is handled inside
-   *  visibleGroups; this prop is still required (pass [] for admin). */
+  /** User's effective permissions (3-layer intersection from /me): an owner's / employee's page shows only with its
+   *  permission (the admin's and Support's pages have none). */
   permissions: readonly string[];
   /** Signed up, not accepted yet: no menu entry (only « Mon compte » + « Déconnexion »). */
   pending: boolean;
@@ -37,34 +35,33 @@ function itemClasses(isActive: boolean, collapsed: boolean) {
   );
 }
 
-function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavRow({
+  to,
+  label,
+  icon: Icon,
+  collapsed,
+  end,
+}: {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  collapsed: boolean;
+  end?: boolean;
+}) {
   const t = useT();
-  const label = t(item.label);
-  // Tooltip only fires when collapsed — labels are visible inline when expanded.
-  // Mobile keeps native title since hover doesn't apply there.
-  const tooltipLabel = collapsed ? (item.ready === false ? `${label} · ${t("nav.soon")}` : label) : "";
-
-  const inner =
-    item.ready === false ? (
-      <div aria-disabled className={cn(itemClasses(false, collapsed), "cursor-not-allowed opacity-45")}>
-        <item.icon className="size-[18px] shrink-0" aria-hidden />
-        <span className={collapsed ? "md:hidden" : ""}>{label}</span>
-      </div>
-    ) : (
+  const text = t(label);
+  return (
+    // Tooltip only when collapsed (labels show inline when expanded).
+    <Tooltip label={collapsed ? text : ""} placement="right" className="relative block">
       <NavLink
-        to={item.to}
-        end={item.to === ROUTES.RAPPORT}
-        aria-label={collapsed ? label : undefined} // icons only: its name stays (screen readers)
+        to={to}
+        end={end}
+        aria-label={collapsed ? text : undefined} // icons only: its name stays (screen readers)
         className={({ isActive }) => cn(itemClasses(isActive, collapsed), "relative")}
       >
-        <item.icon className="size-[18px] shrink-0" aria-hidden />
-        <span className={collapsed ? "md:hidden" : ""}>{label}</span>
+        <Icon className="size-[18px] shrink-0" aria-hidden />
+        <span className={collapsed ? "md:hidden" : ""}>{text}</span>
       </NavLink>
-    );
-
-  return (
-    <Tooltip label={tooltipLabel} placement="right" className="relative block">
-      {inner}
     </Tooltip>
   );
 }
@@ -114,7 +111,10 @@ export function Sidebar({
   const { lockNow, isLocking } = useLockNow();
   // « Verrouiller l'écran »: only once the lock is on and has its code (« Mon compte » → « Verrouillage »).
   const canLock = !!me?.lock.enabled && me.lock.has_pin;
-  const groups = pending ? [] : visibleGroups(role, permissions);
+  // The role's pages with a sidebar link, without those its permissions close (owner / employee).
+  const links = pending
+    ? []
+    : ROLE_ROUTES[role].filter((r) => r.nav && (!r.feature || permissions.includes(r.feature)));
 
   return (
     <>
@@ -159,27 +159,47 @@ export function Sidebar({
         </Link>
 
         <nav className="flex flex-1 flex-col gap-3.5 overflow-auto p-2.5">
-          {groups.map((group, gi) => (
-            <div key={group.title ?? gi} className="flex flex-col gap-0.5">
-              {group.title && (
-                <span
-                  className={`px-3 pb-0.5 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground ${collapsed ? "md:hidden" : ""}`}
-                >
-                  {t(group.title)}
-                </span>
-              )}
-              {group.items.map((item) => (
-                <NavRow key={item.to} item={item} collapsed={collapsed} />
-              ))}
-            </div>
-          ))}
+          {(
+            [
+              ["top", null],
+              ["exploitation", "nav.groupExploitation"],
+              ["gestion", "nav.groupGestion"],
+              ["administration", "nav.groupAdministration"],
+            ] as const
+          ).map(([group, title]) => {
+            const items = links.filter((r) => r.nav?.group === group);
+            if (items.length === 0) return null;
+            return (
+              <div key={group} className="flex flex-col gap-0.5">
+                {title && (
+                  <span
+                    className={`px-3 pb-0.5 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground ${collapsed ? "md:hidden" : ""}`}
+                  >
+                    {t(title)}
+                  </span>
+                )}
+                {items.map((r) => (
+                  <NavRow
+                    key={r.path}
+                    to={r.path}
+                    label={r.nav!.label}
+                    icon={r.nav!.icon}
+                    collapsed={collapsed}
+                    end={r.path.endsWith("/rapport")}
+                  />
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="flex shrink-0 flex-col gap-0.5 border-t border-border p-2.5">
-          {(isStaff(role) || !SETTINGS_ITEM.feature || permissions.includes(SETTINGS_ITEM.feature)) && (
-            <NavRow item={SETTINGS_ITEM} collapsed={collapsed} />
-          )}
-          <NavRow item={ACCOUNT_ITEM} collapsed={collapsed} />
+          {links
+            .filter((r) => r.nav?.group === "bottom")
+            .map((r) => (
+              <NavRow key={r.path} to={r.path} label={r.nav!.label} icon={r.nav!.icon} collapsed={collapsed} />
+            ))}
+          <NavRow to={ROUTES.ME} label="nav.compte" icon={CircleUser} collapsed={collapsed} />
           {canLock && (
             <ActionRow
               icon={Lock}

@@ -1,10 +1,10 @@
+import { ROUTES } from "@/routes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
 import { API } from "@/api/api";
-import { ROUTES } from "@/types";
 
 export function useLogout() {
   const navigate = useNavigate();

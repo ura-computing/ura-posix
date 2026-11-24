@@ -168,7 +168,7 @@ def create_medicament(
         product_type=body.product_type,
     )
     db.add(m)
-    sync_unclassified(db)  # staff's « N produits à classer »
+    sync_unclassified(db)  # the admin's and Support's « N produits à classer »
     db.commit()
     db.refresh(m)
     return _row(m)
@@ -187,7 +187,7 @@ def update_medicament(
     data = body.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(m, k, v)
-    sync_unclassified(db)  # staff's « N produits à classer »
+    sync_unclassified(db)  # the admin's and Support's « N produits à classer »
     db.commit()
     db.refresh(m)
     return _row(m)
@@ -209,7 +209,7 @@ def delete_medicament(med_id: MedIdPath, db: DbDep) -> None:
                 "Ce médicament est utilisé dans des ventes, achats ou stocks : suppression impossible.",
             )
     db.delete(m)
-    sync_unclassified(db)  # staff's « N produits à classer »
+    sync_unclassified(db)  # the admin's and Support's « N produits à classer »
     db.commit()
 
 

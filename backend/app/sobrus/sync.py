@@ -740,7 +740,7 @@ def _problem(db: Session, run: SobrusRun, conn: SobrusConnection, owner: User | 
             to=owner.email,
             name=owner.name or owner.email,
             needs_password=code == "sobrusBadCredentials",
-            app_url=f"{settings.FRONTEND_URL}/sobrus",
+            app_url=f"{settings.FRONTEND_URL}/owner/sobrus",
         )
         conn.problem_notified_at = _now()
     db.commit()
@@ -761,15 +761,15 @@ def _finish(db: Session, run: SobrusRun, status: str, error_code: str | None = N
 
 def _notify_end(db: Session, run: SobrusRun, status: str, error_code: str | None) -> None:
     """The bell: the catalogue run → who started it; an import → the pharmacy's owners (a connection test: nobody).
-    New products may be unclassified: staff's « N produits à classer » follows."""
+    New products may be unclassified: the admin's and Support's « N produits à classer » follows."""
     if run.mode == "check" or status == "cancelled":
         return
     who = [run.created_by] if run.mode == "products" and run.created_by else owner_ids(db, run.pharmacy_id)
     if status == "success":
-        notify(db, who, "sobrusDone", {"mode": run.mode, "n": run.lines_added}, "/sobrus")
+        notify(db, who, "sobrusDone", {"mode": run.mode, "n": run.lines_added}, "sobrus")
         sync_unclassified(db)
     else:
-        notify(db, who, "sobrusFailed", {"mode": run.mode, "error": error_code or "serverError"}, "/sobrus")
+        notify(db, who, "sobrusFailed", {"mode": run.mode, "error": error_code or "serverError"}, "sobrus")
 
 
 def execute(run_id: int) -> None:

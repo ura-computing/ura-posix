@@ -16,7 +16,50 @@ Updated 2026-11-12. One list, top to bottom. Open items only: a step leaves this
 | One step → `make tests` green → step removed from this file | the oracle (`resources/tests/oracle.py`) pins every number |
 | The oracle changes only for a bug fix listed here, in the same step | a refactor never moves a number silently |
 | API path / shape changes only when this plan says so (frontend + E2E in the same step) | coverage gate `99-gates.spec.ts` |
-| Hidden store website (`backend/app/store_website/`, `frontend/src/pages/store/*`): moved as-is, never rewritten | hidden, must not break |
+| Online store (`backend/app/store_website/`, `frontend/src/pages/store/*`): built (Support queue + editor, owner page, download + deploy) | E2E `09-boutique`, `27-support` |
+
+---
+
+## 1. Frontend by role + clean code (2026-11-24)
+
+Detail: `.claude/plans/frontend-by-role.md`
+
+```
+1.1 folders   →   1.2 routes   →   1.3 no abstractions   →   1.4 store models   →   1.5 tests (last) → commit + push
+```
+
+```
+src/
+├── pages/
+│   ├── owner/      owner-only pages (sobrus, equipe, historique, ma-boutique)
+│   ├── support/    Support-only pages (boutiques, boutique, editeur)
+│   └── common/     home · login · sign-up · compte · 404 · store preview
+├── _components/
+│   ├── pages/      page bodies shared by 2+ roles (Ventes, Catalogue…)
+│   └── atoms · molecules · organisms · templates
+├── routes.ts       ROLE_ROUTES: public · guest · signedIn · admin · support · owner · employee (full paths)
+└── storefront/     the 5 store models + the downloaded site
+```
+
+| Role | Prefix | Example |
+|---|---|---|
+| admin | `/admin/…` | `/admin/catalogue` |
+| support | `/support/…` | `/support/catalogue`, `/support/boutiques` |
+| owner | `/owner/…` | `/owner/ventes`, `/owner/ma-boutique` |
+| employee | `/employee/…` | `/employee/ventes` |
+| common | none | `/login`, `/compte` |
+
+| Remove | Use |
+|---|---|
+| `STAFF`, `isStaff`, `STAFF_ROLES`, `is_staff` | `ROLES.ADMIN` · `ROLES.SUPPORT` · `ROLES.OWNER` · `ROLES.EMPLOYEE` |
+
+**Review the whole codebase: remove over-complication** (asked 2026-11-24)
+
+| Look for | Do |
+|---|---|
+| helpers that only rename / group / re-export | write the plain value |
+| layers between a page and its data / route | read the source directly |
+| unused files, exports, i18n keys, endpoints | delete |
 
 ---
 

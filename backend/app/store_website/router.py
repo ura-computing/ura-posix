@@ -3,7 +3,7 @@
 | Caller | Dependency | Does |
 |---|---|---|
 | Owner / employee | `MemberDep` | sends the pharmacy's request, edits it while `soumise`, picks the featured categories |
-| Support (staff) | `AdminDep` | the queue: takes a request, moves it forward, builds the store in the editor, uploads the logo |
+| Support (and the admin) | `AdminDep` | the queue: takes a request, moves it forward, builds the store in the editor, uploads the logo |
 | Anyone | none | `/public/preview/{id}` (safe subset for the preview page), `/public/{id}/summary`, `/products`, `/products/{pid}` (ONLY that request's pharmacy's shelf: `catalog_queries.py`), `/logo/{id}` |
 
 The owner never sees the work in progress; the featured categories belong to the owner (own endpoint).
@@ -22,12 +22,11 @@ from app.core.errors import ApiError, ErrorCode
 from app.core.models import Pharmacy, Store, StoreCustomization, StoreWebsiteRequest
 from app.core.permissions import AdminDep, MemberDep, OwnerDep
 from app.core.security import CurrentUserDep
-from app.notifications.service import notify, staff_ids
+from app.notifications.service import notify, support_ids
 from app.store_website.catalog_queries import store_of, store_product, store_products, store_summary
 from app.store_website.schemas import (
     CustomizationOut,
     CustomizationPatch,
-    FeaturedCategoriesIn,
     PublicPreviewOut,
     SiteKeyIn,
     SiteKeyOut,
@@ -87,17 +86,22 @@ def create_request(
     if open_request_of(db, pharmacy_id) is not None:
         raise ApiError(409, ErrorCode.REQUEST_ACTIVE_EXISTS, "Une demande active existe déjà pour cette pharmacie.")
     req = StoreWebsiteRequest(
-        id=uuid4(), pharmacy_id=pharmacy_id, owner_id=user.id, state="soumise", **body.model_dump()
+        id=uuid4(),
+        pharmacy_id=pharmacy_id,
+        owner_id=user.id,
+        state="soumise",
+        urgency="flexible",  # no longer asked (2026-11-24); the column stays
+        **body.model_dump(),
     )
     db.add(req)
     store_of(db, pharmacy_id).request_id = req.id
     pharmacy = db.get(Pharmacy, pharmacy_id)
     notify(
         db,
-        staff_ids(db),
+        support_ids(db),
         "storeRequest",
         {"pharmacy": pharmacy.name if pharmacy else "", "store": body.store_name},
-        "/admin/boutiques",
+        "boutiques",
     )
     db.flush()
     db.add(
@@ -128,18 +132,6 @@ def patch_request(
     db.commit()
     db.refresh(req)
     return request_out(db, req)
-
-
-@router.patch("/requests/{request_id}/featured-categories", response_model=CustomizationOut)
-def patch_featured_categories(
-    request_id: RequestId, body: FeaturedCategoriesIn, pharmacy_id: OwnerDep, db: DbDep
-) -> CustomizationOut:
-    """The categories shown first on the store's home page (the owner's choice)."""
-    cust = customization_of(own_request_or_404(db, request_id, pharmacy_id))
-    cust.featured_category_ids = body.featured_category_ids
-    db.commit()
-    db.refresh(cust)
-    return customization_out(cust)
 
 
 @router.post("/my-request/logo", response_model=CustomizationOut)

@@ -30,9 +30,8 @@ export default defineConfig([
   },
   {
     // Pages use the atoms (Button, Input, Select, Textarea): one look everywhere. Only a file input stays raw.
-    files: ["src/pages/**/*.tsx"],
-    // The storefront templates draw the pharmacy's own site (its look, not the app's).
-    ignores: ["src/pages/store/_templates/**"],
+    files: ["src/pages/**/*.tsx", "src/_components/pages/**/*.tsx"],
+    // The storefront (src/storefront/) draws the pharmacy's own site with its own look: not under this rule.
     rules: {
       "no-restricted-syntax": [
         "error",

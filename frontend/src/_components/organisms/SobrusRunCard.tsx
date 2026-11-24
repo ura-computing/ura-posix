@@ -4,6 +4,7 @@
  *  - `SobrusRunCard`: owners with « Connexion Sobrus » (every page but /sobrus, which shows the whole run);
  *  - `AdminSobrusImportCard`: the admin's Catalogue « Importer les produits depuis Sobrus », on every page (the owner
  *    whose Sobrus account it reads never sees it). */
+import { useMe } from "@/hooks/useMe";
 import { Ban, CheckCircle2, ChevronDown, CircleAlert, CloudDownload, RefreshCw, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -11,7 +12,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAdminSobrusImportWatcher } from "@/hooks/useAdminSobrusImportWatcher";
 import { useSobrusRunWatcher } from "@/hooks/useSobrusRunWatcher";
 import { useT } from "@/i18n/I18nProvider";
-import { ROUTES, type SobrusRun } from "@/types";
+import { type SobrusRun } from "@/types";
 import { cn } from "@/utils/cn";
 import { formatDateTime, formatNumStr } from "@/utils/format";
 import { currentStep, eventText, fileName, modeName, runResult } from "@/utils/sobrus";
@@ -190,11 +191,13 @@ function RunCornerCard({
 
 export function SobrusRunCard() {
   const t = useT();
+  const { me } = useMe();
+  const role = me?.role;
   const nav = useNavigate();
   const { pathname } = useLocation();
   const { activeRun, endedRun, dismissEnded, cancelRun, isCancelling } = useSobrusRunWatcher();
   const run = activeRun ?? endedRun;
-  if (!run || pathname === ROUTES.SOBRUS) return null; // its page shows the whole run
+  if (!run || pathname === `/${role}/sobrus`) return null; // its page shows the whole run
   const running = run === activeRun;
   return (
     <RunCornerCard
@@ -206,7 +209,7 @@ export function SobrusRunCard() {
       label={running ? currentStep(t, run) : modeName(t, run)}
       added={t("sobrus.addedSoFar", { n: formatNumStr(run.lines_added) })}
       result={runResult(t, run)}
-      onOpen={() => nav(ROUTES.SOBRUS)}
+      onOpen={() => nav(`/${role}/sobrus`)}
       onStop={run.mode !== "check" ? () => void cancelRun(run.id) : null}
       isStopping={isCancelling}
       onDismiss={dismissEnded}
@@ -217,6 +220,8 @@ export function SobrusRunCard() {
 
 export function AdminSobrusImportCard() {
   const t = useT();
+  const { me } = useMe();
+  const role = me?.role;
   const nav = useNavigate();
   const { activeRun, endedRun, pharmacyName, dismissEnded, cancelImport, isCancelling } =
     useAdminSobrusImportWatcher(true);
@@ -233,7 +238,7 @@ export function AdminSobrusImportCard() {
       label={running ? currentStep(t, run) : t("catalogue.sobrusImport")}
       added={t("catalogue.sobrusAddedSoFar", { n: formatNumStr(run.lines_added) })}
       result={runResult(t, run)}
-      onOpen={() => nav(ROUTES.ADMIN_CATALOGUE)}
+      onOpen={() => nav(`/${role}/catalogue`)}
       onStop={() => void cancelImport()}
       isStopping={isCancelling}
       onDismiss={dismissEnded}

@@ -463,7 +463,7 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
     },
     "admin (seed)",
   );
-  expectSame(byEmail("dev@gmail.com"), { role: "developer", status: "active", pharmacy: null }, "développeur (seed)");
+  expectSame(byEmail("support@gmail.com"), { role: "support", status: "active", pharmacy: null }, "Support (seed)");
   expectSame(
     byEmail("owner@gmail.com"),
     {
@@ -502,7 +502,7 @@ test("utilisateurs : tous les comptes, même sans pharmacie ; assigner une pharm
 
   await test.step("filtre « Sans pharmacie »", async () => {
     await page.getByRole("button", { name: "Sans pharmacie", exact: true }).click();
-    for (const email of ["admin@gmail.com", "dev@gmail.com", O.email]) {
+    for (const email of ["admin@gmail.com", "support@gmail.com", O.email]) {
       await expect(page.getByRole("row", { name: new RegExp(email) }), email).toBeVisible();
     }
     await expect(page.getByRole("row", { name: /owner@gmail\.com/ })).toHaveCount(0);

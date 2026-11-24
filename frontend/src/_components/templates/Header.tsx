@@ -11,7 +11,7 @@ import { cn } from "@/utils/cn";
 import { NotificationBell } from "@/_components/organisms/NotificationBell";
 import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
-import { navTitle } from "@/_components/templates/nav";
+import { ROLE_ROUTES, ROUTES } from "@/routes";
 
 function LanguageToggle() {
   const { lang, setLang, t } = useI18n();
@@ -57,7 +57,11 @@ export function Header({ onOpenMobile }: HeaderProps) {
   const { pathname } = useLocation();
   const { me } = useMe();
   const t = useT();
-  const title = t(navTitle(pathname));
+  // The sidebar label of the page shown (a product sheet: « Produits »).
+  const page = me
+    ? ROLE_ROUTES[me.role as Role].find((r) => r.nav && (pathname === r.path || pathname.startsWith(`${r.path}/`)))
+    : undefined;
+  const title = t(pathname === ROUTES.ME ? "nav.compte" : (page?.nav?.label ?? "nav.dashboard"));
   const code = me?.pharmacy?.code;
   const roleLabel = me ? t(ROLE_KEYS[me.role]) : "";
 

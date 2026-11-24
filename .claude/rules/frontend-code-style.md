@@ -9,7 +9,10 @@ paths:
 
 | What | Where |
 |---|---|
-| A page | `pages/<feature>/<route>/index.tsx` + its `hooks.ts` (+ `_components/` used by that page only) |
+| Every address | `routes.ts`: one object `ROLE_ROUTES` (public · guest · signedIn · admin · support · owner · employee), full paths written out (`"/owner/ventes"`); `App.tsx` and the sidebar read it |
+| A page of one role | `pages/<role>/<page>/index.tsx` + its `hooks.ts` (+ `_components/` used by that page only); no role: `pages/common/` |
+| A page of 2+ roles | `_components/pages/<page>/` (body + hooks); `routes.ts` points to it for each role; a link inside it: `` `/${me?.role}/ventes` `` |
+| No made-up helpers | no wrappers that only rename / group (`STAFF`, `isStaff`, `rolePath`, re-export files): write the plain value |
 | Shared UI | `src/_components/atoms/` (one control) → `molecules/` (2+ atoms) → `organisms/` (app blocks) → `templates/` (`Page`, `AppLayout`), `routing/` (`Require*`). README §6.3 lists them |
 | Every backend call | `api/api.ts`: read `API.<group>.<action> = { url, key }`, write `{ url, refreshes }`; after a write `refresh(qc, API.x.write)` |
 | An app-wide hook | `hooks/use….ts(x)`: every file of a `hooks/` folder starts with `use` (`useMe.ts`, `useUpload.tsx`); a helper that is not a hook goes in `utils/` |

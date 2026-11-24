@@ -8,7 +8,7 @@ export interface NotificationOut {
   kind: NotificationKind;
   /** The text's values, e.g. { n: 12 }, { store: "…", state: "en_cours" }. */
   params: Record<string, string | number>;
-  /** The page it opens, e.g. "/admin/boutiques". */
+  /** The page it opens, after the user's role: "boutiques" → /support/boutiques. */
   link: string | null;
   created_at: string;
   read_at: string | null;

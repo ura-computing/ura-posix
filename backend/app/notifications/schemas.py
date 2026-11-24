@@ -13,7 +13,7 @@ class NotificationOut(BaseModel):
     id: int
     kind: str  # the text: `notifications.<kind>` with `params`
     params: dict
-    link: str | None  # the page it opens, e.g. "/admin/boutiques"
+    link: str | None  # the page it opens, after the user's role: "boutiques" → /support/boutiques
     created_at: datetime
     read_at: datetime | None
 

@@ -18,7 +18,6 @@ from app.ledger.schemas import Pagination
 # ─── shared literals ────────────────────────────────────────────────────────
 
 RequestStateLiteral = Literal["soumise", "prise_en_charge", "en_cours", "livree", "cloturee"]
-UrgencyLiteral = Literal["asap", "ce_mois", "flexible"]
 TemplateLiteral = Literal["classique", "moderne", "lumiere", "apotheose", "elegance"]
 FontPairingLiteral = Literal["classique", "moderne", "editorial"]
 
@@ -34,7 +33,6 @@ class WebsiteRequestCreate(BaseModel):
     brand_palette: list[str] = Field(..., min_length=2, max_length=3)
     phone: str = Field(..., min_length=6, max_length=32)
     custom_domain: str | None = Field(None, max_length=255)
-    urgency: UrgencyLiteral
     vision: str | None = Field(None, max_length=2000)
 
 
@@ -46,14 +44,7 @@ class WebsiteRequestPatch(BaseModel):
     brand_palette: list[str] | None = Field(None, min_length=2, max_length=3)
     phone: str | None = Field(None, min_length=6, max_length=32)
     custom_domain: str | None = Field(None, max_length=255)
-    urgency: UrgencyLiteral | None = None
     vision: str | None = Field(None, max_length=2000)
-
-
-class FeaturedCategoriesIn(BaseModel):
-    """PATCH /v1/store-website/requests/{id}/featured-categories — the owner's pick, e.g. ["beaute", "bebe"]."""
-
-    featured_category_ids: list[str] = Field(..., max_length=50)
 
 
 # ─── Support-side ──────────────────────────────────────────────────────────
@@ -118,7 +109,6 @@ class WebsiteRequestOut(BaseModel):
     brand_palette: list[str]
     phone: str
     custom_domain: str | None
-    urgency: str
     vision: str | None
     state: str
     claimed_by: ClaimedByOut | None = None

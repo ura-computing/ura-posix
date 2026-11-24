@@ -1,5 +1,5 @@
 /** The big « Retour à la liste … » at the top of a detail page (easy to spot; the top bar already shows where we
- *  are). Example: `<BackLink to={ROUTES.PRODUITS} label={t("products.backToList")} />`. */
+ *  are). Example: `<BackLink to={`/${role}/produits`} label={t("products.backToList")} />`. */
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 
