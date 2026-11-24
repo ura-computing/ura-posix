@@ -25,7 +25,7 @@ Updated 2026-11-12. One list, top to bottom. Open items only: a step leaves this
 Detail: `.claude/plans/frontend-by-role.md`
 
 ```
-1.1 folders   →   1.2 routes   →   1.3 no abstractions   →   1.4 store models   →   1.5 tests (last) → commit + push
+1.1 folders ✓   →   1.2 routes ✓   →   1.3 no abstractions ✓   →   1.4 store models ✓   →   1.5 tests (last) → commit + push
 ```
 
 ```
@@ -38,7 +38,7 @@ src/
 │   ├── pages/      page bodies shared by 2+ roles (Ventes, Catalogue…)
 │   └── atoms · molecules · organisms · templates
 ├── routes.ts       ROLE_ROUTES: public · guest · signedIn · admin · support · owner · employee (full paths)
-└── storefront/     the 5 store models + the downloaded site
+└── storefront/     ui/ = the 4 store pages (one design system) · templates/<model>/ = look + hero · kit/ = the downloaded site
 ```
 
 | Role | Prefix | Example |

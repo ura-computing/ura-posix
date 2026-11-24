@@ -3,7 +3,7 @@
  *  The preview page (`/preview/:template/:page?request=…`, shown in the editor's frame) loads both and renders
  *  `TEMPLATE_REGISTRY[template].pages[page](props)`. A downloaded store will load the same data with its token. */
 
-import type { StoreProductDetail, StoreProductsPage, StoreSummary } from "@/types/storeWebsite";
+import type { FontPairing, StoreProductDetail, StoreProductsPage, StoreSummary } from "@/types/storeWebsite";
 
 /** The 4 pages every model implements. */
 export type StorePage = "home" | "catalogue" | "produit" | "contact";
@@ -31,8 +31,6 @@ export interface SectionConfig {
   /** The section's texts (title, sub, cta…). */
   content: Record<string, string>;
 }
-
-export type FontPairing = "classique" | "moderne" | "editorial";
 
 export interface TemplateCustomization {
   /** The pharmacy's store name (« Pharmacie Demo Shop »), in the header and the footer. */

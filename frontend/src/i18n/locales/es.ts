@@ -1889,7 +1889,6 @@ export const es: Dict = {
     previewNotFound: "Vista previa no encontrada",
     previewNotFoundHint: "Este enlace no existe o ya no está disponible.",
     autoSaveHint: "Cada cambio se guarda solo, medio segundo después.",
-    soon: "Pronto",
     sectionHeroHint: "La foto grande y el título arriba",
     sectionBrandsHint: "Los logos de las marcas vendidas",
     sectionCatalogueHint: "Las secciones de la tienda",

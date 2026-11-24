@@ -1,19 +1,18 @@
 /** Framer Motion variants shared by templates.
  *
  *  Templates should compose these rather than roll their own to keep the
- *  motion vocabulary coherent (blur-in reveals + staggered children +
+ *  motion vocabulary coherent (rise-in reveals + staggered children +
  *  soft entrance). Per-template personality (parallax leaves, 3D tilt,
  *  etc.) stays local to that template's own tsx. */
 
 import type { Variants } from "framer-motion";
 
-/** Blur-in rise, used as the base entrance for every section. */
+/** Rise + fade, the entrance of every section (no blur filter: too slow to draw on big blocks and cheap phones). */
 export const blurUpVariants: Variants = {
-  hidden: { opacity: 0, y: 26, filter: "blur(12px)" },
+  hidden: { opacity: 0, y: 26 },
   show: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: { duration: 0.9, ease: [0.2, 0.7, 0.2, 1] },
   },
 };

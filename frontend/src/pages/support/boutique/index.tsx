@@ -94,7 +94,7 @@ export default function StoreRequestPage() {
                 {t(next.label)}
               </Button>
             )}
-            <Button size="lg" onClick={() => navigate(`/support/boutiques/${id}/editeur`)}>
+            <Button onClick={() => navigate(`/support/boutiques/${id}/editeur`)}>
               {t("store.openEditor")}
               <ArrowRight className="size-4" />
             </Button>

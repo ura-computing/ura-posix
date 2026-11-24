@@ -14,7 +14,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { Badge } from "@/_components/atoms/Badge";
 import { ColorSwatch } from "@/_components/atoms/ColorSwatch";
 import { Spinner } from "@/_components/atoms/Spinner";
 import { ChoiceCard } from "@/_components/molecules/ChoiceCard";
@@ -32,10 +31,9 @@ import {
   type CustomizationOut,
   type CustomizationPatch,
   type EditorSectionKey,
-  type StoreTemplate,
 } from "@/types/storeWebsite";
 
-import { TEMPLATE_REGISTRY } from "@/storefront/templates/registry";
+import { PALETTES } from "@/storefront/templates/_shared/defaultCustomization";
 
 const SECTION_ICON: Record<EditorSectionKey, LucideIcon> = {
   hero: Image,
@@ -48,15 +46,6 @@ const SECTION_ICON: Record<EditorSectionKey, LucideIcon> = {
   footer: PanelBottom,
 };
 const SECTION_KEYS = Object.keys(EDITOR_SECTION_LABEL) as EditorSectionKey[];
-
-/** Each model's own colors (its look before the pharmacy's colors). */
-const TEMPLATE_COLORS: Record<StoreTemplate, string[]> = {
-  lumiere: ["#F4C9D9", "#9BE0C4", "#E9C887"],
-  classique: ["#F4EEDF", "#C9BFA3", "#6B584A"],
-  moderne: ["#F5F5F5", "#0F172A", "#F97316"],
-  apotheose: ["#0A0A0A", "#C7A662", "#F5E6C9"],
-  elegance: ["#1E293B", "#7C3AED", "#F59E0B"],
-};
 
 const COLOR_KEYS = ["primary", "secondary", "accent"] as const;
 const COLOR_LABEL = { primary: "store.colorPrimary", secondary: "store.colorSecondary", accent: "store.colorAccent" };
@@ -101,13 +90,12 @@ export function EditorSettings({
               className="items-start gap-2 p-3"
             >
               <span className="flex items-center gap-1">
-                {TEMPLATE_COLORS[tpl].map((c) => (
+                {Object.values(PALETTES[tpl]).map((c) => (
                   <ColorSwatch key={c} color={c} size="md" />
                 ))}
               </span>
               <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 {TEMPLATE_LABEL[tpl]}
-                {!TEMPLATE_REGISTRY[tpl].ready && <Badge>{t("store.soon")}</Badge>}
               </span>
             </ChoiceCard>
           ))}

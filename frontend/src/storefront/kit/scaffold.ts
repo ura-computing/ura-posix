@@ -1,9 +1,6 @@
 /** The fixed files of a downloaded store site (the templates and `StoreApp.tsx` are added as they are in the app).
  *  `npm install && npm run build` → `dist/`, to put on any static host at the domain typed by Support. */
 
-const FONTS =
-  "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Spectral:wght@400;500&display=swap";
-
 export const scaffold = (storeName: string): Record<string, string> => ({
   "package.json": `${JSON.stringify(
     {
@@ -64,9 +61,6 @@ export default defineConfig({
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${storeName.replace(/[<&>"]/g, "")}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="${FONTS}" />
   </head>
   <body>
     <div id="root"></div>

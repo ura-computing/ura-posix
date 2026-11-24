@@ -1,13 +1,14 @@
 /** « Télécharger le site »: the store's source, made in the browser and downloaded (nothing is kept on the server):
- *  the models + `StoreApp.tsx` as they are in the app, the shared types, the fixed files (`scaffold.ts`) and the
+ *  the models, the pages (`ui/`) + `StoreApp.tsx` as they are in the app, the shared types, the fixed files (`scaffold.ts`) and the
  *  `.env` with the new key. The sources load only now (`import.meta.glob` lazy, `?raw`). */
 import { envFile, scaffold } from "./scaffold";
 
 const TEMPLATES = import.meta.glob("../templates/**/*.{ts,tsx}", { query: "?raw", import: "default" });
+const UI = import.meta.glob("../ui/*.{ts,tsx}", { query: "?raw", import: "default" });
 const KIT = import.meta.glob("./StoreApp.tsx", { query: "?raw", import: "default" });
 const TYPES = import.meta.glob("../../types/storeWebsite.ts", { query: "?raw", import: "default" });
 
-/** Same place as in the app: "../templates/lumiere/Home.tsx" → "src/storefront/templates/lumiere/Home.tsx",
+/** Same place as in the app: "../ui/Home.tsx" → "src/storefront/ui/Home.tsx",
  *  "./StoreApp.tsx" → "src/storefront/kit/StoreApp.tsx", "../../types/storeWebsite.ts" → "src/types/storeWebsite.ts". */
 const zipPath = (path: string) =>
   path.startsWith("../../")
@@ -32,7 +33,7 @@ export async function downloadSite({
   const folder = zip.folder(domain.replace(/[^a-z0-9.-]/gi, "-")) ?? zip;
   for (const [path, text] of Object.entries(scaffold(storeName))) folder.file(path, text);
   folder.file(".env", envFile(apiUrl, key, domain));
-  for (const sources of [TEMPLATES, KIT, TYPES]) {
+  for (const sources of [TEMPLATES, UI, KIT, TYPES]) {
     for (const [path, load] of Object.entries(sources)) folder.file(zipPath(path), (await load()) as string);
   }
   const blob = await zip.generateAsync({ type: "blob" });

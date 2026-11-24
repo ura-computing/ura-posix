@@ -70,15 +70,13 @@ export const DEFAULT_SECTIONS: SectionConfig[] = [
   },
 ];
 
-/** Per-template default customization. Palettes are tuned to each
- *  template's visual personality (Lumière is airy pastels, Apothéose will
- *  be dark + gold, etc.). */
-const PALETTES: Record<StoreTemplate, TemplateCustomization["brandColors"]> = {
+/** Each model's colors before the pharmacy picks its own (the editor shows them on the model's card). */
+export const PALETTES: Record<StoreTemplate, TemplateCustomization["brandColors"]> = {
   lumiere: { primary: "#1FA97E", secondary: "#F4C9D9", accent: "#E9C887" },
-  classique: { primary: "#3D5A3B", secondary: "#D9C7A5", accent: "#8C6A3F" },
-  moderne: { primary: "#0F172A", secondary: "#64748B", accent: "#F97316" },
-  apotheose: { primary: "#0A0A0A", secondary: "#C7A662", accent: "#F5E6C9" },
-  elegance: { primary: "#1E293B", secondary: "#7C3AED", accent: "#F59E0B" },
+  classique: { primary: "#75B239", secondary: "#EDF0F5", accent: "#E86B00" },
+  moderne: { primary: "#0E7C86", secondary: "#DFF3F0", accent: "#5FD3BC" },
+  apotheose: { primary: "#C7A662", secondary: "#2A2620", accent: "#8C6A3F" },
+  elegance: { primary: "#4F7D5C", secondary: "#EEF2EA", accent: "#B45309" },
 };
 
 const FONTS: Record<StoreTemplate, TemplateCustomization["fontPairing"]> = {

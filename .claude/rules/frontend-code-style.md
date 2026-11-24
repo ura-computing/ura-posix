@@ -14,6 +14,7 @@ paths:
 | A page of 2+ roles | `_components/pages/<page>/` (body + hooks); `routes.ts` points to it for each role; a link inside it: `` `/${me?.role}/ventes` `` |
 | No made-up helpers | no wrappers that only rename / group (`STAFF`, `isStaff`, `rolePath`, re-export files): write the plain value |
 | Shared UI | `src/_components/atoms/` (one control) → `molecules/` (2+ atoms) → `organisms/` (app blocks) → `templates/` (`Page`, `AppLayout`), `routing/` (`Require*`). README §6.3 lists them |
+| Online store | `storefront/ui/` = the 4 pages of every model (CSS variables `--sf-*`); a model = `templates/<model>/index.ts` (look + photo) + `Hero.tsx`; `registry.tsx` lists them. No app components inside (the ZIP ships this folder) |
 | Every backend call | `api/api.ts`: read `API.<group>.<action> = { url, key }`, write `{ url, refreshes }`; after a write `refresh(qc, API.x.write)` |
 | An app-wide hook | `hooks/use….ts(x)`: every file of a `hooks/` folder starts with `use` (`useMe.ts`, `useUpload.tsx`); a helper that is not a hook goes in `utils/` |
 | A read used by 2+ pages | `hooks/useSharedQueries.ts`, one hook per query |

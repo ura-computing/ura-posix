@@ -60,7 +60,13 @@
 
 ### 1.4 Store models
 
-4 more models (Classique, Moderne, Apothéose, Élégance) from free online templates, on one storefront design system.
+Done 2026-11-24. One design system, 5 models, same 4 pages + addresses for all.
+
+| Folder | Holds |
+|---|---|
+| `storefront/ui/` | `Shell`, `Home` (shared sections), `Catalogue`, `Produit`, `Contact`, `ProductCard`, `Styles` (fonts + `sf-*` motion), `model.ts` (`StoreModel`, `--sf-*` CSS variables) |
+| `storefront/templates/<model>/` | `index.ts` = look (colors around the pharmacy's 3, fonts, corners, shadow) + one Unsplash photo; `Hero.tsx` = its own hero |
+| Sources | Classique ← Pharmative (Colorlib, Nunito, green #75B239); Moderne ← Clinova (teal #0E7C86, ink #0F2A37); Élégance ← Clinova Senior Care (sage #4F7D5C); Apothéose = dark + gold. Palette + layout ideas only, no code / images copied |
 
 ### 1.5 Tests (last)
 

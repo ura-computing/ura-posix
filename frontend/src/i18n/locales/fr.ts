@@ -1902,7 +1902,6 @@ export const fr = {
     previewNotFound: "Aperçu introuvable",
     previewNotFoundHint: "Ce lien n'existe pas ou n'est plus disponible.",
     autoSaveHint: "Chaque changement est enregistré tout seul, une demi-seconde après.",
-    soon: "Bientôt",
     sectionHeroHint: "La grande photo et le titre en haut",
     sectionBrandsHint: "Les logos des marques vendues",
     sectionCatalogueHint: "Les rayons du magasin",
