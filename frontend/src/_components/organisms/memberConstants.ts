@@ -13,6 +13,7 @@ import {
   Package,
   PackagePlus,
   PackageX,
+  HandHeart,
   Printer,
   RefreshCw,
   type LucideIcon,
@@ -32,7 +33,8 @@ export type FeatureKey =
   | "sobrus"
   | "labels"
   | "orders"
-  | "damaged";
+  | "damaged"
+  | "promis";
 
 export interface FeatureDef {
   key: FeatureKey;
@@ -59,6 +61,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "produits", label: "adminFeat.produits", description: "adminFeat.produitsD", icon: Package },
   { key: "sobrus", label: "adminFeat.sobrus", description: "adminFeat.sobrusD", icon: RefreshCw, ownerOnly: true },
   { key: "damaged", label: "adminFeat.damaged", description: "adminFeat.damagedD", icon: PackageX },
+  { key: "promis", label: "adminFeat.promis", description: "adminFeat.promisD", icon: HandHeart },
   { key: "labels", label: "adminFeat.labels", description: "adminFeat.labelsD", icon: Printer, premium: true },
   { key: "orders", label: "adminFeat.orders", description: "adminFeat.ordersD", icon: PackagePlus, premium: true },
 ];
@@ -89,5 +92,6 @@ export const ROLE_LABEL = {
   owner: "adminFeat.roleOwner",
   employee: "adminFeat.roleEmployee",
   support: "roles.support",
+  admin: "roles.admin",
 } as const;
 export const STATUS_LABEL = { active: "adminFeat.statusActive", inactive: "adminFeat.statusInactive" } as const;

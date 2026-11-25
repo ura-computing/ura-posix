@@ -33,6 +33,9 @@ Decided already (user, 2026-11-24):
 | Owner discounts (Q-D2) | the owner sets, per product, **a counter discount** (shown in Promis) **and** the online store promo (exists) |
 | Other picks | Sobrus product list `.xlsx`, admin + Support only · Promis for owner + employees, permission ON by default · customer list per pharmacy · Promis line may be a product outside the catalogue (typed name) · purchasing-groups screen built empty · unknown wholesalers / delivery times shown « inconnu » until typed · 2–3 Hugging Face models tested on the 25 files before choosing · small automatic tests for the discount formulas (engine only) · admin ticks the exact products of each lab rule |
 | Home delivery (Q-C3) | **not now**: pickup at the pharmacy only |
+| Reserve without stock (2026-11-25) | « Rendre prêt » with too little free stock (Sobrus stock only arrives at the nightly import) → **allowed + orange warning**; the reservation still counts |
+| Promis access (2026-11-25) | own feature `promis`, ON for every pharmacy / owner / employee; menu group « Commandes » |
+| Build order of C (2026-11-25) | C-1 tables + wizard + list → C-2 sheet + states + reservation → C-3 WhatsApp + reminders + dashboard + J+7 expiry → C-4 counter discount; stop after each |
 | AWS | the whole app may move to AWS if cheaper; then plan microservices (separate decision, not in this plan). The AI reader is built as its own service already |
 | Docs `resources/suppliers-stuff/` (25 files) | same content as the board; **no wholesaler, no purchasing group, no delivery days / cut-off / lead time** anywhere |
 
@@ -182,13 +185,17 @@ Menu « Commandes » → Journalières · Directes · Promis · Avoirs.
 
 | Table | Holds | Example |
 |---|---|---|
-| `suppliers` | wholesalers, labs, distributors: name, kind (grossiste / laboratoire / distributeur), contact, phone, payment, delivery days, cut-off, lead time, transport fees, status | Bottu · laboratoire · 05 22 67 51 51 · chèque comptant · CTM |
+| `suppliers` | wholesalers, labs, distributors: name, kind (grossiste / laboratoire / distributeur), contact, phone, payment, delivery days, cut-off, lead time, ordering channel (téléphone / fax / e-mail / WhatsApp / EDI / délégué), transport fees + free from (MAD), status | Bottu · laboratoire · 05 22 67 51 51 · chèque comptant · CTM |
 | `purchasing_groups` + `…_members` | groups and which pharmacies belong | (none known yet: Q-D5) |
 | `supplier_conditions` | one rule: scope (supplier / product / list / order), kind (minimum, quantity tiers, amount tiers, product discount, pack, payment discount, transport, packaging multiple, return rule), basis (units / MAD / references), value(s), valid from → to, state (confirmé / non vérifié / manquant), source, version | Afric-Phar · tiers on units · 100 → 20 %, 200 → 23 %, 300 → 25 % · confirmé |
 | `condition_products` | which products a rule covers (explicit list, never « all the lab ») | Strepsils rule → the Strepsils products |
 | `condition_history` | old versions, never deleted | |
 
 Import of the board: 5 labs complete + 16 « à compléter » (state « non vérifié », only what is written). Unknowns stay
+Board check (2026-11-25): the 5 fields missing for all 21 labs = delivery days, cut-off, lead time, ordering channel,
+transport fees; the board says they will come from the « talks » (WhatsApp with the delegates), not in the 25 files.
+Most documents date from 2023–2024 → every imported rule stays « non vérifié » until the admin confirms it is still
+true; GSK « FD » + currency and Afric-Phar 1,5 % / 60 j stay flagged.
 empty and visible: Afric-Phar « 4 000–5 000 DH → 7 % » scope, GSK « FD » + currency, Pharma5 « 90 jours »,
 Classeur1 = no lab name, Anginib PPH > PPV.
 
@@ -314,3 +321,14 @@ How: one page at a time, a list of what breaks the rule (screenshot + file), the
 ## 9. Questions
 
 All answered 2026-11-24: see the decisions table at the top.
+
+## Resume here (2026-11-25, session stopped for token use)
+
+- C-1 + C-2 built (not committed): migration 0047 applied on dev, `backend/app/promis/`, menu « Commandes » →
+  « Promis »: list, wizard (tabs « Client déjà enregistré » / « Nouveau client »), sheet `/promis/:id` with steps
+  (`NEXT` in router.py), pop-up per step, « Prêt » reserves 7 days (orange warning when free stock low), product sheet
+  shows « Réservées (promis) ». Waiting for the user's UI test, then C-3 (WhatsApp, reminders, dashboard, J+7 expiry,
+  deadline filter).
+- To do (user 2026-11-25): no « Premium » anywhere. Étiquette (`labels`) + Commander (`orders`) = normal accesses the
+  admin / owner switch on/off, OFF by default for a new pharmacy; remove the word « Premium », PremiumTag and the
+  upgrade dialog (`PremiumDialog`). Promis + Stock abîmé stay ON by default.

@@ -9,6 +9,7 @@ import {
   Building2,
   Coins,
   Globe,
+  HandHeart,
   History,
   LayoutDashboard,
   Package,
@@ -45,7 +46,11 @@ export interface AppRoute {
   /** The permission it needs (owner / employee pages). */
   feature?: Feature;
   /** Its sidebar link; none = reached from another page. `bottom`: above « Mon compte ». */
-  nav?: { label: string; icon: LucideIcon; group: "top" | "exploitation" | "gestion" | "administration" | "bottom" };
+  nav?: {
+    label: string;
+    icon: LucideIcon;
+    group: "top" | "exploitation" | "commandes" | "gestion" | "administration" | "bottom";
+  };
 }
 
 export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRoute[]> = {
@@ -177,6 +182,14 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       nav: { label: "nav.stockAbime", icon: PackageX, group: "exploitation" },
     },
     {
+      path: "/owner/promis",
+      load: () => import("@/_components/pages/promis"),
+      feature: "promis",
+      nav: { label: "nav.promis", icon: HandHeart, group: "commandes" },
+    },
+    { path: "/owner/promis/nouveau", load: () => import("@/_components/pages/promis/new"), feature: "promis" },
+    { path: "/owner/promis/:id", load: () => import("@/_components/pages/promis/sheet"), feature: "promis" },
+    {
       path: "/owner/analyses",
       load: () => import("@/_components/pages/analytics/analyses"),
       feature: "analyse",
@@ -267,6 +280,14 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       feature: "damaged",
       nav: { label: "nav.stockAbime", icon: PackageX, group: "exploitation" },
     },
+    {
+      path: "/employee/promis",
+      load: () => import("@/_components/pages/promis"),
+      feature: "promis",
+      nav: { label: "nav.promis", icon: HandHeart, group: "commandes" },
+    },
+    { path: "/employee/promis/nouveau", load: () => import("@/_components/pages/promis/new"), feature: "promis" },
+    { path: "/employee/promis/:id", load: () => import("@/_components/pages/promis/sheet"), feature: "promis" },
     {
       path: "/employee/analyses",
       load: () => import("@/_components/pages/analytics/analyses"),

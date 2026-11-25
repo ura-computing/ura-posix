@@ -11,13 +11,13 @@ export interface MemberOut {
   id: number;
   full_name: string | null;
   email: string;
-  role: MemberRole;
+  role: AccountRole;
   status: MemberStatus;
   granted_permissions: string[];
 }
 
 /** Who a create / reset dialog talks about: a pharmacy member or a Support person. */
-export type AccountRole = MemberRole | "support";
+export type AccountRole = MemberRole | "support" | "admin";
 export interface AccountRef {
   id: number;
   full_name: string | null;

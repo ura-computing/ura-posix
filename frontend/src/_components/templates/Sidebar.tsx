@@ -163,6 +163,7 @@ export function Sidebar({
             [
               ["top", null],
               ["exploitation", "nav.groupExploitation"],
+              ["commandes", "nav.groupCommandes"],
               ["gestion", "nav.groupGestion"],
               ["administration", "nav.groupAdministration"],
             ] as const

@@ -124,6 +124,18 @@ def _apply_features_bulk(db, pharmacy_id: int, features: dict[str, bool]) -> Non
             db.add(PharmacyFeature(pharmacy_id=pharmacy_id, feature=key, enabled=bool(enabled)))
 
 
+# Who changes whom: Support → admin → owner → employee (the owner's own page: his employees only).
+_RANK = {"employee": 0, "owner": 1, "admin": 2, "support": 3}
+
+
+def _above(actor: User, target: User | None = None) -> None:
+    """One adds / changes / deletes only an account below his own; Support also the other Support accounts.
+    `target` None = a new Support account. Example: the admin resetting the password of Support → 403 `supportOnly`."""
+    role = target.role if target else "support"
+    if _RANK[actor.role] <= _RANK[role] and not actor.role == role == "support":
+        raise ApiError(403, ErrorCode.SUPPORT_ONLY, "Seul le Support peut modifier ce compte.")
+
+
 def _get_member_or_404(db, user_id: int) -> User:
     """Target user by id, else 404. Callers add their own admin-role guard. A `pending`
     account (sign-up not accepted yet) is handled in « Demandes » only."""
@@ -356,20 +368,25 @@ def create_user(
 @router.post("/admin/users/{user_id}/reset-password", response_model=ResetPasswordOut)
 def reset_user_password(
     body: ResetPasswordIn,
+    actor: AdminDep,
     db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> ResetPasswordOut:
     """Set the password the admin typed. Invalidates active sessions via
     token_version bump so the user must log in with the new password."""
     target = _get_member_or_404(db, user_id)
+    _above(actor, target)
     reset_member_password(db, target, body.password)
     return ResetPasswordOut(user_id=target.id)
 
 
 @router.post("/admin/users/{user_id}/reset-pin", response_model=ResetPasswordOut)
-def reset_user_pin(body: ResetPinIn, db: DbDep, user_id: Annotated[int, Path(ge=1)]) -> ResetPasswordOut:
+def reset_user_pin(
+    body: ResetPinIn, actor: AdminDep, db: DbDep, user_id: Annotated[int, Path(ge=1)]
+) -> ResetPasswordOut:
     """Set the lock-screen code the admin typed."""
     target = _get_member_or_404(db, user_id)
+    _above(actor, target)
     reset_member_pin(db, target, body.pin)
     return ResetPasswordOut(user_id=target.id)
 
@@ -377,14 +394,16 @@ def reset_user_pin(body: ResetPinIn, db: DbDep, user_id: Annotated[int, Path(ge=
 @router.patch("/admin/users/{user_id}/status", response_model=MemberOut)
 def set_user_status(
     body: StatusPatchIn,
+    actor: AdminDep,
     db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> MemberOut:
     """Toggle active <-> inactive. Going inactive also bumps token_version
-    so existing sessions die immediately."""
+    so existing sessions die immediately. An admin account: Support only (Support is above the admin)."""
     target = _get_member_or_404(db, user_id)
-    if target.role == "admin":
-        raise ApiError(400, ErrorCode.ADMIN_STATUS_LOCKED, "Impossible de modifier le statut d'un administrateur.")
+    if target.role == "admin" and actor.role != "support":
+        raise ApiError(400, ErrorCode.ADMIN_STATUS_LOCKED, "Seul le Support peut désactiver un administrateur.")
+    _above(actor, target)
     set_member_status(db, target, body.status)
     return member_out(db, target)
 
@@ -460,14 +479,16 @@ def assign_user_pharmacy(
 
 @router.delete("/admin/users/{user_id}", status_code=204)
 def delete_user(
+    actor: AdminDep,
     db: DbDep,
     user_id: Annotated[int, Path(ge=1)],
 ) -> None:
-    """Hard-delete a non-admin user. Cascades drop UserPermission rows (FK
-    ondelete=CASCADE). For 'soft remove access' use PATCH /status instead."""
+    """Hard-delete a user; an admin account: Support only (Support is above the admin). Cascades drop
+    UserPermission rows (FK ondelete=CASCADE). For 'soft remove access' use PATCH /status instead."""
     target = _get_member_or_404(db, user_id)
-    if target.role == "admin":
-        raise ApiError(400, ErrorCode.ADMIN_NOT_DELETABLE, "Impossible de supprimer un administrateur.")
+    if target.role == "admin" and actor.role != "support":
+        raise ApiError(400, ErrorCode.ADMIN_NOT_DELETABLE, "Seul le Support peut supprimer un administrateur.")
+    _above(actor, target)
     db.delete(target)
     db.commit()
 
@@ -482,8 +503,9 @@ def list_support(db: DbDep) -> list[SupportAccountRow]:
 
 
 @router.post("/admin/support", response_model=SupportAccountRow, status_code=201)
-def create_support(body: SupportCreateIn, db: DbDep) -> SupportAccountRow:
-    """A Support account: active at once, no pharmacy, every right of the admin."""
+def create_support(body: SupportCreateIn, actor: AdminDep, db: DbDep) -> SupportAccountRow:
+    """A Support account (added by Support only): active at once, no pharmacy, every right of the admin and more."""
+    _above(actor)
     if db.query(User).filter(User.email == body.email).first():
         raise ApiError(409, ErrorCode.EMAIL_TAKEN, "Un utilisateur avec cet email existe déjà.")
     return support_row(add_support(db, email=body.email, name=body.full_name, password=body.password))

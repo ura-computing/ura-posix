@@ -1,6 +1,6 @@
 /** /owner/ma-boutique — « Ma boutique en ligne » (owner). No request yet: ask for it step by step (`RequestWizard`).
  *  Sent: 4 tabs (in the URL, ?tab=…), changes show on the site at once, live too:
- *    Ma demande — where it stands (`Stepper`), what was asked, « Modifier » while « Envoyée »
+ *    Ma demande — what was asked (left), where it stands (vertical `Stepper`, right), « Modifier » while « Envoyée »
  *    Produits   — show / hide each product, promo prices
  *    Catégories — which categories the site shows
  *    Packs      — several products at one price */
@@ -125,34 +125,36 @@ export default function MyStorePage() {
       {tab === "categories" && <CategoriesTab />}
       {tab === "packs" && <PacksTab />}
       {tab === "request" && (
-        <>
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1fr_320px]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <SectionCard title={t("store.theRequest")}>
+              <FieldList
+                fields={[
+                  { label: t("myStore.storeName"), value: request.store_name },
+                  { label: t("myStore.whatsapp"), value: <span className="font-mono">{request.phone}</span> },
+                  { label: t("store.colors"), value: <PaletteSwatches colors={request.brand_palette} /> },
+                  { label: t("myStore.domain"), value: request.custom_domain || t("store.noDomain") },
+                  { label: t("myStore.wishes"), value: request.vision || t("store.noWishes") },
+                ]}
+              />
+            </SectionCard>
+            <SectionCard title={t("myStore.dangerTitle")}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">{t("myStore.deleteHint")}</p>
+                <Button variant="danger-outline" onClick={() => setDeleteOpen(true)}>
+                  <Trash2 className="size-4" />
+                  {t("myStore.delete")}
+                </Button>
+              </div>
+            </SectionCard>
+          </div>
           <SectionCard title={t("store.steps")}>
             <Stepper
+              vertical
               steps={REQUEST_STATE_ORDER.map((s) => t(REQUEST_STATE_LABEL[s]))}
               current={REQUEST_STATE_ORDER.indexOf(request.state)}
             />
             <p className="text-sm text-muted-foreground">{t(`myStore.stateHint_${request.state}`)}</p>
-          </SectionCard>
-
-          <SectionCard title={t("store.theRequest")}>
-            <FieldList
-              fields={[
-                { label: t("myStore.storeName"), value: request.store_name },
-                { label: t("myStore.whatsapp"), value: <span className="font-mono">{request.phone}</span> },
-                { label: t("store.colors"), value: <PaletteSwatches colors={request.brand_palette} /> },
-                { label: t("myStore.domain"), value: request.custom_domain || t("store.noDomain") },
-                { label: t("myStore.wishes"), value: request.vision || t("store.noWishes") },
-              ]}
-            />
-          </SectionCard>
-          <SectionCard title={t("myStore.dangerTitle")}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">{t("myStore.deleteHint")}</p>
-              <Button variant="danger-outline" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="size-4" />
-                {t("myStore.delete")}
-              </Button>
-            </div>
           </SectionCard>
           <ConfirmDialog
             open={deleteOpen}
@@ -166,7 +168,7 @@ export default function MyStorePage() {
               setDeleteOpen(false);
             }}
           />
-        </>
+        </div>
       )}
     </Page>
   );

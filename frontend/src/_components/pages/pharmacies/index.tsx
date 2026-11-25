@@ -24,7 +24,7 @@ import type {
   PharmacyListRow,
   AdminUserRow,
   MemberOut,
-  MemberRole,
+  AccountRole,
   MemberStatus,
   PharmacyIn,
 } from "@/types/members";
@@ -53,6 +53,8 @@ import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/
 import { Page } from "@/_components/templates/Page";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { Badge } from "@/_components/atoms/Badge";
+import { useMe } from "@/hooks/useMe";
+import { ROLES } from "@/types";
 
 /** « Pharmacies » tab of /admin/pharmacies — the pharmacies list (was the
  *  whole page before the « Utilisateurs » tab). The TanStack hooks return
@@ -236,12 +238,15 @@ const toMember = (u: AdminUserRow): MemberOut => ({
   full_name: u.full_name,
   email: u.email,
   granted_permissions: u.granted_permissions,
-  role: u.role as MemberRole,
+  role: u.role as AccountRole,
   status: u.status as MemberStatus,
 });
 
 function UsersTab() {
   const t = useT();
+  const { me } = useMe();
+  // Support is above the admin: only Support manages an admin account.
+  const canManage = (u: AdminUserRow) => isMember(u) || (u.role === ROLES.ADMIN && me?.role === ROLES.SUPPORT);
   const { users, isLoading: usersLoading, isError: usersError, reload: reloadUsers } = useAdminUsers();
   const { pharmacies } = useAdminPharmaciesList(); // active ones only → assign targets
 
@@ -355,11 +360,11 @@ function UsersTab() {
       align: "right",
       sortable: false,
       render: (u) =>
-        !isMember(u) ? (
+        !canManage(u) ? (
           <span className="text-muted-foreground">—</span>
         ) : (
           <div className="flex items-center justify-end gap-1.5">
-            {!hasActivePharmacy(u) && (
+            {isMember(u) && !hasActivePharmacy(u) && (
               <Button variant="outline" size="sm" onClick={() => setAssignTarget(u)}>
                 <Building2 className="size-3.5" />
                 {t("adminUsers.assign")}
@@ -437,7 +442,11 @@ function UsersTab() {
         title={t("members.removeTitle", {
           who: removeTarget?.full_name ?? removeTarget?.email ?? t("members.thisMember"),
         })}
-        description={t("members.removeDesc", { pharmacy: removeTarget?.pharmacy?.name ?? "—" })}
+        description={
+          removeTarget?.role === ROLES.ADMIN
+            ? t("adminUsers.removeAdminDesc")
+            : t("members.removeDesc", { pharmacy: removeTarget?.pharmacy?.name ?? "—" })
+        }
         onConfirm={async () => {
           if (removeTarget) await deleteUser(removeTarget.id);
           setRemoveTarget(null);

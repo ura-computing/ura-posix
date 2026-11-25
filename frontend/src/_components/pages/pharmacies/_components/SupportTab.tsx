@@ -1,6 +1,6 @@
-/** « Support » tab of /admin/pharmacies: the admin's helpers (role `support`, same rights as the admin, no
- *  pharmacy). Add one (the admin types the password, « Ouvrir dans Gmail »), then the same row menu as a pharmacy
- *  member: reset the password / the lock code, deactivate, delete. */
+/** « Support » tab of /admin/pharmacies: the admin's helpers (role `support`, every right of the admin and above
+ *  it, no pharmacy). Only Support adds one (types the password, « Ouvrir dans Gmail ») and has the row menu (reset
+ *  the password / the lock code, deactivate, delete); the admin sees the list, « Ajouter » disabled with its reason. */
 import { useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 
@@ -12,7 +12,9 @@ import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { FilterBar } from "@/_components/organisms/FilterBar";
 import { MemberKebab } from "@/_components/organisms/MemberKebab";
 import { STATUS_LABEL } from "@/_components/organisms/memberConstants";
+import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
+import { ROLES } from "@/types";
 import type { AccountRef, SupportAccountRow } from "@/types/members";
 import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
@@ -41,6 +43,8 @@ export function SupportTab() {
   const { resetUserPin } = useResetUserPin();
   const { setUserStatus } = useSetUserStatus();
   const { deleteUser } = useDeleteUser();
+  const { me } = useMe();
+  const canManage = me?.role === ROLES.SUPPORT;
 
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -92,25 +96,30 @@ export function SupportTab() {
       label: t("adminUsers.colActions"),
       align: "right",
       sortable: false,
-      render: (s) => (
-        <div className="flex justify-end">
-          <MemberKebab
-            member={s}
-            onResetPassword={() => setResetTarget(toAccount(s))}
-            onResetPin={() => setPinTarget(toAccount(s))}
-            onToggleStatus={() =>
-              void setUserStatus({ userId: s.id, status: s.status === "active" ? "inactive" : "active" })
-            }
-            onRemove={() => setRemoveTarget(s)}
-          />
-        </div>
-      ),
+      render: (s) =>
+        canManage ? (
+          <div className="flex justify-end">
+            <MemberKebab
+              member={s}
+              onResetPassword={() => setResetTarget(toAccount(s))}
+              onResetPin={() => setPinTarget(toAccount(s))}
+              onToggleStatus={() =>
+                void setUserStatus({ userId: s.id, status: s.status === "active" ? "inactive" : "active" })
+              }
+              onRemove={() => setRemoveTarget(s)}
+            />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
   ];
 
   return (
     <>
-      <p className="text-sm text-muted-foreground">{t("adminSupport.intro")}</p>
+      <p className="text-sm text-muted-foreground">
+        {t("adminSupport.intro")} {!canManage && t("adminSupport.supportOnly")}
+      </p>
 
       <FilterBar
         search={{ value: search, onChange: setSearch, placeholder: t("adminSupport.searchPh"), suggestions: null }}
@@ -120,6 +129,7 @@ export function SupportTab() {
             variant: "primary",
             icon: <UserPlus className="size-4" />,
             onClick: () => setCreateOpen(true),
+            disabled: !canManage,
           },
         ]}
       />

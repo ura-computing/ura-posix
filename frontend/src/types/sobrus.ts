@@ -38,6 +38,8 @@ export interface SobrusRun {
   lines_added: number;
   events: SobrusEvent[];
   error_code: string | null;
+  /** Who clicked (null = the nightly robot): the admin's corner card shows to that person only. */
+  created_by: number | null;
   created_at: string;
   started_at: string | null;
   ended_at: string | null;

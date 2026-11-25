@@ -59,7 +59,15 @@ export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
  *  « ≈ N jours de ventes ». */
 function StockBox({ stock }: { stock: ProductStock }) {
   const t = useT();
-  const { current_stock: current, stock_min: min, stock_max: max, coverage_days: days, damaged, free_stock } = stock;
+  const {
+    current_stock: current,
+    stock_min: min,
+    stock_max: max,
+    coverage_days: days,
+    damaged,
+    reserved,
+    free_stock,
+  } = stock;
   const under = current != null && current < min;
   const row = (label: string, value: number) => (
     <span className="flex items-center justify-between gap-6 text-sm">
@@ -77,12 +85,9 @@ function StockBox({ stock }: { stock: ProductStock }) {
       </span>
       {row(t("products.boxMin"), min)}
       {row(t("products.boxMax"), max)}
-      {damaged > 0 && (
-        <>
-          {row(t("damaged.boxDamaged"), damaged)}
-          {free_stock != null && row(t("damaged.boxFree"), free_stock)}
-        </>
-      )}
+      {damaged > 0 && row(t("damaged.boxDamaged"), damaged)}
+      {reserved > 0 && row(t("promis.boxReserved"), reserved)}
+      {(damaged > 0 || reserved > 0) && free_stock != null && row(t("damaged.boxFree"), free_stock)}
       {days != null && (
         <span className={cn("mt-1 text-sm font-medium", under ? "text-warning" : "text-muted-foreground")}>
           {t("products.daysOfSales", { n: days })}

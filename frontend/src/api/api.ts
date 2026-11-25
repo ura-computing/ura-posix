@@ -16,6 +16,7 @@ import type { CatalogFilters } from "@/types/catalog";
 import type { DamageFilters } from "@/types/damaged";
 import type { HistoryFilters } from "@/types/history";
 import type { MovementsFilters, ProductsFilters } from "@/types/products";
+import type { PromisFilters } from "@/types/promis";
 import type { MargeMode, StockFilters } from "@/types/stats";
 import type { SupplierFilters } from "@/types/suppliers";
 import type { AchatsFilters, VentesFilters, VentesFiltersKey } from "@/types/transactions";
@@ -330,6 +331,38 @@ export const API = {
     move: {
       url: (id: number) => `/damaged/${id}`,
       refreshes: (): Read[] => [API.damaged.list, API.products.sheet, API.products.history, API.history.list],
+    },
+  },
+  /** « Promis »: the list; the wizard's customer + product searches; « Créer le promis ». */
+  promis: {
+    list: {
+      url: "/promis",
+      key: (f: PromisFilters) => ["promis", "list", f] as const,
+      all: ["promis", "list"],
+    },
+    customers: {
+      url: "/promis/customers",
+      key: (search: string) => ["promis", "customers", search] as const,
+      all: ["promis", "customers"],
+    },
+    products: {
+      url: "/promis/products",
+      key: (search: string) => ["promis", "products", search] as const,
+      all: ["promis", "products"],
+    },
+    create: {
+      url: "/promis",
+      refreshes: (): Read[] => [API.promis.list, API.promis.customers],
+    },
+    sheet: {
+      url: (id: number) => `/promis/${id}`,
+      key: (id: number) => ["promis", "sheet", id] as const,
+      all: ["promis", "sheet"],
+    },
+    /** One step (« Rendre prêt », « Retiré par le client »…): « Prêt » changes the products' free stock. */
+    move: {
+      url: (id: number) => `/promis/${id}/state`,
+      refreshes: (): Read[] => [API.promis.list, API.promis.sheet, API.promis.products, API.products.sheet],
     },
   },
   history: {

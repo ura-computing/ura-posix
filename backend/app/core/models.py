@@ -47,6 +47,7 @@ ALLOWED_FEATURES = (
     "labels",  # premium: « Étiquette » on the product page
     "orders",  # premium: « Commander » on the product page
     "damaged",  # « Stock abîmé »: boxes declared damaged (app/damaged/)
+    "promis",  # « Promis »: products promised to a customer (app/promis/)
 )
 # Premium: a new pharmacy gets them OFF (the admin switches them on); every other feature ON. Users always get the
 # permission, so the pharmacy switch alone decides.
@@ -422,6 +423,103 @@ class StockDamage(Base):
     created_by_name: Mapped[str] = mapped_column(String, nullable=False)  # kept if the account is deleted
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# Créé → (À commander) → Commandé → Reçu → Prêt (reserved, 7 days) → Retiré; Reçu → Incident → Commandé;
+# Prêt → Expiré (7 days passed) → Rendu au stock; any state before Retiré → Annulé.
+PROMIS_STATES = (
+    "created",
+    "to_order",
+    "ordered",
+    "received",
+    "incident",
+    "ready",
+    "picked_up",
+    "expired",
+    "returned",
+    "cancelled",
+)
+
+
+class Customer(Base):
+    """A customer of one pharmacy (Promis): name, phone (+212…), whether WhatsApp messages are OK."""
+
+    __tablename__ = "customers"
+    __table_args__ = (Index("ix_customers_pharmacy_name", "pharmacy_id", "name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    whatsapp_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class Promis(Base):
+    """« Promis »: what a customer asked for that the pharmacy could not give at once, followed until the customer
+    takes it (`PROMIS_STATES`). `number` counts per pharmacy (« Promis n° 42 »); `pickup_deadline` = 7 days after
+    « Prêt », fixed. Every change is a `PromisEvent`."""
+
+    __tablename__ = "promis"
+    __table_args__ = (
+        UniqueConstraint("pharmacy_id", "number", name="uq_promis_pharmacy_number"),
+        CheckConstraint("state IN (" + ", ".join(f"'{s}'" for s in PROMIS_STATES) + ")", name="ck_promis_state"),
+        Index("ix_promis_pharmacy_state", "pharmacy_id", "state"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    customer_id: Mapped[int] = mapped_column(Integer, ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False, default="created")
+    unreachable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # « client injoignable »
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pickup_deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    created_by_name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+
+class PromisLine(Base):
+    """One product of a Promis: from the catalogue (`medicament_id`) or typed (`name` only); `reserved_qty` = boxes
+    kept for the customer while « Prêt »; `shelf_place` = where the box waits (« tiroir B »)."""
+
+    __tablename__ = "promis_lines"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_promis_lines_quantity"),
+        Index("ix_promis_lines_medicament", "medicament_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    promis_id: Mapped[int] = mapped_column(Integer, ForeignKey("promis.id", ondelete="CASCADE"), nullable=False)
+    medicament_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    reserved_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    shelf_place: Mapped[str | None] = mapped_column(String, nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)  # PPV at creation
+    counter_discount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)  # % at creation
+
+
+class PromisEvent(Base):
+    """One step of a Promis (never edited): from → to, who, why."""
+
+    __tablename__ = "promis_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    promis_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("promis.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_state: Mapped[str | None] = mapped_column(String, nullable=True)
+    to_state: Mapped[str] = mapped_column(String, nullable=False)
+    actor_name: Mapped[str] = mapped_column(String, nullable=False)  # « Robot » for the automatic J+7 expiry
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ProductNote(Base):

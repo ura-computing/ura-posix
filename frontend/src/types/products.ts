@@ -75,7 +75,9 @@ export interface ProductStock {
   current_stock: number | null;
   /** « Boîtes abîmées » still off the free stock. */
   damaged: number;
-  /** current_stock − damaged (never under 0); null when current_stock is null. */
+  /** Boxes kept for customers by « Prêt » promis. */
+  reserved: number;
+  /** current_stock − damaged − reserved (never under 0); null when current_stock is null. */
   free_stock: number | null;
   stock_min: number;
   stock_max: number;

@@ -231,7 +231,8 @@ export function AdminSobrusImportCard({ kind }: { kind: AdminSobrusKind }) {
     true,
   );
   const run = activeRun ?? endedRun;
-  if (!run) return null;
+  // Only the person who clicked « Importer » follows it in the corner (the page's own card shows it to everyone).
+  if (!run || String(run.created_by) !== me?.id) return null;
   const running = run === activeRun;
   return (
     <RunCornerCard

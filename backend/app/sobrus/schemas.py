@@ -24,6 +24,7 @@ class SobrusRunOut(BaseModel):
     lines_added: int
     events: list[dict]  # [{at, code, kind?, year?, n?, start?, end?, error?}]
     error_code: str | None
+    created_by: int | None  # who clicked (None = the nightly robot); the admin's corner card: that person only
     created_at: datetime
     started_at: datetime | None
     ended_at: datetime | None

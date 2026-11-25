@@ -21,6 +21,8 @@ from app.core.utils import normalize_email
 # there's no signup workflow).
 
 MemberRole = Literal["owner", "employee"]
+# A row the admin / Support acts on (« Utilisateurs », « Support » tabs): any account.
+AccountRole = Literal["owner", "employee", "support", "admin"]
 MemberStatus = Literal["active", "inactive"]
 
 
@@ -32,7 +34,7 @@ class MemberOut(BaseModel):
     id: int
     full_name: str | None
     email: str
-    role: MemberRole
+    role: AccountRole
     status: MemberStatus
     granted_permissions: list[str]
     model_config = ConfigDict(from_attributes=True)
