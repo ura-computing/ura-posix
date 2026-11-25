@@ -1,4 +1,4 @@
-import type { MonthlyTrendPoint } from "@/types";
+import type { MonthlyTrendPoint } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { Card } from "@/_components/atoms/Card";
 

@@ -1,5 +1,5 @@
 import { Badge } from "@/_components/atoms/Badge";
-import type { SuffixColor } from "@/types";
+import type { SuffixColor } from "@/types/catalog";
 import { cn } from "@/utils/cn";
 
 const TINT: Record<SuffixColor, { bg: string; fg: string; border: string }> = {

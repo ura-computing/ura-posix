@@ -8,7 +8,7 @@
 import type { ReactNode } from "react";
 
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
-import type { AnalyseMargeRow, MargeMode } from "@/types";
+import type { AnalyseMargeRow, MargeMode } from "@/types/stats";
 import { MatchBadge } from "./_components/MatchBadge";
 
 export interface AnalyseColDef {

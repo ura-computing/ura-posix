@@ -12,8 +12,8 @@ import { Download, Upload, BarChart3, Boxes, Coins, Percent, ShoppingCart, Spark
 import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { FilterBar, type ActiveFilter, type RightAction } from "@/_components/organisms/FilterBar";
-import { MARGE_MODES } from "@/types";
-import type { AnalyseFilters, MargeMode, AnalyseMargeKpis, AnalyseMargeRow, ListeItem } from "@/types";
+import { MARGE_MODES } from "@/types/stats";
+import type { AnalyseFilters, MargeMode, AnalyseMargeKpis, AnalyseMargeRow, ListeItem } from "@/types/stats";
 
 import { useAnalysePage } from "./hooks";
 import { KpiTile } from "@/_components/organisms/KpiTile";

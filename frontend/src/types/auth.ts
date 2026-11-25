@@ -92,11 +92,6 @@ export interface ValidateTokenResponse {
   full_name: string;
 }
 
-export interface SetPasswordRequest {
-  token: string;
-  password: string;
-}
-
 export interface UpdateProfileRequest {
   name: string;
   phone: string;

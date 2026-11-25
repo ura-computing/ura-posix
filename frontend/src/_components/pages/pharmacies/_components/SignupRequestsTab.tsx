@@ -10,7 +10,7 @@ import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { useT } from "@/i18n/I18nProvider";
-import type { SignupRequestRow } from "@/types";
+import type { SignupRequestRow } from "@/types/members";
 import { formatDateTime } from "@/utils/format";
 
 import { useAcceptSignup, useRefuseSignup, useSignupRequests } from "../hooks";

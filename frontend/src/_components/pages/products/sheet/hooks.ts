@@ -11,19 +11,18 @@ import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
+import { ROLES, type Role } from "@/types";
+import { type ProductHistoryResponse } from "@/types/history";
 import {
-  ROLES,
   type EditField,
   type MovementsFilters,
   type ProductEditIn,
   type ProductMovementLine,
   type ProductMovementsResponse,
-  type ProductHistoryResponse,
   type ProductNote,
   type ProductSheet,
   type ProductStats,
-  type Role,
-} from "@/types";
+} from "@/types/products";
 import { PERIOD_PRESETS, currentYear, presetOf, type PeriodPreset } from "@/utils/dateRange";
 
 export const SHEET_TABS = ["general", "stats", "movements", "codes", "history"] as const;

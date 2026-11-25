@@ -12,7 +12,7 @@ import { Segmented } from "@/_components/molecules/Segmented";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { SkeletonCard, SkeletonTile } from "@/_components/molecules/Skeletons";
-import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare } from "@/types";
+import type { MonthFigures, ProductStats, SupplierPrice, SupplierShare } from "@/types/products";
 import { useMonths, useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatMoney, formatNumStr, formatPct, formatQty, pctChange } from "@/utils/format";

@@ -41,15 +41,6 @@ export interface UploadStockResult {
   new_medicaments?: { count: number; sample: string[] };
 }
 
-/** Response from PATCH /v1/uploads/batches/{id} */
-export interface BatchPatchResult {
-  id: number;
-  status: ImportBatchStatus;
-  error_message: string | null;
-  /** Number of Achat/Vente rows the PATCH deleted (only on status='cancelled'). */
-  deleted_rows: number;
-}
-
 /** What a row of « Gestion des imports » is: a file, or the « Clôture de caisse » the Sobrus robot read (read-only). */
 export type ImportKind = DocType | "closing";
 

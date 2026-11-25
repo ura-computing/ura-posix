@@ -8,7 +8,7 @@ import {
   parseSobrusCsv,
   readFileText,
 } from "@/utils/csv";
-import type { DocType } from "@/types";
+import type { DocType } from "@/types/imports";
 
 import { useUploadCtx, type UploadPhase } from "@/hooks/useUpload";
 import { translate } from "@/i18n/I18nProvider";

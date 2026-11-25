@@ -1,7 +1,7 @@
 import { useMe } from "@/hooks/useMe";
 import { TrendingUp, ShieldCheck, TrendingDown, AlertTriangle } from "lucide-react";
-import { type MarginAlertsResponse } from "@/types";
-import type { CategoryType } from "@/types";
+import { type MarginAlertsResponse } from "@/types/stats";
+import type { CategoryType } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";
 import { formatQty, formatMAD } from "@/utils/format";

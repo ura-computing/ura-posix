@@ -1,5 +1,6 @@
 """Login / logout, my account, password flows, my sessions (other devices)."""
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Response, status
@@ -40,7 +41,6 @@ from app.core.security import (
     verify_password,
 )
 from app.core.utils import (
-    generate_token,
     hash_token,
     parse_user_agent,
 )
@@ -114,7 +114,7 @@ def _open_session(db: DbSession, user: User, request: Request, response: Respons
     """A new session for this device (login, after a password change): its row (committed, so its id is in the JWT)
     and both cookies."""
     now = datetime.now(timezone.utc)
-    raw_session_token = generate_token()
+    raw_session_token = secrets.token_urlsafe(32)
     session_row = UserSession(
         user_id=user.id,
         refresh_token_hash=hash_token(raw_session_token),
@@ -267,7 +267,7 @@ def forgot_password(body: ForgotPasswordRequest, request: Request, db: DbDep) ->
     enumeration reason — admin notices via logs."""
     user = db.query(User).filter(User.email == body.email).first()
     if user and user.status == "active":
-        raw = generate_token()
+        raw = secrets.token_urlsafe(32)
         user.reset_token = hash_token(raw)
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRY_MIN)
         db.commit()

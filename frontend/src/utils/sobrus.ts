@@ -2,7 +2,7 @@
  *  (`_components/SobrusRunCard.tsx`) and the admin Catalogue's « Importer les produits depuis Sobrus »: what the robot
  *  does now, each step done, how a run ended. */
 import type { TFn } from "@/i18n/I18nProvider";
-import type { SobrusEvent, SobrusRun } from "@/types";
+import type { SobrusEvent, SobrusRun } from "@/types/sobrus";
 import { formatDate, formatNumStr } from "@/utils/format";
 
 const kindName = (t: TFn, kind: string | null | undefined) =>

@@ -5,7 +5,7 @@ import { KeyRound, Power, RefreshCw, Trash2 } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
 import { KebabItem, KebabMenu } from "@/_components/molecules/KebabMenu";
-import type { MemberOut } from "@/types";
+import type { MemberOut } from "@/types/members";
 
 export function MemberKebab({
   member,

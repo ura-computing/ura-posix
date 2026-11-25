@@ -371,9 +371,3 @@ def col(row: dict[str, Any], *names: str) -> str | None:
         if v:
             return v
     return None
-
-
-# Regex helpers (filename validation — same patterns as the frontend wizard).
-ACHAT_FILENAME_RE = re.compile(r"^Sobrus - Achats \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$", re.I)
-VENTE_FILENAME_RE = re.compile(r"^Sobrus - Ventes \d{4}-\d{2}-\d{2} - \d{4}-\d{2}-\d{2}( \(\d+\))?\.csv$", re.I)
-STOCK_FILENAME_RE = re.compile(r"^Sobrus - Stock \d{8}( \(\d+\))?\.csv$", re.I)

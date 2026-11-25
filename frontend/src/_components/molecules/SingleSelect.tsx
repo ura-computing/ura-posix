@@ -50,7 +50,7 @@ export interface SingleSelectProps {
 
 /** The trigger inside another field: the field draws the border. */
 const INLINE_TRIGGER =
-  "inline-flex cursor-pointer items-center gap-1.5 border-r border-border bg-transparent px-3 font-mono text-sm text-foreground hover:bg-muted/50";
+  "inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-r border-border bg-transparent px-3 text-sm text-foreground hover:bg-muted/50";
 
 export function SingleSelect({
   label,

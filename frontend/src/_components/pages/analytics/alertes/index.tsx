@@ -34,7 +34,7 @@ import type {
   PeremptionBracket,
   StockRow,
   VentesSansAchatResponse,
-} from "@/types";
+} from "@/types/stats";
 import type { DialogDescriptor } from "../hooks";
 import { Page } from "@/_components/templates/Page";
 import { LoadError } from "@/_components/molecules/LoadError";

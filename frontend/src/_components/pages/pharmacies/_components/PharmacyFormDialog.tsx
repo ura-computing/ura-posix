@@ -11,7 +11,7 @@ import { FormField, FormInput } from "@/_components/molecules/FormField";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { Callout } from "@/_components/molecules/Callout";
 import { DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
-import type { PharmacyIn } from "@/types";
+import type { PharmacyIn } from "@/types/members";
 
 const EMPTY: PharmacyIn = {
   name: "",

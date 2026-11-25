@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/utils/cn";
 import { formatMAD, formatPct, formatQty } from "@/utils/format";
 import { ABCD_COLORS } from "@/_components/pages/analytics/constants";
-import type { StockRow } from "@/types";
+import type { StockRow } from "@/types/stats";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- one window for 4 row types
 export interface AlertColumn<T = any> {

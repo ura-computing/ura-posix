@@ -24,7 +24,7 @@ import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/
 import { Switch } from "@/_components/atoms/Switch";
 import { Tooltip } from "@/_components/atoms/Tooltip";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
-import type { MemberOut } from "@/types";
+import type { MemberOut } from "@/types/members";
 
 import { FEATURES, ROLE_LABEL, type FeatureKey } from "@/_components/organisms/memberConstants";
 

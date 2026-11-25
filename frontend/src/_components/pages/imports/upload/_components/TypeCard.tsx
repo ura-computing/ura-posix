@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import type { DocType } from "@/types";
+import type { DocType } from "@/types/imports";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";

@@ -1,6 +1,8 @@
 import { useMe } from "@/hooks/useMe";
-import { ROLES, type MarginAlertsResponse, type Role } from "@/types";
-import type { CategoryType, Feature, StatsFilters } from "@/types";
+import { ROLES, type Role } from "@/types";
+import { type MarginAlertsResponse } from "@/types/stats";
+import type { Feature } from "@/types";
+import type { CategoryType, StatsFilters } from "@/types/stats";
 import { useStockSummary } from "../hooks";
 import { useStats } from "@/hooks/useSharedQueries";
 import { useT } from "@/i18n/I18nProvider";

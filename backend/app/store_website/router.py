@@ -90,7 +90,6 @@ def create_request(
         pharmacy_id=pharmacy_id,
         owner_id=user.id,
         state="soumise",
-        urgency="flexible",  # no longer asked (2026-11-24); the column stays
         **body.model_dump(),
     )
     db.add(req)

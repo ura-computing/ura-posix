@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-import type { Me, MeResponse } from "@/types";
+import type { Me, MeResponse } from "@/types/auth";
 
 function toFlat(r: MeResponse): Me {
   return {

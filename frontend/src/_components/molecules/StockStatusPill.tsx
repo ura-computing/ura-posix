@@ -2,7 +2,7 @@
  *  same badge on the Stock page and the product sheet. */
 import { Badge } from "@/_components/atoms/Badge";
 import { STATUS_META } from "@/_components/pages/analytics/constants";
-import type { StockRow } from "@/types";
+import type { StockRow } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 

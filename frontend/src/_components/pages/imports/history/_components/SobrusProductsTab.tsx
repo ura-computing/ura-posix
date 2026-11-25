@@ -7,7 +7,7 @@ import { EmptyState } from "@/_components/molecules/EmptyState";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { SkeletonRows } from "@/_components/molecules/Skeletons";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
-import type { AdminSobrusImport, SobrusRun } from "@/types";
+import type { AdminSobrusImport, SobrusRun } from "@/types/sobrus";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDateTime, formatNumStr } from "@/utils/format";
 import { runResult } from "@/utils/sobrus";

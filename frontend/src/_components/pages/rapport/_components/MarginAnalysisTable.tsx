@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { TabBar } from "@/_components/molecules/TabBar";
-import type { MargeMode } from "@/types";
+import type { MargeMode } from "@/types/stats";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { DataTable } from "@/_components/organisms/DataTable";
 import type { ColumnDef } from "@/_components/organisms/DataTable";

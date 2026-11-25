@@ -11,7 +11,7 @@ import { POPOVER_PANEL, usePopover } from "@/_components/molecules/popover";
 import { useMe } from "@/hooks/useMe";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useT } from "@/i18n/I18nProvider";
-import type { NotificationKind, NotificationOut } from "@/types";
+import type { NotificationKind, NotificationOut } from "@/types/notifications";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";
 import { notificationText } from "@/utils/notifications";

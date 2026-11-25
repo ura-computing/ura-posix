@@ -6,7 +6,7 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { ApiErr, api } from "@/api/client";
 import { API } from "@/api/api";
-import { type ValidateTokenResponse } from "@/types";
+import { type ValidateTokenResponse } from "@/types/auth";
 
 export function useSetPassword(token: string) {
   const t = useT();

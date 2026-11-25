@@ -1,7 +1,7 @@
 import { useMe } from "@/hooks/useMe";
 import { Receipt, ArrowDownCircle, FileText } from "lucide-react";
-import { type TvaSummary } from "@/types";
-import type { CategoryType } from "@/types";
+import { type TvaSummary } from "@/types/stats";
+import type { CategoryType } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatMAD } from "@/utils/format";

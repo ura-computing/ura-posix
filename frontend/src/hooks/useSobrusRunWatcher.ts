@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { API, refresh } from "@/api/api";
 import { api } from "@/api/client";
 import { useSobrusConnection } from "@/hooks/useSharedQueries";
-import type { SobrusRun } from "@/types";
+import type { SobrusRun } from "@/types/sobrus";
 
 const DONE_SHOWN_MS = 6000;
 

@@ -12,7 +12,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAdminSobrusImportWatcher } from "@/hooks/useAdminSobrusImportWatcher";
 import { useSobrusRunWatcher } from "@/hooks/useSobrusRunWatcher";
 import { useT } from "@/i18n/I18nProvider";
-import { type SobrusRun } from "@/types";
+import { type SobrusRun } from "@/types/sobrus";
 import { cn } from "@/utils/cn";
 import { formatDateTime, formatNumStr } from "@/utils/format";
 import { currentStep, eventText, fileName, modeName, runResult } from "@/utils/sobrus";

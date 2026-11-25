@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { DataTablePagination } from "@/_components/organisms/DataTable";
-import { MARGE_MODE_LABELS } from "@/types";
+import { MARGE_MODE_LABELS } from "@/types/stats";
 import type {
   AnalyseFilters,
   AnalyseMargeResponse,
@@ -14,7 +14,7 @@ import type {
   ListeRequest,
   AnalyseMargeKpis,
   MargeKpiPoint,
-} from "@/types";
+} from "@/types/stats";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { normalizeText, matchesText, matchesFields } from "@/utils/text";
 

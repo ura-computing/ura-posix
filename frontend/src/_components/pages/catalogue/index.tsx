@@ -7,7 +7,7 @@ import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar"
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatMAD, formatNumStr, formatPct } from "@/utils/format";
-import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types";
+import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types/catalog";
 
 import { CatalogStatsTiles } from "./_components/CatalogStatsTiles";
 import { SobrusImportCard } from "./_components/SobrusImportCard";

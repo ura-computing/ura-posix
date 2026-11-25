@@ -25,7 +25,7 @@ import { PinField } from "@/_components/molecules/PinField";
 import { Segmented } from "@/_components/molecules/Segmented";
 import { Lock, Monitor } from "lucide-react";
 import { TextField } from "@/_components/molecules/TextField";
-import type { Me, Session } from "@/types";
+import type { Me, Session } from "@/types/auth";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { useLogout } from "@/hooks/useLogout";
 import { Page } from "@/_components/templates/Page";

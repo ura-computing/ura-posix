@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useListFilters } from "@/hooks/useListFilters";
-import type { CategoryType, ProductsFilters, ProductsListResponse } from "@/types";
+import type { ProductsFilters, ProductsListResponse } from "@/types/products";
+import type { CategoryType } from "@/types/stats";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
 

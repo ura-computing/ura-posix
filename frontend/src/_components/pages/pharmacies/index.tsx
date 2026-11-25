@@ -26,7 +26,8 @@ import type {
   MemberOut,
   MemberRole,
   MemberStatus,
-} from "@/types";
+  PharmacyIn,
+} from "@/types/members";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
 import { FeaturePills } from "@/_components/molecules/FeaturePills";
 import { PharmacyFormDialog } from "./_components/PharmacyFormDialog";
@@ -71,7 +72,7 @@ function PharmaciesTab() {
   const { createPharmacy } = useCreatePharmacy();
   const { createUser } = useCreateUser();
 
-  const handleCreate = async (v: import("@/types").PharmacyIn) => {
+  const handleCreate = async (v: PharmacyIn) => {
     const detail = await createPharmacy(v);
     setCreateOpen(false);
     nav(`/admin/pharmacies/${detail.id}`);

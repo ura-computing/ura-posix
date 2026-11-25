@@ -13,7 +13,7 @@ import { FilterBar } from "@/_components/organisms/FilterBar";
 import { MemberKebab } from "@/_components/organisms/MemberKebab";
 import { STATUS_LABEL } from "@/_components/organisms/memberConstants";
 import { useT } from "@/i18n/I18nProvider";
-import type { AccountRef, SupportAccountRow } from "@/types";
+import type { AccountRef, SupportAccountRow } from "@/types/members";
 import { formatDateTime } from "@/utils/format";
 import { matchesFields } from "@/utils/text";
 

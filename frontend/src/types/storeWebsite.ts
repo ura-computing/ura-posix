@@ -139,10 +139,6 @@ export interface CustomizationPatch {
   featured_category_ids?: string[];
 }
 
-export interface StateTransition {
-  state: RequestState;
-}
-
 // ── The store's data: ONLY the request's pharmacy (backend `store_website/catalog_queries.py`) ──
 
 /** One product of the pharmacy's shelf, as a customer may see it. */

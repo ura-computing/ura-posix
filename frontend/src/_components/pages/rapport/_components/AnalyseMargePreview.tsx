@@ -1,6 +1,6 @@
 import { useMe } from "@/hooks/useMe";
 import { Sparkles, Coins, TrendingUp, Percent, UploadCloud } from "lucide-react";
-import type { CategoryType, StatsFilters, StatsResponse } from "@/types";
+import type { CategoryType, StatsFilters, StatsResponse } from "@/types/stats";
 import { useOptimisationGain } from "../hooks";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";

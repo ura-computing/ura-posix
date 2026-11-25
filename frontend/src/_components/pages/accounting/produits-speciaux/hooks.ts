@@ -19,7 +19,7 @@ import type {
   SpecialProduct,
   SupplierExclusion,
   SupplierSummary,
-} from "@/types";
+} from "@/types/exclusions";
 import { formatDate, formatNumStr } from "@/utils/format";
 
 export type ExclusionKind = "product" | "bl" | "supplier" | "line";

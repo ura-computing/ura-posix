@@ -7,7 +7,7 @@ import { ApiErr, api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { translate } from "@/i18n/I18nProvider";
 import { chunk } from "@/utils/csv";
-import { type DocType, type UploadStockResult, type UploadTxResult } from "@/types";
+import { type DocType, type UploadStockResult, type UploadTxResult } from "@/types/imports";
 
 /**
  * Multi-upload queue (strict FIFO, concurrency=1). Provider lives at the app

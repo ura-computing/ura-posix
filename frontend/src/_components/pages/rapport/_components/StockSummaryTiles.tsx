@@ -1,6 +1,6 @@
 import { useMe } from "@/hooks/useMe";
 import { Coins, UploadCloud, ShieldCheck, AlertTriangle, Boxes } from "lucide-react";
-import type { CategoryType, StockSummaryResponse } from "@/types";
+import type { CategoryType, StockSummaryResponse } from "@/types/stats";
 import { useCategoryTint } from "../hooks";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";

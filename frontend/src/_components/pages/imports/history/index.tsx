@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { TabBar } from "@/_components/molecules/TabBar";
 import type { TabItem } from "@/_components/molecules/TabBar";
 import { formatDateTime, formatNumStr, formatQty } from "@/utils/format";
-import type { DataImport, ImportBatchStatus, ImportKind } from "@/types";
+import type { DataImport, ImportBatchStatus, ImportKind } from "@/types/imports";
 
 import { useMe } from "@/hooks/useMe";
 import { ROLES, type Role } from "@/types";

@@ -15,7 +15,7 @@ import type {
   MemberStatus,
   OwnerEmployeesResponse,
   ResetPasswordOut,
-} from "@/types";
+} from "@/types/members";
 
 export function useOwnerEmployees() {
   const { data, isLoading, isError, refetch } = useQuery({

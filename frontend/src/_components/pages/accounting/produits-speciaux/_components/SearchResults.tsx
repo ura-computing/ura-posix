@@ -14,7 +14,7 @@ import { StarToggle } from "@/_components/atoms/StarToggle";
 import { SkeletonRows, SkeletonText } from "@/_components/molecules/Skeletons";
 import { Card } from "@/_components/atoms/Card";
 import { useT, type TFn } from "@/i18n/I18nProvider";
-import type { BlSummary, MedicamentSuggestion, SupplierSummary } from "@/types";
+import type { BlSummary, MedicamentSuggestion, SupplierSummary } from "@/types/exclusions";
 import { formatDate, formatMAD, formatNumStr, formatQty } from "@/utils/format";
 
 import { useBlDetail, useSupplierBls, type ExclusionTarget } from "../hooks";

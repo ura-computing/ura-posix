@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { ApiErr, api } from "@/api/client";
 import { API } from "@/api/api";
-import { type LoginRequest, type MeResponse } from "@/types";
+import { type LoginRequest, type MeResponse } from "@/types/auth";
 
 export function useLogin() {
   const navigate = useNavigate();

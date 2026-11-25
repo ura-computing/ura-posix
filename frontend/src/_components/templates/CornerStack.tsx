@@ -4,7 +4,7 @@ import { useMe } from "@/hooks/useMe";
 import { useNavigate } from "react-router-dom";
 
 import { Ban, CheckCircle2, Clock, FileSpreadsheet, X } from "lucide-react";
-import type { DocType } from "@/types";
+import type { DocType } from "@/types/imports";
 import { useT } from "@/i18n/I18nProvider";
 import { AdminSobrusImportCard, SobrusRunCard } from "@/_components/organisms/SobrusRunCard";
 import { useUploadCtx, type UploadJob } from "@/hooks/useUpload";

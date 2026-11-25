@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ScanBarcode } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
-import type { ProductSheet } from "@/types";
+import type { ProductSheet } from "@/types/products";
 import { useT } from "@/i18n/I18nProvider";
 
 import { ScanDialog } from "../../_components/ScanDialog";

@@ -21,7 +21,7 @@ import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/C
 import { MembersSection } from "@/_components/organisms/MembersSection";
 import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDialog";
 import { allFeatures, toFeatureRecord, type FeatureKey, FEATURES } from "@/_components/organisms/memberConstants";
-import { type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types";
+import { type CreateUserIn, type CreateUserOut, type MemberOut, type PharmacyIn } from "@/types/members";
 
 import { PharmacyFormDialog } from "../_components/PharmacyFormDialog";
 import {

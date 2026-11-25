@@ -5,7 +5,7 @@ import { useMe } from "@/hooks/useMe";
 import { Link } from "react-router-dom";
 
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
-import { type AuditRow } from "@/types";
+import { type AuditRow } from "@/types/history";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";

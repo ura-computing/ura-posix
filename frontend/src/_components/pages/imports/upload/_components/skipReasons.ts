@@ -1,4 +1,4 @@
-import type { UploadStockResult } from "@/types";
+import type { UploadStockResult } from "@/types/imports";
 import { type TFn } from "@/i18n/I18nProvider";
 import { formatNumStr } from "@/utils/format";
 import type { UploadProgress } from "@/hooks/useUpload";

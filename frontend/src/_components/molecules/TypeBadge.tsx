@@ -1,6 +1,6 @@
 import { Badge } from "@/_components/atoms/Badge";
 import { useT } from "@/i18n/I18nProvider";
-import type { ProductType } from "@/types";
+import type { ProductType } from "@/types/catalog";
 
 /** Pharmacie / Parapharmacie badge (catalogue, achats, ventes, comptabilité). "—" when unknown.
  *  `size="md"`: the bigger one under a page title (product sheet). */

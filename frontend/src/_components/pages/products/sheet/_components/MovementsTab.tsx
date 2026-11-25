@@ -10,7 +10,7 @@ import { Button } from "@/_components/atoms/Button";
 import { Segmented } from "@/_components/molecules/Segmented";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
-import type { ProductMovementLine, ProductSheet } from "@/types";
+import type { ProductMovementLine, ProductSheet } from "@/types/products";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDate, formatDateTime, formatMAD, formatPct, formatQty } from "@/utils/format";

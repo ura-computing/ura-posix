@@ -7,7 +7,7 @@ import { useStockAbcd, usePeremptions } from "@/_components/pages/analytics/hook
 import { monthsAgo, todayIso } from "@/utils/dateRange";
 import type { DialogDescriptor } from "@/_components/pages/analytics/hooks";
 import { downloadXlsx, exportFilename } from "@/utils/table";
-import type { AbcdClass, StockRow } from "@/types";
+import type { AbcdClass, StockRow } from "@/types/stats";
 import { matchesFields } from "@/utils/text";
 import { translateFr } from "@/i18n/I18nProvider";
 
@@ -206,5 +206,3 @@ export function useStockPage() {
     closeDialog: () => setDialog(null),
   };
 }
-
-export type UseStockPage = ReturnType<typeof useStockPage>;

@@ -6,7 +6,7 @@ import { Download } from "lucide-react";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { HistoryTable } from "@/_components/organisms/HistoryTable";
 import { Page } from "@/_components/templates/Page";
-import type { HistoryKind } from "@/types";
+import type { HistoryKind } from "@/types/history";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDate } from "@/utils/format";
 

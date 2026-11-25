@@ -5,7 +5,7 @@
 import { SlidersHorizontal, UserPlus, Users } from "lucide-react";
 
 import { useT } from "@/i18n/I18nProvider";
-import type { MemberOut } from "@/types";
+import type { MemberOut } from "@/types/members";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";

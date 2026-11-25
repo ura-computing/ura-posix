@@ -9,7 +9,7 @@ import { formatMAD, formatQty, formatPct } from "@/utils/format";
 import { useAchatsPage } from "./hooks";
 import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
-import type { AchatRow, AchatsSupplierSummary } from "@/types";
+import type { AchatRow, AchatsSupplierSummary } from "@/types/transactions";
 import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
 import { Page } from "@/_components/templates/Page";
 import { LedgerFooter } from "../_components/LedgerFooter";

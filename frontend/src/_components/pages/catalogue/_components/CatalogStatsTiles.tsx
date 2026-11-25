@@ -5,7 +5,7 @@ import { BookOpen, CloudDownload, HelpCircle, Pill, Sparkles } from "lucide-reac
 import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { useAdminSobrusImport } from "@/hooks/useSharedQueries";
-import type { ProductType } from "@/types";
+import type { ProductType } from "@/types/catalog";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDateTime, formatNumStr } from "@/utils/format";
 import { runResult } from "@/utils/sobrus";

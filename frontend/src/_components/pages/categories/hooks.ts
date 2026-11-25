@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
 
-import type { CategorySuffixIn, CategorySuffixOut } from "@/types";
+import type { CategorySuffixIn, CategorySuffixOut } from "@/types/catalog";
 
 export function useCategorySuffixes() {
   const { data, isLoading, isError, refetch } = useQuery({

@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
 import { useT } from "@/i18n/I18nProvider";
-import { type AdminSobrusImport, type DataImport, type DataImportsResponse, type DocType } from "@/types";
+import { type DataImport, type DataImportsResponse, type DocType } from "@/types/imports";
+import { type AdminSobrusImport } from "@/types/sobrus";
 
 export function useImports() {
   const { data, isLoading, isError, error, refetch } = useQuery({

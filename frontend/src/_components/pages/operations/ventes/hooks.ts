@@ -16,7 +16,7 @@ import type {
   VentesListResponse,
   VentesSuggestions,
   VentesSurveillanceCounts,
-} from "@/types";
+} from "@/types/transactions";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
 import { useRefParam } from "../_components/useRefParam";

@@ -12,17 +12,11 @@
  */
 import type { QueryClient } from "@tanstack/react-query";
 
-import type {
-  AchatsFilters,
-  CatalogFilters,
-  HistoryFilters,
-  MargeMode,
-  MovementsFilters,
-  ProductsFilters,
-  StockFilters,
-  VentesFilters,
-  VentesFiltersKey,
-} from "@/types";
+import type { CatalogFilters } from "@/types/catalog";
+import type { HistoryFilters } from "@/types/history";
+import type { MovementsFilters, ProductsFilters } from "@/types/products";
+import type { MargeMode, StockFilters } from "@/types/stats";
+import type { AchatsFilters, VentesFilters, VentesFiltersKey } from "@/types/transactions";
 
 type Key = readonly unknown[];
 

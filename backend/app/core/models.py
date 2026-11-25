@@ -701,9 +701,6 @@ class PaymentEntry(Base):
 
 # ─── "Ma boutique en ligne" — store website request + customization ─────────
 
-STORE_REQUEST_STATES = ("soumise", "prise_en_charge", "en_cours", "livree", "cloturee")
-STORE_URGENCIES = ("asap", "ce_mois", "flexible")
-
 
 class StoreWebsiteRequest(Base):
     """Owner's landing-page brief. Constraint at DB level: one active (non
@@ -722,7 +719,6 @@ class StoreWebsiteRequest(Base):
     brand_palette: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # ["#hex", ...] 2-3
     phone: Mapped[str] = mapped_column(String, nullable=False)
     custom_domain: Mapped[str | None] = mapped_column(String, nullable=True)
-    urgency: Mapped[str] = mapped_column(String, nullable=False)  # STORE_URGENCIES
     vision: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Lifecycle

@@ -6,7 +6,7 @@ import { CloudDownload, Square } from "lucide-react";
 import { Button } from "@/_components/atoms/Button";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
-import type { SobrusRun } from "@/types";
+import type { SobrusRun } from "@/types/sobrus";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";

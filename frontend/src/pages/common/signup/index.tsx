@@ -14,7 +14,7 @@ import { AuthLayout } from "@/_components/templates/AuthLayout";
 import { PasswordField } from "@/_components/molecules/PasswordField";
 import { TextField } from "@/_components/molecules/TextField";
 import { WizardProgress } from "@/_components/molecules/WizardProgress";
-import { type SignupIn } from "@/types";
+import { type SignupIn } from "@/types/auth";
 import { cn } from "@/utils/cn";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 

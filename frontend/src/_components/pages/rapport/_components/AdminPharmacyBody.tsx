@@ -11,8 +11,8 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { type MarginAlertsResponse } from "@/types";
-import type { MargeMode, StatsResponse, StockSummaryResponse } from "@/types";
+import { type MarginAlertsResponse } from "@/types/stats";
+import type { MargeMode, StatsResponse, StockSummaryResponse } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatQty, formatMAD, formatPct } from "@/utils/format";

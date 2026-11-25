@@ -19,18 +19,6 @@ export interface MedicamentSuggestion {
   nb_ventes: number;
 }
 
-export interface SpecialProductBulkResult {
-  inserted: number;
-  already_special: number;
-  products: SpecialProduct[];
-}
-
-export interface SpecialProductReintegrateResult {
-  reintegrated: number;
-  not_special: number;
-  medicament_ids: number[];
-}
-
 // ── BL exclusions (PG-007) — owner-managed delivery-note exclusions ─────────
 export interface BlLine {
   product: string | null;
@@ -73,18 +61,6 @@ export interface BlExclusion {
   created_at: string;
 }
 
-export interface BlExclusionResult {
-  excluded: number;
-  already_excluded: number;
-  item: BlExclusion | null;
-}
-
-export interface BlReintegrateResult {
-  reintegrated: number;
-  not_excluded: number;
-  delivery_refs: string[];
-}
-
 // ── BL lines: one product left out on one BL only (the star of a product line in a BL's content) ──
 export interface BlLineExclusion {
   id: number;
@@ -107,11 +83,6 @@ export interface BlLineExclusionResult {
   ids: number[];
 }
 
-export interface BlLineReintegrateResult {
-  reintegrated: number;
-  not_excluded: number;
-}
-
 // ── Supplier (fournisseur) exclusions — owner-managed, achats-side ──────────
 export interface SupplierSummary {
   supplier: string;
@@ -130,16 +101,4 @@ export interface SupplierExclusion {
   last_date: string | null;
   notes: string | null;
   created_at: string;
-}
-
-export interface SupplierExclusionResult {
-  excluded: number;
-  already_excluded: number;
-  item: SupplierExclusion | null;
-}
-
-export interface SupplierReintegrateResult {
-  reintegrated: number;
-  not_excluded: number;
-  suppliers: string[];
 }

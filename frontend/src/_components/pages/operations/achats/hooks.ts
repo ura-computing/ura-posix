@@ -7,7 +7,7 @@ import { API } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useListFilters } from "@/hooks/useListFilters";
 
-import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types";
+import type { AchatsFilters, AchatsListResponse, AchatsSuggestions, AchatsSupplierSummary } from "@/types/transactions";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 import { useT } from "@/i18n/I18nProvider";
 import { useRefParam } from "../_components/useRefParam";

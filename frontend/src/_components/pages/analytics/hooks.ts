@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { API } from "@/api/api";
 
-import type { PeremptionsResponse, StockAbcdResponse, StockFilters, VentesSansAchatResponse } from "@/types";
+import type { PeremptionsResponse, StockAbcdResponse, StockFilters, VentesSansAchatResponse } from "@/types/stats";
 
 /** Same vocabulary as StatsFilters.category_type so the segmented selector
  *  matches /rapport visually + semantically. "all" = no filter. */
@@ -174,8 +174,6 @@ export function useAlertesPage() {
     closeDialog: () => setDialog(null),
   };
 }
-
-export type UseAlertesPage = ReturnType<typeof useAlertesPage>;
 
 /** TanStack Query wrappers for stats endpoints.
  *

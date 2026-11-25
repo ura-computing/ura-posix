@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { api } from "@/api/client";
 import { API } from "@/api/api";
-import type { ForgotPasswordRequest } from "@/types";
+import type { ForgotPasswordRequest } from "@/types/auth";
 
 export function useForgotPassword() {
   const { mutate, isPending, isSuccess, isError, error } = useMutation({

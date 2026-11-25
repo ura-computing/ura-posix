@@ -1,7 +1,7 @@
 /** A bell line as a sentence, in the page language: `notificationText(t, line)` →
  *  « 12 produits à classer dans le catalogue », « Votre boutique « Pharmacie Demo Shop » : En cours ». */
 import type { TFn } from "@/i18n/I18nProvider";
-import type { NotificationOut } from "@/types";
+import type { NotificationOut } from "@/types/notifications";
 import { REQUEST_STATE_LABEL, type RequestState } from "@/types/storeWebsite";
 import { formatNumStr } from "@/utils/format";
 

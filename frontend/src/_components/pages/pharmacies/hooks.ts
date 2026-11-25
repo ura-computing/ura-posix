@@ -33,7 +33,7 @@ import type {
   SignupRequestRow,
   SupportAccountRow,
   SupportCreateIn,
-} from "@/types";
+} from "@/types/members";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 

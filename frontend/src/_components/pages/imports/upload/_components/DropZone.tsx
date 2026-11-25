@@ -1,4 +1,4 @@
-import type { DocType } from "@/types";
+import type { DocType } from "@/types/imports";
 import { useT } from "@/i18n/I18nProvider";
 import { Callout } from "@/_components/molecules/Callout";
 import { FileDropZone } from "@/_components/molecules/FileDropZone";

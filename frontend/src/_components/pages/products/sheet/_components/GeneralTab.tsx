@@ -13,7 +13,7 @@ import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { SkeletonRows, SkeletonTile } from "@/_components/molecules/Skeletons";
 import { StockStatusPill } from "@/_components/molecules/StockStatusPill";
-import type { ProductMovement, ProductSheet, ProductStats } from "@/types";
+import type { ProductMovement, ProductSheet, ProductStats } from "@/types/products";
 import { useMonthsShort } from "@/i18n/dates";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";

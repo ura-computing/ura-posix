@@ -1,5 +1,5 @@
 import { Building2, Users, BookOpen, ClipboardCheck } from "lucide-react";
-import type { AdminStatsResponse } from "@/types";
+import type { AdminStatsResponse } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatQty } from "@/utils/format";

@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 import { API } from "@/api/api";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
-import type { HistoryFilters, HistoryKind, HistoryResponse } from "@/types";
+import type { HistoryFilters, HistoryKind, HistoryResponse } from "@/types/history";
 import { formatDateTime } from "@/utils/format";
 import { historyKind, historyText } from "@/utils/history";
 import { downloadXlsx, exportFilename } from "@/utils/table";

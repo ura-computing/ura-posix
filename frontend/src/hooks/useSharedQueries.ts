@@ -5,19 +5,17 @@ import { useQuery } from "@tanstack/react-query";
 
 import { API } from "@/api/api";
 import { api } from "@/api/client";
+import type { PharmacyListRow } from "@/types/members";
+import type { AdminSobrusImport, SobrusConnection } from "@/types/sobrus";
 import type {
   AnalyseFilters,
   AnalyseMargeResponse,
   MargeMode,
   MarginAlertsResponse,
-  PharmacyListRow,
-  AdminSobrusImport,
-  SobrusConnection,
   StatsFilters,
   StatsResponse,
-  VentesFilters,
-  VentesListResponse,
-} from "@/types";
+} from "@/types/stats";
+import type { VentesFilters, VentesListResponse } from "@/types/transactions";
 
 export type MarginAlertsFilters = Omit<StatsFilters, "include_non_declared">;
 

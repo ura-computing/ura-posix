@@ -2,7 +2,9 @@ import { Download, BarChart3, Receipt, Wallet, Trash2, ArrowRightLeft, Banknote,
 
 import { useCategoryTypeOptions } from "@/hooks/useCategoryTypeOptions";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
-import type { StatsFilters, StatsResponse, PaymentEntry, PaymentMethod, VenteRow } from "@/types";
+import type { PaymentEntry, PaymentMethod } from "@/types/accounting";
+import type { StatsFilters, StatsResponse } from "@/types/stats";
+import type { VenteRow } from "@/types/transactions";
 
 import { CashClosingSection } from "./_components/CashClosingSection";
 import { useComptabilitePage, useDeletePayment, useSavePayment } from "./hooks";
@@ -16,7 +18,7 @@ import { MonthPicker } from "@/_components/molecules/MonthPicker";
 import { SkeletonTile } from "@/_components/molecules/Skeletons";
 import { Button } from "@/_components/atoms/Button";
 import { FormField } from "@/_components/molecules/FormField";
-import { PAYMENT_METHODS } from "@/types";
+import { PAYMENT_METHODS } from "@/types/accounting";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import { Page } from "@/_components/templates/Page";

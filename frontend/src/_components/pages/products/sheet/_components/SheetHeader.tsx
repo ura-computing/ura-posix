@@ -9,7 +9,7 @@ import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
 import type { PremiumFeature } from "@/_components/organisms/PremiumDialog";
-import type { ProductSheet, ProductStock } from "@/types";
+import type { ProductSheet, ProductStock } from "@/types/products";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatQty } from "@/utils/format";

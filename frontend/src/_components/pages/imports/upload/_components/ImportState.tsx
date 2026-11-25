@@ -1,5 +1,5 @@
 import { CheckCircle2, X, Ban, Clock, Loader2, RotateCcw } from "lucide-react";
-import type { DocType, UploadStockResult } from "@/types";
+import type { DocType, UploadStockResult } from "@/types/imports";
 import { useT } from "@/i18n/I18nProvider";
 import { formatQty } from "@/utils/format";
 import type { UploadPhase, UploadProgress } from "@/hooks/useUpload";

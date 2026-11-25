@@ -11,7 +11,7 @@ import { Textarea } from "@/_components/atoms/Input";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
 import { SkeletonText } from "@/_components/molecules/Skeletons";
-import type { ProductNote } from "@/types";
+import type { ProductNote } from "@/types/products";
 import { useT } from "@/i18n/I18nProvider";
 import { formatDateTime } from "@/utils/format";
 

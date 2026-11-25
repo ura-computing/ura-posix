@@ -38,8 +38,6 @@ STOCK_SORT_KEYS = {
     "status",
 }
 
-STOCK_STATUS_KEYS = ("sous-stock", "ideal", "a-surveiller", "sur-stock", "inconnu", "negatif")
-
 _ABCD_CLASSES = ["A", "A-", "B+", "B", "C", "C-", "C-N", "D"]
 
 

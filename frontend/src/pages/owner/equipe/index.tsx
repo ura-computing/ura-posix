@@ -20,7 +20,7 @@ import { UserPermissionsDialog } from "@/_components/organisms/UserPermissionsDi
 import { FEATURES, toFeatureRecord, type FeatureKey } from "@/_components/organisms/memberConstants";
 import { useMe } from "@/hooks/useMe";
 import { cn } from "@/utils/cn";
-import type { CreateUserIn, CreateUserOut, MemberOut } from "@/types";
+import type { CreateUserIn, CreateUserOut, MemberOut } from "@/types/members";
 
 import {
   useCreateEmployee,

@@ -1,5 +1,5 @@
 import { useState, useLayoutEffect, useRef } from "react";
-import type { CategoryType, MonthlyTrendPoint, TrendGranularity } from "@/types";
+import type { CategoryType, MonthlyTrendPoint, TrendGranularity } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatMAD, formatNumStr } from "@/utils/format";

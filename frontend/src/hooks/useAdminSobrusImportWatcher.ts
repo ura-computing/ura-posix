@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { API, refresh } from "@/api/api";
 import { api } from "@/api/client";
 import { useAdminSobrusImport } from "@/hooks/useSharedQueries";
-import type { AdminSobrusImport } from "@/types";
+import type { AdminSobrusImport } from "@/types/sobrus";
 
 const DONE_SHOWN_MS = 6000;
 

@@ -2,7 +2,7 @@
 // Shared, locked design constants for the Stock page.
 import type { IconTone } from "@/_components/organisms/KpiTile";
 import type { TFn } from "@/i18n/I18nProvider";
-import type { AbcdClass, PeremptionsResponse, StockRow } from "@/types";
+import type { AbcdClass, PeremptionsResponse, StockRow } from "@/types/stats";
 
 /** ABCD class colours — LOCKED (pharmacist memory). Do not shift to tokens. */
 export const ABCD_COLORS: Record<AbcdClass, string> = {

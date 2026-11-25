@@ -1,5 +1,5 @@
-// Roles, features (addresses: routes/paths.ts; urls + query keys: api/api.ts). Domain shapes live in one file per domain
-// (same names as the backend `schemas.py` files) and are re-exported here: import from "@/types".
+// Roles, statuses, features (addresses: routes.ts; urls + query keys: api/api.ts). Domain shapes: one file per domain
+// (same names as the backend `schemas.py` files), imported from that file: `import type { Stats } from "@/types/stats"`.
 
 export const ROLES = {
   ADMIN: "admin",
@@ -34,17 +34,3 @@ export const FEATURES = [
   "orders", // premium: « Commander » (product page)
 ] as const;
 export type Feature = (typeof FEATURES)[number];
-
-export * from "./auth";
-export * from "./stats";
-export * from "./catalog";
-export * from "./imports";
-export * from "./accounting";
-export * from "./transactions";
-export * from "./exclusions";
-export * from "./members";
-export * from "./storeWebsite";
-export * from "./products";
-export * from "./history";
-export * from "./sobrus";
-export * from "./notifications";

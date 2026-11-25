@@ -28,7 +28,7 @@ import { PinField } from "@/_components/molecules/PinField";
 import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { ROLE_LABEL } from "@/_components/organisms/memberConstants";
-import type { AccountRef, CreateUserIn, MemberRole } from "@/types";
+import type { AccountRef, CreateUserIn, MemberRole } from "@/types/members";
 
 export interface PharmacyOption {
   id: number;

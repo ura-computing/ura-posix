@@ -9,7 +9,9 @@ import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useStats, useVentesList } from "@/hooks/useSharedQueries";
 
-import type { ClosingMonth, PaymentMethod, StatsFilters, VentesFilters, PaymentEntry, PaymentEntryIn } from "@/types";
+import type { ClosingMonth, PaymentMethod, PaymentEntry, PaymentEntryIn } from "@/types/accounting";
+import type { StatsFilters } from "@/types/stats";
+import type { VentesFilters } from "@/types/transactions";
 import { translateFr } from "@/i18n/I18nProvider";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 

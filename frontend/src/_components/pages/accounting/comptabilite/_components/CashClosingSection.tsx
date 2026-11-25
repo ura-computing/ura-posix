@@ -14,7 +14,7 @@ import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/
 import { EmptyState } from "@/_components/molecules/EmptyState";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { useMe } from "@/hooks/useMe";
-import { type ClosingDay, type ClosingMethod } from "@/types";
+import { type ClosingDay, type ClosingMethod } from "@/types/accounting";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatDateTime, formatMAD, formatMADStr, formatQty } from "@/utils/format";
 

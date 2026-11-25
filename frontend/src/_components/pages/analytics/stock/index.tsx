@@ -13,7 +13,7 @@ import { KpiTile, type IconTone } from "@/_components/organisms/KpiTile";
 import { NeedleGauge } from "@/_components/atoms/NeedleGauge";
 import { cn } from "@/utils/cn";
 import { formatQty, formatPct, formatMAD, formatNumStr } from "@/utils/format";
-import type { AbcdClass, StockRow, PeremptionBracket, PeremptionsResponse } from "@/types";
+import type { AbcdClass, StockRow, PeremptionBracket, PeremptionsResponse } from "@/types/stats";
 import { ABCD_COLORS, ABCD_ORDER, abcdFontSize, STATUS_OPTIONS } from "../constants";
 import { useMemo, type ReactNode } from "react";
 import type { DialogDescriptor } from "@/_components/pages/analytics/hooks";

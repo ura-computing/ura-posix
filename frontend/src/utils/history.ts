@@ -2,7 +2,7 @@
  *  `historyText(t, row)` → « PPV : 46,80 MAD → 50,00 MAD »,
  *  « Import Achats « Sobrus - Achats 2026… » : 1 234 lignes importées, 0 ignorées »; on a product's
  *  tab « Import Achats « … » : 247 lignes de ce produit ». */
-import type { AuditRow } from "@/types";
+import type { AuditRow } from "@/types/history";
 import type { TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
 

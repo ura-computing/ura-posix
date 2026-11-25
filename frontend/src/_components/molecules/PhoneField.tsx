@@ -7,12 +7,7 @@ import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { SingleSelect } from "@/_components/molecules/SingleSelect";
 
-const COUNTRIES: { code: CountryCode; label: string }[] = [
-  { code: "MA", label: "Maroc" },
-  { code: "FR", label: "France" },
-  { code: "ES", label: "Espagne" },
-  { code: "US", label: "États-Unis" },
-];
+const COUNTRIES: CountryCode[] = ["MA", "FR", "ES", "US"];
 
 interface PhoneFieldProps {
   label: string;
@@ -53,7 +48,7 @@ export const PhoneField = forwardRef<HTMLInputElement, PhoneFieldProps>(
             inline
             label=""
             ariaLabel={t("shared.countryCode")}
-            options={COUNTRIES.map((c) => ({ value: c.code, label: `+${getCountryCallingCode(c.code)}` }))}
+            options={COUNTRIES.map((c) => ({ value: c, label: `${t(`country.${c}`)} +${getCountryCallingCode(c)}` }))}
             value={country}
             onChange={(v) => {
               const c = v as CountryCode;

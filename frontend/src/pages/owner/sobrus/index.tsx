@@ -24,7 +24,7 @@ import { Spinner } from "@/_components/atoms/Spinner";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { useT } from "@/i18n/I18nProvider";
-import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
+import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types/sobrus";
 import { cn } from "@/utils/cn";
 import { PERIOD_LABELS, PERIOD_PRESETS, presetOf, type PeriodPreset } from "@/utils/dateRange";
 import { formatDateTime, formatNumStr } from "@/utils/format";

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { API } from "@/api/api";
 import { api, type ApiErr } from "@/api/client";
 import { useLogout } from "@/hooks/useLogout";
-import type { LockState, MeResponse } from "@/types";
+import type { LockState, MeResponse } from "@/types/auth";
 
 const ACTIVITY_KEY = "pg-last-activity";
 const CHANNEL = "pg-lock";

@@ -6,7 +6,7 @@ import { SingleSelect } from "@/_components/molecules/SingleSelect";
 import { useMe } from "@/hooks/useMe";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { ROLES, type Role } from "@/types";
-import type { MargeMode, StatsFilters } from "@/types";
+import type { MargeMode, StatsFilters } from "@/types/stats";
 import {
   useAdminPharmacyStats,
   useAdminStats,

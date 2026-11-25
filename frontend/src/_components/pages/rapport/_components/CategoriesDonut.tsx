@@ -1,4 +1,4 @@
-import type { CategoryType, TopCategoryRow } from "@/types";
+import type { CategoryType, TopCategoryRow } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatPct, formatNumStr } from "@/utils/format";

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { API, refresh } from "@/api/api";
 import { api } from "@/api/client";
 import { useSobrusConnection } from "@/hooks/useSharedQueries";
-import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types";
+import type { SobrusConnection, SobrusConnectionBody, SobrusRun, SobrusRunBody } from "@/types/sobrus";
 
 /** « Connexion Sobrus »: the connection (+ the run in progress, polled every 2 s), the last runs,
  *  and the owner's actions. A run's end refreshes the other pages: `hooks/useSobrusRunWatcher.ts`. */

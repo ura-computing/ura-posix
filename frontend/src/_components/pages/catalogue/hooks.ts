@@ -10,7 +10,6 @@ import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
 
 import type {
-  AdminSobrusImport,
   CatalogFilters,
   CatalogStats,
   CatalogImportResponse,
@@ -18,7 +17,8 @@ import type {
   Medicament,
   MedicamentInput,
   ProductType,
-} from "@/types";
+} from "@/types/catalog";
+import type { AdminSobrusImport } from "@/types/sobrus";
 
 const DEFAULT_FILTERS: CatalogFilters = {
   search: "",

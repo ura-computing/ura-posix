@@ -14,7 +14,7 @@ import type {
   StatsFilters,
   StatsResponse,
   StockSummaryResponse,
-} from "@/types";
+} from "@/types/stats";
 
 // ── Owner ────────────────────────────────────────────────────────────────────
 

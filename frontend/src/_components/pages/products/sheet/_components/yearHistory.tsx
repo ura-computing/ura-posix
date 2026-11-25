@@ -2,7 +2,7 @@
  *  Général (Ventes only): per year a Ventes line (light green) and an Achats line (light blue), the
  *  units each month, the total, then the amount (CA of the sales, Σ line totals of the purchases). */
 import type { ColumnDef } from "@/_components/organisms/DataTable";
-import type { YearHistory } from "@/types";
+import type { YearHistory } from "@/types/products";
 import type { TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatNumStr, formatQty } from "@/utils/format";

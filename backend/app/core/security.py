@@ -39,7 +39,7 @@ def create_access_token(user_id: int, token_version: int, session_id: int) -> st
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def _authenticate(db: DbDep, access_token: AccessCookieDep = None) -> tuple[User, UserSession]:
+def get_current_session(db: DbDep, access_token: AccessCookieDep = None) -> tuple[User, UserSession]:
     creds_exc = ApiError(
         status.HTTP_401_UNAUTHORIZED,
         ErrorCode.SESSION_EXPIRED,
@@ -78,15 +78,10 @@ def _authenticate(db: DbDep, access_token: AccessCookieDep = None) -> tuple[User
 
 def get_current_user(db: DbDep, access_token: AccessCookieDep = None) -> User:
     """The logged-in user; a session whose screen is locked (lock screen) gets 423 `screenLocked` on every route."""
-    user, session_row = _authenticate(db, access_token)
+    user, session_row = get_current_session(db, access_token)
     if session_row.locked_at is not None:
         raise ApiError(status.HTTP_423_LOCKED, ErrorCode.SCREEN_LOCKED, "Écran verrouillé : tapez votre code.")
     return user
-
-
-def get_current_session(db: DbDep, access_token: AccessCookieDep = None) -> tuple[User, UserSession]:
-    """The user and this device's session, even with the screen locked: `GET /auth/me`, `/auth/lock`, `/auth/unlock`."""
-    return _authenticate(db, access_token)
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]

@@ -13,7 +13,7 @@ import { DataTable } from "@/_components/organisms/DataTable";
 import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { useT } from "@/i18n/I18nProvider";
 import type { ColumnDef } from "@/_components/organisms/DataTable";
-import type { CategorySuffixOut, CategorySuffixIn, SuffixColor } from "@/types";
+import type { CategorySuffixOut, CategorySuffixIn, SuffixColor } from "@/types/catalog";
 
 import {
   useCategorySuffixes,
@@ -23,7 +23,7 @@ import {
 } from "./hooks";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
 import { DialogBody, DialogFooter, DialogHeader } from "@/_components/molecules/DialogShell";
-import { SUFFIX_COLORS } from "@/types";
+import { SUFFIX_COLORS } from "@/types/catalog";
 import { Page } from "@/_components/templates/Page";
 import { Card } from "@/_components/atoms/Card";
 import { SkeletonRows } from "@/_components/molecules/Skeletons";

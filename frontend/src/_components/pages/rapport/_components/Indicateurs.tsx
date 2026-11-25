@@ -1,6 +1,6 @@
 import { useMe } from "@/hooks/useMe";
 import { BarChart3, CalendarCheck, CalendarX, Receipt, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
-import type { CategoryType, StatsResponse, AdvancedKpis } from "@/types";
+import type { CategoryType, StatsResponse, AdvancedKpis } from "@/types/stats";
 import { useT } from "@/i18n/I18nProvider";
 import { KpiTile } from "@/_components/organisms/KpiTile";
 import { formatDate, formatQty, formatMAD, formatPct, pctChange } from "@/utils/format";

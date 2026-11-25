@@ -14,7 +14,7 @@ import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { Page } from "@/_components/templates/Page";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
-import { type ProductRow } from "@/types";
+import { type ProductRow } from "@/types/products";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { formatDate, formatMAD, formatPct, formatQty } from "@/utils/format";
 

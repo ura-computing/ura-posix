@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useT } from "@/i18n/I18nProvider";
 import { ApiErr, api } from "@/api/client";
 import { API, refresh } from "@/api/api";
-import type { UpdateProfileRequest, ChangePasswordRequest, MeResponse, Session } from "@/types";
+import type { UpdateProfileRequest, ChangePasswordRequest, MeResponse, Session } from "@/types/auth";
 
 export function useSessions(userId: string) {
   const { data, isLoading, isError, error } = useQuery({

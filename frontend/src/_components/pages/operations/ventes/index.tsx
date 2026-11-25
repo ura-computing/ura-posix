@@ -3,13 +3,13 @@ import { useEffect } from "react";
 import { Download, Upload } from "lucide-react";
 
 import { FilterBar } from "@/_components/organisms/FilterBar";
-import { SURVEILLANCE_TABS } from "@/types";
+import { SURVEILLANCE_TABS } from "@/types/transactions";
 import { formatMAD, formatQty, formatPct } from "@/utils/format";
 
 import { useVentesPage } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { GaugeTiles } from "@/_components/organisms/GaugeTiles";
-import type { VentesDiscountSummary, SurveillanceTab, VentesSurveillanceCounts, VenteRow } from "@/types";
+import type { VentesDiscountSummary, SurveillanceTab, VentesSurveillanceCounts, VenteRow } from "@/types/transactions";
 import { SuffixBadge } from "@/_components/molecules/SuffixBadge";
 import { DataTable, type ColumnDef, type DataTablePagination } from "@/_components/organisms/DataTable";
 import { Page } from "@/_components/templates/Page";
