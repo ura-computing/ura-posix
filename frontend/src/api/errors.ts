@@ -67,6 +67,7 @@ export const ErrorCode = {
   BL_NOT_FOUND: "blNotFound",
   SUPPLIER_EMPTY: "supplierEmpty",
   SUPPLIER_NOT_FOUND: "supplierNotFound",
+  SUPPLIER_EXISTS: "supplierExists",
   PAYMENT_NOT_FOUND: "paymentNotFound",
   SOBRUS_NOT_CONNECTED: "sobrusNotConnected",
   SOBRUS_RUN_ACTIVE: "sobrusRunActive",

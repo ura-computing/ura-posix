@@ -90,6 +90,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       load: () => import("@/_components/pages/fournisseurs"),
       nav: { label: "nav.suppliers", icon: Truck, group: "administration" },
     },
+    { path: "/admin/fournisseurs/:id", load: () => import("@/_components/pages/fournisseurs/sheet") },
     {
       path: "/admin/categories",
       load: () => import("@/_components/pages/categories"),
@@ -124,6 +125,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       load: () => import("@/_components/pages/fournisseurs"),
       nav: { label: "nav.suppliers", icon: Truck, group: "administration" },
     },
+    { path: "/support/fournisseurs/:id", load: () => import("@/_components/pages/fournisseurs/sheet") },
     {
       path: "/support/categories",
       load: () => import("@/_components/pages/categories"),

@@ -11,6 +11,7 @@ import type { SupplierFilters, SupplierKind, SupplierListResponse } from "@/type
 const DEFAULT_FILTERS: SupplierFilters = {
   search: "",
   kind: null,
+  archived: false,
   sort_by: "name",
   sort_order: "asc",
   page: 1,
@@ -30,6 +31,7 @@ export function useFournisseursPage() {
     filters,
     setSearch: (search: string) => patch({ search }),
     setKind: (kind: SupplierKind | null) => patch({ kind }),
+    setArchived: (archived: boolean) => patch({ archived }),
     setSort,
     setPage,
     setPageSize,

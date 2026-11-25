@@ -654,6 +654,16 @@ export const API = {
       refreshes: (): Read[] => [API.admin.sobrusSuppliers],
     },
     /** « Fournisseurs »: the list shared by every pharmacy (one page, by name). */
+    /** A supplier's sheet; its « Modifier » / « Archiver ». */
+    supplier: {
+      url: (id: number) => `/admin/suppliers/${id}`,
+      key: (id: number) => ["admin", "supplier", id] as const,
+      all: ["admin", "supplier"],
+    },
+    editSupplier: {
+      url: (id: number) => `/admin/suppliers/${id}`,
+      refreshes: (): Read[] => [API.admin.suppliers, API.admin.supplier],
+    },
     suppliers: {
       url: "/admin/suppliers",
       key: (f: SupplierFilters) => ["admin", "suppliers", f] as const,

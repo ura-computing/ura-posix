@@ -181,6 +181,19 @@ Reservation: `reserved` per product = sum of `reserved_qty` of « Prêt » lines
 Behind the access « Commander » (`orders`, OFF by default, admin switches it on).
 Menu « Commandes » → Journalières · Directes · Promis · Avoirs.
 
+Build order of D (2026-11-25), stop + commit after each:
+
+| Step | What |
+|---|---|
+| D-1 | supplier sheet (admin, Support): order fields (contact, channel, delivery days, cut-off, lead time, payment, transport), « inconnu » in orange, archive |
+| D-2 | conditions: tables + per-supplier screen in plain words, state badges, add / edit step by step |
+| D-3 | import of the board (21 labs, « non vérifié ») |
+| D-4 | conditions engine (pure function) + its small tests |
+| D-5 | purchasing groups screen (empty) |
+| D-6 | stock link + needs calculation |
+| D-7 | Journalières · D-8 Directes · D-9 validation + Excel · D-10 Promis inside · D-11 avoirs |
+| D-12 | AI reader (own service) |
+
 ### D1. Data (ticket 01)
 
 | Table | Holds | Example |

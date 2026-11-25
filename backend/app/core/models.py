@@ -844,6 +844,8 @@ class PharmacyBlLineExclusion(Base):
 
 
 SUPPLIER_KINDS = ("laboratoire", "grossiste", "societe")
+# How the pharmacy orders from it: téléphone, fax, e-mail, WhatsApp, EDI, the lab's delegate.
+ORDER_CHANNELS = ("phone", "fax", "email", "whatsapp", "edi", "delegate")
 
 
 class Supplier(Base):
@@ -854,6 +856,10 @@ class Supplier(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IS NULL OR kind IN (" + ", ".join(f"'{k}'" for k in SUPPLIER_KINDS) + ")", name="ck_suppliers_kind"
+        ),
+        CheckConstraint(
+            "order_channel IS NULL OR order_channel IN (" + ", ".join(f"'{c}'" for c in ORDER_CHANNELS) + ")",
+            name="ck_suppliers_order_channel",
         ),
     )
 
@@ -866,6 +872,19 @@ class Supplier(Base):
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     address: Mapped[str | None] = mapped_column(String, nullable=True)
     city: Mapped[str | None] = mapped_column(String, nullable=True)
+    # What ordering needs (typed by the admin; Sobrus gives none of it). None = « inconnu » on the screen.
+    contact_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    order_channel: Mapped[str | None] = mapped_column(String, nullable=True)  # ORDER_CHANNELS
+    delivery_days: Mapped[list | None] = mapped_column(JSON, nullable=True)  # ["mon", "thu"]
+    cutoff_time: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # « 11:00 »: order before, delivered next day
+    lead_time_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payment_terms: Mapped[str | None] = mapped_column(String, nullable=True)  # « chèque comptant », « 60 jours »
+    transport_fee: Mapped[float | None] = mapped_column(Float, nullable=True)  # MAD per order
+    free_transport_from: Mapped[float | None] = mapped_column(Float, nullable=True)  # MAD: no fee from this amount
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 

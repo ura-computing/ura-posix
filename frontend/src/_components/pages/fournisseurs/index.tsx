@@ -1,11 +1,13 @@
 /** « Fournisseurs » (admin, Support): the supplier list shared by every pharmacy (laboratoires, grossistes, sociétés),
- *  filled by « Importer depuis Sobrus ». Search by name or city, filter by kind. */
+ *  filled by « Importer depuis Sobrus ». Search by name or city, filter by kind, « Archivés »; a click opens its sheet. */
 import { Building2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { SobrusImportCard } from "@/_components/organisms/SobrusImportCard";
 import { Page } from "@/_components/templates/Page";
+import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
 import type { Supplier, SupplierKind } from "@/types/suppliers";
 
@@ -17,8 +19,23 @@ const dash = (v: string | null) => v || <span className="text-muted-foreground">
 
 export default function FournisseursPage() {
   const t = useT();
-  const { filters, isError, isLoading, reload, reset, rows, setKind, setPage, setPageSize, setSearch, setSort, total } =
-    useFournisseursPage();
+  const { me } = useMe();
+  const navigate = useNavigate();
+  const {
+    filters,
+    isError,
+    isLoading,
+    reload,
+    reset,
+    rows,
+    setArchived,
+    setKind,
+    setPage,
+    setPageSize,
+    setSearch,
+    setSort,
+    total,
+  } = useFournisseursPage();
 
   const COLUMNS: ColumnDef<Supplier>[] = [
     {
@@ -60,7 +77,15 @@ export default function FournisseursPage() {
     <Page title={t("suppliers.title")} subtitle={t("suppliers.subtitle")}>
       <SobrusImportCard kind="suppliers" />
 
-      <FilterBar
+      <FilterBar<"active" | "archived">
+        segment={{
+          value: filters.archived ? "archived" : "active",
+          onChange: (v) => setArchived(v === "archived"),
+          options: [
+            { value: "active", label: t("suppliers.scopeActive") },
+            { value: "archived", label: t("suppliers.scopeArchived") },
+          ],
+        }}
         search={{
           value: filters.search,
           onChange: setSearch,
@@ -100,6 +125,7 @@ export default function FournisseursPage() {
         emptyTitle={t("suppliers.emptyTitle")}
         emptyHint={t("suppliers.emptyHint")}
         rowKey={(s) => s.id}
+        onRowClick={(s) => void navigate(`/${me?.role}/fournisseurs/${s.id}`)}
       />
     </Page>
   );
