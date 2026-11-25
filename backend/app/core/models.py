@@ -387,6 +387,8 @@ class PharmacyProductEdit(Base):
     barcode1: Mapped[str | None] = mapped_column(String, nullable=True)
     barcode2: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
+    # « Remise comptoir » (%): the owner's discount at the counter, shown in « Promis ». No imported value.
+    counter_discount: Mapped[float | None] = mapped_column(Float, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

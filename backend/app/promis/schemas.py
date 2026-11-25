@@ -58,6 +58,7 @@ class PromisProduct(BaseModel):
     pid: str
     product: str
     price: float | None  # PPV (the pharmacy's own when edited)
+    counter_discount: float  # « Remise comptoir » (%), 0 = none
     free_stock: int | None  # None = not in the pharmacy's stock
 
 
@@ -120,7 +121,8 @@ class PromisSheetLine(BaseModel):
     quantity: int
     reserved_qty: int
     shelf_place: str | None
-    unit_price: float | None
+    unit_price: float | None  # PPV at creation
+    counter_discount: float  # % at creation
     free_stock: int | None  # None = outside the catalogue or not in the pharmacy's stock
 
 

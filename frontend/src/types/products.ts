@@ -68,6 +68,10 @@ export interface ProductPrices {
   last_pu: number | null;
   last_pu_date: string | null;
   marge_pct: number | null;
+  /** « Remise comptoir » (%), the owner's; null = none. */
+  counter_discount: number | null;
+  /** PPV − counter discount; null = no discount. */
+  counter_price: number | null;
 }
 
 export interface ProductStock {
@@ -147,7 +151,8 @@ export type EditField =
   | "expiry_date"
   | "barcode1"
   | "barcode2"
-  | "description";
+  | "description"
+  | "counter_discount";
 
 /** PUT /products/{id}: only the fields sent change; null = back to the imported value. */
 export type ProductEditIn = Partial<Record<EditField, string | number | null>>;

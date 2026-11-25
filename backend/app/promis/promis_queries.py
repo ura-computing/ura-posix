@@ -65,6 +65,7 @@ def catalogue_products(db: Session, pharmacy_id: int, *, search: str | None = No
             Medicament.pid,
             name.label("product"),
             func.coalesce(e.ppv, Medicament.ppv).label("price"),
+            func.coalesce(e.counter_discount, 0).label("counter_discount"),
             func.coalesce(e.current_stock, s.current_stock).label("current_stock"),
         )
         .outerjoin(s, and_(s.pharmacy_id == pharmacy_id, s.medicament_id == Medicament.id))
@@ -84,6 +85,7 @@ def catalogue_products(db: Session, pharmacy_id: int, *, search: str | None = No
             "pid": r.pid,
             "product": r.product,
             "price": round(float(r.price), 2) if r.price is not None else None,
+            "counter_discount": float(r.counter_discount),
             "free_stock": max(0, r.current_stock - damaged.get(r.id, 0) - reserved.get(r.id, 0))
             if r.current_stock is not None
             else None,

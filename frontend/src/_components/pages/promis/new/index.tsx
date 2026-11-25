@@ -19,7 +19,9 @@ import { WizardProgress } from "@/_components/molecules/WizardProgress";
 import { Page } from "@/_components/templates/Page";
 import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
-import { formatMAD, formatNumStr } from "@/utils/format";
+import { formatMADStr, formatNumStr, formatPctStr } from "@/utils/format";
+
+import { netPrice } from "../constants";
 
 import { useNewPromis } from "./hooks";
 
@@ -95,6 +97,11 @@ export default function NewPromisPage() {
     </div>
   );
   const typed = productSearch.trim();
+  // Catalogue lines only (a typed product has no price).
+  const total = lines.reduce(
+    (sum, l) => sum + (l.price != null ? netPrice(l.price, l.discount) * Number(l.quantity) : 0),
+    0,
+  );
 
   return (
     <Page narrow title={t("promis.new")} above={<BackLink to={`/${me?.role}/promis`} label={t("promis.backToList")} />}>
@@ -192,13 +199,24 @@ export default function NewPromisPage() {
                           {p.free_stock == null
                             ? t("promis.notInStock")
                             : t("promis.freeStock", { n: formatNumStr(p.free_stock) })}
-                          {p.price != null && <> · {formatMAD(p.price)}</>}
+                          {p.price != null && (
+                            <>
+                              {" · "}
+                              {p.counter_discount > 0
+                                ? t("promis.priceAfter", {
+                                    price: formatMADStr(p.price),
+                                    pct: formatPctStr(p.counter_discount),
+                                    net: formatMADStr(netPrice(p.price, p.counter_discount)),
+                                  })
+                                : formatMADStr(p.price)}
+                            </>
+                          )}
                         </span>
                       </span>
                       <Button
                         variant="outline"
                         disabled={added}
-                        onClick={() => addLine(p.id, p.product)}
+                        onClick={() => addLine(p.id, p.product, p.price, p.counter_discount)}
                         aria-label={`${t("promis.addProduct")} ${p.product}`}
                       >
                         {added ? <Check className="size-4" /> : <Plus className="size-4" />}
@@ -263,11 +281,26 @@ export default function NewPromisPage() {
             )}
             {row(
               t("promis.products"),
-              lines.map((l, i) => (
-                <div key={i}>
-                  {l.quantity} × {l.name}
-                </div>
-              )),
+              <>
+                {lines.map((l, i) => (
+                  <div key={i} className="flex justify-between gap-3">
+                    <span>
+                      {l.quantity} × {l.name}
+                    </span>
+                    {l.price != null && (
+                      <span className="font-mono">
+                        {formatMADStr(netPrice(l.price, l.discount) * Number(l.quantity))}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {total > 0 && (
+                  <div className="mt-1 flex justify-between gap-3 border-t border-border pt-1 font-semibold">
+                    <span>{t("promis.total")}</span>
+                    <span className="font-mono">{formatMADStr(total)}</span>
+                  </div>
+                )}
+              </>,
             )}
             <FormField label={t("promis.note")}>
               <Textarea

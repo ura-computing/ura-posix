@@ -15,6 +15,9 @@ export interface DraftLine {
   name: string;
   /** The text of the quantity field. */
   quantity: string;
+  /** PPV and « Remise comptoir » (%) of a catalogue product (null / 0 outside the catalogue). */
+  price: number | null;
+  discount: number;
 }
 
 export function useNewPromis() {
@@ -79,8 +82,8 @@ export function useNewPromis() {
     unreachable,
     setUnreachable,
     lines,
-    addLine: (medicament_id: number | null, lineName: string) =>
-      setLines((all) => [...all, { medicament_id, name: lineName, quantity: "1" }]),
+    addLine: (medicament_id: number | null, lineName: string, price: number | null = null, discount = 0) =>
+      setLines((all) => [...all, { medicament_id, name: lineName, quantity: "1", price, discount }]),
     setQuantity: (index: number, quantity: string) =>
       setLines((all) => all.map((l, i) => (i === index ? { ...l, quantity } : l))),
     removeLine: (index: number) => setLines((all) => all.filter((_, i) => i !== index)),
@@ -99,7 +102,7 @@ export function useNewPromis() {
         customer: customer ? null : { name: name.trim(), phone: typedPhone, whatsapp_ok: whatsappOk },
         unreachable,
         note: note.trim() || null,
-        lines: lines.map((l) => ({ ...l, quantity: Number(l.quantity) })),
+        lines: lines.map(({ medicament_id, name, quantity }) => ({ medicament_id, name, quantity: Number(quantity) })),
       }),
     isCreating,
   };

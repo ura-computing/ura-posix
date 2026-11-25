@@ -4,7 +4,7 @@
  *  tab « Import Achats « … » : 247 lignes de ce produit ». */
 import type { AuditRow } from "@/types/history";
 import type { TFn } from "@/i18n/I18nProvider";
-import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
+import { formatDate, formatMADStr, formatNumStr, formatPctStr } from "@/utils/format";
 
 /** The editable field's label, as on the product page. */
 const FIELD_LABEL: Record<string, [string, Record<string, number>?]> = {
@@ -22,11 +22,13 @@ const FIELD_LABEL: Record<string, [string, Record<string, number>?]> = {
   barcode1: ["products.barcodeN", { n: 1 }],
   barcode2: ["products.barcodeN", { n: 2 }],
   description: ["history.fieldDescription"],
+  counter_discount: ["products.counterDiscount"],
 };
 
 function fieldValue(field: string, v: string | number | null | undefined): string {
   if (v == null || v === "") return "—";
   if (field === "ppv" || field === "pph") return formatMADStr(Number(v));
+  if (field === "counter_discount") return formatPctStr(Number(v));
   if (field === "current_stock" || field === "stock_min" || field === "stock_max") return formatNumStr(Number(v));
   if (field === "expiry_date") return formatDate(String(v));
   return String(v);

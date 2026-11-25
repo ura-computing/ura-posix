@@ -24,6 +24,8 @@ export interface PromisProduct {
   pid: string;
   product: string;
   price: number | null;
+  /** « Remise comptoir » (%), 0 = none. */
+  counter_discount: number;
   /** null = not in the pharmacy's stock. */
   free_stock: number | null;
 }
@@ -78,7 +80,9 @@ export interface PromisSheetLine {
   quantity: number;
   reserved_qty: number;
   shelf_place: string | null;
+  /** PPV and counter discount (%) at creation. */
   unit_price: number | null;
+  counter_discount: number;
   /** null = outside the catalogue or not in the pharmacy's stock. */
   free_stock: number | null;
 }

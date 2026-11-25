@@ -315,6 +315,17 @@ export function GeneralTab({
           <FieldList
             fields={[
               priced("ppv", t("col.ppv"), prices.ppv != null ? mad(prices.ppv) : null, "price"),
+              priced(
+                "counter_discount",
+                t("products.counterDiscount"),
+                prices.counter_discount
+                  ? join([
+                      formatPctStr(prices.counter_discount),
+                      prices.counter_price != null && formatMADStr(prices.counter_price),
+                    ])
+                  : t("products.counterDiscountNone"),
+                "pct",
+              ),
               { label: t("col.pph"), value: mad(prices.pph) },
               { label: t("products.avgPu"), value: mad(prices.avg_pu) },
               {

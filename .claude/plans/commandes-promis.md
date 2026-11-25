@@ -324,11 +324,9 @@ All answered 2026-11-24: see the decisions table at the top.
 
 ## Resume here (2026-11-25, session stopped for token use)
 
-- C-1 + C-2 committed (0742379). C-3 built (not committed): migration 0048 `promis_messages`, « Envoyer sur
-  WhatsApp » (wa.me, text ready, noted when clicked), messages due (created / ready / reminder J+5→J+7 once a day /
-  returned), list dashboard (4 counters + « À faire aujourd'hui »), deadline filter, J+7 expiry (`expire_overdue`:
-  robot loop + every promis read; « Expiré » still reserves until « Rendre au stock »). Waiting for the user's UI
-  test, then C-4 (counter discount on the product sheet, price in Promis).
+- C done: C-1 + C-2 (0742379), C-3 (592c306), C-4 « Remise comptoir » (migration 0049, product sheet « Prix et
+  marge », price − discount in the Promis wizard + sheet). Next: sidebar too long (user 2026-11-25, see answer), then
+  D (Commandes).
 - To do (user 2026-11-25): no « Premium » anywhere. Étiquette (`labels`) + Commander (`orders`) = normal accesses the
   admin / owner switch on/off, OFF by default for a new pharmacy; remove the word « Premium », PremiumTag and the
   upgrade dialog (`PremiumDialog`). Promis + Stock abîmé stay ON by default.

@@ -12,12 +12,12 @@ import { Button } from "@/_components/atoms/Button";
 import { Input } from "@/_components/atoms/Input";
 import { DatePickerButton } from "@/_components/molecules/DatePickerButton";
 import { useT } from "@/i18n/I18nProvider";
-import { formatDate, formatMADStr, formatNumStr } from "@/utils/format";
+import { formatDate, formatMADStr, formatNumStr, formatPctStr } from "@/utils/format";
 
 import { isoToTyped, typedToIso, type EditSection, type FormField } from "../hooks";
 import { SheetEditContext } from "./editContext";
 
-export type EditKind = "text" | "price" | "int" | "date";
+export type EditKind = "text" | "price" | "int" | "date" | "pct";
 
 function useSheetEdit() {
   const ctx = useContext(SheetEditContext);
@@ -29,6 +29,7 @@ function useSheetEdit() {
 function importedText(kind: EditKind, v: string | number | null | undefined): string {
   if (v == null || v === "") return "—";
   if (kind === "price") return formatMADStr(Number(v));
+  if (kind === "pct") return formatPctStr(Number(v));
   if (kind === "int") return formatNumStr(Number(v));
   if (kind === "date") return formatDate(String(v));
   return String(v);
@@ -65,7 +66,7 @@ function EditInput({ field, kind, label }: { field: FormField; kind: EditKind; l
         <Input
           aria-label={label}
           invalid={!!error}
-          inputMode={kind === "price" ? "decimal" : kind === "int" ? "numeric" : undefined}
+          inputMode={kind === "price" || kind === "pct" ? "decimal" : kind === "int" ? "numeric" : undefined}
           placeholder={kind === "date" ? t("products.datePlaceholder") : undefined}
           className={kind === "text" ? "text-left" : kind === "date" ? "text-left font-mono" : "text-right font-mono"}
           {...register(field)}

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, field_validator
 
 from app.ledger.schemas import Pagination
 
@@ -58,6 +58,8 @@ class ProductPrices(BaseModel):
     last_pu: float | None  # price of the latest purchase (with a price, qty > 0)
     last_pu_date: str | None
     marge_pct: float | None  # (1 − avg_pu / ppv) × 100
+    counter_discount: float | None  # « Remise comptoir » (%), the owner's; None = none
+    counter_price: float | None  # PPV − counter discount; None = no discount
 
 
 class ProductStock(BaseModel):
@@ -198,6 +200,12 @@ class ProductEditIn(BaseModel):
     barcode1: Text = None
     barcode2: Text = None
     description: LongText = None
+    counter_discount: float | None = Field(default=None, ge=0, le=100)  # 0 = no discount (stored as none)
+
+    @field_validator("counter_discount", mode="after")
+    @classmethod
+    def _no_zero_discount(cls, value: float | None) -> float | None:
+        return value or None
 
 
 # ═══ Statistiques ════════════════════════════════════════════════════════════

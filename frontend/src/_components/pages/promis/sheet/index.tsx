@@ -25,9 +25,9 @@ import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
 import NotFoundPage from "@/pages/common/not-found";
 import type { PromisEvent, PromisSheet, PromisState } from "@/types/promis";
-import { formatDate, formatDateTime, formatNumStr, formatQty } from "@/utils/format";
+import { formatDate, formatDateTime, formatMADStr, formatNumStr, formatPctStr, formatQty } from "@/utils/format";
 
-import { ICON, STATE_TONE } from "../constants";
+import { ICON, netPrice, STATE_TONE } from "../constants";
 import { StepDialog } from "./_components/StepDialog";
 import { usePromisSheet } from "./hooks";
 import { messageKind, whatsappUrl } from "./whatsapp";
@@ -219,8 +219,21 @@ function PromisSheetPage({ id }: { id: number }) {
                       </span>
                     )}
                   </span>
-                  <span className="font-mono text-base font-semibold">
-                    {formatQty(l.quantity)} {t("promis.quantity").toLowerCase()}
+                  <span className="flex flex-col items-end">
+                    <span className="font-mono text-base font-semibold">
+                      {formatQty(l.quantity)} {t("promis.quantity").toLowerCase()}
+                    </span>
+                    {l.unit_price != null && (
+                      <span className="text-xs text-muted-foreground">
+                        {l.counter_discount > 0
+                          ? t("promis.priceAfter", {
+                              price: formatMADStr(l.unit_price),
+                              pct: formatPctStr(l.counter_discount),
+                              net: formatMADStr(netPrice(l.unit_price, l.counter_discount)),
+                            })
+                          : formatMADStr(l.unit_price)}
+                      </span>
+                    )}
                   </span>
                 </li>
               ))}

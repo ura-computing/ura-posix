@@ -193,6 +193,7 @@ def create_promis(body: PromisIn, pharmacy_id: PromisDep, user: CurrentUserDep, 
                 name=product["product"] if product else line.name,
                 quantity=line.quantity,
                 unit_price=product["price"] if product else None,
+                counter_discount=product["counter_discount"] if product else 0.0,
             )
         )
     db.add(PromisEvent(promis_id=promis.id, from_state=None, to_state="created", actor_name=actor))
@@ -247,6 +248,7 @@ def _sheet(db, promis: Promis) -> PromisSheet:
                 reserved_qty=line.reserved_qty,
                 shelf_place=line.shelf_place,
                 unit_price=line.unit_price,
+                counter_discount=line.counter_discount,
                 free_stock=products[line.medicament_id]["free_stock"] if line.medicament_id in products else None,
             )
             for line in lines

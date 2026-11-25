@@ -262,6 +262,7 @@ EDITABLE_FIELDS = (
     "barcode1",
     "barcode2",
     "description",
+    "counter_discount",  # « Remise comptoir »: nothing imported (None), only the owner's value
 )
 
 
@@ -298,6 +299,7 @@ def _imported_values(db: Session, pharmacy_id: int, med: Medicament) -> tuple[di
         "barcode1": med.barcode1,
         "barcode2": med.barcode2,
         "description": info.description if info else None,
+        "counter_discount": None,
     }
     extra = {
         "category_type": "pharmacie" if is_pharma else "parapharmacie",
@@ -388,6 +390,10 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             "last_pu": round(last.unit_price, 4) if last else None,
             "last_pu_date": last.delivery_date if last else None,
             "marge_pct": round((1 - float(avg_pu) / ppv) * 100, 2) if avg_pu is not None and ppv and ppv > 0 else None,
+            "counter_discount": v["counter_discount"],
+            "counter_price": round(ppv * (1 - v["counter_discount"] / 100), 2)
+            if ppv is not None and v["counter_discount"]
+            else None,
         },
         "stock": {
             "current_stock": current,
@@ -429,7 +435,8 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
         ),
         "last_sale": {"date": last_out.date, "quantity": last_out.quantity} if last_out else None,
         "notes_count": note_counts(db, pharmacy_id, [med_id]).get(med_id, 0),
-        "imported": {f: imported[f] for f in edited},
+        # « Revenir à la valeur importée »: not for the counter discount (nothing imported; emptied = no discount).
+        "imported": {f: imported[f] for f in edited if f != "counter_discount"},
     }
 
 

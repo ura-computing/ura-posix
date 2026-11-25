@@ -248,6 +248,7 @@ const EDIT_FIELDS = [
   "category",
   "tva",
   "ppv",
+  "counter_discount",
   "current_stock",
   "stock_min",
   "stock_max",
@@ -282,6 +283,7 @@ function toForm(s: ProductSheet): EditValues {
     category: s.category ?? "",
     tva: s.tva ?? "",
     ppv: decimal(s.prices.ppv),
+    counter_discount: decimal(s.prices.counter_discount),
     current_stock: s.stock.current_stock == null ? "" : String(s.stock.current_stock),
     stock_min: String(s.stock.stock_min),
     stock_max: String(s.stock.stock_max),
@@ -296,7 +298,7 @@ function toForm(s: ProductSheet): EditValues {
 function toApi(field: FormField, raw: string): string | number | null {
   const v = raw.trim();
   if (!v) return null;
-  if (field === "ppv") return Number(v.replace(/\s/g, "").replace(",", "."));
+  if (field === "ppv" || field === "counter_discount") return Number(v.replace(/\s/g, "").replace(",", "."));
   if (field === "expiry_date") return typedToIso(v);
   if (INTEGERS.includes(field)) return Number(v.replace(/\s/g, ""));
   return v;
@@ -313,6 +315,10 @@ function editSchema(t: TFn) {
   return z
     .object({
       ppv: price,
+      counter_discount: z.string().refine((v) => {
+        const n = v.replace(/\s/g, "").replace(",", ".");
+        return !v.trim() || (/^\d+(\.\d{1,2})?$/.test(n) && Number(n) <= 100);
+      }, t("products.invalidPct")),
       current_stock: count(true),
       stock_min: count(false),
       stock_max: count(false),

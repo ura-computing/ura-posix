@@ -1,4 +1,5 @@
-/** « Promis »: each state's badge color, the list's state filter, each step's icon (buttons, pop-ups). */
+/** « Promis »: each state's badge color, the list's state filter, each step's icon (buttons, pop-ups), the
+ *  price after the counter discount. */
 import { Archive, CircleX, PackageCheck, TriangleAlert, Truck, Undo2, UserCheck, type LucideIcon } from "lucide-react";
 
 import type { BadgeTone } from "@/_components/atoms/Badge";
@@ -27,3 +28,6 @@ export const ICON: Partial<Record<PromisState, LucideIcon>> = {
   incident: TriangleAlert,
   cancelled: CircleX,
 };
+
+/** The price after the owner's « Remise comptoir »: 80 MAD − 10 % → 72 MAD. */
+export const netPrice = (price: number, discount: number) => Math.round(price * (100 - discount)) / 100;
