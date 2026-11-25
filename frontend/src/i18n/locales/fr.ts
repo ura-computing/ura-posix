@@ -86,6 +86,7 @@ export const fr = {
     home: "Accueil",
     logout: "Déconnexion",
     lock: "Verrouiller l'écran",
+    account: "Mon compte et déconnexion",
   },
 
   theme: {

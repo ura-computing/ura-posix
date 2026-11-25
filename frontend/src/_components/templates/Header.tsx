@@ -1,4 +1,5 @@
-/** The top bar of every page: its title, the language, the theme, the account. */
+/** The top bar of every page: its title, the language, the theme, the account (`ProfileMenu`: « Mon compte »,
+ *  « Déconnexion »). */
 import { useLocation } from "react-router-dom";
 
 import { useMe } from "@/hooks/useMe";
@@ -9,6 +10,7 @@ import { useI18n, useT } from "@/i18n/I18nProvider";
 import { LANGS, LANG_LABELS } from "@/i18n/config";
 import { cn } from "@/utils/cn";
 import { NotificationBell } from "@/_components/organisms/NotificationBell";
+import { ProfileMenu } from "@/_components/organisms/ProfileMenu";
 import { ThemeToggle } from "@/_components/molecules/ThemeToggle";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
 import { ROLE_ROUTES, ROUTES } from "@/routes";
@@ -112,6 +114,7 @@ export function Header({ onOpenMobile }: HeaderProps) {
         {me && <NotificationBell />}
         <LanguageToggle />
         <ThemeToggle />
+        <ProfileMenu />
       </div>
     </header>
   );

@@ -2,14 +2,13 @@
 import type { ComponentType } from "react";
 import { NavLink, Link } from "react-router-dom";
 
-import { ChevronLeft, ChevronRight, CircleUser, Lock, LogOut, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, type LucideIcon } from "lucide-react";
 import type { Role } from "@/types";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { PharmagestIcon } from "@/_components/atoms/PharmagestIcon";
 import { Tooltip } from "@/_components/atoms/Tooltip";
 import { useLockNow } from "@/hooks/useLockScreen";
-import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/useMe";
 import { PharmagestWordmark } from "@/_components/atoms/PharmagestWordmark";
 import { ROLE_ROUTES, ROUTES } from "@/routes";
@@ -106,7 +105,6 @@ export function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const t = useT();
-  const { handleLogout } = useLogout();
   const { me } = useMe();
   const { lockNow, isLocking } = useLockNow();
   // « Verrouiller l'écran »: only once the lock is on and has its code (« Mon compte » → « Verrouillage »).
@@ -194,14 +192,9 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="flex shrink-0 flex-col gap-0.5 border-t border-border p-2.5">
-          {links
-            .filter((r) => r.nav?.group === "bottom")
-            .map((r) => (
-              <NavRow key={r.path} to={r.path} label={r.nav!.label} icon={r.nav!.icon} collapsed={collapsed} />
-            ))}
-          <NavRow to={ROUTES.ME} label="nav.compte" icon={CircleUser} collapsed={collapsed} />
-          {canLock && (
+        {/* « Mon compte » and « Déconnexion »: the round account button, top right (`ProfileMenu`). */}
+        {canLock && (
+          <div className="flex shrink-0 flex-col gap-0.5 border-t border-border p-2.5">
             <ActionRow
               icon={Lock}
               label={t("header.lock")}
@@ -209,9 +202,8 @@ export function Sidebar({
               disabled={isLocking}
               onClick={lockNow}
             />
-          )}
-          <ActionRow icon={LogOut} label={t("header.logout")} collapsed={collapsed} onClick={handleLogout} />
-        </div>
+          </div>
+        )}
       </aside>
     </>
   );

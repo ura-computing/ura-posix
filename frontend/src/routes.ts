@@ -45,11 +45,11 @@ export interface AppRoute {
   load: () => Promise<{ default: ComponentType }>;
   /** The permission it needs (owner / employee pages). */
   feature?: Feature;
-  /** Its sidebar link; none = reached from another page. `bottom`: above « Mon compte ». */
+  /** Its sidebar link; none = reached from another page. */
   nav?: {
     label: string;
     icon: LucideIcon;
-    group: "top" | "exploitation" | "commandes" | "gestion" | "administration" | "bottom";
+    group: "top" | "exploitation" | "commandes" | "gestion" | "administration";
   };
 }
 
@@ -98,7 +98,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
     {
       path: "/admin/imports",
       load: () => import("@/_components/pages/imports/history"),
-      nav: { label: "nav.imports", icon: Settings, group: "bottom" },
+      nav: { label: "nav.imports", icon: Settings, group: "administration" },
     },
     { path: "/admin/upload-file", load: () => import("@/_components/pages/imports/upload") },
   ],
@@ -139,7 +139,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
     {
       path: "/support/imports",
       load: () => import("@/_components/pages/imports/history"),
-      nav: { label: "nav.imports", icon: Settings, group: "bottom" },
+      nav: { label: "nav.imports", icon: Settings, group: "administration" },
     },
     { path: "/support/upload-file", load: () => import("@/_components/pages/imports/upload") },
   ],
@@ -238,7 +238,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       path: "/owner/imports",
       load: () => import("@/_components/pages/imports/history"),
       feature: "import",
-      nav: { label: "nav.imports", icon: Settings, group: "bottom" },
+      nav: { label: "nav.imports", icon: Settings, group: "gestion" },
     },
     { path: "/owner/upload-file", load: () => import("@/_components/pages/imports/upload"), feature: "import" },
   ],
@@ -316,7 +316,7 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       path: "/employee/imports",
       load: () => import("@/_components/pages/imports/history"),
       feature: "import",
-      nav: { label: "nav.imports", icon: Settings, group: "bottom" },
+      nav: { label: "nav.imports", icon: Settings, group: "gestion" },
     },
     { path: "/employee/upload-file", load: () => import("@/_components/pages/imports/upload"), feature: "import" },
   ],

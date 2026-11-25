@@ -110,13 +110,16 @@ async function loginPending(page: Page, person: Person) {
   await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
   await expect(page.getByText(PENDING_HINT)).toBeVisible();
   await expect(page.locator("aside nav").getByRole("link"), "menu vide").toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Mon compte", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Mon compte et déconnexion" }).click();
+  await expect(page.getByRole("menuitem", { name: "Mon compte", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.goto("/owner/employees");
   await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
   await expect(page.getByText(PENDING_HINT), "« Équipe » : même 404").toBeVisible();
 
   const out = pageSend(page, "POST", "/auth/logout", 204);
-  await page.getByRole("button", { name: "Déconnexion", exact: true }).click();
+  await page.getByRole("button", { name: "Mon compte et déconnexion" }).click();
+  await page.getByRole("menuitem", { name: "Déconnexion", exact: true }).click();
   await out;
   await expect(page).toHaveURL(/\/login$/);
 }

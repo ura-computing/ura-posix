@@ -4,7 +4,7 @@
  *  deactivate / reactivate, delete a second employee (confirmation dialog).
  *  Then the employee logs in with the new password: /auth/me carries the
  *  restricted set, a blocked page shows the 404 INSIDE the layout, and the
- *  sidebar « Déconnexion » works. Serial: each test needs the one before. */
+ *  « Déconnexion » (account button, top right) works. Serial: each test needs the one before. */
 import type { Page } from "@playwright/test";
 
 import { apiGet, apiPost } from "../lib/api";
@@ -199,11 +199,9 @@ test.describe("employé", () => {
     await page.goto("/owner/employees"); // owner-only page: same 404 inside the layout
     await expect(page.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeVisible();
     await expect(page, "pas de redirection").toHaveURL(/\/owner\/employees$/);
-    const logout = page.getByRole("button", {
-      name: "Déconnexion",
-      exact: true,
-    });
-    await expect(logout, "le menu reste là (on peut se déconnecter)").toBeVisible();
+    await page.getByRole("button", { name: "Mon compte et déconnexion" }).click();
+    const logout = page.getByRole("menuitem", { name: "Déconnexion", exact: true });
+    await expect(logout, "le bouton du compte reste là (on peut se déconnecter)").toBeVisible();
 
     const out = pageSend(page, "POST", "/auth/logout", 204);
     await logout.click();

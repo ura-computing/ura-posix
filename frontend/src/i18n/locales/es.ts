@@ -84,6 +84,7 @@ export const es: Dict = {
     home: "Inicio",
     logout: "Cerrar sesión",
     lock: "Bloquear la pantalla",
+    account: "Mi cuenta y cerrar sesión",
   },
 
   theme: {
