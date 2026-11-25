@@ -6,9 +6,9 @@
 import { useState } from "react";
 import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 import { FilterBar } from "@/_components/organisms/FilterBar";
-import { PremiumDialog, type PremiumFeature } from "@/_components/organisms/PremiumDialog";
 import { useMe } from "@/hooks/useMe";
 import { BackLink } from "@/_components/molecules/BackLink";
 import { Page } from "@/_components/templates/Page";
@@ -47,11 +47,9 @@ function ProductSheetPage({ id }: { id: number }) {
   const { sheet, isLoading, notFound, tab, setTab } = useProduitPage(id);
   const editor = useSheetEditor(sheet);
   const { range, setRange, period, setPeriod } = useStatsRange();
-  // « Étiquette » / « Commander » (premium): unlocked = in the account's effective permissions.
+  // « Étiquette » / « Commander »: open = in the account's effective permissions.
   const { me } = useMe();
   const role = me?.role;
-  const has = (f: PremiumFeature) => !!me?.permissions.includes(f);
-  const [premium, setPremium] = useState<PremiumFeature | null>(null);
   const { stats } = useProductStats(id, range, !!sheet);
   useScanner(); // a scan anywhere on the page → that product
   // « Observations »: their window opens with the page when there are some — once (switching tabs
@@ -88,7 +86,9 @@ function ProductSheetPage({ id }: { id: number }) {
         actions={
           <SheetActions
             sheet={sheet}
-            onPremium={setPremium}
+            canLabel={!!me?.permissions.includes("labels")}
+            canOrder={!!me?.permissions.includes("orders")}
+            onSoon={() => toast.info(t("products.soon"))}
             onOpenNotes={() => setNotesOpen(true)}
             onDeclareDamage={me?.permissions.includes("damaged") ? () => setDamageOpen(true) : null}
           />
@@ -115,7 +115,6 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "codes" && <CodesTab sheet={sheet} />}
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
-      <PremiumDialog feature={premium} unlocked={premium !== null && has(premium)} onClose={() => setPremium(null)} />
       <DamageDialog
         open={damageOpen}
         product={sheet.product}

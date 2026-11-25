@@ -247,7 +247,7 @@ test.describe("admin", () => {
     const created = (await apiGet<Row[]>(page, "/admin/pharmacies")).find((p) => p.code === res.pharmacy_code);
     expectSame(created, { name: NEW_PHARMACY.name, city: NEW_PHARMACY.city }, "pharmacie créée");
     const detail = await apiGet<Row>(page, `/admin/pharmacies/${created!.id}`);
-    expect([...detail.enabled_features].sort(), "toutes les fonctionnalités, premium coupées").toEqual(
+    expect([...detail.enabled_features].sort(), "toutes les fonctionnalités, Étiquette / Commander coupées").toEqual(
       [...PHARMACY_FEATURES].sort(),
     );
   });

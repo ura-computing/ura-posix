@@ -178,7 +178,7 @@ Reservation: `reserved` per product = sum of `reserved_qty` of « Prêt » lines
 
 ## D. Commandes (ClickUp 01 → 12, 14; 13 skipped)
 
-Behind the premium feature « Commander » (`orders`, OFF by default, admin switches it on).
+Behind the access « Commander » (`orders`, OFF by default, admin switches it on).
 Menu « Commandes » → Journalières · Directes · Promis · Avoirs.
 
 ### D1. Data (ticket 01)
@@ -327,6 +327,3 @@ All answered 2026-11-24: see the decisions table at the top.
 - C done: C-1 + C-2 (0742379), C-3 (592c306), C-4 « Remise comptoir » (migration 0049, product sheet « Prix et
   marge », price − discount in the Promis wizard + sheet). Next: sidebar too long (user 2026-11-25, see answer), then
   D (Commandes).
-- To do (user 2026-11-25): no « Premium » anywhere. Étiquette (`labels`) + Commander (`orders`) = normal accesses the
-  admin / owner switch on/off, OFF by default for a new pharmacy; remove the word « Premium », PremiumTag and the
-  upgrade dialog (`PremiumDialog`). Promis + Stock abîmé stay ON by default.

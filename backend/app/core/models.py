@@ -44,14 +44,14 @@ ALLOWED_FEATURES = (
     "special_products",
     "produits",
     "sobrus",  # « Connexion Sobrus » (owners only, app/sobrus/)
-    "labels",  # premium: « Étiquette » on the product page
-    "orders",  # premium: « Commander » on the product page
+    "labels",  # « Étiquette » on the product page (OFF for a new pharmacy)
+    "orders",  # « Commander » on the product page (OFF for a new pharmacy)
     "damaged",  # « Stock abîmé »: boxes declared damaged (app/damaged/)
     "promis",  # « Promis »: products promised to a customer (app/promis/)
 )
-# Premium: a new pharmacy gets them OFF (the admin switches them on); every other feature ON. Users always get the
+# A new pharmacy gets these OFF (the admin switches them on); every other feature ON. Users always get the
 # permission, so the pharmacy switch alone decides.
-PREMIUM_FEATURES = ("labels", "orders")
+OFF_BY_DEFAULT = ("labels", "orders")
 # Same rule as migrations 0009 / 0016, so a fresh DB (create_all) rejects unknown features too.
 _FEATURES_SQL = "(" + ", ".join(f"'{f}'" for f in ALLOWED_FEATURES) + ")"
 

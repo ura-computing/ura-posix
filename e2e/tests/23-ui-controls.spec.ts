@@ -6,7 +6,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { apiDelete, apiGet, apiPost } from "../lib/api";
 import type { Row } from "../lib/checks";
-import { LOGGED_OUT, PREMIUM_FEATURES, loadState, sessionFile } from "../lib/auth";
+import { LOGGED_OUT, OFF_BY_DEFAULT, loadState, sessionFile } from "../lib/auth";
 import { expected } from "../lib/expected";
 import { expect, test } from "../lib/fixtures";
 import { REPO_DIR } from "../lib/paths";
@@ -829,13 +829,13 @@ test.describe("administrateur", () => {
         await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
         await expect(switches.and(page.locator("[aria-checked=true]"))).toHaveCount(0);
         const off = switches.and(page.locator("[aria-checked=false]"));
-        await cancel.click(); // nothing saved: back as saved (every feature on, premium off)
-        await expect(off).toHaveCount(PREMIUM_FEATURES.length);
+        await cancel.click(); // nothing saved: back as saved (every feature on but OFF_BY_DEFAULT)
+        await expect(off).toHaveCount(OFF_BY_DEFAULT.length);
         await page.getByRole("button", { name: "Tout désactiver", exact: true }).click();
         await page.getByRole("button", { name: "Tout activer", exact: true }).click();
         await expect(off).toHaveCount(0);
-        await cancel.click(); // premium switched on only on screen: back as saved
-        await expect(off).toHaveCount(PREMIUM_FEATURES.length);
+        await cancel.click(); // « Étiquette » / « Commander » switched on only on screen: back as saved
+        await expect(off).toHaveCount(OFF_BY_DEFAULT.length);
         // Each switch by itself: one click changes it, a second puts it back (nothing to save).
         for (const one of await switches.all()) {
           const was = await one.getAttribute("aria-checked");

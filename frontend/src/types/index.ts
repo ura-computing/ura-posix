@@ -30,8 +30,8 @@ export const FEATURES = [
   "special_products",
   "produits",
   "sobrus",
-  "labels", // premium: « Étiquette » (product page)
-  "orders", // premium: « Commander » (product page)
+  "labels", // « Étiquette » (product page), OFF for a new pharmacy
+  "orders", // « Commander » (product page), OFF for a new pharmacy
   "damaged", // « Stock abîmé »
   "promis", // « Promis »
 ] as const;

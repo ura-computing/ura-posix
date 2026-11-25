@@ -24,7 +24,7 @@ const EMP = {
 const NEW_PASSWORD = "EmployeE2e#2";
 const REMOVED = ["stock", "analyse"];
 const GRANTED = ALL_FEATURES.filter((f) => !REMOVED.includes(f)).sort();
-/** What the employee can open: granted ∩ the pharmacy's switches (premium off). */
+/** What the employee can open: granted ∩ the pharmacy's switches (Étiquette / Commander off). */
 const EFFECTIVE = GRANTED.filter((f) => PHARMACY_FEATURES.includes(f));
 
 const employeeId = (): number => loadState().employeeId;
@@ -56,8 +56,8 @@ test.describe("propriétaire", () => {
 
   test("inviter un employé : mot de passe tapé, toutes les permissions", async ({ page }) => {
     const all = [...ALL_FEATURES].sort();
-    const on = [...PHARMACY_FEATURES].sort(); // premium off for the pharmacy
-    // The owner holds every permission; the pharmacy's switches leave the premium ones off.
+    const on = [...PHARMACY_FEATURES].sort(); // Étiquette / Commander off for the pharmacy
+    // The owner holds every permission; the pharmacy's switches leave Étiquette / Commander off.
     expectSame(await open(page), { employees: [], pharmacy_features: on, my_permissions: all }, "équipe au départ");
 
     await page.getByRole("button", { name: "Inviter un employé" }).click();

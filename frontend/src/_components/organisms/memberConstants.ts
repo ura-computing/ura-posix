@@ -43,8 +43,6 @@ export interface FeatureDef {
   icon: LucideIcon;
   /** Owners only (« Connexion Sobrus »): not offered on an employee's accesses. */
   ownerOnly?: boolean;
-  /** Premium (« Étiquette », « Commander »): OFF for a new pharmacy, the admin switches it on. */
-  premium?: boolean;
 }
 
 // label/description hold i18n KEYS (adminFeat.*) — translate at render with t().
@@ -62,8 +60,8 @@ export const FEATURES: FeatureDef[] = [
   { key: "sobrus", label: "adminFeat.sobrus", description: "adminFeat.sobrusD", icon: RefreshCw, ownerOnly: true },
   { key: "damaged", label: "adminFeat.damaged", description: "adminFeat.damagedD", icon: PackageX },
   { key: "promis", label: "adminFeat.promis", description: "adminFeat.promisD", icon: HandHeart },
-  { key: "labels", label: "adminFeat.labels", description: "adminFeat.labelsD", icon: Printer, premium: true },
-  { key: "orders", label: "adminFeat.orders", description: "adminFeat.ordersD", icon: PackagePlus, premium: true },
+  { key: "labels", label: "adminFeat.labels", description: "adminFeat.labelsD", icon: Printer },
+  { key: "orders", label: "adminFeat.orders", description: "adminFeat.ordersD", icon: PackagePlus },
 ];
 
 export const FEATURE_KEYS: readonly FeatureKey[] = FEATURES.map((f) => f.key);

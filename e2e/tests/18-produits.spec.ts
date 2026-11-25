@@ -629,7 +629,7 @@ test("fiche produit: copier le code barre (en-tête)", async ({ page }) => {
   expect(await page.evaluate(() => navigator.clipboard.readText()), "presse-papiers").toBe(e.barcode1);
 });
 
-test("fiche produit: « Étiquette » et « Commander » premium : verrouillés, puis ouverts par l'administrateur", async ({
+test("fiche produit: « Étiquette » et « Commander » : désactivés avec la raison, puis ouverts par l'administrateur", async ({
   page,
   browser,
 }) => {
@@ -637,24 +637,23 @@ test("fiche produit: « Étiquette » et « Commander » premium : verrouillés,
   const [pid] = Object.entries<Row>(expected().products.sheets).find(
     ([, s]) => s.stock.stock_max - Math.max(0, s.stock.current_stock ?? 0) > 0,
   ) as [string, Row];
-  const click = async (name: RegExp, text: string) => {
-    await page.locator("main header").getByRole("button", { name }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog, String(name)).toContainText(text);
-    await dialog.getByRole("button", { name: "Fermer", exact: true }).last().click();
-    await expect(dialog).toHaveCount(0);
+  const header = page.locator("main header");
+  const click = async (name: RegExp) => {
+    await header.getByRole("button", { name }).click();
+    await expect(page.getByText("Bientôt disponible.", { exact: true }).first(), String(name)).toBeVisible();
   };
   await openSheet(page, pid);
-  await click(/^Étiquette/, "Pour l'activer, contactez APCM.");
-  await click(/^Commander/, "Pour l'activer, contactez APCM.");
+  await expect(header.getByRole("button", { name: /^Étiquette/ })).toBeDisabled();
+  await expect(header.getByRole("button", { name: /^Commander/ })).toBeDisabled();
+  await expect(header.getByText("Accès pas encore activé : demandez-le à l'administrateur.")).toBeVisible();
   const ctx = await browser.newContext({ storageState: sessionFile("admin") });
   const admin = await ctx.newPage();
   const features = `/admin/pharmacies/${loadState().pharmacyId}/features`;
   await apiPut(admin, features, { features: { labels: true, orders: true } });
   try {
     await page.reload();
-    await click(/^Étiquette/, "Bientôt disponible");
-    await click(/^Commander/, "Bientôt disponible");
+    await click(/^Étiquette/);
+    await click(/^Commander/);
   } finally {
     await apiPut(admin, features, { features: { labels: false, orders: false } });
     await ctx.close();

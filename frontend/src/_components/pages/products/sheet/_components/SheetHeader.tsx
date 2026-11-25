@@ -1,6 +1,6 @@
 /** Top of the product sheet, on every tab, kept calm (above it: `BackLink` « Retour à la liste des produits »): the name; one line with
  *  the type and stock badges, the PID and the code barre; on the right the stock box and the actions: « Observations »,
- *  « Déclarer des boîtes abîmées », the premium « Étiquette » / « Commander N ». */
+ *  « Déclarer des boîtes abîmées », « Étiquette » / « Commander N » (accesses OFF for a new pharmacy). */
 import { PackageX, Printer, ShoppingCart, StickyNote } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
@@ -8,7 +8,6 @@ import { Button } from "@/_components/atoms/Button";
 import { Card } from "@/_components/atoms/Card";
 import { SectionTitle } from "@/_components/atoms/SectionTitle";
 import { TypeBadge } from "@/_components/molecules/TypeBadge";
-import type { PremiumFeature } from "@/_components/organisms/PremiumDialog";
 import type { ProductSheet, ProductStock } from "@/types/products";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -98,16 +97,22 @@ function StockBox({ stock }: { stock: ProductStock }) {
 }
 
 /** Right of the title: the stock box, then, stacked, « Observations » (their window), « Étiquette » and « Commander N »
- *  (premium: without it, a click opens the upgrade screen; N = maximum − stock, disabled when nothing to order, the
- *  reason under it). No « Modifier » here: each block of « Général » / « Codes » has its own. */
+ *  (N = maximum − stock). Without the access: shown, disabled, the reason under it; with it: « Bientôt disponible »
+ *  for now. No « Modifier » here: each block of « Général » / « Codes » has its own. */
 export function SheetActions({
   sheet,
-  onPremium,
+  canLabel,
+  canOrder,
+  onSoon,
   onOpenNotes,
   onDeclareDamage,
 }: {
   sheet: ProductSheet;
-  onPremium: (feature: PremiumFeature) => void;
+  /** The accesses « Étiquette » (`labels`) and « Commander » (`orders`). */
+  canLabel: boolean;
+  canOrder: boolean;
+  /** A click while the feature is not built yet. */
+  onSoon: () => void;
   onOpenNotes: () => void;
   /** null = no « Stock abîmé » access: the button is not shown. */
   onDeclareDamage: (() => void) | null;
@@ -131,15 +136,20 @@ export function SheetActions({
             {t("damaged.declare")}
           </Button>
         )}
-        <Button variant="outline" onClick={() => onPremium("labels")}>
+        <Button variant="outline" onClick={onSoon} disabled={!canLabel}>
           <Printer className="size-4" />
           {t("products.label")}
         </Button>
-        <Button variant="outline" onClick={() => onPremium("orders")} disabled={toOrder <= 0}>
+        <Button variant="outline" onClick={onSoon} disabled={!canOrder || toOrder <= 0}>
           <ShoppingCart className="size-4" />
           {toOrder > 0 ? t("products.order", { n: toOrder }) : t("products.orderNone")}
         </Button>
-        {toOrder <= 0 && <span className="max-w-48 text-sm text-muted-foreground">{t("products.orderEnough")}</span>}
+        {(!canLabel || !canOrder) && (
+          <span className="max-w-48 text-sm text-muted-foreground">{t("products.accessOff")}</span>
+        )}
+        {canOrder && toOrder <= 0 && (
+          <span className="max-w-48 text-sm text-muted-foreground">{t("products.orderEnough")}</span>
+        )}
       </div>
     </div>
   );

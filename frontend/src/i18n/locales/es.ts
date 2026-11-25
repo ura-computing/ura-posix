@@ -2,16 +2,6 @@
 import type { Dict } from "./fr";
 
 export const es: Dict = {
-  premium: {
-    tag: "Premium",
-    title: "Función Premium",
-    labels: "« Etiqueta » imprime la etiqueta de un producto: su nombre, su código de barras, su precio.",
-    orders: "« Pedir » prepara el pedido de un producto, con la cantidad necesaria.",
-    included: "Forma parte de la oferta Premium de PharmaGest.",
-    how: "Para activarla, contacte con APCM.",
-    soonTitle: "Próximamente",
-    soonText: "Esta función llega pronto a PharmaGest.",
-  },
   common: {
     optional: "Opcional",
     export: "Exportar Excel",
@@ -797,6 +787,8 @@ export const es: Dict = {
     label: "Etiqueta",
     order: "Pedir {{n}}",
     orderNone: "Pedir",
+    soon: "Disponible pronto.",
+    accessOff: "Acceso aún no activado: pídalo al administrador.",
     orderEnough: "Stock suficiente: nada que pedir.",
     period7: "7 d",
     period30: "30 d",
@@ -1428,9 +1420,9 @@ export const es: Dict = {
     sobrus: "Conexión Sobrus",
     sobrusD: "PharmaGest importa solo las compras, ventas y stock de Sobrus (propietario)",
     labels: "Etiquetas",
-    labelsD: "Imprimir la etiqueta de un producto (Premium)",
+    labelsD: "Imprimir la etiqueta de un producto",
     orders: "Pedidos",
-    ordersD: "Preparar el pedido de un producto (Premium)",
+    ordersD: "Preparar el pedido de un producto",
     damaged: "Stock dañado",
     damagedD: "Declarar cajas dañadas, sacarlas del stock libre",
     promis: "Promesas",

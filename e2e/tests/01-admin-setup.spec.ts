@@ -26,7 +26,7 @@ test("admin: crée la pharmacie E2E et son propriétaire", async ({ page }) => {
   const pharmacyId = Number(new URL(page.url()).pathname.split("/").pop());
   const pharmacy = await apiGet(page, `/admin/pharmacies/${pharmacyId}`);
   expect(pharmacy.code, "code derived from the city").toMatch(/^BOU\d{4}$/);
-  expect([...pharmacy.enabled_features].sort(), "all features on by default, premium off").toEqual(
+  expect([...pharmacy.enabled_features].sort(), "all features on by default, Étiquette / Commander off").toEqual(
     [...PHARMACY_FEATURES].sort(),
   );
 

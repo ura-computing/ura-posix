@@ -4,16 +4,6 @@ import type { ErrorCode } from "@/api/errors";
  *  every key here must exist there. Numbers/dates are formatted by utils/format
  *  (French style) regardless of language, so only words live here. */
 export const fr = {
-  premium: {
-    tag: "Premium",
-    title: "Fonction Premium",
-    labels: "« Étiquette » imprime l'étiquette d'un produit : son nom, son code barre, son prix.",
-    orders: "« Commander » prépare la commande d'un produit, avec la quantité qu'il faut.",
-    included: "Elle fait partie de l'offre Premium de PharmaGest.",
-    how: "Pour l'activer, contactez APCM.",
-    soonTitle: "Bientôt disponible",
-    soonText: "Cette fonction arrive bientôt dans PharmaGest.",
-  },
   common: {
     optional: "Facultatif",
     export: "Exporter Excel",
@@ -806,6 +796,8 @@ export const fr = {
     label: "Étiquette",
     order: "Commander {{n}}",
     orderNone: "Commander",
+    soon: "Bientôt disponible.",
+    accessOff: "Accès pas encore activé : demandez-le à l'administrateur.",
     orderEnough: "Stock suffisant : rien à commander.",
     period7: "7 j",
     period30: "30 j",
@@ -1439,9 +1431,9 @@ export const fr = {
     sobrus: "Connexion Sobrus",
     sobrusD: "PharmaGest importe tout seul les achats, ventes et stock de Sobrus (propriétaire)",
     labels: "Étiquettes",
-    labelsD: "Imprimer l'étiquette d'un produit (Premium)",
+    labelsD: "Imprimer l'étiquette d'un produit",
     orders: "Commandes",
-    ordersD: "Préparer la commande d'un produit (Premium)",
+    ordersD: "Préparer la commande d'un produit",
     damaged: "Stock abîmé",
     damagedD: "Déclarer des boîtes abîmées, les retirer du stock libre",
     promis: "Promis",

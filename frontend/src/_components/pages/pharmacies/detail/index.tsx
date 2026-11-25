@@ -15,7 +15,6 @@ import { useT } from "@/i18n/I18nProvider";
 
 import { Button } from "@/_components/atoms/Button";
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
-import { PremiumTag } from "@/_components/molecules/PremiumTag";
 import { SwitchCard } from "@/_components/molecules/SwitchCard";
 import { CreateUserDialog, ResetPasswordDialog } from "@/_components/organisms/CreateUserDialog";
 import { MembersSection } from "@/_components/organisms/MembersSection";
@@ -100,7 +99,6 @@ function FeatureToggleGrid({
               key={f.key}
               icon={f.icon}
               title={t(f.label)}
-              tag={f.premium ? <PremiumTag /> : undefined}
               description={t(f.description)}
               checked={values[f.key]}
               onChange={(next) => onToggle(f.key, next)}

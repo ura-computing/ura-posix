@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ApiError, ErrorCode
 from app.core.models import (
     ALLOWED_FEATURES,
-    PREMIUM_FEATURES,
+    OFF_BY_DEFAULT,
     Pharmacy,
     PharmacyFeature,
     StoreWebsiteRequest,
@@ -239,7 +239,7 @@ def add_pharmacy(
             db.rollback()
             continue
         for feature in ALLOWED_FEATURES:
-            db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feature, enabled=feature not in PREMIUM_FEATURES))
+            db.add(PharmacyFeature(pharmacy_id=pharm.id, feature=feature, enabled=feature not in OFF_BY_DEFAULT))
         db.flush()
         return pharm
     raise ApiError(
