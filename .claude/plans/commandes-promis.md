@@ -338,5 +338,5 @@ All answered 2026-11-24: see the decisions table at the top.
 ## Resume here (2026-11-25, session stopped for token use)
 
 - C done: C-1 + C-2 (0742379), C-3 (592c306), C-4 « Remise comptoir » (migration 0049, product sheet « Prix et
-  marge », price − discount in the Promis wizard + sheet). Next: sidebar too long (user 2026-11-25, see answer), then
-  D (Commandes).
+  marge », price − discount in the Promis wizard + sheet). Then: account button top right (35d53e2), no « Premium » (d7b952b),
+  D-1 supplier sheet (c4888af). Waiting: user's UI test of D-1, sidebar choice (A tabs / B fold / C « Plus »). Next: D-2.
