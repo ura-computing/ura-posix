@@ -339,4 +339,20 @@ All answered 2026-11-24: see the decisions table at the top.
 
 - C done: C-1 + C-2 (0742379), C-3 (592c306), C-4 « Remise comptoir » (migration 0049, product sheet « Prix et
   marge », price − discount in the Promis wizard + sheet). Then: account button top right (35d53e2), no « Premium » (d7b952b),
-  D-1 supplier sheet (c4888af), D-2 conditions (53bf37c), D-3 board import (a747a3a), D-4 engine + 12 tests (867c8b3), D-5 groups tab (28e5b33), D-6 needs (9c8acc2), Étiquette print (2b348cb), D-7 Commandes du jour (6ca9c7c), label redesign (c09ed2f), D-9 flow (next commit: pharmacy sends → admin « Commandes à passer » filter + timeline + Excel → Passée → Livrée). Next: D-8 Directes, D-10 Promis inside, D-11 avoirs.
+  D-1 supplier sheet (c4888af), D-2 conditions (53bf37c), D-3 board import (a747a3a), D-4 engine + 12 tests (867c8b3), D-5 groups tab (28e5b33), D-6 needs (9c8acc2), Étiquette print (2b348cb), D-7 Commandes du jour (6ca9c7c), label redesign (c09ed2f), D-9 flow (ab41846: pharmacy sends → admin « Commandes à passer » filter + timeline + Excel → Passée → Livrée), owner list + filter (ad6a463). Next: D-8 Directes, D-10 Promis inside, D-11 avoirs.
+
+## G. « Quoi de neuf » guided tour on first login (user, 2026-11-25)
+
+A short guided tour (« product tour » / coach marks: a bubble pointing at a part of the screen, « Suivant »,
+« Passer ») shown once to every existing account at its next login, then never again (« Revoir le guide » in « Mon
+compte »).
+
+| Step | Points at | Says |
+|---|---|---|
+| 1 | the round account button, top right | « Votre compte a bougé : Mon compte et Déconnexion sont ici. » |
+| 2 | « Gestion des imports » in the sidebar | « Gestion des imports est maintenant dans GESTION. » |
+
+- Plain words, big « Suivant » / « J'ai compris », « Passer » always there; no animation (light pages).
+- Seen = saved on the account (server), so it does not come back on another computer.
+- New accounts: the same mechanism can carry a first « how to use the app » tour later (not in this step).
+
