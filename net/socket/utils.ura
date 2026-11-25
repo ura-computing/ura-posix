@@ -1,0 +1,13 @@
+fn poll(sockets &Array<Socket>, events i16, timeout i32) Array<i16>:
+    entries Array<cstd::pollfd>
+    for socket in sockets:
+        entries.append({
+            fd: socket.fd,
+            events: events
+        })
+    if cstd::poll(entries.data, entries.len(), timeout) < 0:
+        throw fail("poll")
+    ready Array<i16>
+    for entry in entries:
+        ready.append(entry.revents)
+    return ready

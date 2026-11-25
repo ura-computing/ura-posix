@@ -20,6 +20,12 @@ fn bind(address &Address) &Socket:
         throw fail("bind")
     return &self
 
+fn connect(address &Address) &Socket:
+    size i32 = sizeof(cstd::sockaddr_in)
+    if cstd::connect(self.fd, &address.raw, size) < 0:
+        throw fail("connect")
+    return &self
+
 fn listen(backlog i32):
     if cstd::listen(self.fd, backlog) < 0:
         throw fail("listen")

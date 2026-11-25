@@ -10,5 +10,11 @@ pub fn create(port i32) Address:
     }
     return address
 
+pub fn create(ip String, port i32) Address:
+    address Address = Address::create(port)
+    if cstd::inet_pton(cstd::AF_INET, ip.chars(), &address.raw.sin_addr) != 1:
+        throw fail($"inet_pton {ip}")
+    return address
+
 fn port() i32:
     return cstd::ntohs(self.raw.sin_port) as i32
