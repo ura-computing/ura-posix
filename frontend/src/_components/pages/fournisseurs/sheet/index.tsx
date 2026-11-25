@@ -1,5 +1,5 @@
-/** One supplier (admin, Support), laid out like the promis sheet: left, its blocks (« Contact », « Commande et
- *  livraison », « Paiement et transport », « Note »), each with « Modifier »; right, « À compléter »: what ordering
+/** One supplier (admin, Support), laid out like the promis sheet: left, its blocks (« Contact », « Conditions »,
+ *  « Commande et livraison », « Paiement et transport », « Note »), each with « Modifier »; right, « À compléter »: what ordering
  *  still needs. An empty value says « inconnu » in orange (nothing is invented). « Archiver » takes it out of the list
  *  (back with « Remettre dans la liste »). */
 import { useState, type ReactNode } from "react";
@@ -21,6 +21,7 @@ import NotFoundPage from "@/pages/common/not-found";
 import { WEEK, type SupplierSheet } from "@/types/suppliers";
 import { formatDate, formatMADStr } from "@/utils/format";
 
+import { ConditionsCard } from "./_components/ConditionsCard";
 import { SupplierEditDialog, type SupplierBlock } from "./_components/SupplierEditDialog";
 import { useSupplierSheet } from "./hooks";
 
@@ -103,6 +104,7 @@ function SupplierSheetPage({ id }: { id: number }) {
               ]}
             />
           </SectionCard>
+          <ConditionsCard supplier={s} />
           <SectionCard title={t("suppliers.block_order")} actions={edit("order")}>
             <FieldList
               fields={[

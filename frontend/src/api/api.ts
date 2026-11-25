@@ -664,6 +664,24 @@ export const API = {
       url: (id: number) => `/admin/suppliers/${id}`,
       refreshes: (): Read[] => [API.admin.suppliers, API.admin.supplier],
     },
+    /** A supplier's conditions; add, change (version + 1), delete. */
+    conditions: {
+      url: (supplierId: number) => `/admin/suppliers/${supplierId}/conditions`,
+      key: (supplierId: number) => ["admin", "conditions", supplierId] as const,
+      all: ["admin", "conditions"],
+    },
+    addCondition: {
+      url: (supplierId: number) => `/admin/suppliers/${supplierId}/conditions`,
+      refreshes: (): Read[] => [API.admin.conditions],
+    },
+    editCondition: {
+      url: (id: number) => `/admin/conditions/${id}`,
+      refreshes: (): Read[] => [API.admin.conditions],
+    },
+    deleteCondition: {
+      url: (id: number) => `/admin/conditions/${id}`,
+      refreshes: (): Read[] => [API.admin.conditions],
+    },
     suppliers: {
       url: "/admin/suppliers",
       key: (f: SupplierFilters) => ["admin", "suppliers", f] as const,

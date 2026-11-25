@@ -96,6 +96,7 @@ class ErrorCode(StrEnum):
     SUPPLIER_EMPTY = "supplierEmpty"
     SUPPLIER_NOT_FOUND = "supplierNotFound"
     SUPPLIER_EXISTS = "supplierExists"
+    CONDITION_NOT_FOUND = "conditionNotFound"
     PAYMENT_NOT_FOUND = "paymentNotFound"
     # Connexion Sobrus (app/sobrus/)
     SOBRUS_NOT_CONNECTED = "sobrusNotConnected"

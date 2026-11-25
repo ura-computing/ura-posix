@@ -889,6 +889,90 @@ class Supplier(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
 
+CONDITION_KINDS = (
+    "minimum_order",  # « Commande minimum : 5 000 MAD » (basis + value)
+    "qty_tiers",  # « Dès 100 unités : 20 % · dès 200 : 23 % » (tiers on units)
+    "amount_tiers",  # « Dès 4 000 MAD : 7 % » (tiers on MAD)
+    "product_discount",  # « Remise : 10 % » (value)
+    "pack",  # « 36 achetées + 6 offertes » (value = bought, days unused, tiers unused, text = how)
+    "payment_discount",  # « Escompte 2 % si payé sous 60 jours » (value %, days)
+    "transport",  # « Transport offert dès 1 500 MAD » (value MAD)
+    "packaging",  # « Par multiple de 12 (colisage) » (value)
+    "return_rule",  # « Ni repris ni échangés » (text)
+)
+CONDITION_STATES = ("confirmed", "unverified", "missing")  # « Confirmée », « À vérifier », « Manquante »
+CONDITION_BASES = ("units", "mad", "references")
+
+
+class SupplierCondition(Base):
+    """One commercial rule of a supplier, the same for every pharmacy (typed by the admin). Its products: the exact
+    list in `condition_products` (none = every product of the supplier). « À vérifier » rules are shown, never applied
+    by the engine. Every change: a new `version`, the old one in `condition_history`. Deleted = `deleted_at`."""
+
+    __tablename__ = "supplier_conditions"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN (" + ", ".join(f"'{k}'" for k in CONDITION_KINDS) + ")", name="ck_supplier_conditions_kind"
+        ),
+        CheckConstraint(
+            "state IN (" + ", ".join(f"'{s}'" for s in CONDITION_STATES) + ")", name="ck_supplier_conditions_state"
+        ),
+        CheckConstraint(
+            "basis IS NULL OR basis IN (" + ", ".join(f"'{b}'" for b in CONDITION_BASES) + ")",
+            name="ck_supplier_conditions_basis",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("suppliers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    basis: Mapped[str | None] = mapped_column(String, nullable=True)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tiers: Mapped[list | None] = mapped_column(JSON, nullable=True)  # [{"from": 100, "pct": 20}, …], ascending
+    text: Mapped[str | None] = mapped_column(String, nullable=True)
+    valid_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    state: Mapped[str] = mapped_column(String, nullable=False, default="unverified")
+    source: Mapped[str | None] = mapped_column(String, nullable=True)  # « Board 2024 », a document's name
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by_name: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ConditionProduct(Base):
+    """A product a condition covers (ticked by the admin: never « all the lab »)."""
+
+    __tablename__ = "condition_products"
+
+    condition_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("supplier_conditions.id", ondelete="CASCADE"), primary_key=True
+    )
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), primary_key=True
+    )
+
+
+class ConditionHistory(Base):
+    """An old version of a condition (never edited, never deleted): what it said, who changed it, when."""
+
+    __tablename__ = "condition_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    condition_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("supplier_conditions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    changed_by_name: Mapped[str] = mapped_column(String, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class PharmacySupplierExclusion(Base):
     """A supplier (fournisseur) name the pharmacy excluded. In Comptabilité only,
     every product bought from it (accent/case-insensitive match) drops from ventes

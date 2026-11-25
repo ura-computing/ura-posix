@@ -4,6 +4,10 @@
 GET   /v1/admin/suppliers        search (name, city), kind, archived (the archived ones only), sort, page → one page
 GET   /v1/admin/suppliers/{id}   its sheet (order fields: None = « inconnu »)
 PATCH /v1/admin/suppliers/{id}   the fields sent (null = back to « inconnu »), `archived`: « Archiver » / back
+GET   /v1/admin/suppliers/{id}/conditions   its conditions (not deleted), with their products
+POST  /v1/admin/suppliers/{id}/conditions   add one
+PUT   /v1/admin/conditions/{cid}            change one: version + 1, the old one kept in `condition_history`
+DELETE /v1/admin/conditions/{cid}           delete one (kept, `deleted_at`; its history stays)
 """
 
 from __future__ import annotations
@@ -16,11 +20,20 @@ from sqlalchemy import asc, desc, or_
 
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Supplier
-from app.core.permissions import admin_only
+from app.core.models import ConditionHistory, ConditionProduct, Medicament, Supplier, SupplierCondition
+from app.core.audit import user_label
+from app.core.permissions import AdminDep, admin_only
 from app.ingestion.csv_parse import normalized_name
 from app.ledger.schemas import paginate
-from app.purchasing.schemas import SupplierEditIn, SupplierListResponse, SupplierRow, SupplierSheet
+from app.purchasing.schemas import (
+    ConditionIn,
+    ConditionOut,
+    ConditionProductOut,
+    SupplierEditIn,
+    SupplierListResponse,
+    SupplierRow,
+    SupplierSheet,
+)
 
 router = APIRouter(tags=["purchasing"], dependencies=[admin_only])
 
@@ -65,12 +78,12 @@ def _supplier(db, supplier_id: int) -> Supplier:
     return supplier
 
 
-@router.get("/admin/suppliers/{supplier_id}", response_model=SupplierSheet)
+@router.get("/admin/suppliers/{supplier_id:int}", response_model=SupplierSheet)
 def get_supplier(supplier_id: Annotated[int, Path(ge=1)], db: DbDep) -> SupplierSheet:
     return SupplierSheet.model_validate(_supplier(db, supplier_id), from_attributes=True)
 
 
-@router.patch("/admin/suppliers/{supplier_id}", response_model=SupplierSheet)
+@router.patch("/admin/suppliers/{supplier_id:int}", response_model=SupplierSheet)
 def edit_supplier(supplier_id: Annotated[int, Path(ge=1)], body: SupplierEditIn, db: DbDep) -> SupplierSheet:
     """A later « Importer depuis Sobrus » never replaces these values (it fills empty fields only)."""
     supplier = _supplier(db, supplier_id)
@@ -90,3 +103,109 @@ def edit_supplier(supplier_id: Annotated[int, Path(ge=1)], body: SupplierEditIn,
     db.commit()
     db.refresh(supplier)
     return SupplierSheet.model_validate(supplier, from_attributes=True)
+
+
+# ── Conditions (D-2) ─────────────────────────────────────────────────────────
+
+_CONDITION_FIELDS = ("kind", "basis", "value", "days", "tiers", "text", "valid_from", "valid_to", "state", "source")
+
+
+def _conditions_out(db, conditions: list[SupplierCondition]) -> list[ConditionOut]:
+    ids = [c.id for c in conditions]
+    products: dict[int, list[ConditionProductOut]] = {}
+    if ids:
+        rows = (
+            db.query(ConditionProduct.condition_id, Medicament.id, Medicament.pid, Medicament.product)
+            .join(Medicament, Medicament.id == ConditionProduct.medicament_id)
+            .filter(ConditionProduct.condition_id.in_(ids))
+            .order_by(Medicament.product)
+        )
+        for cid, mid, pid, name in rows:
+            products.setdefault(cid, []).append(ConditionProductOut(id=mid, pid=pid, product=name))
+    return [
+        ConditionOut(
+            **{f: getattr(c, f) for f in _CONDITION_FIELDS},
+            id=c.id,
+            version=c.version,
+            updated_by_name=c.updated_by_name,
+            updated_at=c.updated_at,
+            products=products.get(c.id, []),
+        )
+        for c in conditions
+    ]
+
+
+def _write(db, condition: SupplierCondition, body: ConditionIn, actor: str) -> None:
+    """The condition's fields + its products (only catalogue products: an unknown id → 404)."""
+    values = body.model_dump(exclude={"product_ids"}, by_alias=True)
+    for field in _CONDITION_FIELDS:
+        setattr(condition, field, values[field])
+    condition.updated_by_name = actor
+    found = {mid for (mid,) in db.query(Medicament.id).filter(Medicament.id.in_(body.product_ids))}
+    if len(found) != len(body.product_ids):
+        raise ApiError(404, ErrorCode.MEDICAMENTS_NOT_FOUND, "Produit introuvable dans le catalogue.")
+    db.flush()
+    db.query(ConditionProduct).filter(ConditionProduct.condition_id == condition.id).delete()
+    db.add_all(ConditionProduct(condition_id=condition.id, medicament_id=mid) for mid in body.product_ids)
+
+
+def _condition(db, condition_id: int) -> SupplierCondition:
+    condition = db.get(SupplierCondition, condition_id)
+    if condition is None or condition.deleted_at is not None:
+        raise ApiError(404, ErrorCode.CONDITION_NOT_FOUND, "Condition introuvable.")
+    return condition
+
+
+def _snapshot(db, condition: SupplierCondition, actor: str) -> None:
+    """The version about to change, kept for good."""
+    out = _conditions_out(db, [condition])[0].model_dump(mode="json")
+    db.add(ConditionHistory(condition_id=condition.id, version=condition.version, snapshot=out, changed_by_name=actor))
+
+
+@router.get("/admin/suppliers/{supplier_id:int}/conditions", response_model=list[ConditionOut])
+def list_conditions(supplier_id: Annotated[int, Path(ge=1)], db: DbDep) -> list[ConditionOut]:
+    """Confirmed first, then « À vérifier », then « Manquante »; by kind."""
+    _supplier(db, supplier_id)
+    rows = (
+        db.query(SupplierCondition)
+        .filter(SupplierCondition.supplier_id == supplier_id, SupplierCondition.deleted_at.is_(None))
+        .all()
+    )
+    order = {"confirmed": 0, "unverified": 1, "missing": 2}
+    rows.sort(key=lambda c: (order[c.state], c.kind, c.id))
+    return _conditions_out(db, rows)
+
+
+@router.post("/admin/suppliers/{supplier_id:int}/conditions", response_model=ConditionOut, status_code=201)
+def add_condition(
+    supplier_id: Annotated[int, Path(ge=1)], body: ConditionIn, admin: AdminDep, db: DbDep
+) -> ConditionOut:
+    _supplier(db, supplier_id)
+    condition = SupplierCondition(supplier_id=supplier_id)
+    db.add(condition)
+    _write(db, condition, body, user_label(admin))  # its fields, then saved, then its products
+    db.commit()
+    db.refresh(condition)
+    return _conditions_out(db, [condition])[0]
+
+
+@router.put("/admin/conditions/{condition_id}", response_model=ConditionOut)
+def edit_condition(
+    condition_id: Annotated[int, Path(ge=1)], body: ConditionIn, admin: AdminDep, db: DbDep
+) -> ConditionOut:
+    condition = _condition(db, condition_id)
+    _snapshot(db, condition, user_label(admin))
+    _write(db, condition, body, user_label(admin))
+    condition.version += 1
+    db.commit()
+    db.refresh(condition)
+    return _conditions_out(db, [condition])[0]
+
+
+@router.delete("/admin/conditions/{condition_id}", status_code=204)
+def delete_condition(condition_id: Annotated[int, Path(ge=1)], admin: AdminDep, db: DbDep) -> None:
+    condition = _condition(db, condition_id)
+    _snapshot(db, condition, user_label(admin))
+    condition.deleted_at = datetime.now(timezone.utc)
+    condition.updated_by_name = user_label(admin)
+    db.commit()

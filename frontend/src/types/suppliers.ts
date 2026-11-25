@@ -50,3 +50,45 @@ export interface SupplierListResponse {
   data: Supplier[];
   pagination: { page: number; limit: number; total: number; total_pages: number };
 }
+
+export type ConditionKind =
+  | "minimum_order"
+  | "qty_tiers"
+  | "amount_tiers"
+  | "product_discount"
+  | "pack"
+  | "payment_discount"
+  | "transport"
+  | "packaging"
+  | "return_rule";
+export type ConditionState = "confirmed" | "unverified" | "missing";
+export type ConditionBasis = "units" | "mad" | "references";
+
+/** « Dès 100 unités : 20 % ». */
+export interface Tier {
+  from: number;
+  pct: number;
+}
+
+/** One commercial rule of a supplier (the same for every pharmacy). `products` empty = the whole supplier. */
+export interface Condition {
+  id: number;
+  kind: ConditionKind;
+  basis: ConditionBasis | null;
+  value: number | null;
+  days: number | null;
+  tiers: Tier[] | null;
+  text: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  state: ConditionState;
+  source: string | null;
+  version: number;
+  updated_by_name: string;
+  updated_at: string;
+  products: { id: number; pid: string; product: string }[];
+}
+
+export type ConditionInput = Omit<Condition, "id" | "version" | "updated_by_name" | "updated_at" | "products"> & {
+  product_ids: number[];
+};
