@@ -2,11 +2,10 @@
  *  filled by the calculation (free stock, promis, the supplier's confirmed conditions). The person checks the orange
  *  lines, changes a quantity if needed, then « Valider la commande ». Each card says what the supplier asks: minimum
  *  reached or not, the next discount tier (shown, never added), free transport. Groups at the top filter the lines.
- *  « Envoyer à l'administrateur »: the admin places it with the supplier. Tab « Envoyées » (?tab=envoyees): each sent
- *  order with its timeline (Envoyée → Passée → Livrée). */
+ *  « Envoyer à l'administrateur »: the admin places it with the supplier. One list: the drafts first (« À préparer »),
+ *  then the orders sent, each with its timeline (Envoyée → Passée → Livrée); a filter (state + supplier search). */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
 import { ClipboardList, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
@@ -16,20 +15,22 @@ import { EmptyState } from "@/_components/molecules/EmptyState";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { SectionCard } from "@/_components/molecules/SectionCard";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
-import { TabBar } from "@/_components/molecules/TabBar";
 import { ToggleChip } from "@/_components/molecules/ToggleChip";
+import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { SentOrderCard } from "@/_components/organisms/SentOrderCard";
 import { API } from "@/api/api";
 import { api } from "@/api/client";
 import { Page } from "@/_components/templates/Page";
 import { useT } from "@/i18n/I18nProvider";
-import type { DailyOrder, OrderGroup, SentOrder } from "@/types/orders";
+import type { DailyOrder, OrderGroup, SentOrder, SentState } from "@/types/orders";
 import { formatMADStr, formatNumStr, formatPctStr } from "@/utils/format";
+import { matchesFields } from "@/utils/text";
 
 import { OrderLineRow } from "./_components/OrderLineRow";
 import { useDailyOrders } from "./hooks";
 
 const GROUPS: OrderGroup[] = ["urgent", "promis", "restock", "check"];
+const STATES: ("draft" | SentState)[] = ["draft", "validated", "sent", "delivered", "cancelled"];
 
 export default function DailyOrdersPage() {
   const t = useT();
@@ -47,27 +48,40 @@ export default function DailyOrdersPage() {
     isValidating,
   } = useDailyOrders();
   const [group, setGroup] = useState<OrderGroup | null>(null);
-  const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "envoyees" ? "sent" : "draft";
-  const { data: sent, isLoading: isLoadingSent } = useQuery({
+  const [state, setState] = useState<"draft" | SentState | null>(null);
+  const [search, setSearch] = useState("");
+  const { data: sent } = useQuery({
     queryKey: API.orders.sent.key,
     queryFn: () => api.get<SentOrder[]>(API.orders.sent.url),
-    enabled: tab === "sent",
   });
   const [validating, setValidating] = useState<DailyOrder | null>(null);
 
   const amount = (basis: "units" | "mad" | "references", n: number) =>
     basis === "mad" ? formatMADStr(n) : t(`orders.n_${basis}`, { n: formatNumStr(n) });
-  const shown = orders
-    .map((o) => ({ ...o, lines: group ? o.lines.filter((l) => l.group === group) : o.lines }))
-    .filter((o) => o.lines.length > 0);
+  const bySupplier = (name: string | undefined) => !search || matchesFields([name], search);
+  const showDrafts = state === null || state === "draft";
+  const shown = showDrafts
+    ? orders
+        .filter((o) => bySupplier(o.supplier?.name ?? t("orders.noSupplier")))
+        .map((o) => ({ ...o, lines: group ? o.lines.filter((l) => l.group === group) : o.lines }))
+        .filter((o) => o.lines.length > 0)
+    : [];
+  const sentShown = (sent ?? []).filter(
+    (o) => (state === null || o.state === state) && bySupplier(o.order.supplier?.name),
+  );
+  const activeFilters = [
+    search
+      ? { key: "search", label: <>{t("orders.filterSearch", { value: search })}</>, onClear: () => setSearch("") }
+      : null,
+    state ? { key: "state", label: <>{t(`orders.state_${state}`)}</>, onClear: () => setState(null) } : null,
+  ].filter(Boolean) as ActiveFilter[];
 
   return (
     <Page
       title={t("orders.title")}
       subtitle={t("orders.subtitle")}
       actions={
-        tab === "draft" && (
+        showDrafts && (
           <Button
             size="lg"
             variant="outline"
@@ -81,44 +95,47 @@ export default function DailyOrdersPage() {
         )
       }
     >
-      <TabBar<"draft" | "sent">
-        tabs={[
-          { id: "draft", label: t("orders.tab_draft") },
-          { id: "sent", label: t("orders.tab_sentList") },
-        ]}
-        activeId={tab}
-        onChange={(id) => setParams(id === "sent" ? { tab: "envoyees" } : {})}
+      <FilterBar
+        search={{ value: search, onChange: setSearch, placeholder: t("orders.searchSupplier"), suggestions: null }}
+        singleSelect={{
+          label: t("orders.stateFilter"),
+          options: [
+            { value: "", label: t("orders.allStates") },
+            ...STATES.map((s) => ({ value: s, label: t(`orders.state_${s}`) })),
+          ],
+          value: state ?? "",
+          onChange: (v) => setState(v === "" ? null : (v as "draft" | SentState)),
+        }}
+        activeFilters={activeFilters}
+        onResetAll={() => {
+          setSearch("");
+          setState(null);
+        }}
       />
-      {tab === "sent" ? (
-        isLoadingSent ? (
-          <PageSkeleton />
-        ) : (sent ?? []).length === 0 ? (
-          <EmptyState icon={<ClipboardList className="size-6" />} title={t("orders.empty_sentList")} />
-        ) : (
-          (sent ?? []).map((o) => <SentOrderCard key={o.id} order={o} title={o.order.supplier?.name ?? ""} />)
-        )
-      ) : isLoading ? (
+      {isLoading ? (
         <PageSkeleton />
       ) : isError ? (
         <LoadError onRetry={reload} />
-      ) : orders.length === 0 ? (
+      ) : shown.length === 0 && sentShown.length === 0 ? (
         <EmptyState
           icon={<ClipboardList className="size-6" />}
-          title={t("orders.emptyTitle")}
-          hint={t("orders.emptyHint")}
+          title={t(state || search ? "orders.emptyFiltered" : "orders.emptyTitle")}
+          hint={state || search ? undefined : t("orders.emptyHint")}
         />
       ) : (
         <>
-          <div className="flex flex-wrap gap-2" role="group" aria-label={t("orders.groups")}>
-            <ToggleChip pressed={group === null} onToggle={() => setGroup(null)}>
-              {t("orders.all")}
-            </ToggleChip>
-            {GROUPS.filter((g) => counts[g]).map((g) => (
-              <ToggleChip key={g} pressed={group === g} onToggle={() => setGroup(group === g ? null : g)}>
-                {t(`orders.group_${g}`)} · {counts[g]}
+          {shown.length > 0 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t("orders.groups")}>
+              <ToggleChip pressed={group === null} onToggle={() => setGroup(null)}>
+                {t("orders.all")}
               </ToggleChip>
-            ))}
-          </div>
+              {GROUPS.filter((g) => counts[g]).map((g) => (
+                <ToggleChip key={g} pressed={group === g} onToggle={() => setGroup(group === g ? null : g)}>
+                  {t(`orders.group_${g}`)} · {counts[g]}
+                </ToggleChip>
+              ))}
+            </div>
+          )}
 
           {shown.map((o) => (
             <SectionCard
@@ -127,6 +144,9 @@ export default function DailyOrdersPage() {
               hint={t("orders.nLines", { n: o.lines.length })}
               actions={
                 <span className="flex flex-wrap items-center gap-3">
+                  <Badge size="md" tone="primary">
+                    {t("orders.state_draft")}
+                  </Badge>
                   {!o.supplier && <span className="text-sm text-muted-foreground">{t("orders.needSupplier")}</span>}
                   <Button disabled={!o.supplier} onClick={() => setValidating(o)}>
                     {t("orders.validate")}
@@ -171,6 +191,9 @@ export default function DailyOrdersPage() {
                 </span>
               </p>
             </SectionCard>
+          ))}
+          {sentShown.map((o) => (
+            <SentOrderCard key={o.id} order={o} title={o.order.supplier?.name ?? ""} />
           ))}
         </>
       )}

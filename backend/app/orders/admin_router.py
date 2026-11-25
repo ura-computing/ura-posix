@@ -92,7 +92,7 @@ def move_order(order_id: Annotated[int, Path(ge=1)], body: OrderStateIn, admin: 
         owner_ids(db, order.pharmacy_id),
         "orderStep",
         {"supplier": supplier.get("name", ""), "state": body.state},
-        "commandes?tab=envoyees",
+        "commandes",
     )
     db.commit()
     return sent_order(order, db.get(Pharmacy, order.pharmacy_id))
