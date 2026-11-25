@@ -8,6 +8,7 @@ GET   /v1/admin/suppliers/{id}/conditions   its conditions (not deleted), with t
 POST  /v1/admin/suppliers/{id}/conditions   add one
 PUT   /v1/admin/conditions/{cid}            change one: version + 1, the old one kept in `condition_history`
 DELETE /v1/admin/conditions/{cid}           delete one (kept, `deleted_at`; its history stays)
+GET / POST /v1/admin/purchasing-groups, PUT / DELETE …/{id}   « Groupements »: name, note, member pharmacies
 """
 
 from __future__ import annotations
@@ -20,7 +21,16 @@ from sqlalchemy import asc, desc, or_
 
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import ConditionHistory, ConditionProduct, Medicament, Supplier, SupplierCondition
+from app.core.models import (
+    ConditionHistory,
+    ConditionProduct,
+    Medicament,
+    Pharmacy,
+    PurchasingGroup,
+    PurchasingGroupMember,
+    Supplier,
+    SupplierCondition,
+)
 from app.core.audit import user_label
 from app.core.permissions import AdminDep, admin_only
 from app.ingestion.csv_parse import normalized_name
@@ -29,6 +39,9 @@ from app.purchasing.schemas import (
     ConditionIn,
     ConditionOut,
     ConditionProductOut,
+    GroupIn,
+    GroupOut,
+    GroupPharmacy,
     SupplierEditIn,
     SupplierListResponse,
     SupplierRow,
@@ -208,4 +221,64 @@ def delete_condition(condition_id: Annotated[int, Path(ge=1)], admin: AdminDep, 
     _snapshot(db, condition, user_label(admin))
     condition.deleted_at = datetime.now(timezone.utc)
     condition.updated_by_name = user_label(admin)
+    db.commit()
+
+
+# ── Purchasing groups (D-5) ──────────────────────────────────────────────────
+
+
+def _groups_out(db, groups: list[PurchasingGroup]) -> list[GroupOut]:
+    members: dict[int, list[GroupPharmacy]] = {}
+    rows = (
+        db.query(PurchasingGroupMember.group_id, Pharmacy)
+        .join(Pharmacy, Pharmacy.id == PurchasingGroupMember.pharmacy_id)
+        .filter(PurchasingGroupMember.group_id.in_([g.id for g in groups]))
+        .order_by(Pharmacy.name)
+    )
+    for gid, p in rows:
+        members.setdefault(gid, []).append(GroupPharmacy(id=p.id, name=p.name, code=p.code, city=p.city))
+    return [GroupOut(id=g.id, name=g.name, note=g.note, pharmacies=members.get(g.id, [])) for g in groups]
+
+
+def _save_group(db, group: PurchasingGroup, body: GroupIn) -> GroupOut:
+    clash = db.query(PurchasingGroup.id).filter(PurchasingGroup.name == body.name, PurchasingGroup.id != group.id)
+    if clash.first():
+        raise ApiError(409, ErrorCode.GROUP_EXISTS, "Un groupement porte déjà ce nom.")
+    ids = sorted(set(body.pharmacy_ids))
+    if len({pid for (pid,) in db.query(Pharmacy.id).filter(Pharmacy.id.in_(ids))}) != len(ids):
+        raise ApiError(404, ErrorCode.PHARMACY_NOT_FOUND, "Pharmacie introuvable.")
+    group.name, group.note = body.name, body.note
+    db.add(group)
+    db.flush()
+    db.query(PurchasingGroupMember).filter(PurchasingGroupMember.group_id == group.id).delete()
+    db.add_all(PurchasingGroupMember(group_id=group.id, pharmacy_id=pid) for pid in ids)
+    db.commit()
+    return _groups_out(db, [group])[0]
+
+
+def _group(db, group_id: int) -> PurchasingGroup:
+    group = db.get(PurchasingGroup, group_id)
+    if group is None:
+        raise ApiError(404, ErrorCode.GROUP_NOT_FOUND, "Groupement introuvable.")
+    return group
+
+
+@router.get("/admin/purchasing-groups", response_model=list[GroupOut])
+def list_groups(db: DbDep) -> list[GroupOut]:
+    return _groups_out(db, db.query(PurchasingGroup).order_by(PurchasingGroup.name).all())
+
+
+@router.post("/admin/purchasing-groups", response_model=GroupOut, status_code=201)
+def add_group(body: GroupIn, db: DbDep) -> GroupOut:
+    return _save_group(db, PurchasingGroup(), body)
+
+
+@router.put("/admin/purchasing-groups/{group_id}", response_model=GroupOut)
+def edit_group(group_id: Annotated[int, Path(ge=1)], body: GroupIn, db: DbDep) -> GroupOut:
+    return _save_group(db, _group(db, group_id), body)
+
+
+@router.delete("/admin/purchasing-groups/{group_id}", status_code=204)
+def delete_group(group_id: Annotated[int, Path(ge=1)], db: DbDep) -> None:
+    db.delete(_group(db, group_id))
     db.commit()

@@ -92,3 +92,17 @@ export interface Condition {
 export type ConditionInput = Omit<Condition, "id" | "version" | "updated_by_name" | "updated_at" | "products"> & {
   product_ids: number[];
 };
+
+/** « Groupement »: pharmacies that buy together. */
+export interface PurchasingGroup {
+  id: number;
+  name: string;
+  note: string | null;
+  pharmacies: { id: number; name: string; code: string | null; city: string | null }[];
+}
+
+export interface PurchasingGroupInput {
+  name: string;
+  note: string | null;
+  pharmacy_ids: number[];
+}

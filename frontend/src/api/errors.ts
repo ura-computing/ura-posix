@@ -69,6 +69,8 @@ export const ErrorCode = {
   SUPPLIER_NOT_FOUND: "supplierNotFound",
   SUPPLIER_EXISTS: "supplierExists",
   CONDITION_NOT_FOUND: "conditionNotFound",
+  GROUP_NOT_FOUND: "groupNotFound",
+  GROUP_EXISTS: "groupExists",
   PAYMENT_NOT_FOUND: "paymentNotFound",
   SOBRUS_NOT_CONNECTED: "sobrusNotConnected",
   SOBRUS_RUN_ACTIVE: "sobrusRunActive",

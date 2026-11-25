@@ -192,3 +192,31 @@ class ConditionOut(BaseModel):
     updated_by_name: str
     updated_at: datetime
     products: list[ConditionProductOut]  # empty = every product of the supplier
+
+
+# ═══ Purchasing groups (D-5) ═════════════════════════════════════════════════
+
+
+class GroupIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    note: str | None = Field(default=None, max_length=1000)
+    pharmacy_ids: list[int] = Field(default_factory=list, max_length=500)
+
+    @field_validator("name", "note", mode="before")
+    @classmethod
+    def _blank(cls, value: object) -> object:
+        return (" ".join(value.split()) or None) if isinstance(value, str) else value
+
+
+class GroupPharmacy(BaseModel):
+    id: int
+    name: str
+    code: str | None
+    city: str | None
+
+
+class GroupOut(BaseModel):
+    id: int
+    name: str
+    note: str | None
+    pharmacies: list[GroupPharmacy]

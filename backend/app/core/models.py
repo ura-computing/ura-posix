@@ -973,6 +973,28 @@ class ConditionHistory(Base):
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class PurchasingGroup(Base):
+    """« Groupement »: pharmacies that buy together (their own conditions come later, when one is known)."""
+
+    __tablename__ = "purchasing_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PurchasingGroupMember(Base):
+    __tablename__ = "purchasing_group_members"
+
+    group_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("purchasing_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    pharmacy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), primary_key=True
+    )
+
+
 class PharmacySupplierExclusion(Base):
     """A supplier (fournisseur) name the pharmacy excluded. In Comptabilité only,
     every product bought from it (accent/case-insensitive match) drops from ventes

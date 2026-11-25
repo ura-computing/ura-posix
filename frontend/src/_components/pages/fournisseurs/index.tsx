@@ -1,8 +1,10 @@
 /** « Fournisseurs » (admin, Support): the supplier list shared by every pharmacy (laboratoires, grossistes, sociétés),
- *  filled by « Importer depuis Sobrus ». Search by name or city, filter by kind, « Archivés »; a click opens its sheet. */
+ *  filled by « Importer depuis Sobrus ». Search by name or city, filter by kind, « Archivés »; a click opens its sheet.
+ *  Tab « Groupements » (?tab=groupements): pharmacies that buy together. */
 import { Building2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { TabBar } from "@/_components/molecules/TabBar";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { SobrusImportCard } from "@/_components/organisms/SobrusImportCard";
@@ -11,6 +13,7 @@ import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
 import type { Supplier, SupplierKind } from "@/types/suppliers";
 
+import { GroupsTab } from "./_components/GroupsTab";
 import { useFournisseursPage } from "./hooks";
 
 const KINDS: SupplierKind[] = ["laboratoire", "grossiste", "societe"];
@@ -21,6 +24,8 @@ export default function FournisseursPage() {
   const t = useT();
   const { me } = useMe();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "groupements" ? "groups" : "suppliers";
   const {
     filters,
     isError,
@@ -75,58 +80,72 @@ export default function FournisseursPage() {
 
   return (
     <Page title={t("suppliers.title")} subtitle={t("suppliers.subtitle")}>
-      <SobrusImportCard kind="suppliers" />
-
-      <FilterBar<"active" | "archived">
-        segment={{
-          value: filters.archived ? "archived" : "active",
-          onChange: (v) => setArchived(v === "archived"),
-          options: [
-            { value: "active", label: t("suppliers.scopeActive") },
-            { value: "archived", label: t("suppliers.scopeArchived") },
-          ],
-        }}
-        search={{
-          value: filters.search,
-          onChange: setSearch,
-          placeholder: t("suppliers.searchPlaceholder"),
-          suggestions: null,
-        }}
-        singleSelect={{
-          label: t("suppliers.colKind"),
-          options: [
-            { value: "", label: t("suppliers.allKinds") },
-            ...KINDS.map((k) => ({ value: k, label: t(`suppliers.kind.${k}`) })),
-          ],
-          value: filters.kind ?? "",
-          onChange: (v) => setKind(v === "" ? null : (v as SupplierKind)),
-        }}
-        activeFilters={activeFilters}
-        onResetAll={reset}
+      <TabBar<"suppliers" | "groups">
+        tabs={[
+          { id: "suppliers", label: t("suppliers.tabSuppliers") },
+          { id: "groups", label: t("groups.title") },
+        ]}
+        activeId={tab}
+        onChange={(id) => setParams(id === "groups" ? { tab: "groupements" } : {})}
       />
+      {tab === "groups" ? (
+        <GroupsTab />
+      ) : (
+        <>
+          <SobrusImportCard kind="suppliers" />
 
-      <DataTable<Supplier>
-        rows={rows}
-        columns={COLUMNS}
-        isLoading={isLoading}
-        isError={isError}
-        onRetry={reload}
-        sortBy={filters.sort_by}
-        sortOrder={filters.sort_order}
-        onSort={setSort}
-        pagination={{
-          page: filters.page,
-          pageSize: filters.limit,
-          total,
-          onPage: setPage,
-          onPageSize: setPageSize,
-          pageSizes: [25, 50, 100],
-        }}
-        emptyTitle={t("suppliers.emptyTitle")}
-        emptyHint={t("suppliers.emptyHint")}
-        rowKey={(s) => s.id}
-        onRowClick={(s) => void navigate(`/${me?.role}/fournisseurs/${s.id}`)}
-      />
+          <FilterBar<"active" | "archived">
+            segment={{
+              value: filters.archived ? "archived" : "active",
+              onChange: (v) => setArchived(v === "archived"),
+              options: [
+                { value: "active", label: t("suppliers.scopeActive") },
+                { value: "archived", label: t("suppliers.scopeArchived") },
+              ],
+            }}
+            search={{
+              value: filters.search,
+              onChange: setSearch,
+              placeholder: t("suppliers.searchPlaceholder"),
+              suggestions: null,
+            }}
+            singleSelect={{
+              label: t("suppliers.colKind"),
+              options: [
+                { value: "", label: t("suppliers.allKinds") },
+                ...KINDS.map((k) => ({ value: k, label: t(`suppliers.kind.${k}`) })),
+              ],
+              value: filters.kind ?? "",
+              onChange: (v) => setKind(v === "" ? null : (v as SupplierKind)),
+            }}
+            activeFilters={activeFilters}
+            onResetAll={reset}
+          />
+
+          <DataTable<Supplier>
+            rows={rows}
+            columns={COLUMNS}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={reload}
+            sortBy={filters.sort_by}
+            sortOrder={filters.sort_order}
+            onSort={setSort}
+            pagination={{
+              page: filters.page,
+              pageSize: filters.limit,
+              total,
+              onPage: setPage,
+              onPageSize: setPageSize,
+              pageSizes: [25, 50, 100],
+            }}
+            emptyTitle={t("suppliers.emptyTitle")}
+            emptyHint={t("suppliers.emptyHint")}
+            rowKey={(s) => s.id}
+            onRowClick={(s) => void navigate(`/${me?.role}/fournisseurs/${s.id}`)}
+          />
+        </>
+      )}
     </Page>
   );
 }

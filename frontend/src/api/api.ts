@@ -664,6 +664,10 @@ export const API = {
       url: (id: number) => `/admin/suppliers/${id}`,
       refreshes: (): Read[] => [API.admin.suppliers, API.admin.supplier],
     },
+    /** « Groupements » (Fournisseurs tab): list; add / change / delete one. */
+    groups: { url: "/admin/purchasing-groups", key: ["admin", "groups"] },
+    addGroup: { url: "/admin/purchasing-groups", refreshes: (): Read[] => [API.admin.groups] },
+    editGroup: { url: (id: number) => `/admin/purchasing-groups/${id}`, refreshes: (): Read[] => [API.admin.groups] },
     /** A supplier's conditions; add, change (version + 1), delete. */
     conditions: {
       url: (supplierId: number) => `/admin/suppliers/${supplierId}/conditions`,
