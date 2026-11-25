@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  ClipboardList,
   Boxes,
   Building2,
   Coins,
@@ -189,6 +190,12 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       feature: "promis",
       nav: { label: "nav.promis", icon: HandHeart, group: "commandes" },
     },
+    {
+      path: "/owner/commandes",
+      load: () => import("@/_components/pages/commandes"),
+      feature: "orders",
+      nav: { label: "nav.dailyOrders", icon: ClipboardList, group: "commandes" },
+    },
     { path: "/owner/promis/nouveau", load: () => import("@/_components/pages/promis/new"), feature: "promis" },
     { path: "/owner/promis/:id", load: () => import("@/_components/pages/promis/sheet"), feature: "promis" },
     {
@@ -287,6 +294,12 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       load: () => import("@/_components/pages/promis"),
       feature: "promis",
       nav: { label: "nav.promis", icon: HandHeart, group: "commandes" },
+    },
+    {
+      path: "/employee/commandes",
+      load: () => import("@/_components/pages/commandes"),
+      feature: "orders",
+      nav: { label: "nav.dailyOrders", icon: ClipboardList, group: "commandes" },
     },
     { path: "/employee/promis/nouveau", load: () => import("@/_components/pages/promis/new"), feature: "promis" },
     { path: "/employee/promis/:id", load: () => import("@/_components/pages/promis/sheet"), feature: "promis" },

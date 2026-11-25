@@ -378,6 +378,15 @@ export const API = {
       refreshes: (): Read[] => [API.promis.sheet, API.promis.summary],
     },
   },
+  /** « Commandes du jour »: the drafts; « Recalculer »; a line's quantity / « Enlever »; « Commander N » (product
+   *  sheet); « Valider la commande ». Every write answers the drafts again. */
+  orders: {
+    daily: { url: "/orders/daily", key: ["orders", "daily"] },
+    refresh: { url: "/orders/daily/refresh", refreshes: (): Read[] => [API.orders.daily] },
+    line: { url: (id: number) => `/orders/lines/${id}`, refreshes: (): Read[] => [API.orders.daily] },
+    add: { url: "/orders/lines", refreshes: (): Read[] => [API.orders.daily] },
+    validate: { url: (id: number) => `/orders/${id}/validate`, refreshes: (): Read[] => [API.orders.daily] },
+  },
   history: {
     list: {
       url: "/history",

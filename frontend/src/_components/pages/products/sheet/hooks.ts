@@ -397,3 +397,27 @@ export function useSheetEditor(sheet: ProductSheet | null) {
 }
 
 export type SheetEditor = ReturnType<typeof useSheetEditor>;
+
+/** « Commander N »: N boxes into today's order of the product's supplier; the toast says which one, « Voir » opens
+ *  « Commandes du jour ». */
+export function useAddToOrder() {
+  const t = useT();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { me } = useMe();
+  const { mutateAsync } = useMutation({
+    mutationFn: (body: { medicament_id: number; quantity: number }) =>
+      api.post<{ order_id: number; supplier: { id: number; name: string } | null }>(API.orders.add.url, body),
+    onSuccess: ({ supplier }, { quantity }) => {
+      void refresh(qc, API.orders.add);
+      toast.success(t("orders.added", { n: quantity, supplier: supplier?.name ?? t("orders.noSupplier") }), {
+        action: { label: t("orders.see"), onClick: () => void navigate(`/${me?.role}/commandes`) },
+      });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return {
+    addToOrder: (medicamentId: number, quantity: number) =>
+      mutateAsync({ medicament_id: medicamentId, quantity }).then(() => undefined),
+  };
+}

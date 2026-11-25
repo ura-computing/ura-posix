@@ -638,10 +638,6 @@ test("fiche produit: « Étiquette » et « Commander » : désactivés avec la 
     ([, s]) => s.stock.stock_max - Math.max(0, s.stock.current_stock ?? 0) > 0,
   ) as [string, Row];
   const header = page.locator("main header");
-  const click = async (name: RegExp) => {
-    await header.getByRole("button", { name }).click();
-    await expect(page.getByText("Bientôt disponible.", { exact: true }).first(), String(name)).toBeVisible();
-  };
   await openSheet(page, pid);
   await expect(header.getByRole("button", { name: /^Étiquette/ })).toBeDisabled();
   await expect(header.getByRole("button", { name: /^Commander/ })).toBeDisabled();
@@ -658,7 +654,11 @@ test("fiche produit: « Étiquette » et « Commander » : désactivés avec la 
     await expect(dialog.getByRole("heading", { name: "Étiquette" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Imprimer" })).toBeEnabled();
     await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
-    await click(/^Commander/);
+    // « Commander N »: N boxes into today's order of its supplier.
+    const added = pageSend(page, "POST", "/orders/lines", 201);
+    await header.getByRole("button", { name: /^Commander/ }).click();
+    await added;
+    await expect(page.getByText(/ajoutée\(s\) à la commande du jour/).first()).toBeVisible();
   } finally {
     await apiPut(admin, features, { features: { labels: false, orders: false } });
     await ctx.close();

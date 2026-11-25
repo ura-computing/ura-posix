@@ -98,14 +98,14 @@ function StockBox({ stock }: { stock: ProductStock }) {
 }
 
 /** Right of the title: the stock box, then, stacked, « Observations » (their window), « Étiquette » and « Commander N »
- *  (N = for the shelf + for the promis, its reason under it: app/purchasing/needs.py). Without the access: shown, disabled, the reason under it; with it: « Bientôt disponible »
- *  for now. No « Modifier » here: each block of « Général » / « Codes » has its own. */
+ *  (N = for the shelf + for the promis, its reason under it: app/purchasing/needs.py; a click puts N boxes in today's
+ *  order). Without the access: shown, disabled, the reason under it. No « Modifier » here: each block of « Général » / « Codes » has its own. */
 export function SheetActions({
   sheet,
   canLabel,
   canOrder,
   onLabel,
-  onSoon,
+  onOrder,
   onOpenNotes,
   onDeclareDamage,
 }: {
@@ -115,8 +115,8 @@ export function SheetActions({
   canOrder: boolean;
   /** « Étiquette »: its window (preview, copies, « Imprimer »). */
   onLabel: () => void;
-  /** A click while the feature is not built yet. */
-  onSoon: () => void;
+  /** « Commander N »: N boxes into today's order of the product's supplier. */
+  onOrder: (quantity: number) => void;
   onOpenNotes: () => void;
   /** null = no « Stock abîmé » access: the button is not shown. */
   onDeclareDamage: (() => void) | null;
@@ -144,7 +144,7 @@ export function SheetActions({
           <Printer className="size-4" />
           {t("products.label")}
         </Button>
-        <Button variant="outline" onClick={onSoon} disabled={!canOrder || toOrder <= 0}>
+        <Button variant="outline" onClick={() => onOrder(toOrder)} disabled={!canOrder || toOrder <= 0}>
           <ShoppingCart className="size-4" />
           {toOrder > 0 ? t("products.order", { n: toOrder }) : t("products.orderNone")}
         </Button>

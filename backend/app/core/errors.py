@@ -99,6 +99,9 @@ class ErrorCode(StrEnum):
     CONDITION_NOT_FOUND = "conditionNotFound"
     GROUP_NOT_FOUND = "groupNotFound"
     GROUP_EXISTS = "groupExists"
+    ORDER_NOT_FOUND = "orderNotFound"
+    ORDER_LINE_NOT_FOUND = "orderLineNotFound"
+    ORDER_NO_SUPPLIER = "orderNoSupplier"
     PAYMENT_NOT_FOUND = "paymentNotFound"
     # Connexion Sobrus (app/sobrus/)
     SOBRUS_NOT_CONNECTED = "sobrusNotConnected"

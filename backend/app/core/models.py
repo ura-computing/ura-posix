@@ -995,6 +995,65 @@ class PurchasingGroupMember(Base):
     )
 
 
+ORDER_STATES = ("draft", "validated", "sent", "confirmed", "partial", "refused", "delivered", "cancelled")
+ORDER_GROUPS = ("urgent", "restock", "promis", "check")  # « Urgences », « Réassort », « Promis », « À vérifier »
+
+
+class PurchaseOrder(Base):
+    """An order of the pharmacy to one supplier (`supplier_id` None = supplier unknown: « À vérifier »). « Commandes
+    du jour »: the drafts, one per supplier, rebuilt by « Recalculer » (a quantity the person changed stays).
+    « Valider »: `frozen` = the lines and the conditions applied that day, never changed after."""
+
+    __tablename__ = "purchase_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN (" + ", ".join(f"'{s}'" for s in ORDER_STATES) + ")", name="ck_purchase_orders_state"
+        ),
+        Index("ix_purchase_orders_pharmacy_state", "pharmacy_id", "state"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    supplier_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True
+    )
+    state: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    frozen: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    validated_by_name: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class PurchaseOrderLine(Base):
+    """One product of an order: `suggested` = what the calculation says, `quantity` = what will be ordered (`edited`:
+    the person changed it, or added it from the product sheet: « Recalculer » keeps it)."""
+
+    __tablename__ = "purchase_order_lines"
+    __table_args__ = (
+        UniqueConstraint("order_id", "medicament_id", name="uq_purchase_order_lines_product"),
+        CheckConstraint("quantity > 0", name="ck_purchase_order_lines_quantity"),
+        CheckConstraint(
+            '"group" IN (' + ", ".join(f"'{g}'" for g in ORDER_GROUPS) + ")", name="ck_purchase_order_lines_group"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False
+    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    suggested: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    edited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    group: Mapped[str] = mapped_column(String, nullable=False, default="restock")
+    for_shelf: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    for_promis: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    customers: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    unit_price: Mapped[float | None] = mapped_column(Float, nullable=True)  # PPH: last purchase price, else catalogue
+
+
 class PharmacySupplierExclusion(Base):
     """A supplier (fournisseur) name the pharmacy excluded. In Comptabilité only,
     every product bought from it (accent/case-insensitive match) drops from ventes

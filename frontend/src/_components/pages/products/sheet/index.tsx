@@ -6,7 +6,6 @@
 import { useState } from "react";
 import { ArrowLeftRight, BarChart3, Box, History, ScanLine } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { toast } from "sonner";
 
 import { FilterBar } from "@/_components/organisms/FilterBar";
 import { useMe } from "@/hooks/useMe";
@@ -31,13 +30,14 @@ import { NotesDialog } from "./_components/NotesDialog";
 import { SheetActions, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
+  type SheetTab,
+  useAddToOrder,
   useDeclareDamage,
   useProductNotes,
   useProductStats,
   useProduitPage,
   useSheetEditor,
   useStatsRange,
-  type SheetTab,
 } from "./hooks";
 
 /** A period button on (same look as « Mixte », the other segments of the app). */
@@ -62,6 +62,7 @@ function ProductSheetPage({ id }: { id: number }) {
   const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
   const [damageOpen, setDamageOpen] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
+  const { addToOrder } = useAddToOrder();
   const { declareDamage, isDeclaring } = useDeclareDamage();
 
   if (notFound) return <NotFoundPage embedded />;
@@ -91,7 +92,7 @@ function ProductSheetPage({ id }: { id: number }) {
             canLabel={!!me?.permissions.includes("labels")}
             canOrder={!!me?.permissions.includes("orders")}
             onLabel={() => setLabelOpen(true)}
-            onSoon={() => toast.info(t("products.soon"))}
+            onOrder={(quantity) => void addToOrder(id, quantity)}
             onOpenNotes={() => setNotesOpen(true)}
             onDeclareDamage={me?.permissions.includes("damaged") ? () => setDamageOpen(true) : null}
           />

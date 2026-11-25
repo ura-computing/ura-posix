@@ -15,7 +15,6 @@ Runs at every start (entrypoint.sh, `make migrate`) and does its work once per l
 from __future__ import annotations
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -24,15 +23,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/ → 
 from app.core.database import SessionLocal
 from app.core.models import Supplier, SupplierCondition
 from app.ingestion.csv_parse import normalized_name
+from app.purchasing.supplier_names import bare_name
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "board_conditions.json"
 FIELDS = ("phone", "contact_name", "address", "city", "payment_terms", "note")
 ACTOR = "Tableau des conditions"
-
-
-def _bare(name: str) -> str:
-    """« Laboratoire BOTTU » → « bottu »; « Société BP PHARM » → « bp pharm » (exact otherwise: « … MARCHE » differs)."""
-    return re.sub(r"^(laboratoires?|labo|societe|grossiste)\s+", "", normalized_name(name))
 
 
 def main() -> None:
@@ -42,9 +37,9 @@ def main() -> None:
         # Sobrus names start with « Laboratoire », « Société », « Grossiste »: compared without them.
         by_bare: dict[str, int] = {}
         for sid, key in db.query(Supplier.id, Supplier.name_key).order_by(Supplier.id):
-            by_bare.setdefault(_bare(key), sid)
+            by_bare.setdefault(bare_name(key), sid)
         for lab in board["labs"]:
-            keys = {_bare(lab["name"]), *(_bare(a) for a in lab["aliases"])}
+            keys = {bare_name(lab["name"]), *(bare_name(a) for a in lab["aliases"])}
             found = [by_bare[k] for k in keys if k in by_bare]
             supplier = db.get(Supplier, min(found)) if found else None
             if supplier is None:
