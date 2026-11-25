@@ -424,6 +424,14 @@ export const es: Dict = {
     writeReason: "Escriba el motivo.",
     confirm: "Validar",
   },
+  label: {
+    title: "Etiqueta",
+    copies: "Número de etiquetas",
+    less: "Una etiqueta menos",
+    more: "Una etiqueta más",
+    print: "Imprimir",
+    noPrice: "Este producto no tiene precio de venta: la etiqueta se imprime sin precio.",
+  },
   damaged: {
     title: "Stock dañado",
     subtitle: "Las cajas dañadas ya no cuentan en el stock libre, hasta « Vuelto a la venta ».",

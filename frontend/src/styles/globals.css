@@ -169,3 +169,18 @@ h5,
 h6 {
   line-height: 1.2;
 }
+
+/* « Imprimer » (product label): only the `.print-area` portal goes on paper, nothing else of the page. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+  }
+}

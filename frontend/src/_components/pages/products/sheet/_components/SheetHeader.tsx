@@ -104,6 +104,7 @@ export function SheetActions({
   sheet,
   canLabel,
   canOrder,
+  onLabel,
   onSoon,
   onOpenNotes,
   onDeclareDamage,
@@ -112,6 +113,8 @@ export function SheetActions({
   /** The accesses « Étiquette » (`labels`) and « Commander » (`orders`). */
   canLabel: boolean;
   canOrder: boolean;
+  /** « Étiquette »: its window (preview, copies, « Imprimer »). */
+  onLabel: () => void;
   /** A click while the feature is not built yet. */
   onSoon: () => void;
   onOpenNotes: () => void;
@@ -137,7 +140,7 @@ export function SheetActions({
             {t("damaged.declare")}
           </Button>
         )}
-        <Button variant="outline" onClick={onSoon} disabled={!canLabel}>
+        <Button variant="outline" onClick={onLabel} disabled={!canLabel}>
           <Printer className="size-4" />
           {t("products.label")}
         </Button>

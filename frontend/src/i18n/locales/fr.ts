@@ -432,6 +432,14 @@ export const fr = {
     writeReason: "Écrivez la raison.",
     confirm: "Valider",
   },
+  label: {
+    title: "Étiquette",
+    copies: "Nombre d'étiquettes",
+    less: "Une étiquette de moins",
+    more: "Une étiquette de plus",
+    print: "Imprimer",
+    noPrice: "Ce produit n'a pas de prix de vente : l'étiquette s'imprime sans prix.",
+  },
   damaged: {
     title: "Stock abîmé",
     subtitle: "Les boîtes abîmées ne comptent plus dans le stock libre, jusqu'à « Remis en vente ».",

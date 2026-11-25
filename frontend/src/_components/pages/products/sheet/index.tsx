@@ -26,6 +26,7 @@ import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
 import { DamageDialog } from "./_components/DamageDialog";
+import { LabelDialog } from "./_components/LabelDialog";
 import { NotesDialog } from "./_components/NotesDialog";
 import { SheetActions, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
@@ -60,6 +61,7 @@ function ProductSheetPage({ id }: { id: number }) {
   const showNotes = notesOpen === true;
   const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
   const [damageOpen, setDamageOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
   const { declareDamage, isDeclaring } = useDeclareDamage();
 
   if (notFound) return <NotFoundPage embedded />;
@@ -88,6 +90,7 @@ function ProductSheetPage({ id }: { id: number }) {
             sheet={sheet}
             canLabel={!!me?.permissions.includes("labels")}
             canOrder={!!me?.permissions.includes("orders")}
+            onLabel={() => setLabelOpen(true)}
             onSoon={() => toast.info(t("products.soon"))}
             onOpenNotes={() => setNotesOpen(true)}
             onDeclareDamage={me?.permissions.includes("damaged") ? () => setDamageOpen(true) : null}
@@ -115,6 +118,7 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "codes" && <CodesTab sheet={sheet} />}
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
+      <LabelDialog sheet={sheet} open={labelOpen} onClose={() => setLabelOpen(false)} />
       <DamageDialog
         open={damageOpen}
         product={sheet.product}

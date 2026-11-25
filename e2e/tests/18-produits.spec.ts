@@ -629,7 +629,7 @@ test("fiche produit: copier le code barre (en-tête)", async ({ page }) => {
   expect(await page.evaluate(() => navigator.clipboard.readText()), "presse-papiers").toBe(e.barcode1);
 });
 
-test("fiche produit: « Étiquette » et « Commander » : désactivés avec la raison, puis ouverts par l'administrateur", async ({
+test("fiche produit: « Étiquette » et « Commander » : désactivés avec la raison, puis ouverts par l'administrateur (« Étiquette » : sa fenêtre)", async ({
   page,
   browser,
 }) => {
@@ -652,7 +652,12 @@ test("fiche produit: « Étiquette » et « Commander » : désactivés avec la 
   await apiPut(admin, features, { features: { labels: true, orders: true } });
   try {
     await page.reload();
-    await click(/^Étiquette/);
+    // « Étiquette »: its window (preview, copies, « Imprimer »).
+    await header.getByRole("button", { name: /^Étiquette/ }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Étiquette" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Imprimer" })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
     await click(/^Commander/);
   } finally {
     await apiPut(admin, features, { features: { labels: false, orders: false } });
