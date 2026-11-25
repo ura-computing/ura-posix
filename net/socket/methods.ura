@@ -1,21 +1,24 @@
 pub fn create() Socket:
-    socket Socket
-    socket.fd = cstd::socket(cstd::AF_INET, cstd::SOCK_STREAM, 0)
+    socket Socket = {
+        fd: cstd::socket(cstd::AF_INET, cstd::SOCK_STREAM, 0)
+    }
     if socket.fd < 0:
         throw fail("socket")
     return socket
 
-fn reuse():
+fn reuse() &Socket:
     yes i32 = 1
     size i32 = sizeof(i32)
     code i32 = cstd::setsockopt(self.fd, cstd::SOL_SOCKET, cstd::SO_REUSEADDR, &yes, size)
     if code < 0:
         throw fail("setsockopt")
+    return &self
 
-fn bind(address &Address):
+fn bind(address &Address) &Socket:
     size i32 = sizeof(cstd::sockaddr_in)
     if cstd::bind(self.fd, &address.raw, size) < 0:
         throw fail("bind")
+    return &self
 
 fn listen(backlog i32):
     if cstd::listen(self.fd, backlog) < 0:
@@ -48,9 +51,10 @@ fn recv(size i32) String:
     return text
 
 fn poll(events i16, timeout i32) i16:
-    entry cstd::pollfd
-    entry.fd = self.fd
-    entry.events = events
+    entry cstd::pollfd = {
+        fd: self.fd,
+        events: events
+    }
     if cstd::poll(&entry, 1, timeout) < 0:
         throw fail("poll")
     return entry.revents

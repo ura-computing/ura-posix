@@ -4,8 +4,9 @@ fn now() i64:
     return seconds
 
 fn sleep(ms i64):
-    wait cstd::timespec
+    wait cstd::timespec = {
+        tv_sec: ms / 1000,
+        tv_nsec: (ms % 1000) * 1000000
+    }
     left cstd::timespec
-    wait.tv_sec = ms / 1000
-    wait.tv_nsec = (ms % 1000) * 1000000
     cstd::nanosleep(&wait, &left)

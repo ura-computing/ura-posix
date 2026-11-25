@@ -14,9 +14,11 @@ pub fn create(path String, mode String) File:
     if appends:
         flags = flags | cstd::O_CREAT | cstd::O_APPEND
 
-    file File
-    file.path = path
-    file.fd = cstd::open(path.chars(), flags, cstd::S_IRUSR | cstd::S_IWUSR)
+    file File = {
+        path: path,
+        fd: cstd::open(path.chars(), flags, cstd::S_IRUSR | cstd::S_IWUSR)
+    }
+
     if file.fd < 0:
         throw fail($"open {path}")
     return file

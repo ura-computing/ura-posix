@@ -12,6 +12,7 @@ SIGSEGV i32 = 11
 SIGPIPE i32 = 13
 SIGALRM i32 = 14
 SIGTERM i32 = 15
+
 @if os == "macos":
     SIGBUS i32 = 10
     SIGUSR1 i32 = 30
