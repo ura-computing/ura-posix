@@ -69,6 +69,10 @@ class ProductStock(BaseModel):
     damaged: int  # « Boîtes abîmées » still off the free stock (app/damaged/)
     reserved: int  # boxes kept for customers by « Prêt » promis (app/promis/)
     free_stock: int | None  # current_stock − damaged − reserved (never under 0); None when current_stock is None
+    waiting: int  # boxes promised to customers, not reserved yet (app/purchasing/needs_queries)
+    waiting_customers: list[str]  # who they are for
+    to_order_shelf: int  # « Commander N »: max − free stock (app/purchasing/needs.py)
+    to_order_promis: int  # + the promised boxes
     stock_min: int  # units_sold_12m ÷ 300 × 14
     stock_max: int  # units_sold_12m ÷ 300 × 15
     units_sold_12m: int

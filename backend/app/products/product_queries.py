@@ -50,6 +50,7 @@ from app.damaged.damage_queries import damaged_boxes
 from app.ledger.schemas import paginate
 from app.products.notes_queries import note_counts
 from app.promis.promis_queries import reserved_boxes
+from app.purchasing.needs_queries import product_needs
 
 
 def _linked_ids(pharmacy_id: int):
@@ -360,6 +361,7 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
 
     damaged = damaged_boxes(db, pharmacy_id, [med_id]).get(med_id, 0)
     reserved = reserved_boxes(db, pharmacy_id, [med_id]).get(med_id, 0)
+    need = product_needs(db, pharmacy_id, [med_id])[med_id]
     return {
         "id": med.id,
         "pid": med.pid,
@@ -400,6 +402,10 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
             "damaged": damaged,
             "reserved": reserved,
             "free_stock": max(0, current - damaged - reserved) if current is not None else None,
+            "waiting": need.waiting,
+            "waiting_customers": need.customers,
+            "to_order_shelf": need.for_shelf,
+            "to_order_promis": need.for_promis,
             "stock_min": v["stock_min"],
             "stock_max": v["stock_max"],
             "units_sold_12m": units,

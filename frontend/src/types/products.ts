@@ -83,6 +83,12 @@ export interface ProductStock {
   reserved: number;
   /** current_stock − damaged − reserved (never under 0); null when current_stock is null. */
   free_stock: number | null;
+  /** Boxes promised to customers, not reserved yet, and who they are for. */
+  waiting: number;
+  waiting_customers: string[];
+  /** « Commander N » = for the shelf (max − free stock) + for the promis. */
+  to_order_shelf: number;
+  to_order_promis: number;
   stock_min: number;
   stock_max: number;
   units_sold_12m: number;

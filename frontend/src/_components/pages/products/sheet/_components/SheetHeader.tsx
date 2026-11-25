@@ -85,6 +85,7 @@ function StockBox({ stock }: { stock: ProductStock }) {
       {row(t("products.boxMin"), min)}
       {row(t("products.boxMax"), max)}
       {damaged > 0 && row(t("damaged.boxDamaged"), damaged)}
+      {stock.waiting > 0 && row(t("products.boxWaiting"), stock.waiting)}
       {reserved > 0 && row(t("promis.boxReserved"), reserved)}
       {(damaged > 0 || reserved > 0) && free_stock != null && row(t("damaged.boxFree"), free_stock)}
       {days != null && (
@@ -97,7 +98,7 @@ function StockBox({ stock }: { stock: ProductStock }) {
 }
 
 /** Right of the title: the stock box, then, stacked, « Observations » (their window), « Étiquette » and « Commander N »
- *  (N = maximum − stock). Without the access: shown, disabled, the reason under it; with it: « Bientôt disponible »
+ *  (N = for the shelf + for the promis, its reason under it: app/purchasing/needs.py). Without the access: shown, disabled, the reason under it; with it: « Bientôt disponible »
  *  for now. No « Modifier » here: each block of « Général » / « Codes » has its own. */
 export function SheetActions({
   sheet,
@@ -118,8 +119,8 @@ export function SheetActions({
   onDeclareDamage: (() => void) | null;
 }) {
   const t = useT();
-  const { current_stock: current, stock_max: max } = sheet.stock;
-  const toOrder = Math.max(0, max - Math.max(0, current ?? 0));
+  const { to_order_shelf: shelf, to_order_promis: promis, waiting_customers: customers } = sheet.stock;
+  const toOrder = shelf + promis;
   const notes = sheet.notes_count;
   return (
     <div className="flex flex-wrap items-start gap-3">
@@ -149,6 +150,13 @@ export function SheetActions({
         )}
         {canOrder && toOrder <= 0 && (
           <span className="max-w-48 text-sm text-muted-foreground">{t("products.orderEnough")}</span>
+        )}
+        {toOrder > 0 && (
+          <span className="max-w-48 text-sm text-muted-foreground">
+            {promis > 0
+              ? t("products.orderWhyBoth", { shelf, promis, who: customers.join(", ") })
+              : t("products.orderWhyShelf", { shelf })}
+          </span>
         )}
       </div>
     </div>
