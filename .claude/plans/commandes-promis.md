@@ -339,4 +339,4 @@ All answered 2026-11-24: see the decisions table at the top.
 
 - C done: C-1 + C-2 (0742379), C-3 (592c306), C-4 « Remise comptoir » (migration 0049, product sheet « Prix et
   marge », price − discount in the Promis wizard + sheet). Then: account button top right (35d53e2), no « Premium » (d7b952b),
-  D-1 supplier sheet (c4888af), D-2 conditions (53bf37c), D-3 board import (next commit). Waiting: UI test. Next: D-4 engine.
+  D-1 supplier sheet (c4888af), D-2 conditions (53bf37c), D-3 board import (a747a3a), D-4 engine + 12 tests (next commit). Next: D-5 groups, D-6 needs.
