@@ -17,27 +17,36 @@ import { formatMADStr } from "@/utils/format";
 
 import { BarcodeImage } from "./BarcodeImage";
 
+/** 63 × 38 mm, black on white: the name (2 lines at most), then the price alone on its row (big, right), then the
+ *  barcode and the pharmacy's name. Nothing overflows: each part has its own row. */
 function Label({ sheet, pharmacy }: { sheet: ProductSheet; pharmacy: string }) {
   const { ppv, counter_price: net } = sheet.prices;
   const code = sheet.barcode1 ?? sheet.barcode2;
+  const price = net ?? ppv;
   return (
-    <div className="flex h-[38mm] w-[63mm] flex-col justify-between overflow-hidden rounded border border-black/30 bg-white p-[2.5mm] text-black">
-      <span className="line-clamp-2 text-[11pt] font-bold leading-tight">{sheet.product}</span>
-      <span className="flex items-end justify-between gap-2">
+    <div className="grid h-[38mm] w-[63mm] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.5mm] border border-black/25 bg-white px-[3mm] py-[2.5mm] text-black">
+      <span className="line-clamp-2 text-[9pt] font-semibold uppercase leading-[1.15] tracking-tight">
+        {sheet.product}
+      </span>
+      <span className="flex items-baseline justify-end gap-[2mm] self-center">
+        {net != null && ppv != null && (
+          <span className="text-[9pt] text-black/60 line-through">{formatMADStr(ppv)}</span>
+        )}
+        {price != null && (
+          <span className="text-[18pt] font-extrabold leading-none tabular-nums">{formatMADStr(price)}</span>
+        )}
+      </span>
+      <span className="flex items-end justify-between gap-[2mm]">
         {code ? (
-          <span className="flex flex-col items-center">
-            <BarcodeImage code={code} className="h-[11mm] w-[30mm] p-0" />
-            <span className="font-mono text-[7pt]">{code}</span>
+          <span className="flex flex-col items-center gap-[0.5mm]">
+            <BarcodeImage code={code} className="h-[8mm] w-[32mm] p-0" />
+            <span className="font-mono text-[6.5pt] leading-none tracking-[0.15em]">{code}</span>
           </span>
         ) : (
           <span />
         )}
-        <span className="flex flex-col items-end leading-none">
-          {net != null && ppv != null && <span className="text-[9pt] line-through">{formatMADStr(ppv)}</span>}
-          <span className="text-[15pt] font-extrabold">{formatMADStr(net ?? ppv)}</span>
-        </span>
+        <span className="truncate pb-[0.3mm] text-right text-[6.5pt] text-black/70">{pharmacy}</span>
       </span>
-      <span className="truncate text-[7pt]">{pharmacy}</span>
     </div>
   );
 }
