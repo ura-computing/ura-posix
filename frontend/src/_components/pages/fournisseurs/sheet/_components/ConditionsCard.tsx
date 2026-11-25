@@ -70,6 +70,9 @@ export function ConditionsCard({ supplier }: { supplier: SupplierSheet }) {
                 </span>
                 <span className="text-base font-semibold text-foreground">{conditionText(t, c)}</span>
                 <span className="text-sm text-muted-foreground">{products(c)}</span>
+                {c.text && c.kind !== "pack" && c.kind !== "return_rule" && (
+                  <span className="text-sm text-foreground">{t("conditions.noteValue", { text: c.text })}</span>
+                )}
                 <span className="text-xs text-muted-foreground">
                   {[
                     c.valid_from && t("conditions.since", { date: formatDate(c.valid_from) }),

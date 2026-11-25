@@ -1,0 +1,535 @@
+{
+ "source": "Tableau des conditions laboratoires (Para Les Joyaux, documents 2023–2024)",
+ "_comment": "Only what the board writes. Every rule « À vérifier »: the admin ticks the products and confirms. Classeur1 left out: no lab name in the file.",
+ "labs": [
+  {
+   "name": "Laboratoires Bottu",
+   "aliases": [
+    "bottu"
+   ],
+   "phone": "05 22 67 51 51 / 52 / 53",
+   "payment_terms": "Chèque au comptant",
+   "note": "Transport : CTM. Minimum par produit : 5 ou 10 unités selon le produit. Remises 12 % / 16 % / 20 % / 25 % selon la quantité par produit (ex. Doliprane, Physiomer, Azix, Mobic, Zamox) : paliers non écrits dans le document.",
+   "conditions": [
+    {
+     "kind": "minimum_order",
+     "basis": "units",
+     "value": 200
+    },
+    {
+     "kind": "pack",
+     "text": "Pack 10 % (hors marché)"
+    },
+    {
+     "kind": "return_rule",
+     "text": "Produits commandés ni repris ni échangés"
+    }
+   ]
+  },
+  {
+   "name": "Afric-Phar",
+   "aliases": [
+    "africphar",
+    "afric phar"
+   ],
+   "contact_name": "Boudiar Amal",
+   "phone": "0631497715",
+   "address": "ZI Ouest Aïn Harrouda",
+   "city": "Mohammedia",
+   "payment_terms": "Escompte 1,5 % (chèque ou virement) ; échéance chèque 60 jours — mécanique à confirmer",
+   "conditions": [
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 100,
+       "pct": 20
+      },
+      {
+       "from": 200,
+       "pct": 23
+      },
+      {
+       "from": 300,
+       "pct": 25
+      }
+     ],
+     "text": "Packs 1, 2, 3"
+    },
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 24,
+       "pct": 7
+      },
+      {
+       "from": 48,
+       "pct": 10
+      }
+     ],
+     "text": "Produits à cocher : Fortimel"
+    },
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 30,
+       "pct": 7
+      },
+      {
+       "from": 50,
+       "pct": 10
+      }
+     ],
+     "text": "Produits à cocher : Algik"
+    },
+    {
+     "kind": "payment_discount",
+     "value": 1.5,
+     "days": 0,
+     "text": "Escompte 1,5 % ; chèque à 60 jours : comment les deux s'articulent est à confirmer"
+    },
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 4000,
+       "pct": 7
+      },
+      {
+       "from": 6000,
+       "pct": 10
+      }
+     ],
+     "text": "4 000 à 5 000 DH → 7 % ; plus de 6 000 DH → 10 % : champ d'application non précisé"
+    },
+    {
+     "kind": "return_rule",
+     "text": "Aucun retour ni échange sur l'offre spéciale"
+    }
+   ]
+  },
+  {
+   "name": "Maphar — CFAO Healthcare",
+   "aliases": [
+    "maphar",
+    "maphar cfao healthcare",
+    "cfao healthcare"
+   ],
+   "note": "Remises par palier de montant, produit par produit : à paramétrer produit par produit. Celestene : 0 %.",
+   "conditions": [
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 5000,
+       "pct": 10
+      },
+      {
+       "from": 15000,
+       "pct": 15
+      },
+      {
+       "from": 25000,
+       "pct": 18
+      }
+     ],
+     "text": "PFF (la plupart) — produits à cocher : Allegra, Baralgin, No-Dol, No-Spa, Rhinathiol, Avlocardyl…"
+    },
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 5000,
+       "pct": 6
+      },
+      {
+       "from": 15000,
+       "pct": 8
+      },
+      {
+       "from": 25000,
+       "pct": 10
+      }
+     ],
+     "text": "PFI — produits à cocher : Enterogermina, Nasacort"
+    },
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 5000,
+       "pct": 6
+      },
+      {
+       "from": 15000,
+       "pct": 8
+      },
+      {
+       "from": 25000,
+       "pct": 14
+      }
+     ],
+     "text": "PFI — produit à cocher : Aspegic"
+    },
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 5000,
+       "pct": 11
+      },
+      {
+       "from": 15000,
+       "pct": 13
+      },
+      {
+       "from": 25000,
+       "pct": 17
+      }
+     ],
+     "text": "PFI — produits à cocher : Arcoxia, Cerazette, Mercilon, Singulair"
+    },
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 5000,
+       "pct": 13
+      },
+      {
+       "from": 15000,
+       "pct": 18
+      },
+      {
+       "from": 25000,
+       "pct": 21
+      }
+     ],
+     "text": "Produit à cocher : Duphalac (≥ 80)"
+    },
+    {
+     "kind": "product_discount",
+     "value": 4,
+     "text": "Produit à cocher : Nautamine"
+    },
+    {
+     "kind": "product_discount",
+     "value": 35,
+     "text": "Produit à cocher : solution hydro-alcoolique 5 L"
+    },
+    {
+     "kind": "pack",
+     "text": "1 boîte de solution hydro-alcoolique F100ML offerte par commande"
+    }
+   ]
+  },
+  {
+   "name": "Laboratoire Phi",
+   "aliases": [
+    "phi",
+    "laboratoires phi",
+    "lab phi",
+    "phi (pharmaceutical institute)"
+   ],
+   "payment_terms": "Au comptant avec escompte de 2 %",
+   "note": "Aussi Reckitt : Gaviscon, Strepsils, Durex. Anomalie à vérifier : « Anginib » affiche un PPH supérieur au PPV (probable erreur dans le document source).",
+   "conditions": [
+    {
+     "kind": "product_discount",
+     "value": 15,
+     "text": "Liste 1 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 10,
+     "text": "Liste 2 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 15,
+     "text": "Liste 3 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 25,
+     "text": "Liste 4 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 30,
+     "text": "Liste 5 — produit à cocher : Vigorex"
+    },
+    {
+     "kind": "product_discount",
+     "value": 15,
+     "text": "Liste 6 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 10,
+     "text": "Liste 7 — produits à cocher"
+    },
+    {
+     "kind": "product_discount",
+     "value": 16,
+     "text": "Médicament conseil, environ — produit à cocher : Gaviscon"
+    },
+    {
+     "kind": "product_discount",
+     "value": 25,
+     "text": "Médicament conseil, environ — produit à cocher : Strepsils"
+    },
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 30,
+       "pct": 16
+      },
+      {
+       "from": 40,
+       "pct": 20
+      },
+      {
+       "from": 60,
+       "pct": 25
+      }
+     ],
+     "text": "Offre Strepsils (panaché) — produits à cocher"
+    },
+    {
+     "kind": "minimum_order",
+     "basis": "units",
+     "value": 30,
+     "text": "Offre Strepsils (panaché) — produits à cocher"
+    },
+    {
+     "kind": "packaging",
+     "value": 144,
+     "text": "Strepsils — produits à cocher"
+    },
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 36,
+       "pct": 20
+      },
+      {
+       "from": 48,
+       "pct": 24
+      },
+      {
+       "from": 96,
+       "pct": 30
+      }
+     ],
+     "text": "Offre Durex — produits à cocher"
+    },
+    {
+     "kind": "packaging",
+     "value": 72,
+     "text": "Durex : colisage 288 ou 72 — produits à cocher"
+    },
+    {
+     "kind": "packaging",
+     "value": 10,
+     "text": "Gaviscon : colisage 10 ou 12 — toute commande qui ne respecte pas le colisage ne sera PAS livrée"
+    },
+    {
+     "kind": "payment_discount",
+     "value": 2,
+     "days": 0,
+     "text": "Au comptant"
+    },
+    {
+     "kind": "return_rule",
+     "text": "Produits ni repris ni échangés"
+    }
+   ]
+  },
+  {
+   "name": "GSK",
+   "aliases": [
+    "gsk",
+    "glaxosmithkline",
+    "gsk transfert direct",
+    "gsk - glaxo smithkline maroc"
+   ],
+   "note": "Transfert direct : commande directe au laboratoire, hors grossiste. Vérifié sur la commande de novembre 2024 : 27 675,46 MAD → remise 14 % (palier 2).",
+   "conditions": [
+    {
+     "kind": "amount_tiers",
+     "tiers": [
+      {
+       "from": 14900,
+       "pct": 12
+      },
+      {
+       "from": 24900,
+       "pct": 14
+      }
+     ],
+     "text": "« FD » non défini dans le document ; devise des seuils non écrite (probablement MAD). Produits à cocher : Augmentin, Clavulin, Amoxil, Clamoxyl, Dermoval, Bactroban, Zentel, Zovirax"
+    }
+   ]
+  },
+  {
+   "name": "Pharma5",
+   "aliases": [
+    "pharma 5"
+   ],
+   "note": "« 90 jours » ambigu : paiement ou livraison ? « Min x3 » = 3 unités ?",
+   "conditions": [
+    {
+     "kind": "pack",
+     "text": "Offre 3+1 (équivalent 25 %)"
+    }
+   ]
+  },
+  {
+   "name": "Medipro",
+   "aliases": [],
+   "note": "Commande groupée. Manque : minimum, paiement, livraison, heure limite, délai.",
+   "conditions": [
+    {
+     "kind": "qty_tiers",
+     "tiers": [
+      {
+       "from": 300,
+       "pct": 16
+      },
+      {
+       "from": 400,
+       "pct": 20
+      }
+     ],
+     "text": "Commande groupée"
+    }
+   ]
+  },
+  {
+   "name": "BP Pharm",
+   "aliases": [
+    "bp pharma"
+   ],
+   "payment_terms": "Comptant à la livraison, LCN refusés",
+   "note": "Livraison à leur charge. Manque : montant du minimum, remises.",
+   "conditions": []
+  },
+  {
+   "name": "Pharmed",
+   "aliases": [],
+   "payment_terms": "Chèque à vue",
+   "note": "Prix du jour de livraison. Manque : minimum, remises, livraison.",
+   "conditions": [
+    {
+     "kind": "return_rule",
+     "text": "Réclamations sous 8 jours"
+    }
+   ]
+  },
+  {
+   "name": "Miradent",
+   "aliases": [
+    "miradent maroc"
+   ],
+   "note": "Tout le reste manque.",
+   "conditions": [
+    {
+     "kind": "return_rule",
+     "text": "Échange jusqu'à 6 mois avant péremption"
+    }
+   ]
+  },
+  {
+   "name": "Esnapharm",
+   "aliases": [],
+   "note": "Juste un bon de commande 2023 : tout est à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "Health Innovation",
+   "aliases": [],
+   "note": "Juste des bons de commande : tout est à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "Meduria",
+   "aliases": [
+    "meduria distribution"
+   ],
+   "note": "Juste une liste de prix 09/2024 : tout est à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "GUM (Sunstar)",
+   "aliases": [
+    "gum",
+    "sunstar"
+   ],
+   "note": "Tarif 2024, ligne « Escompte » sans taux : tout est à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "Mason Vitamins",
+   "aliases": [],
+   "note": "Juste un tarif 2024 : tout est à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "Distribio",
+   "aliases": [],
+   "note": "Catalogue de 18 pages (prix + colisage) : conditions à demander au délégué.",
+   "conditions": []
+  },
+  {
+   "name": "Gilbert",
+   "aliases": [
+    "laboratoires gilbert"
+   ],
+   "note": "Offres ponctuelles (produit offert). Conditions générales à demander.",
+   "conditions": []
+  },
+  {
+   "name": "Oral-B / Crest",
+   "aliases": [
+    "oral-b",
+    "oral b",
+    "crest"
+   ],
+   "note": "Bon de commande 2023 : tout le reste est à demander.",
+   "conditions": [
+    {
+     "kind": "pack",
+     "text": "Packs 1+1 / 2+1 (bon 2023)"
+    }
+   ]
+  },
+  {
+   "name": "Elmex / Meridol",
+   "aliases": [
+    "elmex",
+    "meridol"
+   ],
+   "note": "Bon de commande 2024 : tout le reste est à demander.",
+   "conditions": [
+    {
+     "kind": "packaging",
+     "value": 12,
+     "text": "Colisage 12 / 48 (bon 2024)"
+    }
+   ]
+  },
+  {
+   "name": "ACM",
+   "aliases": [
+    "laboratoires acm"
+   ],
+   "note": "Juste un bon de commande 2023 : tout est à demander au délégué.",
+   "conditions": []
+  }
+ ]
+}

@@ -380,6 +380,16 @@ function Wizard({ supplier, condition, onSave, isSaving, onClose }: Props) {
                 </ChoiceCard>
               ))}
             </div>
+            {kind !== "pack" && kind !== "return_rule" && (
+              <FormField label={t("conditions.note")}>
+                <FormInput
+                  value={ruleText}
+                  onChange={setRuleText}
+                  maxLength={500}
+                  placeholder={t("conditions.notePlaceholder")}
+                />
+              </FormField>
+            )}
             <FormField label={t("conditions.source")}>
               <FormInput
                 value={source}
