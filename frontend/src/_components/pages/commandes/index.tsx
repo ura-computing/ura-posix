@@ -1,8 +1,12 @@
 /** « Commandes du jour » (owner, employee with « Commander »): what to order today, one card per supplier, already
  *  filled by the calculation (free stock, promis, the supplier's confirmed conditions). The person checks the orange
  *  lines, changes a quantity if needed, then « Valider la commande ». Each card says what the supplier asks: minimum
- *  reached or not, the next discount tier (shown, never added), free transport. Groups at the top filter the lines. */
+ *  reached or not, the next discount tier (shown, never added), free transport. Groups at the top filter the lines.
+ *  « Envoyer à l'administrateur »: the admin places it with the supplier. Tab « Envoyées » (?tab=envoyees): each sent
+ *  order with its timeline (Envoyée → Passée → Livrée). */
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { ClipboardList, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
@@ -12,10 +16,14 @@ import { EmptyState } from "@/_components/molecules/EmptyState";
 import { LoadError } from "@/_components/molecules/LoadError";
 import { SectionCard } from "@/_components/molecules/SectionCard";
 import { PageSkeleton } from "@/_components/molecules/Skeletons";
+import { TabBar } from "@/_components/molecules/TabBar";
 import { ToggleChip } from "@/_components/molecules/ToggleChip";
+import { SentOrderCard } from "@/_components/organisms/SentOrderCard";
+import { API } from "@/api/api";
+import { api } from "@/api/client";
 import { Page } from "@/_components/templates/Page";
 import { useT } from "@/i18n/I18nProvider";
-import type { DailyOrder, OrderGroup } from "@/types/orders";
+import type { DailyOrder, OrderGroup, SentOrder } from "@/types/orders";
 import { formatMADStr, formatNumStr, formatPctStr } from "@/utils/format";
 
 import { OrderLineRow } from "./_components/OrderLineRow";
@@ -39,6 +47,13 @@ export default function DailyOrdersPage() {
     isValidating,
   } = useDailyOrders();
   const [group, setGroup] = useState<OrderGroup | null>(null);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "envoyees" ? "sent" : "draft";
+  const { data: sent, isLoading: isLoadingSent } = useQuery({
+    queryKey: API.orders.sent.key,
+    queryFn: () => api.get<SentOrder[]>(API.orders.sent.url),
+    enabled: tab === "sent",
+  });
   const [validating, setValidating] = useState<DailyOrder | null>(null);
 
   const amount = (basis: "units" | "mad" | "references", n: number) =>
@@ -52,19 +67,37 @@ export default function DailyOrdersPage() {
       title={t("orders.title")}
       subtitle={t("orders.subtitle")}
       actions={
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={refresh}
-          isLoading={isRefreshing}
-          loadingText={t("orders.refreshing")}
-        >
-          <RefreshCw className="size-4" />
-          {t("orders.refresh")}
-        </Button>
+        tab === "draft" && (
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={refresh}
+            isLoading={isRefreshing}
+            loadingText={t("orders.refreshing")}
+          >
+            <RefreshCw className="size-4" />
+            {t("orders.refresh")}
+          </Button>
+        )
       }
     >
-      {isLoading ? (
+      <TabBar<"draft" | "sent">
+        tabs={[
+          { id: "draft", label: t("orders.tab_draft") },
+          { id: "sent", label: t("orders.tab_sentList") },
+        ]}
+        activeId={tab}
+        onChange={(id) => setParams(id === "sent" ? { tab: "envoyees" } : {})}
+      />
+      {tab === "sent" ? (
+        isLoadingSent ? (
+          <PageSkeleton />
+        ) : (sent ?? []).length === 0 ? (
+          <EmptyState icon={<ClipboardList className="size-6" />} title={t("orders.empty_sentList")} />
+        ) : (
+          (sent ?? []).map((o) => <SentOrderCard key={o.id} order={o} title={o.order.supplier?.name ?? ""} />)
+        )
+      ) : isLoading ? (
         <PageSkeleton />
       ) : isError ? (
         <LoadError onRetry={reload} />

@@ -76,3 +76,23 @@ class AddLineIn(BaseModel):
 class AddLineOut(BaseModel):
     order_id: int
     supplier: SupplierRef | None
+
+
+class SentOrder(BaseModel):
+    """An order sent to the admin, as both sides see it: its frozen copy + where it stands."""
+
+    id: int
+    state: Literal["validated", "sent", "delivered", "cancelled"]
+    pharmacy: dict  # {id, name, code}
+    order: DailyOrder  # the frozen copy (lines, prices, conditions of that day)
+    validated_at: datetime
+    validated_by_name: str | None
+    sent_at: datetime | None
+    delivered_at: datetime | None
+    cancel_reason: str | None
+    handled_by_name: str | None
+
+
+class OrderStateIn(BaseModel):
+    state: Literal["sent", "delivered", "cancelled"]
+    reason: str | None = Field(default=None, max_length=300)

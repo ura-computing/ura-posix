@@ -6,7 +6,7 @@
     need        = for shelf + for promis
 
 Example: maximum 3, free 0, a promis of 1 waiting, nothing incoming → 3 + 1 = 4 (« 3 pour le rayon + 1 pour Mme
-Alami »). `incoming` = boxes already ordered and not received (our own orders, D-9; 0 until then).
+Alami »). `incoming` = boxes of our orders sent to the admin or placed, not delivered yet.
 """
 
 from __future__ import annotations

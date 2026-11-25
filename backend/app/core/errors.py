@@ -102,6 +102,7 @@ class ErrorCode(StrEnum):
     ORDER_NOT_FOUND = "orderNotFound"
     ORDER_LINE_NOT_FOUND = "orderLineNotFound"
     ORDER_NO_SUPPLIER = "orderNoSupplier"
+    ORDER_STATE_CHANGED = "orderStateChanged"
     PAYMENT_NOT_FOUND = "paymentNotFound"
     # Connexion Sobrus (app/sobrus/)
     SOBRUS_NOT_CONNECTED = "sobrusNotConnected"

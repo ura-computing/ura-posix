@@ -6,7 +6,10 @@ POST   /v1/orders/daily/refresh      « Recalculer »: lines follow the calculat
 POST   /v1/orders/lines              {medicament_id, quantity}: « Commander N » on the product sheet → its supplier's draft
 PATCH  /v1/orders/lines/{id}         {quantity}: the person's quantity (kept by « Recalculer »)
 DELETE /v1/orders/lines/{id}         « Enlever »
-POST   /v1/orders/{id}/validate      « Valider la commande »: frozen copy of the lines + the conditions applied (D-9 sends it)
+POST   /v1/orders/{id}/validate      « Envoyer à l'administrateur »: frozen copy of the lines + the conditions applied;
+                                     the admin and Support get a line in their bell (« Commandes à passer »)
+GET    /v1/orders/sent               the orders sent to the admin, where each one stands (newest first, 50)
+Orders sent and not delivered count as incoming in each product's need (`needs_queries`).
 """
 
 from __future__ import annotations
@@ -19,12 +22,14 @@ from fastapi import APIRouter, Path, status
 from app.core.audit import user_label
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import PurchaseOrder, PurchaseOrderLine
+from app.core.models import Pharmacy, PurchaseOrder, PurchaseOrderLine
 from app.core.permissions import member
 from app.core.security import CurrentUserDep
 from app.core.utils import today as pharmacy_today
 from app.orders.daily_queries import drafts, order_view, placement, rebuild
-from app.orders.schemas import AddLineIn, AddLineOut, DailyOrder, DailyOrders, LineQuantityIn
+from app.notifications.service import admin_and_support_ids, notify
+from app.orders.admin_router import sent_order
+from app.orders.schemas import AddLineIn, AddLineOut, DailyOrder, DailyOrders, LineQuantityIn, SentOrder
 from app.products.product_queries import linked_product
 from app.purchasing.needs_queries import product_needs
 
@@ -142,5 +147,26 @@ def validate_order(
     order.state = "validated"
     order.validated_at = datetime.now(timezone.utc)
     order.validated_by_name = user_label(user)
+    pharmacy = db.get(Pharmacy, pharmacy_id)
+    notify(
+        db,
+        admin_and_support_ids(db),
+        "orderToPlace",
+        {"pharmacy": pharmacy.name, "supplier": view.supplier.name, "n": len(view.lines)},
+        "commandes-a-passer",
+    )
     db.commit()
     return _daily(db, pharmacy_id)
+
+
+@router.get("/orders/sent", response_model=list[SentOrder])
+def sent_orders(pharmacy_id: OrdersDep, db: DbDep) -> list[SentOrder]:
+    pharmacy = db.get(Pharmacy, pharmacy_id)
+    rows = (
+        db.query(PurchaseOrder)
+        .filter(PurchaseOrder.pharmacy_id == pharmacy_id, PurchaseOrder.state != "draft")
+        .order_by(PurchaseOrder.validated_at.desc(), PurchaseOrder.id.desc())
+        .limit(50)
+        .all()
+    )
+    return [sent_order(o, pharmacy) for o in rows]

@@ -2,7 +2,17 @@
  *  A line opens its page and becomes read; « Tout marquer comme lu » on top. Same panel as every dropdown
  *  (`popover.ts`), same trigger look as the theme switch. */
 import { FloatingPortal } from "@floating-ui/react";
-import { Bell, CircleAlert, CloudDownload, Globe, Tags, UserPlus, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  CircleAlert,
+  ClipboardCheck,
+  ClipboardList,
+  CloudDownload,
+  Globe,
+  Tags,
+  UserPlus,
+  type LucideIcon,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/_components/atoms/Button";
@@ -23,6 +33,8 @@ const ICON: Record<NotificationKind, LucideIcon> = {
   sobrusDone: CloudDownload,
   sobrusFailed: CircleAlert,
   storeStep: Globe,
+  orderToPlace: ClipboardList,
+  orderStep: ClipboardCheck,
 };
 
 export function NotificationBell() {

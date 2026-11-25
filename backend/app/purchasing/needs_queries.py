@@ -6,11 +6,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.analytics.stock_queries import _stock_max_for, _stock_min_for, _vente_units_subq, stock_abcd_window
-from app.core.models import Customer, PharmacyProductEdit, PharmacyStock, Promis, PromisLine
+from app.core.models import (
+    Customer,
+    PharmacyProductEdit,
+    PharmacyStock,
+    Promis,
+    PromisLine,
+    PurchaseOrder,
+    PurchaseOrderLine,
+)
 from app.core.utils import today as pharmacy_today
 from app.damaged.damage_queries import damaged_boxes
 from app.promis.promis_queries import reserved_boxes
@@ -29,6 +37,7 @@ class ProductNeed:
     stock_min: int
     stock_max: int
     waiting: int  # boxes promised, not reserved yet
+    incoming: int  # boxes of our orders sent / placed, or delivered after the last stock import
     customers: list[str]  # who they are for (« Mme Alami »)
     for_shelf: int
     for_promis: int
@@ -68,6 +77,23 @@ def product_needs(db: Session, pharmacy_id: int, med_ids: list[int]) -> dict[int
     for mid, qty, names in rows:
         waiting[mid] = (int(qty), sorted(names))
 
+    # Incoming: boxes of our orders sent to the admin or placed, and the ones delivered after the last stock import
+    # (Sobrus counts them only from the next import).
+    last_import = (
+        db.query(func.max(PharmacyStock.imported_at)).filter(PharmacyStock.pharmacy_id == pharmacy_id).scalar()
+    )
+    on_the_way = PurchaseOrder.state.in_(("validated", "sent"))
+    if last_import is not None:
+        on_the_way = or_(on_the_way, and_(PurchaseOrder.state == "delivered", PurchaseOrder.delivered_at > last_import))
+    else:
+        on_the_way = or_(on_the_way, PurchaseOrder.state == "delivered")
+    incoming = dict(
+        db.query(PurchaseOrderLine.medicament_id, func.sum(PurchaseOrderLine.quantity))
+        .join(PurchaseOrder, PurchaseOrder.id == PurchaseOrderLine.order_id)
+        .filter(PurchaseOrder.pharmacy_id == pharmacy_id, on_the_way, PurchaseOrderLine.medicament_id.in_(med_ids))
+        .group_by(PurchaseOrderLine.medicament_id)
+        .all()
+    )
     out = {}
     for mid in med_ids:
         edit = edits.get(mid)
@@ -76,7 +102,7 @@ def product_needs(db: Session, pharmacy_id: int, med_ids: list[int]) -> dict[int
         low = edit.stock_min if edit and edit.stock_min is not None else _stock_min_for(sales)
         high = edit.stock_max if edit and edit.stock_max is not None else _stock_max_for(sales)
         qty, names = waiting.get(mid, (0, []))
-        n = need_for(current, damaged.get(mid, 0), reserved.get(mid, 0), high, qty)
+        n = need_for(current, damaged.get(mid, 0), reserved.get(mid, 0), high, qty, int(incoming.get(mid) or 0))
         out[mid] = ProductNeed(
             medicament_id=mid,
             current=current,
@@ -86,6 +112,7 @@ def product_needs(db: Session, pharmacy_id: int, med_ids: list[int]) -> dict[int
             stock_min=low,
             stock_max=high,
             waiting=qty,
+            incoming=int(incoming.get(mid) or 0),
             customers=names,
             for_shelf=n.for_shelf,
             for_promis=n.for_promis,

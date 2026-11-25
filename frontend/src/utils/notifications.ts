@@ -24,6 +24,10 @@ export function notificationText(t: TFn, { kind, params }: NotificationOut): str
         store: params.store,
         state: t(REQUEST_STATE_LABEL[params.state as RequestState]),
       });
+    case "orderToPlace":
+      return t("notifications.orderToPlace", { ...params, n: formatNumStr(Number(params.n)) });
+    case "orderStep":
+      return t("notifications.orderStep", { supplier: params.supplier, state: t(`orders.state_${params.state}`) });
     default:
       return t(`notifications.${kind}`, params);
   }

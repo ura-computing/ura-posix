@@ -1,7 +1,14 @@
 /** The bell of the top bar (mirrors backend/app/notifications/schemas.py). */
 
 export type NotificationKind =
-  "signupRequest" | "storeRequest" | "catalogueToClassify" | "sobrusDone" | "sobrusFailed" | "storeStep";
+  | "signupRequest"
+  | "storeRequest"
+  | "catalogueToClassify"
+  | "sobrusDone"
+  | "sobrusFailed"
+  | "storeStep"
+  | "orderToPlace"
+  | "orderStep";
 
 export interface NotificationOut {
   id: number;

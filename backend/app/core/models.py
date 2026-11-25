@@ -1002,7 +1002,8 @@ ORDER_GROUPS = ("urgent", "restock", "promis", "check")  # « Urgences », « R�
 class PurchaseOrder(Base):
     """An order of the pharmacy to one supplier (`supplier_id` None = supplier unknown: « À vérifier »). « Commandes
     du jour »: the drafts, one per supplier, rebuilt by « Recalculer » (a quantity the person changed stays).
-    « Valider »: `frozen` = the lines and the conditions applied that day, never changed after."""
+    « Envoyer à l'administrateur » (state `validated`): `frozen` = the lines and the conditions applied that day, never
+    changed after. The admin places it (`sent`, « Passée »), then `delivered` — or `cancelled` with a reason."""
 
     __tablename__ = "purchase_orders"
     __table_args__ = (
@@ -1022,6 +1023,11 @@ class PurchaseOrder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     validated_by_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    # The admin's follow-up: « Passée » (placed with the supplier), « Livrée », or « Annulée » (reason).
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    handled_by_name: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class PurchaseOrderLine(Base):

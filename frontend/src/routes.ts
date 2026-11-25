@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  ClipboardCheck,
   ClipboardList,
   Boxes,
   Building2,
@@ -93,6 +94,11 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
     },
     { path: "/admin/fournisseurs/:id", load: () => import("@/_components/pages/fournisseurs/sheet") },
     {
+      path: "/admin/commandes-a-passer",
+      load: () => import("@/_components/pages/commandes-a-passer"),
+      nav: { label: "nav.ordersToPlace", icon: ClipboardCheck, group: "administration" },
+    },
+    {
       path: "/admin/categories",
       load: () => import("@/_components/pages/categories"),
       nav: { label: "nav.categories", icon: Tags, group: "administration" },
@@ -127,6 +133,11 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       nav: { label: "nav.suppliers", icon: Truck, group: "administration" },
     },
     { path: "/support/fournisseurs/:id", load: () => import("@/_components/pages/fournisseurs/sheet") },
+    {
+      path: "/support/commandes-a-passer",
+      load: () => import("@/_components/pages/commandes-a-passer"),
+      nav: { label: "nav.ordersToPlace", icon: ClipboardCheck, group: "administration" },
+    },
     {
       path: "/support/categories",
       load: () => import("@/_components/pages/categories"),

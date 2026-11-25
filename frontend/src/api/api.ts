@@ -385,7 +385,19 @@ export const API = {
     refresh: { url: "/orders/daily/refresh", refreshes: (): Read[] => [API.orders.daily] },
     line: { url: (id: number) => `/orders/lines/${id}`, refreshes: (): Read[] => [API.orders.daily] },
     add: { url: "/orders/lines", refreshes: (): Read[] => [API.orders.daily] },
-    validate: { url: (id: number) => `/orders/${id}/validate`, refreshes: (): Read[] => [API.orders.daily] },
+    validate: {
+      url: (id: number) => `/orders/${id}/validate`,
+      refreshes: (): Read[] => [API.orders.daily, API.orders.sent],
+    },
+    /** The orders sent to the admin, where each one stands. */
+    sent: { url: "/orders/sent", key: ["orders", "sent"] },
+    /** « Commandes à passer » (admin, Support): by state; « Passée » / « Livrée » / « Annuler ». */
+    toPlace: {
+      url: "/admin/orders",
+      key: (f: { state: string | null; search: string }) => ["orders", "admin", f] as const,
+      all: ["orders", "admin"],
+    },
+    move: { url: (id: number) => `/admin/orders/${id}/state`, refreshes: (): Read[] => [API.orders.toPlace] },
   },
   history: {
     list: {

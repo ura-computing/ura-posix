@@ -7,6 +7,8 @@
 | catalogueToClassify | admin + Support | products without a type after an import (one line, kept up to date) | « 12 produits à classer » |
 | sobrusDone / sobrusFailed | the pharmacy's owners (catalogue run: who started it) | a Sobrus run ends | « Import Sobrus terminé : 1 204 lignes » |
 | storeStep | the store's owner | Support moves the request | « Votre boutique : En cours » |
+| orderToPlace | admin + Support | a pharmacy sends its order (« Envoyer à l'administrateur ») | « Pharmacie Demo : commande Bottu à passer (12 produits) » |
+| orderStep | the pharmacy's owners | the admin moves it (Passée, Livrée, Annulée) | « Commande Bottu : passée chez le fournisseur » |
 """
 
 from __future__ import annotations

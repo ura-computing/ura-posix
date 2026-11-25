@@ -40,3 +40,19 @@ export interface DailyOrders {
   orders: DailyOrder[];
   counts: Partial<Record<OrderGroup, number>>;
 }
+
+export type SentState = "validated" | "sent" | "delivered" | "cancelled";
+
+/** An order sent to the admin: its frozen copy + where it stands (both the pharmacy and the admin see it). */
+export interface SentOrder {
+  id: number;
+  state: SentState;
+  pharmacy: { id: number; name: string; code: string | null };
+  order: DailyOrder;
+  validated_at: string;
+  validated_by_name: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  cancel_reason: string | null;
+  handled_by_name: string | null;
+}
