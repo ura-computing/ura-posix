@@ -69,6 +69,8 @@ def _row(m: Medicament) -> dict:
         "barcode1": m.barcode1,
         "barcode2": m.barcode2,
         "laboratoire": m.laboratoire,
+        "dci": m.dci,
+        "galenic_form": m.galenic_form,
         "product_type": m.product_type,
         "created_at": m.created_at.isoformat() if m.created_at else "",
         "updated_at": m.updated_at.isoformat() if m.updated_at else None,
@@ -110,8 +112,9 @@ def list_catalog(
     sort_order: Annotated[str, Query()] = "asc",
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=500)] = 25,
+    export: Annotated[bool, Query(description="If true, return every matching row (Excel)")] = False,
 ) -> dict:
-    """Paginated + filtered + sortable catalog list."""
+    """Paginated + filtered + sortable catalog list; export=true → every matching row (« Exporter »)."""
     q = db.query(Medicament)
 
     if search and search.strip():
@@ -130,10 +133,10 @@ def list_catalog(
     q = q.order_by(desc(col) if sort_order == "desc" else asc(col))
 
     total = q.count()
-    rows = q.offset((page - 1) * limit).limit(limit).all()
+    rows = q.all() if export else q.offset((page - 1) * limit).limit(limit).all()
     return {
         "data": [_row(m) for m in rows],
-        "pagination": paginate(total, page, limit),
+        "pagination": paginate(total, 1 if export else page, max(total, 1) if export else limit),
     }
 
 

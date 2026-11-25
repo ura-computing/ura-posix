@@ -52,11 +52,12 @@ Pharmacy staff are not computer people and their computers are slow.
 | Light pages | lists paged on the server, search on the server, no animation inside the app, skeleton in < 1 s |
 | Long jobs in the background | AI reading, big exports: « en cours… », a notification when done, the page stays usable |
 | Mistakes easy to undo | « Annuler » on the last action where possible; dangerous actions ask to confirm in plain words |
+| Row actions: « ⋮ » → a pop-up of plain choices (user, 2026-11-25: « from now we follow this way ») | « Stock abîmé »: « ⋮ » → « Que s'est-il passé ? » → window « Qu'avez-vous fait de ces boîtes ? » with big cards « Je les ai jetées » + one line « Elles restent hors du stock libre » → « Valider » |
 
 ## 0. Order of work
 
 ```
-A. Sobrus tickets (small)  →  B. Stock endommagé  →  C. Promis  →  D. Commandes 01 → 12 + 14  →  E. Tests (end)
+A. Sobrus tickets (small)  →  B. Stock endommagé  →  C. Promis  →  D. Commandes 01 → 12 + 14  →  F. UI review  →  E. Tests (end)
 ```
 
 Each step: build → I give you a UI test list → your OK → next step (memory « stop after each step »).
@@ -88,7 +89,7 @@ example:      10           −  2                          −  1            = 7
 | Part | Plan |
 |---|---|
 | Where | Produits → product sheet: button « Déclarer des boîtes abîmées » (quantity, reason, note). Page « Stock abîmé »: list of all declarations, filters, export `.xlsx` |
-| Reason | typed by the user, required (« carton écrasé à la livraison ») |
+| Reason | typed by the user, optional (« carton écrasé à la livraison »), user 2026-11-25 |
 | What happens next (state) | « À traiter » → « Rendu au fournisseur » (→ can create a supplier avoir, D10) · « Détruit » · « Remis en vente » (error) |
 | Who | owner + employee with a new permission « Stock abîmé » (ON by default) |
 | History | every declaration / change in « Historique » (who, when, why) |
@@ -285,6 +286,21 @@ Créé → En attente → Accepté / Refusé → Avoir reçu → Payé / compens
 declaration (B). Number, date, amount, reason.
 
 ---
+
+## F. UI review of the whole app (user, 2026-11-25)
+
+Every page, old and new, follows the pop-up and message style the user approved on « Stock abîmé » (2026-11-25).
+
+| Check | The rule |
+|---|---|
+| Row actions | « ⋮ » menu; an action that needs a choice opens a pop-up, never a bare menu of state words |
+| Pop-up | `Dialog` + `DialogHeader` (icon, question as title, what it is about as subtitle) + `DialogBody` + `DialogFooter`; choices = big `ChoiceCard`s, each a first-person sentence (« Je les ai jetées ») + one line saying what happens (« Elles reviennent dans le stock libre. ») |
+| Buttons | « Annuler » + one main button (« Valider »); disabled → the reason written next to it (« Choisissez une réponse. ») |
+| Words | states named as the user says them (« Jetées », « Bonnes, remises en stock »), never codes or tech words |
+| Messages | toasts short and plain (« C'est noté. »); errors say what to do |
+| Controls | numbers with `QuantityField` (« − » / « + »), never the browser's arrows; app components only |
+
+How: one page at a time, a list of what breaks the rule (screenshot + file), the user picks, then fixes; same « stop after each step ».
 
 ## 8. Tests (end of the whole batch)
 

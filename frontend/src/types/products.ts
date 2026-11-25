@@ -73,6 +73,10 @@ export interface ProductPrices {
 export interface ProductStock {
   /** null = not in the last stock import. */
   current_stock: number | null;
+  /** « Boîtes abîmées » still off the free stock. */
+  damaged: number;
+  /** current_stock − damaged (never under 0); null when current_stock is null. */
+  free_stock: number | null;
   stock_min: number;
   stock_max: number;
   units_sold_12m: number;

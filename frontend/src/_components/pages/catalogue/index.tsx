@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Pencil, Trash2, Plus, UploadCloud, FileSpreadsheet } from "lucide-react";
+import { Download, Pencil, Trash2, Plus, UploadCloud, FileSpreadsheet } from "lucide-react";
 
 import { ConfirmDialog } from "@/_components/molecules/ConfirmDialog";
 import { DataTable, type ColumnDef } from "@/_components/organisms/DataTable";
+import { SobrusImportCard } from "@/_components/organisms/SobrusImportCard";
 import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar";
 import { useT } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
@@ -10,7 +11,6 @@ import { formatMAD, formatNumStr, formatPct } from "@/utils/format";
 import type { Medicament, MedicamentInput, ProductType, CatalogImportResponse } from "@/types/catalog";
 
 import { CatalogStatsTiles } from "./_components/CatalogStatsTiles";
-import { SobrusImportCard } from "./_components/SobrusImportCard";
 import { useCatalogPage } from "./hooks";
 import { Button } from "@/_components/atoms/Button";
 import { Dialog, DialogContent } from "@/_components/atoms/Dialog";
@@ -367,6 +367,7 @@ export default function CataloguePage() {
     create,
     filters,
     importCsv,
+    handleExport,
     isCreating,
     isError,
     isImporting,
@@ -555,6 +556,12 @@ export default function CataloguePage() {
         }}
         rightActions={[
           {
+            label: t("common.export"),
+            icon: <Download className="size-4" />,
+            variant: "outline",
+            onClick: () => void handleExport(),
+          },
+          {
             label: t("catalogue.importCsv"),
             icon: <UploadCloud className="size-4" />,
             variant: "outline",
@@ -571,7 +578,7 @@ export default function CataloguePage() {
         onResetAll={reset}
       />
 
-      <SobrusImportCard />
+      <SobrusImportCard kind="products" />
 
       <DataTable<Medicament>
         rows={list?.data ?? []}

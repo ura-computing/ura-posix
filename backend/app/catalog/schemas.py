@@ -27,6 +27,8 @@ class MedicamentRow(BaseModel):
     barcode1: str | None = None
     barcode2: str | None = None
     laboratoire: str | None = None
+    dci: str | None = None  # from Sobrus' product list
+    galenic_form: str | None = None
     product_type: str | None = None  # "pharmacie" | "parapharmacie" | None (auto)
     created_at: str
     updated_at: str | None = None

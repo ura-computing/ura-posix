@@ -33,10 +33,11 @@ const TYPE_LABEL: Record<ImportKind, string> = {
   vente: "imports.typeVente",
   stock: "imports.typeStock",
   closing: "imports.typeClosing",
+  returns: "imports.typeReturns",
 };
 
-/** « Clôture de caisse » (the Sobrus robot): read again at every run, so never deleted. */
-const readOnly = (row: DataImport) => row.file_type === "closing";
+/** « Clôture de caisse », « Retours clients » (the Sobrus robot): read again at every run, so never deleted. */
+const readOnly = (row: DataImport) => row.file_type === "closing" || row.file_type === "returns";
 
 // Indigo (cancelled) / violet (deleted) = nothing to do; orange = act (import the file again).
 const CANCELLED = "border-transparent bg-[color-mix(in_srgb,var(--chart-7)_14%,transparent)] text-[var(--chart-7)]";

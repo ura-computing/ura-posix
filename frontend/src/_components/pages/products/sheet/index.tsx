@@ -25,10 +25,12 @@ import { SheetSkeleton } from "./_components/SheetSkeleton";
 import { GeneralTab } from "./_components/GeneralTab";
 import { HistoryTab } from "./_components/HistoryTab";
 import { MovementsTab } from "./_components/MovementsTab";
+import { DamageDialog } from "./_components/DamageDialog";
 import { NotesDialog } from "./_components/NotesDialog";
 import { SheetActions, SheetMeta } from "./_components/SheetHeader";
 import { StatsTab } from "./_components/StatsTab";
 import {
+  useDeclareDamage,
   useProductNotes,
   useProductStats,
   useProduitPage,
@@ -59,6 +61,8 @@ function ProductSheetPage({ id }: { id: number }) {
   if (notesOpen === null && sheet) setNotesOpen(sheet.notes_count > 0);
   const showNotes = notesOpen === true;
   const { notes, isLoading: notesLoading, addNote, isAdding, deleteNote, isDeleting } = useProductNotes(id, showNotes);
+  const [damageOpen, setDamageOpen] = useState(false);
+  const { declareDamage, isDeclaring } = useDeclareDamage();
 
   if (notFound) return <NotFoundPage embedded />;
   if (isLoading || !sheet) {
@@ -81,7 +85,14 @@ function ProductSheetPage({ id }: { id: number }) {
         media={<ProductPhoto key={photo} src={photo} name={sheet.product} className="size-20 rounded-xl p-1.5" />}
         title={sheet.product}
         subtitle={<SheetMeta sheet={sheet} />}
-        actions={<SheetActions sheet={sheet} onPremium={setPremium} onOpenNotes={() => setNotesOpen(true)} />}
+        actions={
+          <SheetActions
+            sheet={sheet}
+            onPremium={setPremium}
+            onOpenNotes={() => setNotesOpen(true)}
+            onDeclareDamage={me?.permissions.includes("damaged") ? () => setDamageOpen(true) : null}
+          />
+        }
       >
         <TabBar tabs={tabs} activeId={tab} onChange={setTab} />
         {/* The page dates: « Performance » (Général), Statistiques; Traçabilité has them in its own
@@ -105,6 +116,14 @@ function ProductSheetPage({ id }: { id: number }) {
         {tab === "history" && <HistoryTab id={sheet.id} />}
       </Page>
       <PremiumDialog feature={premium} unlocked={premium !== null && has(premium)} onClose={() => setPremium(null)} />
+      <DamageDialog
+        open={damageOpen}
+        product={sheet.product}
+        medicamentId={sheet.id}
+        onSave={declareDamage}
+        isSaving={isDeclaring}
+        onClose={() => setDamageOpen(false)}
+      />
       <NotesDialog
         open={showNotes}
         product={sheet.product}

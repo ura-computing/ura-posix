@@ -7,6 +7,7 @@ import type { StatsFilters, StatsResponse } from "@/types/stats";
 import type { VenteRow } from "@/types/transactions";
 
 import { CashClosingSection } from "./_components/CashClosingSection";
+import { SalesReturnsSection } from "./_components/SalesReturnsSection";
 import { useComptabilitePage, useDeletePayment, useSavePayment } from "./hooks";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { useState } from "react";
@@ -593,6 +594,9 @@ export default function ComptabilitePage() {
 
       {/* Sobrus « Clôture de caisse » of the same month (read-only) */}
       <CashClosingSection month={activeMonth} />
+
+      {/* Sobrus « Retours clients (avoirs) » of the same month (read-only) */}
+      <SalesReturnsSection month={activeMonth} />
 
       {/* Ventes ledger */}
       <section className="flex flex-col gap-3">

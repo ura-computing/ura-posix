@@ -35,9 +35,18 @@ function fieldValue(field: string, v: string | number | null | undefined): strin
 const IMPORT_TYPE: Record<string, string> = { achat: "nav.achats", vente: "nav.ventes", stock: "nav.stock" };
 
 /** « Import » / « Fiche produit » / « Observation ». */
+/** « Stock abîmé » states (same keys as its page). */
+const DAMAGE_STATUS: Record<string, string> = {
+  pending: "damaged.statusPending",
+  returned: "damaged.statusReturned",
+  destroyed: "damaged.statusDestroyed",
+  back_on_sale: "damaged.statusBackOnSale",
+};
+
 export function historyKind(t: TFn, row: AuditRow): string {
   if (row.action.startsWith("import_")) return t("history.kindImport");
   if (row.action.startsWith("note_")) return t("history.kindNote");
+  if (row.action.startsWith("damage_")) return t("history.kindDamaged");
   if (row.action.startsWith("sobrus_")) return t("history.kindSobrus");
   return t("history.kindProduct");
 }
@@ -75,6 +84,16 @@ export function historyText(t: TFn, row: AuditRow): string {
     case "note_added":
     case "note_deleted":
       return t(`history.${row.action}`, { text: String(d.text ?? ""), author: String(d.author ?? "—") });
+    case "damage_declared":
+      return d.reason
+        ? t("history.damage_declared", { n: formatNumStr(Number(d.quantity ?? 0)), reason: String(d.reason) })
+        : t("history.damage_declared_no_reason", { n: formatNumStr(Number(d.quantity ?? 0)) });
+    case "damage_status_changed":
+      return t("history.damage_status_changed", {
+        n: formatNumStr(Number(d.quantity ?? 0)),
+        before: t(DAMAGE_STATUS[String(d.before)] ?? "damaged.statusPending"),
+        after: t(DAMAGE_STATUS[String(d.after)] ?? "damaged.statusPending"),
+      });
     case "sobrus_connected":
     case "sobrus_password_updated":
     case "sobrus_disconnected":

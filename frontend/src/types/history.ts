@@ -10,6 +10,8 @@ export type AuditAction =
   | "product_reverted"
   | "note_added"
   | "note_deleted"
+  | "damage_declared"
+  | "damage_status_changed"
   | "sobrus_connected"
   | "sobrus_password_updated"
   | "sobrus_disconnected"
@@ -44,7 +46,7 @@ export interface ProductHistoryResponse {
   pagination: { page: number; limit: number; total: number; total_pages: number };
 }
 
-export type HistoryKind = "all" | "imports" | "product" | "notes";
+export type HistoryKind = "all" | "imports" | "product" | "notes" | "damaged";
 
 export interface HistoryFilters {
   page: number;

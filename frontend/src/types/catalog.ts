@@ -38,6 +38,8 @@ export interface Medicament {
   barcode1: string | null;
   barcode2: string | null;
   laboratoire: string | null;
+  dci: string | null;
+  galenic_form: string | null;
   product_type: ProductType | null;
   created_at: string;
   updated_at: string | null;

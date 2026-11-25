@@ -1,6 +1,6 @@
-/** Catalogue « Produits depuis Sobrus »: one button reads the products of one owner's Sobrus account (the next one if
- *  Sobrus refuses it): new products added, empty fields filled. While it runs: what the robot does + « Arrêter »;
- *  after: each account tried and how it ended. The CSV import stays for when Sobrus fails. */
+/** The admin's Sobrus run card (Catalogue « Produits depuis Sobrus », « Fournisseurs »): one button reads one owner's
+ *  Sobrus account (the next one if Sobrus refuses it): new rows added, empty fields filled. While it runs: what the
+ *  robot does + « Arrêter »; after: each account tried and how it ended. Its own texts: `<texts>.sobrus*`. */
 import { CloudDownload, Square } from "lucide-react";
 
 import { Button } from "@/_components/atoms/Button";
@@ -11,8 +11,8 @@ import { useT, type TFn } from "@/i18n/I18nProvider";
 import { cn } from "@/utils/cn";
 import { formatDateTime } from "@/utils/format";
 import { currentStep, runResult } from "@/utils/sobrus";
-
-import { useSobrusProductsImport } from "../hooks";
+import { useAdminSobrusRun } from "@/hooks/useAdminSobrusRun";
+import { ADMIN_SOBRUS, type AdminSobrusKind } from "@/hooks/useSharedQueries";
 
 const RESULT_TONE: Record<SobrusRun["status"], string> = {
   queued: "text-muted-foreground",
@@ -24,13 +24,14 @@ const RESULT_TONE: Record<SobrusRun["status"], string> = {
 
 /** Sobrus refused this owner's account (the next one is tried), or did not answer (the CSV import stays). */
 const REFUSED = ["sobrusNoAccess", "sobrusBadCredentials", "sobrusNeedsAction"];
-const failure = (t: TFn, run: SobrusRun) =>
-  t(REFUSED.includes(run.error_code ?? "") ? "catalogue.sobrusRefused" : "catalogue.sobrusFailed");
+const failure = (t: TFn, run: SobrusRun, texts: string) =>
+  t(REFUSED.includes(run.error_code ?? "") ? "catalogue.sobrusRefused" : `${texts}.sobrusFailed`);
 
-export function SobrusImportCard() {
+export function SobrusImportCard({ kind }: { kind: AdminSobrusKind }) {
   const t = useT();
+  const { texts } = ADMIN_SOBRUS[kind];
   const { sobrusImport, isLoading, isRunning, startImport, isStarting, stopImport, isCancelling } =
-    useSobrusProductsImport();
+    useAdminSobrusRun(kind);
   const connected = sobrusImport?.connected ?? 0;
   const runs = sobrusImport?.runs ?? [];
   const reason = connected === 0 ? t("catalogue.sobrusNoneConnected") : isRunning ? t("catalogue.sobrusBusy") : null;
@@ -38,8 +39,8 @@ export function SobrusImportCard() {
     <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex max-w-3xl flex-col gap-1">
-          <SectionTitle>{t("catalogue.sobrusTitle")}</SectionTitle>
-          <p className="text-sm text-muted-foreground">{t("catalogue.sobrusHint", { n: connected })}</p>
+          <SectionTitle>{t(`${texts}.sobrusTitle`)}</SectionTitle>
+          <p className="text-sm text-muted-foreground">{t(`${texts}.sobrusHint`, { n: connected })}</p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -56,7 +57,7 @@ export function SobrusImportCard() {
               isLoading={isStarting}
             >
               <CloudDownload className="size-4" />
-              {t("catalogue.sobrusImport")}
+              {t(`${texts}.sobrusImport`)}
             </Button>
           </div>
           {reason && <span className="text-xs text-muted-foreground">{reason}</span>}
@@ -72,7 +73,7 @@ export function SobrusImportCard() {
                   {t("catalogue.sobrusAccount", { name: pharmacy_name })}
                 </span>
                 <span className={cn("text-sm", RESULT_TONE[run.status])}>
-                  {active ? currentStep(t, run) : run.status === "error" ? failure(t, run) : runResult(t, run)}
+                  {active ? currentStep(t, run) : run.status === "error" ? failure(t, run, texts) : runResult(t, run)}
                   {run.ended_at && (
                     <span className="ml-2 text-xs text-muted-foreground">{formatDateTime(run.ended_at)}</span>
                   )}

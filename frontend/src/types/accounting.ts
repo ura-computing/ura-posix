@@ -53,6 +53,28 @@ export interface ClosingDay {
   customers: ClosingCustomer[];
 }
 
+/** One Sobrus « Retour client » (avoir, « RV-7162 »); `refund` = how the money went back (« Restituer en argent »). */
+export interface SalesReturn {
+  id: number;
+  number: string;
+  day: string;
+  customer: string | null;
+  refund: string | null;
+  status: string | null;
+  amount: number;
+  products: { name: string; quantity: number; unit_price: number }[];
+}
+
+export interface SalesReturnMonth {
+  returns: SalesReturn[];
+  count: number;
+  total: number;
+  connected: boolean;
+  /** Its account may not read the returns (only the owner's Sobrus login can). */
+  no_access: boolean;
+  last_fetched_at: string | null;
+}
+
 export interface ClosingMonth {
   days: ClosingDay[];
   totals: { invoices: number; total: number; paid: number; credit_sales: number; returns: number; net: number };

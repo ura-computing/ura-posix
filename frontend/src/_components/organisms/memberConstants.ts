@@ -1,4 +1,4 @@
-/** Single source of truth for the 11 permission features rendered on the admin
+/** Single source of truth for the permission features rendered on the admin
  *  permission pages. Same keys as backend's ALLOWED_FEATURES (see models.py). */
 import {
   LayoutDashboard,
@@ -12,6 +12,7 @@ import {
   Star,
   Package,
   PackagePlus,
+  PackageX,
   Printer,
   RefreshCw,
   type LucideIcon,
@@ -30,7 +31,8 @@ export type FeatureKey =
   | "produits"
   | "sobrus"
   | "labels"
-  | "orders";
+  | "orders"
+  | "damaged";
 
 export interface FeatureDef {
   key: FeatureKey;
@@ -56,6 +58,7 @@ export const FEATURES: FeatureDef[] = [
   { key: "special_products", label: "adminFeat.special", description: "adminFeat.specialD", icon: Star },
   { key: "produits", label: "adminFeat.produits", description: "adminFeat.produitsD", icon: Package },
   { key: "sobrus", label: "adminFeat.sobrus", description: "adminFeat.sobrusD", icon: RefreshCw, ownerOnly: true },
+  { key: "damaged", label: "adminFeat.damaged", description: "adminFeat.damagedD", icon: PackageX },
   { key: "labels", label: "adminFeat.labels", description: "adminFeat.labelsD", icon: Printer, premium: true },
   { key: "orders", label: "adminFeat.orders", description: "adminFeat.ordersD", icon: PackagePlus, premium: true },
 ];

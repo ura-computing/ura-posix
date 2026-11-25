@@ -1,6 +1,6 @@
 """« Historique des modifications » (owner): every change of the pharmacy, kept as proof.
 
-GET /v1/history   person, kind (all | imports | product | notes), date_from / date_to (pharmacy days),
+GET /v1/history   person, kind (all | imports | product | notes | damaged), date_from / date_to (pharmacy days),
                   search (product, file, note), page; export=true → every matching line (Excel).
 A product's own lines: GET /v1/products/{med_id}/history (`app/products/router.py`, everyone with
 Produits)."""
@@ -25,7 +25,7 @@ def get_history(
     pharmacy_id: OwnerDep,
     db: DbDep,
     person: Annotated[str | None, Query(description="exactly the name shown")] = None,
-    kind: Annotated[str, Query(description="all | imports | product | notes")] = "all",
+    kind: Annotated[str, Query(description="all | imports | product | notes | damaged")] = "all",
     date_from: Annotated[date | None, Query()] = None,
     date_to: Annotated[date | None, Query()] = None,
     search: Annotated[str | None, Query(description="product, file, note text")] = None,

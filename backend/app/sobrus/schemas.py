@@ -10,7 +10,7 @@ from app.core.utils import today
 
 class SobrusRunOut(BaseModel):
     id: int
-    mode: Literal["full", "new", "check", "range", "products"]  # products: the admin's « Produits Sobrus »
+    mode: Literal["full", "new", "check", "range", "products", "suppliers"]  # products, suppliers: the admin's
     status: Literal["queued", "running", "success", "error", "cancelled"]
     cancel_requested: bool
     date_from: date | None  # mode `range` only

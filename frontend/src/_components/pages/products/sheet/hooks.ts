@@ -12,6 +12,7 @@ import { useListFilters } from "@/hooks/useListFilters";
 import { useMe } from "@/hooks/useMe";
 import { useT, type TFn } from "@/i18n/I18nProvider";
 import { ROLES, type Role } from "@/types";
+import type { Damage, DamageInput } from "@/types/damaged";
 import { type ProductHistoryResponse } from "@/types/history";
 import {
   type EditField,
@@ -220,6 +221,21 @@ export function useProductNotes(id: number, enabled: boolean) {
     deleteNote,
     isDeleting,
   };
+}
+
+/** « Déclarer des boîtes abîmées »: off the free stock until « Remis en vente » (page « Stock abîmé »). */
+export function useDeclareDamage() {
+  const t = useT();
+  const qc = useQueryClient();
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (body: DamageInput) => api.post<Damage>(API.damaged.declare.url, body),
+    onSuccess: () => {
+      toast.success(t("damaged.declared"));
+      void refresh(qc, API.damaged.declare);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return { declareDamage: mutateAsync, isDeclaring: isPending };
 }
 
 // ── « Modifier » (owner) ────────────────────────────────────────────────────

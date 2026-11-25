@@ -9,7 +9,7 @@ import { API, refresh } from "@/api/api";
 import { useGlobalDateRange } from "@/hooks/useGlobalDateRange";
 import { useStats, useVentesList } from "@/hooks/useSharedQueries";
 
-import type { ClosingMonth, PaymentMethod, PaymentEntry, PaymentEntryIn } from "@/types/accounting";
+import type { ClosingMonth, PaymentMethod, PaymentEntry, PaymentEntryIn, SalesReturnMonth } from "@/types/accounting";
 import type { StatsFilters } from "@/types/stats";
 import type { VentesFilters } from "@/types/transactions";
 import { translateFr } from "@/i18n/I18nProvider";
@@ -251,5 +251,39 @@ export function useCashClosings(month: string) {
     isError,
     reload: () => void refetch(),
     exportClosings,
+  };
+}
+
+/** « Retours clients (avoirs) » of one month (read-only, fetched by the Sobrus robot at every run) + its Excel file. */
+export function useSalesReturns(month: string) {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: API.salesReturns.list.key(month),
+    queryFn: () => api.get<SalesReturnMonth>(API.salesReturns.list.url, { params: { month } }),
+    staleTime: 30_000,
+  });
+  const exportReturns = () => {
+    if (!data) return;
+    const header = ["Date", "N°", "Client", "Remboursement", "Statut", "Produits", "Montant (MAD)"];
+    const rows = data.returns.map((r) => [
+      r.day,
+      r.number,
+      r.customer ?? "",
+      r.refund ?? "",
+      r.status ?? "",
+      r.products.map((p) => `${p.name} × ${p.quantity}`).join(", "),
+      r.amount,
+    ]);
+    void downloadXlsx(
+      [header, ...rows, ["Total", "", "", "", "", "", data.total]],
+      exportFilename("Retours clients", "xlsx", `${month}-01`, data.returns[0]?.day ?? `${month}-01`),
+      "Retours clients",
+    );
+  };
+  return {
+    salesReturns: data ?? null,
+    isLoading,
+    isError,
+    reload: () => void refetch(),
+    exportReturns,
   };
 }

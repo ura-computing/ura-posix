@@ -64,6 +64,8 @@ class ProductStock(BaseModel):
     """Same rules as the Stock page (`stock_queries`), same 12 months."""
 
     current_stock: int | None  # None = not in the last stock import
+    damaged: int  # « Boîtes abîmées » still off the free stock (app/damaged/)
+    free_stock: int | None  # current_stock − damaged (never under 0); None when current_stock is None
     stock_min: int  # units_sold_12m ÷ 300 × 14
     stock_max: int  # units_sold_12m ÷ 300 × 15
     units_sold_12m: int

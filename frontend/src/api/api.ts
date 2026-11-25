@@ -13,9 +13,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import type { CatalogFilters } from "@/types/catalog";
+import type { DamageFilters } from "@/types/damaged";
 import type { HistoryFilters } from "@/types/history";
 import type { MovementsFilters, ProductsFilters } from "@/types/products";
 import type { MargeMode, StockFilters } from "@/types/stats";
+import type { SupplierFilters } from "@/types/suppliers";
 import type { AchatsFilters, VentesFilters, VentesFiltersKey } from "@/types/transactions";
 
 type Key = readonly unknown[];
@@ -314,6 +316,22 @@ export const API = {
   },
 
   /** « Historique des modifications » (owner): every change of the pharmacy. */
+  /** « Stock abîmé »: the page's list; « Déclarer des boîtes abîmées » (product sheet); a declaration's next state. */
+  damaged: {
+    list: {
+      url: "/damaged",
+      key: (f: DamageFilters) => ["damaged", "list", f] as const,
+      all: ["damaged", "list"],
+    },
+    declare: {
+      url: "/damaged",
+      refreshes: (): Read[] => [API.damaged.list, API.products.sheet, API.products.history, API.history.list],
+    },
+    move: {
+      url: (id: number) => `/damaged/${id}`,
+      refreshes: (): Read[] => [API.damaged.list, API.products.sheet, API.products.history, API.history.list],
+    },
+  },
   history: {
     list: {
       url: "/history",
@@ -377,6 +395,13 @@ export const API = {
     list: {
       url: "/accounting/cash-closings",
       key: (month: string) => ["cash-closings", month] as const,
+    },
+  },
+  /** Comptabilité « Retours clients (avoirs) » of one month (read-only, fetched by the Sobrus robot). */
+  salesReturns: {
+    list: {
+      url: "/accounting/sales-returns",
+      key: (month: string) => ["sales-returns", month] as const,
     },
   },
 
@@ -572,6 +597,24 @@ export const API = {
       url: "/admin/catalog/sobrus-products/cancel",
       refreshes: (): Read[] => [API.admin.sobrusProducts, API.admin.sobrusProductsHistory],
     },
+    /** « Fournisseurs » « Importer depuis Sobrus »: the last click's tries; start; « Arrêter ». */
+    sobrusSuppliers: { url: "/admin/suppliers/sobrus", key: ["admin", "sobrus-suppliers", "last"] },
+    startSobrusSuppliers: {
+      url: "/admin/suppliers/sobrus",
+      refreshes: (): Read[] => [API.admin.sobrusSuppliers],
+    },
+    cancelSobrusSuppliers: {
+      url: "/admin/suppliers/sobrus/cancel",
+      refreshes: (): Read[] => [API.admin.sobrusSuppliers],
+    },
+    /** « Fournisseurs »: the list shared by every pharmacy (one page, by name). */
+    suppliers: {
+      url: "/admin/suppliers",
+      key: (f: SupplierFilters) => ["admin", "suppliers", f] as const,
+      all: ["admin", "suppliers"],
+    },
+    /** A suppliers import ended (the corner card sees it on any page): the list reloads. */
+    sobrusSuppliersEnded: { refreshes: (): Read[] => [API.admin.suppliers] },
     users: { url: "/admin/users", key: ["admin", "users"] },
     support: { url: "/admin/support", key: ["admin", "support"] },
     createSupport: { url: "/admin/support", refreshes: (): Read[] => [API.admin.support, API.admin.users] },

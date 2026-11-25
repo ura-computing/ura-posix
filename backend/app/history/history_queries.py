@@ -26,6 +26,7 @@ KINDS = {
     "imports": IMPORT_ACTIONS,
     "product": [AuditAction.PRODUCT_EDITED, AuditAction.PRODUCT_REVERTED],
     "notes": [AuditAction.NOTE_ADDED, AuditAction.NOTE_DELETED],
+    "damaged": [AuditAction.DAMAGE_DECLARED, AuditAction.DAMAGE_STATUS_CHANGED],
 }
 
 

@@ -5,14 +5,18 @@ import type { NotificationOut } from "@/types/notifications";
 import { REQUEST_STATE_LABEL, type RequestState } from "@/types/storeWebsite";
 import { formatNumStr } from "@/utils/format";
 
+/** The admin's Sobrus runs have their own « done » text; every other run: « N lignes ajoutées ». */
+const SOBRUS_DONE: Record<string, string> = {
+  products: "notifications.sobrusCatalogueDone",
+  suppliers: "notifications.sobrusSuppliersDone",
+};
+
 export function notificationText(t: TFn, { kind, params }: NotificationOut): string {
   switch (kind) {
     case "catalogueToClassify":
       return t("notifications.catalogueToClassify", { n: formatNumStr(Number(params.n)) });
     case "sobrusDone":
-      return t(params.mode === "products" ? "notifications.sobrusCatalogueDone" : "notifications.sobrusDone", {
-        n: formatNumStr(Number(params.n)),
-      });
+      return t(SOBRUS_DONE[String(params.mode)] ?? "notifications.sobrusDone", { n: formatNumStr(Number(params.n)) });
     case "sobrusFailed":
       return t("notifications.sobrusFailed", { reason: t(`errors.${params.error}`) });
     case "storeStep":

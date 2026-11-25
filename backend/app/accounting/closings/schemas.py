@@ -62,3 +62,35 @@ class ClosingMonth(BaseModel):
     connected: bool
     no_access: bool
     last_fetched_at: datetime | None
+
+
+class SalesReturnProduct(BaseModel):
+    name: str
+    quantity: float
+    unit_price: float
+
+
+class SalesReturnRow(BaseModel):
+    """One Sobrus « Retour client » (avoir): `refund` = how the money went back (« Restituer en argent »)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    number: str
+    day: date
+    customer: str | None
+    refund: str | None
+    status: str | None
+    amount: float
+    products: list[SalesReturnProduct]
+
+
+class SalesReturnMonth(BaseModel):
+    """The month's returns (newest first) + their count and total; `connected` / `no_access` as for the closing."""
+
+    returns: list[SalesReturnRow]
+    count: int
+    total: float
+    connected: bool
+    no_access: bool
+    last_fetched_at: datetime | None

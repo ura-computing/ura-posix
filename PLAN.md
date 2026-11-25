@@ -68,7 +68,7 @@ src/
 Full plan + every decision: `.claude/plans/commandes-promis.md`.
 
 ```
-A. Sobrus (products .xlsx, suppliers, avoirs by date)  →  B. stock abîmé  →  C. Promis  →  D. Commandes 01–12 + AI document reader  →  E. tests
+A. Sobrus (products .xlsx, suppliers, avoirs by date) ✓  →  B. stock abîmé ✓  →  C. Promis  →  D. Commandes 01–12 + AI document reader  →  F. UI review of the whole app (« ⋮ » + plain pop-ups, approved 2026-11-25)  →  E. tests
 ```
 
 ---

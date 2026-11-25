@@ -40,6 +40,7 @@ export default function HistoryPage() {
     { value: "imports", label: t("history.kindImports"), activeBg: ACTIVE },
     { value: "product", label: t("history.kindProducts"), activeBg: ACTIVE },
     { value: "notes", label: t("history.kindNotes"), activeBg: ACTIVE },
+    { value: "damaged", label: t("history.kindDamaged"), activeBg: ACTIVE },
   ];
   const activeFilters = [
     filters.search

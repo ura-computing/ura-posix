@@ -45,6 +45,10 @@ export function currentStep(t: TFn, run: SobrusRun): string {
     return t("sobrus.stepImport", { what: fileName(t, run), current: run.chunk_current, total: run.chunk_total });
   }
   if (run.phase === "closing") return t("sobrus.stepClosing", { current: run.chunk_current, total: run.chunk_total });
+  if (run.phase === "returns") return t("sobrus.stepReturns", { page: run.chunk_current });
+  if (run.phase === "suppliers") {
+    return t("sobrus.stepSuppliers", { page: run.chunk_current, n: formatNumStr(run.lines_added) });
+  }
   if (run.phase === "products") {
     return t("sobrus.stepProducts", { page: run.chunk_current, n: formatNumStr(run.lines_added) });
   }
@@ -55,6 +59,10 @@ export function currentStep(t: TFn, run: SobrusRun): string {
 export function runResult(t: TFn, run: SobrusRun): string {
   if (run.status === "success") {
     if (run.mode === "check") return t("sobrus.resultChecked");
+    if (run.mode === "suppliers") {
+      const done = run.events.find((e) => e.code === "suppliers_done");
+      return t("sobrus.resultSuppliers", { n: formatNumStr(done?.n ?? 0) });
+    }
     if (run.mode === "products") {
       const done = run.events.find((e) => e.code === "products_done");
       return t("sobrus.resultProducts", { n: formatNumStr(done?.n ?? 0), filled: formatNumStr(done?.filled ?? 0) });

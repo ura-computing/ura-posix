@@ -211,7 +211,8 @@ export function CornerStack({ sobrusOwner, admin }: { sobrusOwner: boolean; admi
   return (
     <div className="fixed bottom-24 right-4 z-50 flex w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-2">
       {sobrusOwner && <SobrusRunCard />}
-      {admin && <AdminSobrusImportCard />}
+      {admin && <AdminSobrusImportCard kind="products" />}
+      {admin && <AdminSobrusImportCard kind="suppliers" />}
       <UploadProgressWidget />
     </div>
   );

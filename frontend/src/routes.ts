@@ -12,12 +12,14 @@ import {
   History,
   LayoutDashboard,
   Package,
+  PackageX,
   RefreshCw,
   Settings,
   ShoppingCart,
   Star,
   Tags,
   TrendingUp,
+  Truck,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -79,6 +81,11 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       nav: { label: "nav.catalogue", icon: BookOpen, group: "administration" },
     },
     {
+      path: "/admin/fournisseurs",
+      load: () => import("@/_components/pages/fournisseurs"),
+      nav: { label: "nav.suppliers", icon: Truck, group: "administration" },
+    },
+    {
       path: "/admin/categories",
       load: () => import("@/_components/pages/categories"),
       nav: { label: "nav.categories", icon: Tags, group: "administration" },
@@ -106,6 +113,11 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       path: "/support/catalogue",
       load: () => import("@/_components/pages/catalogue"),
       nav: { label: "nav.catalogue", icon: BookOpen, group: "administration" },
+    },
+    {
+      path: "/support/fournisseurs",
+      load: () => import("@/_components/pages/fournisseurs"),
+      nav: { label: "nav.suppliers", icon: Truck, group: "administration" },
     },
     {
       path: "/support/categories",
@@ -158,6 +170,12 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       nav: { label: "nav.produits", icon: Package, group: "exploitation" },
     },
     { path: "/owner/produits/:id", load: () => import("@/_components/pages/products/sheet"), feature: "produits" },
+    {
+      path: "/owner/stock-abime",
+      load: () => import("@/_components/pages/stock-abime"),
+      feature: "damaged",
+      nav: { label: "nav.stockAbime", icon: PackageX, group: "exploitation" },
+    },
     {
       path: "/owner/analyses",
       load: () => import("@/_components/pages/analytics/analyses"),
@@ -243,6 +261,12 @@ export const ROLE_ROUTES: Record<"public" | "guest" | "signedIn" | Role, AppRout
       nav: { label: "nav.produits", icon: Package, group: "exploitation" },
     },
     { path: "/employee/produits/:id", load: () => import("@/_components/pages/products/sheet"), feature: "produits" },
+    {
+      path: "/employee/stock-abime",
+      load: () => import("@/_components/pages/stock-abime"),
+      feature: "damaged",
+      nav: { label: "nav.stockAbime", icon: PackageX, group: "exploitation" },
+    },
     {
       path: "/employee/analyses",
       load: () => import("@/_components/pages/analytics/analyses"),

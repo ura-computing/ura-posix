@@ -20,6 +20,8 @@ class AuditAction(StrEnum):
     PRODUCT_REVERTED = "product_reverted"  # {product, field, before, after = the imported value}
     NOTE_ADDED = "note_added"  # {product, text}
     NOTE_DELETED = "note_deleted"  # {product, text, author}
+    DAMAGE_DECLARED = "damage_declared"  # {product, quantity, reason (None = not given)}
+    DAMAGE_STATUS_CHANGED = "damage_status_changed"  # {product, quantity, before, after}
     SOBRUS_CONNECTED = "sobrus_connected"  # {email}
     SOBRUS_PASSWORD_UPDATED = "sobrus_password_updated"  # {email}
     SOBRUS_DISCONNECTED = "sobrus_disconnected"  # {email}

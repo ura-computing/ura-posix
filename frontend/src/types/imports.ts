@@ -42,7 +42,7 @@ export interface UploadStockResult {
 }
 
 /** What a row of « Gestion des imports » is: a file, or the « Clôture de caisse » the Sobrus robot read (read-only). */
-export type ImportKind = DocType | "closing";
+export type ImportKind = DocType | "closing" | "returns";
 
 /** A row from GET /v1/data/imports — drives the /imports page. */
 export interface DataImport {

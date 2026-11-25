@@ -46,6 +46,7 @@ ALLOWED_FEATURES = (
     "sobrus",  # « Connexion Sobrus » (owners only, app/sobrus/)
     "labels",  # premium: « Étiquette » on the product page
     "orders",  # premium: « Commander » on the product page
+    "damaged",  # « Stock abîmé »: boxes declared damaged (app/damaged/)
 )
 # Premium: a new pharmacy gets them OFF (the admin switches them on); every other feature ON. Users always get the
 # permission, so the pharmacy switch alone decides.
@@ -262,7 +263,7 @@ class ImportBatch(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID), nullable=False, index=True)
-    file_type: Mapped[str] = mapped_column(String, nullable=False)  # achat | vente | stock | closing
+    file_type: Mapped[str] = mapped_column(String, nullable=False)  # achat | vente | stock | closing | returns
     filename: Mapped[str | None] = mapped_column(String, nullable=True)
     rows_inserted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     rows_skipped: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -391,6 +392,38 @@ class PharmacyProductEdit(Base):
     updated_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
 
 
+# « À traiter » → « Rendu au fournisseur » / « Détruit »; « Remis en vente » = declared by mistake (back to stock).
+DAMAGE_STATUSES = ("pending", "returned", "destroyed", "back_on_sale")
+
+
+class StockDamage(Base):
+    """« Boîtes abîmées »: boxes the pharmacy declared damaged. Sobrus keeps counting them forever, so PharmaGest takes
+    them off its free stock forever (returned, destroyed too); only « Remis en vente » gives them back."""
+
+    __tablename__ = "stock_damages"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_damages_quantity"),
+        CheckConstraint(
+            "status IN (" + ", ".join(f"'{s}'" for s in DAMAGE_STATUSES) + ")", name="ck_stock_damages_status"
+        ),
+        Index("ix_stock_damages_pharmacy_medicament", "pharmacy_id", "medicament_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    medicament_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey(FK_MEDICAMENTS_ID, ondelete="CASCADE"), nullable=False
+    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    note: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey(FK_USERS_ID, ondelete="SET NULL"), nullable=True)
+    created_by_name: Mapped[str] = mapped_column(String, nullable=False)  # kept if the account is deleted
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ProductNote(Base):
     """« Observations »: a pharmacy's notes on one product (« à vendre avec … »), shown in a window
     when its page opens. Anyone with Produits adds one; its author or the owner deletes it (the
@@ -449,7 +482,9 @@ class AuditLog(Base):
 
 
 SOBRUS_CONNECTION_STATUSES = ("active", "needs_login", "invalid")
-SOBRUS_RUN_MODES = ("full", "new", "check", "range", "products")
+SOBRUS_RUN_MODES = ("full", "new", "check", "range", "products", "suppliers")
+# The admin's runs (Catalogue « Produits Sobrus », « Fournisseurs »): one owner's account, the next one if refused.
+SOBRUS_ADMIN_MODES = ("products", "suppliers")
 SOBRUS_RUN_STATUSES = ("queued", "running", "success", "error", "cancelled")
 
 
@@ -489,6 +524,8 @@ class SobrusConnection(Base):
     # « Clôture de caisse » report: None = not tried yet, False = this Sobrus account may not read it (only the
     # owner's login can), True = read at the last run.
     closing_access: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # « Retours clients (avoirs) » (`/salesreturns`): same meaning as `closing_access`.
+    returns_access: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # Admin « Importer les produits depuis Sobrus »: the last page an import cut before the end saved (None = none
     # cut, or the last one read the whole list): the next import resumes there.
     products_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -537,6 +574,31 @@ class SobrusCashClosing(Base):
     gross_total: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     by_method: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     by_customer: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class SobrusSalesReturn(Base):
+    """One Sobrus « Retour client » (avoir, `RV-7162`), read by the worker at every run (`/salesreturns`): its day,
+    customer, how the money went back (« Restituer en argent »), status, amount, and its products
+    [{name, quantity, unit_price}] (read once, from its sheet). One row per pharmacy and return, replaced at each
+    fetch. Shown read-only in Comptabilité."""
+
+    __tablename__ = "sobrus_sales_returns"
+    __table_args__ = (
+        UniqueConstraint("pharmacy_id", "sobrus_id", name="uq_sobrus_sales_returns_pharmacy_sobrus"),
+        Index("ix_sobrus_sales_returns_pharmacy_day", "pharmacy_id", "day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pharmacy_id: Mapped[int] = mapped_column(Integer, ForeignKey(FK_PHARMACIES_ID, ondelete="CASCADE"), nullable=False)
+    sobrus_id: Mapped[str] = mapped_column(String, nullable=False)
+    number: Mapped[str] = mapped_column(String, nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    customer: Mapped[str | None] = mapped_column(String, nullable=True)
+    refund: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    products: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -656,6 +718,33 @@ class PharmacyBlLineExclusion(Base):
     )
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+SUPPLIER_KINDS = ("laboratoire", "grossiste", "societe")
+
+
+class Supplier(Base):
+    """« Fournisseurs »: one list shared by every pharmacy (laboratoires, grossistes, sociétés). Filled from Sobrus'
+    supplier directory (run mode `suppliers`); same name = same supplier (`name_key` = `csv_parse.normalized_name`)."""
+
+    __tablename__ = "suppliers"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IS NULL OR kind IN (" + ", ".join(f"'{k}'" for k in SUPPLIER_KINDS) + ")", name="ck_suppliers_kind"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    name_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    sobrus_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    city: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
 
 class PharmacySupplierExclusion(Base):

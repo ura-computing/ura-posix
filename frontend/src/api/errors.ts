@@ -39,6 +39,8 @@ export const ErrorCode = {
   PRODUCT_NOT_FOUND: "productNotFound",
   NOTE_NOT_FOUND: "noteNotFound",
   NOTE_NOT_YOURS: "noteNotYours",
+  DAMAGE_NOT_FOUND: "damageNotFound",
+  DAMAGE_CLOSED: "damageClosed",
   STOCK_MIN_ABOVE_MAX: "stockMinAboveMax",
   SUFFIX_EXISTS: "suffixExists",
   SUFFIX_NOT_FOUND: "suffixNotFound",

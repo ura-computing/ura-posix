@@ -46,6 +46,7 @@ from app.core.models import (
 from app.core.search import product_search_clauses, supplier_search_clauses, tokenize_search
 from app.core.utils import today as pharmacy_today
 from app.core.audit import AuditAction, log_action
+from app.damaged.damage_queries import damaged_boxes
 from app.ledger.schemas import paginate
 from app.products.notes_queries import note_counts
 
@@ -354,6 +355,7 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
         .first()
     )
 
+    damaged = damaged_boxes(db, pharmacy_id, [med_id]).get(med_id, 0)
     return {
         "id": med.id,
         "pid": med.pid,
@@ -387,6 +389,8 @@ def product_sheet(db: Session, pharmacy_id: int, med_id: int) -> dict | None:
         },
         "stock": {
             "current_stock": current,
+            "damaged": damaged,
+            "free_stock": max(0, current - damaged) if current is not None else None,
             "stock_min": v["stock_min"],
             "stock_max": v["stock_max"],
             "units_sold_12m": units,

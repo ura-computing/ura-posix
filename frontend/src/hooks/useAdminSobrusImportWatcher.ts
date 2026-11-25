@@ -1,19 +1,21 @@
-/** The admin's Catalogue « Importer les produits depuis Sobrus », followed on every admin page (`CornerStack`): the try
- *  in progress, and the one that just ended. When it ends, the catalogue reloads, whatever page is open. A finished
+/** One admin Sobrus run (Catalogue « Importer les produits depuis Sobrus », « Fournisseurs » « Importer depuis Sobrus »),
+ *  followed on every admin page (`CornerStack`): the try in progress, and the one that just ended. When it ends, its
+ *  list reloads (catalogue / suppliers), whatever page is open. A finished
  *  import leaves by itself after 6 s; one that stopped (error, « Arrêter ») stays until dismissed. */
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { API, refresh } from "@/api/api";
+import { refresh } from "@/api/api";
 import { api } from "@/api/client";
-import { useAdminSobrusImport } from "@/hooks/useSharedQueries";
+import { ADMIN_SOBRUS, useAdminSobrusImport, type AdminSobrusKind } from "@/hooks/useSharedQueries";
 import type { AdminSobrusImport } from "@/types/sobrus";
 
 const DONE_SHOWN_MS = 6000;
 
-export function useAdminSobrusImportWatcher(enabled: boolean) {
+export function useAdminSobrusImportWatcher(kind: AdminSobrusKind, enabled: boolean) {
   const qc = useQueryClient();
-  const { sobrusImport } = useAdminSobrusImport(enabled);
+  const { cancel: cancelWrite, ended } = ADMIN_SOBRUS[kind];
+  const { sobrusImport } = useAdminSobrusImport(kind, enabled);
   const runs = (sobrusImport?.runs ?? []).map(({ run }) => run);
   const activeRun = runs.find((r) => r.status === "queued" || r.status === "running") ?? null;
   const activeId = activeRun?.id ?? null;
@@ -28,8 +30,8 @@ export function useAdminSobrusImportWatcher(enabled: boolean) {
   }
 
   useEffect(() => {
-    if (endedId != null) void refresh(qc, API.admin.catalog.importCsv);
-  }, [endedId, qc]);
+    if (endedId != null) void refresh(qc, ended);
+  }, [endedId, qc, ended]);
 
   // The last try of the click (a refused account is followed by the next one).
   const last = runs.at(-1) ?? null;
@@ -42,8 +44,8 @@ export function useAdminSobrusImportWatcher(enabled: boolean) {
   }, [endedRun?.status, endedRun?.id]);
 
   const { mutateAsync: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: () => api.post<AdminSobrusImport>(API.admin.cancelSobrusProducts.url, {}),
-    onSuccess: () => refresh(qc, API.admin.cancelSobrusProducts),
+    mutationFn: () => api.post<AdminSobrusImport>(cancelWrite.url, {}),
+    onSuccess: () => refresh(qc, cancelWrite),
   });
 
   const name = (id: number | undefined) => sobrusImport?.runs.find(({ run }) => run.id === id)?.pharmacy_name ?? "";

@@ -2,14 +2,16 @@
  *  goes (the step, the bar, what was added so far, « Arrêter »), then how it ended (« Terminé : … » for 6 s, or why
  *  it stopped until ✕). A click on the card opens its page.
  *  - `SobrusRunCard`: owners with « Connexion Sobrus » (every page but /sobrus, which shows the whole run);
- *  - `AdminSobrusImportCard`: the admin's Catalogue « Importer les produits depuis Sobrus », on every page (the owner
- *    whose Sobrus account it reads never sees it). */
+ *  - `AdminSobrusImportCard`: the admin's Sobrus runs (Catalogue « Importer les produits depuis Sobrus »,
+ *    « Fournisseurs » « Importer depuis Sobrus »), on every page (the owner whose Sobrus account it reads never sees
+ *    it). Its own texts: `<texts>.sobrusCornerTitle` …. */
 import { useMe } from "@/hooks/useMe";
 import { Ban, CheckCircle2, ChevronDown, CircleAlert, CloudDownload, RefreshCw, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAdminSobrusImportWatcher } from "@/hooks/useAdminSobrusImportWatcher";
+import { ADMIN_SOBRUS, type AdminSobrusKind } from "@/hooks/useSharedQueries";
 import { useSobrusRunWatcher } from "@/hooks/useSobrusRunWatcher";
 import { useT } from "@/i18n/I18nProvider";
 import { type SobrusRun } from "@/types/sobrus";
@@ -218,13 +220,16 @@ export function SobrusRunCard() {
   );
 }
 
-export function AdminSobrusImportCard() {
+export function AdminSobrusImportCard({ kind }: { kind: AdminSobrusKind }) {
   const t = useT();
   const { me } = useMe();
   const role = me?.role;
   const nav = useNavigate();
-  const { activeRun, endedRun, pharmacyName, dismissEnded, cancelImport, isCancelling } =
-    useAdminSobrusImportWatcher(true);
+  const { texts, page } = ADMIN_SOBRUS[kind];
+  const { activeRun, endedRun, pharmacyName, dismissEnded, cancelImport, isCancelling } = useAdminSobrusImportWatcher(
+    kind,
+    true,
+  );
   const run = activeRun ?? endedRun;
   if (!run) return null;
   const running = run === activeRun;
@@ -232,21 +237,21 @@ export function AdminSobrusImportCard() {
     <RunCornerCard
       run={run}
       running={running}
-      title={t("catalogue.sobrusCornerTitle")}
+      title={t(`${texts}.sobrusCornerTitle`)}
       titleIcon={<CloudDownload className="size-3 text-muted-foreground" aria-hidden />}
       what={pharmacyName}
-      label={running ? currentStep(t, run) : t("catalogue.sobrusImport")}
-      added={t("catalogue.sobrusAddedSoFar", { n: formatNumStr(run.lines_added) })}
+      label={running ? currentStep(t, run) : t(`${texts}.sobrusImport`)}
+      added={t(`${texts}.sobrusAddedSoFar`, { n: formatNumStr(run.lines_added) })}
       result={runResult(t, run)}
-      onOpen={() => nav(`/${role}/catalogue`)}
+      onOpen={() => nav(`/${role}/${page}`)}
       onStop={() => void cancelImport()}
       isStopping={isCancelling}
       onDismiss={dismissEnded}
       facts={[
         { label: t("catalogue.factAccount"), value: pharmacyName },
         { label: t("catalogue.factPages"), value: formatNumStr(run.chunk_current) },
-        { label: t("catalogue.factAdded"), value: formatNumStr(run.lines_added) },
-        { label: t("catalogue.factRead"), value: formatNumStr(run.chunk_current * 21) },
+        { label: t(`${texts}.factAdded`), value: formatNumStr(run.lines_added) },
+        { label: t(`${texts}.factRead`), value: formatNumStr(run.chunk_current * 21) },
       ]}
     />
   );

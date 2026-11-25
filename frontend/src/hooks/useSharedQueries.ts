@@ -141,12 +141,35 @@ export function useSobrusConnection(enabled = true) {
 const importActive = (s: AdminSobrusImport | undefined) =>
   !!s?.runs.some(({ run }) => run.status === "queued" || run.status === "running");
 
-/** Admin Catalogue « Importer les produits depuis Sobrus »: the last click's tries (the Catalogue card, the corner
- *  card on every admin page). Polled every 2 s while one runs. */
-export function useAdminSobrusImport(enabled = true) {
+/** The admin's Sobrus runs: Catalogue « Importer les produits depuis Sobrus », « Fournisseurs » « Importer depuis
+ *  Sobrus ». */
+export const ADMIN_SOBRUS = {
+  products: {
+    read: API.admin.sobrusProducts,
+    start: API.admin.startSobrusProducts,
+    cancel: API.admin.cancelSobrusProducts,
+    ended: API.admin.catalog.importCsv,
+    texts: "catalogue",
+    page: "catalogue",
+  },
+  suppliers: {
+    read: API.admin.sobrusSuppliers,
+    start: API.admin.startSobrusSuppliers,
+    cancel: API.admin.cancelSobrusSuppliers,
+    ended: API.admin.sobrusSuppliersEnded,
+    texts: "suppliers",
+    page: "fournisseurs",
+  },
+} as const;
+export type AdminSobrusKind = keyof typeof ADMIN_SOBRUS;
+
+/** One admin Sobrus run's last click: its tries (the page's card; products: also the corner card on every admin
+ *  page). Polled every 2 s while one runs. */
+export function useAdminSobrusImport(kind: AdminSobrusKind = "products", enabled = true) {
+  const { read } = ADMIN_SOBRUS[kind];
   const { data, isLoading, refetch } = useQuery({
-    queryKey: API.admin.sobrusProducts.key,
-    queryFn: () => api.get<AdminSobrusImport>(API.admin.sobrusProducts.url),
+    queryKey: read.key,
+    queryFn: () => api.get<AdminSobrusImport>(read.url),
     enabled,
     refetchInterval: (query) => (importActive(query.state.data) ? 2000 : false),
   });

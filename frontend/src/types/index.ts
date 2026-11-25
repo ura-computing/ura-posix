@@ -32,5 +32,6 @@ export const FEATURES = [
   "sobrus",
   "labels", // premium: « Étiquette » (product page)
   "orders", // premium: « Commander » (product page)
+  "damaged", // « Stock abîmé »
 ] as const;
 export type Feature = (typeof FEATURES)[number];

@@ -1,8 +1,8 @@
-"""Admin Catalogue « Importer les produits depuis Sobrus »: the pharmacies mostly have the same products, so ONE owner's
-Sobrus account is read (run mode `products`, `sync.Robot.products`): the one that worked last. Refused or failed → the
-robot queues the next connected pharmacy, until one works or none is left. The runs of one click share their start
-(`since`, first event `products_try`), so the next try skips the pharmacies already tried. The catalogue CSV import
-stays, for when Sobrus fails."""
+"""The admin's Sobrus runs: Catalogue « Importer les produits depuis Sobrus » (run mode `products`) and « Fournisseurs »
+(run mode `suppliers`). Every pharmacy sees the same Sobrus base, so ONE owner's Sobrus account is read: the one that
+worked last. Refused or failed → the robot queues the next connected pharmacy, until one works or none is left. The
+runs of one click share their start (`since`, first event `products_try`, both modes), so the next try skips the
+pharmacies already tried. The catalogue CSV import stays, for when Sobrus fails."""
 
 from __future__ import annotations
 
@@ -25,12 +25,12 @@ def chain_since(run: SobrusRun) -> datetime:
     return run.created_at
 
 
-def tried(db: Session, since: datetime) -> set[int]:
-    rows = db.query(SobrusRun.pharmacy_id).filter(SobrusRun.mode == "products", SobrusRun.created_at >= since)
+def tried(db: Session, mode: str, since: datetime) -> set[int]:
+    rows = db.query(SobrusRun.pharmacy_id).filter(SobrusRun.mode == mode, SobrusRun.created_at >= since)
     return {pid for (pid,) in rows}
 
 
-def queue_next(db: Session, since: datetime, created_by: int | None, exclude: set[int]) -> SobrusRun | None:
+def queue_next(db: Session, mode: str, since: datetime, created_by: int | None, exclude: set[int]) -> SobrusRun | None:
     """The next account to try: active connections, the last one that worked first; a pharmacy busy with another
     run is skipped. None = nobody left."""
     conns = (
@@ -43,7 +43,7 @@ def queue_next(db: Session, since: datetime, created_by: int | None, exclude: se
         now = datetime.now(timezone.utc)
         run = SobrusRun(
             pharmacy_id=conn.pharmacy_id,
-            mode="products",
+            mode=mode,
             status="queued",
             created_by=created_by,
             # Set here, not by the database: its now() is the transaction's start, before `since` (then the run would

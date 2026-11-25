@@ -11,11 +11,13 @@ ROUTER_MODULES: dict[str, str] = {
     "auth": "app.identity.auth.router",
     "stats": "app.analytics.router",
     "catalog": "app.catalog.router",
+    "purchasing": "app.purchasing.router",
     "admin_pharmacies": "app.identity.members.admin_router",
     "owner_employees": "app.identity.members.owner_router",
     "imports": "app.ingestion.router",
     "transactions": "app.ledger.router",
     "products": "app.products.router",
+    "damaged": "app.damaged.router",
     "history": "app.history.router",
     "sobrus": "app.sobrus.router",
     "exclusions": "app.accounting.exclusions.router",
@@ -35,6 +37,7 @@ SERVICE_ROUTERS: dict[str, tuple[str, ...]] = {
     "analytics": (
         "stats",
         "products",
+        "damaged",
         "history",
         "transactions",
         "accounting",
@@ -44,8 +47,8 @@ SERVICE_ROUTERS: dict[str, tuple[str, ...]] = {
         "store_public",
         "store_website",
     ),
-    # Big uploads (memory): achats / ventes / stock, the admin catalogue.
-    "ingestion": ("imports", "catalog"),
+    # Big uploads (memory): achats / ventes / stock, the admin catalogue + suppliers.
+    "ingestion": ("imports", "catalog", "purchasing"),
     # Queues the Sobrus runs and reads what the worker stored (the worker itself: `app/sobrus/worker.py`).
     "sobrus": ("sobrus",),
 }

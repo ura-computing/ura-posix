@@ -1,7 +1,7 @@
 /** « Connexion Sobrus » (mirrors backend/app/sobrus/schemas.py). The password is never sent back. */
 
 /** `products`: the admin's « Produits Sobrus » (a pharmacy's Sobrus products into the catalogue). */
-export type SobrusRunMode = "full" | "new" | "check" | "range" | "products";
+export type SobrusRunMode = "full" | "new" | "check" | "range" | "products" | "suppliers";
 export type SobrusRunStatus = "queued" | "running" | "success" | "error" | "cancelled";
 export type SobrusConnectionStatus = "active" | "needs_login" | "invalid";
 
@@ -29,7 +29,7 @@ export interface SobrusRun {
   date_from: string | null;
   date_to: string | null;
   /** What it does now: login | download | import | closing (« Clôture de caisse », month x / y) | products (page x). */
-  phase: "login" | "download" | "import" | "closing" | "products" | null;
+  phase: "login" | "download" | "import" | "closing" | "returns" | "products" | "suppliers" | null;
   kind: "achat" | "vente" | "stock" | null;
   year: number | null;
   bytes_received: number;

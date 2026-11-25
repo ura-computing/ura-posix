@@ -5,9 +5,9 @@ import { toast } from "sonner";
 
 import { api } from "@/api/client";
 import { API, refresh } from "@/api/api";
-import { useAdminSobrusImport } from "@/hooks/useSharedQueries";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
+import { downloadXlsx, exportFilename } from "@/utils/table";
 
 import type {
   CatalogFilters,
@@ -18,7 +18,6 @@ import type {
   MedicamentInput,
   ProductType,
 } from "@/types/catalog";
-import type { AdminSobrusImport } from "@/types/sobrus";
 
 const DEFAULT_FILTERS: CatalogFilters = {
   search: "",
@@ -106,8 +105,53 @@ export function useCatalogPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Excel: every matching row (server side, no pagination), every field the Sobrus import reads, French headers.
+  const handleExport = async () => {
+    try {
+      const { data: rows } = await api.get<CatalogListResponse>(API.admin.catalog.list.url, {
+        params: { ...filters, page: undefined, limit: undefined, export: true },
+      });
+      const header = [
+        "PID Sobrus",
+        "Produit",
+        "Code barre",
+        "Code barre 2",
+        "Laboratoire",
+        "Catégorie",
+        "Type",
+        "DCI",
+        "Forme galénique",
+        "TVA",
+        "PPH",
+        "PPV",
+      ];
+      const type = { pharmacie: "Pharmacie", parapharmacie: "Parapharmacie" };
+      // A product from the catalogue CSV has no Sobrus ID: its PID is made from its barcode or its name
+      // (`csv_parse._derive_pid`), so the cell stays empty.
+      const sobrusPid = (r: Medicament) => (/^\d+$/.test(r.pid) && r.pid !== r.barcode1 ? r.pid : "");
+      const body = rows.map((r) => [
+        sobrusPid(r),
+        r.product,
+        r.barcode1 ?? "",
+        r.barcode2 ?? "",
+        r.laboratoire ?? "",
+        r.category ?? "",
+        r.product_type ? type[r.product_type] : "",
+        r.dci ?? "",
+        r.galenic_form ?? "",
+        r.tva ?? "",
+        r.pph ?? "",
+        r.ppv ?? "",
+      ]);
+      await downloadXlsx([header, ...body], exportFilename("PRODUITS_CATALOGUE", "xlsx"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("catalogue.exportFailed"));
+    }
+  };
+
   return {
     filters,
+    handleExport,
     setSearch,
     setCategories,
     setType,
@@ -133,40 +177,6 @@ export function useCatalogPage() {
 }
 
 export type { Medicament };
-
-/** « Importer les produits depuis Sobrus »: the robot reads one owner's Sobrus product list (the next one if Sobrus
- *  refuses it). Its progress: the shared query (also the corner card on every admin page, which reloads the
- *  catalogue when it ends). */
-export function useSobrusProductsImport() {
-  const t = useT();
-  const queryClient = useQueryClient();
-  const { sobrusImport, isLoading, isRunning } = useAdminSobrusImport();
-
-  const { mutateAsync: start, isPending: isStarting } = useMutation({
-    mutationFn: () => api.post<{ pharmacy_name: string }>(API.admin.startSobrusProducts.url, {}),
-    onSuccess: ({ pharmacy_name }) => {
-      toast.success(t("catalogue.sobrusStarted", { name: pharmacy_name }));
-      void refresh(queryClient, API.admin.startSobrusProducts);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const { mutateAsync: cancel, isPending: isCancelling } = useMutation({
-    mutationFn: () => api.post<AdminSobrusImport>(API.admin.cancelSobrusProducts.url, {}),
-    onSuccess: () => void refresh(queryClient, API.admin.cancelSobrusProducts),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return {
-    sobrusImport,
-    isLoading,
-    isRunning,
-    startImport: () => start().then(() => undefined),
-    isStarting,
-    stopImport: () => cancel().then(() => undefined),
-    isCancelling,
-  };
-}
 
 /** The catalogue at a glance (tiles on top of its page). Refreshed by every catalogue write and when a Sobrus import
  *  ends (`API.admin.catalog.importCsv` refreshes). */

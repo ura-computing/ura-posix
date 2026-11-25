@@ -52,10 +52,13 @@ from app.core.models import (
     SobrusConnection,
     SobrusImportedYear,
     SobrusRun,
+    SobrusSalesReturn,
+    SOBRUS_ADMIN_MODES,
+    Supplier,
     User,
 )
 from app.core.utils import PHARMACY_TZ, today
-from app.ingestion.csv_parse import iter_csv, parse_int
+from app.ingestion.csv_parse import iter_csv, normalized_name, parse_int
 from app.ingestion.service import (
     ACHAT_CFG,
     COL_BARCODE1,
@@ -106,6 +109,10 @@ PRODUCTS_LOG_PAGES = 250  # a progress line in the robot's log every 250 pages (
 PRODUCTS_MAX_PAGES = 10000  # 210 000 products: never an endless loop on a Sobrus that repeats its last page
 PRODUCT_COLUMNS = "laboratory_supplier_id,product_dci_id"
 # Catalogue fields a fetch may fill (only when empty): medicament column → Sobrus product → value.
+SUPPLIERS_BATCH = 10  # list pages per batch (210 suppliers, each one's sheet read too)
+SUPPLIER_KIND = {"laboratory": "laboratoire", "wholesaler": "grossiste", "company": "societe"}
+SUPPLIER_SKIPPED = ("pharmacy", "parapharmacy")  # confrères in Sobrus' directory, not suppliers
+SUPPLIER_FILL = ("kind", "sobrus_id", "phone", "email", "address", "city")
 PRODUCT_FILL = ("barcode1", "tva", "ppv", "pph", "category", "laboratoire", "dci", "galenic_form")
 
 
@@ -208,6 +215,50 @@ def _product_values(p: dict) -> dict:
         "dci": _label(p.get("product_dci_id")),
         "galenic_form": _label(p.get("product_galenic_form_id")),
     }
+
+
+def _supplier_values(row: dict, sheet: dict) -> dict:
+    """One supplier of Sobrus' list + its sheet (`/suppliers/{ID}`) → the `suppliers` columns."""
+    text = lambda v: (v or "").strip() or None  # noqa: E731
+    name = row["name"].strip()
+    return {
+        "name": name,
+        "name_key": normalized_name(name),
+        "kind": SUPPLIER_KIND.get(sheet.get("type")),
+        "sobrus_id": str(row["ID"]),
+        "phone": text(sheet.get("phone") or row.get("phone")),
+        "email": text(sheet.get("email")),
+        "address": text(sheet.get("address")),
+        "city": text(sheet.get("city") or row.get("city")),
+    }
+
+
+def _return_values(row: dict, pharmacy_id: int) -> dict:
+    """One return of Sobrus' `/salesreturns` list → the `sobrus_sales_returns` columns (products aside)."""
+    return {
+        "pharmacy_id": pharmacy_id,
+        "sobrus_id": str(row["ID"]),
+        "number": row.get("transaction_number") or str(row["ID"]),
+        "day": date.fromisoformat(row["date"]),
+        "customer": _label(row.get("customer_id")),
+        "refund": _label(row.get("given_back_via_credit")),
+        "status": _label(row.get("status")),
+        "amount": _num(row.get("amount_given_back")),
+        "fetched_at": _now(),
+    }
+
+
+def _return_products(sheet: dict) -> list[dict]:
+    """A return's sheet (`/salesreturns/{ID}`) → its products [{name, quantity, unit_price}]."""
+    return [
+        {"name": p.get("name") or "", "quantity": _num(p.get("quantity")), "unit_price": _num(p.get("unit_price"))}
+        for p in sheet.get("products") or []
+    ]
+
+
+def _data(answer) -> list | dict | None:
+    """Sobrus' JSON answers wrap their content in `data`."""
+    return answer.get("data") if isinstance(answer, dict) else None
 
 
 def _months(start: date, end: date) -> list[tuple[date, date]]:
@@ -331,14 +382,15 @@ class Robot:
         self._save_session()
         _event(self.db, self.run, "login_ok")
 
-    def _wait(self, seconds: float) -> None:
-        """Before logging in again: the heartbeat goes on (not « stopped »), « Arrêter » works."""
+    def _wait(self, seconds: float, phase: str | None = "login") -> None:
+        """Before logging in again, or Sobrus' rate limit: the heartbeat goes on (not « stopped »), « Arrêter »
+        works."""
         end = time.monotonic() + seconds
         while (left := end - time.monotonic()) > 0:
             time.sleep(min(5.0, left))
             if _cancel_requested(self.db, self.run):
                 raise Cancelled()
-            _set(self.db, self.run, phase="login")
+            _set(self.db, self.run, phase=phase)
 
     def _download(self, kind: str, year: int | None, start: str | None, end: str | None) -> bytes:
         _set(
@@ -571,28 +623,28 @@ class Robot:
             self.db.rollback()
             log.warning("Sobrus closing %s → %s: %s", start, end, e.code)
             _event(self.db, self.run, "closing_failed", error=e.code)
-            self._closing_batch(start, end, 0, e.code)
+            self._batch("closing", "Clôture de caisse", start, end, 0, e.code)
             return
         except (KeyError, TypeError, ValueError, AttributeError):  # not the JSON Sobrus sends today
             self.db.rollback()
             log.exception("Sobrus closing %s → %s: unexpected answer", start, end)
             _event(self.db, self.run, "closing_failed", error="sobrusExportFailed")
-            self._closing_batch(start, end, 0, "sobrusExportFailed")
+            self._batch("closing", "Clôture de caisse", start, end, 0, "sobrusExportFailed")
             return
         self.conn.closing_access = True
         _event(self.db, self.run, "closing_done", start=start.isoformat(), end=end.isoformat(), n=days)
         if days:
-            self._closing_batch(start, end, days, None)
+            self._batch("closing", "Clôture de caisse", start, end, days, None)
 
-    def _closing_batch(self, start: date, end: date, days: int, error: str | None) -> None:
-        """Its line in « Gestion des imports » (badge « Clôture de caisse », read-only: the next run reads the days
-        again): the days saved, or why Sobrus did not give them."""
+    def _batch(self, file_type: str, title: str, start: date, end: date, rows: int, error: str | None) -> None:
+        """A report's line in « Gestion des imports » (badge « Clôture de caisse » / « Retours clients », read-only:
+        the next run reads it again): the rows saved, or why Sobrus did not give them."""
         self.db.add(
             ImportBatch(
                 pharmacy_id=self.run.pharmacy_id,
-                file_type="closing",
-                filename=f"Sobrus - Clôture de caisse {start.isoformat()} - {end.isoformat()}",
-                rows_inserted=days,
+                file_type=file_type,
+                filename=f"Sobrus - {title} {start.isoformat()} - {end.isoformat()}",
+                rows_inserted=rows,
                 rows_skipped=0,
                 status="error" if error else "success",
                 error_message=error,
@@ -601,39 +653,107 @@ class Robot:
         )
         self.db.commit()
 
-    def _fetch_pages(self, pages: list[int]) -> list[list[dict]]:
-        """These product pages from Sobrus, PRODUCTS_PARALLEL at a time (a request ≈ 70 ms, so waiting for each one in
-        turn was most of the time). Only HTTP in the threads (the database session stays here); a page refused is asked
-        again here: 429 → after a short wait, session over → after a new login (`_get`)."""
-        params = lambda page: {"extra_columns": PRODUCT_COLUMNS, "page": page, "limit": 21}  # noqa: E731
+    def returns(self, start: date, end: date) -> None:
+        """« Retours clients (avoirs) » of these days. Sobrus' `/salesreturns` lists them newest first with no date
+        filter: pages are read until one ends before `start`. One row per return (replaced); a new one's sheet gives
+        its products. Refused or failed: noted, the run goes on (its achats / ventes are in)."""
+        saved = page = 0
+        try:
+            while page < PRODUCTS_MAX_PAGES:
+                if _cancel_requested(self.db, self.run):
+                    raise Cancelled()
+                page += 1
+                _set(self.db, self.run, phase="returns", kind=None, year=None, chunk_current=page, chunk_total=0)
+                items = _data(self._get("/salesreturns", {"page": page, "limit": 21})) or []
+                rows = [r for r in items if start <= date.fromisoformat(r["date"]) <= end]
+                known = {
+                    sid
+                    for (sid,) in self.db.query(SobrusSalesReturn.sobrus_id).filter(
+                        SobrusSalesReturn.pharmacy_id == self.run.pharmacy_id,
+                        SobrusSalesReturn.sobrus_id.in_([str(r["ID"]) for r in rows]),
+                    )
+                }
+                new = [r for r in rows if str(r["ID"]) not in known]
+                sheets = self._get_many([(f"/salesreturns/{r['ID']}", {}) for r in new])
+                products = {str(r["ID"]): _return_products(_data(s) or {}) for r, s in zip(new, sheets)}
+                for r in rows:
+                    values = _return_values(r, self.run.pharmacy_id)
+                    stmt = insert(SobrusSalesReturn).values(**values, products=products.get(values["sobrus_id"], []))
+                    self.db.execute(
+                        stmt.on_conflict_do_update(  # a known return: its state again, its products kept
+                            constraint="uq_sobrus_sales_returns_pharmacy_sobrus",
+                            set_={k: stmt.excluded[k] for k in values if k not in ("pharmacy_id", "sobrus_id")},
+                        )
+                    )
+                saved += len(rows)
+                self.db.commit()
+                if not items or date.fromisoformat(items[-1]["date"]) < start:  # past the period
+                    break
+        except SessionExpired:
+            self.conn.returns_access = False
+            _event(self.db, self.run, "returns_no_access")
+            return
+        except SobrusError as e:
+            self.db.rollback()
+            log.warning("Sobrus returns %s → %s: %s", start, end, e.code)
+            _event(self.db, self.run, "returns_failed", error=e.code)
+            self._batch("returns", "Retours clients", start, end, 0, e.code)
+            return
+        except (KeyError, TypeError, ValueError, AttributeError):  # not the JSON Sobrus sends today
+            self.db.rollback()
+            log.exception("Sobrus returns %s → %s: unexpected answer", start, end)
+            _event(self.db, self.run, "returns_failed", error="sobrusExportFailed")
+            self._batch("returns", "Retours clients", start, end, 0, "sobrusExportFailed")
+            return
+        self.conn.returns_access = True
+        _event(self.db, self.run, "returns_done", start=start.isoformat(), end=end.isoformat(), n=saved)
+        if saved:
+            self._batch("returns", "Retours clients", start, end, saved, None)
+
+    def _get_many(self, reads: list[tuple[str, dict]]) -> list[dict | list]:
+        """These Sobrus reads (path, params), PRODUCTS_PARALLEL at a time (a request ≈ 70 ms, so waiting for each one in
+        turn was most of the time). Only HTTP in the threads (the database session stays here). Sobrus' rate limit
+        (429): the refused read and every one after it wait (1 s, 2 s … 30 s, one log line), then go on; a round that
+        moved on starts the waits again from 1 s, PRODUCTS_BACKOFF_S waits in a row without progress = sobrusBusy.
+        Session over → a new login once (`_get`)."""
+        out: list = [None] * len(reads)
+        todo = list(range(len(reads)))
+        waits = iter(PRODUCTS_BACKOFF_S)
         with ThreadPoolExecutor(max_workers=PRODUCTS_PARALLEL) as pool:
-            futures = [pool.submit(self.client.get_json, "/products", params(page)) for page in pages]
-        out = []
-        for page, future in zip(pages, futures):
-            try:
-                answer = future.result()
-            except SobrusError as e:
-                if e.code != "sobrusBusy":
-                    raise
-                answer = self._product_page_again(params(page))
-            except SessionExpired:
-                try:
-                    answer = self._get("/products", params(page))  # logs in again once
-                except SessionExpired as refused:  # this account may not list the products: the next one is tried
-                    raise SobrusError("sobrusNoAccess") from refused
-            out.append((answer.get("data") if isinstance(answer, dict) else None) or [])
+            while todo:
+                busy: list[int] = []
+                for at in range(0, len(todo), PRODUCTS_PARALLEL):
+                    chunk = todo[at : at + PRODUCTS_PARALLEL]
+                    for i, future in [(i, pool.submit(self.client.get_json, *reads[i])) for i in chunk]:
+                        try:
+                            out[i] = future.result()
+                        except SobrusError as e:
+                            if e.code != "sobrusBusy":
+                                raise
+                            busy.append(i)
+                        except SessionExpired:
+                            try:
+                                out[i] = self._get(*reads[i])  # logs in again once
+                            except SessionExpired as refused:  # this account may not read it: the next one is tried
+                                raise SobrusError("sobrusNoAccess") from refused
+                    if busy:  # stop asking: the rest of the round waits too
+                        busy += todo[at + PRODUCTS_PARALLEL :]
+                        break
+                if busy:
+                    if len(busy) < len(todo):
+                        waits = iter(PRODUCTS_BACKOFF_S)
+                    wait = next(waits, None)
+                    if wait is None:
+                        raise SobrusError("sobrusBusy")
+                    log.info("Sobrus run %s · rate limit: %s read(s) wait %s s", self.run.id, len(busy), wait)
+                    self._wait(wait, phase=self.run.phase)
+                todo = busy
         return out
 
-    def _product_page_again(self, params: dict) -> dict | list:
-        """A page Sobrus refused with 429 (its rate limit, not the login's): asked again after 1 s, 2 s, 4 s…"""
-        for wait in PRODUCTS_BACKOFF_S:
-            time.sleep(wait)
-            try:
-                return self.client.get_json("/products", params)
-            except SobrusError as e:
-                if e.code != "sobrusBusy":
-                    raise
-        raise SobrusError("sobrusBusy")
+    def _fetch_pages(self, pages: list[int]) -> list[list[dict]]:
+        """These product pages from Sobrus (an empty list = past the end)."""
+        reads = [("/products", {"extra_columns": PRODUCT_COLUMNS, "page": n, "limit": 21}) for n in pages]
+        return [_data(answer) or [] for answer in self._get_many(reads)]
 
     def _upsert_products(self, found: dict[str, dict]) -> tuple[int, int]:
         """One statement for a batch: a new PID is inserted, a known one gets only its empty fields (never the admin's
@@ -722,6 +842,66 @@ class Robot:
         )
         _event(self.db, self.run, "products_done", n=added, filled=filled)
 
+    def _upsert_suppliers(self, found: dict[str, dict]) -> int:
+        """One statement for a batch: a new name is inserted, a known one gets only its empty fields (never the
+        admin's values, never the name). → how many were added."""
+        stmt = insert(Supplier).values(list(found.values()))
+        new = stmt.excluded
+        table = Supplier.__table__.c
+        empty = lambda col: or_(col.is_(None), col == "")  # noqa: E731
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[table.name_key],
+            set_={
+                **{f: case((empty(table[f]), new[f]), else_=table[f]) for f in SUPPLIER_FILL},
+                "updated_at": func.now(),
+            },
+            where=or_(*(and_(empty(table[f]), new[f].is_not(None)) for f in SUPPLIER_FILL)),
+        ).returning(literal_column("xmax = 0"))
+        return sum(1 for (inserted,) in self.db.execute(stmt) if inserted)
+
+    def suppliers(self) -> None:
+        """Sobrus' supplier directory into the shared « Fournisseurs » list (21 a page, no total: until an empty page).
+        Each one's sheet gives its type, email and address; pharmacies and parapharmacies are left out. Per batch:
+        SUPPLIERS_BATCH list pages + their sheets, one upsert, one commit with the progress, one « Arrêter » check."""
+        added = page = 0
+        _set(self.db, self.run, phase="suppliers", kind=None, year=None, chunk_current=0, chunk_total=0)
+        while page < PRODUCTS_MAX_PAGES:
+            if _cancel_requested(self.db, self.run):
+                raise Cancelled()
+            pages = list(range(page + 1, page + SUPPLIERS_BATCH + 1))
+            rows, last = [], False
+            for number, answer in zip(pages, self._get_many([("/suppliers", {"page": n, "limit": 21}) for n in pages])):
+                items = _data(answer) or []
+                if not items:  # the end of the list
+                    last = True
+                    break
+                page = number
+                rows += [r for r in items if r.get("ID") and (r.get("name") or "").strip()]
+            # A supplier already saved needs no sheet (its empty fields are filled from the first one read): a run
+            # started again (robot restart, « Arrêter ») only asks Sobrus for the new ones.
+            known = {
+                sid
+                for (sid,) in self.db.query(Supplier.sobrus_id).filter(
+                    Supplier.sobrus_id.in_([str(r["ID"]) for r in rows])
+                )
+            }
+            rows = [r for r in rows if str(r["ID"]) not in known]
+            sheets = self._get_many([(f"/suppliers/{r['ID']}", {}) for r in rows])
+            if _cancel_requested(self.db, self.run):  # « Arrêter » during the fetch: this batch is not saved
+                raise Cancelled()
+            found: dict[str, dict] = {}
+            for row, answer in zip(rows, sheets):
+                sheet = _data(answer) or {}
+                if sheet.get("type") not in SUPPLIER_SKIPPED:
+                    values = _supplier_values(row, sheet)
+                    found.setdefault(values["name_key"], values)  # the same name twice: kept once
+            if found:
+                added += self._upsert_suppliers(found)
+            _set(self.db, self.run, chunk_current=page, lines_added=added)  # commits the batch
+            if last:
+                break
+        _event(self.db, self.run, "suppliers_done", n=added)
+
 
 def _problem(db: Session, run: SobrusRun, conn: SobrusConnection, owner: User | None, code: str) -> None:
     """The connection's state after a failed run + one email to the owner per problem."""
@@ -764,7 +944,7 @@ def _notify_end(db: Session, run: SobrusRun, status: str, error_code: str | None
     New products may be unclassified: the admin's and Support's « N produits à classer » follows."""
     if run.mode == "check" or status == "cancelled":
         return
-    who = [run.created_by] if run.mode == "products" and run.created_by else owner_ids(db, run.pharmacy_id)
+    who = [run.created_by] if run.mode in SOBRUS_ADMIN_MODES and run.created_by else owner_ids(db, run.pharmacy_id)
     if status == "success":
         notify(db, who, "sobrusDone", {"mode": run.mode, "n": run.lines_added}, "sobrus")
         sync_unclassified(db)
@@ -798,14 +978,18 @@ def execute(run_id: int) -> None:
                 robot.period(run.date_from, run.date_to)
             elif run.mode == "products":
                 robot.products()
+            elif run.mode == "suppliers":
+                robot.suppliers()
             elif run.mode != "check":  # a mode this robot does not know (an older robot after a deploy): never « done »
                 raise SobrusError("serverError")
-            if run.mode not in ("check", "products"):
+            if run.mode not in ("check", *SOBRUS_ADMIN_MODES):
                 robot.stock()
                 if run.mode == "range":
                     robot.closing(run.date_from, run.date_to)
+                    robot.returns(run.date_from, run.date_to)
                 else:
                     robot.closing(closing_from, today())
+                    robot.returns(closing_from, today())
             robot._save_session()  # cookies refreshed during the run
             conn.status = "active"
             conn.last_error_code = None
@@ -821,9 +1005,9 @@ def execute(run_id: int) -> None:
             db.rollback()
             _problem(db, run, conn, owner, e.code)
             _finish(db, run, "error", e.code)
-            if run.mode == "products":  # the admin's catalogue import: the next owner's account
+            if run.mode in SOBRUS_ADMIN_MODES:  # the admin's run: the next owner's account
                 since = chain_since(run)
-                queue_next(db, since, run.created_by, tried(db, since))
+                queue_next(db, run.mode, since, run.created_by, tried(db, run.mode, since))
         except Exception:
             log.exception("sobrus run %s failed", run_id)
             db.rollback()

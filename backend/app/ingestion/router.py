@@ -394,8 +394,8 @@ def delete_import(
         raise ApiError(404, ErrorCode.BATCH_NOT_FOUND, "Lot d'import introuvable.")
     if batch.deleted_at is not None:
         raise ApiError(409, ErrorCode.BATCH_ALREADY_DELETED, "Ce lot a déjà été supprimé.")
-    if batch.file_type == "closing":  # « Clôture de caisse »: read again from Sobrus at every run, nothing to undo
-        raise ApiError(409, ErrorCode.BATCH_READ_ONLY, "La clôture de caisse est lue depuis Sobrus : rien à supprimer.")
+    if batch.file_type in ("closing", "returns"):  # Sobrus reports: read again at every run, nothing to undo
+        raise ApiError(409, ErrorCode.BATCH_READ_ONLY, "Ce rapport est lu depuis Sobrus : rien à supprimer.")
 
     deleted_rows = 0
     if batch.file_type in ("achat", "vente"):

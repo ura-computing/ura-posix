@@ -1,7 +1,7 @@
 /** Top of the product sheet, on every tab, kept calm (above it: `BackLink` « Retour à la liste des produits »): the name; one line with
  *  the type and stock badges, the PID and the code barre; on the right the stock box and the actions: « Observations »,
- *  the premium « Étiquette » / « Commander N ». */
-import { Printer, ShoppingCart, StickyNote } from "lucide-react";
+ *  « Déclarer des boîtes abîmées », the premium « Étiquette » / « Commander N ». */
+import { PackageX, Printer, ShoppingCart, StickyNote } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
@@ -59,7 +59,7 @@ export function SheetMeta({ sheet }: { sheet: ProductSheet }) {
  *  « ≈ N jours de ventes ». */
 function StockBox({ stock }: { stock: ProductStock }) {
   const t = useT();
-  const { current_stock: current, stock_min: min, stock_max: max, coverage_days: days } = stock;
+  const { current_stock: current, stock_min: min, stock_max: max, coverage_days: days, damaged, free_stock } = stock;
   const under = current != null && current < min;
   const row = (label: string, value: number) => (
     <span className="flex items-center justify-between gap-6 text-sm">
@@ -77,6 +77,12 @@ function StockBox({ stock }: { stock: ProductStock }) {
       </span>
       {row(t("products.boxMin"), min)}
       {row(t("products.boxMax"), max)}
+      {damaged > 0 && (
+        <>
+          {row(t("damaged.boxDamaged"), damaged)}
+          {free_stock != null && row(t("damaged.boxFree"), free_stock)}
+        </>
+      )}
       {days != null && (
         <span className={cn("mt-1 text-sm font-medium", under ? "text-warning" : "text-muted-foreground")}>
           {t("products.daysOfSales", { n: days })}
@@ -93,10 +99,13 @@ export function SheetActions({
   sheet,
   onPremium,
   onOpenNotes,
+  onDeclareDamage,
 }: {
   sheet: ProductSheet;
   onPremium: (feature: PremiumFeature) => void;
   onOpenNotes: () => void;
+  /** null = no « Stock abîmé » access: the button is not shown. */
+  onDeclareDamage: (() => void) | null;
 }) {
   const t = useT();
   const { current_stock: current, stock_max: max } = sheet.stock;
@@ -111,6 +120,12 @@ export function SheetActions({
           {t("products.observations")}
           {notes > 0 && <Badge tone="warning">{notes}</Badge>}
         </Button>
+        {onDeclareDamage && (
+          <Button variant="outline" onClick={onDeclareDamage}>
+            <PackageX className="size-4" />
+            {t("damaged.declare")}
+          </Button>
+        )}
         <Button variant="outline" onClick={() => onPremium("labels")}>
           <Printer className="size-4" />
           {t("products.label")}

@@ -156,7 +156,7 @@ class SobrusClient:
             log.info("Sobrus %s: HTTP %s", path, r.status_code)
             raise SessionExpired()
         if r.status_code == 429:
-            log.warning("Sobrus %s: HTTP 429 (too many requests)", path)
+            log.debug("Sobrus %s: HTTP 429 (too many requests)", path)  # the caller waits, one line for many
             raise SobrusError("sobrusBusy")
         if r.status_code != 200:
             log.warning("Sobrus %s: HTTP %s", path, r.status_code)
