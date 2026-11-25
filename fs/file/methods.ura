@@ -1,0 +1,53 @@
+// mode letters in any order: r read, w write (create, truncate), a append (create)
+pub fn create(path String, mode String) File:
+    reads bool = mode.contains("r")
+    writes bool = mode.contains("w")
+    appends bool = mode.contains("a")
+
+    flags i32 = cstd::O_RDONLY
+    if reads and (writes or appends):
+        flags = cstd::O_RDWR
+    elif writes or appends:
+        flags = cstd::O_WRONLY
+    if writes:
+        flags = flags | cstd::O_CREAT | cstd::O_TRUNC
+    if appends:
+        flags = flags | cstd::O_CREAT | cstd::O_APPEND
+
+    file File
+    file.path = path
+    file.fd = cstd::open(path.chars(), flags, cstd::S_IRUSR | cstd::S_IWUSR)
+    if file.fd < 0:
+        throw fail($"open {path}")
+    return file
+
+fn read(size i32) String:
+    text String
+    text.resize(size)
+
+    count i64 = cstd::read(self.fd, text.data, size as i64)
+    if count < 0:
+        throw fail($"read {self.path}")
+
+    text.resize(count as i32)
+    return text
+
+fn read_all() String:
+    text String
+    part String = self.read(4096)
+    while not part.is_empty():
+        text += part
+        part = self.read(4096)
+    return text
+
+fn write(text String) i64:
+    count i64 = cstd::write(self.fd, text.data, text.count as i64)
+    if count < 0:
+        throw fail($"write {self.path}")
+    return count
+
+fn close():
+    if self.fd < 0:
+        return
+    cstd::close(self.fd)
+    self.fd = -1

@@ -1,0 +1,9 @@
+pub fn create(port i32) Address:
+    address Address
+    address.raw.sin_family = cstd::AF_INET as u16
+    address.raw.sin_port = cstd::htons(port as u16)
+    address.raw.sin_addr.s_addr = cstd::INADDR_ANY
+    return address
+
+fn port() i32:
+    return cstd::ntohs(self.raw.sin_port) as i32

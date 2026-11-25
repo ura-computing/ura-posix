@@ -1,0 +1,4 @@
+struct Process:
+    pid i32
+
+    use "./process/methods"

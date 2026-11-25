@@ -1,0 +1,40 @@
+// time.h + sys/time.h
+
+CLOCK_REALTIME i32 = 0
+@if os == "macos":
+    CLOCK_MONOTONIC i32 = 6
+@else:
+    CLOCK_MONOTONIC i32 = 1
+
+struct timespec:
+    tv_sec i64
+    tv_nsec i64
+
+struct timeval:
+    tv_sec i64
+    tv_usec i64
+
+struct tm:
+    tm_sec i32
+    tm_min i32
+    tm_hour i32
+    tm_mday i32
+    tm_mon i32
+    tm_year i32
+    tm_wday i32
+    tm_yday i32
+    tm_isdst i32
+    tm_gmtoff i64
+    tm_zone char[]
+
+proto time(out &i64) i64
+proto clock() i64
+proto difftime(end i64, start i64) f64
+proto mktime(date &tm) i64
+proto gmtime_r(timer &i64, out &tm) &tm
+proto localtime_r(timer &i64, out &tm) &tm
+proto strftime(buffer char[], size i64, format char[], date &tm) i64
+
+proto clock_gettime(clock i32, out &timespec) i32
+proto nanosleep(wait &timespec, left &timespec) i32
+proto gettimeofday(out &timeval, zone i8[]) i32

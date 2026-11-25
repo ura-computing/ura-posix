@@ -1,0 +1,4 @@
+struct Clock:
+    start cstd::timespec
+
+    use "./clock/methods"

@@ -1,0 +1,4 @@
+struct Address:
+    raw cstd::sockaddr_in
+
+    use "./address/methods"

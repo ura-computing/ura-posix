@@ -1,0 +1,62 @@
+pub fn create() Socket:
+    socket Socket
+    socket.fd = cstd::socket(cstd::AF_INET, cstd::SOCK_STREAM, 0)
+    if socket.fd < 0:
+        throw fail("socket")
+    return socket
+
+fn reuse():
+    yes i32 = 1
+    size i32 = sizeof(i32)
+    code i32 = cstd::setsockopt(self.fd, cstd::SOL_SOCKET, cstd::SO_REUSEADDR, &yes, size)
+    if code < 0:
+        throw fail("setsockopt")
+
+fn bind(address &Address):
+    size i32 = sizeof(cstd::sockaddr_in)
+    if cstd::bind(self.fd, &address.raw, size) < 0:
+        throw fail("bind")
+
+fn listen(backlog i32):
+    if cstd::listen(self.fd, backlog) < 0:
+        throw fail("listen")
+
+fn accept() Socket:
+    client Socket
+    address Address
+    size i32 = sizeof(cstd::sockaddr_in)
+    client.fd = cstd::accept(self.fd, &address.raw, &size)
+    if client.fd < 0:
+        throw fail("accept")
+    return client
+
+fn send(text String) i64:
+    count i64 = cstd::send(self.fd, text.data, text.count as i64, 0)
+    if count < 0:
+        throw fail("send")
+    return count
+
+fn recv(size i32) String:
+    text String
+    text.resize(size)
+
+    count i64 = cstd::recv(self.fd, text.data, size as i64, 0)
+    if count < 0:
+        throw fail("recv")
+
+    text.resize(count as i32)
+    return text
+
+fn poll(events i16, timeout i32) i16:
+    entry cstd::pollfd
+    entry.fd = self.fd
+    entry.events = events
+    if cstd::poll(&entry, 1, timeout) < 0:
+        throw fail("poll")
+    return entry.revents
+
+fn close():
+    if self.fd < 0:
+        return
+    cstd::close(self.fd)
+    self.fd = -1

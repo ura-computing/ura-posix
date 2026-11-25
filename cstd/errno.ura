@@ -1,0 +1,74 @@
+// errno.h + string.h strerror
+
+@if os == "macos":
+    proto __error() &i32
+@else:
+    proto __errno_location() &i32
+
+fn errno() i32:
+    @if os == "macos":
+        return __error()
+    @else:
+        return __errno_location()
+
+proto strerror(code i32) char[]
+
+EPERM i32 = 1
+ENOENT i32 = 2
+ESRCH i32 = 3
+EINTR i32 = 4
+EIO i32 = 5
+ENXIO i32 = 6
+E2BIG i32 = 7
+ENOEXEC i32 = 8
+EBADF i32 = 9
+ECHILD i32 = 10
+ENOMEM i32 = 12
+EACCES i32 = 13
+EFAULT i32 = 14
+EBUSY i32 = 16
+EEXIST i32 = 17
+EXDEV i32 = 18
+ENODEV i32 = 19
+ENOTDIR i32 = 20
+EISDIR i32 = 21
+EINVAL i32 = 22
+ENFILE i32 = 23
+EMFILE i32 = 24
+ENOTTY i32 = 25
+EFBIG i32 = 27
+ENOSPC i32 = 28
+ESPIPE i32 = 29
+EROFS i32 = 30
+EMLINK i32 = 31
+EPIPE i32 = 32
+EDOM i32 = 33
+ERANGE i32 = 34
+@if os == "macos":
+    EAGAIN i32 = 35
+    EDEADLK i32 = 11
+    ENAMETOOLONG i32 = 63
+    ENOSYS i32 = 78
+    ENOTEMPTY i32 = 66
+    ELOOP i32 = 62
+    EADDRINUSE i32 = 48
+    EADDRNOTAVAIL i32 = 49
+    ENETUNREACH i32 = 51
+    ECONNRESET i32 = 54
+    ETIMEDOUT i32 = 60
+    ECONNREFUSED i32 = 61
+    EHOSTUNREACH i32 = 65
+@else:
+    EAGAIN i32 = 11
+    EDEADLK i32 = 35
+    ENAMETOOLONG i32 = 36
+    ENOSYS i32 = 38
+    ENOTEMPTY i32 = 39
+    ELOOP i32 = 40
+    EADDRINUSE i32 = 98
+    EADDRNOTAVAIL i32 = 99
+    ENETUNREACH i32 = 101
+    ECONNRESET i32 = 104
+    ETIMEDOUT i32 = 110
+    ECONNREFUSED i32 = 111
+    EHOSTUNREACH i32 = 113

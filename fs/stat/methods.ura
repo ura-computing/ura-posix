@@ -1,0 +1,17 @@
+pub fn create(path String) Stat:
+    info Stat
+    if cstd::stat(path.chars(), &info.raw) < 0:
+        throw fail($"stat {path}")
+    return info
+
+fn size() i64:
+    return self.raw.st_size
+
+fn kind() i32:
+    return (self.raw.st_mode as i32) & cstd::S_IFMT
+
+fn is_dir() bool:
+    return self.kind() == cstd::S_IFDIR
+
+fn is_file() bool:
+    return self.kind() == cstd::S_IFREG

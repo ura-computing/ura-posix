@@ -1,0 +1,15 @@
+fn fail(call String) Error:
+    reason String = String::create(cstd::strerror(cstd::errno()))
+    return Error::create($"{call}: {reason}\n")
+
+fn id() i32:
+    return cstd::getpid()
+
+fn exit(code i32):
+    cstd::exit(code)
+
+fn run(command String) i32:
+    status i32 = cstd::system(command.chars())
+    if status < 0:
+        throw fail($"run {command}")
+    return (status / 256) % 256

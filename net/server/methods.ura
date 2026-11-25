@@ -1,0 +1,15 @@
+pub fn create(port i32, backlog i32) Server:
+    server Server
+    server.address = Address::create(port)
+    server.socket = Socket::create()
+
+    server.socket.reuse()
+    server.socket.bind(&server.address)
+    server.socket.listen(backlog)
+    return server
+
+fn accept() Socket:
+    return self.socket.accept()
+
+fn close():
+    self.socket.close()

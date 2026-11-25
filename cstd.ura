@@ -1,0 +1,13 @@
+mod cstd:
+    use "./cstd/errno"
+    use "./cstd/ctype"
+    use "./cstd/string"
+    use "./cstd/stdlib"
+    use "./cstd/stdio"
+    use "./cstd/unistd"
+    use "./cstd/fcntl"
+    use "./cstd/time"
+    use "./cstd/stat"
+    use "./cstd/dirent"
+    use "./cstd/signal"
+    use "./cstd/socket"

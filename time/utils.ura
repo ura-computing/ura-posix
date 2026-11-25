@@ -1,0 +1,11 @@
+fn now() i64:
+    seconds i64
+    cstd::time(&seconds)
+    return seconds
+
+fn sleep(ms i64):
+    wait cstd::timespec
+    left cstd::timespec
+    wait.tv_sec = ms / 1000
+    wait.tv_nsec = (ms % 1000) * 1000000
+    cstd::nanosleep(&wait, &left)

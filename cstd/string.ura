@@ -1,0 +1,29 @@
+// string.h
+
+proto strlen(text char[]) i64
+proto strnlen(text char[], max i64) i64
+proto strcmp(a char[], b char[]) i32
+proto strncmp(a char[], b char[], n i64) i32
+proto strcasecmp(a char[], b char[]) i32
+proto strncasecmp(a char[], b char[], n i64) i32
+proto strcpy(dst char[], src char[]) char[]
+proto strncpy(dst char[], src char[], n i64) char[]
+proto strcat(dst char[], src char[]) char[]
+proto strncat(dst char[], src char[], n i64) char[]
+proto strdup(text char[]) char[]
+proto strndup(text char[], n i64) char[]
+proto strchr(text char[], c i32) char[]
+proto strrchr(text char[], c i32) char[]
+proto strstr(text char[], needle char[]) char[]
+proto strspn(text char[], accept char[]) i64
+proto strcspn(text char[], reject char[]) i64
+proto strpbrk(text char[], accept char[]) char[]
+proto strtok(text char[], delim char[]) char[]
+proto strsignal(sig i32) char[]
+
+proto memchr(ptr i8[], c i32, n i64) i8[]
+proto memcmp(a i8[], b i8[], n i64) i32
+proto memcpy(dst i8[], src i8[], n i64) i8[]
+proto memmove(dst i8[], src i8[], n i64) i8[]
+proto memset(ptr i8[], value i32, n i64) i8[]
+proto bzero(ptr i8[], n i64) void

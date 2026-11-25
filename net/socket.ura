@@ -1,0 +1,4 @@
+struct Socket:
+    fd i32
+
+    use "./socket/methods"

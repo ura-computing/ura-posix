@@ -1,0 +1,36 @@
+// fcntl.h
+
+O_RDONLY i32 = 0
+O_WRONLY i32 = 1
+O_RDWR i32 = 2
+
+@if os == "macos":
+    O_CREAT i32 = 512
+    O_EXCL i32 = 2048
+    O_TRUNC i32 = 1024
+    O_APPEND i32 = 8
+    O_NONBLOCK i32 = 4
+    O_DIRECTORY i32 = 1048576
+    O_CLOEXEC i32 = 16777216
+    AT_FDCWD i32 = -2
+@else:
+    O_CREAT i32 = 64
+    O_EXCL i32 = 128
+    O_TRUNC i32 = 512
+    O_APPEND i32 = 1024
+    O_NONBLOCK i32 = 2048
+    O_DIRECTORY i32 = 65536
+    O_CLOEXEC i32 = 524288
+    AT_FDCWD i32 = -100
+
+F_DUPFD i32 = 0
+F_GETFD i32 = 1
+F_SETFD i32 = 2
+F_GETFL i32 = 3
+F_SETFL i32 = 4
+FD_CLOEXEC i32 = 1
+
+proto open(path char[], flags i32, ...) i32
+proto openat(dirfd i32, path char[], flags i32, ...) i32
+proto creat(path char[], mode i32) i32
+proto fcntl(fd i32, cmd i32, ...) i32

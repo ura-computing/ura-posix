@@ -1,0 +1,15 @@
+pub fn create() Clock:
+    clock Clock
+    clock.reset()
+    return clock
+
+fn reset():
+    cstd::clock_gettime(cstd::CLOCK_MONOTONIC, &self.start)
+
+fn elapsed() i64:
+    current cstd::timespec
+    cstd::clock_gettime(cstd::CLOCK_MONOTONIC, &current)
+
+    seconds i64 = current.tv_sec - self.start.tv_sec
+    nanos i64 = current.tv_nsec - self.start.tv_nsec
+    return seconds * 1000 + nanos / 1000000

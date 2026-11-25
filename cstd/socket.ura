@@ -1,0 +1,74 @@
+// sys/socket.h, netinet/in.h, arpa/inet.h, poll.h
+
+AF_UNSPEC i32 = 0
+AF_UNIX i32 = 1
+AF_INET i32 = 2
+@if os == "macos":
+    AF_INET6 i32 = 30
+@else:
+    AF_INET6 i32 = 10
+
+SOCK_STREAM i32 = 1
+SOCK_DGRAM i32 = 2
+SOCK_RAW i32 = 3
+
+@if os == "macos":
+    SOL_SOCKET i32 = 65535
+    SO_REUSEADDR i32 = 4
+    SO_KEEPALIVE i32 = 8
+@else:
+    SOL_SOCKET i32 = 1
+    SO_REUSEADDR i32 = 2
+    SO_KEEPALIVE i32 = 9
+
+IPPROTO_TCP i32 = 6
+IPPROTO_UDP i32 = 17
+
+SHUT_RD i32 = 0
+SHUT_WR i32 = 1
+SHUT_RDWR i32 = 2
+
+POLLIN i16 = 1
+POLLOUT i16 = 4
+POLLERR i16 = 8
+POLLHUP i16 = 16
+POLLNVAL i16 = 32
+
+INADDR_ANY u32 = 0
+
+struct in_addr:
+    s_addr u32
+
+struct sockaddr_in:
+    @if os == "macos":
+        sin_len u8
+        sin_family u8
+    @else:
+        sin_family u16
+    sin_port u16
+    sin_addr in_addr
+    sin_zero i64
+
+struct pollfd:
+    fd i32
+    events i16
+    revents i16
+
+proto socket(domain i32, type i32, protocol i32) i32
+proto bind(fd i32, addr &sockaddr_in, addrlen i32) i32
+proto listen(fd i32, backlog i32) i32
+proto accept(fd i32, addr &sockaddr_in, addrlen &i32) i32
+proto connect(fd i32, addr &sockaddr_in, addrlen i32) i32
+proto shutdown(fd i32, how i32) i32
+proto setsockopt(fd i32, level i32, name i32, value &i32, size i32) i32
+
+proto send(fd i32, buf char[], len i64, flags i32) i64
+proto recv(fd i32, buf char[], len i64, flags i32) i64
+
+proto htons(value u16) u16
+proto ntohs(value u16) u16
+proto htonl(value u32) u32
+proto ntohl(value u32) u32
+proto inet_pton(family i32, text char[], dst &in_addr) i32
+
+proto poll(fds pollfd[], count i32, timeout i32) i32

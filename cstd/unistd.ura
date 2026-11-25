@@ -1,0 +1,40 @@
+// unistd.h
+
+F_OK i32 = 0
+X_OK i32 = 1
+W_OK i32 = 2
+R_OK i32 = 4
+
+STDIN_FILENO i32 = 0
+STDOUT_FILENO i32 = 1
+STDERR_FILENO i32 = 2
+
+proto getpid() i32
+proto getppid() i32
+proto getuid() i32
+proto getgid() i32
+proto fork() i32
+proto execvp(file char[], argv char[]) i32
+proto _exit(code i32) void
+proto waitpid(pid i32, status &i32, options i32) i32
+
+proto getcwd(buf char[], size i64) char[]
+proto chdir(path char[]) i32
+proto access(path char[], mode i32) i32
+proto unlink(path char[]) i32
+proto rmdir(path char[]) i32
+proto symlink(target char[], path char[]) i32
+proto readlink(path char[], buf char[], size i64) i64
+
+proto read(fd i32, buf char[], len i64) i64
+proto write(fd i32, buf char[], len i64) i64
+proto close(fd i32) i32
+proto dup(fd i32) i32
+proto dup2(oldfd i32, newfd i32) i32
+proto pipe(fds i32[]) i32
+proto lseek(fd i32, offset i64, whence i32) i64
+proto isatty(fd i32) i32
+
+proto sleep(seconds i32) i32
+proto usleep(microseconds i32) i32
+proto gethostname(name char[], len i64) i32

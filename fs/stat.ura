@@ -1,0 +1,4 @@
+struct Stat:
+    raw cstd::stat
+
+    use "./stat/methods"

@@ -1,0 +1,28 @@
+// stdlib.h
+
+EXIT_SUCCESS i32 = 0
+EXIT_FAILURE i32 = 1
+
+proto malloc(size i64) i8[]
+proto calloc(count i64, size i64) i8[]
+proto realloc(ptr i8[], size i64) i8[]
+proto free(ptr i8[]) void
+
+proto exit(code i32) void
+proto abort() void
+proto system(command char[]) i32
+proto getenv(name char[]) char[]
+proto setenv(name char[], value char[], overwrite i32) i32
+proto unsetenv(name char[]) i32
+
+proto rand() i32
+proto srand(seed u32) void
+proto abs(n i32) i32
+proto labs(n i64) i64
+
+proto atoi(text char[]) i32
+proto atol(text char[]) i64
+proto atof(text char[]) f64
+proto strtol(text char[], end i8[], base i32) i64
+proto strtoul(text char[], end i8[], base i32) u64
+proto strtod(text char[], end i8[]) f64

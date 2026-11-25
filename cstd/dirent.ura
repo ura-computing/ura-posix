@@ -1,0 +1,24 @@
+// dirent.h — DIR * is an opaque handle (i8[])
+
+DT_UNKNOWN u8 = 0
+DT_DIR u8 = 4
+DT_REG u8 = 8
+DT_LNK u8 = 10
+
+struct dirent:
+    @if os == "macos":
+        d_ino u64
+        d_seekoff u64
+        d_reclen u16
+        d_namlen u16
+        d_type u8
+    @else:
+        d_ino u64
+        d_off i64
+        d_reclen u16
+        d_type u8
+
+proto opendir(path char[]) i8[]
+proto closedir(dir i8[]) i32
+proto readdir(dir i8[]) &dirent
+proto rewinddir(dir i8[]) void

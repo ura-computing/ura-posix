@@ -1,0 +1,18 @@
+fn fail(call String) Error:
+    reason String = String::create(cstd::strerror(cstd::errno()))
+    return Error::create($"{call}: {reason}\n")
+
+fn exists(path String) bool:
+    return cstd::access(path.chars(), cstd::F_OK) == 0
+
+fn remove(path String):
+    if cstd::remove(path.chars()) < 0:
+        throw fail($"remove {path}")
+
+fn rename(oldpath String, newpath String):
+    if cstd::rename(oldpath.chars(), newpath.chars()) < 0:
+        throw fail($"rename {oldpath}")
+
+fn mkdir(path String):
+    if cstd::mkdir(path.chars(), cstd::S_IRWXU) < 0:
+        throw fail($"mkdir {path}")

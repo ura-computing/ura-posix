@@ -1,0 +1,3 @@
+fn fail(call String) Error:
+    reason String = String::create(cstd::strerror(cstd::errno()))
+    return Error::create($"{call}: {reason}\n")

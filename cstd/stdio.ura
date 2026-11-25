@@ -1,0 +1,45 @@
+// stdio.h — FILE * is an opaque handle (i8[])
+
+SEEK_SET i32 = 0
+SEEK_CUR i32 = 1
+SEEK_END i32 = 2
+EOF i32 = -1
+
+proto fopen(path char[], mode char[]) i8[]
+proto fdopen(fd i32, mode char[]) i8[]
+proto freopen(path char[], mode char[], file i8[]) i8[]
+proto fclose(file i8[]) i32
+proto fflush(file i8[]) i32
+proto fileno(file i8[]) i32
+
+proto fgetc(file i8[]) i32
+proto fputc(c i32, file i8[]) i32
+proto getchar() i32
+proto putchar(c i32) i32
+proto ungetc(c i32, file i8[]) i32
+proto fgets(buffer char[], size i32, file i8[]) char[]
+proto fputs(text char[], file i8[]) i32
+proto puts(text char[]) i32
+proto fread(buffer char[], size i64, count i64, file i8[]) i64
+proto fwrite(buffer char[], size i64, count i64, file i8[]) i64
+
+proto fseek(file i8[], offset i64, whence i32) i32
+proto ftell(file i8[]) i64
+proto rewind(file i8[]) void
+proto feof(file i8[]) i32
+proto ferror(file i8[]) i32
+proto clearerr(file i8[]) void
+
+proto remove(path char[]) i32
+proto rename(oldpath char[], newpath char[]) i32
+proto tmpfile() i8[]
+proto perror(text char[]) void
+
+proto printf(format char[], ...) i32
+proto fprintf(file i8[], format char[], ...) i32
+proto dprintf(fd i32, format char[], ...) i32
+proto sprintf(buffer char[], format char[], ...) i32
+proto snprintf(buffer char[], size i64, format char[], ...) i32
+proto scanf(format char[], ...) i32
+proto fscanf(file i8[], format char[], ...) i32
+proto sscanf(buffer char[], format char[], ...) i32

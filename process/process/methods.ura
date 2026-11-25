@@ -1,0 +1,19 @@
+pub fn create() Process:
+    child Process
+    child.pid = cstd::fork()
+    if child.pid < 0:
+        throw fail("fork")
+    return child
+
+fn is_child() bool:
+    return self.pid == 0
+
+fn wait() i32:
+    status i32 = 0
+    if cstd::waitpid(self.pid, &status, 0) < 0:
+        throw fail("waitpid")
+    return (status / 256) % 256
+
+fn kill(sig i32):
+    if cstd::kill(self.pid, sig) < 0:
+        throw fail("kill")
