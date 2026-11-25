@@ -1,4 +1,5 @@
-/** « Promis » list (/owner/promis, /employee/promis): one page at a time (server side), search + state, Excel. */
+/** « Promis » list (/owner/promis, /employee/promis): the dashboard (counts, « À faire aujourd'hui »), then one page
+ *  at a time (server side), search + state + pickup deadline, Excel. */
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -6,13 +7,14 @@ import { API } from "@/api/api";
 import { api } from "@/api/client";
 import { useListFilters } from "@/hooks/useListFilters";
 import { useT } from "@/i18n/I18nProvider";
-import type { PromisFilters, PromisListResponse, PromisState } from "@/types/promis";
+import type { PromisDeadline, PromisFilters, PromisListResponse, PromisState, PromisSummary } from "@/types/promis";
 import { formatDateTime } from "@/utils/format";
 import { downloadXlsx, exportFilename } from "@/utils/table";
 
 const DEFAULT_FILTERS: PromisFilters = {
   search: "",
   state: null,
+  deadline: null,
   sort_by: null,
   sort_order: "desc",
   page: 1,
@@ -25,6 +27,10 @@ export function usePromisPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: API.promis.list.key(filters),
     queryFn: () => api.get<PromisListResponse>(API.promis.list.url, { params: filters }),
+  });
+  const { data: summary } = useQuery({
+    queryKey: API.promis.summary.key,
+    queryFn: () => api.get<PromisSummary>(API.promis.summary.url),
   });
 
   // Excel: every matching row (server side, no pagination), French headers.
@@ -54,6 +60,8 @@ export function usePromisPage() {
     filters,
     setSearch: (search: string) => patch({ search }),
     setState: (state: PromisState | null) => patch({ state }),
+    setDeadline: (deadline: PromisDeadline | null) => patch({ deadline }),
+    summary: summary ?? null,
     setPage,
     setPageSize,
     reset,

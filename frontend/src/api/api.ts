@@ -352,8 +352,10 @@ export const API = {
     },
     create: {
       url: "/promis",
-      refreshes: (): Read[] => [API.promis.list, API.promis.customers],
+      refreshes: (): Read[] => [API.promis.list, API.promis.customers, API.promis.summary],
     },
+    /** The list's dashboard: counts per state, « À faire aujourd'hui ». */
+    summary: { url: "/promis/summary", key: ["promis", "summary"] },
     sheet: {
       url: (id: number) => `/promis/${id}`,
       key: (id: number) => ["promis", "sheet", id] as const,
@@ -362,7 +364,18 @@ export const API = {
     /** One step (« Rendre prêt », « Retiré par le client »…): « Prêt » changes the products' free stock. */
     move: {
       url: (id: number) => `/promis/${id}/state`,
-      refreshes: (): Read[] => [API.promis.list, API.promis.sheet, API.promis.products, API.products.sheet],
+      refreshes: (): Read[] => [
+        API.promis.list,
+        API.promis.sheet,
+        API.promis.summary,
+        API.promis.products,
+        API.products.sheet,
+      ],
+    },
+    /** « Envoyer sur WhatsApp » was clicked. */
+    message: {
+      url: (id: number) => `/promis/${id}/messages`,
+      refreshes: (): Read[] => [API.promis.sheet, API.promis.summary],
     },
   },
   history: {

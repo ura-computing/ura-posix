@@ -5,15 +5,18 @@ GET  /v1/promis              search (customer, phone, product, barcode), state, 
 POST /v1/promis              {customer_id | customer, unreachable, note?, lines: [{medicament_id | name, quantity}]}
 GET  /v1/promis/customers    the pharmacy's customers matching `search` (wizard step 1)
 GET  /v1/promis/products     catalogue products matching `search`, with price + free stock (wizard step 2)
+GET  /v1/promis/summary      dashboard: counts per state, « À faire aujourd'hui », pickups of the next 7 days
 GET  /v1/promis/{id}         its sheet: customer, lines (free stock), steps, where it may go now
 POST /v1/promis/{id}/state   {state, reason?, shelf_place?}: one step (`NEXT`); « Prêt » reserves its boxes for 7 days,
                              even when the free stock is too low (the screen warns: Sobrus stock arrives at night)
+POST /v1/promis/{id}/messages {kind}: « Envoyer sur WhatsApp » was clicked (the dashboard stops listing it)
+Every read first turns « Prêt » past its 7 days into « Expiré » (the robot also does it, `expire_overdue`).
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Query, status
 from sqlalchemy import func
@@ -21,18 +24,31 @@ from sqlalchemy import func
 from app.core.audit import user_label
 from app.core.database import DbDep
 from app.core.errors import ApiError, ErrorCode
-from app.core.models import Customer, Pharmacy, Promis, PromisEvent, PromisLine
+from app.core.models import Customer, Pharmacy, Promis, PromisEvent, PromisLine, PromisMessage
 from app.core.permissions import member
 from app.core.security import CurrentUserDep
 from app.core.utils import today as pharmacy_today
 from app.ledger.schemas import paginate
-from app.promis.promis_queries import catalogue_products, lines_of, list_query, search_customers
+from app.promis.promis_queries import (
+    catalogue_products,
+    expire_overdue,
+    lines_of,
+    list_query,
+    message_due,
+    search_customers,
+    sent_messages,
+    summary,
+)
 from app.promis.schemas import (
     CustomerOut,
     PromisIn,
     PromisLineOut,
     PromisListResponse,
+    PromisMessageIn,
+    PromisMessageOut,
     PromisMoveIn,
+    PromisSummary,
+    PromisTodo,
     PromisSheet,
     PromisProduct,
     PromisRow,
@@ -96,18 +112,34 @@ def list_products(
     return catalogue_products(db, pharmacy_id, search=search)
 
 
+@router.get("/promis/summary", response_model=PromisSummary)
+def promis_summary(pharmacy_id: PromisDep, db: DbDep) -> PromisSummary:
+    expire_overdue(db, pharmacy_id)
+    found = summary(db, pharmacy_id)
+    return PromisSummary(
+        counts=found["counts"],
+        todo=[
+            PromisTodo(id=r["promis"].id, number=r["promis"].number, customer_name=r["customer"].name, todo=r["todo"])
+            for r in found["todo"]
+        ],
+        week=found["week"],
+    )
+
+
 @router.get("/promis", response_model=PromisListResponse)
 def list_promis(
     pharmacy_id: PromisDep,
     db: DbDep,
     search: SearchQ = None,
     state: Annotated[PromisState | None, Query()] = None,
+    deadline: Annotated[Literal["today", "tomorrow", "week", "late"] | None, Query()] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     export: Annotated[bool, Query(description="If true, return every matching row (Excel)")] = False,
 ) -> PromisListResponse:
     """Newest first."""
-    q = list_query(db, pharmacy_id, search, state)
+    expire_overdue(db, pharmacy_id)
+    q = list_query(db, pharmacy_id, search, state, deadline)
     total = q.count()
     q = q.order_by(Promis.number.desc())
     found = q.all() if export else q.offset((page - 1) * limit).limit(limit).all()
@@ -193,6 +225,7 @@ def _sheet(db, promis: Promis) -> PromisSheet:
     ids = [line.medicament_id for line in lines if line.medicament_id is not None]
     products = {p["id"]: p for p in catalogue_products(db, promis.pharmacy_id, ids=ids)}
     events = db.query(PromisEvent).filter(PromisEvent.promis_id == promis.id).order_by(PromisEvent.id)
+    sent = sent_messages(db, [promis.id]).get(promis.id, [])
     return PromisSheet(
         id=promis.id,
         number=promis.number,
@@ -225,12 +258,30 @@ def _sheet(db, promis: Promis) -> PromisSheet:
             for e in events
         ],
         next=list(NEXT.get(promis.state, ())),
+        messages=[PromisMessageOut(kind=m.kind, sent_by_name=m.sent_by_name, sent_at=m.sent_at) for m in sent],
+        message_due=message_due(promis, customer, sent, pharmacy_today()),
     )
 
 
 @router.get("/promis/{promis_id}", response_model=PromisSheet)
 def get_promis(promis_id: Annotated[int, Path(ge=1)], pharmacy_id: PromisDep, db: DbDep) -> PromisSheet:
+    expire_overdue(db, pharmacy_id)
     return _sheet(db, _own(db, pharmacy_id, promis_id))
+
+
+@router.post("/promis/{promis_id}/messages", response_model=PromisSheet, status_code=status.HTTP_201_CREATED)
+def message_sent(
+    promis_id: Annotated[int, Path(ge=1)],
+    body: PromisMessageIn,
+    pharmacy_id: PromisDep,
+    user: CurrentUserDep,
+    db: DbDep,
+) -> PromisSheet:
+    """« Envoyer sur WhatsApp »: the person opened WhatsApp with the text ready; noted so it is not due any more."""
+    promis = _own(db, pharmacy_id, promis_id)
+    db.add(PromisMessage(promis_id=promis.id, kind=body.kind, sent_by_name=user_label(user)))
+    db.commit()
+    return _sheet(db, promis)
 
 
 @router.post("/promis/{promis_id}/state", response_model=PromisSheet)

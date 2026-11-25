@@ -58,6 +58,7 @@ export interface PromisInput {
 export interface PromisFilters {
   search: string;
   state: PromisState | null;
+  deadline: PromisDeadline | null;
   sort_by: string | null;
   sort_order: "asc" | "desc";
   page: number;
@@ -106,7 +107,27 @@ export interface PromisSheet {
   events: PromisEvent[];
   /** Where it may go now. */
   next: PromisState[];
+  /** WhatsApp messages sent, oldest first. */
+  messages: { kind: MessageKind; sent_by_name: string; sent_at: string }[];
+  /** The message to send now. */
+  message_due: MessageKind | null;
 }
+
+export type MessageKind = "created" | "ready" | "reminder" | "returned";
+
+export type PromisTodoKind =
+  "expired" | "last_day" | "msg_ready" | "msg_reminder" | "msg_returned" | "msg_created" | "received" | "to_order";
+
+export interface PromisSummary {
+  /** Per state (absent = 0). */
+  counts: Partial<Record<PromisState, number>>;
+  /** Most urgent first, 50 at most. */
+  todo: { id: number; number: number; customer_name: string; todo: PromisTodoKind }[];
+  /** « Prêt » whose last pickup day is within 7 days. */
+  week: number;
+}
+
+export type PromisDeadline = "today" | "tomorrow" | "week" | "late";
 
 export interface PromisMove {
   state: PromisState;

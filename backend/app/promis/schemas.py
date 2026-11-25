@@ -146,6 +146,37 @@ class PromisSheet(BaseModel):
     lines: list[PromisSheetLine]
     events: list[PromisEventOut]  # oldest first
     next: list[PromisState]  # where it may go now (same rule as the screen's buttons)
+    messages: list[PromisMessageOut]  # WhatsApp messages sent, oldest first
+    message_due: MessageKind | None  # the one to send now
+
+
+MessageKind = Literal["created", "ready", "reminder", "returned"]
+
+
+class PromisMessageOut(BaseModel):
+    kind: MessageKind
+    sent_by_name: str
+    sent_at: datetime
+
+
+class PromisMessageIn(BaseModel):
+    kind: MessageKind
+
+
+class PromisTodo(BaseModel):
+    id: int
+    number: int
+    customer_name: str
+    # what to do: a message to send (msg_*), the last pickup day, an expired one, a box to make ready, one to order
+    todo: Literal[
+        "expired", "last_day", "msg_ready", "msg_reminder", "msg_returned", "msg_created", "received", "to_order"
+    ]
+
+
+class PromisSummary(BaseModel):
+    counts: dict[str, int]  # per state (absent = 0)
+    todo: list[PromisTodo]  # most urgent first, 50 at most
+    week: int  # « Prêt » whose last pickup day is within 7 days
 
 
 class PromisMoveIn(BaseModel):

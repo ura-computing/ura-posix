@@ -1,5 +1,6 @@
 /** « Promis » (owner, employee with « Promis »): every product promised to a customer, newest first (a click opens its sheet);
- *  « Nouveau promis » opens the step-by-step form. */
+ *  « Nouveau promis » opens the step-by-step form. On top: the dashboard (counts per state, « À faire aujourd'hui »);
+ *  « Retrait » filters by the last pickup day. */
 import { Download, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -10,9 +11,10 @@ import { FilterBar, type ActiveFilter } from "@/_components/organisms/FilterBar"
 import { Page } from "@/_components/templates/Page";
 import { useMe } from "@/hooks/useMe";
 import { useT } from "@/i18n/I18nProvider";
-import type { Promis, PromisState } from "@/types/promis";
+import type { Promis, PromisDeadline, PromisState } from "@/types/promis";
 import { formatDateTime, formatQty } from "@/utils/format";
 
+import { PromisDashboard } from "./_components/PromisDashboard";
 import { STATE_TONE, STATES } from "./constants";
 import { usePromisPage } from "./hooks";
 
@@ -30,8 +32,10 @@ export default function PromisPage() {
     rows,
     setPage,
     setPageSize,
+    setDeadline,
     setSearch,
     setState,
+    summary,
     total,
   } = usePromisPage();
 
@@ -99,6 +103,7 @@ export default function PromisPage() {
       ? { key: "state", label: <>{t(`promis.state_${filters.state}`)}</>, onClear: () => setState(null) }
       : null,
   ].filter(Boolean) as ActiveFilter[];
+  const DEADLINES: (PromisDeadline | "all")[] = ["all", "today", "tomorrow", "week", "late"];
 
   return (
     <Page
@@ -111,7 +116,14 @@ export default function PromisPage() {
         </ButtonLink>
       }
     >
-      <FilterBar
+      <PromisDashboard summary={summary} onState={setState} />
+
+      <FilterBar<PromisDeadline | "all">
+        segment={{
+          value: filters.deadline ?? "all",
+          onChange: (v) => setDeadline(v === "all" ? null : v),
+          options: DEADLINES.map((d) => ({ value: d, label: t(`promis.deadline_${d}`) })),
+        }}
         search={{
           value: filters.search,
           onChange: setSearch,

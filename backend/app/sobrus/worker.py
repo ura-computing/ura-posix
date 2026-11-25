@@ -28,6 +28,7 @@ from app.core.observability import init_sentry
 from app.core.database import SessionLocal, engine
 from app.core.models import Pharmacy, PharmacyFeature, SobrusConnection, SobrusRun
 from app.core.utils import PHARMACY_TZ
+from app.promis.promis_queries import expire_overdue
 from app.sobrus.launcher import BACKEND_DIR, CHANNEL
 from app.sobrus.sync import execute
 
@@ -182,6 +183,8 @@ def main() -> None:
             if listen is None:
                 listen = _listen()
             schedule_nightly()
+            with SessionLocal() as db:  # « Promis »: « Prêt » past its 7 days → « Expiré » (not a Sobrus call)
+                expire_overdue(db)
             recover()
             while (run_id := claim()) is not None:
                 log.info("Sobrus run %s started: %s", run_id, describe(run_id))

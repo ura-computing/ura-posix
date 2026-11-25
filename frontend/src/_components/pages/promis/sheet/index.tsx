@@ -8,7 +8,7 @@
  *    … → « Annulé » (red). */
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Phone } from "lucide-react";
+import { MessageCircle, Phone } from "lucide-react";
 
 import { Badge } from "@/_components/atoms/Badge";
 import { Button } from "@/_components/atoms/Button";
@@ -30,6 +30,7 @@ import { formatDate, formatDateTime, formatNumStr, formatQty } from "@/utils/for
 import { ICON, STATE_TONE } from "../constants";
 import { StepDialog } from "./_components/StepDialog";
 import { usePromisSheet } from "./hooks";
+import { messageKind, whatsappUrl } from "./whatsapp";
 
 /** The usual next step of each state: the big button. */
 const MAIN: Partial<Record<PromisState, PromisState>> = {
@@ -69,7 +70,7 @@ function PromisSheetPage({ id }: { id: number }) {
   const t = useT();
   const { me } = useMe();
   const role = me?.role;
-  const { sheet, isLoading, isError, notFound, reload, move, isMoving } = usePromisSheet(id);
+  const { sheet, isLoading, isError, notFound, reload, move, isMoving, messageSent } = usePromisSheet(id);
   const [target, setTarget] = useState<PromisState | null>(null);
   const back = <BackLink to={`/${role}/promis`} label={t("promis.backToList")} />;
 
@@ -96,6 +97,20 @@ function PromisSheetPage({ id }: { id: number }) {
     return Icon ? <Icon className="size-4" /> : null;
   };
   const phone = customer.phone;
+  const kind = messageKind(sheet);
+  const whatsapp = (variant: "primary" | "outline", size: "md" | "sm") =>
+    kind && (
+      <a
+        href={whatsappUrl(t, sheet, kind, me?.pharmacy?.name ?? "")}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => messageSent(kind)}
+        className={buttonClass(variant, size)}
+      >
+        <MessageCircle className={size === "sm" ? "size-3.5" : "size-4"} />
+        {t("promis.sendWhatsapp")}
+      </a>
+    );
 
   return (
     <Page
@@ -129,6 +144,11 @@ function PromisSheetPage({ id }: { id: number }) {
         </>
       }
     >
+      {sheet.message_due && (
+        <Callout tone="warning" title={t(`promis.due_${sheet.message_due}`)} action={whatsapp("primary", "md")}>
+          {t("promis.dueHint")}
+        </Callout>
+      )}
       {state === "ready" && sheet.pickup_deadline && (
         <Callout tone="success" title={t("promis.deadline", { date: formatDate(sheet.pickup_deadline) })}>
           {lines[0]?.shelf_place && t("promis.shelfPlace", { place: lines[0].shelf_place })}
@@ -141,10 +161,13 @@ function PromisSheetPage({ id }: { id: number }) {
             title={t("promis.customer")}
             actions={
               phone && (
-                <a href={`tel:${phone}`} className={buttonClass("outline", "sm")}>
-                  <Phone className="size-3.5" />
-                  {t("promis.call", { name: customer.name })}
-                </a>
+                <span className="flex flex-wrap gap-2">
+                  {whatsapp("outline", "sm")}
+                  <a href={`tel:${phone}`} className={buttonClass("outline", "sm")}>
+                    <Phone className="size-3.5" />
+                    {t("promis.call", { name: customer.name })}
+                  </a>
+                </span>
               )
             }
           >
@@ -206,6 +229,14 @@ function PromisSheetPage({ id }: { id: number }) {
 
           <SectionCard title={t("promis.history")}>
             <ul className="flex flex-col divide-y divide-border">
+              {sheet.messages.length > 0 && (
+                <li className="py-2 text-sm text-muted-foreground">
+                  {t("promis.messagesSent", { n: sheet.messages.length })} ·{" "}
+                  {sheet.messages
+                    .map((m) => `${t(`promis.msgName_${m.kind}`)} (${formatDateTime(m.sent_at)})`)
+                    .join(", ")}
+                </li>
+              )}
               {[...events].reverse().map((e, i) => (
                 <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2 text-sm">
                   <span className="flex min-w-0 flex-col">

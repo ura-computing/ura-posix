@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { API, refresh } from "@/api/api";
 import { api, ApiErr } from "@/api/client";
 import { useT } from "@/i18n/I18nProvider";
-import type { PromisMove, PromisSheet } from "@/types/promis";
+import type { MessageKind, PromisMove, PromisSheet } from "@/types/promis";
 
 export function usePromisSheet(id: number) {
   const t = useT();
@@ -26,8 +26,16 @@ export function usePromisSheet(id: number) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const { mutate: noteMessage } = useMutation({
+    mutationFn: (kind: MessageKind) => api.post<PromisSheet>(API.promis.message.url(id), { kind }),
+    onSuccess: () => void refresh(qc, API.promis.message),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return {
     sheet: data ?? null,
+    /** WhatsApp opened with the text: noted, so the dashboard stops listing it. */
+    messageSent: (kind: MessageKind) => noteMessage(kind),
     isLoading: valid && isLoading,
     isError,
     // Not one of the pharmacy's promis (or a wrong address): the 404 inside the layout.

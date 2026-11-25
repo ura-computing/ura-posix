@@ -522,6 +522,29 @@ class PromisEvent(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+PROMIS_MESSAGE_KINDS = ("created", "ready", "reminder", "returned")
+
+
+class PromisMessage(Base):
+    """One WhatsApp message a person sent to the customer of a promis (« Envoyer sur WhatsApp »): the dashboard
+    lists the ones still due today. `reminder`: from 2 days before the pickup deadline, once a day."""
+
+    __tablename__ = "promis_messages"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN (" + ", ".join(f"'{k}'" for k in PROMIS_MESSAGE_KINDS) + ")", name="ck_promis_messages_kind"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    promis_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("promis.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    sent_by_name: Mapped[str] = mapped_column(String, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class ProductNote(Base):
     """« Observations »: a pharmacy's notes on one product (« à vendre avec … »), shown in a window
     when its page opens. Anyone with Produits adds one; its author or the owner deletes it (the
