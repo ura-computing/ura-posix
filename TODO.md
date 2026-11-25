@@ -29,4 +29,9 @@
 + calendar component should be consistent
 + selector should also be consistent
 + check .devcontainer
-+ 
+
++ on firt login for existing user add like a (i forogot its name):
+	+ it whoas how to use the app
+	+ this one will use just top alert user with that the compte is moved to the top right
+	+ and getion des imports is under GESTION
+	
